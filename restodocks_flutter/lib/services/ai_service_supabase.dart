@@ -1077,29 +1077,18 @@ class AiServiceSupabase implements AiService {
       final next0 = nextRow.isNotEmpty ? nextRow[0].trim().toLowerCase() : '';
       final next1 = nextRow.length > 1 ? nextRow[1].trim() : '';
       final next2 = nextRow.length > 2 ? nextRow[2].trim() : '';
-      final next1Lower = next1.toLowerCase();
-      final hasHeaderRow = (next0 == '№' || next0.isEmpty) &&
-          next1Lower.contains('наименование') &&
-          next1Lower.contains('продукт');
+      final hasHeaderRow = (next0 == '№' || next0.isEmpty) && next1.toLowerCase().contains('наименование') && next1.toLowerCase().contains('продукт');
       final nextRowLooksLikeData = next1.isNotEmpty && next1.length >= 2 &&
           (_parseNum(next2) != null || next2.toLowerCase().contains('шт'));
       if (!hasHeaderRow && !nextRowLooksLikeData) {
         r++;
         continue;
       }
-      // Название блюда: колонка 0 или первая непустая (Excel/объединённые ячейки часто дают пустую col0)
-      String dishName = cells.isNotEmpty ? cells[0].trim() : '';
-      if (dishName.length < 3 && cells.length > 1) {
-        final alt = cells[1].trim();
-        if (alt.length >= 3 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(alt) &&
-            !RegExp(r'^№$|^выход$|^декор$', caseSensitive: false).hasMatch(alt.toLowerCase())) {
-          dishName = alt;
-        }
-      }
+      final dishName = cells.isNotEmpty ? cells[0].trim() : '';
       final c1 = cells.length > 1 ? cells[1].trim() : '';
       final col1LooksLikeWeight = c1.isNotEmpty && (_parseNum(c1) != null || RegExp(r'^\d+\s*шт\.?$', caseSensitive: false).hasMatch(c1.toLowerCase()));
       if (dishName.length < 3 || !RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(dishName) ||
-          RegExp(r'^№$|^выход$|^декор$', caseSensitive: false).hasMatch(dishName.toLowerCase()) ||
+          RegExp(r'^№$|^выход$|^декор$', caseSensitive: false).hasMatch(dishName) ||
           dishName.toLowerCase().startsWith('доставка') ||
           col1LooksLikeWeight /* строка ингредиента (название | вес), не заголовок блюда */) {
         r++;
@@ -1279,10 +1268,7 @@ class AiServiceSupabase implements AiService {
       final n0 = nextRow.isNotEmpty ? nextRow[0].trim().toLowerCase() : '';
       final n1 = nextRow.length > 1 ? nextRow[1].trim() : '';
       final n2 = nextRow.length > 2 ? nextRow[2].trim() : '';
-      final n1Lower = n1.toLowerCase();
-      final headerOk = (n0 == '№' || n0.isEmpty) &&
-          n1Lower.contains('наименование') &&
-          n1Lower.contains('продукт');
+      final headerOk = (n0 == '№' || n0.isEmpty) && n1.toLowerCase().contains('наименование') && n1.toLowerCase().contains('продукт');
       final dataOk = n1.isNotEmpty && n1.length >= 2 && (_parseNum(n2) != null || n2.toLowerCase().contains('шт'));
       if (headerOk || dataOk) count++;
     }
