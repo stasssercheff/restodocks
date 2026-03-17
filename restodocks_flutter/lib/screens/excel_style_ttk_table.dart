@@ -189,14 +189,22 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       }
 
     // Добавляем строку "Итого"
-    final totalOutput = indexedRows.map((e) => e.value).where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.outputWeight);
-    final totalCost = indexedRows.map((e) => e.value).where((ing) => ing.productName.isNotEmpty).fold<double>(0, (s, ing) => s + ing.effectiveCost);
+    final totalOutput = indexedRows
+        .map((e) => e.value)
+        .where((ing) => ing.productName.isNotEmpty)
+        .fold<double>(0, (s, ing) => s + ing.outputWeight);
+    // Иногда из источника может прилететь отрицательная стоимость (ошибка парсинга/валюты).
+    // В UI это выглядит как «-100» в итого. Для отображения не допускаем отрицательные суммы.
+    final totalCost = indexedRows
+        .map((e) => e.value)
+        .where((ing) => ing.productName.isNotEmpty)
+        .fold<double>(0, (s, ing) => s + (ing.effectiveCost < 0 ? 0 : ing.effectiveCost));
 
     // Расчет итоговой стоимости
     final costPerKgFinishedProduct = widget.isSemiFinished
         ? // Для ПФ: стоимость за кг готового продукта
           (totalOutput > 0 ? ((totalCost / totalOutput) * 1000).ceil() : 0)
-        : // Для блюд: сумма стоимостей всех ингредиентов (gross costs)
+        : // Для блюд: сумма стоимостей всех ингредиентов
           totalCost;
 
     return SingleChildScrollView(
