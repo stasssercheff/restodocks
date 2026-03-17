@@ -15,12 +15,18 @@ class HaccpLogDetailScreen extends StatelessWidget {
     required this.log,
     this.employee,
     this.creator,
+    this.subjectNameSnapshot,
+    this.subjectPositionSnapshot,
   });
 
   final HaccpLog log;
   final Employee? employee;
   /// Для гигиенического журнала: кто заполнил запись (подпись медработника).
   final Employee? creator;
+  /// Снимок ФИО субъекта (для гигиенического журнала при удалённом сотруднике).
+  final String? subjectNameSnapshot;
+  /// Снимок должности субъекта (для гигиенического журнала при удалённом сотруднике).
+  final String? subjectPositionSnapshot;
 
   static final _dateFmt = DateFormat('dd.MM.yyyy');
   static final _dateTimeFmt = DateFormat('dd.MM.yyyy HH:mm');
@@ -53,10 +59,10 @@ class HaccpLogDetailScreen extends StatelessWidget {
   /// Приложение 1: Гигиенический журнал (сотрудники).
   Widget _buildHealthHygieneTable(BuildContext context) {
     final parsed = HaccpLog.parseHealthHygieneDescription(log.description);
-    final empName = employee != null
+    final empName = subjectNameSnapshot ?? parsed.employeeNameSnapshot ?? (employee != null
         ? '${employee!.fullName}${employee!.surname != null ? ' ${employee!.surname}' : ''}'
-        : '—';
-    final position = parsed.positionOverride ?? employee?.roleDisplayName ?? '—';
+        : null) ?? '—';
+    final position = subjectPositionSnapshot ?? parsed.positionOverride ?? employee?.roleDisplayName ?? '—';
     final creatorName = creator != null
         ? '${creator!.fullName}${creator!.surname != null ? ' ${creator!.surname}' : ''}'
         : '—';

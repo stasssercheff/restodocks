@@ -69,6 +69,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   List<TechCard> _finishedBrakerageTechCards = [];
   String? _selectedFinishedBrakerageTechCardId;
 
+  /// Сотрудники заведения для форм медкнижек, медосмотров и полей «ответственный»/«подпись».
+  List<Employee> _formEmployees = [];
+
   HaccpLogType? get _logType {
     final t = HaccpLogType.fromCode(widget.logTypeCode);
     return t != null && HaccpLogType.supportedInApp.contains(t) ? t : null;
@@ -81,7 +84,19 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadHealthEmployees());
     } else if (_logType == HaccpLogType.finishedProductBrakerage) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadFinishedBrakerageTechCards());
+    } else if (_logType == HaccpLogType.medBookRegistry || _logType == HaccpLogType.medExaminations) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadFormEmployees());
     }
+  }
+
+  Future<void> _loadFormEmployees() async {
+    final acc = context.read<AccountManagerSupabase>();
+    final est = acc.establishment;
+    if (est == null) return;
+    try {
+      final list = await acc.getEmployeesForEstablishment(est.id);
+      if (mounted) setState(() => _formEmployees = list.where((e) => e.isActive).toList());
+    } catch (_) {}
   }
 
   Future<void> _loadHealthEmployees() async {
@@ -132,6 +147,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   }
 
   String _getText(String key) => _controllers[key]?.text.trim() ?? '';
+
+  void _setText(String key, String value) {
+    _controllers[key] ??= TextEditingController();
+    _controllers[key]!.text = value;
+  }
 
   double? _getNum(String key) {
     final s = _getText(key);
@@ -195,6 +215,31 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         DropdownMenuItem(value: false, child: Text('запрещено')),
       ],
       onChanged: (v) => setState(() => _approvalToSell = v),
+    );
+  }
+
+  /// Выпадающий список выбора сотрудника (подставляет ФИО/должность в форму).
+  Widget _employeeSelectorDropdown({
+    required List<Employee> employees,
+    required String label,
+    required void Function(Employee?) onSelected,
+  }) {
+    if (employees.isEmpty) return const SizedBox.shrink();
+    return DropdownButtonFormField<Employee?>(
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+        isDense: true,
+      ),
+      value: null,
+      items: [
+        const DropdownMenuItem<Employee?>(value: null, child: Text('— Выбрать из списка —')),
+        ...employees.map((e) => DropdownMenuItem<Employee?>(
+          value: e,
+          child: Text('${e.surname != null ? '${e.surname} ' : ''}${e.fullName} (${e.roleDisplayName})'),
+        )),
+      ],
+      onChanged: (e) => onSelected(e),
     );
   }
 
@@ -793,7 +838,24 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         TableRow(
           children: [
             _tableCell(const Text('1')),
-            _tableCell(_textField('med_book_employee_name', 'Ф. И. О.')),
+            _tableCell(Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _employeeSelectorDropdown(
+                  employees: _formEmployees,
+                  label: 'Сотрудник',
+                  onSelected: (e) {
+                    if (e != null) {
+                      _setText('med_book_employee_name', e.surname != null ? '${e.surname} ${e.fullName}' : e.fullName);
+                      _setText('med_book_position', e.roleDisplayName);
+                      setState(() {});
+                    }
+                  },
+                ),
+                _textField('med_book_employee_name', 'Ф. И. О.'),
+              ],
+            )),
             _tableCell(_textField('med_book_position', 'Должность')),
             _tableCell(_textField('med_book_number', 'Номер медкнижки')),
             _tableCell(InkWell(
@@ -910,6 +972,22 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       children: [
         Text('Данные работника', style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _employeeSelectorDropdown(
+            employees: _formEmployees,
+            label: 'Сотрудник',
+            onSelected: (e) {
+              if (e != null) {
+                _setText('med_exam_employee_name', e.surname != null ? '${e.surname} ${e.fullName}' : e.fullName);
+                _setText('med_exam_dob', e.birthday != null ? DateFormat('dd.MM.yyyy').format(e.birthday!) : '');
+                _setText('med_exam_position', e.roleDisplayName);
+                _setText('med_exam_department', e.employeeDepartment?.displayName ?? e.department);
+                setState(() {});
+              }
+            },
+          ),
+        ),
         Table(
           columnWidths: const {0: FlexColumnWidth(1), 1: FlexColumnWidth(1)},
           border: TableBorder.all(color: Theme.of(context).dividerColor),
@@ -1050,7 +1128,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           _tableCell(_textField('wash_disinfectant_concentration_pct', '%')),
           _tableCell(_textField('wash_rinsing_temp', 't°')),
           _tableCell(_signatureFromAccount()),
-          _tableCell(_textField('wash_controller_signature', 'Контролёр')),
+          _tableCell(_signatureFromAccount()),
         ]),
       ],
     );
@@ -1207,7 +1285,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       final note = _getText('note').isNotEmpty ? _getText('note') : null;
       for (final row in _healthRows) {
         final posOverride = (row.positionOverride ?? '').trim().isEmpty ? null : (row.positionOverride ?? '').trim();
-        final description = HaccpLog.buildHealthHygieneDescription(employeeId: row.employeeId, positionOverride: posOverride);
+        final emp = _healthEmployees.where((e) => e.id == row.employeeId).firstOrNull;
+        final employeeNameSnapshot = emp != null ? '${emp.fullName}${emp.surname != null ? ' ${emp.surname}' : ''}' : null;
+        final description = HaccpLog.buildHealthHygieneDescription(employeeId: row.employeeId, positionOverride: posOverride, employeeName: employeeNameSnapshot);
         await svc.insertStatus(
           establishmentId: estId,
           createdByEmployeeId: empId,
@@ -1309,7 +1389,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       washDisinfectantName: isWash && _getText('wash_disinfectant_name').isNotEmpty ? _getText('wash_disinfectant_name') : null,
       washDisinfectantConcentrationPct: isWash && _getText('wash_disinfectant_concentration_pct').isNotEmpty ? _getText('wash_disinfectant_concentration_pct') : null,
       washRinsingTemp: isWash && _getText('wash_rinsing_temp').isNotEmpty ? _getText('wash_rinsing_temp') : null,
-      washControllerSignature: isWash && _getText('wash_controller_signature').isNotEmpty ? _getText('wash_controller_signature') : null,
+      washControllerSignature: isWash ? signatureName : null,
       genCleanPremises: isGenClean && _getText('gen_clean_premises').isNotEmpty ? _getText('gen_clean_premises') : null,
       genCleanDate: isGenClean ? _genCleanDate : null,
       genCleanResponsible: isGenClean ? signatureName : null,

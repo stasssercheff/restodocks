@@ -406,28 +406,35 @@ class HaccpLog {
     return double.tryParse(v.toString());
   }
 
-  /// Для гигиенического журнала: парсим description как JSON {employee_id?, position?}.
-  static ({String? subjectEmployeeId, String? positionOverride}) parseHealthHygieneDescription(String? description) {
-    if (description == null || description.trim().isEmpty) return (subjectEmployeeId: null, positionOverride: null);
+  /// Для гигиенического журнала: парсим description как JSON {employee_id?, position?, employee_name?}.
+  /// employee_name — снимок ФИО на момент сохранения (остаётся при удалении сотрудника).
+  static ({String? subjectEmployeeId, String? positionOverride, String? employeeNameSnapshot}) parseHealthHygieneDescription(String? description) {
+    if (description == null || description.trim().isEmpty) return (subjectEmployeeId: null, positionOverride: null, employeeNameSnapshot: null);
     try {
       final map = jsonDecode(description) as Map<String, dynamic>?;
-      if (map == null) return (subjectEmployeeId: null, positionOverride: null);
+      if (map == null) return (subjectEmployeeId: null, positionOverride: null, employeeNameSnapshot: null);
       final eid = map['employee_id']?.toString();
       final pos = map['position']?.toString();
+      final name = map['employee_name']?.toString();
       return (
         subjectEmployeeId: eid?.isNotEmpty == true ? eid : null,
         positionOverride: pos?.isNotEmpty == true ? pos : null,
+        employeeNameSnapshot: name?.trim().isNotEmpty == true ? name!.trim() : null,
       );
     } catch (_) {
-      return (subjectEmployeeId: null, positionOverride: null);
+      return (subjectEmployeeId: null, positionOverride: null, employeeNameSnapshot: null);
     }
   }
 
   /// Собрать description для сохранения записи гигиенического журнала.
-  static String buildHealthHygieneDescription({required String employeeId, String? positionOverride}) {
+  /// [employeeName] — снимок ФИО (сохраняется при удалении сотрудника).
+  static String buildHealthHygieneDescription({required String employeeId, String? positionOverride, String? employeeName}) {
     final map = <String, dynamic>{'employee_id': employeeId};
     if (positionOverride != null && positionOverride.trim().isNotEmpty) {
       map['position'] = positionOverride.trim();
+    }
+    if (employeeName != null && employeeName.trim().isNotEmpty) {
+      map['employee_name'] = employeeName.trim();
     }
     return jsonEncode(map);
   }

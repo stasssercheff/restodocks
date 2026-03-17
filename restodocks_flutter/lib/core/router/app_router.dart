@@ -665,10 +665,18 @@ class AppRouter {
                       final log = extra['log'];
                       final employee = extra['employee'];
                       final creator = extra['creator'];
+                      final subjectNameSnapshot = extra['subjectNameSnapshot'] as String?;
+                      final subjectPositionSnapshot = extra['subjectPositionSnapshot'] as String?;
                       if (log == null) return _slideTransitionPage(state, const SizedBox());
                       return _slideTransitionPage(
                         state,
-                        HaccpLogDetailScreen(log: log as HaccpLog, employee: employee as Employee?, creator: creator as Employee?),
+                        HaccpLogDetailScreen(
+                          log: log as HaccpLog,
+                          employee: employee as Employee?,
+                          creator: creator as Employee?,
+                          subjectNameSnapshot: subjectNameSnapshot,
+                          subjectPositionSnapshot: subjectPositionSnapshot,
+                        ),
                       );
                     },
                   ),

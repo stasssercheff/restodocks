@@ -618,9 +618,11 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     final subjectId = parsed.subjectEmployeeId ?? log.createdByEmployeeId;
     final emp = idToEmp[subjectId];
     final creator = idToEmp[log.createdByEmployeeId];
+    final subjectName = parsed.employeeNameSnapshot ?? (emp != null ? '${emp.fullName}${emp.surname != null ? ' ${emp.surname}' : ''}' : null);
+    final subjectPos = parsed.positionOverride ?? emp?.roleDisplayName;
     context.push(
       '/haccp-journals/${widget.logTypeCode}/view',
-      extra: {'log': log, 'employee': emp, 'creator': creator},
+      extra: {'log': log, 'employee': emp, 'creator': creator, 'subjectNameSnapshot': subjectName, 'subjectPositionSnapshot': subjectPos},
     );
   }
 }
@@ -938,7 +940,7 @@ class _JournalTableView extends StatelessWidget {
         final parsed = HaccpLog.parseHealthHygieneDescription(log.description);
         final subjectId = parsed.subjectEmployeeId ?? log.createdByEmployeeId;
         final emp = idToEmp[subjectId];
-        final name = emp != null ? '${emp.fullName}${emp.surname != null ? ' ${emp.surname}' : ''}' : '—';
+        final name = parsed.employeeNameSnapshot ?? (emp != null ? '${emp.fullName}${emp.surname != null ? ' ${emp.surname}' : ''}' : null) ?? '—';
         final pos = parsed.positionOverride ?? emp?.roleDisplayName ?? '—';
         final creator = idToEmp[log.createdByEmployeeId];
         final creatorName = creator != null ? '${creator.fullName}${creator.surname != null ? ' ${creator.surname}' : ''}' : '—';

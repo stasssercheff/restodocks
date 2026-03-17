@@ -175,7 +175,7 @@ class HaccpPdfExportService {
         final subjectId = parsed.subjectEmployeeId ?? log.createdByEmployeeId;
         final full = employeeIdToName[subjectId] ?? '';
         final parsedEmp = _parseEmp(full);
-        name = parsedEmp.$1;
+        name = parsed.employeeNameSnapshot ?? parsedEmp.$1;
         position = parsed.positionOverride ?? parsedEmp.$2;
         creatorFull = employeeIdToName[log.createdByEmployeeId] ?? '';
       }
