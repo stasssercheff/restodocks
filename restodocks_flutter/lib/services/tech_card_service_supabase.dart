@@ -126,24 +126,39 @@ class TechCardServiceSupabase {
           .eq('establishment_id', establishmentId)
           .order('created_at', ascending: false);
 
-      return _parseTechCardsWithIngredients(data as List);
+      final list = _parseTechCardsWithIngredients(data as List);
+      devLog('[ttk_svc] getTechCardsForEstablishment(est=$establishmentId) → ${list.length} cards');
+      return list;
     } catch (e) {
-      devLog('Ошибка получения ТТК: $e');
+      devLog('[ttk_svc] getTechCardsForEstablishment(est=$establishmentId) ERROR: $e');
       return [];
     }
   }
 
-  /// Парсинг списка ТТК из ответа с вложенными tt_ingredients
+  /// Парсинг списка ТТК из ответа с вложенными tt_ingredients.
+  /// Битые карточки пропускаются (одна не должна ломать весь список).
   static List<TechCard> _parseTechCardsWithIngredients(List<dynamic> data) {
     final techCards = <TechCard>[];
+    int skipCards = 0;
     for (final row in data) {
-      final m = row as Map<String, dynamic>;
-      final ingredientsData = m['tt_ingredients'] as List<dynamic>? ?? [];
-      final ingredients = ingredientsData
-          .map((j) => TTIngredient.fromJson(j as Map<String, dynamic>))
-          .toList();
-      final tc = TechCard.fromJson(m);
-      techCards.add(tc.copyWith(ingredients: ingredients));
+      try {
+        final m = row as Map<String, dynamic>;
+        final ingredientsData = m['tt_ingredients'] as List<dynamic>? ?? [];
+        final ingredients = <TTIngredient>[];
+        for (final j in ingredientsData) {
+          try {
+            ingredients.add(TTIngredient.fromJson(j as Map<String, dynamic>));
+          } catch (_) {}
+        }
+        final tc = TechCard.fromJson(m);
+        techCards.add(tc.copyWith(ingredients: ingredients));
+      } catch (e) {
+        skipCards++;
+        devLog('[ttk_svc] _parse skip card: $e');
+      }
+    }
+    if (skipCards > 0) {
+      devLog('[ttk_svc] _parse: ok=${techCards.length}, skipCards=$skipCards');
     }
     return techCards;
   }

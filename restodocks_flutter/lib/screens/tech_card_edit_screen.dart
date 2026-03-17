@@ -1446,7 +1446,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             );
             if (mounted) context.pop(result);
           } else {
-            context.go('/tech-cards?refresh=1');
+            final dept = widget.department ?? 'kitchen';
+            context.go('/tech-cards/$dept?refresh=1');
           }
         }
       } else {
@@ -1512,7 +1513,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           setState(() => _saving = false);
           await clearDraft();
           AppToastService.show(context.read<LocalizationService>().t('save') + ' ✓');
-          context.go('/tech-cards?refresh=1');
+          final dept = widget.department ?? 'kitchen';
+          context.go('/tech-cards/$dept?refresh=1');
         }
       }
     } catch (e) {
@@ -1653,7 +1655,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       await context.read<TechCardServiceSupabase>().deleteTechCard(widget.techCardId);
       if (mounted) {
         AppToastService.show(loc.t('tech_card_deleted'));
-        context.go('/tech-cards');
+        final dept = widget.department ?? 'kitchen';
+        context.go('/tech-cards/$dept?refresh=1');
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));

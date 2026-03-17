@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 import 'excel_style_ttk_table.dart';
 
 import '../models/models.dart';
+import '../utils/dev_log.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../services/ai_service.dart';
 import '../services/ai_service_supabase.dart';
@@ -204,7 +205,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final est = acc.establishment;
     final emp = acc.currentEmployee;
     if (est == null) {
-        setState(() { _loading = false; _error = 'no_establishment'; });
+      devLog('[ttk_list] _load: est=null, skip');
+      setState(() { _loading = false; _error = 'no_establishment'; });
       return;
     }
     setState(() { _loading = true; _error = null; });
@@ -253,12 +255,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           return true;
         }).toList();
       }
+      devLog('[ttk_list] _load: est=${est.dataEstablishmentId} dept=${widget.department} all=${all.length} afterFilter=${list.length}');
       if (mounted) {
         setState(() { _list = list; _loading = false; });
         _ensureTechCardTranslations(svc, list);
         _warmPdfParser();
       }
     } catch (e) {
+      devLog('[ttk_list] _load error: $e');
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
   }
