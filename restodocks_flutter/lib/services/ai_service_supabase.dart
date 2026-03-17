@@ -523,11 +523,10 @@ class AiServiceSupabase implements AiService {
       }
       if (data == null) {
         final err = (lastInvokeError ?? '').toLowerCase();
-        if (err.contains('503') || err.contains('preflight') || err.contains('access control') || err.contains('failed to load')) {
-          lastParseTechCardPdfReason = 'service_unavailable';
-        } else {
-          lastParseTechCardPdfReason = 'timeout_or_network';
-        }
+        final is503OrCors = err.contains('503') || err.contains('preflight') || err.contains('access control')
+            || err.contains('failed to load') || err.contains('cannot load') || err.contains('failed to fetch')
+            || err.contains('cors') || err.contains('fetch') || err.contains('networkerror');
+        lastParseTechCardPdfReason = is503OrCors ? 'service_unavailable' : 'timeout_or_network';
         return [];
       }
       lastParseTechCardPdfReason = data['reason'] as String? ?? (data['error'] as String?);
@@ -3205,17 +3204,16 @@ class AiServiceSupabase implements AiService {
     }).toList()).toList();
   }
 
-  /// Парсинг по шаблонам. Локальный — первый рубеж. При затыке — сервер.
+  /// Парсинг по шаблонам. Сервер первым, локальный — fallback при сбое.
   Future<List<TechCardRecognitionResult>> _tryParseByStoredTemplates(List<List<String>> rows) async {
-    // 1. Локальный (REST) — первый рубеж, быстрее
-    final local = await _tryParseByStoredTemplatesLocally(rows);
-    if (local.isNotEmpty) return local;
-
-    // 2. Сервер (EF) — при затыке в локальной версии
     try {
       final safeRows = _rowsForJson(rows);
       final data = await invoke('parse-ttk-by-templates', {'rows': safeRows});
-      if (data == null) return [];
+      if (data == null) {
+        final local = await _tryParseByStoredTemplatesLocally(rows);
+        if (local.isNotEmpty) return local;
+        return [];
+      }
       final sig = data['header_signature'] as String?;
       if (sig != null && sig.isNotEmpty) lastParseHeaderSignature = sig;
       final sanity = data['sanity_issues'];
