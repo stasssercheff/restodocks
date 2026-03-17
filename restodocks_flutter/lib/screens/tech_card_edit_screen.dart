@@ -825,6 +825,36 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     return categoryTranslations[c]?[lang] ?? c;
   }
 
+  /// Подтягивает цену за кг и стоимость из номенклатуры заведения по названию продукта (для импортированных ТТК).
+  void _autoFillPriceFromNomenclature() {
+    final store = context.read<ProductStoreSupabase>();
+    final establishmentId = context.read<AccountManagerSupabase>().dataEstablishmentId;
+    if (establishmentId == null) return;
+    final list = <TTIngredient>[];
+    for (final ing in _ingredients) {
+      if (ing.isPlaceholder || ing.productName.trim().isEmpty || ing.sourceTechCardId != null) {
+        list.add(ing);
+        continue;
+      }
+      final product = store.findProductForIngredient(ing.productId, ing.productName);
+      if (product == null) {
+        list.add(ing);
+        continue;
+      }
+      final priceInfo = store.getEstablishmentPrice(product.id, establishmentId);
+      final pricePerKg = priceInfo?.$1 ?? 0.0;
+      if (pricePerKg <= 0) {
+        list.add(ing);
+        continue;
+      }
+      final cost = (pricePerKg * ing.grossWeight / 1000);
+      list.add(ing.copyWith(productId: product.id, pricePerKg: pricePerKg, cost: cost));
+    }
+    _ingredients
+      ..clear()
+      ..addAll(list);
+  }
+
   /// Подставляет брутто в граммах по номенклатуре, когда продукт в шт и задан вес 1 шт (например яйцо 1 шт → 60 г).
   void _autoFillBruttoFromNomenclature() {
     final store = context.read<ProductStoreSupabase>();
@@ -1012,6 +1042,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               ));
             }
             _autoFillBruttoFromNomenclature();
+            _autoFillPriceFromNomenclature();
             if (addPlaceholders && _ingredients.isEmpty) {
               _ingredients.add(TTIngredient.emptyPlaceholder());
               _ingredients.add(TTIngredient.emptyPlaceholder());

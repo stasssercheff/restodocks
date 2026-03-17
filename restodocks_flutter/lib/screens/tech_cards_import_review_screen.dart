@@ -102,8 +102,8 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   /// Ошибки парсинга (битые карточки) — берём из сервиса и очищаем
   List<TtkParseError>? _parseErrors;
 
-  /// Убирать «ПФ» из названия при сохранении (для всех ПФ) — избегает «ПФ ПФ что-то».
-  bool _stripPfPrefixFromName = true;
+  /// Установить перед названием «ПФ» для всех ПФ при сохранении (если ещё нет).
+  bool _ensurePfPrefix = true;
 
   /// Индексы в _items, проходящие фильтр поиска по названию.
   List<int> get _filteredIndices {
@@ -138,6 +138,13 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       sections: defaultSections,
       isSemiFinished: c.isSemiFinished ?? true,
     )).toList();
+    // Не включать «ПФ» по умолчанию, если у всех ПФ уже есть префикс в названии.
+    final pfItems = _items.where((i) => i.isSemiFinished).toList();
+    if (pfItems.isNotEmpty) {
+      final hasPfPrefix = RegExp(r'^пф\s|^п/ф\s|^п\.ф\.\s', caseSensitive: false);
+      final allAlreadyHave = pfItems.every((i) => hasPfPrefix.hasMatch((i.result.dishName ?? '').trim()));
+      if (allAlreadyHave) _ensurePfPrefix = false;
+    }
     // Напоминание при каждом открытии экрана проверки импорта (не только при первом формате).
     if (widget.cards.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _showFirstTimeImportNotice());
@@ -640,13 +647,10 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       for (final item in sorted) {
         try {
           var resultToSave = item.result;
-          if (_stripPfPrefixFromName && item.isSemiFinished) {
+          if (_ensurePfPrefix && item.isSemiFinished) {
             final raw = (item.result.dishName ?? '').trim();
             if (raw.isNotEmpty) {
-              final stripped = stripPfPrefix(raw);
-              if (stripped.isNotEmpty) {
-                resultToSave = item.result.copyWith(dishName: stripped);
-              }
+              resultToSave = item.result.copyWith(dishName: ensurePfPrefix(raw));
             }
           }
           await svc.createTechCardFromRecognitionResult(
@@ -832,14 +836,67 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           if (_items.any((i) => i.isSemiFinished))
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: CheckboxListTile(
-                value: _stripPfPrefixFromName,
-                onChanged: (v) => setState(() => _stripPfPrefixFromName = v ?? true),
-                title: Text(loc.t('ttk_import_strip_pf_prefix') ?? 'Убирать «ПФ» из названия при сохранении'),
-                subtitle: Text(loc.t('ttk_import_strip_pf_prefix_hint') ?? 'Для всех полуфабрикатов. Избегает «ПФ ПФ Крем».'),
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
-                dense: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: Checkbox(
+                          value: _ensurePfPrefix,
+                          onChanged: (v) => setState(() => _ensurePfPrefix = v ?? true),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _ensurePfPrefix = !_ensurePfPrefix),
+                          behavior: HitTestBehavior.opaque,
+                          child: Text(
+                            loc.t('ttk_import_ensure_pf_prefix') ?? 'Установить перед названием «ПФ»\n(если ещё нет)',
+                            style: theme.textTheme.bodyMedium,
+                            maxLines: 2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: _saving ? null : () => setState(() {
+                          _items = _items.map((item) => _ReviewItem(
+                            result: item.result,
+                            originalDishName: item.originalDishName,
+                            category: item.category,
+                            sections: item.sections,
+                            isSemiFinished: true,
+                          )).toList();
+                        }),
+                        child: Text(loc.t('ttk_import_all_pf') ?? 'Все ПФ'),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: _saving ? null : () => setState(() {
+                          _items = _items.map((item) => _ReviewItem(
+                            result: item.result,
+                            originalDishName: item.originalDishName,
+                            category: item.category,
+                            sections: item.sections,
+                            isSemiFinished: false,
+                          )).toList();
+                        }),
+                        child: Text(loc.t('ttk_import_all_dishes') ?? 'Все блюда'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           if (_parseErrors != null && _parseErrors!.isNotEmpty) ...[

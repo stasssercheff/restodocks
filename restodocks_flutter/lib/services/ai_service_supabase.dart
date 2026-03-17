@@ -365,7 +365,8 @@ class AiServiceSupabase implements AiService {
       final excelErrors = <TtkParseError>[];
       final listByTemplate = AiServiceSupabase.parseTtkByTemplate(rows, errors: excelErrors);
       if (excelErrors.isNotEmpty) lastParseTechCardErrors = excelErrors;
-      final listByStored = await _tryParseByStoredTemplates(rows);
+      final listByStored = await _tryParseByStoredTemplates(rows)
+          .timeout(const Duration(seconds: 18), onTimeout: () => <TechCardRecognitionResult>[]);
       final hasTemplateWithIngredients = listByTemplate.isNotEmpty && listByTemplate.any((c) => c.ingredients.isNotEmpty);
       final hasStoredWithIngredients = listByStored.isNotEmpty && listByStored.any((c) => c.ingredients.isNotEmpty);
       // Приоритет: если шаблон дал больше карточек (несколько блоков в одном файле) — берём его;
@@ -446,8 +447,10 @@ class AiServiceSupabase implements AiService {
       if (rows.isNotEmpty) {
         list = _mergeTechnologyFromPolnoePosobie(rows, list);
       }
-      list = await _enrichTechnologyFromLearned(list, rows, lastParseHeaderSignature);
-      var corrected = await _applyParseCorrections(list, lastParseHeaderSignature, establishmentId);
+      list = await _enrichTechnologyFromLearned(list, rows, lastParseHeaderSignature)
+          .timeout(const Duration(seconds: 6), onTimeout: () => list);
+      var corrected = await _applyParseCorrections(list, lastParseHeaderSignature, establishmentId)
+          .timeout(const Duration(seconds: 6), onTimeout: () => list);
       corrected = await _fillTechnologyFromStoredPf(corrected, establishmentId);
       final validationErrors = _validateParsedCards(corrected);
       if (validationErrors != null) {
@@ -1373,16 +1376,48 @@ class AiServiceSupabase implements AiService {
         final d0 = dr.isNotEmpty ? dr[0].toLowerCase().trim() : '';
         final d1 = dr.length > 1 ? dr[1].trim().toLowerCase() : '';
         if (d0 == 'выход' || (d0.startsWith('выход') && d0.length < 20)) {
-          // Значение может быть в col 2 или 3; единица кг — в col 1 или 2 (формат: Выход | | кг | 0.7)
+          // Значение может быть в col 2 или 3 (формат: Выход | кг | 0.7). Не брать первое число подряд — в col 2 может быть 35 из колонки «Норма», тогда 35*1000=35000 г.
+          final unitCell = d0 + (dr.length > 1 ? dr[1] : '') + (dr.length > 2 ? dr[2] : '');
+          final isKg = unitCell.toLowerCase().contains('кг');
+          final numbersInRow = <num>[];
+          for (var i = 1; i < dr.length && i < 6; i++) {
+            final v = _parseNum(dr[i]);
+            if (v != null && v > 0) numbersInRow.add(v);
+          }
           num? outVal;
-          for (var i = 2; i < dr.length && i < 5; i++) {
-            outVal = _parseNum(dr[i]);
-            if (outVal != null && outVal > 0) break;
+          final sumGrams = ingredients.fold<double>(0, (s, ing) => s + (ing.outputGrams ?? 0));
+          if (sumGrams > 0 && numbersInRow.isNotEmpty) {
+            // Есть состав — предпочитаем число, совпадающее с итогом: в кг (0.01–10) или в г (100–5000).
+            final targetKg = sumGrams / 1000;
+            for (final n in numbersInRow) {
+              if (n >= 0.01 && n <= 10 && (n - targetKg).abs() < 0.01) {
+                outVal = n;
+                break;
+              }
+              if (n >= 100 && n <= 5000 && (n - sumGrams).abs() < 1) {
+                outVal = n;
+                break;
+              }
+            }
+          }
+          if (outVal == null && numbersInRow.isNotEmpty) {
+            // Нет состава или не нашли совпадение: брать значение в диапазоне кг (0.1–10) или г (100–5000), не 10–100 (часто ошибочно 35 и т.п.).
+            for (final n in numbersInRow) {
+              if (n >= 0.1 && n <= 10) {
+                outVal = n;
+                break;
+              }
+              if (n >= 100 && n <= 5000) {
+                outVal = n;
+                break;
+              }
+            }
           }
           if (outVal != null && outVal > 0) {
-            final unitCell = d0 + (dr.length > 1 ? dr[1] : '') + (dr.length > 2 ? dr[2] : '');
-            outputGrams = (unitCell.toLowerCase().contains('кг') && outVal < 100 ? outVal * 1000 : outVal).toDouble();
+            outputGrams = (isKg && outVal < 100 ? outVal * 1000 : outVal.toDouble()).toDouble();
           }
+          // Если в строке не нашли подходящее число, но есть состав — выход = сумма выходов ингредиентов (как в файле ТТК).
+          if (outputGrams == null && sumGrams > 0) outputGrams = sumGrams;
           break;
         }
         if (d0 == '№' && d1.contains('наименование')) break;
@@ -3208,7 +3243,8 @@ class AiServiceSupabase implements AiService {
   Future<List<TechCardRecognitionResult>> _tryParseByStoredTemplates(List<List<String>> rows) async {
     try {
       final safeRows = _rowsForJson(rows);
-      final data = await invoke('parse-ttk-by-templates', {'rows': safeRows});
+      final data = await invoke('parse-ttk-by-templates', {'rows': safeRows})
+          .timeout(const Duration(seconds: 14), onTimeout: () => null);
       if (data == null) {
         final local = await _tryParseByStoredTemplatesLocally(rows);
         if (local.isNotEmpty) return local;
