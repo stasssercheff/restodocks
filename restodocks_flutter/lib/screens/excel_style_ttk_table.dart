@@ -290,10 +290,27 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       ));
                     }, 'gross_$rowIndex'),
 
-                    // % отхода — рассчитывается таблицей из брутто и нетто (только чтение)
-                    _buildReadOnlyCell(ingredient.grossWeight > 0
-                        ? ((1 - ingredient.netWeight / ingredient.grossWeight) * 100).clamp(0.0, 100.0).toStringAsFixed(0)
-                        : ingredient.primaryWastePct.toStringAsFixed(0)),
+                    // % отхода — редактируемо; при вводе пересчёт нетто и выхода
+                    _buildNumericCell(
+                      ingredient.primaryWastePct.toStringAsFixed(0),
+                      (value) {
+                        final wastePct = (double.tryParse(value?.replaceFirst(',', '.') ?? '') ?? 0).clamp(0.0, 99.9);
+                        final gross = ingredient.grossWeight;
+                        final net = gross > 0 ? gross * (1.0 - wastePct / 100.0) : 0.0;
+                        final output = net * (1.0 - (ingredient.cookingLossPctOverride ?? 0) / 100.0);
+                        final qty = _usesPieces(ingredient)
+                            ? (gross / (ingredient.gramsPerPiece ?? 50))
+                            : (gross / 1000.0);
+                        final newCost = (ingredient.pricePerKg ?? 0) * qty;
+                        _updateIngredient(rowIndex, ingredient.copyWith(
+                          primaryWastePct: wastePct,
+                          netWeight: net,
+                          outputWeight: output,
+                          cost: newCost,
+                        ));
+                      },
+                      'waste_$rowIndex',
+                    ),
 
                     // Нетто
                     _buildNumericCell(ingredient.netWeight == 0 ? '' : ingredient.netWeight.toStringAsFixed(0), (value) {
