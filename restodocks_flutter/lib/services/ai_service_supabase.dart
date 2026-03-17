@@ -3051,9 +3051,7 @@ class AiServiceSupabase implements AiService {
       final sanity = data['sanity_issues'];
       if (sanity is List) {
         final issues = sanity.whereType<String>().where((s) => s.isNotEmpty).toList();
-        if (issues.isNotEmpty) {
-          lastParseTechCardErrors = issues.map((msg) => TtkParseError(error: msg)).toList();
-        }
+        if (issues.isNotEmpty) debugPrint('[tt_parse] sanity hints (не показываем как ошибки): $issues');
       }
       final raw = data['cards'];
       if (raw is! List || raw.isEmpty) return [];
