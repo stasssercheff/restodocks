@@ -3064,13 +3064,16 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       if (chefList.isEmpty) return;
       final chef = chefList.first as Map<String, dynamic>;
 
+      final dept = (employee.department == 'bar' || employee.hasRole('bar_manager') || employee.hasRole('bartender'))
+          ? 'bar'
+          : 'kitchen';
       final payload = {
         'type': 'iiko_inventory',
         'header': {
           'date': _date.toIso8601String(),
           'establishmentName': establishment.name,
           'employeeName': employee.fullName,
-          'department': 'kitchen', // iiko — данные кухни, не показывать в баре/зале
+          'department': dept,
           'fileName': fileName,
           'totalPositions': _rows.length,
           'filledPositions': _rows.where((r) => r.total > 0).length,

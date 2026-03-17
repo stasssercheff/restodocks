@@ -31,10 +31,11 @@ class InboxService {
           rawList = rawList.where((d) {
             final p = d['payload'] as Map<String, dynamic>?;
             final h = p?['header'] as Map<String, dynamic>?;
-            final isIiko = p?['type'] == 'iiko_inventory';
-            if (isIiko) return false;
             final dept = (h?['department'] ?? '').toString();
-            return dept == 'bar' || dept == 'Bar';
+            final isBar = dept == 'bar' || dept == 'Bar';
+            final isIiko = p?['type'] == 'iiko_inventory';
+            if (isIiko) return isBar; // инвентаризация iiko бара — показываем барменеджеру
+            return isBar;
           }).toList();
         } else if (currentEmployee.hasRole('floor_manager')) {
           rawList = await docService.listForEstablishment(establishmentId);
@@ -87,9 +88,7 @@ class InboxService {
         final payloadType = payload['type']?.toString() ?? '';
         final isIiko = payloadType == 'iiko_inventory';
         final isWriteoff = payloadType == 'writeoff';
-        var docDept = isIiko
-            ? 'kitchen'
-            : (header['department']?.toString() ?? _mapSectionToDepartment(currentEmployee.department));
+        var docDept = header['department']?.toString() ?? _mapSectionToDepartment(currentEmployee.department);
         docDept = _mapSectionToDepartment(docDept);
         // Списания: если отдел management — показываем в Кухне, чтобы были видны во входящих
         if (isWriteoff && docDept == 'management') docDept = 'kitchen';
