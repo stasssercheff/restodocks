@@ -552,9 +552,11 @@ class _InventoryScreenState extends State<InventoryScreen>
     final est = account.establishment;
     final estId = est?.dataEstablishmentId;
     if (estId == null) return;
-    await store.loadProducts();
-    await store.loadNomenclature(estId);
-    final techCards = await techCardSvc.getTechCardsForEstablishment(estId);
+    await Future.wait([
+      store.loadProducts(),
+      store.loadNomenclature(estId),
+      techCardSvc.getTechCardsForEstablishment(estId),
+    ]);
     if (!mounted) return;
     final products = store.getNomenclatureProducts(estId);
     final pfOnly = techCards.where((tc) => tc.isSemiFinished).toList();

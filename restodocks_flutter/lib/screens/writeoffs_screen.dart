@@ -200,8 +200,12 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     final tcSvc = context.read<TechCardServiceSupabase>();
     final dataEstId = account.establishment?.dataEstablishmentId;
     if (dataEstId != null) {
-      _cachedProducts = await productStore.loadNomenclatureProductsDirect(dataEstId);
-      _cachedTechCards = await tcSvc.getTechCardsForEstablishment(dataEstId);
+      final results = await Future.wait([
+        productStore.loadNomenclatureProductsDirect(dataEstId),
+        tcSvc.getTechCardsForEstablishment(dataEstId),
+      ]);
+      _cachedProducts = results[0] as List<Product>;
+      _cachedTechCards = results[1] as List<TechCard>;
     }
     if (mounted) {
       await restoreDraftNow();

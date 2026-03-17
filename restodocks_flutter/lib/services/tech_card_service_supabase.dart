@@ -117,98 +117,69 @@ class TechCardServiceSupabase {
     return createdTechCard;
   }
 
-  /// Получение всех ТТК для заведения
+  /// Получение всех ТТК для заведения (один запрос с ингредиентами — без N+1)
   Future<List<TechCard>> getTechCardsForEstablishment(String establishmentId) async {
     try {
       final data = await _supabase.client
           .from('tech_cards')
-          .select()
+          .select('*, tt_ingredients(*)')
           .eq('establishment_id', establishmentId)
           .order('created_at', ascending: false);
 
-      final techCards = <TechCard>[];
-
-      for (final techCardJson in data) {
-        final techCard = TechCard.fromJson(techCardJson);
-
-        // Загружаем ингредиенты для этой ТТК
-        final ingredientsData = await _supabase.client
-            .from('tt_ingredients')
-            .select()
-            .eq('tech_card_id', techCard.id);
-
-        final ingredients = (ingredientsData as List)
-            .map((json) => TTIngredient.fromJson(json))
-            .toList();
-
-        techCards.add(techCard.copyWith(ingredients: ingredients));
-      }
-
-      return techCards;
+      return _parseTechCardsWithIngredients(data as List);
     } catch (e) {
       devLog('Ошибка получения ТТК: $e');
       return [];
     }
   }
 
-  /// Поиск ТТК по ID
+  /// Парсинг списка ТТК из ответа с вложенными tt_ingredients
+  static List<TechCard> _parseTechCardsWithIngredients(List<dynamic> data) {
+    final techCards = <TechCard>[];
+    for (final row in data) {
+      final m = row as Map<String, dynamic>;
+      final ingredientsData = m['tt_ingredients'] as List<dynamic>? ?? [];
+      final ingredients = ingredientsData
+          .map((j) => TTIngredient.fromJson(j as Map<String, dynamic>))
+          .toList();
+      final tc = TechCard.fromJson(m);
+      techCards.add(tc.copyWith(ingredients: ingredients));
+    }
+    return techCards;
+  }
+
+  /// Поиск ТТК по ID (один запрос)
   Future<TechCard?> getTechCardById(String techCardId) async {
     try {
-      final techCardData = await _supabase.client
+      final data = await _supabase.client
           .from('tech_cards')
-          .select()
+          .select('*, tt_ingredients(*)')
           .eq('id', techCardId)
           .limit(1)
-          .single();
-
-      final techCard = TechCard.fromJson(techCardData);
-
-      // Загружаем ингредиенты
-      final ingredientsData = await _supabase.client
-          .from('tt_ingredients')
-          .select()
-          .eq('tech_card_id', techCardId);
-
-      final ingredients = (ingredientsData as List)
-          .map((json) => TTIngredient.fromJson(json))
+          .maybeSingle();
+      if (data == null) return null;
+      final m = data as Map<String, dynamic>;
+      final ingredientsData = m['tt_ingredients'] as List<dynamic>? ?? [];
+      final ingredients = ingredientsData
+          .map((j) => TTIngredient.fromJson(j as Map<String, dynamic>))
           .toList();
-
-      return techCard.copyWith(ingredients: ingredients);
+      return TechCard.fromJson(m).copyWith(ingredients: ingredients);
     } catch (e) {
       devLog('Ошибка получения ТТК: $e');
       return null;
     }
   }
 
-  /// Поиск ТТК по названию блюда
+  /// Поиск ТТК по названию блюда (один запрос)
   Future<List<TechCard>> searchTechCards(String query, String establishmentId) async {
     try {
       final data = await _supabase.client
           .from('tech_cards')
-          .select()
+          .select('*, tt_ingredients(*)')
           .eq('establishment_id', establishmentId)
           .or('dish_name.ilike.%$query%,category.ilike.%$query%')
           .order('dish_name');
-
-      final techCards = <TechCard>[];
-
-      for (final techCardJson in data) {
-        final techCard = TechCard.fromJson(techCardJson);
-
-        // Загружаем ингредиенты
-        final ingredientsData = await _supabase.client
-            .from('tt_ingredients')
-            .select()
-            .eq('tech_card_id', techCard.id);
-
-        final ingredients = (ingredientsData as List)
-            .map((json) => TTIngredient.fromJson(json))
-            .toList();
-
-        techCards.add(techCard.copyWith(ingredients: ingredients));
-      }
-
-      return techCards;
+      return _parseTechCardsWithIngredients(data as List);
     } catch (e) {
       devLog('Ошибка поиска ТТК: $e');
       return [];
@@ -393,34 +364,15 @@ class TechCardServiceSupabase {
     };
   }
 
-  /// Получение ТТК, созданных конкретным пользователем
+  /// Получение ТТК, созданных конкретным пользователем (один запрос)
   Future<List<TechCard>> getTechCardsByCreator(String creatorId) async {
     try {
       final data = await _supabase.client
           .from('tech_cards')
-          .select()
+          .select('*, tt_ingredients(*)')
           .eq('created_by', creatorId)
           .order('created_at', ascending: false);
-
-      final techCards = <TechCard>[];
-
-      for (final techCardJson in data) {
-        final techCard = TechCard.fromJson(techCardJson);
-
-        // Загружаем ингредиенты
-        final ingredientsData = await _supabase.client
-            .from('tt_ingredients')
-            .select()
-            .eq('tech_card_id', techCard.id);
-
-        final ingredients = (ingredientsData as List)
-            .map((json) => TTIngredient.fromJson(json))
-            .toList();
-
-        techCards.add(techCard.copyWith(ingredients: ingredients));
-      }
-
-      return techCards;
+      return _parseTechCardsWithIngredients(data as List);
     } catch (e) {
       devLog('Ошибка получения ТТК по создателю: $e');
       return [];

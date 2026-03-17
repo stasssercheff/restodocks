@@ -210,9 +210,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final svc = context.read<TechCardServiceSupabase>();
-      final all = await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
-      final customKitchen = await svc.getCustomCategories(est.dataEstablishmentId, 'kitchen');
-      final customBar = await svc.getCustomCategories(est.dataEstablishmentId, 'bar');
+      final results = await Future.wait([
+        svc.getTechCardsForEstablishment(est.dataEstablishmentId),
+        svc.getCustomCategories(est.dataEstablishmentId, 'kitchen'),
+        svc.getCustomCategories(est.dataEstablishmentId, 'bar'),
+      ]);
+      final all = results[0] as List<TechCard>;
+      final customKitchen = results[1] as List<({String id, String name})>;
+      final customBar = results[2] as List<({String id, String name})>;
       _customCategoryNames.clear();
       for (final c in customKitchen) _customCategoryNames[c.id] = c.name;
       for (final c in customBar) _customCategoryNames[c.id] = c.name;
