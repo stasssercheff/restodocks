@@ -423,12 +423,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // Нетто
                   const SizedBox.shrink(), // Способ
                   _buildTotalCell(
-                    widget.weightPerPortion > 0
-                        ? '${widget.weightPerPortion.toStringAsFixed(0)}г'
-                        : '${totalOutput.toStringAsFixed(0)}г',
-                  ), // Выход: вес порции из файла или сумма выходов
-                  // вес прц — редактируемое поле в итого
-                  widget.canEdit && widget.onWeightPerPortionChanged != null
+                    widget.isSemiFinished
+                        ? '${totalOutput.toStringAsFixed(0)}г' // Для ПФ: всегда сумма выходов
+                        : (widget.weightPerPortion > 0
+                            ? '${widget.weightPerPortion.toStringAsFixed(0)}г'
+                            : '${totalOutput.toStringAsFixed(0)}г'), // Для блюд: вес порции или сумма выходов
+                  ), // Выход: для ПФ - сумма выходов, для блюд - вес порции
+                  // вес прц — для ПФ показываем totalOutput, для блюд - weightPerPortion
+                  widget.canEdit && widget.onWeightPerPortionChanged != null && !widget.isSemiFinished
                       ? _buildNumericCell(
                           widget.weightPerPortion == 0 ? '' : widget.weightPerPortion.toStringAsFixed(0),
                           (value) {
@@ -437,7 +439,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                           },
                           'weight_per_portion',
                         )
-                      : _buildTotalCell(widget.weightPerPortion == 0 ? '' : widget.weightPerPortion.toStringAsFixed(0)),
+                      : _buildTotalCell(
+                          widget.isSemiFinished
+                              ? (totalOutput == 0 ? '' : totalOutput.toStringAsFixed(0)) // Для ПФ: сумма выходов
+                              : (widget.weightPerPortion == 0 ? '' : widget.weightPerPortion.toStringAsFixed(0)), // Для блюд: вес порции
+                        ),
                   _buildTotalCell('1'), // порций(шт) в итого всегда 1
                   const SizedBox.shrink(), // Стоимость (пусто)
                   widget.isCook

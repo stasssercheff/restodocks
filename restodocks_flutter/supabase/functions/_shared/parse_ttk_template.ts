@@ -372,7 +372,8 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       // В PDF инструкция может быть на одной строке с «Итого» — сохранить хвост как технологию
       const afterNums = rowText.replace(/^.*?\bитого\s*[\d,.\s]*/i, "").trim();
       if (afterNums.length > 30 && /[а-яё]/i.test(afterNums)) technologyParts.push(afterNums);
-      let outG = parseNum(outputVal);
+      let outG = parseNum(outputVal) || parseNum(grossVal) || parseNum(netVal);
+      if (outG == null && cells.length > 1) outG = parseNum(cells[1]);
       if (outputColIsKg && outG != null && outG > 0 && outG < 100) outG = outG * 1000;
       flushCard(outG);
       currentDish = null;
@@ -750,7 +751,7 @@ export function parseTtkByStoredTemplate(
     }
   }
   flushCard(undefined);
-  return { cards: results, sanityIssues: [...sanityIssuesSet] };
+  return { cards: results, sanityIssues: Array.from(sanityIssuesSet) };
 }
 
 /**
