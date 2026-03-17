@@ -979,8 +979,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             } else if (widget.initialSections != null && widget.initialSections!.isEmpty) {
               _selectedSections = [];
             }
-            // ТТК блюдо: вес порции = выход (вес итого из парсинга)
-            if (!_isSemiFinished && ai.yieldGrams != null && ai.yieldGrams! > 0) {
+            // Вес в «Итого» из парсинга: для блюд это вес порции, для ПФ — выход/вес итого из файла.
+            if (ai.yieldGrams != null && ai.yieldGrams! > 0) {
               _portionWeight = ai.yieldGrams!.toDouble();
             }
             _ingredients.clear();
