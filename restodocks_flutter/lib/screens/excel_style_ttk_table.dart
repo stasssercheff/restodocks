@@ -31,6 +31,8 @@ class ExcelStyleTtkTable extends StatefulWidget {
   /// Вес порции (г) — вносится в итого, столбец «вес прц». При изменении вызывается callback.
   final double weightPerPortion;
   final void Function(double)? onWeightPerPortionChanged;
+  /// При клике на ПФ-ингредиент — переход к просмотру ТТК ПФ.
+  final void Function(String techCardId)? onTapPfIngredient;
 
   ExcelStyleTtkTable({
     super.key,
@@ -53,6 +55,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
     this.hideTechnologyBlock = false,
     this.weightPerPortion = 100,
     this.onWeightPerPortionChanged,
+    this.onTapPfIngredient,
   });
 
   @override
@@ -666,45 +669,57 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       if (ingredient.productId != null || ingredient.productName.isNotEmpty ||
           (ingredient.sourceTechCardId != null && ingredient.sourceTechCardId!.isNotEmpty)) {
         final name = _getIngredientDisplayName(ingredient, lang);
-        return InkWell(
-          onTap: () {
-            // При клике на выбранный продукт открываем dropdown для изменения
-            // Очищаем productId, чтобы показать поле поиска
-            _updateIngredient(rowIndex, ingredient.copyWith(
-              productId: null,
-              productName: '',
-            ));
-          },
-          child: Container(
-            height: 44,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade400, width: 1),
-              borderRadius: BorderRadius.circular(4),
-              color: Colors.white,
-            ),
-            child: Row(
-              children: [
-                Expanded(
+        final isPf = ingredient.sourceTechCardId != null && ingredient.sourceTechCardId!.isNotEmpty;
+        return Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.grey.shade400, width: 1),
+            borderRadius: BorderRadius.circular(4),
+            color: Colors.white,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: InkWell(
+                  onTap: () {
+                    if (isPf && widget.onTapPfIngredient != null) {
+                      widget.onTapPfIngredient!(ingredient.sourceTechCardId!);
+                    } else {
+                      _updateIngredient(rowIndex, ingredient.copyWith(
+                        productId: null,
+                        productName: '',
+                      ));
+                    }
+                  },
                   child: Tooltip(
                     message: name,
-                    child: Text(
-                      name,
-                      style: const TextStyle(fontSize: 12),
-                      textAlign: TextAlign.center,
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        name,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isPf ? Theme.of(context).colorScheme.primary : null,
+                          decoration: isPf ? TextDecoration.underline : null,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
                     ),
                   ),
                 ),
-                const Icon(
-                  Icons.edit,
-                  size: 16,
-                  color: Colors.grey,
+              ),
+              if (isPf && widget.onTapPfIngredient != null)
+                IconButton(
+                  icon: const Icon(Icons.open_in_new, size: 16),
+                  tooltip: widget.loc.t('ttk_view') ?? 'Просмотр ТТК',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  onPressed: () => widget.onTapPfIngredient!(ingredient.sourceTechCardId!),
                 ),
-              ],
-            ),
+              const Icon(Icons.edit, size: 16, color: Colors.grey),
+            ],
           ),
         );
       }

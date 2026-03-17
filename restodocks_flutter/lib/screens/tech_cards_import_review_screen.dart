@@ -538,6 +538,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     try {
       final svc = context.read<TechCardServiceSupabase>();
       final productStore = context.read<ProductStoreSupabase>();
+      await productStore.loadNomenclature(est.dataEstablishmentId);
       final products = productStore.getNomenclatureProducts(est.dataEstablishmentId);
       final allTc = await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
       final techCardsPf = allTc

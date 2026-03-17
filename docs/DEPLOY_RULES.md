@@ -52,6 +52,8 @@ npx supabase db push --project-ref osglfptwbuqqmqunttha
 
 Деплой только вручную. Требуется: `cd restodocks_flutter`, `npx supabase` (CLI установлен).
 
+**Важно:** без деплоя Edge Functions изменения в парсере (WASTE_KEYS, колонки и т.д.) работают только локально. Чтобы работало у всех пользователей — после правок в `parse_ttk_template.ts`, `ai-parse-tech-cards-pdf` и т.п. нужно задеплоить функции.
+
 ```bash
 cd restodocks_flutter
 npx supabase functions deploy parse-xls-bytes --project-ref osglfptwbuqqmqunttha

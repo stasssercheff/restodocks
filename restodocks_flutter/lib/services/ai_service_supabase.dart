@@ -1774,7 +1774,7 @@ class AiServiceSupabase implements AiService {
     // iiko DOCX: "Вес брутто, кг" приоритетнее "Брутто в ед. изм."
     final grossKeys = ['вес брутто', 'масса брутто', 'брутто', 'бр', 'вес гр', '1 порция', 'расход', 'норма', 'норма закладки', 'масса', 'gross'];
     final netKeys = ['вес нетто', 'масса нетто', 'нетто', 'нт', 'net'];
-    final wasteKeys = ['отход', 'отх', 'waste', 'процент отхода'];
+    final wasteKeys = ['отход', 'отх', 'waste', 'процент отхода', '% отхода', 'отх.', 'отх %', 'отход%'];
     final outputKeys = ['выход', 'вес готового', 'вес готового продукта', 'готовый', 'output'];
     final unitKeys = ['ед. изм', 'ед изм', 'единица', 'unit'];
     final technologyKeys = ['технология', 'приготовления', 'способ приготовления', 'technology'];
@@ -3592,7 +3592,7 @@ class AiServiceSupabase implements AiService {
       const productKeys = ['продукт', 'сырьё', 'ингредиент', 'product', 'ingredient'];
       const grossKeys = ['брутто', 'бр', 'вес брутто', 'gross'];
       const netKeys = ['нетто', 'нт', 'вес нетто', 'net'];
-      const wasteKeys = ['отход', 'отх', 'waste', 'процент отхода'];
+      const wasteKeys = ['отход', 'отх', 'waste', 'процент отхода', '% отхода', 'отх.', 'отх %', 'отход%'];
       const outputKeys = ['выход', 'вес готового', 'готовый', 'output'];
       // Сканируем минимум 3 строки: ГОСТ 2-row header — «Брутто»/«Нетто» во второй строке.
       for (var r = 0; r < rows.length; r++) {

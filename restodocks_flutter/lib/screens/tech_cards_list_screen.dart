@@ -166,6 +166,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       'salad': {'ru': 'Салат', 'en': 'Salad'},
       'meat': {'ru': 'Мясо', 'en': 'Meat'},
       'seafood': {'ru': 'Рыба', 'en': 'Seafood'},
+      'poultry': {'ru': 'Птица', 'en': 'Poultry'},
       'side': {'ru': 'Гарнир', 'en': 'Side dish'},
       'subside': {'ru': 'Подгарнир', 'en': 'Sub-side dish'},
       'bakery': {'ru': 'Выпечка', 'en': 'Bakery'},

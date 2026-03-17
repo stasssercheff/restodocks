@@ -921,9 +921,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       final est = context.read<AccountManagerSupabase>().establishment;
       if (est != null) {
         await context.read<ProductStoreSupabase>().loadNomenclature(est.dataEstablishmentId);
-        // Оптимизация UX: при создании из импорта (initialFromAi) не блокируем первый рендер загрузкой всех ТТК/категорий.
-        // Эти данные нужны в основном для пикеров/справочников и могут догрузиться фоном.
-        if (!(_isNew && widget.initialFromAi != null)) {
+        // Оптимизация: при просмотре или создании из импорта — не блокировать первый рендер загрузкой всех ТТК.
+        final deferTcLoad = (_isNew && widget.initialFromAi != null) || widget.forceViewMode;
+        if (!deferTcLoad) {
           final tcSvc = context.read<TechCardServiceSupabase>();
           final tcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
           final customKitchen = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'kitchen');
@@ -1065,10 +1065,63 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         });
         // Если перевод технологии ещё не сохранён — запросить через DeepL
         if (tc != null) _translateTechnologyIfNeeded(tc);
+        // Дополнить цены из номенклатуры (если productId есть, cost=0)
+        if (tc != null && est != null) _enrichPricesFromNomenclature(est.dataEstablishmentId);
         if (mounted) await restoreDraftNow();
       });
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  /// Дополняет цены ингредиентов из номенклатуры (по productId или по названию).
+  /// Нормализация: убираем пунктуацию, множественные пробелы — для сопоставления у всех пользователей.
+  void _enrichPricesFromNomenclature(String establishmentId) {
+    final store = context.read<ProductStoreSupabase>();
+    final products = store.getNomenclatureProducts(establishmentId);
+    final norm = (String s) => s
+        .replaceAll(RegExp(r'[^a-zA-Zа-яёЁ0-9\s]'), '')
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    var changed = false;
+    final updated = <int, TTIngredient>{};
+    for (var i = 0; i < _ingredients.length; i++) {
+      final ing = _ingredients[i];
+      if (ing.cost > 0) continue;
+      String? pid = ing.productId;
+      double? price;
+      if (pid != null) {
+        final ep = store.getEstablishmentPrice(pid, establishmentId);
+        price = ep?.$1;
+      }
+      if ((price == null || price <= 0) && ing.productName.trim().isNotEmpty) {
+        final nameNorm = norm(ing.productName);
+        for (final p in products) {
+          if (norm(p.name) == nameNorm ||
+              p.names?.values.any((n) => norm(n) == nameNorm) == true) {
+            pid = p.id;
+            price = store.getEstablishmentPrice(p.id, establishmentId)?.$1;
+            break;
+          }
+        }
+      }
+      if (price == null || price <= 0) continue;
+      final newCost = (price / 1000) * ing.grossWeight;
+      updated[i] = ing.copyWith(
+        productId: pid ?? ing.productId,
+        cost: newCost,
+        pricePerKg: price,
+      );
+      changed = true;
+    }
+    if (changed && mounted) {
+      setState(() {
+        for (final e in updated.entries) {
+          if (e.key < _ingredients.length) _ingredients[e.key] = e.value;
+        }
+      });
+      _scheduleDraftSave();
     }
   }
 
@@ -2935,6 +2988,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                             onRemove: _removeIngredient,
                             onSuggestWaste: _suggestWasteForRow,
                             hideTechnologyBlock: true,
+                            onTapPfIngredient: (id) => context.push('/tech-cards/$id?view=1'),
                           )
                         : ConstrainedBox(
                             constraints: const BoxConstraints(minWidth: 1145), // как в режиме создания
