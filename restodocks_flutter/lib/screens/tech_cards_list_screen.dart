@@ -540,15 +540,19 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           await _createFromExcel(context, loc);
           return;
         }
-        if (mode == _TtkImportMode.multi && list.length <= 1) {
-          if (mounted) setState(() => _loadingExcel = false);
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text((loc.t('ttk_import_file_not_multi') ?? 'Файл «%s» не подходит: в нём одна или ноль карточек. Выберите режим «Одна ТТК в документе» или загрузите файл с несколькими карточками.').replaceFirst('%s', file.name)),
-            duration: const Duration(seconds: 5),
-          ));
-          if (!mounted) return;
-          await _createFromExcel(context, loc);
-          return;
+        if (mode == _TtkImportMode.multi && list.isEmpty) {
+          // В режиме «несколько ТТК» пустой результат по файлу — пропускаем, не выкидываем в диалог
+          failedCount++;
+          continue;
+        }
+        if (mode == _TtkImportMode.multi && list.length == 1) {
+          // Одна карточка в режиме «несколько» — всё равно ведём на проверку (парсер мог не найти все блоки)
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text((loc.t('ttk_import_one_card_in_multi') ?? 'В файле «%s» распознана 1 карточка. Если их больше — выберите режим «Одна ТТК в документе» для каждого или проверьте разметку.').replaceFirst('%s', file.name)),
+              duration: const Duration(seconds: 4),
+            ));
+          }
         }
         allCards.addAll(list);
       }

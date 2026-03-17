@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
+import '../core/router/app_router.dart';
 import '../core/theme/app_theme.dart';
 
 /// Toast overlay — компактное светлокрасное окошко. Скрывается по тапу в любое место.
@@ -157,5 +159,14 @@ class AppToastService {
     _entry?.remove();
     _entry = null;
     _pendingOnTap = null;
+  }
+
+  /// Переход во входящие → Уведомления (для уведомления о днях рождения).
+  static void goToInboxNotifications() {
+    hide();
+    final ctx = _navigatorKey?.currentState?.context ?? AppRouter.rootNavigatorKey.currentContext;
+    if (ctx != null) {
+      GoRouter.of(ctx).go('/inbox?tab=notifications');
+    }
   }
 }

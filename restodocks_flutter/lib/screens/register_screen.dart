@@ -28,6 +28,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String _department = 'kitchen';
   String _section = 'control';
   String _role = 'sous_chef';
+  DateTime? _birthday;
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -171,6 +172,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         section: section,
         roles: [_role],
         authUserId: authUserId,
+        birthday: _birthday,
       );
 
       final emailService = EmailService();
@@ -295,6 +297,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (v != _passwordController.text) return loc.t('passwords_not_match');
                     return null;
                   },
+                ),
+                const SizedBox(height: 16),
+
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.cake),
+                  title: Text(
+                    _birthday == null
+                        ? (loc.t('birthday') ?? 'День рождения') + ' — ' + (loc.t('optional') ?? 'не указано')
+                        : '${loc.t('birthday') ?? 'День рождения'}: ${_birthday!.day.toString().padLeft(2, '0')}.${_birthday!.month.toString().padLeft(2, '0')}.${_birthday!.year}',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_birthday != null)
+                        IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () => setState(() => _birthday = null),
+                          tooltip: loc.t('clear') ?? 'Очистить',
+                        ),
+                      TextButton(
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _birthday ?? DateTime.now().subtract(const Duration(days: 365 * 25)),
+                            firstDate: DateTime(1920),
+                            lastDate: DateTime.now(),
+                          );
+                          if (picked != null && mounted) setState(() => _birthday = picked);
+                        },
+                        child: Text(_birthday == null ? (loc.t('set') ?? 'Указать') : (loc.t('change') ?? 'Изменить')),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 16),
 

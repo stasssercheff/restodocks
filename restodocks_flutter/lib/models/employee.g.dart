@@ -35,6 +35,9 @@ Employee _$EmployeeFromJson(Map<String, dynamic> json) => Employee(
       employmentEndDate: json['employment_end_date'] == null
           ? null
           : DateTime.parse(json['employment_end_date'] as String),
+      birthday: json['birthday'] == null
+          ? null
+          : DateTime.parse(json['birthday'] as String),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -64,6 +67,7 @@ Map<String, dynamic> _$EmployeeToJson(Employee instance) => <String, dynamic>{
       'employment_status': instance.employmentStatus,
       'employment_start_date': instance.employmentStartDate?.toIso8601String(),
       'employment_end_date': instance.employmentEndDate?.toIso8601String(),
+      'birthday': instance.birthday?.toIso8601String(),
       'created_at': instance.createdAt.toIso8601String(),
       'updated_at': instance.updatedAt.toIso8601String(),
     };

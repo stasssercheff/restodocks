@@ -96,6 +96,7 @@ class AccountManager {
     required String department,
     String? section,
     required List<String> roles,
+    DateTime? birthday,
   }) async {
     final employee = Employee.create(
       fullName: fullName,
@@ -106,6 +107,7 @@ class AccountManager {
       section: section,
       roles: roles,
       establishmentId: company.id,
+      birthday: birthday,
     );
 
     // Обновляем establishment с ownerId, если это владелец

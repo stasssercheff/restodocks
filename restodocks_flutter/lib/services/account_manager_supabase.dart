@@ -20,6 +20,9 @@ const _keyRememberPin = 'restodocks_remember_pin';
 const _keyRememberEmail = 'restodocks_remember_email';
 const _keyRememberPassword = 'restodocks_remember_password';
 
+String _dateOnly(DateTime d) =>
+    '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
 /// Сервис управления аккаунтами с использованием Supabase
 class AccountManagerSupabase extends ChangeNotifier {
   static final AccountManagerSupabase _instance = AccountManagerSupabase._internal();
@@ -446,6 +449,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     required List<String> roles,
     String? authUserId,
     String? ownerAccessLevel,
+    DateTime? birthday,
   }) async {
     if (authUserId == null || authUserId.isEmpty) {
       throw Exception('employees.id = auth.users.id — требуется authUserId от signUp');
@@ -481,6 +485,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       'p_department': department,
       'p_section': section ?? '',
       'p_roles': roles,
+      'p_birthday': birthday != null ? _dateOnly(birthday) : null,
     };
     if (rpcName == 'create_employee_for_company') {
       params['p_owner_access_level'] = ownerAccessLevel ?? 'full';

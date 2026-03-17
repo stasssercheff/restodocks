@@ -745,7 +745,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             if (parts.length >= 2) timeDisplay = '${parts[0]}–${parts[1]}';
           }
           var bg = isShift ? Colors.green.shade100 : isDayOff ? Colors.amber.shade100 : null;
-          if (isToday(d)) {
+          final emp = slot.employeeId != null ? _employees.where((e) => e.id == slot.employeeId).firstOrNull : null;
+          final b = emp?.birthday;
+          final isBirthday = b != null && b.month == d.month && b.day == d.day;
+          if (isBirthday) {
+            bg = Colors.pink.shade100;
+          } else if (isToday(d)) {
             final base = bg ?? theme.colorScheme.surface;
             bg = Color.lerp(base, todayHighlightBg, 0.6) ?? base;
           }

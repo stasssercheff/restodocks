@@ -1,12 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/router/app_router.dart';
+import '../models/models.dart';
+import '../services/app_toast_service.dart';
 import '../services/services.dart';
 
+const _keyBirthdayNotifyLastShown = 'restodocks_birthday_notify_last_shown';
+
 /// Слушает новые данные во Входящих и Сообщениях. Показывает уведомление (плашка/модал) по настройкам.
+/// Также по выбранному времени показывает уведомление о ближайших днях рождения (если пользователь в приложении).
 class InboxNotificationListener extends StatefulWidget {
   const InboxNotificationListener({super.key, required this.child});
 
@@ -18,6 +26,7 @@ class InboxNotificationListener extends StatefulWidget {
 
 class _InboxNotificationListenerState extends State<InboxNotificationListener> {
   final List<RealtimeChannel> _channels = [];
+  Timer? _birthdayNotifyTimer;
 
   @override
   void initState() {
@@ -29,6 +38,8 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
 
   @override
   void dispose() {
+    _birthdayNotifyTimer?.cancel();
+    _birthdayNotifyTimer = null;
     for (final ch in _channels) {
       ch.unsubscribe();
     }
@@ -130,6 +141,86 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
       ch.subscribe();
       _channels.add(ch);
     }
+
+    // 6. Уведомление о днях рождения в выбранное время (если пользователь в приложении)
+    if (_canSeeDeletionNotifications(emp)) {
+      _scheduleBirthdayNotification(est.id);
+    }
+  }
+
+  void _scheduleBirthdayNotification(String estId) {
+    _birthdayNotifyTimer?.cancel();
+    _birthdayNotifyTimer = null;
+    final screenPref = ScreenLayoutPreferenceService();
+    if (screenPref.birthdayNotifyDays < 1) return;
+    final timeStr = screenPref.birthdayNotifyTime;
+    final parts = timeStr.split(':');
+    final hour = parts.isNotEmpty ? (int.tryParse(parts[0]) ?? 9) : 9;
+    final minute = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+    final now = DateTime.now();
+    var next = DateTime(now.year, now.month, now.day, hour, minute);
+    if (now.isAfter(next) || now.isAtSameMomentAs(next)) {
+      next = next.add(const Duration(days: 1));
+    }
+    var duration = next.difference(now);
+    if (duration.isNegative) duration = duration + const Duration(days: 1);
+    _birthdayNotifyTimer = Timer(duration, () => _onBirthdayNotifyFired(estId));
+  }
+
+  Future<void> _onBirthdayNotifyFired(String estId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final todayStr = _todayKey();
+    if (prefs.getString(_keyBirthdayNotifyLastShown) == todayStr) return;
+    final screenPref = ScreenLayoutPreferenceService();
+    if (screenPref.birthdayNotifyDays < 1) return;
+    final days = screenPref.birthdayNotifyDays;
+    final acc = AccountManagerSupabase();
+    List<Employee> employees;
+    try {
+      employees = await acc.getEmployeesForEstablishment(estId);
+    } catch (_) {
+      return;
+    }
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final upcoming = <({Employee emp, int daysUntil})>[];
+    for (final emp in employees) {
+      final b = emp.birthday;
+      if (b == null) continue;
+      final thisYear = DateTime(now.year, b.month, b.day);
+      if (thisYear == today) {
+        upcoming.add((emp: emp, daysUntil: 0));
+        continue;
+      }
+      for (var d = 1; d <= days; d++) {
+        final target = today.add(Duration(days: d));
+        if (thisYear.year == target.year && thisYear.month == target.month && thisYear.day == target.day) {
+          upcoming.add((emp: emp, daysUntil: d));
+          break;
+        }
+      }
+    }
+    if (upcoming.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _scheduleBirthdayNotification(estId);
+      });
+      return;
+    }
+    final parts = upcoming.map((e) {
+      if (e.daysUntil == 0) return '${e.emp.fullName} (сегодня)';
+      return '${e.emp.fullName} (через ${e.daysUntil} дн.)';
+    }).toList();
+    final message = 'День рождения: ${parts.join(', ')}';
+    AppToastService.showBanner(message, onTap: AppToastService.goToInboxNotifications);
+    await prefs.setString(_keyBirthdayNotifyLastShown, todayStr);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _scheduleBirthdayNotification(estId);
+    });
+  }
+
+  static String _todayKey() {
+    final n = DateTime.now();
+    return '${n.year}-${n.month.toString().padLeft(2, '0')}-${n.day.toString().padLeft(2, '0')}';
   }
 
   bool _hasInboxOrders(dynamic emp) =>

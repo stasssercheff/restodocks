@@ -1099,6 +1099,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ).then((_) => customController.dispose());
   }
 
+  void _showBirthdayNotifyDaysPicker(BuildContext context, LocalizationService loc, ScreenLayoutPreferenceService screenPref) {
+    final current = screenPref.birthdayNotifyDays;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('birthday_notify_days') ?? 'Оповещение о днях рождения'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [0, 1, 2, 3, 4, 5].map((days) {
+              final label = days == 0
+                  ? (loc.t('birthday_notify_off') ?? 'Без уведомления')
+                  : (loc.t('birthday_notify_days_value') ?? 'За %s дн. до ДР').replaceAll('%s', '$days');
+              final selected = current == days;
+              return ListTile(
+                title: Text(label),
+                trailing: selected ? const Icon(Icons.check, color: Colors.green) : null,
+                onTap: () async {
+                  await screenPref.setBirthdayNotifyDays(days);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                },
+              );
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showBirthdayNotifyTimePicker(BuildContext context, LocalizationService loc, ScreenLayoutPreferenceService screenPref) {
+    final options = birthdayNotifyTimeOptions;
+    final current = screenPref.birthdayNotifyTime;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('birthday_notify_time') ?? 'Время уведомления'),
+        content: SizedBox(
+          width: 200,
+          height: 320,
+          child: ListView.builder(
+            itemCount: options.length,
+            itemBuilder: (_, i) {
+              final time = options[i];
+              final selected = current == time;
+              return ListTile(
+                dense: true,
+                title: Text(time),
+                trailing: selected ? const Icon(Icons.check, color: Colors.green, size: 20) : null,
+                onTap: () async {
+                  await screenPref.setBirthdayNotifyTime(time);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   static const _trainingVideos = <String, String>{
     'Чеклист создание + ТТК, отображение во входящих': 'https://youtu.be/goZ20v6DV2s',
     'Чеклист заполнение': 'https://youtu.be/ggc8es-ivJc',
@@ -1634,15 +1694,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ],
             ),
-            Consumer<ScreenLayoutPreferenceService>(
-              builder: (_, screenPref, __) => SwitchListTile(
-                secondary: const Icon(Icons.translate),
-                title: Text(localization.t('show_name_translit') ?? 'Показывать имена транслитом'),
-                subtitle: Text(localization.t('show_name_translit_hint') ?? 'Отображать ФИО сотрудников латиницей'),
-                value: screenPref.showNameTranslit,
-                onChanged: (v) => screenPref.setShowNameTranslit(v),
+            if (currentEmployee.hasRole('owner') ||
+                currentEmployee.department == 'management' ||
+                currentEmployee.hasRole('executive_chef') ||
+                currentEmployee.hasRole('sous_chef') ||
+                currentEmployee.hasRole('bar_manager') ||
+                currentEmployee.hasRole('floor_manager') ||
+                currentEmployee.hasRole('general_manager'))
+              ExpansionTile(
+                initiallyExpanded: false,
+                leading: const Icon(Icons.people),
+                title: Text(localization.t('settings_employees') ?? 'Сотрудники'),
+                subtitle: Text(
+                  localization.t('settings_employees_hint') ?? 'Имена транслитом и уведомления о днях рождения',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                children: [
+                  Consumer<ScreenLayoutPreferenceService>(
+                    builder: (_, screenPref, __) => SwitchListTile(
+                      secondary: const Icon(Icons.translate),
+                      title: Text(localization.t('show_name_translit') ?? 'Показывать имена транслитом'),
+                      subtitle: Text(localization.t('show_name_translit_hint') ?? 'Отображать ФИО сотрудников латиницей (например, Иванов → Ivanov)'),
+                      value: screenPref.showNameTranslit,
+                      onChanged: (v) => screenPref.setShowNameTranslit(v),
+                    ),
+                  ),
+                  Consumer<ScreenLayoutPreferenceService>(
+                    builder: (_, screenPref, __) {
+                      final days = screenPref.birthdayNotifyDays;
+                      return ListTile(
+                        leading: const Icon(Icons.cake),
+                        title: Text(localization.t('birthday_notify_days') ?? 'Оповещение о днях рождения'),
+                        subtitle: Text(
+                          days == 0
+                              ? (localization.t('birthday_notify_off') ?? 'Без уведомления')
+                              : (localization.t('birthday_notify_days_value') ?? 'За %s дн. до ДР').replaceAll('%s', '$days'),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _showBirthdayNotifyDaysPicker(context, localization, screenPref),
+                      );
+                    },
+                  ),
+                  if (context.read<ScreenLayoutPreferenceService>().birthdayNotifyDays > 0)
+                    Consumer<ScreenLayoutPreferenceService>(
+                      builder: (_, screenPref, __) => ListTile(
+                        leading: const Icon(Icons.schedule),
+                        title: Text(localization.t('birthday_notify_time') ?? 'Время уведомления'),
+                        subtitle: Text(
+                          screenPref.birthdayNotifyTime,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _showBirthdayNotifyTimePicker(context, localization, screenPref),
+                      ),
+                    ),
+                ],
               ),
-            ),
             Consumer<ScreenLayoutPreferenceService>(
               builder: (_, screenPref, __) => SwitchListTile(
                 secondary: const Icon(Icons.notifications_active_outlined),

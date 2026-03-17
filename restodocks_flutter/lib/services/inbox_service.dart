@@ -238,6 +238,62 @@ class InboxService {
     return documents.where((doc) => doc.department == department).toList();
   }
 
+  /// Создать уведомление об изменении дня рождения (вызывается при сохранении профиля сотрудником).
+  Future<void> insertBirthdayChangeNotification({
+    required String establishmentId,
+    required String employeeId,
+    required String employeeName,
+    required DateTime? newBirthday,
+    DateTime? previousBirthday,
+  }) async {
+    try {
+      await _supabase.client.from('employee_birthday_change_notifications').insert({
+        'establishment_id': establishmentId,
+        'employee_id': employeeId,
+        'employee_name': employeeName,
+        'previous_birthday': previousBirthday != null ? _dateOnly(previousBirthday) : null,
+        'new_birthday': newBirthday != null ? _dateOnly(newBirthday) : null,
+        'changed_by_employee_id': employeeId,
+      });
+    } catch (e) {
+      devLog('Error inserting birthday change notification: $e');
+    }
+  }
+
+  static String _dateOnly(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  /// Уведомления об изменении дня рождения (видят owner, executive_chef, sous_chef, bar_manager, floor_manager)
+  Future<List<EmployeeBirthdayChangeNotification>> getBirthdayChangeNotifications(String establishmentId) async {
+    try {
+      final res = await _supabase.client
+          .from('employee_birthday_change_notifications')
+          .select()
+          .eq('establishment_id', establishmentId)
+          .order('created_at', ascending: false)
+          .limit(100);
+      final list = res as List<dynamic>? ?? [];
+      return list.map((r) {
+        final m = Map<String, dynamic>.from(r as Map);
+        return EmployeeBirthdayChangeNotification(
+          id: m['id']?.toString() ?? '',
+          employeeName: m['employee_name']?.toString() ?? '—',
+          previousBirthday: _parseDate(m['previous_birthday']?.toString()),
+          newBirthday: _parseDate(m['new_birthday']?.toString()) ?? DateTime.now(),
+          createdAt: DateTime.tryParse(m['created_at']?.toString() ?? '') ?? DateTime.now(),
+        );
+      }).toList();
+    } catch (e) {
+      devLog('Error loading birthday change notifications: $e');
+      return [];
+    }
+  }
+
+  static DateTime? _parseDate(String? s) {
+    if (s == null || s.isEmpty) return null;
+    return DateTime.tryParse(s);
+  }
+
   /// Уведомления об удалении сотрудников (видят owner, executive_chef, sous_chef, bar_manager, floor_manager)
   Future<List<EmployeeDeletionNotification>> getDeletionNotifications(String establishmentId) async {
     try {
@@ -263,6 +319,23 @@ class InboxService {
       return [];
     }
   }
+}
+
+/// Уведомление об изменении дня рождения сотрудника
+class EmployeeBirthdayChangeNotification {
+  final String id;
+  final String employeeName;
+  final DateTime? previousBirthday;
+  final DateTime newBirthday;
+  final DateTime createdAt;
+
+  EmployeeBirthdayChangeNotification({
+    required this.id,
+    required this.employeeName,
+    this.previousBirthday,
+    required this.newBirthday,
+    required this.createdAt,
+  });
 }
 
 /// Уведомление об удалении сотрудника

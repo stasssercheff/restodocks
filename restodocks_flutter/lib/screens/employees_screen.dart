@@ -629,6 +629,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
   late String _employmentStatus;
   DateTime? _employmentStartDate;
   DateTime? _employmentEndDate;
+  DateTime? _birthday;
   bool _saving = false;
   String? _error;
 
@@ -651,6 +652,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
     _employmentStatus = widget.employee.employmentStatus ?? 'permanent';
     _employmentStartDate = widget.employee.employmentStartDate;
     _employmentEndDate = widget.employee.employmentEndDate;
+    _birthday = widget.employee.birthday;
   }
 
   @override
@@ -688,6 +690,7 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
         employmentStatus: _employmentStatus,
         employmentStartDate: _employmentStartDate,
         employmentEndDate: _employmentEndDate,
+        birthday: _birthday,
       );
       await context.read<AccountManagerSupabase>().updateEmployee(updated);
       if (mounted) widget.onSaved();
@@ -742,6 +745,40 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                           labelText: loc.t('full_name') ?? 'ФИО',
                           border: const OutlineInputBorder(),
                           filled: true,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.cake, size: 22),
+                        title: Text(
+                          _birthday == null
+                              ? (loc.t('birthday') ?? 'День рождения') + ' — ' + (loc.t('not_specified') ?? 'не указано')
+                              : '${loc.t('birthday') ?? 'День рождения'}: ${_birthday!.day.toString().padLeft(2, '0')}.${_birthday!.month.toString().padLeft(2, '0')}.${_birthday!.year}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (_birthday != null)
+                              IconButton(
+                                icon: const Icon(Icons.clear, size: 20),
+                                onPressed: () => setState(() => _birthday = null),
+                                tooltip: loc.t('clear') ?? 'Очистить',
+                              ),
+                            TextButton(
+                              onPressed: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: _birthday ?? DateTime.now().subtract(const Duration(days: 365 * 25)),
+                                  firstDate: DateTime(1920),
+                                  lastDate: DateTime.now(),
+                                );
+                                if (picked != null && mounted) setState(() => _birthday = picked);
+                              },
+                              child: Text(_birthday == null ? (loc.t('set') ?? 'Указать') : (loc.t('change') ?? 'Изменить')),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 12),

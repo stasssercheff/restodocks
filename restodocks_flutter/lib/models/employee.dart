@@ -162,6 +162,10 @@ class Employee extends Equatable {
   @JsonKey(name: 'employment_end_date')
   final DateTime? employmentEndDate;
 
+  /// День рождения (только дата, без времени).
+  @JsonKey(name: 'birthday')
+  final DateTime? birthday;
+
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
 
@@ -193,6 +197,7 @@ class Employee extends Equatable {
     this.employmentStatus = 'permanent',
     this.employmentStartDate,
     this.employmentEndDate,
+    this.birthday,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -222,6 +227,7 @@ class Employee extends Equatable {
     String? employmentStatus,
     DateTime? employmentStartDate,
     DateTime? employmentEndDate,
+    DateTime? birthday,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -249,6 +255,7 @@ class Employee extends Equatable {
       employmentStatus: employmentStatus ?? this.employmentStatus,
       employmentStartDate: employmentStartDate ?? this.employmentStartDate,
       employmentEndDate: employmentEndDate ?? this.employmentEndDate,
+      birthday: birthday ?? this.birthday,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -431,7 +438,7 @@ class Employee extends Equatable {
 
   /// Полное отображаемое имя с должностью
   String get displayNameWithRole {
-    return '$fullName (${roleDisplayName})';
+    return '$fullName ($roleDisplayName)';
   }
 
   /// JSON сериализация (защита от null из БД/API на Web)
@@ -484,6 +491,7 @@ class Employee extends Equatable {
     employmentStatus,
     employmentStartDate,
     employmentEndDate,
+    birthday,
     createdAt,
     updatedAt,
   ];
@@ -499,6 +507,7 @@ class Employee extends Equatable {
     required List<String> roles,
     required String establishmentId,
     String preferredLanguage = 'ru',
+    DateTime? birthday,
   }) {
     final now = DateTime.now();
     return Employee(
@@ -516,6 +525,7 @@ class Employee extends Equatable {
       isActive: true,
       dataAccessEnabled: false,
       canEditOwnSchedule: false,
+      birthday: birthday,
       createdAt: now,
       updatedAt: now,
     );

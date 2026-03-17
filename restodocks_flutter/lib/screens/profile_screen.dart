@@ -11,6 +11,7 @@ import 'package:provider/provider.dart';
 
 import '../services/services.dart';
 import '../services/profile_service.dart';
+import '../services/inbox_service.dart';
 import '../models/models.dart';
 import '../widgets/app_bar_home_button.dart';
 
@@ -70,6 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showEditProfile(BuildContext context) {
     final account = context.read<AccountManagerSupabase>();
     final emp = account.currentEmployee;
+    final establishment = account.establishment;
     if (emp == null) return;
     showDialog<void>(
       context: context,
@@ -77,6 +79,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (ctx) => _ProfileEditDialog(
         employee: emp,
         onSaved: (updated) async {
+          if (establishment != null &&
+              updated.birthday != null &&
+              _birthdayChanged(emp.birthday, updated.birthday)) {
+            final inboxService = InboxService(context.read<AccountManagerSupabase>().supabase);
+            await inboxService.insertBirthdayChangeNotification(
+              establishmentId: establishment.id,
+              employeeId: emp.id,
+              employeeName: updated.fullName.trim().isNotEmpty ? updated.fullName : emp.fullName,
+              newBirthday: updated.birthday,
+              previousBirthday: emp.birthday,
+            );
+          }
           await account.updateEmployee(updated);
           if (ctx.mounted) {
             Navigator.of(ctx).pop();
@@ -86,6 +100,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         onCancel: () => Navigator.of(ctx).pop(),
       ),
     );
+  }
+
+  static bool _birthdayChanged(DateTime? a, DateTime? b) {
+    if (a == null && b == null) return false;
+    if (a == null || b == null) return true;
+    return a.year != b.year || a.month != b.month || a.day != b.day;
   }
 
   @override
@@ -381,6 +401,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: const TextStyle(fontSize: 14, color: Colors.grey),
               textAlign: TextAlign.center,
             ),
+            if (employee.birthday != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                '${localization.t('birthday') ?? 'День рождения'}: ${DateFormat('dd.MM.yyyy').format(employee.birthday!)}',
+                style: const TextStyle(fontSize: 14, color: Colors.grey),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ],
         ),
       ),
@@ -594,6 +622,7 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
   late TextEditingController _nameController;
   late TextEditingController _surnameController;
   String? _avatarUrl;
+  DateTime? _birthday;
   bool _isLoading = false;
   String? _error;
 
@@ -607,6 +636,7 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
       text: widget.employee.surname ?? (parts.length > 1 ? parts.sublist(1).join(' ') : ''),
     );
     _avatarUrl = widget.employee.avatarUrl;
+    _birthday = widget.employee.birthday;
   }
 
   @override
@@ -712,6 +742,7 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
         fullName: fullName,
         surname: surname.isEmpty ? '' : surname,
         avatarUrl: cleanAvatarUrl ?? widget.employee.avatarUrl,
+        birthday: _birthday,
       );
       await widget.onSaved(updated);
     } catch (e) {
@@ -799,6 +830,40 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
                     labelText: loc.t('surname'),
                     border: const OutlineInputBorder(),
                     prefixIcon: const Icon(Icons.badge),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.cake),
+                  title: Text(
+                    _birthday == null
+                        ? (loc.t('birthday') ?? 'День рождения') + ' — ' + (loc.t('not_specified') ?? 'не указано')
+                        : DateFormat('dd.MM.yyyy').format(_birthday!),
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_birthday != null)
+                        IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () => setState(() => _birthday = null),
+                          tooltip: loc.t('clear') ?? 'Очистить',
+                        ),
+                      TextButton(
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _birthday ?? DateTime.now().subtract(const Duration(days: 365 * 25)),
+                            firstDate: DateTime(1920),
+                            lastDate: DateTime.now(),
+                          );
+                          if (picked != null && mounted) setState(() => _birthday = picked);
+                        },
+                        child: Text(_birthday == null ? (loc.t('set') ?? 'Указать') : (loc.t('change') ?? 'Изменить')),
+                      ),
+                    ],
                   ),
                 ),
                 if (_error != null) ...[

@@ -38,6 +38,8 @@ class _InboxScreenState extends State<InboxScreen> {
   late InboxService _inboxService;
   List<InboxDocument> _documents = [];
   List<EmployeeDeletionNotification> _deletionNotifications = [];
+  List<EmployeeBirthdayChangeNotification> _birthdayChangeNotifications = [];
+  List<({Employee emp, DateTime birthdayDate, int daysUntil})> _upcomingBirthdays = [];
   int _unreadMessagesCount = 0;
   bool _loading = true;
   _InboxTab? _selectedTab;
@@ -95,7 +97,8 @@ class _InboxScreenState extends State<InboxScreen> {
   bool _canSeeNotifications(Employee employee) {
     return employee.roles.any((r) =>
         r == 'owner' || r == 'executive_chef' || r == 'sous_chef' ||
-        r == 'bar_manager' || r == 'floor_manager');
+        r == 'bar_manager' || r == 'floor_manager' || r == 'general_manager') ||
+        employee.department == 'management';
   }
 
   /// Входящие по ролям: Заказы, Инвентаризация, iiko, Уведомления, Чеклисты. Сообщения — отдельная кнопка на главной.
@@ -137,8 +140,34 @@ class _InboxScreenState extends State<InboxScreen> {
       final currentEmployee = accountManager.currentEmployee;
       final documents = await _inboxService.getInboxDocuments(establishment.id, currentEmployee);
       List<EmployeeDeletionNotification> notifications = [];
+      List<EmployeeBirthdayChangeNotification> birthdayChanges = [];
+      List<({Employee emp, DateTime birthdayDate, int daysUntil})> upcoming = [];
       if (currentEmployee != null && _canSeeNotifications(currentEmployee)) {
         notifications = await _inboxService.getDeletionNotifications(establishment.id);
+        birthdayChanges = await _inboxService.getBirthdayChangeNotifications(establishment.id);
+        final screenPref = context.read<ScreenLayoutPreferenceService>();
+        final days = screenPref.birthdayNotifyDays;
+        if (days > 0) {
+          final employees = await accountManager.getEmployeesForEstablishment(establishment.id);
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          for (final emp in employees) {
+            final b = emp.birthday;
+            if (b == null) continue;
+            final thisYear = DateTime(now.year, b.month, b.day);
+            if (thisYear == today) {
+              upcoming.add((emp: emp, birthdayDate: thisYear, daysUntil: 0));
+              continue;
+            }
+            for (var d = 1; d <= days; d++) {
+              final target = today.add(Duration(days: d));
+              if (thisYear.year == target.year && thisYear.month == target.month && thisYear.day == target.day) {
+                upcoming.add((emp: emp, birthdayDate: thisYear, daysUntil: d));
+                break;
+              }
+            }
+          }
+        }
       }
       int unreadMessages = 0;
       if (currentEmployee != null) {
@@ -151,6 +180,8 @@ class _InboxScreenState extends State<InboxScreen> {
         setState(() {
           _documents = documents;
           _deletionNotifications = notifications;
+          _birthdayChangeNotifications = birthdayChanges;
+          _upcomingBirthdays = upcoming;
           _unreadMessagesCount = unreadMessages;
           _loading = false;
         });
@@ -171,7 +202,8 @@ class _InboxScreenState extends State<InboxScreen> {
       if (_selectedTypeTab == _InboxTypeTab.notifications) {
         final overdue = _overdueChecklistsForNotifications.where((d) => !viewed.contains(d.id)).map((d) => d.id).toList();
         final del = _deletionNotifications.where((n) => !viewed.contains('del_${n.id}')).map((n) => 'del_${n.id}').toList();
-        return [...overdue, ...del];
+        final bday = _birthdayChangeNotifications.where((n) => !viewed.contains('bday_${n.id}')).map((n) => 'bday_${n.id}').toList();
+        return [...overdue, ...del, ...bday];
       }
       return _filteredDocuments.where((d) => !viewed.contains(d.id)).map((d) => d.id).toList();
     }
@@ -179,7 +211,8 @@ class _InboxScreenState extends State<InboxScreen> {
     if (_selectedTab == _InboxTab.notifications) {
       final overdue = _overdueChecklistsForNotifications.where((d) => !viewed.contains(d.id)).map((d) => d.id).toList();
       final del = _deletionNotifications.where((n) => !viewed.contains('del_${n.id}')).map((n) => 'del_${n.id}').toList();
-      return [...overdue, ...del];
+      final bday = _birthdayChangeNotifications.where((n) => !viewed.contains('bday_${n.id}')).map((n) => 'bday_${n.id}').toList();
+      return [...overdue, ...del, ...bday];
     }
     return _filteredDocuments.where((d) => !viewed.contains(d.id)).map((d) => d.id).toList();
   }
@@ -442,7 +475,8 @@ class _InboxScreenState extends State<InboxScreen> {
         return docsUnviewed.where((d) => d.type == DocumentType.writeoff).length;
       case _InboxTab.notifications:
         final delUnviewed = _deletionNotifications.where((n) => !viewed.contains('del_${n.id}')).length;
-        return docsUnviewed.where((d) => d.type == DocumentType.checklistMissedDeadline).length + delUnviewed;
+        final bdayUnviewed = _birthdayChangeNotifications.where((n) => !viewed.contains('bday_${n.id}')).length;
+        return docsUnviewed.where((d) => d.type == DocumentType.checklistMissedDeadline).length + delUnviewed + bdayUnviewed;
       case _InboxTab.checklist:
         return docsUnviewed.where((d) =>
             d.type == DocumentType.checklistSubmission ||
@@ -684,9 +718,11 @@ class _InboxScreenState extends State<InboxScreen> {
   Widget _buildDeletionNotificationsList(LocalizationService loc) {
     final overdueChecklists = _overdueChecklistsForNotifications;
     final hasDeletions = _deletionNotifications.isNotEmpty;
+    final hasBirthdayChanges = _birthdayChangeNotifications.isNotEmpty;
+    final hasUpcoming = _upcomingBirthdays.isNotEmpty;
     final hasOverdue = overdueChecklists.isNotEmpty;
 
-    if (!hasDeletions && !hasOverdue) {
+    if (!hasDeletions && !hasOverdue && !hasBirthdayChanges && !hasUpcoming) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -720,6 +756,76 @@ class _InboxScreenState extends State<InboxScreen> {
             document: doc,
             onDownload: _downloadDocument,
           )),
+          const SizedBox(height: 16),
+        ],
+        if (hasUpcoming) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              loc.t('birthday_upcoming') ?? 'Ближайшие дни рождения',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+          ..._upcomingBirthdays.map((e) {
+            final dateStr = DateFormat('dd.MM').format(e.birthdayDate);
+            final daysText = e.daysUntil == 0
+                ? (loc.t('birthday_today') ?? 'Сегодня')
+                : (loc.t('birthday_in_days') ?? 'Через %s дн.').replaceAll('%s', '${e.daysUntil}');
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                  child: Icon(Icons.cake, color: Theme.of(context).colorScheme.onPrimaryContainer),
+                ),
+                title: Text(
+                  '${e.emp.fullName} — $dateStr',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                ),
+                subtitle: Text(daysText, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+              ),
+            );
+          }),
+          const SizedBox(height: 16),
+        ],
+        if (hasBirthdayChanges) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              loc.t('birthday_changed') ?? 'Изменение дня рождения',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          ..._birthdayChangeNotifications.map((n) {
+            final estId = context.read<AccountManagerSupabase>().establishment?.id;
+            if (estId != null) context.read<InboxViewedService>().addViewed(estId, 'bday_${n.id}');
+            final dateStr = DateFormat('dd.MM.yyyy').format(n.newBirthday);
+            final prevStr = n.previousBirthday != null ? DateFormat('dd.MM.yyyy').format(n.previousBirthday!) : (loc.t('not_specified') ?? 'не указано');
+            final createdStr = DateFormat('dd.MM.yyyy HH:mm').format(n.createdAt.toLocal());
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                  child: Icon(Icons.edit_calendar, color: Theme.of(context).colorScheme.onSecondaryContainer),
+                ),
+                title: Text(
+                  '${n.employeeName}: $dateStr',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                ),
+                subtitle: Text(
+                  '${loc.t('birthday_was') ?? 'Было'}: $prevStr • $createdStr',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+              ),
+            );
+          }),
           const SizedBox(height: 16),
         ],
         if (hasDeletions) ...[
