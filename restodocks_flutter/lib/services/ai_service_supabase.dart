@@ -315,6 +315,16 @@ class AiServiceSupabase implements AiService {
             part = AiServiceSupabase.parseTtkByTemplate(expanded);
             if (part.isEmpty) part = AiServiceSupabase._tryParseKkFromRows(expanded);
           }
+          // Fallback: карточки без ингредиентов (название+технология) — пробуем relaxed парсер
+          if (part.isNotEmpty && part.every((c) => c.ingredients.isEmpty)) {
+            final dish = part.first.dishName;
+            final relaxed = AiServiceSupabase._tryParseRelaxedProductGrossNet(expanded, dish);
+            if (relaxed.isNotEmpty && relaxed.first.ingredients.isNotEmpty) part = relaxed;
+          }
+          if (part.isEmpty) {
+            final dish = expanded.isNotEmpty ? AiServiceSupabase._extractDishFromFirstRows(expanded) : null;
+            part = AiServiceSupabase._tryParseRelaxedProductGrossNet(expanded, dish);
+          }
           final multiBlock = AiServiceSupabase._tryParseMultiColumnBlocks(expanded);
           if (_shouldPreferMultiBlock(part, multiBlock)) part = multiBlock;
           merged.addAll(part);
@@ -1570,8 +1580,145 @@ class AiServiceSupabase implements AiService {
         RegExp(r'^способ\s*(приготовления|оформления)?$').hasMatch(low);
   }
 
+  /// ГОСТ 2-row header: «Наименование сырья и продуктов» | «Расход сырья на 1 порцию» + следующая строка: '' | «Брутто» | «Нетто».
+  /// Явная поддержка — локальный парсер должен стабильно работать без EF.
+  static List<TechCardRecognitionResult> _tryParseGost2RowHeader(List<List<String>> rows) {
+    if (rows.length < 4) return [];
+    rows = _normalizeRowLengths(rows);
+    String? dishName;
+    int headerEnd = -1;
+    int grossCol = -1, netCol = -1;
+    for (var r = 0; r < rows.length - 2 && r < 15; r++) {
+      final r0 = rows[r].map((c) => (c ?? '').toString().trim().toLowerCase()).toList();
+      final r1 = rows[r + 1].map((c) => (c ?? '').toString().trim().toLowerCase()).toList();
+      final hasNameOrRashod = r0.any((c) =>
+          (c.contains('наименование') && (c.contains('сырья') || c.contains('продукт'))) ||
+          (c.contains('расход') && c.contains('сырья')));
+      final hasBruttoNetto = r1.length >= 3 &&
+          r1.skip(1).any((c) => c.contains('брутто')) &&
+          r1.skip(1).any((c) => c.contains('нетто'));
+      if (hasNameOrRashod && hasBruttoNetto) {
+        for (var c = 1; c < r1.length && c < 8; c++) {
+          if (r1[c].contains('брутто')) grossCol = c;
+          if (r1[c].contains('нетто')) netCol = c;
+        }
+        if (grossCol < 0 || netCol < 0) return [];
+        headerEnd = r + 1;
+        for (var ri = 0; ri <= r; ri++) {
+          for (final cell in rows[ri]) {
+            final s = (cell ?? '').toString().trim();
+            if (s.length >= 3 && s.length <= 80 &&
+                RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(s) &&
+                !s.toLowerCase().contains('наименование') &&
+                !s.toLowerCase().contains('расход') &&
+                !s.toLowerCase().contains('область') &&
+                !RegExp(r'^\d+\.\s').hasMatch(s)) {
+              dishName = s;
+              break;
+            }
+          }
+          if (dishName != null) break;
+        }
+        break;
+      }
+    }
+    if (headerEnd < 0 || grossCol < 0 || netCol < 0) return [];
+    final ingredients = <TechCardIngredientLine>[];
+    for (var r = headerEnd + 1; r < rows.length; r++) {
+      final cells = rows[r].map((c) => (c ?? '').toString().trim()).toList();
+      if (cells.length <= netCol) continue;
+      final product = cells[0].trim();
+      if (product.isEmpty || _isJunkProductName(product)) continue;
+      final g = _parseNum(cells.length > grossCol ? cells[grossCol] : '');
+      final n = _parseNum(cells.length > netCol ? cells[netCol] : '');
+      if ((g == null || g <= 0) && (n == null || n <= 0)) continue;
+      if (product.toLowerCase().contains('итого') || product.toLowerCase().contains('выход')) break;
+      double gross = g ?? n ?? 0;
+      double net = n ?? g ?? 0;
+      if (product.toLowerCase().contains('яйц') && gross == 1 && net >= 20 && net <= 60) gross = 50;
+      ingredients.add(TechCardIngredientLine(
+        productName: product,
+        grossGrams: gross,
+        netGrams: net,
+        outputGrams: null,
+        primaryWastePct: null,
+        unit: 'g',
+        ingredientType: RegExp(r'^П/Ф\s', caseSensitive: false).hasMatch(product) ? 'semi_finished' : 'product',
+      ));
+    }
+    if (ingredients.isEmpty) return [];
+    return [
+      TechCardRecognitionResult(
+        dishName: dishName ?? 'Блюдо',
+        ingredients: ingredients,
+        isSemiFinished: (dishName ?? '').toLowerCase().contains('пф'),
+      ),
+    ];
+  }
+
+  /// Извлечь название блюда из первых строк таблицы (DOCX: «Салат Цезарь» до заголовка).
+  static String? _extractDishFromFirstRows(List<List<String>> rows) {
+    for (var r = 0; r < rows.length && r < 8; r++) {
+      for (final cell in rows[r]) {
+        final s = (cell ?? '').toString().trim();
+        if (s.length >= 3 && s.length <= 80 &&
+            RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(s) &&
+            !s.toLowerCase().contains('наименование') &&
+            !s.toLowerCase().contains('расход') &&
+            !s.toLowerCase().contains('брутто') &&
+            !s.toLowerCase().contains('нетто') &&
+            !s.toLowerCase().contains('область') &&
+            !RegExp(r'^\d+\.\s').hasMatch(s) &&
+            _isValidDishName(s) &&
+            !_isSkipForDishName(s)) {
+          return s;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Fallback: строки с паттерном [текст, число, число] — продукт | брутто | нетто. Для DOCX с нестандартной структурой.
+  static List<TechCardRecognitionResult> _tryParseRelaxedProductGrossNet(List<List<String>> rows, String? dishName) {
+    if (rows.length < 2) return [];
+    rows = _normalizeRowLengths(rows);
+    final ingredients = <TechCardIngredientLine>[];
+    for (var r = 0; r < rows.length; r++) {
+      final cells = rows[r].map((c) => (c ?? '').toString().trim()).toList();
+      if (cells.length < 3) continue;
+      final c0 = cells[0], c1 = cells[1], c2 = cells.length > 2 ? cells[2] : '';
+      if (c0.isEmpty || c0.length < 2) continue;
+      if (c0.toLowerCase().contains('наименование') || c0.toLowerCase().contains('брутто') || c0.toLowerCase().contains('итого')) continue;
+      final g = _parseNum(c1);
+      final n = _parseNum(c2);
+      if ((g == null || g <= 0) && (n == null || n <= 0)) continue;
+      if (RegExp(r'^[\d\s.,\-]+$').hasMatch(c0)) continue;
+      if (_isJunkProductName(c0)) continue;
+      double gross = g ?? n ?? 0;
+      double net = n ?? g ?? 0;
+      if (c0.toLowerCase().contains('яйц') && gross == 1 && net >= 20 && net <= 60) gross = 50;
+      ingredients.add(TechCardIngredientLine(
+        productName: c0,
+        grossGrams: gross,
+        netGrams: net,
+        outputGrams: null,
+        primaryWastePct: null,
+        unit: 'g',
+        ingredientType: RegExp(r'^П/Ф\s', caseSensitive: false).hasMatch(c0) ? 'semi_finished' : 'product',
+      ));
+    }
+    if (ingredients.isEmpty) return [];
+    return [
+      TechCardRecognitionResult(
+        dishName: dishName ?? 'Блюдо',
+        ingredients: ingredients,
+        isSemiFinished: (dishName ?? '').toLowerCase().contains('пф'),
+      ),
+    ];
+  }
+
   /// Парсинг ТТК по шаблону (Наименование, Продукт, Брутто, Нетто...) — без вызова ИИ.
-  /// [errors] — при не null: try-catch на каждую строку, битые карточки в errors, цикл продолжается.
+  /// [errors] — при non-null: try-catch на каждую строку, битые карточки в errors, цикл продолжается.
   static List<TechCardRecognitionResult> parseTtkByTemplate(
     List<List<String>> rows, {
     List<TtkParseError>? errors,
@@ -1582,6 +1729,10 @@ class AiServiceSupabase implements AiService {
 
     // ГОСТ: строка "3. РЕЦЕПТУРА" — пропустить, заголовок в следующей строке
     rows = _skipGostSectionHeaders(rows);
+
+    // ГОСТ 2-row: явная обработка — чтобы локальный парсер стабильно работал
+    final gost2 = _tryParseGost2RowHeader(rows);
+    if (gost2.isNotEmpty && gost2.first.ingredients.isNotEmpty) return gost2;
 
     // Несколько блоков в одном файле (супы.xlsx и др.): название → №|Наименование продукта|Вес → Выход. Если нашли 2+ карточки — используем.
     final polnoe = _tryParsePolnoePosobieFormat(rows);
@@ -3083,9 +3234,315 @@ class AiServiceSupabase implements AiService {
       }
       return _applyEggGrossFix(list);
     } catch (e) {
-      devLog('parse-ttk-by-templates: $e');
+      devLog('parse-ttk-by-templates: $e (fallback: local templates from DB)');
+      final local = await _tryParseByStoredTemplatesLocally(rows);
+      if (local.isNotEmpty) return local;
       return [];
     }
+  }
+
+  /// Локальный парсер: полный дубликат серверной логики. Читает tt_parse_templates и tt_parse_learned_dish_name
+  /// из Supabase (REST, без EF) — те же шаблоны, то же обучение. Когда EF 503 — парсим локально.
+  Future<List<TechCardRecognitionResult>> _tryParseByStoredTemplatesLocally(List<List<String>> rows) async {
+    try {
+    if (rows.length < 2) return [];
+    const keywords = ['наименование', 'продукт', 'брутто', 'нетто', 'название', 'сырьё', 'ингредиент', 'расход сырья'];
+    String? firstSig;
+    Map<String, dynamic>? templateData;
+    for (var r = 0; r < rows.length && r < 100; r++) {
+      final row = rows[r].map((c) => (c ?? '').toString().trim().toLowerCase()).toList();
+      if (row.length < 2) continue;
+      if (!row.any((c) => keywords.any((k) => c.contains(k)))) continue;
+      final headerRow = rows[r].map((c) => (c ?? '').toString().trim()).toList();
+      final sig = AiServiceSupabase._headerSignature(headerRow);
+      if (sig.isEmpty) continue;
+      final res0 = await _client.from('tt_parse_templates')
+          .select('header_signature, header_row_index, name_col, product_col, gross_col, net_col, waste_col, output_col, technology_col')
+          .eq('header_signature', sig)
+          .maybeSingle();
+      var templateData0 = res0 is Map<String, dynamic> ? res0 : (res0 != null ? (res0 as dynamic).data as Map<String, dynamic>? : null);
+      if (templateData0 == null) {
+        final allRes = await _client.from('tt_parse_templates')
+            .select('header_signature, header_row_index, name_col, product_col, gross_col, net_col, waste_col, output_col, technology_col');
+        final templates = (allRes is List ? allRes : <Map<String, dynamic>>[]).cast<Map<String, dynamic>>();
+        final sigPrefix6 = sig.split('|').take(6).join('|');
+        templateData0 = templates.where((t) {
+          final ts = (t['header_signature'] ?? '') as String;
+          if (sig == ts || sig.startsWith('$ts|') || ts.startsWith('$sig|')) return true;
+          final tsPrefix6 = ts.split('|').take(6).join('|');
+          return sigPrefix6.isNotEmpty && tsPrefix6.isNotEmpty && (sigPrefix6 == tsPrefix6 || sig.startsWith('$sigPrefix6|'));
+        }).firstOrNull;
+      }
+      if (templateData0 != null) {
+        firstSig = sig;
+        templateData = templateData0;
+        break;
+      }
+    }
+    if (firstSig == null || templateData == null) return [];
+
+    final headerIndices = <int>[];
+    for (var r = 0; r < rows.length && r < 500; r++) {
+      final headerRow = rows[r].map((c) => (c ?? '').toString().trim()).toList();
+      if (AiServiceSupabase._headerSignature(headerRow) == firstSig) headerIndices.add(r);
+    }
+    if (headerIndices.isEmpty) return [];
+
+    int? dishNameRowOffset;
+    int? dishNameCol;
+    int? learnedProductCol;
+    int? learnedGrossCol;
+    int? learnedNetCol;
+    int? learnedTechCol;
+    final learnedRes = await _client.from('tt_parse_learned_dish_name')
+        .select('dish_name_row_offset, dish_name_col, product_col, gross_col, net_col, technology_col')
+        .eq('header_signature', firstSig)
+        .maybeSingle();
+    final l = learnedRes is Map<String, dynamic> ? learnedRes : null;
+    if (l != null) {
+      if (l['dish_name_row_offset'] != null) dishNameRowOffset = l['dish_name_row_offset'] as int;
+      if (l['dish_name_col'] != null) dishNameCol = l['dish_name_col'] as int;
+      if (l['product_col'] != null) learnedProductCol = l['product_col'] as int;
+      if (l['gross_col'] != null) learnedGrossCol = l['gross_col'] as int;
+      if (l['net_col'] != null) learnedNetCol = l['net_col'] as int;
+      if (l['technology_col'] != null) learnedTechCol = l['technology_col'] as int;
+    }
+
+    final templateHeaderIdx = (templateData['header_row_index'] ?? 0) as int;
+    var templateGrossCol = (templateData['gross_col'] ?? -1) as int;
+    var templateNetCol = (templateData['net_col'] ?? -1) as int;
+    int inferredGrossCol = -1, inferredNetCol = -1;
+    if (headerIndices.isNotEmpty) {
+      final nextRow = (rows[headerIndices.first + 1] ?? []).map((c) => (c ?? '').toString().trim().toLowerCase()).toList();
+      for (var c = 0; c < nextRow.length; c++) {
+        if (nextRow[c].contains('брутто') && inferredGrossCol < 0) inferredGrossCol = c;
+        if (nextRow[c].contains('нетто') && inferredNetCol < 0) inferredNetCol = c;
+      }
+    }
+    final needInferred = templateGrossCol < 0 || templateNetCol < 0 || templateGrossCol == templateNetCol;
+    final useInferred = needInferred && inferredGrossCol >= 0 && inferredNetCol >= 0 && inferredGrossCol != inferredNetCol;
+    final effectiveGrossCol = useInferred ? inferredGrossCol : (templateGrossCol >= 0 ? templateGrossCol : inferredGrossCol);
+    final effectiveNetCol = useInferred ? inferredNetCol : (templateNetCol >= 0 ? templateNetCol : inferredNetCol);
+
+    final nameCol = (templateData['name_col'] ?? 0) as int;
+    var templateProductCol = (templateData['product_col'] ?? 1) as int;
+    final productCol = (inferredGrossCol >= 0 && (templateProductCol == inferredGrossCol || learnedProductCol == inferredGrossCol))
+        ? nameCol
+        : (learnedProductCol ?? templateProductCol);
+    final wasteCol = (templateData['waste_col'] ?? -1) as int;
+    final outputCol = (templateData['output_col'] ?? -1) as int;
+    var techCol = (templateData['technology_col'] ?? -1) as int;
+    if (learnedTechCol != null) techCol = learnedTechCol;
+
+    var grossCol = learnedGrossCol ?? effectiveGrossCol;
+    var netCol = learnedNetCol ?? effectiveNetCol;
+    if (grossCol >= 0 && netCol >= 0 && grossCol == netCol && effectiveGrossCol >= 0 && effectiveNetCol >= 0 && effectiveGrossCol != effectiveNetCol) {
+      grossCol = effectiveGrossCol;
+      netCol = effectiveNetCol;
+    }
+
+    final list = AiServiceSupabase._parseTtkWithStoredColumns(
+      rows,
+      headerIdx: templateHeaderIdx,
+      headerIndices: headerIndices,
+      nameCol: nameCol,
+      productCol: productCol,
+      grossCol: grossCol,
+      netCol: netCol,
+      wasteCol: wasteCol,
+      outputCol: outputCol,
+      techCol: techCol,
+      dishNameRowOffset: dishNameRowOffset,
+      dishNameCol: dishNameCol,
+    );
+    if (list.isEmpty) return [];
+    lastParseHeaderSignature = firstSig;
+    lastParseWasFirstTimeFormat = false;
+    debugPrint('[tt_parse] local templates: ${list.length} cards (EF fallback)');
+    return _applyEggGrossFix(list);
+    } catch (e, st) {
+      devLog('[tt_parse] local templates failed: $e\n$st');
+      return [];
+    }
+  }
+
+  /// Парсинг rows с заданными индексами колонок (из tt_parse_templates). Полный дубликат parseTtkByStoredTemplate.
+  static List<TechCardRecognitionResult> _parseTtkWithStoredColumns(
+    List<List<String>> rows, {
+    required int headerIdx,
+    required List<int> headerIndices,
+    required int nameCol,
+    required int productCol,
+    required int grossCol,
+    required int netCol,
+    required int wasteCol,
+    required int outputCol,
+    required int techCol,
+    int? dishNameRowOffset,
+    int? dishNameCol,
+  }) {
+    if (rows.length <= headerIdx + 1 || headerIndices.isEmpty) return [];
+    final firstHeaderIdx = headerIndices.first;
+    final headerRow = rows[firstHeaderIdx].map((c) => (c ?? '').toString().trim().toLowerCase()).toList();
+    final grossColIsKg = grossCol >= 0 && grossCol < headerRow.length && (headerRow[grossCol] ?? '').contains('кг');
+    final netColIsKg = netCol >= 0 && netCol < headerRow.length && (headerRow[netCol] ?? '').contains('кг');
+    final results = <TechCardRecognitionResult>[];
+    var currentDish = _resolveDishName(rows, firstHeaderIdx, nameCol, productCol, dishNameRowOffset, dishNameCol);
+
+    for (var i = 0; i < headerIndices.length; i++) {
+      final startRow = i == 0 ? 0 : headerIndices[i];
+      final endRow = i + 1 < headerIndices.length ? headerIndices[i + 1] : rows.length;
+      final blockRows = rows.sublist(startRow, endRow);
+      final blockHeaderIdx = headerIndices[i] - startRow;
+      final blockResults = _parseBlockWithColumns(blockRows, blockHeaderIdx, nameCol, productCol, grossCol, netCol, wasteCol, outputCol, techCol, grossColIsKg, netColIsKg, currentDish);
+      results.addAll(blockResults.cards);
+      if (blockResults.initialDish != null) currentDish = blockResults.initialDish;
+    }
+    return results;
+  }
+
+  static String? _resolveDishName(List<List<String>> rows, int headerIdx, int nameCol, int productCol, int? dishNameRowOffset, int? dishNameCol) {
+    if (dishNameRowOffset != null && dishNameCol != null) {
+      final nameRow = headerIdx + dishNameRowOffset;
+      if (nameRow >= 0 && nameRow < rows.length) {
+        final row = rows[nameRow];
+        final primary = (row.length > dishNameCol ? row[dishNameCol] : '').toString().trim();
+        if (primary.length >= 2 && _isValidDishNameStored(primary)) return primary;
+        for (final c in [dishNameCol - 1, dishNameCol - 2, dishNameCol + 1, dishNameCol + 2]) {
+          if (c >= 0 && c < row.length) {
+            final v = (row[c] ?? '').toString().trim();
+            if (v.length >= 2 && _isValidDishNameStored(v)) return v;
+          }
+        }
+      }
+    }
+    for (var r = 0; r < headerIdx && r < rows.length; r++) {
+      for (final cell in rows[r]) {
+        final s = (cell ?? '').toString().trim();
+        if (s.length >= 4 && _isValidDishNameStored(s) && !_isSkipForDishName(s)) return s;
+      }
+    }
+    return null;
+  }
+
+  static bool _isValidDishNameStored(String s) =>
+      s.length >= 4 && RegExp(r'[а-яА-ЯёЁa-zA-Z]{2,}').hasMatch(s) && !RegExp(r'^(г|кг|мл|л|шт|кдж|ккал)$', caseSensitive: false).hasMatch(s.replaceAll(RegExp(r'\s+'), ''));
+
+  static ({List<TechCardRecognitionResult> cards, String? initialDish}) _parseBlockWithColumns(
+    List<List<String>> rows, int headerIdx, int nameCol, int productCol, int grossCol, int netCol, int wasteCol, int outputCol, int techCol,
+    bool grossColIsKg, bool netColIsKg, String? initialDish,
+  ) {
+    final headerRow = headerIdx < rows.length ? rows[headerIdx].map((c) => (c ?? '').toString().trim().toLowerCase()).toList() : <String>[];
+    final results = <TechCardRecognitionResult>[];
+    var currentDish = initialDish;
+    final ingredients = <TechCardIngredientLine>[];
+    final techParts = <String>[];
+
+    void flush() {
+      if (currentDish != null && (currentDish!.isNotEmpty || ingredients.isNotEmpty)) {
+        final tech = techParts.where((s) => s.length > 15).join('\n').trim();
+        results.add(TechCardRecognitionResult(
+          dishName: currentDish,
+          technologyText: tech.isEmpty ? null : tech,
+          ingredients: List.from(ingredients),
+          isSemiFinished: (currentDish ?? '').toLowerCase().contains('пф'),
+          yieldGrams: null,
+        ));
+      }
+      ingredients.clear();
+      techParts.clear();
+    }
+
+    for (var r = headerIdx + 1; r < rows.length; r++) {
+      final cells = rows[r].map((c) => (c ?? '').toString().trim()).toList();
+      if (cells.isEmpty) continue;
+      var pCol = productCol;
+      var gCol = grossCol;
+      var nCol = netCol;
+      if (cells.length >= 3 && cells.length <= 8) {
+        final atP = productCol < cells.length ? cells[productCol] : '';
+        if (atP.isNotEmpty && RegExp(r'^[\d,.\-\s]+$').hasMatch(atP)) {
+          pCol = 1;
+          if (cells.length >= 4) { gCol = 2; nCol = 3; }
+        }
+      }
+      final nameVal = nameCol < cells.length ? cells[nameCol] : '';
+      var productVal = pCol < cells.length ? cells[pCol] : '';
+      if (productVal.isEmpty || productVal.length < 3 || RegExp(r'^[\d,.\-\s]+$').hasMatch(productVal) || productVal.toLowerCase() == 'итого') {
+        for (final c in [pCol - 1, pCol - 2, pCol + 1, pCol + 2]) {
+          if (c >= 0 && c < cells.length) {
+            final v = cells[c];
+            if (v.length >= 3 && !RegExp(r'^[\d,.\-\s]+$').hasMatch(v) && v.toLowerCase() != 'итого') {
+              productVal = v;
+              break;
+            }
+          }
+        }
+      }
+      var grossVal = gCol >= 0 && gCol < cells.length ? cells[gCol] : '';
+      var netVal = nCol >= 0 && nCol < cells.length ? cells[nCol] : '';
+      if ((grossVal.isEmpty || netVal.isEmpty) && productVal.length >= 3 && cells.length >= 3) {
+        final nums = <({int col, String val, double num})>[];
+        for (var c = 2; c < cells.length && c < 10; c++) {
+          if (c == pCol) continue;
+          final v = (cells[c] ?? '').trim();
+          final n = _parseNum(v);
+          if (n != null && n > 0 && n < 10000) nums.add((col: c, val: v, num: n));
+        }
+        if (nums.isNotEmpty && grossVal.isEmpty) grossVal = nums.first.val;
+        if (nums.length >= 2 && netVal.isEmpty) netVal = nums[1].val;
+        else if (nums.isNotEmpty && netVal.isEmpty) netVal = nums.first.val;
+      }
+      final wasteVal = wasteCol >= 0 && wasteCol < cells.length ? cells[wasteCol] : '';
+      final outputVal = outputCol >= 0 && outputCol < cells.length ? cells[outputCol] : '';
+      final techVal = techCol >= 0 && techCol < cells.length ? cells[techCol] : '';
+
+      var grossNum = _parseNum(grossVal);
+      var netNum = _parseNum(netVal);
+      final unitCell = productCol == 1 && cells.length > 2 ? cells[2].toLowerCase() : '';
+      final rowUnitIsKg = unitCell.contains('кг') || unitCell.contains('л');
+      final grossRawKg = RegExp(r'^\s*0[,.]\d{1,3}\s*$').hasMatch(grossVal);
+      final netRawKg = RegExp(r'^\s*0[,.]\d{1,3}\s*$').hasMatch(netVal);
+      if (grossColIsKg && grossNum != null && grossNum > 0 && grossNum < 100) grossNum = grossNum * 1000;
+      else if (rowUnitIsKg && grossNum != null && grossNum > 0 && grossNum < 100) grossNum = grossNum * 1000;
+      else if (grossRawKg && grossNum != null && grossNum > 0 && grossNum < 100) grossNum = grossNum * 1000;
+      if (netColIsKg && netNum != null && netNum > 0 && netNum < 100) netNum = netNum * 1000;
+      else if (rowUnitIsKg && netNum != null && netNum > 0 && netNum < 100) netNum = netNum * 1000;
+      else if (netRawKg && netNum != null && netNum > 0 && netNum < 100) netNum = netNum * 1000;
+
+      if (nameVal.toLowerCase() == 'итого' || productVal.toLowerCase() == 'итого') {
+        var outG = _parseNum(outputVal) ?? _parseNum(grossVal) ?? _parseNum(netVal);
+        if (outG != null && outG > 0 && outG < 100 && outputCol >= 0 && outputCol < headerRow.length && (headerRow[outputCol].contains('кг'))) outG = outG * 1000;
+        flush();
+        currentDish = null;
+        continue;
+      }
+      final rowText = cells.join(' ').toLowerCase();
+      if (techVal.length > 15) techParts.add(techVal);
+
+      if (productVal.isNotEmpty && !_isJunkProductName(productVal) && (grossNum != null && grossNum > 0 || netNum != null && netNum > 0)) {
+        if ((grossNum != null && grossNum > 100000) || (netNum != null && netNum > 100000)) continue;
+        if (currentDish == null && nameVal.isNotEmpty && _isValidDishNameStored(nameVal) && (grossNum == null || grossNum <= 0) && (netNum == null || netNum <= 0)) currentDish = nameVal;
+        if (currentDish != null && productVal.trim().toLowerCase() == currentDish!.trim().toLowerCase()) continue;
+        final gross = grossNum ?? netNum ?? 0.0;
+        final net = netNum ?? grossNum ?? 0.0;
+        final cleanName = productVal.replaceFirst(RegExp(r'^П/Ф\s*', caseSensitive: false), '').trim();
+        ingredients.add(TechCardIngredientLine(
+          productName: cleanName,
+          grossGrams: gross,
+          netGrams: net,
+          outputGrams: _parseNum(outputVal),
+          primaryWastePct: _parseNum(wasteVal),
+          unit: 'g',
+          ingredientType: RegExp(r'^П/Ф\s', caseSensitive: false).hasMatch(productVal) ? 'semi_finished' : 'product',
+        ));
+      } else if (nameVal.isNotEmpty && (grossNum == null || grossNum <= 0) && (netNum == null || netNum <= 0) && _isValidDishNameStored(nameVal)) {
+        if (currentDish != null && ingredients.isNotEmpty) flush();
+        currentDish = nameVal;
+      }
+    }
+    flush();
+    return (cards: results, initialDish: currentDish);
   }
 
   /// Сохранить обучение через Edge Function (service_role, обход RLS)
