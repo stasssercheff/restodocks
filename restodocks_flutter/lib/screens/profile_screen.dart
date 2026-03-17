@@ -749,9 +749,14 @@ class _ProfileEditDialogState extends State<_ProfileEditDialog> {
       if (mounted) setState(() {
         _isLoading = false;
         final msg = e.toString().toLowerCase();
-        _error = (msg.contains('payment') || msg.contains('column') || msg.contains('pgrst'))
-            ? context.read<LocalizationService>().t('employee_save_error_schema')
-            : e.toString();
+        if (msg.contains('birthday')) {
+          _error = context.read<LocalizationService>().t('employee_save_error_birthday_migration')
+              ?? 'Не удалось сохранить день рождения. В Supabase SQL Editor выполните миграцию 20260317100000_employee_birthday_and_notifications.sql';
+        } else if (msg.contains('payment') || msg.contains('column') || msg.contains('pgrst')) {
+          _error = context.read<LocalizationService>().t('employee_save_error_schema');
+        } else {
+          _error = e.toString();
+        }
       });
     }
   }

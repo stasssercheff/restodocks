@@ -1012,7 +1012,16 @@ class AccountManagerSupabase extends ChangeNotifier {
           employee.id,
         );
       } catch (e) {
-        if (_isSchemaColumnError(e)) {
+        if (_isBirthdayColumnError(e)) {
+          employeeData = Map<String, dynamic>.from(employeeData)
+            ..remove('birthday');
+          await _supabase.updateData(
+            'employees',
+            employeeData,
+            'id',
+            employee.id,
+          );
+        } else if (_isSchemaColumnError(e)) {
           employeeData = Map<String, dynamic>.from(employeeData)
             ..remove('can_edit_own_schedule');
           await _supabase.updateData(
@@ -1113,6 +1122,10 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   bool _isSchemaColumnError(Object e) {
     return e.toString().toLowerCase().contains('can_edit_own_schedule');
+  }
+
+  bool _isBirthdayColumnError(Object e) {
+    return e.toString().toLowerCase().contains('birthday');
   }
 
   /// Удалить заведение (владелец). Проверяет PIN и email.
