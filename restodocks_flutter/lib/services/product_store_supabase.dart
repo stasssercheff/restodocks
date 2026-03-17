@@ -208,7 +208,7 @@ class ProductStoreSupabase {
       if (errStr.contains('409') || errStr.contains('23505') ||
           errStr.contains('duplicate') || errStr.contains('unique') || errStr.contains('already exists')) {
         devLog('DEBUG ProductStore: Duplicate detected for "${product.name}", fetching existing...');
-        Product? fetchProduct() async {
+        Future<Product?> fetchProduct() async {
           try {
             final res = await _supabase.client
                 .rpc('get_product_by_normalized_name', params: {'p_name': product.name.trim()});
