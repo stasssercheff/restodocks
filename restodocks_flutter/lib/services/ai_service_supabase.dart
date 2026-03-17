@@ -44,6 +44,9 @@ class AiServiceSupabase implements AiService {
   /// Если в Excel несколько листов и sheetIndex не передан — сюда записываются имена листов; парсер возвращает [] и ждёт повторного вызова с sheetIndex.
   static List<String>? lastParseMultipleSheetNames;
 
+  /// Последняя ошибка invoke (для различения 503/preflight и таймаута).
+  static String? lastInvokeError;
+
   /// Преобразует сырую ошибку API (JSON, 429 и т.д.) в понятное пользователю сообщение.
   static String _sanitizeAiError(String raw) {
     if (raw.isEmpty) return 'Неизвестная ошибка';
@@ -66,6 +69,7 @@ class AiServiceSupabase implements AiService {
   /// Вызов Edge Function с retry при 5xx/сети (proxy/ EarlyDrop).
   /// При 5xx на последней попытке возвращает res.data (если Map) — для извлечения error/details.
   Future<Map<String, dynamic>?> invoke(String name, Map<String, dynamic> body) async {
+    lastInvokeError = null;
     const maxRetries = 3;
     const delays = [500, 1000];
     Object? lastError;
@@ -88,6 +92,7 @@ class AiServiceSupabase implements AiService {
         lastError = e;
       }
     }
+    lastInvokeError = lastError?.toString();
     return lastErrorBody; // чтобы _saveLearningViaEdgeFunction мог извлечь error/details
   }
 
@@ -517,7 +522,12 @@ class AiServiceSupabase implements AiService {
             .timeout(_pdfParseTimeout, onTimeout: () => null);
       }
       if (data == null) {
-        lastParseTechCardPdfReason = 'timeout_or_network';
+        final err = (lastInvokeError ?? '').toLowerCase();
+        if (err.contains('503') || err.contains('preflight') || err.contains('access control') || err.contains('failed to load')) {
+          lastParseTechCardPdfReason = 'service_unavailable';
+        } else {
+          lastParseTechCardPdfReason = 'timeout_or_network';
+        }
         return [];
       }
       lastParseTechCardPdfReason = data['reason'] as String? ?? (data['error'] as String?);
