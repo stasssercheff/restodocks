@@ -103,7 +103,7 @@ void main() {
       expect(list[0].ingredients.length, 1);
     });
 
-    test('parseTtkByTemplate супы.xlsx / Полное пособие Кухня (блоки: название→№|Наименование|Вес→Выход)', () {
+    test('parseTtkByTemplate супы.xlsx / Полное пособие Кухня (блоки: название→№|Наименование|Вес→Выход, 7 карточек)', () {
       final rows = [
         ['Тыквенный крем-суп с горгонзолой', '', '', '', 'Доставка:', '', ''],
         ['№', 'Наименование продукта', 'Вес гр/шт', 'Вид нарезки', '', ''],
@@ -117,14 +117,43 @@ void main() {
         ['4', 'База на лигурию п/ф', '290', '', '', ''],
         ['5', 'Бульон куриный п/ф', '160', '', '', ''],
         ['Выход', '', '420/70', '', '', ''],
+        ['Суп грибной кремовый', '', '', '', ''],
+        ['№', 'Наименование продукта', 'Вес гр/шт', '', ''],
+        ['1', 'Грибной крем-суп пф', '350', '', ''],
+        ['Выход', '', '350', '', ''],
+        ['Суп-пюре из брокколи', '', '', '', ''],
+        ['№', 'Наименование продукта', 'Вес гр/шт', '', ''],
+        ['1', 'Брокколи п/ф', '200', '', ''],
+        ['2', 'Сливки 22%', '50', '', ''],
+        ['Выход', '', '250', '', ''],
+        ['Том ям', '', '', '', ''],
+        ['№', 'Наименование продукта', 'Вес гр/шт', '', ''],
+        ['1', 'Бульон том ям п/ф', '300', '', ''],
+        ['2', 'Креветки п/ф', '80', '', ''],
+        ['Выход', '', '380', '', ''],
+        ['Гороховый суп', '', '', '', ''],
+        ['№', 'Наименование продукта', 'Вес гр/шт', '', ''],
+        ['1', 'Горох разварной п/ф', '250', '', ''],
+        ['2', 'Копчености п/ф', '30', '', ''],
+        ['Выход', '', '280', '', ''],
+        ['Мисо суп', '', '', '', ''],
+        ['№', 'Наименование продукта', 'Вес гр/шт', '', ''],
+        ['1', 'Паста мисо', '20', '', ''],
+        ['2', 'Тофу', '50', '', ''],
+        ['3', 'Водоросли вакаме', '5', '', ''],
+        ['Выход', '', '75', '', ''],
       ];
       final list = AiServiceSupabase.parseTtkByTemplate(rows);
-      // debug: print(list.map((c) => '${c.dishName} (${c.ingredients.length})').join('; '));
-      expect(list.length, 2);
+      expect(list.length, 7, reason: 'супы.xlsx — 7 карточек');
       expect(list[0].dishName, contains('Тыквенный'));
       expect(list[0].ingredients.length, greaterThanOrEqualTo(3));
       expect(list[1].dishName, contains('Рыбная'));
       expect(list[1].ingredients.length, greaterThanOrEqualTo(2));
+      expect(list[2].dishName!.toLowerCase(), contains('грибной'));
+      expect(list[3].dishName!.toLowerCase(), contains('брокколи'));
+      expect(list[4].dishName!.toLowerCase(), contains('том ям'));
+      expect(list[5].dishName!.toLowerCase(), contains('гороховый'));
+      expect(list[6].dishName!.toLowerCase(), contains('мисо'));
     });
 
     test('parseTtkByTemplate iiko/1С с пустой колонкой № empty Наименование (печенная свекла.xls)', () {
@@ -247,6 +276,42 @@ void main() {
       expect(list[0].ingredients.length, 2);
       expect(list[1].dishName, contains('Борщ'));
       expect(list[1].ingredients.length, 2);
+    });
+
+    test('ПФ-ПФ.csv: Наименование,Продукт,Брутто,...,Технология — несколько карточек', () async {
+      // Формат как в ПФ-ПФ.csv: заголовок с колонкой Технология, новая карта по непустому Наименованию, Итого завершает блок.
+      final csv = 'Наименование,Продукт,Брутто,Нетто,Выход,Технология\n'
+          'ПФ Бешамель,Мука,10,10,10,Прогреть муку с маслом, влить молоко.\n'
+          ',Молоко,100,100,100,,\n'
+          ',Итого,,,120,,\n'
+          'ПФ Биск,Креветки,5000,5000,500,Сварить бульон из креветок.\n'
+          ',Вода,9000,9000,4050,,\n'
+          ',Итого,,,5175,,\n';
+      final bytes = Uint8List.fromList(utf8.encode(csv));
+      final ai = AiServiceSupabase();
+      final list = await ai.parseTechCardsFromExcel(bytes);
+      expect(list.length, 2, reason: 'ПФ-ПФ.csv должен дать 2 карточки (ПФ Бешамель, ПФ Биск)');
+      expect(list[0].dishName, contains('Бешамель'));
+      expect(list[0].ingredients.length, 2); // Мука, Молоко
+      expect(list[0].yieldGrams, 120);
+      expect(list[0].technologyText, isNotEmpty);
+      expect(list[1].dishName, contains('Биск'));
+      expect(list[1].ingredients.length, 2); // Креветки, Вода
+      expect(list[1].yieldGrams, 5175);
+    });
+
+    test('ПФ-ПФ xlsx (сохранён из Excel): заголовок не в первой строке', () async {
+      // Excel иногда добавляет пустую или титульную строку — ищем заголовок по содержимому
+      final csv = 'ТТК полуфабрикатов\n' // титульная строка
+          'Наименование,Продукт,Брутто,Нетто,Выход,Технология\n'
+          'ПФ Бешамель,Мука,10,10,10,Прогреть муку.\n'
+          ',Молоко,100,100,100,,\n'
+          ',Итого,,,120,,\n'
+          'ПФ Биск,Креветки,5000,5000,500,Сварить бульон.\n'
+          ',Итого,,,5175,,\n';
+      final bytes = Uint8List.fromList(utf8.encode(csv));
+      final list = await AiServiceSupabase().parseTechCardsFromExcel(bytes);
+      expect(list.length, 2, reason: 'Заголовок во 2-й строке — все карточки должны распознаться');
     });
   });
 

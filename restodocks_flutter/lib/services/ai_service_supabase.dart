@@ -353,11 +353,13 @@ class AiServiceSupabase implements AiService {
       final listByStored = await _tryParseByStoredTemplates(rows);
       final hasTemplateWithIngredients = listByTemplate.isNotEmpty && listByTemplate.any((c) => c.ingredients.isNotEmpty);
       final hasStoredWithIngredients = listByStored.isNotEmpty && listByStored.any((c) => c.ingredients.isNotEmpty);
-      // Приоритет обучению: если для этого формата уже сохранены колонки — используем их результат,
-      // иначе при повторном импорте того же файла снова побеждает встроенный шаблон и правки «не срабатывают».
-      var list = hasStoredWithIngredients
-          ? listByStored
-          : (hasTemplateWithIngredients || listByStored.isEmpty) ? listByTemplate : listByStored;
+      // Приоритет: если шаблон дал больше карточек (несколько блоков в одном файле) — берём его;
+      // иначе приоритет обучению (результат EF по сохранённым колонкам).
+      var list = (hasTemplateWithIngredients && listByTemplate.length > listByStored.length)
+          ? listByTemplate
+          : hasStoredWithIngredients
+              ? listByStored
+              : (hasTemplateWithIngredients || listByStored.isEmpty) ? listByTemplate : listByStored;
       if (list.isEmpty) {
         list = AiServiceSupabase._tryParseKkFromRows(rows);
         final multiBlock = AiServiceSupabase._tryParseMultiColumnBlocks(rows);
@@ -1581,11 +1583,22 @@ class AiServiceSupabase implements AiService {
     // ГОСТ: строка "3. РЕЦЕПТУРА" — пропустить, заголовок в следующей строке
     rows = _skipGostSectionHeaders(rows);
 
-    // Парсер «Полное пособие» отключён — не перехватываем разбор, идёт общий пайплайн (шаблоны, обучение).
+    // Несколько блоков в одном файле (супы.xlsx и др.): название → №|Наименование продукта|Вес → Выход. Если нашли 2+ карточки — используем.
+    final polnoe = _tryParsePolnoePosobieFormat(rows);
+    if (polnoe.length >= 2) return polnoe;
+
+    // Стандартный заголовок ровно «Наименование | Продукт | Брутто | Нетто» (кол.0 и 1) — разбирает только keyword-парсер. Иначе iiko (№|Наименование продукта|...) попадал бы под skip пф гц.
+    final firstRowLower = rows.isNotEmpty ? rows[0].map((c) => (c ?? '').toString().trim().toLowerCase()).toList() : <String>[];
+    final isStandardHeader = firstRowLower.length >= 3 &&
+        (firstRowLower[0] == 'наименование' || (firstRowLower[0].isNotEmpty && firstRowLower[0].contains('наименование'))) &&
+        firstRowLower.length > 1 && (firstRowLower[1] == 'продукт' || firstRowLower[1].contains('продукт')) &&
+        (firstRowLower.contains('брутто') || firstRowLower.contains('нетто'));
 
     // пф гц: [название] ["" | наименование | Ед.изм | Норма закладки] [№ | продукт | ед | норма] [Выход] — повтор
-    final pfGc = _tryParsePfGcFormat(rows);
-    if (pfGc.isNotEmpty) return pfGc;
+    if (!isStandardHeader) {
+      final pfGc = _tryParsePfGcFormat(rows);
+      if (pfGc.isNotEmpty) return pfGc;
+    }
 
     final results = <TechCardRecognitionResult>[];
     int headerIdx = -1;
@@ -1984,19 +1997,17 @@ class AiServiceSupabase implements AiService {
         currentDish = null;
         return true;
       }
-      // Новая карточка: в nameCol новое блюдо. Не считать блюдом строку с весом в колонках брутто/нетто — это ингредиент.
+      // Новая карточка: в nameCol новое блюдо. При смене блюда (Борщ|Говядина после Итого) — флашим предыдущую и ставим currentDish даже если в строке есть вес.
       if (nameCol != pCol &&
           nameVal.isNotEmpty &&
           !RegExp(r'^[\d\s\.\,]+$').hasMatch(nameVal) &&
-          nameVal.toLowerCase() != 'итого') {
+          nameVal.toLowerCase() != 'итого' &&
+          _isValidDishName(nameVal)) {
         final hasWeightInRow = (grossCol >= 0 && grossCol < cells.length && _parseNum(cells[grossCol]) != null) ||
             (netCol >= 0 && netCol < cells.length && _parseNum(cells[netCol]) != null);
-        if (!hasWeightInRow) {
-          if (currentDish != null && currentDish != nameVal && currentIngredients.isNotEmpty) {
-            flushCard();
-          }
-          if (_isValidDishName(nameVal)) currentDish = nameVal;
-        }
+        final isNewDish = currentDish != nameVal;
+        if (isNewDish && currentDish != null && currentIngredients.isNotEmpty) flushCard();
+        if (isNewDish || (!hasWeightInRow && currentDish == null)) currentDish = nameVal;
       }
       // CSV-формат: при пустом Наименовании название новой карточки может быть в Продукте (ПФ ..., блюдо)
       if (nameCol != pCol && nameVal.isEmpty && productVal.isNotEmpty &&
@@ -2143,13 +2154,28 @@ class AiServiceSupabase implements AiService {
     return results;
   }
 
-  /// Специальный парсер CSV-формата "Наименование,Продукт,Брутто,...,Технология"
-  /// как в ттк.csv: каждая строка с непустым "Наименование" = начало новой карты,
-  /// ингредиенты идут до строки "Итого", технология лежит в последнем столбце.
+  /// Специальный парсер CSV/Excel-формата "Наименование,Продукт,Брутто,...,Технология"
+  /// (ПФ-ПФ.csv, в т.ч. сохранённый из Excel): каждая строка с непустым "Наименование" = начало новой карты,
+  /// ингредиенты идут до строки "Итого", технология в последнем столбце.
+  /// Заголовок может быть не в первой строке (Excel часто добавляет пустую или титульную строку).
   static List<TechCardRecognitionResult> _tryParseCsvWithTechnologyColumn(
       List<List<String>> rows) {
     if (rows.length < 2) return [];
-    final header = rows.first.map((c) => (c ?? '').toString().trim().toLowerCase()).toList();
+    int headerRowIdx = -1;
+    List<String> header = [];
+    for (var r = 0; r < rows.length && r < 20; r++) {
+      final h = rows[r].map((c) => (c ?? '').toString().trim().toLowerCase()).toList();
+      final hasName = h.any((c) => c == 'наименование');
+      final hasProduct = h.any((c) => c == 'продукт');
+      final hasBrutto = h.any((c) => c == 'брутто');
+      final hasTech = h.any((c) => c == 'технология');
+      if (hasName && hasProduct && hasBrutto && hasTech) {
+        headerRowIdx = r;
+        header = h;
+        break;
+      }
+    }
+    if (headerRowIdx < 0 || header.isEmpty) return [];
     final nameCol = header.indexWhere((c) => c == 'наименование');
     final productCol = header.indexWhere((c) => c == 'продукт');
     final bruttoCol = header.indexWhere((c) => c == 'брутто');
@@ -2184,7 +2210,7 @@ class AiServiceSupabase implements AiService {
       currentYield = null;
     }
 
-    for (var r = 1; r < rows.length; r++) {
+    for (var r = headerRowIdx + 1; r < rows.length; r++) {
       final row = rows[r].map((c) => (c ?? '').toString().trim()).toList();
       if (row.isEmpty || row.every((c) => c.isEmpty)) continue;
 

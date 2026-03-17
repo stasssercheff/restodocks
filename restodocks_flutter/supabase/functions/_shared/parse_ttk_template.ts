@@ -699,10 +699,11 @@ export function parseTtkByStoredTemplate(
     }
 
     if (nameVal.toLowerCase() === "итого" || productVal.toLowerCase() === "итого") {
-      let outG = parseNum(outputVal);
+      let outG = parseNum(outputVal) || parseNum(grossVal) || parseNum(netVal);
+      if (outG == null && cells.length > 1) outG = parseNum(cells[1]);
       const outputColIsKgStored = outputCol >= 0 && outputCol < headerRow.length && headerRow[outputCol]?.includes("кг");
       if (outputColIsKgStored && outG != null && outG > 0 && outG < 100) outG = outG * 1000;
-      flushCard(outG);
+      flushCard(outG ?? undefined);
       currentDish = null;
       continue;
     }
