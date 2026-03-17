@@ -332,6 +332,7 @@
     "ai_tech_card_excel_format_hint": "Не удалось распознать ТТК. Карточки — друг под другом в один столбец, одинаковой разметки. Проверьте наличие таблицы с названиями блюд и составом.",
     "ai_tech_card_pdf_format_hint": "Не удалось распознать ТТК в PDF. Проверьте, что это технологическая карта с таблицей ингредиентов.",
     "ai_ttk_pdf_timeout": "PDF загружается слишком долго (таймаут 90 сек). Попробуйте файл меньше или экспортируйте в Excel/Word.",
+    "ai_ttk_pdf_service_unavailable": "Сервис распознавания временно недоступен. Экспортируйте PDF в Word или Excel и загрузите снова.",
     "ai_ttk_pdf_extraction_failed": "Не удалось извлечь текст из PDF. Возможно, это скан — используйте Excel или Word.",
     "ai_ttk_pdf_empty_text": "PDF не содержит текста (только изображения). Экспортируйте в Word или Excel.",
     "ai_ttk_limit_3_per_day": "Лимит парсинга через ИИ: 3 документа в день. Шаблонный формат (таблица как в Excel) без ограничений. Завтра счётчик обновится.",
@@ -1422,7 +1423,8 @@
     "order_sort": "Сортировка:",
     "order_sort_az": "А–Я",
     "order_sort_za": "Я–А",
-    "order_no_results": "Ничего не найдено"
+    "order_no_results": "Ничего не найдено",
+    "no_results": "Ничего не найдено"
   },
   "en": {
     "app_name": "Restodocks",
@@ -1732,6 +1734,7 @@
     "ai_tech_card_excel_format_hint": "Could not recognize tech cards. Cards must be stacked in one column with same layout. Check that the file has a table with dish names and ingredients.",
     "ai_tech_card_pdf_format_hint": "Could not recognize tech cards in PDF. Ensure it is a tech card with an ingredients table.",
     "ai_ttk_pdf_timeout": "PDF loading timed out (90 sec). Try a smaller file or export to Excel/Word.",
+    "ai_ttk_pdf_service_unavailable": "Recognition service temporarily unavailable. Export PDF to Word or Excel and upload again.",
     "ai_ttk_pdf_extraction_failed": "Could not extract text from PDF. Possibly a scan — use Excel or Word.",
     "ai_ttk_pdf_empty_text": "PDF has no text (images only). Export to Word or Excel.",
     "ai_ttk_limit_3_per_day": "AI parsing limit: 3 documents per day. Template format (Excel-like table) has no limit. Counter resets tomorrow.",

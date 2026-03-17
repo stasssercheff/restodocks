@@ -572,7 +572,12 @@ class AiServiceSupabase implements AiService {
       if (list.isEmpty) lastParseTechCardErrors = null;
       return list;
     } catch (e) {
-      lastParseTechCardPdfReason = 'catch: $e';
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('503') || errStr.contains('preflight') || errStr.contains('access control') || errStr.contains('failed to load')) {
+        lastParseTechCardPdfReason = 'service_unavailable';
+      } else {
+        lastParseTechCardPdfReason = 'catch: $e';
+      }
       lastParseTechCardErrors = null;
       return [];
     }
@@ -3190,9 +3195,13 @@ class AiServiceSupabase implements AiService {
     }).toList()).toList();
   }
 
-  /// Парсинг по шаблонам — через Edge Function (service_role). Без лимитов, без AI.
-  /// Так надёжно работает независимо от сессии; иначе на 3-й загрузке упираемся в лимит AI.
+  /// Парсинг по шаблонам. Сначала локально (Supabase REST), затем EF. Так при 503 на EF не спамим консоль.
   Future<List<TechCardRecognitionResult>> _tryParseByStoredTemplates(List<List<String>> rows) async {
+    // 1. Локальный парсер (REST, без EF) — нет 503 в консоли при успехе
+    final local = await _tryParseByStoredTemplatesLocally(rows);
+    if (local.isNotEmpty) return local;
+
+    // 2. Edge Function (service_role) — для форматов без шаблона в БД
     try {
       final safeRows = _rowsForJson(rows);
       final data = await invoke('parse-ttk-by-templates', {'rows': safeRows});
@@ -3234,9 +3243,7 @@ class AiServiceSupabase implements AiService {
       }
       return _applyEggGrossFix(list);
     } catch (e) {
-      devLog('parse-ttk-by-templates: $e (fallback: local templates from DB)');
-      final local = await _tryParseByStoredTemplatesLocally(rows);
-      if (local.isNotEmpty) return local;
+      devLog('parse-ttk-by-templates: $e');
       return [];
     }
   }

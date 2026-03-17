@@ -567,6 +567,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           final reason = AiServiceSupabase.lastParseTechCardExcelReason ?? AiServiceSupabase.lastParseTechCardPdfReason;
           if (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day') {
             msg = loc.t('ai_ttk_limit_3_per_day') ?? '';
+          } else if (reason == 'service_unavailable') {
+            msg = loc.t('ai_ttk_pdf_service_unavailable') ?? 'Сервис распознавания временно недоступен. Экспортируйте PDF в Word или Excel и загрузите снова.';
           } else if (reason == 'timeout_or_network') {
             msg = loc.t('ai_ttk_pdf_timeout') ?? (loc.t('ai_tech_card_pdf_format_hint') ?? 'Таймаут загрузки PDF');
           } else if (reason != null && reason.startsWith('extraction_failed')) {
