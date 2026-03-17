@@ -1359,11 +1359,13 @@ class AiServiceSupabase implements AiService {
       final h3 = headerRow.length > 3 ? headerRow[3].trim().toLowerCase() : '';
       final hasNormInHeader = h3.contains('норма') || h3.contains('закладк') || h2.contains('норма');
       int techColByHeader = -1;
+      int headerNormCol = -1;
       for (var i = 0; i < headerRow.length; i++) {
-        if (headerRow[i].toLowerCase().contains('технол')) {
-          techColByHeader = i;
-          break;
+        final c = headerRow[i].toLowerCase();
+        if (c.contains('технол')) {
+          if (techColByHeader < 0) techColByHeader = i;
         }
+        if ((c.contains('норма') || c.contains('закладк')) && headerNormCol < 0) headerNormCol = i;
       }
       final hasTechCol = techColByHeader >= 0;
       final ingredients = <TechCardIngredientLine>[];
@@ -1376,47 +1378,16 @@ class AiServiceSupabase implements AiService {
         final d0 = dr.isNotEmpty ? dr[0].toLowerCase().trim() : '';
         final d1 = dr.length > 1 ? dr[1].trim().toLowerCase() : '';
         if (d0 == 'выход' || (d0.startsWith('выход') && d0.length < 20)) {
-          // Значение может быть в col 2 или 3 (формат: Выход | кг | 0.7). Не брать первое число подряд — в col 2 может быть 35 из колонки «Норма», тогда 35*1000=35000 г.
-          final unitCell = d0 + (dr.length > 1 ? dr[1] : '') + (dr.length > 2 ? dr[2] : '');
-          final isKg = unitCell.toLowerCase().contains('кг');
-          final numbersInRow = <num>[];
-          for (var i = 1; i < dr.length && i < 6; i++) {
-            final v = _parseNum(dr[i]);
-            if (v != null && v > 0) numbersInRow.add(v);
-          }
-          num? outVal;
+          // 1) Из карты: значение из той же колонки, что и «Норма» в заголовке (в строке Выход там обычно 0.700 кг).
           final sumGrams = ingredients.fold<double>(0, (s, ing) => s + (ing.outputGrams ?? 0));
-          if (sumGrams > 0 && numbersInRow.isNotEmpty) {
-            // Есть состав — предпочитаем число, совпадающее с итогом: в кг (0.01–10) или в г (100–5000).
-            final targetKg = sumGrams / 1000;
-            for (final n in numbersInRow) {
-              if (n >= 0.01 && n <= 10 && (n - targetKg).abs() < 0.01) {
-                outVal = n;
-                break;
-              }
-              if (n >= 100 && n <= 5000 && (n - sumGrams).abs() < 1) {
-                outVal = n;
-                break;
-              }
+          if (headerNormCol >= 0 && headerNormCol < dr.length) {
+            final cellVal = _parseNum(dr[headerNormCol]);
+            if (cellVal != null && cellVal > 0) {
+              final isKg = dr.join(' ').toLowerCase().contains('кг');
+              outputGrams = (isKg && cellVal < 100 ? cellVal * 1000 : cellVal.toDouble()).toDouble();
             }
           }
-          if (outVal == null && numbersInRow.isNotEmpty) {
-            // Нет состава или не нашли совпадение: брать значение в диапазоне кг (0.1–10) или г (100–5000), не 10–100 (часто ошибочно 35 и т.п.).
-            for (final n in numbersInRow) {
-              if (n >= 0.1 && n <= 10) {
-                outVal = n;
-                break;
-              }
-              if (n >= 100 && n <= 5000) {
-                outVal = n;
-                break;
-              }
-            }
-          }
-          if (outVal != null && outVal > 0) {
-            outputGrams = (isKg && outVal < 100 ? outVal * 1000 : outVal.toDouble()).toDouble();
-          }
-          // Если в строке не нашли подходящее число, но есть состав — выход = сумма выходов ингредиентов (как в файле ТТК).
+          // 2) Если в карте не нашли — берём сумму выходов по ингредиентам.
           if (outputGrams == null && sumGrams > 0) outputGrams = sumGrams;
           break;
         }
