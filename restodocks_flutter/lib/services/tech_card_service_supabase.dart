@@ -117,8 +117,18 @@ class TechCardServiceSupabase {
     return createdTechCard;
   }
 
-  /// Получение всех ТТК для заведения (один запрос с ингредиентами — без N+1)
+  /// Получение всех ТТК для заведения (один запрос с ингредиентами — без N+1).
+  /// При 0 карточек или ошибке — fallback без tt_ingredients (ингредиенты подгрузятся при открытии).
   Future<List<TechCard>> getTechCardsForEstablishment(String establishmentId) async {
+    Future<List<TechCard>> _fetchWithoutEmbed() async {
+      final data = await _supabase.client
+          .from('tech_cards')
+          .select()
+          .eq('establishment_id', establishmentId)
+          .order('created_at', ascending: false);
+      return _parseTechCardsWithIngredients(data as List);
+    }
+
     try {
       final data = await _supabase.client
           .from('tech_cards')
@@ -126,12 +136,26 @@ class TechCardServiceSupabase {
           .eq('establishment_id', establishmentId)
           .order('created_at', ascending: false);
 
-      final list = _parseTechCardsWithIngredients(data as List);
-      devLog('[ttk_svc] getTechCardsForEstablishment(est=$establishmentId) → ${list.length} cards');
+      var list = _parseTechCardsWithIngredients(data as List);
+      final rawCount = (data as List).length;
+      if (list.isEmpty && rawCount > 0) {
+        devLog('[ttk_svc] getTechCardsForEstablishment: embed $rawCount rows, parse=0 → retry without embed');
+        list = await _fetchWithoutEmbed();
+        devLog('[ttk_svc] getTechCardsForEstablishment(est=$establishmentId) fallback → ${list.length} cards');
+      } else {
+        devLog('[ttk_svc] getTechCardsForEstablishment(est=$establishmentId) → ${list.length} cards');
+      }
       return list;
     } catch (e) {
-      devLog('[ttk_svc] getTechCardsForEstablishment(est=$establishmentId) ERROR: $e');
-      return [];
+      devLog('[ttk_svc] getTechCardsForEstablishment(est=$establishmentId) ERROR: $e → retry without embed');
+      try {
+        final list = await _fetchWithoutEmbed();
+        devLog('[ttk_svc] getTechCardsForEstablishment(est=$establishmentId) fallback → ${list.length} cards');
+        return list;
+      } catch (e2) {
+        devLog('[ttk_svc] getTechCardsForEstablishment fallback ERROR: $e2');
+        return [];
+      }
     }
   }
 
