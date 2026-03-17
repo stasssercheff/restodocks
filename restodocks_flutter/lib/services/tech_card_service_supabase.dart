@@ -187,7 +187,7 @@ class TechCardServiceSupabase {
     return techCards;
   }
 
-  /// Поиск ТТК по ID (один запрос)
+  /// Поиск ТТК по ID. При ошибке embed — fallback: загрузка карточки и ингредиентов отдельно.
   Future<TechCard?> getTechCardById(String techCardId) async {
     try {
       final data = await _supabase.client
@@ -198,14 +198,47 @@ class TechCardServiceSupabase {
           .maybeSingle();
       if (data == null) return null;
       final m = data as Map<String, dynamic>;
-      final ingredientsData = m['tt_ingredients'] as List<dynamic>? ?? [];
-      final ingredients = ingredientsData
-          .map((j) => TTIngredient.fromJson(j as Map<String, dynamic>))
-          .toList();
+      var ingredients = <TTIngredient>[];
+      try {
+        final ingredientsData = m['tt_ingredients'] as List<dynamic>? ?? [];
+        ingredients = ingredientsData
+            .map((j) => TTIngredient.fromJson(j as Map<String, dynamic>))
+            .toList();
+      } catch (_) {
+        ingredients = await _fetchIngredientsForTechCard(techCardId);
+        devLog('[ttk_svc] getTechCardById: embed parse failed, loaded ${ingredients.length} ingredients separately');
+      }
       return TechCard.fromJson(m).copyWith(ingredients: ingredients);
     } catch (e) {
-      devLog('Ошибка получения ТТК: $e');
-      return null;
+      devLog('[ttk_svc] getTechCardById($techCardId) ERROR: $e → fallback');
+      try {
+        final row = await _supabase.client
+            .from('tech_cards')
+            .select()
+            .eq('id', techCardId)
+            .maybeSingle();
+        if (row == null) return null;
+        final ingredients = await _fetchIngredientsForTechCard(techCardId);
+        return TechCard.fromJson(row as Map<String, dynamic>).copyWith(ingredients: ingredients);
+      } catch (e2) {
+        devLog('[ttk_svc] getTechCardById fallback ERROR: $e2');
+        return null;
+      }
+    }
+  }
+
+  Future<List<TTIngredient>> _fetchIngredientsForTechCard(String techCardId) async {
+    try {
+      final data = await _supabase.client
+          .from('tt_ingredients')
+          .select()
+          .eq('tech_card_id', techCardId)
+          .order('id');
+      return (data as List)
+          .map((j) => TTIngredient.fromJson(j as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
     }
   }
 
