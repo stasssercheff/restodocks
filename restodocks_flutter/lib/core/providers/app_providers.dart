@@ -103,6 +103,9 @@ class AppProviders {
         Provider<EmployeeMessageService>(
           create: (_) => EmployeeMessageService(),
         ),
+        Provider<GroupChatService>(
+          create: (_) => GroupChatService(),
+        ),
         Provider<MenuStopGoService>(
           create: (_) => MenuStopGoService(),
         ),

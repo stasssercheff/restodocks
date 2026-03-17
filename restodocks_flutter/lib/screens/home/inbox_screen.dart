@@ -10,7 +10,9 @@ import '../../models/models.dart';
 import '../../utils/number_format_utils.dart';
 import '../../utils/translit_utils.dart';
 import '../../models/inbox_document.dart';
+import '../../models/chat_room.dart';
 import '../../services/inbox_service.dart';
+import '../../services/group_chat_service.dart';
 import '../../widgets/app_bar_home_button.dart';
 
 /// Входящие: документы (заказы, чеклисты, инвентаризации). Сообщения: диалоги с сотрудниками — отдельно.
@@ -115,7 +117,7 @@ class _InboxScreenState extends State<InboxScreen> {
       if (isOwner || isManagement) {
         tabs.add(_InboxTab.inventory);
         tabs.add(_InboxTab.writeoff);
-        if (employee.hasRole('executive_chef') || employee.hasRole('owner')) {
+        if (employee.hasRole('executive_chef') || employee.hasRole('owner') || employee.hasRole('bar_manager')) {
           tabs.add(_InboxTab.iikoInventory);
         }
       }
@@ -528,10 +530,9 @@ class _InboxScreenState extends State<InboxScreen> {
       onSelected: (_) {
         setState(() {
           _selectedDeptTab = tab;
-          if (tab == _InboxDeptTab.bar || tab == _InboxDeptTab.hall) {
-            if (_selectedTypeTab == _InboxTypeTab.iikoInventory) {
-              _selectedTypeTab = _InboxTypeTab.inventory;
-            }
+          // Инвентаризация iiko есть только у кухни и бара; при переходе в зал сбрасываем на обычную инвентаризацию
+          if (tab == _InboxDeptTab.hall && _selectedTypeTab == _InboxTypeTab.iikoInventory) {
+            _selectedTypeTab = _InboxTypeTab.inventory;
           }
         });
       },
@@ -540,9 +541,9 @@ class _InboxScreenState extends State<InboxScreen> {
     );
   }
 
-  /// Типы вкладок для собственника: Заказы, Инвентаризация, iiko (только кухня), Уведомления, Чеклисты.
+  /// Типы вкладок для собственника: Заказы, Инвентаризация, iiko (кухня и бар), Уведомления, Чеклисты.
   Widget _buildTypeFilterForOwner(LocalizationService loc) {
-    final isBarOrHall = _selectedDeptTab == _InboxDeptTab.bar || _selectedDeptTab == _InboxDeptTab.hall;
+    final isHall = _selectedDeptTab == _InboxDeptTab.hall;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
@@ -562,7 +563,7 @@ class _InboxScreenState extends State<InboxScreen> {
             const SizedBox(width: 8),
             _buildTypeChip(_InboxTypeTab.inventory, loc.t('inbox_tab_inventory') ?? 'Инвентаризация', loc),
             _buildTypeChip(_InboxTypeTab.writeoff, loc.t('writeoffs') ?? 'Списания', loc),
-            if (!isBarOrHall) ...[
+            if (!isHall) ...[
               const SizedBox(width: 8),
               _buildTypeChip(_InboxTypeTab.iikoInventory, loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko', loc),
             ],
@@ -1350,8 +1351,10 @@ class _MessagesContentState extends State<_MessagesContent> {
   List<Employee> _employees = [];
   List<String> _chatPartnerIds = [];
   Map<String, int> _unreadCounts = {};
+  List<ChatRoom> _groupRooms = [];
   bool _loadingEmployees = true;
   RealtimeChannel? _realtimeChannel;
+  RealtimeChannel? _groupRealtimeChannel;
 
   @override
   void initState() {
@@ -1366,6 +1369,7 @@ class _MessagesContentState extends State<_MessagesContent> {
   @override
   void dispose() {
     _realtimeChannel?.unsubscribe();
+    _groupRealtimeChannel?.unsubscribe();
     super.dispose();
   }
 
@@ -1400,6 +1404,15 @@ class _MessagesContentState extends State<_MessagesContent> {
       },
     );
     _realtimeChannel!.subscribe();
+    _groupRealtimeChannel = client.channel('inbox_group_messages').onPostgresChanges(
+      event: PostgresChangeEvent.insert,
+      schema: 'public',
+      table: 'chat_room_messages',
+      callback: (_) {
+        if (mounted) _loadEmployees();
+      },
+    );
+    _groupRealtimeChannel!.subscribe();
   }
 
   Future<void> _loadEmployees() async {
@@ -1412,6 +1425,7 @@ class _MessagesContentState extends State<_MessagesContent> {
     try {
       final acc = context.read<AccountManagerSupabase>();
       final msgSvc = context.read<EmployeeMessageService>();
+      final groupSvc = context.read<GroupChatService>();
       var emps = await acc.getEmployeesForEstablishment(estId);
       emps = emps.where((e) => e.id != emp.id).toList();
       if (widget.restrictToChefOnly) {
@@ -1425,11 +1439,13 @@ class _MessagesContentState extends State<_MessagesContent> {
         partnerIds = partnerIds.where((id) => chefIds.contains(id)).toList();
       }
       final unread = await msgSvc.getUnreadCountPerPartner(emp.id, estId);
+      final rooms = await groupSvc.getRoomsForEmployee(emp.id, estId);
       if (mounted) {
         setState(() {
           _employees = emps;
           _chatPartnerIds = partnerIds;
           _unreadCounts = unread;
+          _groupRooms = rooms;
           _loadingEmployees = false;
         });
       }
@@ -1511,6 +1527,49 @@ class _MessagesContentState extends State<_MessagesContent> {
                     onTap: () => context.push('/inbox/chat/${e.id}'),
                   ),
                 )),
+          if (!_loadingEmployees) ...[
+            const SizedBox(height: 20),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    loc.t('group_chat_title') ?? 'Групповые чаты',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                  ),
+                  FilledButton.icon(
+                    onPressed: () => context.push('/inbox/group/new'),
+                    icon: const Icon(Icons.group_add, size: 20),
+                    label: Text(loc.t('group_chat_new') ?? 'Новый групповой чат'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                      foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ..._groupRooms.map((room) => Card(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                      child: Icon(Icons.group, color: Theme.of(context).colorScheme.onSecondaryContainer),
+                    ),
+                    title: Text(
+                      room.displayName.isEmpty
+                          ? (loc.t('group_chat_default_name') ?? 'Групповой чат')
+                          : room.displayName,
+                    ),
+                    trailing: const Icon(Icons.chat_bubble, size: 18),
+                    onTap: () => context.push('/inbox/group/${room.id}'),
+                  ),
+                )),
+          ],
           if (widget.missedDocuments.isNotEmpty) ...[
             const SizedBox(height: 24),
             Padding(

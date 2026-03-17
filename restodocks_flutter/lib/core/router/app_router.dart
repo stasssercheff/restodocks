@@ -419,6 +419,19 @@ class AppRouter {
                 },
               ),
               GoRoute(
+                path: 'group/new',
+                pageBuilder: (context, state) {
+                  return _slideTransitionPage(state, const CreateGroupChatScreen());
+                },
+              ),
+              GoRoute(
+                path: 'group/:roomId',
+                pageBuilder: (context, state) {
+                  final roomId = state.pathParameters['roomId'] ?? '';
+                  return _slideTransitionPage(state, GroupChatScreen(roomId: roomId));
+                },
+              ),
+              GoRoute(
                 path: 'merge',
                 pageBuilder: (context, state) {
                   final extra = state.extra;

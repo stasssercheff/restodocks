@@ -37,6 +37,7 @@ export 'order_history_service.dart';
 export 'tech_card_history_service.dart';
 export 'order_document_service.dart';
 export 'employee_message_service.dart';
+export 'group_chat_service.dart';
 export 'inventory_history_service.dart';
 export 'email_service.dart';
 export 'app_toast_service.dart';

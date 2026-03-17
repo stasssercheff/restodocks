@@ -151,6 +151,13 @@ Deno.serve(async (req: Request) => {
     // employee_direct_messages: удаляем где сотрудник отправитель или получатель
     await supabase.from("employee_direct_messages").delete().eq("sender_employee_id", targetEmp.id);
     await supabase.from("employee_direct_messages").delete().eq("recipient_employee_id", targetEmp.id);
+    // Групповые чаты: удаляем участника и его сообщения (если таблицы есть)
+    try {
+      await supabase.from("chat_room_messages").delete().eq("sender_employee_id", targetEmp.id);
+      await supabase.from("chat_room_members").delete().eq("employee_id", targetEmp.id);
+    } catch {
+      // Таблицы могут отсутствовать в старых проектах
+    }
     // co_owner_invitations.invited_by — без ON DELETE, удаляем вручную
     await supabase.from("co_owner_invitations").delete().eq("invited_by", targetEmp.id);
     const { error: delEmpErr } = await supabase.from("employees").delete().eq("id", targetEmp.id);
