@@ -717,13 +717,13 @@ export function parseTtkByStoredTemplate(
       continue;
     }
     const rowText = cells.join(" ").toLowerCase();
-    const isPastTable = fromPdf && r >= tableEndRow;
+    const pastTableInPdf = fromPdf && isPastTable;
     const rowHasWeightStored = (grossNum != null && grossNum > 0) || (netNum != null && netNum > 0);
-    if ((!fromPdf || !isPastTable) && nameVal && nameVal.trim().toLowerCase() !== "выход" && !rowHasWeightStored && isValidDish(nameVal) && !isLikelyFragment(nameVal) && !/^[\d\s.,]+$/.test(nameVal) && !productVal) {
+    if ((!fromPdf || !pastTableInPdf) && nameVal && nameVal.trim().toLowerCase() !== "выход" && !rowHasWeightStored && isValidDish(nameVal) && !isLikelyFragment(nameVal) && !/^[\d\s.,]+$/.test(nameVal) && !productVal) {
       if (currentDish != null && currentIngredients.length > 0) flushCard(undefined);
       currentDish = nameVal;
     }
-    if (productVal && (!fromPdf || !isPastTable) && isValidProduct(productVal) && !isJunkProductName(productVal)) {
+    if (productVal && (!fromPdf || !pastTableInPdf) && isValidProduct(productVal) && !isJunkProductName(productVal)) {
       if ((grossNum != null && grossNum > 100000) || (netNum != null && netNum > 100000)) continue;
       if ((grossNum == null || grossNum <= 0) && (netNum == null || netNum <= 0)) continue;
       const hasWeight = (grossNum != null && grossNum > 0) || (netNum != null && netNum > 0);

@@ -8,6 +8,7 @@ import '../models/models.dart';
 import '../services/ai_service.dart';
 import '../services/ai_service_supabase.dart';
 import '../services/services.dart';
+import '../utils/dev_log.dart';
 import '../utils/product_name_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 
@@ -515,7 +516,18 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     final emp = acc.currentEmployee;
-    if (est == null || emp == null) return;
+    if (est == null || emp == null) {
+      if (mounted) {
+        final loc = context.read<LocalizationService>();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(est == null
+              ? (loc.t('ttk_import_no_establishment') ?? 'Выберите заведение')
+              : (loc.t('ttk_import_no_employee') ?? 'Войдите как сотрудник для сохранения ТТК')),
+          duration: const Duration(seconds: 4),
+        ));
+      }
+      return;
+    }
     final loc = context.read<LocalizationService>();
     final lang = loc.currentLanguageCode;
     setState(() => _saving = true);
@@ -641,6 +653,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           final name = (item.result.dishName ?? '').trim().isEmpty ? (loc.t('tech_cards_import_unnamed') ?? 'Без названия') : (item.result.dishName ?? '').trim();
           failed.add((name: name, error: e.toString()));
           failedItems.add(item);
+          devLog('[ttk_import] Ошибка сохранения "$name": $e');
         }
         if (mounted) setState(() => _saveProgress = productNamesToCreate.length + created);
       }
@@ -720,11 +733,15 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           context.go('/tech-cards/${widget.department}?refresh=1');
         } else {
           _items = failedItems;
+          final firstErr = failed.isNotEmpty ? failed.first.error : '';
+          final reason = firstErr.contains('RLS') || firstErr.contains('доступ') || firstErr.contains('права')
+              ? ' (проверьте права/сотрудника)'
+              : (firstErr.length > 80 ? ': ${firstErr.substring(0, 77)}...' : (firstErr.isNotEmpty ? ': $firstErr' : ''));
           final msg = created > 0
               ? '${loc.t('tech_cards_import_created').replaceAll('%s', '$created')}. Не удалось ${failed.length}: ${failed.map((f) => f.name).join(', ')}. Исправьте и повторите.'
-              : 'Не удалось сохранить: ${failed.map((f) => f.name).join(', ')}';
+              : 'Не удалось сохранить: ${failed.map((f) => f.name).join(', ')}$reason';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), duration: const Duration(seconds: 6)),
+            SnackBar(content: Text(msg), duration: const Duration(seconds: 8)),
           );
         }
       }

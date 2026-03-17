@@ -211,6 +211,20 @@ Deno.serve(async (req: Request) => {
     templateCards = templateCards.filter((c) => !(c.ingredients.length === 0 && c.dishName && isFragmentDish(c.dishName)));
     const yieldMatch = text.match(/Выход\s+на\s+1\s+порцию\s*:\s*(\d+)\s*г/i);
     const extractedYield = yieldMatch ? parseInt(yieldMatch[1], 10) : undefined;
+    /** Shama.Book: технология между «Технологический процесс» и «Допустимые сроки» — fallback если парсер не захватил */
+    const extractedTechFromText = (() => {
+      const m = text.match(
+        /Технологический\s+процесс[\s\S]*?(?:\n|\r\n?)([\s\S]*?)(?=\n\s*Допустимые\s+сроки|\n\s*Информация\s+о\s+пищевой|$)/i,
+      );
+      if (!m || !m[1]) return "";
+      let t = m[1].trim().replace(/\r\n/g, "\n");
+      const lines = t.split(/\n/).map((l) => l.trim()).filter(Boolean);
+      const skipHeader = /^условия\s+и\s+сроки|^изготовления|^оформления\s+и\s+подачи/i;
+      while (lines.length > 0 && (skipHeader.test(lines[0]) || lines[0].length < 20)) lines.shift();
+      t = lines.join(" ").replace(/\s+/g, " ");
+      if (t.length < 30 || /^(кдж|ккал|белки|жиры|углеводы)/i.test(t)) return "";
+      return t;
+    })();
     if (templateCards.length > 0) {
       // Обогащение технологии из обучения: даже когда шаблон сработал, подставляем выученную колонку (чтобы правки пользователя давали эффект)
       let learnedTechText = "";
@@ -258,9 +272,11 @@ Deno.serve(async (req: Request) => {
           ingredients = [{ ...ingredients[0], outputGrams: extractedYield }];
         }
         const useLearnedTech = learnedTechText.length > 0 && (idx === 0 || !(card.technologyText ?? "").trim()) && learnedTechText.length >= (card.technologyText ?? "").length;
+        let tech = useLearnedTech ? learnedTechText : (card.technologyText ?? null);
+        if ((!tech || tech.trim().length < 30) && extractedTechFromText.length > 30) tech = extractedTechFromText;
         return {
         dishName: card.dishName ?? null,
-        technologyText: useLearnedTech ? learnedTechText : (card.technologyText ?? null),
+        technologyText: tech,
         isSemiFinished: card.isSemiFinished ?? undefined,
         yieldGrams: extractedYield ?? card.yieldGrams ?? undefined,
         ingredients,

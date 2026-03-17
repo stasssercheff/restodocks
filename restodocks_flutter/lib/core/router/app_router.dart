@@ -772,7 +772,14 @@ class AppRouter {
               final segment = state.pathParameters['segment'] ?? '';
               const knownDepartments = ['kitchen', 'bar', 'dining_room', 'banquet-catering', 'banquet-catering-bar'];
               if (knownDepartments.contains(segment)) {
-                return _slideTransitionPage(state, TechCardsListScreen(department: segment));
+                final refresh = state.queryParameters['refresh'] == '1';
+                return _slideTransitionPage(
+                  state,
+                  TechCardsListScreen(
+                    key: refresh ? ValueKey('ttk_refresh_${DateTime.now().millisecondsSinceEpoch}') : null,
+                    department: segment,
+                  ),
+                );
               }
               final viewOnly = state.queryParameters['view'] == '1';
               final hallView = state.queryParameters['hall'] == '1';
