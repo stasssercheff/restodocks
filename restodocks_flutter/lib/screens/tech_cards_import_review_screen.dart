@@ -102,6 +102,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   /// Ошибки парсинга (битые карточки) — берём из сервиса и очищаем
   List<TtkParseError>? _parseErrors;
 
+  /// Убирать «ПФ» из названия при сохранении (для всех ПФ) — избегает «ПФ ПФ что-то».
+  bool _stripPfPrefixFromName = true;
+
   /// Индексы в _items, проходящие фильтр поиска по названию.
   List<int> get _filteredIndices {
     if (_searchQuery.isEmpty) return List.generate(_items.length, (i) => i);
@@ -517,6 +520,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     final est = acc.establishment;
     final emp = acc.currentEmployee;
     if (est == null || emp == null) {
+      devLog('[ttk_save] _createAll: est=${est != null} emp=${emp != null} — return (no save)');
       if (mounted) {
         final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -634,11 +638,21 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       final failedItems = <_ReviewItem>[];
       for (final item in sorted) {
         try {
+          var resultToSave = item.result;
+          if (_stripPfPrefixFromName && item.isSemiFinished) {
+            final raw = (item.result.dishName ?? '').trim();
+            if (raw.isNotEmpty) {
+              final stripped = stripPfPrefix(raw);
+              if (stripped.isNotEmpty) {
+                resultToSave = item.result.copyWith(dishName: stripped);
+              }
+            }
+          }
           await svc.createTechCardFromRecognitionResult(
             establishmentId: est.dataEstablishmentId,
             createdBy: emp.id,
             createdByName: emp.fullName,
-            result: item.result,
+            result: resultToSave,
             category: item.category,
             sections: _normalizeSections(item.sections),
             isSemiFinishedOverride: item.isSemiFinished,
@@ -708,6 +722,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           }
         }
       }
+      devLog('[ttk_save] done: created=$created failed=${failed.length}');
       if (mounted) {
         setState(() => _saving = false);
         if (failed.isEmpty) {
@@ -813,6 +828,19 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
               style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ),
+          if (_items.any((i) => i.isSemiFinished))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: CheckboxListTile(
+                value: _stripPfPrefixFromName,
+                onChanged: (v) => setState(() => _stripPfPrefixFromName = v ?? true),
+                title: Text(loc.t('ttk_import_strip_pf_prefix') ?? 'Убирать «ПФ» из названия при сохранении'),
+                subtitle: Text(loc.t('ttk_import_strip_pf_prefix_hint') ?? 'Для всех полуфабрикатов. Избегает «ПФ ПФ Крем».'),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+              ),
+            ),
           if (_parseErrors != null && _parseErrors!.isNotEmpty) ...[
             Container(
               width: double.infinity,

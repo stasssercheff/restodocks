@@ -166,9 +166,15 @@ class TechCard extends Equatable {
   }
 
   /// Название для списков (инвентаризация, выбор ПФ и т.д.): для ПФ — «ПФ/Prep Название», для блюда — просто название.
+  /// Если название уже начинается с префикса ПФ (ПФ , п/ф , Prep и т.д.) — не дублируем.
   String getDisplayNameInLists(String languageCode, {String? sfPrefix}) {
     final name = getLocalizedDishName(languageCode);
     if (!isSemiFinished) return name;
+    const pfPrefixes = ['пф ', 'п/ф ', 'п.ф. ', 'pf ', 'prep ', 'sf ', 'hf '];
+    final nameLower = name.trim().toLowerCase();
+    for (final p in pfPrefixes) {
+      if (nameLower.startsWith(p)) return name; // уже есть префикс — не дублируем
+    }
     final prefix = sfPrefix ?? _defaultSfPrefix(languageCode);
     return '$prefix $name';
   }

@@ -1,5 +1,20 @@
 /// Утилиты нормализации названий продуктов (iiko-формат и др.)
 
+/// Убирает "ПФ ", "п/ф " и т.п. из начала названия (для сохранения без дублирования).
+/// "ПФ Крем" → "Крем", "п/ф Соус" → "Соус".
+String stripPfPrefix(String name) {
+  if (name.isEmpty) return name;
+  var s = name.trim();
+  const pfPrefixes = ['пф ', 'п/ф ', 'п.ф. ', 'pf ', 'prep '];
+  final sLower = s.toLowerCase();
+  for (final p in pfPrefixes) {
+    if (sLower.startsWith(p)) {
+      return s.substring(p.length).trim();
+    }
+  }
+  return s;
+}
+
 /// Нормализация для сопоставления ПФ: убирает "ПФ ", "п/ф " и т.п. в начале.
 /// "ПФ чеснок" и "Чеснок" дают один ключ для матчинга.
 String normalizeForPfMatching(String name) {
