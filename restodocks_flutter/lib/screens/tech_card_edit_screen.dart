@@ -753,7 +753,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       _selectedCategory = data['category'] as String? ?? 'misc';
       _selectedSections = List<String>.from(data['sections'] as List<dynamic>? ?? []);
       _isSemiFinished = data['isSemiFinished'] as bool? ?? true;
-      _portionWeight = (data['portionWeight'] as num?)?.toDouble() ?? 100;
+      final fromDraft = (data['portionWeight'] as num?)?.toDouble();
+      final fromAi = widget.initialFromAi?.yieldGrams != null && widget.initialFromAi!.yieldGrams! > 0
+          ? widget.initialFromAi!.yieldGrams!.toDouble()
+          : null;
+      // При открытии из импорта приоритет — выход из файла (ВКС), иначе в «Итого» показывается 100 вместо реального выхода
+      _portionWeight = fromAi ?? fromDraft ?? 100;
       _descriptionForHallController.text = data['descriptionForHall'] as String? ?? '';
       _compositionForHallController.text = data['compositionForHall'] as String? ?? '';
       _sellingPriceController.text = data['sellingPrice'] as String? ?? '';
