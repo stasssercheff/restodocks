@@ -203,18 +203,41 @@ class ProductStoreSupabase {
 
       return saved;
     } catch (e) {
-      // Уникальный индекс сработал — продукт уже есть в БД, ищем его
+      // 409 / unique violation — продукт уже есть в БД, ищем его
       final errStr = e.toString().toLowerCase();
-      if (errStr.contains('duplicate') || errStr.contains('unique') || errStr.contains('already exists')) {
+      if (errStr.contains('409') || errStr.contains('23505') ||
+          errStr.contains('duplicate') || errStr.contains('unique') || errStr.contains('already exists')) {
         devLog('DEBUG ProductStore: Duplicate detected for "${product.name}", fetching existing...');
-        try {
-          final existing = await _supabase.client
+        Product? fetchProduct() async {
+          try {
+            final res = await _supabase.client
+                .rpc('get_product_by_normalized_name', params: {'p_name': product.name.trim()});
+            final Map<String, dynamic>? row = res is Map<String, dynamic>
+                ? res
+                : (res is List && res.isNotEmpty && res[0] is Map)
+                    ? res[0] as Map<String, dynamic>
+                    : null;
+            if (row != null) return Product.fromJson(row);
+          } catch (_) {}
+          // Fallback: RPC не применилась — ищем по ilike и фильтруем по lower(trim)
+          final fallback = await _supabase.client
               .from('products')
               .select()
               .ilike('name', product.name.trim())
-              .limit(1);
-          if (existing.isNotEmpty) {
-            final saved = Product.fromJson(existing[0] as Map<String, dynamic>);
+              .limit(10);
+          final norm = product.name.trim().toLowerCase();
+          for (final r in fallback as List) {
+            final m = r as Map<String, dynamic>;
+            if (norm == (m['name'] as String? ?? '').trim().toLowerCase()) {
+              return Product.fromJson(m);
+            }
+          }
+          return null;
+        }
+
+        try {
+          final saved = await fetchProduct();
+          if (saved != null) {
             if (!_allProducts.any((p) => p.id == saved.id)) {
               _allProducts.add(saved);
             }
