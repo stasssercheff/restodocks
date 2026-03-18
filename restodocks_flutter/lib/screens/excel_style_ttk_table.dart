@@ -85,6 +85,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   // Контроллеры для полей ввода
   final Map<String, TextEditingController> _controllers = {};
   final Map<String, FocusNode> _focusNodes = {};
+  final Map<String, Timer> _debounceTimers = {};
 
   @override
   void initState() {
@@ -127,6 +128,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     }
     for (final n in _focusNodes.values) {
       n.dispose();
+    }
+    for (final t in _debounceTimers.values) {
+      t.cancel();
     }
     super.dispose();
   }
@@ -962,7 +966,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 filled: true,
                 fillColor: Colors.white,
               ),
-              onChanged: onChanged,
+              onChanged: (v) {
+                _debounceTimers[key]?.cancel();
+                _debounceTimers[key] = Timer(const Duration(milliseconds: 60), () {
+                  if (!mounted) return;
+                  onChanged(v);
+                });
+              },
             )
           : Container(
               alignment: Alignment.center,
@@ -1109,6 +1119,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   void _updateIngredient(int index, TTIngredient updated) {
     widget.onUpdate(index, updated);
+    // Локальный rebuild, чтобы пересчёты видны сразу при вводе на web/iOS.
+    if (mounted) setState(() {});
   }
 
   Widget _buildDeleteButton(int rowIndex) {
