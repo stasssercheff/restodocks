@@ -1,5 +1,17 @@
 /// Утилиты нормализации названий продуктов (iiko-формат и др.)
 
+/// Добавляет «ПФ » перед названием, если ещё нет (для полуфабрикатов при импорте).
+String ensurePfPrefix(String name) {
+  if (name.trim().isEmpty) return name.trim();
+  final s = name.trim();
+  const pfPrefixes = ['пф ', 'п/ф ', 'п.ф. ', 'pf '];
+  final sLower = s.toLowerCase();
+  for (final p in pfPrefixes) {
+    if (sLower.startsWith(p)) return s;
+  }
+  return 'ПФ $s';
+}
+
 /// Убирает "ПФ ", "п/ф " и т.п. из начала названия (для сохранения без дублирования).
 /// "ПФ Крем" → "Крем", "п/ф Соус" → "Соус".
 String stripPfPrefix(String name) {

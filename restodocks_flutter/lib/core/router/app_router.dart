@@ -714,6 +714,7 @@ class AppRouter {
               String? initialCategory;
               List<String>? initialSections;
               bool? initialIsSemiFinished;
+              int? initialTypeRevision;
               String? initialHeaderSignature;
               List<List<String>>? initialSourceRows;
               final extra = state.extra;
@@ -722,6 +723,8 @@ class AppRouter {
                 initialCategory = extra['category'] as String?;
                 initialSections = (extra['sections'] as List?)?.cast<String>();
                 initialIsSemiFinished = extra['isSemiFinished'] as bool?;
+                final rev = extra['typeRevision'];
+                initialTypeRevision = rev is num ? rev.toInt() : null;
                 initialHeaderSignature = extra['headerSignature'] as String?;
                 final raw = extra['sourceRows'];
                 initialSourceRows = raw is List && raw.isNotEmpty && raw.first is List
@@ -738,6 +741,7 @@ class AppRouter {
                 initialCategory: initialCategory,
                 initialSections: initialSections,
                 initialIsSemiFinished: initialIsSemiFinished,
+                initialTypeRevision: initialTypeRevision,
                 initialHeaderSignature: initialHeaderSignature,
                 initialSourceRows: initialSourceRows,
               ));

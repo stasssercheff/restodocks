@@ -48,7 +48,9 @@ const PDF_SYSTEM_PROMPT = `Ты парсер технологических ка
 
 Форматы: ГОСТ 31987-2012, СТБ 1210, Сборник: таблица "Наименование сырья" + "Расход сырья на 1 порцию" (г, мл) с колонками Брутто/Нетто; строка "Выход готовой продукции" (г). Варианты по сезону (Свекла до 01.01 / с 01.01) — брать оба или основной.
 
-Структура бывает разной: название в заголовке или отдельной строке; таблица с колонками № / Наименование / Продукт / Сырьё / Брутто / Нетто / Выход / Расход / Норма / Цена / Сумма; числа в граммах или кг (запятая как десятичный разделитель). Для grossGrams/netGrams бери любые подходящие числа (брутто, нетто, норма в кг×1000). Если в таблице есть колонка «Выход» (г) — заполняй outputGrams для каждого ингредиента. Если в документе есть строка «Выход на 1 порцию: X г» или «Выход готовой продукции: X г» — заполняй yieldGrams в карточке (для блюда это вес порции). ingredientType: "product" — сырьё (Т.); "semi_finished" — ПФ (П/Ф). isSemiFinished: true если в названии "ПФ".
+Структура бывает разной: название в заголовке или отдельной строке; таблица с колонками № / Наименование / Продукт / Сырьё / Брутто / Нетто / Выход / Расход / Норма / Цена / Сумма; числа в граммах или кг (запятая как десятичный разделитель). Для grossGrams/netGrams бери любые подходящие числа (брутто, нетто, норма в кг×1000). Если в таблице есть колонка «Выход» (г) — заполняй outputGrams для каждого ингредиента. Если в документе есть строка «Выход на 1 порцию: X г» или «Выход готовой продукции: X г» — заполняй yieldGrams в карточке (для блюда это вес порции).
+
+ВАЖНО: Если в таблице есть два блока колонок — «Расход на 1 порцию» и «Расход на 10 порций» (Брутто, Нетто, Выход в каждом) — для карточки используй ТОЛЬКО данные из блока «на 1 порцию»: grossGrams и netGrams из колонок Брутто/Нетто на 1 порцию, outputGrams из колонки Выход на 1 порцию. В итого (yieldGrams) должен быть суммарный выход на 1 порцию, а не на 10. ingredientType: "product" — сырьё (Т.); "semi_finished" — ПФ (П/Ф). isSemiFinished: true если в названии "ПФ".
 
 Если есть КК (калькуляционная карта) с ценами — извлекай pricePerKg (цена за кг или за л, руб.) для каждого ингредиента. Это важно для расчёта себестоимости.
 
@@ -56,6 +58,27 @@ const PDF_SYSTEM_PROMPT = `Ты парсер технологических ка
 { "cards": [ { "dishName": string, "technologyText": string|null, "isSemiFinished": boolean|null, "yieldGrams": number|null, "ingredients": [ { "productName": string, "grossGrams": number|null, "netGrams": number|null, "outputGrams": number|null, "primaryWastePct": number|null, "cookingMethod": string|null, "cookingLossPct": number|null, "unit": string|null, "ingredientType": "product"|"semi_finished"|null, "pricePerKg": number|null } ] } ] }
 
 Если нет ни одной карточки: { "cards": [] }`;
+
+const KK_MULTI_SYSTEM_PROMPT = `Ты парсер Калькуляционных карт (КК) формы №ОП-1 из PDF (русский язык). Документ может содержать МНОГО КК подряд.
+
+Твоя задача: извлечь ВСЕ карточки (каждое блюдо = отдельная карточка).
+
+Как отделять карточки:
+- каждая новая секция с заголовком "Наименование блюда" (или повторяющаяся шапка формы ОП-1) = новая карточка
+- часто перед строкой "организация" / "структурное подразделение" стоит название блюда
+- внутри карточки таблица ингредиентов: строки вида "1 Т. <продукт> <код> <норма> <цена> <сумма> кг" и т.п.
+- конец карточки обычно рядом с "Общая стоимость" / "Выход одного блюда в готовом виде"
+
+Нужно вернуть ТОЛЬКО JSON:
+{ "cards": [ { "dishName": string, "technologyText": null, "isSemiFinished": boolean|null, "yieldGrams": number|null, "ingredients": [ { "productName": string, "grossGrams": number|null, "netGrams": number|null, "unit": string|null, "pricePerKg": number|null, "ingredientType": "product"|"semi_finished"|null } ] } ] }
+
+Правила:
+- Норма часто в кг с запятой: 0,100 кг → grossGrams/netGrams = 100 (граммы)
+- unit: "g" для кг; "ml" для л; "pcs" для шт
+- ingredientType: "product" если "Т.", "semi_finished" если "П/Ф"
+- Если не уверен в цене, можно оставить pricePerKg null
+
+Если не нашёл карточек: { "cards": [] }`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -124,11 +147,12 @@ Deno.serve(async (req: Request) => {
     }
 
     let text: string;
+    let pageTexts: string[] = [];
     try {
       const pdf = await getDocumentProxy(bytes);
       // mergePages: false — иначе unpdf делает .replace(/\s+/g, ' ') и убивает переносы строк, нужные для таблиц
       const result = await extractText(pdf, { mergePages: false });
-      const pageTexts = (result?.text as string[] | undefined) ?? [];
+      pageTexts = (result?.text as string[] | undefined) ?? [];
       text = pageTexts.join("\n").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
@@ -148,8 +172,27 @@ Deno.serve(async (req: Request) => {
     }
 
     // 0. КК (калькуляционная карта ОП-1) — формат с ценами
-    const kkCards = parseKkOp1(text);
-    if (kkCards.length > 0) {
+    // Для unpdf у нас уже есть страницы: KК почти всегда "1 блюдо = 1 страница".
+    // Это надёжнее, чем пытаться резать один склеенный text по маркерам (которых может не быть в unpdf-выводе).
+    const kkCardsByPage = (pageTexts.length > 0)
+      ? pageTexts.flatMap((p) => parseKkOp1((p ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim()))
+      : [];
+    const kkCards = kkCardsByPage.length > 0 ? kkCardsByPage : parseKkOp1(text);
+    const looksLikeManyKkOp1 = (t: string): boolean => {
+      const m1 = (t.match(/(?:^|\n)\s*Наименование\s+блюда\s*(?:\n|$)/gim) ?? []).length;
+      const m2 = (t.match(/выход\s+одного\s+блюда/gi) ?? []).length;
+      const m3 = (t.match(/общая\s+стоимость/gi) ?? []).length;
+      // если форма явно повторяется — точно много карточек
+      if (m1 >= 2) return true;
+      if (m2 >= 2) return true;
+      if (m3 >= 2) return true;
+      return false;
+    };
+
+    // Fallback: если КК-парсер нашёл 1 карточку, но документ похож на "много КК в одном PDF", используем AI для разбиения.
+    const shouldUseAiForKk = kkCards.length === 1 && looksLikeManyKkOp1(text);
+
+    if (kkCards.length > 0 && !shouldUseAiForKk) {
       const normalized = kkCards.map((card) => {
         const filtered = filterGarbageIngredients(card.ingredients, (s) => isStructuralProductName(s, true));
         const noDishName = dropIngredientsMatchingDishName(filtered, card.dishName);
@@ -308,7 +351,7 @@ Deno.serve(async (req: Request) => {
     try {
       content = await chatText({
         messages: [
-          { role: "system", content: PDF_SYSTEM_PROMPT },
+          { role: "system", content: shouldUseAiForKk ? KK_MULTI_SYSTEM_PROMPT : PDF_SYSTEM_PROMPT },
           { role: "user", content: `PDF extracted text:\n\n${textForAi}` },
         ],
         maxTokens: 16384,

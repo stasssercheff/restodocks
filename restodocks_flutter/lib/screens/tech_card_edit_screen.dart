@@ -566,6 +566,7 @@ class TechCardEditScreen extends StatefulWidget {
     this.initialCategory,
     this.initialSections,
     this.initialIsSemiFinished,
+    this.initialTypeRevision,
     this.initialHeaderSignature,
     this.initialSourceRows,
   });
@@ -588,6 +589,8 @@ class TechCardEditScreen extends StatefulWidget {
   final String? initialCategory;
   final List<String>? initialSections;
   final bool? initialIsSemiFinished;
+  /// Версия массового выбора типа на экране проверки импорта. При изменении должна перебивать ручной выбор в черновике.
+  final int? initialTypeRevision;
 
   @override
   State<TechCardEditScreen> createState() => _TechCardEditScreenState();
@@ -668,6 +671,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   String _selectedCategory = 'misc';
   List<String> _selectedSections = []; // [] = Скрыто, ['all'] = Все цеха
   bool _isSemiFinished = true; // ПФ или блюдо (порция — в карточках блюд, отдельно)
+  // Если пользователь вручную переключил тип ПФ/Блюдо в редакторе, его выбор должен иметь приоритет над экраном импорта.
+  bool _typeManuallyChanged = false;
   final _technologyController = TextEditingController();
   final _descriptionForHallController = TextEditingController();
   final _compositionForHallController = TextEditingController();
@@ -718,6 +723,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       'category': _selectedCategory,
       'sections': _selectedSections,
       'isSemiFinished': _isSemiFinished,
+      'typeManuallyChanged': _typeManuallyChanged,
+      'typeRevision': widget.initialTypeRevision ?? 0,
       'portionWeight': _portionWeight,
       'descriptionForHall': _descriptionForHallController.text,
       'compositionForHall': _compositionForHallController.text,
@@ -752,13 +759,38 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       _technologyController.text = data['technology'] as String? ?? '';
       _selectedCategory = data['category'] as String? ?? 'misc';
       _selectedSections = List<String>.from(data['sections'] as List<dynamic>? ?? []);
-      _isSemiFinished = data['isSemiFinished'] as bool? ?? true;
+      // При открытии из импорта тип ПФ/Блюдо управляется экраном проверки импорта (extra initialIsSemiFinished).
+      // Но если пользователь вручную переключал тип внутри редактора — берём тип из черновика.
+      final desiredFromImport = widget.initialIsSemiFinished ?? widget.initialFromAi?.isSemiFinished ?? true;
+      final draftRev = (data['typeRevision'] is num) ? (data['typeRevision'] as num).toInt() : 0;
+      final currentRev = widget.initialTypeRevision ?? 0;
+      final revisionChanged = widget.initialFromAi != null && currentRev != draftRev;
+      final manual = !revisionChanged && data['typeManuallyChanged'] == true;
+      _typeManuallyChanged = manual;
+      _isSemiFinished = widget.initialFromAi != null
+          ? (manual ? (data['isSemiFinished'] as bool? ?? desiredFromImport) : desiredFromImport)
+          : (data['isSemiFinished'] as bool? ?? true);
       final fromDraft = (data['portionWeight'] as num?)?.toDouble();
-      final fromAi = widget.initialFromAi?.yieldGrams != null && widget.initialFromAi!.yieldGrams! > 0
-          ? widget.initialFromAi!.yieldGrams!.toDouble()
-          : null;
-      // При открытии из импорта приоритет — выход из файла (ВКС), иначе в «Итого» показывается 100 вместо реального выхода
-      _portionWeight = fromAi ?? fromDraft ?? 100;
+      // Сумма выходов из восстанавливаемых ингредиентов (для расчёта веса порции при импорте)
+      var sumFromData = 0.0;
+      for (final item in data['ingredients'] as List<dynamic>? ?? []) {
+        final m = item is Map ? item as Map : null;
+        if (m != null) sumFromData += ((m['outputWeight'] as num?)?.toDouble()) ?? 0;
+      }
+      final sum = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+      final sumOrData = sum > 0 ? sum : sumFromData;
+      if (widget.initialFromAi != null) {
+        // Открыто из импорта: вес порции только по правилу (ПФ=100, Блюдо=выход из файла или сумма), черновик не используем
+        _portionWeight = _isSemiFinished ? 100 : (widget.initialFromAi!.yieldGrams != null && widget.initialFromAi!.yieldGrams! > 0 ? widget.initialFromAi!.yieldGrams!.toDouble() : (sumOrData > 0 ? sumOrData : 100));
+      } else if (_isSemiFinished) {
+        // ТТК ПФ: по умолчанию 100; из черновика (защита от ошибочно больших значений)
+        _portionWeight = (fromDraft != null && fromDraft > 0 && fromDraft <= 10000 ? fromDraft : null) ?? 100;
+      } else {
+        // ТТК блюдо: по умолчанию = вес выхода итого; черновик не берём если явно ошибочный
+        double? draft = fromDraft != null && fromDraft > 0 ? fromDraft : null;
+        if (draft != null && sumOrData > 0 && (draft > 5 * sumOrData || draft < 0.2 * sumOrData)) draft = null;
+        _portionWeight = draft ?? (sumOrData > 0 ? sumOrData : 100);
+      }
       _descriptionForHallController.text = data['descriptionForHall'] as String? ?? '';
       _compositionForHallController.text = data['compositionForHall'] as String? ?? '';
       _sellingPriceController.text = data['sellingPrice'] as String? ?? '';
@@ -823,6 +855,37 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     };
 
     return categoryTranslations[c]?[lang] ?? c;
+  }
+
+  /// Подтягивает цену за кг и стоимость из номенклатуры заведения по названию продукта (для импортированных ТТК).
+  void _autoFillPriceFromNomenclature() {
+    final store = context.read<ProductStoreSupabase>();
+    final est = context.read<AccountManagerSupabase>().establishment;
+    final establishmentId = est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
+    if (establishmentId == null) return;
+    final list = <TTIngredient>[];
+    for (final ing in _ingredients) {
+      if (ing.isPlaceholder || ing.productName.trim().isEmpty || ing.sourceTechCardId != null) {
+        list.add(ing);
+        continue;
+      }
+      final product = store.findProductForIngredient(ing.productId, ing.productName);
+      if (product == null) {
+        list.add(ing);
+        continue;
+      }
+      final priceInfo = store.getEstablishmentPrice(product.id, establishmentId);
+      final pricePerKg = priceInfo?.$1 ?? 0.0;
+      if (pricePerKg <= 0) {
+        list.add(ing);
+        continue;
+      }
+      final cost = (pricePerKg * ing.grossWeight / 1000);
+      list.add(ing.copyWith(productId: product.id, pricePerKg: pricePerKg, cost: cost));
+    }
+    _ingredients
+      ..clear()
+      ..addAll(list);
   }
 
   /// Подставляет брутто в граммах по номенклатуре, когда продукт в шт и задан вес 1 шт (например яйцо 1 шт → 60 г).
@@ -920,14 +983,26 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       await context.read<ProductStoreSupabase>().loadProducts();
       final est = context.read<AccountManagerSupabase>().establishment;
       if (est != null) {
-        await context.read<ProductStoreSupabase>().loadNomenclature(est.dataEstablishmentId);
+        final productStore = context.read<ProductStoreSupabase>();
+        if (est.isBranch) {
+          await productStore.loadNomenclatureForBranch(est.id, est.dataEstablishmentId!);
+        } else {
+          await productStore.loadNomenclature(est.dataEstablishmentId);
+        }
         // Оптимизация: при просмотре или создании из импорта — не блокировать первый рендер загрузкой всех ТТК.
         final deferTcLoad = (_isNew && widget.initialFromAi != null) || widget.forceViewMode;
         if (!deferTcLoad) {
           final tcSvc = context.read<TechCardServiceSupabase>();
-          final tcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
-          final customKitchen = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'kitchen');
-          final customBar = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'bar');
+          List<TechCard> tcs;
+          if (est.isBranch) {
+            final mainTcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId!);
+            final branchTcs = await tcSvc.getTechCardsForEstablishment(est.id);
+            tcs = [...mainTcs, ...branchTcs];
+          } else {
+            tcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
+          }
+          final customKitchen = await tcSvc.getCustomCategories(est.isBranch ? est.id : est.dataEstablishmentId!, 'kitchen');
+          final customBar = await tcSvc.getCustomCategories(est.isBranch ? est.id : est.dataEstablishmentId!, 'bar');
           if (mounted) {
             _pickerTechCards = _isNew ? tcs : tcs.where((t) => t.id != widget.techCardId).toList();
             _semiFinishedProducts = tcs.where((t) => t.isSemiFinished).toList();
@@ -940,9 +1015,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           () async {
             try {
               final tcSvc = context.read<TechCardServiceSupabase>();
-              final tcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
-              final customKitchen = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'kitchen');
-              final customBar = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'bar');
+              List<TechCard> tcs;
+              if (est.isBranch) {
+                final mainTcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId!);
+                final branchTcs = await tcSvc.getTechCardsForEstablishment(est.id);
+                tcs = [...mainTcs, ...branchTcs];
+              } else {
+                tcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
+              }
+              final customKitchen = await tcSvc.getCustomCategories(est.isBranch ? est.id : est.dataEstablishmentId!, 'kitchen');
+              final customBar = await tcSvc.getCustomCategories(est.isBranch ? est.id : est.dataEstablishmentId!, 'bar');
               if (!mounted) return;
               setState(() {
                 _pickerTechCards = _isNew ? tcs : tcs.where((t) => t.id != widget.techCardId).toList();
@@ -979,28 +1061,31 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             } else if (widget.initialSections != null && widget.initialSections!.isEmpty) {
               _selectedSections = [];
             }
-            // Вес в «Итого» из парсинга: для блюд это вес порции, для ПФ — выход/вес итого из файла.
-            if (ai.yieldGrams != null && ai.yieldGrams! > 0) {
-              _portionWeight = ai.yieldGrams!.toDouble();
-            }
             _ingredients.clear();
             for (final line in ai.ingredients) {
               if (line.productName.trim().isEmpty) continue;
-              final gross = line.grossGrams ?? 0.0;
-              final net = line.netGrams ?? line.grossGrams ?? gross;
+              var gross = line.grossGrams ?? 0.0;
+              var net = line.netGrams ?? line.grossGrams ?? gross;
               final unit = line.unit?.trim().isNotEmpty == true ? line.unit! : 'g';
               final wastePct = (line.primaryWastePct ?? 0).clamp(0.0, 99.9);
               final outG = line.outputGrams != null && line.outputGrams! > 0 ? line.outputGrams! : 0.0;
-              final isEggsPcs = (unit == 'шт' || unit == 'pcs') && line.productName.trim().toLowerCase().contains('яйц');
+              final isPcs = unit == 'шт' || unit == 'pcs';
+              final gpp = isPcs ? 50.0 : null;
+              // Для шт/pcs парсер отдаёт количество штук (1, 2…). Конвертируем только когда значение похоже на штуки (малое целое 1–50), иначе это граммы с ошибочной единицей.
+              if (isPcs && gross > 0 && gross <= 50 && gross == gross.round()) {
+                gross = gross * (gpp ?? 50);
+                if (net == (line.grossGrams ?? 0)) net = gross;
+              }
+              final outW = (outG > 0 ? outG : (net > 0 ? net : (gross > 0 ? gross : 100.0))).toDouble();
               _ingredients.add(TTIngredient(
                 id: DateTime.now().millisecondsSinceEpoch.toString() + _ingredients.length.toString(),
                 productId: null,
                 productName: line.productName.trim(),
                 grossWeight: gross > 0 ? gross : 100,
                 netWeight: net > 0 ? net : (gross > 0 ? gross : 100),
-                outputWeight: outG,
+                outputWeight: outW.toDouble(),
                 unit: unit,
-                gramsPerPiece: isEggsPcs ? 50.0 : null,
+                gramsPerPiece: gpp,
                 primaryWastePct: wastePct,
                 cookingLossPctOverride: line.cookingLossPct != null ? line.cookingLossPct!.clamp(0.0, 99.9) : null,
                 isNetWeightManual: line.netGrams != null,
@@ -1012,6 +1097,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               ));
             }
             _autoFillBruttoFromNomenclature();
+            _autoFillPriceFromNomenclature();
+            // Вес порции при импорте: ПФ = 100, Блюдо = выход из файла (yieldGrams) или сумма выходов
+            final sumOutput = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+            _portionWeight = _isSemiFinished ? 100 : (ai.yieldGrams != null && ai.yieldGrams! > 0 ? ai.yieldGrams!.toDouble() : (sumOutput > 0 ? sumOutput : 100));
             if (addPlaceholders && _ingredients.isEmpty) {
               _ingredients.add(TTIngredient.emptyPlaceholder());
               _ingredients.add(TTIngredient.emptyPlaceholder());
@@ -1039,7 +1128,20 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           _techCard = tc;
           _loading = false;
           if (tc != null) {
-            _portionWeight = tc.portionWeight;
+            final sumOutput = tc.ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+            if (tc.isSemiFinished) {
+              // ТТК ПФ: по умолчанию 100; из БД только если задан
+              _portionWeight = tc.portionWeight > 0 ? tc.portionWeight : 100;
+            } else {
+              // ТТК блюдо: по умолчанию = вес выхода итого (сумма); из БД если реалистично, иначе сброс на сумму (защита от ошибочных 35000 и т.п.)
+              if (tc.portionWeight <= 0 && sumOutput > 0) {
+                _portionWeight = sumOutput;
+              } else if (sumOutput > 0 && tc.portionWeight > 5 * sumOutput) {
+                _portionWeight = sumOutput;
+              } else {
+                _portionWeight = tc.portionWeight;
+              }
+            }
             _nameController.text = tc.getLocalizedDishName(context.read<LocalizationService>().currentLanguageCode);
             _selectedCategory = _categoryOptions.contains(tc.category) ? tc.category : 'misc'; // fallback if custom category was deleted
             _selectedSections = List<String>.from(tc.sections);
@@ -1066,7 +1168,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         // Если перевод технологии ещё не сохранён — запросить через DeepL
         if (tc != null) _translateTechnologyIfNeeded(tc);
         // Дополнить цены из номенклатуры (если productId есть, cost=0)
-        if (tc != null && est != null) _enrichPricesFromNomenclature(est.dataEstablishmentId);
+        if (tc != null && est != null) _enrichPricesFromNomenclature(est.isBranch ? est.id : est.dataEstablishmentId!);
         if (mounted) await restoreDraftNow();
       });
     } catch (e) {
@@ -1332,6 +1434,33 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     });
   }
 
+  /// Собрать результат распознавания из текущей формы (для возврата «Назад» при импорте без сохранения в систему).
+  TechCardRecognitionResult _buildRecognitionResultFromForm() {
+    final toSaveIngredients = _ingredients.where((i) => !i.isPlaceholder).toList();
+    final yieldVal = !_isSemiFinished
+        ? _portionWeight
+        : (toSaveIngredients.isEmpty ? 0.0 : toSaveIngredients.fold(0.0, (s, i) => s + i.netWeight));
+    final ingredientsForResult = toSaveIngredients
+        .map((i) => TechCardIngredientLine(
+              productName: i.productName,
+              grossGrams: i.grossWeight,
+              netGrams: i.netWeight,
+              outputGrams: i.outputWeight,
+              unit: i.unit,
+              primaryWastePct: i.primaryWastePct,
+              cookingLossPct: i.cookingLossPctOverride,
+              ingredientType: i.sourceTechCardId != null ? 'semi_finished' : 'product',
+            ))
+        .toList();
+    return TechCardRecognitionResult(
+      dishName: _nameController.text.trim().isEmpty ? null : _nameController.text.trim(),
+      technologyText: _technologyController.text.trim().isEmpty ? null : _technologyController.text.trim(),
+      ingredients: ingredientsForResult,
+      isSemiFinished: _isSemiFinished,
+      yieldGrams: yieldVal > 0 ? yieldVal : null,
+    );
+  }
+
   Future<void> _save() async {
     final loc = context.read<LocalizationService>();
     final acc = context.read<AccountManagerSupabase>();
@@ -1368,12 +1497,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     final translationManager = context.read<TranslationManager>();
     try {
       if (_isNew || tc == null) {
+        // Филиал создаёт ТТК в своём заведении (доп от филиала); головное — в своём.
         final created = await svc.createTechCard(
           dishName: name,
           category: category,
           sections: _selectedSections,
           isSemiFinished: _isSemiFinished,
-          establishmentId: est.dataEstablishmentId,
+          establishmentId: est.isBranch ? est.id : est.dataEstablishmentId,
           createdBy: emp.id,
         );
         final sellingPrice = _parseSellingPrice();
@@ -1497,13 +1627,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               isSemiFinished: _isSemiFinished,
               yieldGrams: yieldVal > 0 ? yieldVal : null,
             );
-            if (mounted) context.pop(result);
+            if (mounted) context.pop(<String, dynamic>{'result': result, 'savedToSystem': true});
           } else {
             final dept = widget.department ?? 'kitchen';
             context.go('/tech-cards/$dept?refresh=1');
           }
         }
       } else {
+        // Редактирование существующей ТТК. Филиал не может сохранять карточки головного заведения (должен открываться с view=1).
         var photoUrls = List<String>.from(_photoUrls);
         if (_pendingPhotoBytes.isNotEmpty) {
           for (var i = 0; i < _pendingPhotoBytes.length; i++) {
@@ -1727,10 +1858,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       _technologyController.text = ai.technologyText!.trim();
     }
     if (ai.isSemiFinished != null) _isSemiFinished = ai.isSemiFinished!;
-    // ТТК блюдо: вес порции = выход из парсинга (для ПФ не подставляем)
-    if (!_isSemiFinished && ai.yieldGrams != null && ai.yieldGrams! > 0) {
-      _portionWeight = ai.yieldGrams!.toDouble();
-    }
     final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
           final addPlaceholders = canEdit && !widget.forceViewMode;
     final hadPlaceholder = _ingredients.isNotEmpty && _ingredients.last.isPlaceholder;
@@ -1738,19 +1865,27 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       _ingredients.removeWhere((e) => e.isPlaceholder);
       for (final line in ai.ingredients) {
         if (line.productName.trim().isEmpty) continue;
-        final gross = line.grossGrams ?? 0.0;
-        final net = line.netGrams ?? line.grossGrams ?? gross;
+        var gross = line.grossGrams ?? 0.0;
+        var net = line.netGrams ?? line.grossGrams ?? gross;
         final outG = line.outputGrams != null && line.outputGrams! > 0 ? line.outputGrams! : 0.0;
         final unit = line.unit?.trim().isNotEmpty == true ? line.unit! : 'g';
         final wastePct = (line.primaryWastePct ?? 0).clamp(0.0, 99.9);
+        final isPcs = unit == 'шт' || unit == 'pcs';
+        final gpp = isPcs ? 50.0 : null;
+        if (isPcs && gross > 0 && gross <= 50 && gross == gross.round()) {
+          gross = gross * (gpp ?? 50);
+          if (net == (line.grossGrams ?? 0)) net = gross;
+        }
+        final outW = (outG > 0 ? outG : (net > 0 ? net : (gross > 0 ? gross : 100.0))).toDouble();
         _ingredients.add(TTIngredient(
           id: DateTime.now().millisecondsSinceEpoch.toString() + _ingredients.length.toString(),
           productId: null,
           productName: line.productName.trim(),
           grossWeight: gross > 0 ? gross : 100,
           netWeight: net > 0 ? net : (gross > 0 ? gross : 100),
-          outputWeight: outG,
+          outputWeight: outW.toDouble(),
           unit: unit,
+          gramsPerPiece: gpp,
           primaryWastePct: wastePct,
           cookingLossPctOverride: line.cookingLossPct != null ? line.cookingLossPct!.clamp(0.0, 99.9) : null,
           isNetWeightManual: line.netGrams != null,
@@ -1764,6 +1899,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       if (addPlaceholders && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
         _ingredients.add(TTIngredient.emptyPlaceholder());
       }
+      final sumOutput = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+      _portionWeight = _isSemiFinished ? 100 : (ai.yieldGrams != null && ai.yieldGrams! > 0 ? ai.yieldGrams!.toDouble() : (sumOutput > 0 ? sumOutput : 100));
     } else if (hadPlaceholder && _ingredients.isNotEmpty) {
       // сохраняем плейсхолдер
     } else if (addPlaceholders && _ingredients.isEmpty) {
@@ -1816,9 +1953,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (est == null) return [];
     final productStore = context.read<ProductStoreSupabase>();
     await productStore.loadProducts();
-    await productStore.loadNomenclature(est.dataEstablishmentId);
+    if (est.isBranch) {
+      await productStore.loadNomenclatureForBranch(est.id, est.dataEstablishmentId!);
+    } else {
+      await productStore.loadNomenclature(est.dataEstablishmentId);
+    }
     if (!mounted) return [];
-    return productStore.getNomenclatureProducts(est.dataEstablishmentId);
+    final effectiveId = est.isBranch ? est.id : est.dataEstablishmentId!;
+    return productStore.getNomenclatureProducts(effectiveId);
   }
 
   /// [replaceIndex] — если задан, заменяем строку вместо добавления (тап по ячейке «Продукт»).
@@ -2046,9 +2188,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (popNavigator) Navigator.of(context).pop();
     final loc = context.read<LocalizationService>();
     final accountManager = context.read<AccountManagerSupabase>();
-    final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
+    final est = accountManager.establishment;
+    final establishmentId = est != null && est.isBranch ? est.id : accountManager.dataEstablishmentId;
+    final currency = accountManager.currentEmployee?.currency ?? est?.defaultCurrency ?? 'RUB';
     final productStore = context.read<ProductStoreSupabase>();
-    final establishmentId = context.read<AccountManagerSupabase>().dataEstablishmentId;
     if (establishmentId != null && establishmentId.isNotEmpty) {
       final ep = productStore.getEstablishmentPrice(p.id, establishmentId);
       productStore.addToNomenclature(establishmentId, p.id, price: ep?.$1, currency: ep?.$2 ?? currency);
@@ -2089,9 +2232,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       if (!mounted) return;
       final loc = context.read<LocalizationService>();
       final accountManager = context.read<AccountManagerSupabase>();
-    final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
+      final est = accountManager.establishment;
+      final establishmentId = est != null && est.isBranch ? est.id : accountManager.dataEstablishmentId;
+    final currency = accountManager.currentEmployee?.currency ?? est?.defaultCurrency ?? 'RUB';
       final productStore = context.read<ProductStoreSupabase>();
-      final establishmentId = context.read<AccountManagerSupabase>().dataEstablishmentId;
       if (establishmentId != null && establishmentId.isNotEmpty) {
         try {
           await productStore.addToNomenclature(
@@ -2556,7 +2700,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final canEdit = context.watch<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
-    final effectiveCanEdit = canEdit && !widget.forceViewMode; // forceViewMode = режим «Просмотр ТТК»
+    final est = context.watch<AccountManagerSupabase>().establishment;
+    // Филиал не может редактировать карточки головного заведения (только просмотр).
+    final forceViewBecauseBranch = est != null && est.isBranch && _techCard != null && _techCard!.establishmentId != est.id;
+    final effectiveCanEdit = canEdit && !widget.forceViewMode && !forceViewBecauseBranch; // forceViewMode = режим «Просмотр ТТК»
     final employee = context.watch<AccountManagerSupabase>().currentEmployee;
     final isCook = employee?.department == 'kitchen' && !effectiveCanEdit; // Повар - кухня без прав редактирования
 
@@ -2650,7 +2797,18 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
     return Scaffold(
       appBar: AppBar(
-        leading: appBarBackButton(context),
+        leading: widget.initialFromAi != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  context.pop(<String, dynamic>{
+                    'result': _buildRecognitionResultFromForm(),
+                    'savedToSystem': false,
+                  });
+                },
+                tooltip: loc.t('back'),
+              )
+            : appBarBackButton(context),
         title: Text(_isNew ? loc.t('create_tech_card') : (_techCard?.getDisplayNameInLists(loc.currentLanguageCode) ?? loc.t('tech_cards'))),
         actions: [
           if (effectiveCanEdit) IconButton(icon: _saving ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save), onPressed: _saving ? null : _save, tooltip: loc.t('save'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
@@ -2738,7 +2896,19 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                             DropdownMenuItem(value: true, child: Row(children: [const Icon(Icons.inventory_2, size: 20), const SizedBox(width: 8), Text(loc.t('tt_type_pf'))])),
                             DropdownMenuItem(value: false, child: Row(children: [const Icon(Icons.restaurant, size: 20), const SizedBox(width: 8), Text(loc.t('tt_type_dish'))])),
                           ],
-                          onChanged: (v) { setState(() => _isSemiFinished = v ?? true); _scheduleDraftSave(); },
+                          onChanged: (v) {
+                            setState(() {
+                              final toPf = v ?? true;
+                              _isSemiFinished = toPf;
+                              if (toPf) {
+                                _portionWeight = 100; // ТТК ПФ: вес порции по умолчанию 100
+                              } else {
+                                final sum = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+                                _portionWeight = sum > 0 ? sum : 100; // ТТК блюдо: вес порции = вес выхода итого
+                              }
+                            });
+                            _scheduleDraftSave();
+                          },
                         )
                       : InputDecorator(
                           decoration: InputDecoration(
@@ -2838,7 +3008,20 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                   ),
                                 ],
                               selected: {_isSemiFinished},
-                              onSelectionChanged: (v) { setState(() => _isSemiFinished = v.first); _scheduleDraftSave(); },
+                              onSelectionChanged: (v) {
+                                setState(() {
+                                  final toPf = v.first;
+                                  _isSemiFinished = toPf;
+                                  _typeManuallyChanged = true;
+                                  if (toPf) {
+                                    _portionWeight = 100; // ТТК ПФ: вес порции по умолчанию 100
+                                  } else {
+                                    final sum = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+                                    _portionWeight = sum > 0 ? sum : 100; // ТТК блюдо: вес порции = вес выхода итого
+                                  }
+                                });
+                                _scheduleDraftSave();
+                              },
                               showSelectedIcon: false,
                               ),
                             )
@@ -2876,8 +3059,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   final p = store.findProductForIngredient(ing.productId, ing.productName);
                   if (p == null) continue;
                   final lacksKbju = (p.calories == null || p.calories == 0) && p.protein == null && p.fat == null && p.carbs == null;
-                  final lacksAllergens = p.containsGluten == null || p.containsLactose == null;
-                  if (lacksKbju || lacksAllergens) {
+                  // Не пугаем баннером из-за аллергенов: многие базы КБЖУ не содержат глютен/лактозу.
+                  // Баннер здесь — именно про КБЖУ, чтобы подсветить некорректный расчёт.
+                  if (lacksKbju) {
                     missingNames.add(p.getLocalizedName(loc.currentLanguageCode));
                   }
                 }
@@ -2898,42 +3082,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                       const SizedBox(height: 4),
                       Text(loc.t('tt_missing_products').replaceFirst('%s', missingNames.join(', ')), style: const TextStyle(fontSize: 12)),
                     ],
-                  ),
-                );
-              },
-            ),
-            // Кнопка «Подстроить отход под выход» — когда задан вес порции из ТТК и сумма выходов не совпадает
-            Builder(
-              builder: (context) {
-                final totalOutput = _ingredients.where((i) => i.productName.trim().isNotEmpty).fold<double>(0, (s, i) => s + i.outputWeight);
-                final showAdjust = effectiveCanEdit &&
-                    _portionWeight > 0 &&
-                    totalOutput > 0 &&
-                    (totalOutput - _portionWeight).abs() > 1;
-                if (!showAdjust) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: TextButton.icon(
-                    icon: const Icon(Icons.tune, size: 18),
-                    label: Text(loc.t('ttk_adjust_waste_to_output') ?? 'Подстроить % отхода под целевой выход'),
-                    onPressed: () async {
-                      final ok = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: Text(loc.t('ttk_adjust_waste_title') ?? 'Подстроить отход'),
-                          content: Text(
-                            (loc.t('ttk_adjust_waste_confirm') ?? 'Подстроить процент отхода у всех ингредиентов, чтобы итоговый выход был %s г? Текущая сумма выходов: %s г.')
-                                .replaceFirst('%s', _portionWeight.toStringAsFixed(0))
-                                .replaceFirst('%s', totalOutput.toStringAsFixed(0)),
-                          ),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel)),
-                            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(loc.t('ok') ?? 'Да')),
-                          ],
-                        ),
-                      );
-                      if (ok == true && mounted) _adjustWasteToMatchOutput(_portionWeight);
-                    },
                   ),
                 );
               },
@@ -3016,6 +3164,53 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   ),
                 ),
               ),
+            ),
+            // Кнопка «Подстроить % отхода под целевой выход» — отдельно под таблицей, не на панели, компактная
+            Builder(
+              builder: (context) {
+                final totalOutput = _ingredients.where((i) => i.productName.trim().isNotEmpty).fold<double>(0, (s, i) => s + i.outputWeight);
+                final showAdjust = effectiveCanEdit &&
+                    _portionWeight > 0 &&
+                    totalOutput > 0 &&
+                    (totalOutput - _portionWeight).abs() > 1;
+                if (!showAdjust) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 32),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    onPressed: () async {
+                      final ok = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: Text(loc.t('ttk_adjust_waste_title') ?? 'Подстроить отход'),
+                          content: Text(
+                            (loc.t('ttk_adjust_waste_confirm') ?? 'Подстроить процент отхода у всех ингредиентов, чтобы итоговый выход был %s г? Текущая сумма выходов: %s г.')
+                                .replaceFirst('%s', _portionWeight.toStringAsFixed(0))
+                                .replaceFirst('%s', totalOutput.toStringAsFixed(0)),
+                          ),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel)),
+                            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(loc.t('ok') ?? 'Да')),
+                          ],
+                        ),
+                      );
+                      if (ok == true && mounted) _adjustWasteToMatchOutput(_portionWeight);
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.tune, size: 16, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 6),
+                        Text(loc.t('ttk_adjust_waste_to_output') ?? 'Подстроить % отхода под целевой выход', style: const TextStyle(fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
             // Блок технологии сразу под таблицей, на странице (без ограничения по высоте «окном»)
             Align(
@@ -3274,6 +3469,11 @@ class _TtkTableState extends State<_TtkTable> {
     final lang = loc.currentLanguageCode;
     final ingredients = widget.ingredients;
     final totalNet = ingredients.fold<double>(0, (s, ing) => s + ing.netWeight);
+    // Выход г. итого — сумма выходов по ингредиентам (не нетто)
+    final totalOutput = ingredients.where((ing) => ing.productName.trim().isNotEmpty).fold<double>(0, (s, ing) {
+      final out = ing.outputWeight > 0 ? ing.outputWeight : ing.effectiveGrossWeight * (1.0 - (ing.cookingLossPctOverride ?? ing.weightLossPercentage) / 100.0);
+      return s + out;
+    });
     final accountManagerForEst = context.read<AccountManagerSupabase>();
     final estId = accountManagerForEst.establishment?.id;
     // Итого по стоимости: effectiveCost или, если нет — цена заведения × нетто (чтобы не показывать 0₫ при привязанной номенклатуре)
@@ -3738,9 +3938,9 @@ class _TtkTableState extends State<_TtkTable> {
             _totalCell(ingredients.fold<double>(0, (s, ing) => s + ing.effectiveGrossWeight).toStringAsFixed(0)),
             _totalCell(''),
             _totalCell(''),
-            _totalCell(totalNet.toStringAsFixed(0)),
+            _totalCell(totalOutput.toStringAsFixed(0)), // Выход г. итого — сумма выходов
             _totalCell(NumberFormatUtils.formatDecimal(totalCost)),
-            _totalCell(totalNet > 0 ? NumberFormatUtils.formatDecimal(totalCost * 1000 / totalNet) : ''),
+            _totalCell(totalOutput > 0 ? NumberFormatUtils.formatDecimal(totalCost * 1000 / totalOutput) : ''),
             _totalCell(''),
             if (hasDeleteCol) _totalCell(''),
           ],

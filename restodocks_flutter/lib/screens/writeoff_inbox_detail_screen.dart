@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../models/models.dart';
 import '../services/services.dart';
 import '../services/inventory_download.dart';
-import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Просмотр списания из входящих.
@@ -145,12 +145,14 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
       ]);
       rows = rows.map((e) => e as Map<String, dynamic>).toList();
       rows.sort((a, b) => (a['productName']?.toString() ?? '').compareTo(b['productName']?.toString() ?? ''));
+      final lang = loc.currentLanguageCode;
       for (var i = 0; i < rows.length; i++) {
         final r = rows[i];
+        final unitRaw = (r['unit']?.toString() ?? 'g').trim().toLowerCase();
         sheet.appendRow([
           IntCellValue(i + 1),
           TextCellValue(r['productName']?.toString() ?? ''),
-          TextCellValue(r['unit']?.toString() ?? ''),
+          TextCellValue(CulinaryUnits.displayName(unitRaw, lang)),
           DoubleCellValue((r['total'] as num?)?.toDouble() ?? 0),
         ]);
       }
@@ -256,11 +258,12 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
                 ),
                 ...rows.asMap().entries.map((e) {
                   final r = e.value;
+                  final unitRaw = (r['unit']?.toString() ?? 'g').trim().toLowerCase();
                   return TableRow(
                     children: [
                       _cell(theme, '${e.key + 1}'),
                       _cell(theme, r['productName']?.toString() ?? ''),
-                      _cell(theme, r['unit']?.toString() ?? ''),
+                      _cell(theme, CulinaryUnits.displayName(unitRaw, loc.currentLanguageCode)),
                       _cell(theme, _fmt(r['total'])),
                     ],
                   );

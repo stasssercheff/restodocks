@@ -71,6 +71,7 @@ Deno.serve(async (req: Request) => {
           primaryWastePct: i.primaryWastePct ?? undefined,
           outputGrams: i.outputGrams ?? undefined,
           ingredientType: i.ingredientType ?? undefined,
+          pricePerKg: (i as { pricePerKg?: number | null }).pricePerKg ?? undefined,
         })),
       }));
       return new Response(JSON.stringify({ cards: normalized }), {
@@ -88,7 +89,7 @@ Structure in the table (columns may be in different order or have different name
 - Percentages: "Процент отхода" / "отход" (waste %), "Уварка" / "ужаривание" (shrinkage/cooking loss %).
 - Technology: "Технология" — multi-line cooking instructions; often in a merged cell on the right for the whole block.
 
-IGNORE these columns (do not use, do not require): "Цена за 1 кг/л", "Кг", "Стоимость", "Цена за 1", price, cost. The system calculates cost itself.
+If the document has prices (e.g. "Цена за 1 кг/л", "Цена", "Стоимость", "Кг") try to extract pricePerKg (price per kg/l) per ingredient. This is used to auto-fill nomenclature prices. If unsure, set pricePerKg null.
 
 How to split cards: each card is a block — one dish name row (or name in first column), then ingredient rows, then usually an "Итого" (total) row. When you see a new dish name or "Наименование" again or a clear separator, start a new card. Technology text belongs to the card it is next to (merged cell).
 
@@ -97,7 +98,7 @@ For each ingredient, set ingredientType: "product" if it is purchased (сырь�
 If column order or names vary (different languages, extra columns), infer from context. Extract: dishName, ingredients (productName, grossGrams, netGrams, primaryWastePct, cookingLossPct, ingredientType; unit default "g"), technologyText. Do not return empty just because the format is non-standard — parse as much as you can.
 
 Return ONLY valid JSON, no markdown:
-{ "cards": [ { "dishName": string, "technologyText": string | null, "isSemiFinished": boolean | null, "ingredients": [ { "productName": string, "grossGrams": number | null, "netGrams": number | null, "outputGrams": number | null, "primaryWastePct": number | null, "cookingMethod": string | null, "cookingLossPct": number | null, "unit": string | null, "ingredientType": "product" | "semi_finished" | null } ] }, ... ] }
+{ "cards": [ { "dishName": string, "technologyText": string | null, "isSemiFinished": boolean | null, "ingredients": [ { "productName": string, "grossGrams": number | null, "netGrams": number | null, "outputGrams": number | null, "primaryWastePct": number | null, "cookingMethod": string | null, "cookingLossPct": number | null, "unit": string | null, "ingredientType": "product" | "semi_finished" | null, "pricePerKg": number | null } ] }, ... ] }
 
 If gross and net are given but primaryWastePct is not: calculate waste = (1 - net/gross)*100. If net and output (weight after cooking) are given but cookingLossPct is not: calculate cookingLossPct = (1 - output/net)*100.
 
@@ -131,6 +132,15 @@ Return ALL cards found (up to hundreds). If no cards, return { "cards": [] }.`;
     }
 
     const cards = Array.isArray(parsed.cards) ? parsed.cards : [];
+    const toNumber = (v: unknown): number | undefined => {
+      if (v == null) return undefined;
+      if (typeof v === "number") return Number.isFinite(v) ? v : undefined;
+      const s = String(v).trim();
+      if (!s) return undefined;
+      const cleaned = s.replace(/\s+/g, "").replace(/,/g, ".").replace(/[^\d.\-]/g, "");
+      const n = Number.parseFloat(cleaned);
+      return Number.isFinite(n) ? n : undefined;
+    };
     const normalized = cards.map((card) => {
       const c = card as Record<string, unknown>;
       const ingredients = Array.isArray(c.ingredients)
@@ -139,13 +149,15 @@ Return ALL cards found (up to hundreds). If no cards, return { "cards": [] }.`;
             const ingredientType = (it === "product" || it === "semi_finished") ? it : undefined;
             return {
               productName: String(i.productName ?? ""),
-              grossGrams: i.grossGrams != null ? Number(i.grossGrams) : undefined,
-              netGrams: i.netGrams != null ? Number(i.netGrams) : undefined,
+              grossGrams: toNumber(i.grossGrams),
+              netGrams: toNumber(i.netGrams),
               unit: i.unit != null ? String(i.unit) : undefined,
               cookingMethod: i.cookingMethod != null ? String(i.cookingMethod) : undefined,
-              primaryWastePct: i.primaryWastePct != null ? Number(i.primaryWastePct) : undefined,
-              cookingLossPct: i.cookingLossPct != null ? Number(i.cookingLossPct) : undefined,
+              primaryWastePct: toNumber(i.primaryWastePct),
+              cookingLossPct: toNumber(i.cookingLossPct),
+              outputGrams: toNumber(i.outputGrams),
               ingredientType,
+              pricePerKg: toNumber(i.pricePerKg),
             };
           })
         : [];
@@ -154,6 +166,7 @@ Return ALL cards found (up to hundreds). If no cards, return { "cards": [] }.`;
         technologyText: c.technologyText != null ? String(c.technologyText) : null,
         ingredients: ingredients,
         isSemiFinished: typeof c.isSemiFinished === "boolean" ? c.isSemiFinished : undefined,
+        yieldGrams: toNumber((c as Record<string, unknown>).yieldGrams),
       };
     });
 

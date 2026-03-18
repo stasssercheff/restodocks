@@ -46,3 +46,4 @@ export 'haccp_log_service_supabase.dart';
 export 'haccp_config_service.dart';
 export 'haccp_pdf_export_service.dart';
 export 'documentation_service_supabase.dart';
+export 'getting_started_read_service.dart';

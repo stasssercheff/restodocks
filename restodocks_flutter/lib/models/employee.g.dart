@@ -21,6 +21,10 @@ Employee _$EmployeeFromJson(Map<String, dynamic> json) => Employee(
       subscriptionPlan: json['subscription_plan'] as String?,
       preferredLanguage: json['preferred_language'] as String? ?? 'ru',
       preferredCurrency: json['preferred_currency'] as String?,
+      gettingStartedShown: json['getting_started_shown'] as bool? ?? false,
+      firstSessionAt: json['first_session_at'] == null
+          ? null
+          : DateTime.parse(json['first_session_at'] as String),
       paymentType: json['payment_type'] as String?,
       ratePerShift: (json['rate_per_shift'] as num?)?.toDouble(),
       hourlyRate: (json['hourly_rate'] as num?)?.toDouble(),
@@ -57,6 +61,8 @@ Map<String, dynamic> _$EmployeeToJson(Employee instance) => <String, dynamic>{
       'subscription_plan': instance.subscriptionPlan,
       'preferred_language': instance.preferredLanguage,
       'preferred_currency': instance.preferredCurrency,
+      'getting_started_shown': instance.gettingStartedShown,
+      'first_session_at': instance.firstSessionAt?.toIso8601String(),
       'payment_type': instance.paymentType,
       'rate_per_shift': instance.ratePerShift,
       'hourly_rate': instance.hourlyRate,

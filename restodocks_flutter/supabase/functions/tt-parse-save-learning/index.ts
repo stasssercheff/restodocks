@@ -57,24 +57,61 @@ Deno.serve(async (req: Request) => {
       const t = body.template as Record<string, unknown>;
       const sig = t.header_signature as string;
       if (sig) {
-        const payload: Record<string, unknown> = {
-          header_signature: sig,
-          header_row_index: t.header_row_index ?? 0,
-          name_col: t.name_col ?? 0,
-          product_col: t.product_col ?? 1,
-          gross_col: t.gross_col ?? -1,
-          net_col: t.net_col ?? -1,
-          waste_col: t.waste_col ?? -1,
-          output_col: t.output_col ?? -1,
-          source: t.source ?? null,
-        };
-        if (t.technology_col != null) payload.technology_col = t.technology_col;
-        const { error } = await supabase.from("tt_parse_templates").upsert(payload, {
-          onConflict: "header_signature",
-        });
-        if (error) {
-          console.error("[tt-parse-save-learning] template upsert error:", error);
-          errors.push(`template: ${error.message}`);
+        // ВАЖНО: не перезатирать уже рабочие шаблоны новым "обучением" от странного файла.
+        // Обновляем только пустые/-1 поля. Это предотвращает "дрейф" и поломку старых форматов.
+        const { data: existing, error: selErr } = await supabase
+          .from("tt_parse_templates")
+          .select("header_signature, header_row_index, name_col, product_col, gross_col, net_col, waste_col, output_col, technology_col, source")
+          .eq("header_signature", sig)
+          .limit(1)
+          .maybeSingle();
+        if (selErr) {
+          console.error("[tt-parse-save-learning] template select error:", selErr);
+          errors.push(`template_select: ${selErr.message}`);
+        } else {
+          const ex = (existing ?? {}) as Record<string, unknown>;
+          const pickNum = (key: string, fallback: number) => {
+            const v = ex[key];
+            return typeof v === "number" ? v : fallback;
+          };
+          const exHeader = pickNum("header_row_index", 0);
+          const exName = pickNum("name_col", 0);
+          const exProduct = pickNum("product_col", 1);
+          const exGross = pickNum("gross_col", -1);
+          const exNet = pickNum("net_col", -1);
+          const exWaste = pickNum("waste_col", -1);
+          const exOutput = pickNum("output_col", -1);
+          const exTech = pickNum("technology_col", -1);
+          const exSource = (typeof ex["source"] === "string" ? (ex["source"] as string) : null);
+
+          const inNum = (k: string, def: number) => {
+            const v = t[k];
+            return typeof v === "number" ? v : def;
+          };
+          const inSource = typeof t.source === "string" ? t.source : null;
+
+          const payload: Record<string, unknown> = {
+            header_signature: sig,
+            header_row_index: exHeader > 0 ? exHeader : inNum("header_row_index", 0),
+            name_col: exName >= 0 ? exName : inNum("name_col", 0),
+            product_col: exProduct >= 0 ? exProduct : inNum("product_col", 1),
+            gross_col: exGross >= 0 ? exGross : inNum("gross_col", -1),
+            net_col: exNet >= 0 ? exNet : inNum("net_col", -1),
+            waste_col: exWaste >= 0 ? exWaste : inNum("waste_col", -1),
+            output_col: exOutput >= 0 ? exOutput : inNum("output_col", -1),
+            source: exSource ?? inSource,
+          };
+          const techIn = inNum("technology_col", -1);
+          if (exTech >= 0) payload.technology_col = exTech;
+          else if (techIn >= 0) payload.technology_col = techIn;
+
+          const { error } = await supabase.from("tt_parse_templates").upsert(payload, {
+            onConflict: "header_signature",
+          });
+          if (error) {
+            console.error("[tt-parse-save-learning] template upsert error:", error);
+            errors.push(`template: ${error.message}`);
+          }
         }
       }
     }

@@ -213,14 +213,21 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final svc = context.read<TechCardServiceSupabase>();
+      // Филиал: карточки головного (только просмотр) + свои (редактируемые). Головное: только свои.
+      List<TechCard> all;
+      if (est.isBranch) {
+        final mainCards = await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
+        final branchCards = await svc.getTechCardsForEstablishment(est.id);
+        all = [...mainCards, ...branchCards];
+      } else {
+        all = await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
+      }
       final results = await Future.wait([
-        svc.getTechCardsForEstablishment(est.dataEstablishmentId),
         svc.getCustomCategories(est.dataEstablishmentId, 'kitchen'),
         svc.getCustomCategories(est.dataEstablishmentId, 'bar'),
       ]);
-      final all = results[0] as List<TechCard>;
-      final customKitchen = results[1] as List<({String id, String name})>;
-      final customBar = results[2] as List<({String id, String name})>;
+      final customKitchen = results[0] as List<({String id, String name})>;
+      final customBar = results[1] as List<({String id, String name})>;
       _customCategoryNames.clear();
       for (final c in customKitchen) _customCategoryNames[c.id] = c.name;
       for (final c in customBar) _customCategoryNames[c.id] = c.name;
@@ -1296,6 +1303,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   colCostWidth: colCostWidth,
                   colActionsWidth: colActionsWidth,
                   costSym: costSym,
+                  establishment: context.read<AccountManagerSupabase>().establishment,
                 ),
                 childCount: g.cards.length,
               ),
@@ -1320,8 +1328,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     required double colCostWidth,
     required double colActionsWidth,
     required String costSym,
+    Establishment? establishment,
   }) {
     final tc = techCards[index];
+    final est = establishment ?? context.read<AccountManagerSupabase>().establishment;
+    // В филиале карточки головного заведения — только просмотр; свои — редактируемые.
+    final viewOnlyCard = est != null && est.isBranch && tc.establishmentId != est.id;
+    final effectiveCanEdit = canEdit && !viewOnlyCard;
     final selected = _selectedTechCards.contains(tc.id);
     final name = tc.getDisplayNameInLists(lang);
     final sectionStr = _sectionLabelForDisplay(tc, loc);
@@ -1340,11 +1353,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           if (_selectionMode) {
             _toggleTechCardSelection(tc.id);
           } else {
-            final path = canEdit ? '/tech-cards/${tc.id}' : '/tech-cards/${tc.id}?view=1';
+            final path = effectiveCanEdit ? '/tech-cards/${tc.id}' : '/tech-cards/${tc.id}?view=1';
             context.push(path);
           }
         },
-        onLongPress: canEdit && !_selectionMode
+        onLongPress: effectiveCanEdit && !_selectionMode
             ? () => context.push('/tech-cards/${tc.id}?view=1')
             : null,
         child: Padding(
@@ -1439,6 +1452,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             ],
             rows: List.generate(techCards.length, (i) {
               final tc = techCards[i];
+              final est = context.read<AccountManagerSupabase>().establishment;
+              final viewOnlyCard = est != null && est.isBranch && tc.establishmentId != est.id;
+              final path = viewOnlyCard ? '/tech-cards/${tc.id}?view=1' : '/tech-cards/${tc.id}';
               return DataRow(
                 selected: _selectedTechCards.contains(tc.id),
                 cells: [
@@ -1447,7 +1463,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   DataCell(Text(_categoryLabel(tc.category, loc))),
                   DataCell(Text(NumberFormatUtils.formatInt(_calculateCostPerKg(tc)))),
                 ],
-                onSelectChanged: _selectionMode ? null : (_) => context.push('/tech-cards/${tc.id}'),
+                onSelectChanged: _selectionMode ? null : (_) => context.push(path),
               );
             }),
           ),

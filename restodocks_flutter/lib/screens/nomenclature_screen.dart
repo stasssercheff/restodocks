@@ -115,7 +115,8 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
       aiService: context.read<AiServiceSupabase>(),
       supabase: context.read<SupabaseService>(),
     );
-    final estId = account.dataEstablishmentId;
+    final est = account.establishment;
+    final estId = est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
 
     if (estId == null) {
       if (mounted) {
@@ -360,6 +361,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   // Список элементов номенклатуры (продукты + ТТК ПФ)
   List<NomenclatureItem> _nomenclatureItems = [];
   bool _isLoading = true;
+  Object? _loadError;
   bool _hasRunAutoTranslationThisSession = false;
 
   // Активная вкладка
@@ -375,14 +377,22 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
     final est = account.establishment;
-    final estId = est?.dataEstablishmentId;
+    if (est == null) return;
+    // Филиал: объединённая номенклатура головного + филиала, цены филиала; идентификатор для операций — id филиала.
+    final estId = est.isBranch ? est.id : est.dataEstablishmentId;
     if (estId == null) return;
 
     final techCardService = context.read<TechCardServiceSupabase>();
 
+    if (mounted) setState(() => _loadError = null);
+
     try {
       await store.loadProducts(force: true);
-      await store.loadNomenclature(estId);
+      if (est.isBranch) {
+        await store.loadNomenclatureForBranch(est.id, est.dataEstablishmentId!);
+      } else {
+        await store.loadNomenclature(estId);
+      }
 
       // Загружаем элементы номенклатуры (продукты + ТТК ПФ)
       var items = await store.getAllNomenclatureItems(estId, techCardService);
@@ -391,6 +401,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     } catch (e) {
       devLog('❌ NomenclatureScreen: _ensureLoaded error: $e');
       if (mounted) {
+        setState(() => _loadError = e);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка загрузки номенклатуры: $e'), duration: const Duration(seconds: 6)),
         );
@@ -897,7 +908,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         loc: loc,
         onRemove: (idsToRemove) async {
           final store = context.read<ProductStoreSupabase>();
-          final estId = context.read<AccountManagerSupabase>().dataEstablishmentId;
+          final est = context.read<AccountManagerSupabase>().establishment;
+          final estId = est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
           if (estId == null) return;
           for (final id in idsToRemove) {
             final item = idToItem[id];
@@ -937,7 +949,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
   void _showCreateProductDialog(LocalizationService loc) {
     final account = context.read<AccountManagerSupabase>();
-    final estId = account.dataEstablishmentId;
+    final est = account.establishment;
+    final estId = est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
     if (estId == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('no_establishment'))));
       return;
@@ -1039,8 +1052,14 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     final hideCategory = p.category == 'misc' || p.category == 'manual' || p.category == 'imported';
 
-    // КБЖУ и глютен/лактоза скрыты
-    return hideCategory ? priceText : '${_categoryLabel(p.category)} · $priceText';
+    // «доп от филиала» — продукт добавлен только в номенклатуру филиала
+    final branchOnly = store.isBranchOnlyProduct(p.id);
+    final base = hideCategory ? priceText : '${_categoryLabel(p.category)} · $priceText';
+    if (branchOnly) {
+      final label = loc.t('branch_only_product_label') ?? 'доп от филиала';
+      return '$base · $label';
+    }
+    return base;
   }
 
   String _currencySymbol(String currency) => Establishment.currencySymbolFor(currency);
@@ -1215,8 +1234,11 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final loc = context.watch<LocalizationService>();
     final store = context.watch<ProductStoreSupabase>();
     final account = context.watch<AccountManagerSupabase>();
-    final estId = account.dataEstablishmentId;
+    final est = account.establishment;
+    // Филиал: работа с номенклатурой и ценами по id филиала (головное — dataEstablishmentId).
+    final estId = est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
     final canEdit = account.currentEmployee?.canEditChecklistsAndTechCards ?? false;
+    final isBranch = est?.isBranch ?? false;
 
     // Фильтруем элементы номенклатуры
     var nomItems = _nomenclatureItems.where((item) {
@@ -1402,6 +1424,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                               loc: loc,
                               sort: _nomSort,
                               filterType: _nomFilter,
+                              loadError: _loadError,
+                              onRetry: () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})),
                               onSortChanged: (s) => setState(() => _nomSort = s),
                               onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
                               onRefresh: () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})),
@@ -1469,6 +1493,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                               loc: loc,
                               sort: _nomSort,
                               filterType: _nomFilter,
+                              loadError: _loadError,
+                              onRetry: () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})),
                               onSortChanged: (s) => setState(() => _nomSort = s),
                               onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
                               onRefresh: () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})),
@@ -1821,10 +1847,14 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     // Обновляем список после загрузки
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
-    final estId = account.dataEstablishmentId;
-    if (estId != null) {
+    final est = account.establishment;
+    if (est != null) {
       await store.loadProducts(force: true);
-      await store.loadNomenclature(estId);
+      if (est.isBranch) {
+        await store.loadNomenclatureForBranch(est.id, est.dataEstablishmentId!);
+      } else {
+        await store.loadNomenclature(est.dataEstablishmentId!);
+      }
     }
     if (mounted) setState(() {});
   }
@@ -2145,6 +2175,8 @@ class _NomenclatureTab extends StatefulWidget {
     required this.loc,
     required this.sort,
     required this.filterType,
+    this.loadError,
+    this.onRetry,
     required this.onSortChanged,
     required this.onFilterTypeChanged,
     required this.onRefresh,
@@ -2167,6 +2199,8 @@ class _NomenclatureTab extends StatefulWidget {
   final LocalizationService loc;
   final _CatalogSort sort;
   final _NomenclatureFilter filterType;
+  final Object? loadError;
+  final VoidCallback? onRetry;
   final void Function(_CatalogSort) onSortChanged;
   final void Function(_NomenclatureFilter) onFilterTypeChanged;
   final VoidCallback onRefresh;
@@ -2205,6 +2239,8 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
     if (widget.items.isEmpty) {
       return _NomenclatureEmpty(
         loc: widget.loc,
+        loadError: widget.loadError,
+        onRetry: widget.onRetry,
         onSwitchToCatalog: widget.onSwitchToCatalog,
       );
     }
@@ -2316,31 +2352,61 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
 class _NomenclatureEmpty extends StatelessWidget {
   const _NomenclatureEmpty({
     required this.loc,
+    this.loadError,
+    this.onRetry,
     required this.onSwitchToCatalog,
   });
 
   final LocalizationService loc;
+  final Object? loadError;
+  final VoidCallback? onRetry;
   final VoidCallback onSwitchToCatalog;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              loadError != null ? Icons.cloud_off_outlined : Icons.inventory_2_outlined,
+              size: 64,
+              color: loadError != null ? theme.colorScheme.error : Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            if (loadError != null) ...[
+              Text(
+                loc.t('nomenclature_load_error') ?? 'Ошибка загрузки номенклатуры',
+                style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.error),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                loadError.toString(),
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
               const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: Text(loc.t('retry') ?? 'Повторить'),
+              ),
+            ] else ...[
               Text(
                 loc.t('nomenclature_empty'),
-                style: Theme.of(context).textTheme.titleMedium,
+                style: theme.textTheme.titleMedium,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 loc.t('add_from_catalog'),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -2350,9 +2416,10 @@ class _NomenclatureEmpty extends StatelessWidget {
                 label: Text(loc.t('add_from_catalog')),
               ),
             ],
-          ),
+          ],
         ),
-      );
+      ),
+    );
   }
 }
 
