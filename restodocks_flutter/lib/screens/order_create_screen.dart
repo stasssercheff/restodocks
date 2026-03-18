@@ -38,7 +38,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
 
   bool _saving = false;
 
-  static const _unitIds = ['g', 'kg', 'ml', 'l', 'pcs', 'шт', 'pack', 'can', 'box'];
+  static const _unitIds = ['g', 'kg', 'ml', 'l', 'pcs', 'pack', 'can', 'box'];
 
   static String _unitLabel(String unitId, String lang) =>
       CulinaryUnits.displayName(unitId, lang);

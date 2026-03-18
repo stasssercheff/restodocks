@@ -1706,7 +1706,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   // Fix for Vercel build issue
 
   static const _addProductCategories = ['manual', 'vegetables', 'fruits', 'meat', 'seafood', 'dairy', 'grains', 'bakery', 'pantry', 'spices', 'beverages', 'eggs', 'legumes', 'nuts', 'misc'];
-  static const _addProductUnits = ['g', 'kg', 'pcs', 'шт', 'ml', 'L'];
+  static const _addProductUnits = ['g', 'kg', 'pcs', 'ml', 'L'];
 
   Future<void> _showAddProductDialog(LocalizationService loc) async {
     final account = context.read<AccountManagerSupabase>();

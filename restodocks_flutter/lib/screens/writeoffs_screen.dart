@@ -11,7 +11,16 @@ import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
 String _unitDisplay(String? unit, String lang) {
-  const ruToId = {'г': 'g', 'кг': 'kg', 'мл': 'ml', 'л': 'l', 'шт': 'pcs', 'штуки': 'pcs'};
+  const ruToId = {
+    'г': 'g',
+    'кг': 'kg',
+    'мл': 'ml',
+    'л': 'l',
+    'шт': 'pcs',
+    'штука': 'pcs',
+    'штуки': 'pcs',
+    'штук': 'pcs',
+  };
   final u = (unit ?? 'g').trim().toLowerCase();
   final id = ruToId[u] ?? u;
   return CulinaryUnits.displayName(id, lang);
@@ -459,7 +468,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
         sum += (r.total / 1000) * pricePerKg;
       } else if (u == 'kg' || u == 'кг' || u == 'l' || u == 'л' || u == 'ml' || u == 'мл') {
         sum += r.total * pricePerKg;
-      } else if (u == 'pcs' || u == 'шт' || u == 'штуки') {
+      } else if (u == 'pcs' || u == 'шт' || u == 'штуки' || u == 'штук') {
         final perPiece = p.basePrice ?? (p.gramsPerPiece != null && p.gramsPerPiece! > 0 ? (pricePerKg * p.gramsPerPiece! / 1000) : 0);
         sum += r.total * (perPiece);
       }
@@ -888,7 +897,7 @@ class _WriteoffUnitDropdown extends StatelessWidget {
     if (p == null) return _baseUnits;
     final options = List<String>.from(_baseUnits);
     final hasGpp = p.gramsPerPiece != null && p.gramsPerPiece! > 0;
-    if (hasGpp) options.addAll(['pcs', 'шт']);
+    if (hasGpp) options.add('pcs'); // без дублей
     final hasPkg = p.packageWeightGrams != null && p.packageWeightGrams! > 0;
     if (hasPkg) {
       options.add('pkg');

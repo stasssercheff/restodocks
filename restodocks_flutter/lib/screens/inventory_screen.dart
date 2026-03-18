@@ -2424,7 +2424,8 @@ class _ProductUnitDropdown extends StatelessWidget {
     final options = List<String>.from(_baseUnits);
     final hasGpp = p?.gramsPerPiece != null && p!.gramsPerPiece! > 0;
     if (hasGpp) {
-      options.addAll(['pcs', 'шт']);
+      // Храним канонически как pcs, чтобы не было дублей в UI.
+      options.add('pcs');
     }
     final hasPkg = p?.packageWeightGrams != null && p!.packageWeightGrams! > 0;
     if (hasPkg) {

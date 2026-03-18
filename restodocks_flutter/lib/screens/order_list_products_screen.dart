@@ -34,7 +34,7 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
     const base = [
       'g', 'kg',           // вес
       'ml', 'l',           // объём
-      'pcs', 'шт',         // штуки
+      'pcs',               // штуки (храним канонически как pcs)
       'pack', 'pkg',       // упаковка (pkg — если в продукте указан packageWeightGrams)
       'can', 'box',        // банка, коробка
       'bottle',            // бутылка
