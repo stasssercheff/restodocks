@@ -77,6 +77,41 @@ function splitKkBlocks(text: string): string[] {
     if (blocks.length > 0) return blocks;
   }
 
+  // Частый случай: в одном PDF много КК, но "Калькуляционная карта" встречается 1 раз (или не в начале строки).
+  // В ОП‑1 для КАЖДОГО блюда повторяется строка "Наименование блюда" — используем её как границу карточки.
+  const nameMarkerRe = /(?:^|\n)\s*Наименование\s+блюда\s*(?:\n|$)/gim;
+  const nameMatches = [...text.matchAll(nameMarkerRe)];
+  if (nameMatches.length >= 2) {
+    const idxs = nameMatches
+      .map((m) => (typeof m.index === "number" ? m.index : -1))
+      .filter((i) => i >= 0)
+      .sort((a, b) => a - b);
+
+    const findLineStart = (pos: number): number => {
+      const nl = text.lastIndexOf("\n", Math.max(0, pos));
+      return nl >= 0 ? nl + 1 : 0;
+    };
+
+    // Старт блока ставим на строку ВЫШЕ "Наименование блюда" (обычно там название блюда),
+    // чтобы extractDishName мог корректно найти dishName в prev/next строках.
+    const boundaries: number[] = [];
+    for (const idx of idxs) {
+      const markerLineStart = findLineStart(idx);
+      const prevLineStart = markerLineStart > 0 ? findLineStart(markerLineStart - 2) : 0;
+      boundaries.push(prevLineStart);
+    }
+    // Убираем дубликаты границ (если маркер уже в первой строке и т.п.)
+    const uniqBoundaries = Array.from(new Set(boundaries)).sort((a, b) => a - b);
+
+    for (let i = 0; i < uniqBoundaries.length; i++) {
+      const start = uniqBoundaries[i];
+      const end = uniqBoundaries[i + 1] ?? text.length;
+      const chunk = text.slice(start, end).trim();
+      if (chunk.length > 50) blocks.push(chunk);
+    }
+    if (blocks.length > 0) return blocks;
+  }
+
   return [text];
 }
 
