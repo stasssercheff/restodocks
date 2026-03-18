@@ -718,13 +718,15 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
     } catch (e) {
       if (mounted) {
         final msg = e.toString();
-        final isSchemaError = msg.contains('hourly_rate') ||
-            msg.contains('rate_per_shift') ||
-            msg.contains('payment_type') ||
-            msg.contains('PGRST204') ||
-            (msg.contains('column') && msg.contains('exist'));
+        final lower = msg.toLowerCase();
+        final isPaymentSchemaError = lower.contains('hourly_rate') ||
+            lower.contains('rate_per_shift') ||
+            lower.contains('payment_type');
+        final isSchemaError = isPaymentSchemaError ||
+            lower.contains('pgrst204') ||
+            (lower.contains('column') && lower.contains('exist'));
         setState(() {
-          _error = isSchemaError
+          _error = isPaymentSchemaError
               ? (loc.t('employee_save_error_schema') ?? 'Не удалось сохранить. В БД нет колонок оплаты. Выполните в Supabase SQL Editor миграцию из файла supabase_migration_employee_payment.sql')
               : msg;
           _saving = false;
