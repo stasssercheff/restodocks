@@ -1363,6 +1363,33 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     });
   }
 
+  /// Собрать результат распознавания из текущей формы (для возврата «Назад» при импорте без сохранения в систему).
+  TechCardRecognitionResult _buildRecognitionResultFromForm() {
+    final toSaveIngredients = _ingredients.where((i) => !i.isPlaceholder).toList();
+    final yieldVal = !_isSemiFinished
+        ? _portionWeight
+        : (toSaveIngredients.isEmpty ? 0.0 : toSaveIngredients.fold(0.0, (s, i) => s + i.netWeight));
+    final ingredientsForResult = toSaveIngredients
+        .map((i) => TechCardIngredientLine(
+              productName: i.productName,
+              grossGrams: i.grossWeight,
+              netGrams: i.netWeight,
+              outputGrams: i.outputWeight,
+              unit: i.unit,
+              primaryWastePct: i.primaryWastePct,
+              cookingLossPct: i.cookingLossPctOverride,
+              ingredientType: i.sourceTechCardId != null ? 'semi_finished' : 'product',
+            ))
+        .toList();
+    return TechCardRecognitionResult(
+      dishName: _nameController.text.trim().isEmpty ? null : _nameController.text.trim(),
+      technologyText: _technologyController.text.trim().isEmpty ? null : _technologyController.text.trim(),
+      ingredients: ingredientsForResult,
+      isSemiFinished: _isSemiFinished,
+      yieldGrams: yieldVal > 0 ? yieldVal : null,
+    );
+  }
+
   Future<void> _save() async {
     final loc = context.read<LocalizationService>();
     final acc = context.read<AccountManagerSupabase>();
@@ -1528,7 +1555,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               isSemiFinished: _isSemiFinished,
               yieldGrams: yieldVal > 0 ? yieldVal : null,
             );
-            if (mounted) context.pop(result);
+            if (mounted) context.pop(<String, dynamic>{'result': result, 'savedToSystem': true});
           } else {
             final dept = widget.department ?? 'kitchen';
             context.go('/tech-cards/$dept?refresh=1');
@@ -2681,7 +2708,18 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
     return Scaffold(
       appBar: AppBar(
-        leading: appBarBackButton(context),
+        leading: widget.initialFromAi != null
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () {
+                  context.pop(<String, dynamic>{
+                    'result': _buildRecognitionResultFromForm(),
+                    'savedToSystem': false,
+                  });
+                },
+                tooltip: loc.t('back'),
+              )
+            : appBarBackButton(context),
         title: Text(_isNew ? loc.t('create_tech_card') : (_techCard?.getDisplayNameInLists(loc.currentLanguageCode) ?? loc.t('tech_cards'))),
         actions: [
           if (effectiveCanEdit) IconButton(icon: _saving ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save), onPressed: _saving ? null : _save, tooltip: loc.t('save'), style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
@@ -2933,42 +2971,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 );
               },
             ),
-            // Кнопка «Подстроить отход под выход» — когда задан вес порции из ТТК и сумма выходов не совпадает
-            Builder(
-              builder: (context) {
-                final totalOutput = _ingredients.where((i) => i.productName.trim().isNotEmpty).fold<double>(0, (s, i) => s + i.outputWeight);
-                final showAdjust = effectiveCanEdit &&
-                    _portionWeight > 0 &&
-                    totalOutput > 0 &&
-                    (totalOutput - _portionWeight).abs() > 1;
-                if (!showAdjust) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: TextButton.icon(
-                    icon: const Icon(Icons.tune, size: 18),
-                    label: Text(loc.t('ttk_adjust_waste_to_output') ?? 'Подстроить % отхода под целевой выход'),
-                    onPressed: () async {
-                      final ok = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: Text(loc.t('ttk_adjust_waste_title') ?? 'Подстроить отход'),
-                          content: Text(
-                            (loc.t('ttk_adjust_waste_confirm') ?? 'Подстроить процент отхода у всех ингредиентов, чтобы итоговый выход был %s г? Текущая сумма выходов: %s г.')
-                                .replaceFirst('%s', _portionWeight.toStringAsFixed(0))
-                                .replaceFirst('%s', totalOutput.toStringAsFixed(0)),
-                          ),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel)),
-                            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(loc.t('ok') ?? 'Да')),
-                          ],
-                        ),
-                      );
-                      if (ok == true && mounted) _adjustWasteToMatchOutput(_portionWeight);
-                    },
-                  ),
-                );
-              },
-            ),
             // Таблица ТТК на странице: без «окна», при росте числа продуктов страница скроллится, технология остаётся ниже
             Scrollbar(
               thumbVisibility: true,
@@ -3047,6 +3049,53 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   ),
                 ),
               ),
+            ),
+            // Кнопка «Подстроить % отхода под целевой выход» — отдельно под таблицей, не на панели, компактная
+            Builder(
+              builder: (context) {
+                final totalOutput = _ingredients.where((i) => i.productName.trim().isNotEmpty).fold<double>(0, (s, i) => s + i.outputWeight);
+                final showAdjust = effectiveCanEdit &&
+                    _portionWeight > 0 &&
+                    totalOutput > 0 &&
+                    (totalOutput - _portionWeight).abs() > 1;
+                if (!showAdjust) return const SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 32),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    onPressed: () async {
+                      final ok = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: Text(loc.t('ttk_adjust_waste_title') ?? 'Подстроить отход'),
+                          content: Text(
+                            (loc.t('ttk_adjust_waste_confirm') ?? 'Подстроить процент отхода у всех ингредиентов, чтобы итоговый выход был %s г? Текущая сумма выходов: %s г.')
+                                .replaceFirst('%s', _portionWeight.toStringAsFixed(0))
+                                .replaceFirst('%s', totalOutput.toStringAsFixed(0)),
+                          ),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel)),
+                            FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(loc.t('ok') ?? 'Да')),
+                          ],
+                        ),
+                      );
+                      if (ok == true && mounted) _adjustWasteToMatchOutput(_portionWeight);
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.tune, size: 16, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 6),
+                        Text(loc.t('ttk_adjust_waste_to_output') ?? 'Подстроить % отхода под целевой выход', style: const TextStyle(fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
             // Блок технологии сразу под таблицей, на странице (без ограничения по высоте «окном»)
             Align(

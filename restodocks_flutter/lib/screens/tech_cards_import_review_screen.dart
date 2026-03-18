@@ -359,6 +359,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         category: item.category,
         sections: result,
         isSemiFinished: item.isSemiFinished,
+        alreadySaved: item.alreadySaved,
       ));
     }
   }
@@ -446,6 +447,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           category: item.category,
           sections: item.sections,
           isSemiFinished: item.isSemiFinished,
+          alreadySaved: item.alreadySaved,
         ));
         changed = true;
       } else {
@@ -645,6 +647,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       final failed = <({String name, String error})>[];
       final failedItems = <_ReviewItem>[];
       for (final item in sorted) {
+        if (item.alreadySaved) continue; // уже сохранена в систему через «Сохранить» в редакторе
         try {
           var resultToSave = item.result;
           if (_ensurePfPrefix && item.isSemiFinished) {
@@ -676,7 +679,8 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         }
         if (mounted) setState(() => _saveProgress = productNamesToCreate.length + created);
       }
-      // Обучение: обратный маппинг — по скорректированным данным находим колонки в исходнике
+      // Обучение постоянно: при любом сохранении (все карточки или одна) — обратный маппинг по скорректированным данным,
+      // сохраняем колонки в tt_parse_learned_dish_name; следующий импорт того же формата использует этот маппинг.
       final sig = widget.headerSignature ?? AiServiceSupabase.lastParseHeaderSignature;
       final sourceRows = widget.sourceRows ?? AiServiceSupabase.lastParsedRows;
       debugPrint('[tt_parse] save: sig=${sig?.isEmpty ?? true ? "null/empty" : "ok"} sourceRows=${sourceRows?.length ?? 0}');
@@ -877,6 +881,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                             category: item.category,
                             sections: item.sections,
                             isSemiFinished: true,
+                            alreadySaved: item.alreadySaved,
                           )).toList();
                         }),
                         child: Text(loc.t('ttk_import_all_pf') ?? 'Все ПФ'),
@@ -890,6 +895,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                             category: item.category,
                             sections: item.sections,
                             isSemiFinished: false,
+                            alreadySaved: item.alreadySaved,
                           )).toList();
                         }),
                         child: Text(loc.t('ttk_import_all_dishes') ?? 'Все блюда'),
@@ -961,6 +967,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                                       category: item.category,
                                       sections: item.sections,
                                       isSemiFinished: item.isSemiFinished,
+                                      alreadySaved: item.alreadySaved,
                                     )),
                               ),
                             ),
@@ -968,7 +975,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                               onPressed: _saving ? null : () async {
                                 final sig = widget.headerSignature ?? AiServiceSupabase.lastParseHeaderSignature;
                                 final rows = widget.sourceRows ?? AiServiceSupabase.lastParsedRows;
-                                final result = await context.push<TechCardRecognitionResult?>(
+                                final raw = await context.push<dynamic>(
                                   '/tech-cards/new',
                                   extra: {
                                     'result': _items[realIndex].result,
@@ -979,7 +986,75 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                                     if (rows != null && rows.isNotEmpty) 'sourceRows': rows,
                                   },
                                 );
+                                TechCardRecognitionResult? result;
+                                bool savedToSystem = false;
+                                if (raw is Map) {
+                                  result = raw['result'] as TechCardRecognitionResult?;
+                                  savedToSystem = raw['savedToSystem'] == true;
+                                } else if (raw is TechCardRecognitionResult) {
+                                  result = raw;
+                                }
                                 if (result != null && mounted) {
+                                  final ai = context.read<AiService>();
+                                  final est = context.read<AccountManagerSupabase>().establishment;
+                                  // При «Назад» (savedToSystem == false): сохраняем обучение по правке, затем переразбор — у всех карточек применяется маппинг
+                                  if (!savedToSystem &&
+                                      rows != null &&
+                                      rows.isNotEmpty &&
+                                      sig != null &&
+                                      sig.isNotEmpty &&
+                                      est?.dataEstablishmentId != null) {
+                                    final orig = _items[realIndex].originalDishName?.trim() ?? '';
+                                    final corr = (result.dishName ?? '').trim();
+                                    if (orig.isNotEmpty && corr.isNotEmpty && orig != corr) {
+                                      await AiServiceSupabase.saveLearningCorrection(
+                                        headerSignature: sig,
+                                        field: 'dish_name',
+                                        originalValue: orig,
+                                        correctedValue: corr,
+                                        establishmentId: est.dataEstablishmentId!,
+                                      );
+                                    }
+                                  }
+                                  if (ai is AiServiceSupabase &&
+                                      rows != null &&
+                                      rows.isNotEmpty &&
+                                      sig != null &&
+                                      sig.isNotEmpty &&
+                                      est?.dataEstablishmentId != null) {
+                                    final reparsed = await ai.reparseRowsWithStoredLearning(
+                                      rows,
+                                      sig,
+                                      est!.dataEstablishmentId,
+                                    );
+                                    if (mounted && reparsed.isNotEmpty && reparsed.length == _items.length) {
+                                      setState(() {
+                                        _items = reparsed.asMap().entries.map((e) {
+                                          final idx = e.key;
+                                          final r = e.value;
+                                          if (idx == realIndex) {
+                                            return _ReviewItem(
+                                              result: result!,
+                                              originalDishName: _items[realIndex].originalDishName,
+                                              category: _items[realIndex].category,
+                                              sections: _items[realIndex].sections,
+                                              isSemiFinished: _items[realIndex].isSemiFinished,
+                                              alreadySaved: savedToSystem,
+                                            );
+                                          }
+                                          return _ReviewItem(
+                                            result: r,
+                                            originalDishName: r.dishName,
+                                            category: _inferCategory(r.dishName ?? ''),
+                                            sections: _items[idx].sections,
+                                            isSemiFinished: r.isSemiFinished ?? true,
+                                            alreadySaved: _items[idx].alreadySaved,
+                                          );
+                                        }).toList();
+                                      });
+                                      return;
+                                    }
+                                  }
                                   setState(() {
                                     _items[realIndex] = _ReviewItem(
                                       result: result,
@@ -987,6 +1062,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                                       category: _items[realIndex].category,
                                       sections: _items[realIndex].sections,
                                       isSemiFinished: _items[realIndex].isSemiFinished,
+                                      alreadySaved: savedToSystem,
                                     );
                                   });
                                 }
@@ -994,6 +1070,15 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                               icon: const Icon(Icons.open_in_new, size: 18),
                               label: Text(loc.t('open')),
                             ),
+                            if (item.alreadySaved)
+                              Padding(
+                                padding: const EdgeInsets.only(left: 8),
+                                child: Chip(
+                                  label: Text(loc.t('tech_cards_import_already_saved') ?? 'Уже сохранена', style: const TextStyle(fontSize: 12)),
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                                ),
+                              ),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -1129,6 +1214,8 @@ class _ReviewItem {
   final String category;
   final List<String> sections;
   final bool isSemiFinished;
+  /// true если карточка уже сохранена в систему через «Сохранить» в редакторе — при «Создать все» пропускаем.
+  final bool alreadySaved;
 
   _ReviewItem({
     required this.result,
@@ -1136,6 +1223,7 @@ class _ReviewItem {
     required this.category,
     this.sections = const ['all'],
     this.isSemiFinished = true,
+    this.alreadySaved = false,
   });
 }
 

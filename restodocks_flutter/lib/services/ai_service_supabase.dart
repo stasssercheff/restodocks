@@ -461,6 +461,47 @@ class AiServiceSupabase implements AiService {
     }
   }
 
+  /// Переразбор rows с учётом только что сохранённого обучения (колонки, маппинг).
+  /// Вызывать после правки одной карточки на экране проверки импорта, чтобы применить маппинг ко всем карточкам в батче.
+  Future<List<TechCardRecognitionResult>> reparseRowsWithStoredLearning(
+    List<List<String>> rows,
+    String? headerSignature,
+    String? establishmentId,
+  ) async {
+    if (rows.length < 2) return [];
+    final expanded = _expandSingleCellRows(rows);
+    if (expanded.length < 2) return [];
+    lastParsedRows = expanded;
+    lastParseHeaderSignature = headerSignature ?? _headerSignatureFromRows(expanded);
+    final excelErrors = <TtkParseError>[];
+    final listByTemplate = AiServiceSupabase.parseTtkByTemplate(expanded, errors: excelErrors);
+    final listByStored = await _tryParseByStoredTemplates(expanded)
+        .timeout(const Duration(seconds: 18), onTimeout: () => <TechCardRecognitionResult>[]);
+    final hasTemplateWithIngredients = listByTemplate.isNotEmpty && listByTemplate.any((c) => c.ingredients.isNotEmpty);
+    final hasStoredWithIngredients = listByStored.isNotEmpty && listByStored.any((c) => c.ingredients.isNotEmpty);
+    var list = (hasTemplateWithIngredients && listByTemplate.length > listByStored.length)
+        ? listByTemplate
+        : hasStoredWithIngredients
+            ? listByStored
+            : (hasTemplateWithIngredients || listByStored.isEmpty) ? listByTemplate : listByStored;
+    if (list.isEmpty) {
+      list = AiServiceSupabase._tryParseKkFromRows(expanded);
+      final multiBlock = AiServiceSupabase._tryParseMultiColumnBlocks(expanded);
+      if (_shouldPreferMultiBlock(list, multiBlock)) list = multiBlock;
+    }
+    if (list.isEmpty) return [];
+    final yieldFromRows = _extractYieldFromRows(expanded);
+    if (yieldFromRows != null && yieldFromRows > 0) {
+      list = list.map((c) => c.yieldGrams == null || c.yieldGrams! <= 0 ? c.copyWith(yieldGrams: yieldFromRows) : c).toList();
+    }
+    list = await _enrichTechnologyFromLearned(list, expanded, lastParseHeaderSignature)
+        .timeout(const Duration(seconds: 6), onTimeout: () => list);
+    var corrected = await _applyParseCorrections(list, lastParseHeaderSignature, establishmentId)
+        .timeout(const Duration(seconds: 6), onTimeout: () => list);
+    corrected = await _fillTechnologyFromStoredPf(corrected, establishmentId);
+    return corrected;
+  }
+
   @override
   Future<List<TechCardRecognitionResult>> parseTechCardsFromText(String text, {String? establishmentId}) async {
     lastParseTechCardExcelReason = null;
@@ -2021,16 +2062,25 @@ class AiServiceSupabase implements AiService {
         }
       }
 
-      // Выход — завершение карточки. Значение из колонки выхода/веса; 420/70 = две составляющие, итог 420+70=490 г.
+      // Выход — завершение карточки (супы/формат: строка «Выход» и число в колонке веса). Значение из колонки брутто/веса (grossCol или 2); 420/70 = сумма 490 г.
       final c0 = cells.isNotEmpty ? cells[0].trim().toLowerCase() : '';
-      final isYieldRow = c0 == 'выход' || (c0.contains('выход') && (c0.contains('блюда') || c0.contains('грамм') || c0.contains('порцию') || c0.contains('готовой')));
+      final c1 = cells.length > 1 ? cells[1].trim().toLowerCase() : '';
+      final isYieldRow = c0 == 'выход' || c1 == 'выход' ||
+          (c0.contains('выход') && (c0.contains('блюда') || c0.contains('грамм') || c0.contains('порцию') || c0.contains('готовой')));
       if (isYieldRow) {
         double? outG;
+        // Берём значение из той же колонки, что и вес ингредиентов (grossCol или кол.2), иначе из outputCol/cells[1]
+        int yieldCol = grossCol >= 0 && grossCol < cells.length ? grossCol : 2;
+        if (yieldCol >= cells.length) yieldCol = 1;
         String? yieldCell;
         if (outputCol >= 0 && outputCol < cells.length && cells[outputCol].trim().isNotEmpty) {
           yieldCell = cells[outputCol].trim();
-        } else if (cells.length > 2) {
-          yieldCell = cells[2].trim().isNotEmpty ? cells[2] : (cells[1].trim().isNotEmpty ? cells[1] : null);
+        } else if (cells.length > yieldCol && cells[yieldCol].trim().isNotEmpty) {
+          yieldCell = cells[yieldCol].trim();
+        } else if (cells.length > 1 && cells[1].trim().isNotEmpty) {
+          yieldCell = cells[1].trim();
+        } else if (cells.length > 2 && cells[2].trim().isNotEmpty) {
+          yieldCell = cells[2].trim();
         }
         if (yieldCell != null && yieldCell.isNotEmpty) {
           if (yieldCell.contains('/')) {
@@ -2044,7 +2094,6 @@ class AiServiceSupabase implements AiService {
             outG = _parseNum(yieldCell);
           }
         }
-        if (outG == null && cells.length > 1) outG = _parseNum(cells[1]);
         if (outG == null) {
           for (var i = 1; i < cells.length && i < 5; i++) {
             final v = _parseNum(cells[i]);
@@ -2076,6 +2125,7 @@ class AiServiceSupabase implements AiService {
         final nextLooksLikeHeader = (nextC0 == '№' || nextC0.isEmpty) && nextC1.contains('наименование') && nextC1.contains('продукт');
         if (nextLooksLikeHeader) {
           var dishInCol0 = cells.isNotEmpty ? cells[0].trim() : '';
+          if (dishInCol0.isEmpty && cells.length > 1) dishInCol0 = cells[1].trim();
           if (_isSkipForDishName(dishInCol0)) {
             dishInCol0 = _extractDishBeforeOrganoleptic(dishInCol0) ?? '';
           }
@@ -2083,9 +2133,21 @@ class AiServiceSupabase implements AiService {
               !RegExp(r'^№$|^выход$|^декор$', caseSensitive: false).hasMatch(dishInCol0)) {
             if (currentDish != null || currentIngredients.isNotEmpty) flushCard();
             currentDish = dishInCol0;
-            // Следующая итерация — пропустить строку заголовка (r+1). Сместим r в основном цикле.
             return true;
           }
+        }
+      }
+      // После flush: новая карточка — одна строка с названием блюда без веса (напр. «Грибной крем суп» без №|Наименование продукта)
+      if (currentDish == null && !isYieldRow) {
+        var nameCell = cells.isNotEmpty ? cells[0].trim() : '';
+        if (nameCell.isEmpty && cells.length > 1) nameCell = cells[1].trim();
+        final hasWeightInRow = (grossCol >= 0 && grossCol < cells.length && _parseNum(cells[grossCol]) != null) ||
+            (cells.length > 2 && _parseNum(cells[2]) != null) || (cells.length > 1 && _parseNum(cells[1]) != null);
+        if (nameCell.length >= 3 && !hasWeightInRow && _isValidDishName(nameCell) && !_isSkipForDishName(nameCell) &&
+            RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(nameCell) &&
+            !RegExp(r'^№$|^выход$|^итого$|^декор$|^технология$', caseSensitive: false).hasMatch(nameCell.toLowerCase())) {
+          currentDish = nameCell;
+          return true;
         }
       }
       // Повтор заголовка №|Наименование продукта — пропуск (второй блок и далее)
