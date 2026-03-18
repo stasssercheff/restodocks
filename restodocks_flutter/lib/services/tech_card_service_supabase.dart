@@ -473,18 +473,7 @@ class TechCardServiceSupabase {
   ) {
     final norm = _normalizeName(productName);
     if (norm.isEmpty) return null;
-    if (ingredientType == 'semi_finished') {
-      final pfNorm = normalizeForPfMatching(productName);
-      if (pfNorm.isNotEmpty) {
-        for (final tc in techCardsPf) {
-          if (normalizeForPfMatching(tc.name) == pfNorm) return tc.id;
-        }
-        final found = createdByName[pfNorm] ?? createdByName[norm] ?? createdByName[productName.trim()];
-        if (found != null) return found;
-      }
-      return null;
-    }
-    if (ingredientType == 'product') {
+    String? tryProducts() {
       for (final p in products) {
         final pNorm = _normalizeName(p.name);
         if (pNorm == norm) return p.id;
@@ -496,22 +485,33 @@ class TechCardServiceSupabase {
       }
       return null;
     }
-    for (final p in products) {
-      final pNorm = _normalizeName(p.name);
-      if (pNorm == norm) return p.id;
-    }
-    if (norm.length >= 10) {
-      for (final p in products) {
-        if (_fuzzyPrefixMatch(norm, _normalizeName(p.name))) return p.id;
+
+    String? tryPf() {
+      final pfNorm = normalizeForPfMatching(productName);
+      // Сначала — явные ПФ из существующих/созданных ТТК
+      if (pfNorm.isNotEmpty) {
+        for (final tc in techCardsPf) {
+          if (normalizeForPfMatching(tc.name) == pfNorm) return tc.id;
+        }
+        final found = createdByName[pfNorm] ?? createdByName[norm] ?? createdByName[productName.trim()];
+        if (found != null) return found;
       }
-    }
-    final pfNorm = normalizeForPfMatching(productName);
-    for (final tc in techCardsPf) {
-      if (_normalizeName(tc.name) == norm || (pfNorm.isNotEmpty && normalizeForPfMatching(tc.name) == pfNorm)) {
-        return tc.id;
+      // Fallback: иногда ingredientType не выставлен, но название совпадает полностью
+      for (final tc in techCardsPf) {
+        if (_normalizeName(tc.name) == norm) return tc.id;
       }
+      return createdByName[norm] ?? createdByName[pfNorm] ?? createdByName[productName.trim()];
     }
-    return createdByName[norm] ?? createdByName[pfNorm] ?? createdByName[productName.trim()];
+
+    // ingredientType может быть ошибочно определён парсером, поэтому делаем fallback в обе стороны.
+    if (ingredientType == 'semi_finished') {
+      return tryPf() ?? tryProducts();
+    }
+    if (ingredientType == 'product') {
+      return tryProducts() ?? tryPf();
+    }
+    // неизвестно — сначала продукт (обычно большинство строк), затем ПФ
+    return tryProducts() ?? tryPf();
   }
 
   /// Создание ТТК из результата распознавания ИИ (пакетный импорт).
