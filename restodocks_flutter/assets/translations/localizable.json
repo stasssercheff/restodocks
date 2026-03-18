@@ -188,6 +188,8 @@
     "expenses_orders_export_loading": "Выгрузка...",
     "expenses_orders_export_saved": "Файл сохранён",
     "expenses_orders_export_error": "Ошибка выгрузки",
+    "expenses_orders_excluded_from_total": "Не включено в итог: %s",
+    "expenses_orders_include_in_total_hint": "Учитывать в итоге затрат",
     "salary_hours": "часов",
     "salary_shifts": "смен",
     "salary_total_all": "Итого по всем",

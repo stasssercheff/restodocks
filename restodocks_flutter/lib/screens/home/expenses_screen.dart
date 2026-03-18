@@ -1,7 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/models.dart';
 import '../../services/inventory_download.dart';
@@ -96,6 +99,9 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
   /// Выбранные поставщики (пусто = все).
   Set<String> _selectedSupplierNames = {};
 
+  /// ID заказов, исключённых из итога (например, отправлены по ошибке). Сохраняется в SharedPreferences.
+  Set<String> _excludedFromTotalOrderIds = {};
+
   @override
   void initState() {
     super.initState();
@@ -123,8 +129,10 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
       final docs = await OrderDocumentService().listForEstablishment(establishmentId);
 
       if (mounted) {
+        final excluded = await _loadExcludedOrderIds(establishmentId);
         setState(() {
           _allOrders = docs;
+          _excludedFromTotalOrderIds = excluded;
           _loading = false;
         });
       }
@@ -164,6 +172,41 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
       if (s.isNotEmpty) names.add(s);
     }
     return names;
+  }
+
+  static const String _prefsKeyPrefix = 'expenses_orders_excluded_';
+
+  Future<Set<String>> _loadExcludedOrderIds(String establishmentId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = '$_prefsKeyPrefix$establishmentId';
+      final json = prefs.getString(key);
+      if (json == null) return {};
+      final list = jsonDecode(json) as List<dynamic>?;
+      if (list == null) return {};
+      return list.map((e) => e.toString()).toSet();
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> _setOrderIncludedInTotal(String orderId, bool include) async {
+    final id = orderId.toString();
+    setState(() {
+      if (include) {
+        _excludedFromTotalOrderIds.remove(id);
+      } else {
+        _excludedFromTotalOrderIds.add(id);
+      }
+    });
+    final account = context.read<AccountManagerSupabase>();
+    final establishmentId = account.establishment?.id;
+    if (establishmentId == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = '$_prefsKeyPrefix$establishmentId';
+      await prefs.setString(key, jsonEncode(_excludedFromTotalOrderIds.toList()));
+    } catch (_) {}
   }
 
   Future<void> _showDateRangePicker(LocalizationService loc) async {
@@ -427,6 +470,8 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
     final filteredOrders = _filteredOrders;
     double totalSum = 0;
     for (final order in filteredOrders) {
+      final orderId = order['id']?.toString() ?? '';
+      if (_excludedFromTotalOrderIds.contains(orderId)) continue;
       final payload = order['payload'] as Map<String, dynamic>? ?? {};
       final grand = (payload['grandTotal'] as num?)?.toDouble();
       if (grand != null) totalSum += grand;
@@ -568,6 +613,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
               itemCount: filteredOrders.length,
               itemBuilder: (_, i) {
                 final order = filteredOrders[i];
+                final orderId = order['id']?.toString() ?? '';
                 final payload = order['payload'] as Map<String, dynamic>? ?? {};
                 final header = payload['header'] as Map<String, dynamic>? ?? {};
                 final createdAt = DateTime.tryParse(order['created_at']?.toString() ?? '') ?? DateTime.now();
@@ -578,17 +624,55 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
                 final sumStr = grandTotal != null
                     ? NumberFormatUtils.formatSum(grandTotal, currency)
                     : '—';
+                final includedInTotal = !_excludedFromTotalOrderIds.contains(orderId);
 
                 return Card(
                   margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    title: Text('$dateStr · ${header['supplierName'] ?? '—'}'),
-                    subtitle: Text('${loc.t('inbox_header_employee') ?? 'Сотрудник'}: $employeeName'),
-                    trailing: Text(
-                      sumStr,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                    ),
+                  child: InkWell(
                     onTap: () => context.push('/inbox/order/${order['id']}'),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: [
+                          Tooltip(
+                            message: loc.t('expenses_orders_include_in_total_hint') ?? 'Учитывать в итоге затрат',
+                            child: SizedBox(
+                              width: 40,
+                              child: Checkbox(
+                                value: includedInTotal,
+                                onChanged: (v) {
+                                  _setOrderIncludedInTotal(orderId, v ?? true);
+                                },
+                                materialTapTargetSize: MaterialTapTargetSize.shrink,
+                                fillColor: WidgetStateProperty.resolveWith((states) {
+                                  if (!includedInTotal) return Theme.of(context).colorScheme.outline;
+                                  return null;
+                                }),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text('$dateStr · ${header['supplierName'] ?? '—'}', style: Theme.of(context).textTheme.titleSmall),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${loc.t('inbox_header_employee') ?? 'Сотрудник'}: $employeeName',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            sumStr,
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 );
               },
@@ -603,20 +687,41 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
               ],
             ),
             child: SafeArea(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    loc.t('salary_total_all') ?? 'Итого по всем',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        loc.t('salary_total_all') ?? 'Итого по всем',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '${NumberFormatUtils.formatSum(totalSum, currency)}',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    '${NumberFormatUtils.formatSum(totalSum, currency)}',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).colorScheme.primary,
+                  if (filteredOrders.isNotEmpty) ...[
+                    Builder(
+                      builder: (_) {
+                        final excludedCount = filteredOrders.where((o) => _excludedFromTotalOrderIds.contains(o['id']?.toString())).length;
+                        if (excludedCount == 0) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            (loc.t('expenses_orders_excluded_from_total') ?? 'Не включено в итог: %s').replaceAll('%s', '$excludedCount'),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          ),
+                        );
+                      },
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
