@@ -391,7 +391,73 @@ String _formatMessageTime(DateTime dt) {
   return DateFormat('dd.MM.yyyy HH:mm').format(dt.toLocal());
 }
 
-class _GroupMessageBubble extends StatelessWidget {
+/// Определяет язык текста (грубая эвристика) среди поддерживаемых: ru/en/es/tr/vi.
+String _detectLanguage(String text) {
+  if (text.trim().isEmpty) return 'en';
+  final runes = text.runes;
+
+  // Кириллица.
+  final hasCyrillic = runes.any((r) => r >= 0x0400 && r <= 0x04FF);
+  if (hasCyrillic) return 'ru';
+
+  // Вьетнамский: đ/Đ.
+  final hasVietSpecial = runes.any((r) => r == 0x0111 || r == 0x0110);
+  final hasLatinExtended = runes.any(
+    (r) => (r >= 0x00C0 && r <= 0x024F) || (r >= 0x1E00 && r <= 0x1EFF),
+  );
+  if (hasVietSpecial) return 'vi';
+
+  // Турецкий.
+  final hasTurkishChars = runes.any((r) {
+    switch (r) {
+      case 0x0131:
+      case 0x0130:
+      case 0x015F:
+      case 0x015E:
+      case 0x011F:
+      case 0x011E:
+      case 0x00E7:
+      case 0x00C7:
+      case 0x00F6:
+      case 0x00D6:
+      case 0x00FC:
+      case 0x00DC:
+        return true;
+    }
+    return false;
+  });
+  if (hasTurkishChars) return 'tr';
+
+  // Испанский.
+  final hasSpanishChars = runes.any((r) {
+    switch (r) {
+      case 0x00F1:
+      case 0x00D1:
+      case 0x00A1:
+      case 0x00BF:
+      case 0x00E1:
+      case 0x00C1:
+      case 0x00E9:
+      case 0x00C9:
+      case 0x00ED:
+      case 0x00CD:
+      case 0x00F3:
+      case 0x00D3:
+      case 0x00FA:
+      case 0x00DA:
+      case 0x00FC:
+      case 0x00DC:
+        return true;
+    }
+    return false;
+  });
+  if (hasSpanishChars) return 'es';
+
+  if (hasLatinExtended) return 'vi';
+  return 'en';
+}
+
+class _GroupMessageBubble extends StatefulWidget {
   const _GroupMessageBubble({
     required this.message,
     required this.isMe,
@@ -405,48 +471,101 @@ class _GroupMessageBubble extends StatelessWidget {
   final ThemeData theme;
 
   @override
+  State<_GroupMessageBubble> createState() => _GroupMessageBubbleState();
+}
+
+class _GroupMessageBubbleState extends State<_GroupMessageBubble> {
+  String? _translatedContent;
+  String? _lastLang;
+
+  @override
+  void initState() {
+    super.initState();
+    _lastLang = context.read<LocalizationService>().currentLanguageCode;
+    _translateIfNeeded();
+  }
+
+  Future<void> _translateIfNeeded() async {
+    final loc = context.read<LocalizationService>();
+    final targetLang = loc.currentLanguageCode;
+    final sourceLang = _detectLanguage(widget.message.content);
+    if (sourceLang == targetLang) return;
+    try {
+      final translationManager = context.read<TranslationManager>();
+      final translated = await translationManager.getLocalizedText(
+        entityType: TranslationEntityType.ui,
+        entityId: 'group_chat_${widget.message.id}',
+        fieldName: 'content',
+        sourceText: widget.message.content,
+        sourceLanguage: sourceLang,
+        targetLanguage: targetLang,
+      );
+      if (mounted && translated != widget.message.content) {
+        setState(() => _translatedContent = translated);
+      }
+    } catch (_) {
+      // silent fallback to original content
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _GroupMessageBubble oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final loc = context.read<LocalizationService>();
+    final lang = loc.currentLanguageCode;
+    if (oldWidget.message.id != widget.message.id ||
+        oldWidget.message.content != widget.message.content ||
+        _lastLang != lang) {
+      _lastLang = lang;
+      _translatedContent = null;
+      _translateIfNeeded();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final content = _translatedContent ?? widget.message.content;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
       decoration: BoxDecoration(
-        color: isMe
-            ? theme.colorScheme.primaryContainer
-            : theme.colorScheme.surfaceContainerHighest,
+        color: widget.isMe
+            ? widget.theme.colorScheme.primaryContainer
+            : widget.theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.only(
           topLeft: const Radius.circular(16),
           topRight: const Radius.circular(16),
-          bottomLeft: Radius.circular(isMe ? 16 : 4),
-          bottomRight: Radius.circular(isMe ? 4 : 16),
+          bottomLeft: Radius.circular(widget.isMe ? 16 : 4),
+          bottomRight: Radius.circular(widget.isMe ? 4 : 16),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (senderName != null)
+          if (widget.senderName != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  senderName!,
-                  style: theme.textTheme.labelSmall?.copyWith(
+                  widget.senderName!,
+                  style: widget.theme.textTheme.labelSmall?.copyWith(
                     fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.primary,
+                    color: widget.theme.colorScheme.primary,
                   ),
                 ),
               ),
             ),
-          if (message.hasImage)
+          if (widget.message.hasImage)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: GestureDetector(
-                onTap: () => _showImageFullScreen(context, message.imageUrl!),
+                onTap: () => _showImageFullScreen(context, widget.message.imageUrl!),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: Image.network(
-                    message.imageUrl!,
+                    widget.message.imageUrl!,
                     fit: BoxFit.cover,
                     width: 200,
                     height: 200,
@@ -457,16 +576,16 @@ class _GroupMessageBubble extends StatelessWidget {
                 ),
               ),
             ),
-          if (message.content.isNotEmpty)
+          if (content.isNotEmpty)
             Text(
-              message.content,
-              style: theme.textTheme.bodyMedium,
+              content,
+              style: widget.theme.textTheme.bodyMedium,
             ),
-          if (message.content.isNotEmpty) const SizedBox(height: 4),
+          if (content.isNotEmpty) const SizedBox(height: 4),
           Text(
-            _formatMessageTime(message.createdAt),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+            _formatMessageTime(widget.message.createdAt),
+            style: widget.theme.textTheme.labelSmall?.copyWith(
+              color: widget.theme.colorScheme.onSurfaceVariant,
             ),
           ),
         ],
