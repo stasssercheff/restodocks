@@ -3386,6 +3386,11 @@ class _TtkTableState extends State<_TtkTable> {
     final lang = loc.currentLanguageCode;
     final ingredients = widget.ingredients;
     final totalNet = ingredients.fold<double>(0, (s, ing) => s + ing.netWeight);
+    // Выход г. итого — сумма выходов по ингредиентам (не нетто)
+    final totalOutput = ingredients.where((ing) => ing.productName.trim().isNotEmpty).fold<double>(0, (s, ing) {
+      final out = ing.outputWeight > 0 ? ing.outputWeight : ing.effectiveGrossWeight * (1.0 - (ing.cookingLossPctOverride ?? ing.weightLossPercentage) / 100.0);
+      return s + out;
+    });
     final accountManagerForEst = context.read<AccountManagerSupabase>();
     final estId = accountManagerForEst.establishment?.id;
     // Итого по стоимости: effectiveCost или, если нет — цена заведения × нетто (чтобы не показывать 0₫ при привязанной номенклатуре)
@@ -3850,9 +3855,9 @@ class _TtkTableState extends State<_TtkTable> {
             _totalCell(ingredients.fold<double>(0, (s, ing) => s + ing.effectiveGrossWeight).toStringAsFixed(0)),
             _totalCell(''),
             _totalCell(''),
-            _totalCell(totalNet.toStringAsFixed(0)),
+            _totalCell(totalOutput.toStringAsFixed(0)), // Выход г. итого — сумма выходов
             _totalCell(NumberFormatUtils.formatDecimal(totalCost)),
-            _totalCell(totalNet > 0 ? NumberFormatUtils.formatDecimal(totalCost * 1000 / totalNet) : ''),
+            _totalCell(totalOutput > 0 ? NumberFormatUtils.formatDecimal(totalCost * 1000 / totalOutput) : ''),
             _totalCell(''),
             if (hasDeleteCol) _totalCell(''),
           ],
