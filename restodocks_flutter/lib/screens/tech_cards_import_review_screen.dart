@@ -867,7 +867,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                       TextButton(
                         onPressed: _saving ? null : () => setState(() {
                           _items = _items.map((item) => _ReviewItem(
-                            result: item.result,
+                            result: item.result.copyWith(isSemiFinished: true),
                             originalDishName: item.originalDishName,
                             category: item.category,
                             sections: item.sections,
@@ -881,7 +881,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                       TextButton(
                         onPressed: _saving ? null : () => setState(() {
                           _items = _items.map((item) => _ReviewItem(
-                            result: item.result,
+                            result: item.result.copyWith(isSemiFinished: false),
                             originalDishName: item.originalDishName,
                             category: item.category,
                             sections: item.sections,
@@ -1023,22 +1023,23 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                                         _items = reparsed.asMap().entries.map((e) {
                                           final idx = e.key;
                                           final r = e.value;
+                                          final preservedType = _items[idx].isSemiFinished;
                                           if (idx == realIndex) {
                                             return _ReviewItem(
                                               result: result!,
                                               originalDishName: _items[realIndex].originalDishName,
                                               category: _items[realIndex].category,
                                               sections: _items[realIndex].sections,
-                                              isSemiFinished: _items[realIndex].isSemiFinished,
+                                              isSemiFinished: preservedType,
                                               alreadySaved: savedToSystem,
                                             );
                                           }
                                           return _ReviewItem(
-                                            result: r,
+                                            result: r.copyWith(isSemiFinished: preservedType),
                                             originalDishName: r.dishName,
                                             category: _inferCategory(r.dishName ?? ''),
                                             sections: _items[idx].sections,
-                                            isSemiFinished: r.isSemiFinished ?? true,
+                                            isSemiFinished: preservedType,
                                             alreadySaved: _items[idx].alreadySaved,
                                           );
                                         }).toList();
@@ -1128,7 +1129,17 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                                 DropdownMenuItem(value: true, child: Text(loc.t('ttk_semi_finished'))),
                                 DropdownMenuItem(value: false, child: Text(loc.t('ttk_dish'))),
                               ],
-                              onChanged: (v) => setState(() => _items[realIndex] = _ReviewItem(result: item.result, originalDishName: item.originalDishName, category: item.category, sections: item.sections, isSemiFinished: v ?? item.isSemiFinished)),
+                              onChanged: (v) => setState(() {
+                                final isPf = v ?? item.isSemiFinished;
+                                _items[realIndex] = _ReviewItem(
+                                  result: item.result.copyWith(isSemiFinished: isPf),
+                                  originalDishName: item.originalDishName,
+                                  category: item.category,
+                                  sections: item.sections,
+                                  isSemiFinished: isPf,
+                                  alreadySaved: item.alreadySaved,
+                                );
+                              }),
                             ),
                             Text(
                               loc.t('tech_cards_ingredients_count').replaceAll('%s', '$count'),
