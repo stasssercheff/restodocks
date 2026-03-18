@@ -17,6 +17,7 @@ export 'theme_service.dart';
 export 'home_button_config_service.dart';
 export 'home_layout_config_service.dart';
 export 'screen_layout_preference_service.dart';
+export 'mobile_ui_scale_service.dart';
 export 'ttk_branch_filter_service.dart';
 export 'owner_view_preference_service.dart';
 export 'notification_preferences_service.dart';

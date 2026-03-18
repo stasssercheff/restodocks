@@ -263,6 +263,29 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           return true;
         }).toList();
       }
+
+      // Важно: ингредиенты могут ссылаться на ПФ из «другого» набора категорий/секций
+      // (ошибка разметки/импорта). Связь в карточке есть, но в поиске по ТТК такую
+      // карточку не найти, если мы её отфильтровали выше. Поэтому добавляем в список
+      // все ТТК, на которые есть ссылки из ингредиентов.
+      try {
+        final byId = {for (final tc in all) tc.id: tc};
+        final referencedIds = <String>{};
+        for (final tc in all) {
+          for (final ing in tc.ingredients) {
+            final id = ing.sourceTechCardId;
+            if (id != null && id.trim().isNotEmpty) referencedIds.add(id.trim());
+          }
+        }
+        final existing = list.map((e) => e.id).toSet();
+        for (final id in referencedIds) {
+          final ref = byId[id];
+          if (ref == null) continue;
+          if (existing.contains(id)) continue;
+          list.add(ref);
+          existing.add(id);
+        }
+      } catch (_) {}
       devLog('[ttk_list] _load: est=${est.dataEstablishmentId} dept=${widget.department} all=${all.length} afterFilter=${list.length}');
       if (mounted) {
         setState(() { _list = list; _loading = false; });
