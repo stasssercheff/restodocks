@@ -112,12 +112,20 @@ export async function tryParseByStoredTemplates(rows: string[][], options?: { fr
   const effectiveNetCol = useInferred ? inferredNetCol : (templateNetCol >= 0 ? templateNetCol : inferredNetCol);
 
   const headerWords = ["брутто", "нетто", "наименование", "продукт", "сырьё"];
+  const looksLikeFormula = (s: string) => {
+    const t = (s ?? "").trim();
+    if (!t) return false;
+    if (t.startsWith("=")) return true;
+    // SUM(D3:D5), A1*1000, Sheet1!A1 etc
+    if (/[A-Za-z]/.test(t) && (t.includes("(") || t.includes(")") || t.includes(":") || t.includes("!"))) return true;
+    return false;
+  };
   const isGarbageCard = (c: { dishName: string | null; ingredients: { productName: string }[] }) => {
     const dn = (c.dishName ?? "").trim().toLowerCase();
     if (headerWords.some((w) => dn === w || dn.startsWith(w))) return true;
     const garbage = c.ingredients.filter((i) => {
       const p = (i.productName ?? "").trim().toLowerCase();
-      return headerWords.some((w) => p === w) || /^[\d,.\s]+$/.test(p) || p.length <= 2;
+      return headerWords.some((w) => p === w) || /^[\d,.\s]+$/.test(p) || p.length <= 2 || looksLikeFormula(p);
     }).length;
     return c.ingredients.length > 0 && garbage / c.ingredients.length >= 0.5;
   };
