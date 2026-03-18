@@ -1393,14 +1393,64 @@ class _SettingsScreenState extends State<SettingsScreen> {
       return;
     }
     try {
+      // Выбор языка соглашения
+      String selectedLang = loc.currentLanguageCode;
+      final pickedLang = await showDialog<String>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx2, setState) => AlertDialog(
+            title: Text(loc.t('haccp_agreement_lang_title') ?? loc.t('language') ?? 'Language'),
+            content: Wrap(
+              spacing: 8,
+              children: LocalizationService.productLanguageCodes.map((code) {
+                return ChoiceChip(
+                  label: Text(loc.getLanguageName(code)),
+                  selected: selectedLang == code,
+                  onSelected: (_) => setState(() => selectedLang = code),
+                );
+              }).toList(),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx2).pop(),
+                child: Text(MaterialLocalizations.of(ctx2).cancelButtonLabel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx2).pop(selectedLang),
+                child: Text(loc.t('download') ?? 'Download'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (pickedLang == null || !context.mounted) return;
+
+      final lang = pickedLang;
+      final roleCode = emp.positionRole ?? (emp.roles.contains('owner') ? 'owner' : null);
+      final employerPosition = roleCode != null ? (loc.tForLanguage(lang, 'role_$roleCode') ) : null;
       final bytes = await HaccpAgreementPdfService.buildAgreementPdfBytes(
         establishment: est,
         employerEmployee: emp,
+        organizationLabel: loc.tForLanguage(lang, 'haccp_agreement_org'),
+        innBinLabel: loc.tForLanguage(lang, 'haccp_agreement_inn_bin'),
+        addressLabel: loc.tForLanguage(lang, 'haccp_agreement_address'),
+        documentTitle: loc.tForLanguage(lang, 'haccp_agreement_doc_title'),
+        documentSubtitle: loc.tForLanguage(lang, 'haccp_agreement_doc_subtitle'),
+        agreementHeading: loc.tForLanguage(lang, 'haccp_agreement_heading'),
+        workerLabel: loc.tForLanguage(lang, 'haccp_agreement_worker'),
+        workerFioHint: loc.tForLanguage(lang, 'haccp_agreement_worker_fio_hint'),
+        positionLabel: loc.tForLanguage(lang, 'haccp_agreement_position'),
+        dateLine: loc.tForLanguage(lang, 'haccp_agreement_date_line'),
+        employerLabel: loc.tForLanguage(lang, 'haccp_agreement_employer'),
+        stampHint: loc.tForLanguage(lang, 'haccp_agreement_stamp_hint'),
+        workerSignLabel: loc.tForLanguage(lang, 'haccp_agreement_worker_sign'),
+        agreementBody: loc.tForLanguage(lang, 'haccp_agreement_body'),
+        employerPositionLabel: (employerPosition != null && employerPosition != 'role_$roleCode') ? employerPosition : null,
       );
       await saveFileBytes('haccp_agreement_employee.pdf', bytes);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('haccp_agreement_saved') ?? 'PDF сохранён')),
+          SnackBar(content: Text(loc.t('haccp_agreement_saved') ?? 'PDF saved')),
         );
       }
     } catch (e) {
