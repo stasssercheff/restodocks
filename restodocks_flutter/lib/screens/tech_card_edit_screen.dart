@@ -754,21 +754,25 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       _selectedSections = List<String>.from(data['sections'] as List<dynamic>? ?? []);
       _isSemiFinished = data['isSemiFinished'] as bool? ?? true;
       final fromDraft = (data['portionWeight'] as num?)?.toDouble();
-      final fromAi = widget.initialFromAi?.yieldGrams != null && widget.initialFromAi!.yieldGrams! > 0
-          ? widget.initialFromAi!.yieldGrams!.toDouble()
-          : null;
+      // Сумма выходов из восстанавливаемых ингредиентов (для расчёта веса порции при импорте)
+      var sumFromData = 0.0;
+      for (final item in data['ingredients'] as List<dynamic>? ?? []) {
+        final m = item is Map ? item as Map : null;
+        if (m != null) sumFromData += ((m['outputWeight'] as num?)?.toDouble()) ?? 0;
+      }
       final sum = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
-      if (_isSemiFinished) {
-        // ТТК ПФ: по умолчанию 100; из импорта или черновика (защита от ошибочно больших значений)
-        _portionWeight = fromAi ?? (fromDraft != null && fromDraft > 0 && fromDraft <= 10000 ? fromDraft : null) ?? 100;
+      final sumOrData = sum > 0 ? sum : sumFromData;
+      if (widget.initialFromAi != null) {
+        // Открыто из импорта: вес порции только по правилу (ПФ=100, Блюдо=выход из файла или сумма), черновик не используем
+        _portionWeight = _isSemiFinished ? 100 : (widget.initialFromAi!.yieldGrams != null && widget.initialFromAi!.yieldGrams! > 0 ? widget.initialFromAi!.yieldGrams!.toDouble() : (sumOrData > 0 ? sumOrData : 100));
+      } else if (_isSemiFinished) {
+        // ТТК ПФ: по умолчанию 100; из черновика (защита от ошибочно больших значений)
+        _portionWeight = (fromDraft != null && fromDraft > 0 && fromDraft <= 10000 ? fromDraft : null) ?? 100;
       } else {
-        // ТТК блюдо: по умолчанию = вес выхода итого; из импорта или черновика (черновик не берём если явно ошибочный, напр. 8690 при выходе ~492)
+        // ТТК блюдо: по умолчанию = вес выхода итого; черновик не берём если явно ошибочный
         double? draft = fromDraft != null && fromDraft > 0 ? fromDraft : null;
-        if (draft != null && sum > 0) {
-          final ratio = draft / sum;
-          if (ratio > 5 || ratio < 0.2) draft = null;
-        }
-        _portionWeight = fromAi ?? draft ?? (sum > 0 ? sum : 100);
+        if (draft != null && sumOrData > 0 && (draft > 5 * sumOrData || draft < 0.2 * sumOrData)) draft = null;
+        _portionWeight = draft ?? (sumOrData > 0 ? sumOrData : 100);
       }
       _descriptionForHallController.text = data['descriptionForHall'] as String? ?? '';
       _compositionForHallController.text = data['compositionForHall'] as String? ?? '';
@@ -1040,10 +1044,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             } else if (widget.initialSections != null && widget.initialSections!.isEmpty) {
               _selectedSections = [];
             }
-            // Вес порции: для ПФ по умолчанию 100 (редактируемый), для блюда = вес выхода итого из файла (редактируемый)
-            if (ai.yieldGrams != null && ai.yieldGrams! > 0) {
-              _portionWeight = _isSemiFinished ? 100 : ai.yieldGrams!.toDouble();
-            }
             _ingredients.clear();
             for (final line in ai.ingredients) {
               if (line.productName.trim().isEmpty) continue;
@@ -1081,6 +1081,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             }
             _autoFillBruttoFromNomenclature();
             _autoFillPriceFromNomenclature();
+            // Вес порции при импорте: ПФ = 100, Блюдо = выход из файла (yieldGrams) или сумма выходов
+            final sumOutput = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+            _portionWeight = _isSemiFinished ? 100 : (ai.yieldGrams != null && ai.yieldGrams! > 0 ? ai.yieldGrams!.toDouble() : (sumOutput > 0 ? sumOutput : 100));
             if (addPlaceholders && _ingredients.isEmpty) {
               _ingredients.add(TTIngredient.emptyPlaceholder());
               _ingredients.add(TTIngredient.emptyPlaceholder());
@@ -1116,7 +1119,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               // ТТК блюдо: по умолчанию = вес выхода итого (сумма); из БД если реалистично, иначе сброс на сумму (защита от ошибочных 35000 и т.п.)
               if (tc.portionWeight <= 0 && sumOutput > 0) {
                 _portionWeight = sumOutput;
-            } else if (sumOutput > 0 && tc.portionWeight > 5 * sumOutput) {
+              } else if (sumOutput > 0 && tc.portionWeight > 5 * sumOutput) {
                 _portionWeight = sumOutput;
               } else {
                 _portionWeight = tc.portionWeight;
@@ -1838,9 +1841,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       _technologyController.text = ai.technologyText!.trim();
     }
     if (ai.isSemiFinished != null) _isSemiFinished = ai.isSemiFinished!;
-    if (ai.yieldGrams != null && ai.yieldGrams! > 0) {
-      _portionWeight = _isSemiFinished ? 100 : ai.yieldGrams!.toDouble();
-    }
     final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
           final addPlaceholders = canEdit && !widget.forceViewMode;
     final hadPlaceholder = _ingredients.isNotEmpty && _ingredients.last.isPlaceholder;
@@ -1882,6 +1882,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       if (addPlaceholders && (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
         _ingredients.add(TTIngredient.emptyPlaceholder());
       }
+      final sumOutput = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+      _portionWeight = _isSemiFinished ? 100 : (ai.yieldGrams != null && ai.yieldGrams! > 0 ? ai.yieldGrams!.toDouble() : (sumOutput > 0 ? sumOutput : 100));
     } else if (hadPlaceholder && _ingredients.isNotEmpty) {
       // сохраняем плейсхолдер
     } else if (addPlaceholders && _ingredients.isEmpty) {

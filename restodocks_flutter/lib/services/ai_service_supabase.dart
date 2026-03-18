@@ -1823,6 +1823,30 @@ class AiServiceSupabase implements AiService {
     final unitKeys = ['ед. изм', 'ед изм', 'единица', 'unit'];
     final technologyKeys = ['технология', 'приготовления', 'способ приготовления', 'technology'];
 
+    // Таблицы «на 1 порцию» и «на 10 порций»: брутто/нетто/выход брать только из блока «на 1 порцию».
+    final portion10Markers = RegExp(r'на\s+10\s+порций|\*10|на\s+10\s+порцию|расход[^]*на\s+10\s+порц', caseSensitive: false);
+    bool isColumnFor10Portions(int rowIndex, int colIndex) {
+      final cell = (rowIndex < rows.length && colIndex < rows[rowIndex].length)
+          ? (rows[rowIndex][colIndex] is String ? rows[rowIndex][colIndex] as String : rows[rowIndex][colIndex].toString()).trim().toLowerCase()
+          : '';
+      if (portion10Markers.hasMatch(cell)) return true;
+      if (rowIndex > 0 && rowIndex - 1 < rows.length) {
+        final prevRow = rows[rowIndex - 1];
+        if (colIndex < prevRow.length) {
+          final prevCell = (prevRow[colIndex] is String ? prevRow[colIndex] as String : prevRow[colIndex].toString()).trim().toLowerCase();
+          if (portion10Markers.hasMatch(prevCell)) return true;
+        }
+        if (prevRow.length < (rows[rowIndex].length)) {
+          final prevIdx = colIndex < prevRow.length ? colIndex : prevRow.length - 1;
+          if (prevIdx >= 0) {
+            final prevCell = (prevRow[prevIdx] is String ? prevRow[prevIdx] as String : prevRow[prevIdx].toString()).trim().toLowerCase();
+            if (portion10Markers.hasMatch(prevCell)) return true;
+          }
+        }
+      }
+      return false;
+    }
+
     int unitCol = -1;
     bool grossColIsKg = false;
     bool netColIsKg = false;
@@ -1859,6 +1883,7 @@ class AiServiceSupabase implements AiService {
         for (final k in grossKeys) {
           if (cell.contains(k)) {
             headerIdx = r;
+            if (isColumnFor10Portions(r, c)) break;
             // "Брутто в ед. изм." — единицы г/шт, не кг; iiko: предпочитаем "Вес брутто, кг"
             final isBruttoInEdIzm = cell.contains('брутто') && (cell.contains('в ед') || cell.contains('ед.изм') || cell.contains('ед изм')) && !cell.contains('вес брутто') && !cell.contains('масса брутто');
             if (isBruttoInEdIzm) {
@@ -1872,6 +1897,7 @@ class AiServiceSupabase implements AiService {
         for (final k in netKeys) {
           if (cell.contains(k)) {
             headerIdx = r;
+            if (isColumnFor10Portions(r, c)) break;
             final isNettoInEdIzm = cell.contains('нетто') && (cell.contains('в ед') || cell.contains('ед.изм') || cell.contains('ед изм')) && !cell.contains('вес нетто') && !cell.contains('масса нетто');
             if (isNettoInEdIzm) {
               if (netCol < 0) netCol = c;
@@ -1884,14 +1910,16 @@ class AiServiceSupabase implements AiService {
         for (final k in wasteKeys) {
           if (cell.contains(k)) {
             headerIdx = r;
-            wasteCol = c;
+            if (isColumnFor10Portions(r, c)) break;
+            if (wasteCol < 0) wasteCol = c;
             break;
           }
         }
         for (final k in outputKeys) {
           if (cell.contains(k)) {
             headerIdx = r;
-            outputCol = c;
+            if (isColumnFor10Portions(r, c)) break;
+            if (outputCol < 0) outputCol = c;
             break;
           }
         }
