@@ -73,7 +73,7 @@ class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
     if (est == null || emp == null) {
       setState(() {
         _loading = false;
-        _error = 'Нет заведения или сотрудника';
+        _error = context.read<LocalizationService>().t('error_no_establishment_or_employee');
       });
       return;
     }

@@ -103,7 +103,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
 
     final bytes = await HaccpPdfExportService.buildJournalPdf(
       establishmentName: est.name,
-      journalTitle: logType.displayNameRu,
+      journalTitle: loc.t(logType.displayNameKey) ?? logType.displayNameRu,
       sanpinRef: logType.sanpinRef,
       logType: logType,
       logs: logsForPeriod,
@@ -239,7 +239,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                       SizedBox(
                         width: 180,
                         child: Text(
-                          '${_monthName(month)} $year',
+                          '${_monthName(context, month)} $year',
                           textAlign: TextAlign.center,
                           style: Theme.of(ctx2).textTheme.titleLarge,
                         ),
@@ -271,11 +271,15 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     );
   }
 
-  static const _monthNames = [
-    'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-    'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
-  ];
-  String _monthName(int month) => _monthNames[month - 1];
+  String _monthName(BuildContext context, int month) {
+    final loc = context.read<LocalizationService>();
+    final localeTag = loc.currentLocale.toLanguageTag();
+    try {
+      return DateFormat('MMMM', localeTag).format(DateTime(2000, month, 1));
+    } catch (_) {
+      return DateFormat('MMMM').format(DateTime(2000, month, 1));
+    }
+  }
 
   Future<(DateTime, DateTime)?> _pickDateRange(BuildContext context) async {
     final now = DateTime.now();
@@ -432,7 +436,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
-          title: const Text('Журнал'),
+          title: Text(loc.t('haccp_journal') ?? 'Журнал'),
         ),
         body: Center(
           child: Padding(
@@ -443,13 +447,13 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                 Icon(Icons.info_outline, size: 48, color: Theme.of(context).colorScheme.outline),
                 const SizedBox(height: 16),
                 Text(
-                  'Этот журнал больше не поддерживается.',
+                  loc.t('haccp_not_supported_title') ?? 'Этот журнал больше не поддерживается.',
                   style: Theme.of(context).textTheme.titleMedium,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Используются только журналы по СанПиН 2.3/2.4.3590-20 (Приложения 1–5).',
+                  loc.t('haccp_not_supported_body') ?? 'Используются только журналы по СанПиН 2.3/2.4.3590-20 (Приложения 1–5).',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
                   textAlign: TextAlign.center,
                 ),
@@ -457,7 +461,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                 FilledButton.icon(
                   onPressed: () => context.pop(),
                   icon: const Icon(Icons.arrow_back),
-                  label: const Text('К списку журналов'),
+                  label: Text(loc.t('haccp_back_to_list') ?? 'К списку журналов'),
                 ),
               ],
             ),
@@ -469,7 +473,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(logType.displayNameRu),
+        title: Text(loc.t(logType.displayNameKey) ?? logType.displayNameRu),
         actions: [
           IconButton(
             icon: const Icon(Icons.date_range),

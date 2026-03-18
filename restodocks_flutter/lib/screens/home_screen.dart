@@ -119,11 +119,14 @@ class _FirstEntryDialog extends StatefulWidget {
 
 class _FirstEntryDialogState extends State<_FirstEntryDialog> {
   bool _confirmed = false;
+  String? _selectedLanguageCode;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final screenHeight = MediaQuery.of(context).size.height;
+    final loc = context.watch<LocalizationService>();
+    final selectedLang = _selectedLanguageCode ?? loc.currentLanguageCode;
     return Dialog(
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: 500, maxHeight: screenHeight * 0.9),
@@ -133,25 +136,57 @@ class _FirstEntryDialogState extends State<_FirstEntryDialog> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
               child: Text(
-                widget.loc.t('getting_started') ?? 'Начало работы с Restodocks',
+                loc.t('getting_started') ?? 'Начало работы с Restodocks',
                 style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
               ),
             ),
             const Divider(height: 1),
             SizedBox(
               height: 400,
-              child: const GettingStartedDocument(showTitle: false),
+              child: GettingStartedDocument(showTitle: false, languageCodeOverride: selectedLang),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Выбор языка прямо в окне первого запуска.
+                  Row(
+                    children: [
+                      Text(loc.t('language') ?? 'Язык', style: theme.textTheme.labelLarge),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: selectedLang,
+                          decoration: const InputDecoration(
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          ),
+                          items: LocalizationService.supportedLocales
+                              .map((l) => DropdownMenuItem(
+                                    value: l.languageCode,
+                                    child: Text(loc.getLanguageName(l.languageCode)),
+                                  ))
+                              .toList(),
+                          onChanged: (code) async {
+                            if (code == null) return;
+                            setState(() => _selectedLanguageCode = code);
+                            await loc.setLocale(Locale(code));
+                            if (context.mounted) {
+                              await context.read<AccountManagerSupabase>().savePreferredLanguage(code);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   CheckboxListTile(
                     value: _confirmed,
                     onChanged: (v) => setState(() => _confirmed = v ?? false),
                     title: Text(
-                      widget.loc.t('getting_started_confirmed') ?? 'Я прочитал(а) инструкцию',
+                      loc.t('getting_started_confirmed') ?? 'Я прочитал(а) инструкцию',
                       style: theme.textTheme.bodyMedium,
                     ),
                     controlAffinity: ListTileControlAffinity.leading,
@@ -165,7 +200,7 @@ class _FirstEntryDialogState extends State<_FirstEntryDialog> {
                             if (context.mounted) Navigator.of(context).pop();
                           }
                         : null,
-                    child: Text(widget.loc.t('start_work') ?? 'Начать работу'),
+                    child: Text(loc.t('start_work') ?? 'Начать работу'),
                   ),
                 ],
               ),

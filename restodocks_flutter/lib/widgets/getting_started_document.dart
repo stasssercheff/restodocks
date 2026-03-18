@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../models/translation.dart';
+import '../services/services.dart';
 
 /// Один пункт документа: заголовок и список подпунктов (или вложенные пункты).
 class _DocumentSection {
@@ -15,15 +19,18 @@ class _DocumentItem {
 }
 
 /// Контент «Начало работы с Restodocks» с раскрывающимися разделами.
-class GettingStartedDocument extends StatelessWidget {
+class GettingStartedDocument extends StatefulWidget {
   const GettingStartedDocument({
     super.key,
     this.showTitle = true,
     this.scrollController,
+    this.languageCodeOverride,
   });
 
   final bool showTitle;
   final ScrollController? scrollController;
+  /// Позволяет принудительно показать документ на выбранном языке (для первого запуска).
+  final String? languageCodeOverride;
 
   static const String _title = 'Начало работы с Restodocks';
 
@@ -148,12 +155,85 @@ class GettingStartedDocument extends StatelessWidget {
   ];
 
   @override
+  State<GettingStartedDocument> createState() => _GettingStartedDocumentState();
+}
+
+class _GettingStartedDocumentState extends State<GettingStartedDocument> {
+  final Map<String, String> _cache = {};
+  bool _loading = false;
+
+  static const String _entityId = 'getting_started';
+  static const String _sourceLang = 'ru';
+
+  String _key(String fieldName, String targetLang) => '$_entityId|$fieldName|$targetLang';
+
+  String _t(String fieldName, String original, String targetLang) {
+    if (targetLang == _sourceLang) return original;
+    return _cache[_key(fieldName, targetLang)] ?? original;
+  }
+
+  Future<void> _ensureTranslations(String targetLang) async {
+    if (!mounted) return;
+    if (targetLang == _sourceLang) return;
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      final translationSvc = context.read<TranslationService>();
+
+      Future<void> translateAndStore(String fieldName, String text) async {
+        final clean = text.trim();
+        if (clean.isEmpty) return;
+        final k = _key(fieldName, targetLang);
+        if (_cache.containsKey(k)) return;
+        final translated = await translationSvc.translate(
+          entityType: TranslationEntityType.ui,
+          entityId: _entityId,
+          fieldName: fieldName,
+          text: clean,
+          from: _sourceLang,
+          to: targetLang,
+        );
+        if (!mounted) return;
+        setState(() {
+          _cache[k] = (translated != null && translated.trim().isNotEmpty) ? translated : clean;
+        });
+      }
+
+      await translateAndStore('title', GettingStartedDocument._title);
+
+      for (var si = 0; si < GettingStartedDocument._sections.length; si++) {
+        final s = GettingStartedDocument._sections[si];
+        await translateAndStore('section_${si}_title', s.title);
+        for (var ii = 0; ii < s.children.length; ii++) {
+          final item = s.children[ii];
+          await translateAndStore('section_${si}_item_${ii}', item.text);
+          final nested = item.nested;
+          if (nested != null && nested.isNotEmpty) {
+            for (var ni = 0; ni < nested.length; ni++) {
+              await translateAndStore('section_${si}_item_${ii}_nested_${ni}', nested[ni].text);
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // ignore
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
+    final targetLang = widget.languageCodeOverride ?? loc.currentLanguageCode;
+    // Ленивая подгрузка: при смене языка переведём контент в фоне.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureTranslations(targetLang));
+
     final theme = Theme.of(context);
-    final hasTitle = showTitle;
-    final sectionCount = _sections.length;
+    final hasTitle = widget.showTitle;
+    final sectionCount = GettingStartedDocument._sections.length;
     return ListView.builder(
-      controller: scrollController,
+      controller: widget.scrollController,
       shrinkWrap: false,
       padding: const EdgeInsets.symmetric(vertical: 8),
       itemCount: (hasTitle ? 1 : 0) + sectionCount,
@@ -166,7 +246,7 @@ class GettingStartedDocument extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 child: Text(
-                  _title,
+                  _t('title', GettingStartedDocument._title, targetLang),
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -176,10 +256,13 @@ class GettingStartedDocument extends StatelessWidget {
             ],
           );
         }
-        final section = _sections[hasTitle ? index - 1 : index];
+        final sectionIndex = hasTitle ? index - 1 : index;
+        final section = GettingStartedDocument._sections[sectionIndex];
         return _SectionExpansion(
-          title: section.title,
+          title: _t('section_${sectionIndex}_title', section.title, targetLang),
+          sectionIndex: sectionIndex,
           children: section.children,
+          translate: (fieldName, original) => _t(fieldName, original, targetLang),
         );
       },
     );
@@ -193,12 +276,18 @@ class _NestedExpandableItem extends StatefulWidget {
     required this.introText,
     required this.nestedItems,
     required this.theme,
+    required this.translate,
+    required this.sectionIndex,
+    required this.itemIndex,
   });
 
   final int index;
   final String introText;
   final List<_DocumentItem> nestedItems;
   final ThemeData theme;
+  final String Function(String fieldName, String original) translate;
+  final int sectionIndex;
+  final int itemIndex;
 
   @override
   State<_NestedExpandableItem> createState() => _NestedExpandableItemState();
@@ -264,7 +353,10 @@ class _NestedExpandableItemState extends State<_NestedExpandableItem> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        sub.text,
+                        widget.translate(
+                          'section_${widget.sectionIndex}_item_${widget.itemIndex}_nested_${e.key}',
+                          sub.text,
+                        ),
                         style: theme.textTheme.bodySmall,
                       ),
                     ),
@@ -283,10 +375,14 @@ class _SectionExpansion extends StatefulWidget {
   const _SectionExpansion({
     required this.title,
     required this.children,
+    required this.translate,
+    required this.sectionIndex,
   });
 
   final String title;
+  final int sectionIndex;
   final List<_DocumentItem> children;
+  final String Function(String fieldName, String original) translate;
 
   @override
   State<_SectionExpansion> createState() => _SectionExpansionState();
@@ -347,7 +443,7 @@ class _SectionExpansionState extends State<_SectionExpansion> {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          item.text,
+                          widget.translate('section_${widget.sectionIndex}_item_${e.key}', item.text),
                           style: theme.textTheme.bodyMedium,
                         ),
                       ),
@@ -357,9 +453,12 @@ class _SectionExpansionState extends State<_SectionExpansion> {
               }
               return _NestedExpandableItem(
                 index: i,
-                introText: item.text,
+                introText: widget.translate('section_${widget.sectionIndex}_item_${e.key}', item.text),
                 nestedItems: item.nested!,
                 theme: theme,
+                translate: widget.translate,
+                sectionIndex: widget.sectionIndex,
+                itemIndex: e.key,
               );
             }),
             const SizedBox(height: 8),

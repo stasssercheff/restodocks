@@ -72,7 +72,7 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
                   margin: const EdgeInsets.only(bottom: 8),
                   child: ListTile(
                     leading: Icon(_iconForType(t)),
-                    title: Text(t.displayNameRu),
+                    title: Text(loc.t(t.displayNameKey) ?? t.displayNameRu),
                     subtitle: Text(t.sanpinRef, style: const TextStyle(fontSize: 11)),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => context.push('/haccp-journals/${t.code}'),

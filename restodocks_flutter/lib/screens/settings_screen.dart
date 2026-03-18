@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/haccp_log_type.dart';
 import '../models/models.dart';
+import '../core/feature_flags.dart';
 import '../services/haccp_agreement_pdf_service.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
@@ -1161,24 +1162,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   static const _trainingVideos = <String, String>{
-    'Чеклист создание + ТТК, отображение во входящих': 'https://youtu.be/goZ20v6DV2s',
-    'Чеклист заполнение': 'https://youtu.be/ggc8es-ivJc',
-    'Создание ТТК + просмотр': 'https://youtu.be/MixDi9UC2kg',
-    'Инвентаризация iiko с загрузкой бланка': 'https://youtu.be/JjMe-Tb04ZM',
-    'Заказ продуктов с отправкой по почте': 'https://youtu.be/e5DJHk_pSbE',
-    'Сотрудники настройка': 'https://youtu.be/bGVJtSdpid0',
-    'Смена роли собственника': 'https://youtu.be/nkk9BpyIkuQ',
-    'Инвента iiko выгрузка бланка': 'https://youtu.be/rFXg9gJ5qUw',
-    'Инвентаризации IIKO слияние_1': 'VFSGL0Zj7fc',
-    'Инвентаризации IIKO слияние_2': 'WQruFDlDQ',
-    'График правка': 'https://youtu.be/sF26hjgdjO8',
-    'Сообщения': 'https://youtu.be/zgH9ITDHU4U',
-    'Сообщения с переводом': 'https://youtu.be/ZICdajkAbNY',
-    'Расчет выплаты за период + выгрузка': 'https://youtu.be/tO4ihTk8bDM',
-    'Загрузка продуктов изменение цены': 'https://youtu.be/p9I1rsNgXpU',
-    'Загрузка продуктов в номенклатуру файл': 'https://youtu.be/po5_brrXdVw',
-    'Загрузка продуктов в номенклатуру текст': 'https://youtu.be/66Q9iUyuqso',
-    'Загрузка продуктов текст из таблицы': 'https://youtu.be/tYsFlIll954',
+    'training_video_checklist_create_ttk_inbox': 'https://youtu.be/goZ20v6DV2s',
+    'training_video_checklist_fill': 'https://youtu.be/ggc8es-ivJc',
+    'training_video_ttk_create_view': 'https://youtu.be/MixDi9UC2kg',
+    'training_video_inventory_iiko_blank_upload': 'https://youtu.be/JjMe-Tb04ZM',
+    'training_video_product_order_email': 'https://youtu.be/e5DJHk_pSbE',
+    'training_video_employees_setup': 'https://youtu.be/bGVJtSdpid0',
+    'training_video_owner_role_switch': 'https://youtu.be/nkk9BpyIkuQ',
+    'training_video_inventory_iiko_blank_export': 'https://youtu.be/rFXg9gJ5qUw',
+    'training_video_inventory_iiko_merge_1': 'VFSGL0Zj7fc',
+    'training_video_inventory_iiko_merge_2': 'WQruFDlDQ',
+    'training_video_schedule_edit': 'https://youtu.be/sF26hjgdjO8',
+    'training_video_messages': 'https://youtu.be/zgH9ITDHU4U',
+    'training_video_messages_with_translation': 'https://youtu.be/ZICdajkAbNY',
+    'training_video_salary_payment_export': 'https://youtu.be/tO4ihTk8bDM',
+    'training_video_products_price_change': 'https://youtu.be/p9I1rsNgXpU',
+    'training_video_products_nomenclature_file': 'https://youtu.be/po5_brrXdVw',
+    'training_video_products_nomenclature_text': 'https://youtu.be/66Q9iUyuqso',
+    'training_video_products_text_from_table': 'https://youtu.be/tYsFlIll954',
   };
 
   /// Извлекает video ID из URL или возвращает как есть, если уже ID (напр. tJvjUcNRnsc-1)
@@ -1212,9 +1213,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: ListView(
             shrinkWrap: true,
             children: _trainingVideos.entries.map((e) {
+              final title = loc.t(e.key) == e.key ? e.key : loc.t(e.key);
               return ListTile(
                 leading: const Icon(Icons.play_circle_outline, color: Colors.red),
-                title: Text(e.key, style: const TextStyle(fontSize: 14)),
+                title: Text(title, style: const TextStyle(fontSize: 14)),
                 trailing: const Icon(Icons.open_in_new, size: 18),
                 dense: true,
                 onTap: () async {
@@ -1819,7 +1821,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   value: isOn,
                                   onChanged: (v) => _toggleHaccpJournal(context, config, est.id, t, v ?? false, localization),
                                 ),
-                                title: Text(t.displayNameRu, style: const TextStyle(fontSize: 14)),
+                                title: Text(localization.t(t.displayNameKey) ?? t.displayNameRu, style: const TextStyle(fontSize: 14)),
                                 onTap: () => _toggleHaccpJournal(context, config, est.id, t, !isOn, localization),
                               );
                             }),
@@ -1903,8 +1905,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showClearNomenclatureConfirm(context, localization),
               ),
-              // Только в Beta: удалить все ТТК (в Prod не показывается)
-              if (const bool.fromEnvironment('IS_BETA', defaultValue: false))
+              // Только в Beta-tools: удалить все ТТК (в Prod не показывается)
+              if (FeatureFlags.betaToolsEnabled)
                 ListTile(
                   leading: const Icon(Icons.restaurant_menu, color: Colors.orange),
                   title: Text(localization.t('clear_all_ttk') ?? 'Удалить все ТТК'),
