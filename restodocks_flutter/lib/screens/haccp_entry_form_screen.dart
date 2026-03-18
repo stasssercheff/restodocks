@@ -1199,6 +1199,405 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     }
   }
 
+  // ---- Mobile (1 column, no horizontal scroll) ----
+
+  Widget _mobileBlock(String title, List<Widget> children) {
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 10),
+            ...children.expand((w) => [w, const SizedBox(height: 10)]).toList()..removeLast(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _mobileSlider({
+    required String label,
+    required double value,
+    required double min,
+    required double max,
+    required int divisions,
+    required String unit,
+    required void Function(double) onChanged,
+    int fractionDigits = 1,
+  }) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
+            Text('${value.toStringAsFixed(fractionDigits)} $unit', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+          ],
+        ),
+        Slider(
+          value: value,
+          min: min,
+          max: max,
+          divisions: divisions,
+          onChanged: (v) => setState(() => onChanged(v)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFormByTypeMobile(LocalizationService loc) {
+    switch (_logType) {
+      case HaccpLogType.healthHygiene:
+        final dateStr = DateFormat('dd.MM.yyyy').format(DateTime.now());
+        final currentEmp = context.watch<AccountManagerSupabase>().currentEmployee;
+        final creatorName = currentEmp != null
+            ? (currentEmp.surname != null ? '${currentEmp.surname} ${currentEmp.fullName}' : currentEmp.fullName)
+            : '—';
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ...List.generate(_healthRows.length, (i) {
+              final row = _healthRows[i];
+              final emp = _healthEmployeeById(row.employeeId);
+              final name = emp != null ? (emp.surname != null ? '${emp.surname} ${emp.fullName}' : emp.fullName) : '—';
+              return Card(
+                margin: const EdgeInsets.only(bottom: 10),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text('$name · $dateStr', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.delete_outline),
+                            onPressed: () => setState(() => _healthRows.removeAt(i)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      _healthPositionDropdownForRow(i),
+                      const SizedBox(height: 8),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Нет признаков инфекционных заболеваний (у сотрудника и семьи)'),
+                        value: row.statusOk,
+                        onChanged: (v) => setState(() => row.statusOk = v),
+                      ),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Нет заболеваний ВДП и гнойничковых заболеваний кожи'),
+                        value: row.status2Ok,
+                        onChanged: (v) => setState(() => row.status2Ok = v),
+                      ),
+                      const Divider(),
+                      Text('Результат: ${row.statusOk ? 'допущен' : 'отстранён'}', style: const TextStyle(fontSize: 12)),
+                      Text('Ответственный: $creatorName', style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final usedIds = _healthRows.map((r) => r.employeeId).toSet();
+                final available = _healthEmployees.where((e) => !usedIds.contains(e.id)).toList();
+                if (available.isEmpty) {
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(loc.t('haccp_all_employees_added') ?? 'Все сотрудники уже добавлены')),
+                  );
+                  return;
+                }
+                final picked = await showDialog<String>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: Text(loc.t('haccp_add_employee_row') ?? 'Добавить сотрудника'),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: available.map((e) {
+                          final name = e.surname != null ? '${e.surname} ${e.fullName}' : e.fullName;
+                          return ListTile(
+                            title: Text(name),
+                            subtitle: Text(e.roleDisplayName),
+                            onTap: () => Navigator.of(ctx).pop(e.id),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                );
+                if (picked != null && mounted) setState(() {
+                  _healthRows.add(_HealthHygieneRow(employeeId: picked, positionOverride: null, positionIsCustom: false, statusOk: true, status2Ok: true));
+                });
+              },
+              icon: const Icon(Icons.add),
+              label: Text(loc.t('haccp_add_row') ?? 'Добавить строку'),
+            ),
+            const SizedBox(height: 10),
+            _textField('note', loc.t('haccp_note') ?? 'Примечание'),
+          ],
+        );
+      case HaccpLogType.fridgeTemperature:
+        return _mobileBlock(
+          loc.t(HaccpLogType.fridgeTemperature.displayNameKey) ?? HaccpLogType.fridgeTemperature.displayNameRu,
+          [
+            Consumer<AccountManagerSupabase>(
+              builder: (_, acc, __) => TextFormField(
+                initialValue: acc.establishment?.name ?? '—',
+                decoration: const InputDecoration(
+                  labelText: 'Наименование производственного помещения',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                readOnly: true,
+              ),
+            ),
+            _textField('equipment', loc.t('haccp_equipment') ?? 'Оборудование'),
+            _mobileSlider(
+              label: 'Температура',
+              value: _tempValue,
+              min: -25,
+              max: 15,
+              divisions: 400,
+              unit: '°C',
+              onChanged: (v) => _tempValue = v,
+              fractionDigits: 1,
+            ),
+          ],
+        );
+      case HaccpLogType.warehouseTempHumidity:
+        _controllers['warehouse_premises'] ??= TextEditingController();
+        return Column(
+          children: [
+            _mobileBlock(
+              loc.t(HaccpLogType.warehouseTempHumidity.displayNameKey) ?? HaccpLogType.warehouseTempHumidity.displayNameRu,
+              [
+                TextFormField(
+                  controller: _controllers['warehouse_premises'],
+                  decoration: const InputDecoration(
+                    labelText: 'Наименование складского помещения',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Укажите помещение' : null,
+                ),
+                _mobileSlider(
+                  label: 'Температура',
+                  value: _tempValue,
+                  min: -5,
+                  max: 35,
+                  divisions: 800,
+                  unit: '°C',
+                  onChanged: (v) => _tempValue = v,
+                  fractionDigits: 1,
+                ),
+                _mobileSlider(
+                  label: 'Относительная влажность',
+                  value: _humidityValue,
+                  min: 0,
+                  max: 100,
+                  divisions: 200,
+                  unit: '%',
+                  onChanged: (v) => _humidityValue = v,
+                  fractionDigits: 1,
+                ),
+                _signatureFromAccount(),
+              ],
+            ),
+          ],
+        );
+      case HaccpLogType.finishedProductBrakerage:
+        return _mobileBlock(
+          loc.t(HaccpLogType.finishedProductBrakerage.displayNameKey) ?? HaccpLogType.finishedProductBrakerage.displayNameRu,
+          [
+            TextFormField(
+              initialValue: DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()),
+              decoration: const InputDecoration(labelText: 'Дата и час изготовления блюда', border: OutlineInputBorder(), isDense: true),
+              readOnly: true,
+            ),
+            _textField('time_brakerage', 'Время снятия бракеража (например 12:00)'),
+            _finishedProductPickerCell(loc),
+            _textField('result', loc.t('haccp_result') ?? 'Результаты органолептической оценки', multiline: true),
+            _approvalSelector(),
+            _signatureFromAccount(),
+            _textField('weighing_result', 'Результаты взвешивания порционных блюд'),
+            _textField('note', loc.t('haccp_note') ?? 'Примечание'),
+          ],
+        );
+      case HaccpLogType.incomingRawBrakerage:
+        return _mobileBlock(
+          loc.t(HaccpLogType.incomingRawBrakerage.displayNameKey) ?? HaccpLogType.incomingRawBrakerage.displayNameRu,
+          [
+            TextFormField(
+              initialValue: DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()),
+              decoration: const InputDecoration(labelText: 'Дата и час поступления', border: OutlineInputBorder(), isDense: true),
+              readOnly: true,
+            ),
+            _textField('product', loc.t('haccp_product') ?? 'Наименование'),
+            _textField('packaging', 'Фасовка'),
+            _textField('manufacturer_supplier', 'Изготовитель/поставщик'),
+            _textField('quantity_kg', 'Кол-во (кг/л/шт)', keyboardType: TextInputType.number),
+            _textField('document_number', '№ документа'),
+            _textField('result', loc.t('haccp_result') ?? 'Органолептическая оценка', multiline: true),
+            _textField('storage_conditions', 'Условия хранения, срок реализации'),
+            InkWell(
+              onTap: () async {
+                final d = await showDatePicker(
+                  context: context,
+                  initialDate: _dateSold ?? DateTime.now(),
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                );
+                if (d != null) setState(() => _dateSold = d);
+              },
+              child: InputDecorator(
+                decoration: const InputDecoration(labelText: 'Дата реализации', border: OutlineInputBorder(), isDense: true),
+                child: Text(_dateSold != null ? DateFormat('dd.MM.yyyy').format(_dateSold!) : 'Выбрать'),
+              ),
+            ),
+            _signatureFromAccount(),
+            _textField('note', loc.t('haccp_note') ?? 'Примечание'),
+          ],
+        );
+      case HaccpLogType.fryingOil:
+        return _mobileBlock(
+          loc.t(HaccpLogType.fryingOil.displayNameKey) ?? HaccpLogType.fryingOil.displayNameRu,
+          [
+            TextFormField(
+              initialValue: DateFormat('dd.MM.yyyy').format(DateTime.now()),
+              decoration: const InputDecoration(labelText: 'Дата', border: OutlineInputBorder(), isDense: true),
+              readOnly: true,
+            ),
+            _textField('oil_name', 'Наименование жира'),
+            _textField('oil_usage_hours', 'Время использования (ч)', keyboardType: TextInputType.number),
+            _textField('oil_quality', 'Качество (цвет/запах/пенистость)', multiline: true),
+            _textField('oil_replaced', 'Замена (да/нет)'),
+            _signatureFromAccount(),
+            _textField('note', loc.t('haccp_note') ?? 'Примечание'),
+          ],
+        );
+      case HaccpLogType.medBookRegistry:
+        return _mobileBlock(
+          loc.t(HaccpLogType.medBookRegistry.displayNameKey) ?? HaccpLogType.medBookRegistry.displayNameRu,
+          [
+            _employeePickerField('med_book_employee_id', 'Сотрудник', _medBookEmployeeId, (id) => setState(() => _medBookEmployeeId = id)),
+            _textField('med_book_position', 'Должность'),
+            _textField('med_book_number', 'Номер медицинской книжки'),
+            _datePickerField('med_book_expiry_date', 'Срок действия', _medBookExpiryDate, (d) => setState(() => _medBookExpiryDate = d)),
+            _datePickerField('med_book_received_date', 'Получение (дата)', _medBookReceivedDate, (d) => setState(() => _medBookReceivedDate = d)),
+            _datePickerField('med_book_returned_date', 'Возврат (дата)', _medBookReturnedDate, (d) => setState(() => _medBookReturnedDate = d)),
+          ],
+        );
+      case HaccpLogType.medExaminations:
+        return _mobileBlock(
+          loc.t(HaccpLogType.medExaminations.displayNameKey) ?? HaccpLogType.medExaminations.displayNameRu,
+          [
+            _employeePickerField('med_exam_employee_id', 'Сотрудник', _medExamEmployeeId, (id) => setState(() => _medExamEmployeeId = id)),
+            _textField('med_exam_position', 'Должность'),
+            _textField('med_exam_department', 'Подразделение'),
+            _datePickerField('med_exam_hire_date', 'Дата приёма', _medExamHireDate, (d) => setState(() => _medExamHireDate = d)),
+            _textField('med_exam_type', 'Вид (предварительный/периодический)'),
+            _textField('med_exam_institution', 'ЛПУ'),
+            _textField('med_exam_harmful_1', 'Вредный фактор №90'),
+            _textField('med_exam_harmful_2', 'Вредный фактор №83'),
+            _datePickerField('med_exam_date', 'Дата прохождения', _medExamDate, (d) => setState(() => _medExamDate = d)),
+            _textField('med_exam_conclusion', 'Заключение'),
+            _textField('med_exam_employer_decision', 'Решение работодателя'),
+            _datePickerField('med_exam_next_date', 'Дата следующего осмотра', _medExamNextDate, (d) => setState(() => _medExamNextDate = d)),
+            _datePickerField('med_exam_exclusion_date', 'Дата исключения из списков', _medExamExclusionDate, (d) => setState(() => _medExamExclusionDate = d)),
+            _textField('med_exam_note', 'Примечание'),
+          ],
+        );
+      case HaccpLogType.disinfectantAccounting:
+        return Column(
+          children: [
+            _mobileBlock(
+              'Расчёт потребности в дезинфицирующих средствах',
+              [
+                _textField('disinf_object_name', 'Объект'),
+                _textField('disinf_object_count', 'Кол-во', keyboardType: TextInputType.number),
+                _textField('disinf_area_sqm', 'Площадь м²', keyboardType: TextInputType.number),
+                _textField('disinf_treatment_type', 'Вид Т/Г'),
+                _textField('disinf_frequency', 'Кратность/мес', keyboardType: TextInputType.number),
+                _textField('disinf_agent_name', 'Дезсредство'),
+                _textField('disinf_concentration_pct', 'Конц.%'),
+                _textField('disinf_consumption_per_sqm', 'Расход/м²', keyboardType: TextInputType.number),
+                _textField('disinf_solution_per_treatment', 'Раствор на 1 обр. (л/кг)', keyboardType: TextInputType.number),
+                _textField('disinf_need_per_treatment', 'Потребность 1 обр. (л/кг)', keyboardType: TextInputType.number),
+                _textField('disinf_need_per_month', 'В месяц (л/кг)', keyboardType: TextInputType.number),
+                _textField('disinf_need_per_year', 'В год (л/кг)', keyboardType: TextInputType.number),
+              ],
+            ),
+            _mobileBlock(
+              'Поступление дезинфицирующих средств',
+              [
+                _datePickerField('disinf_receipt_date', 'Дата', _disinfReceiptDate, (d) => setState(() => _disinfReceiptDate = d)),
+                _textField('disinf_agent_name_receipt', 'Наименование'),
+                _textField('disinf_invoice_number', 'Счёт №'),
+                _textField('disinf_quantity', 'Кол-во', keyboardType: TextInputType.number),
+                _datePickerField('disinf_expiry_date', 'Срок годности', _disinfExpiryDate, (d) => setState(() => _disinfExpiryDate = d)),
+                _signatureFromAccount(),
+              ],
+            ),
+          ],
+        );
+      case HaccpLogType.equipmentWashing:
+        return _mobileBlock(
+          loc.t(HaccpLogType.equipmentWashing.displayNameKey) ?? HaccpLogType.equipmentWashing.displayNameRu,
+          [
+            TextFormField(
+              initialValue: DateFormat('dd.MM.yyyy').format(DateTime.now()),
+              decoration: const InputDecoration(labelText: 'Дата', border: OutlineInputBorder(), isDense: true),
+              readOnly: true,
+            ),
+            _textField('wash_time', 'Время мойки'),
+            _textField('wash_equipment_name', 'Оборудование'),
+            _textField('wash_solution_name', 'Моющий раствор'),
+            _textField('wash_solution_concentration_pct', 'Конц.%'),
+            _textField('wash_disinfectant_name', 'Дез. раствор'),
+            _textField('wash_disinfectant_concentration_pct', 'Конц.%'),
+            _textField('wash_rinsing_temp', 'Ополаскивание t°', keyboardType: TextInputType.number),
+            _signatureFromAccount(),
+          ],
+        );
+      case HaccpLogType.generalCleaningSchedule:
+        return _mobileBlock(
+          loc.t(HaccpLogType.generalCleaningSchedule.displayNameKey) ?? HaccpLogType.generalCleaningSchedule.displayNameRu,
+          [
+            _textField('cleaning_object', 'Объект/помещение'),
+            _textField('cleaning_method', 'Способ уборки'),
+            _textField('cleaning_frequency', 'Периодичность'),
+            _datePickerField('cleaning_date', 'Дата', _generalCleaningDate, (d) => setState(() => _generalCleaningDate = d)),
+            _signatureFromAccount(),
+            _textField('note', loc.t('haccp_note') ?? 'Примечание'),
+          ],
+        );
+      case HaccpLogType.sieveFilterMagnet:
+        return _mobileBlock(
+          loc.t(HaccpLogType.sieveFilterMagnet.displayNameKey) ?? HaccpLogType.sieveFilterMagnet.displayNameRu,
+          [
+            _textField('sieve_object', 'Оборудование/участок'),
+            _textField('sieve_status', 'Состояние/результат'),
+            _datePickerField('sieve_date', 'Дата', _sieveDate, (d) => setState(() => _sieveDate = d)),
+            _signatureFromAccount(),
+            _textField('note', loc.t('haccp_note') ?? 'Примечание'),
+          ],
+        );
+      default:
+        // Для остальных журналов (пока) оставляем текущую форму; ключевая проблема — горизонтальный скролл контейнера.
+        return _buildFormByType(loc);
+    }
+  }
+
   Future<void> _save() async {
     if (_logType == null) return;
     if (!_formKey.currentState!.validate()) return;
@@ -1446,20 +1845,25 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   ),
             ),
             const SizedBox(height: 4),
-            Text(
-              loc.t('haccp_scroll_right_hint') ?? 'Таблица по форме СанПиН — при необходимости прокрутите вправо',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SizedBox(
-                width: 1400,
-                child: _buildFormByType(loc),
+            if (MediaQuery.of(context).size.shortestSide >= 600) ...[
+              Text(
+                loc.t('haccp_scroll_right_hint') ?? 'Таблица по форме СанПиН — при необходимости прокрутите вправо',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
               ),
-            ),
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: 1400,
+                  child: _buildFormByType(loc),
+                ),
+              ),
+            ] else ...[
+              const SizedBox(height: 8),
+              _buildFormByTypeMobile(loc),
+            ],
             const SizedBox(height: 24),
             FilledButton(
               onPressed: _saving ? null : _save,

@@ -84,9 +84,20 @@ class _InboxScreenState extends State<InboxScreen> {
     if (employee == null) return;
     if (widget.messagesOnly) return;
     final tabs = _visibleTabs(employee);
-    if (employee.hasRole('owner')) {
+    final isOwner = employee.hasRole('owner');
+    final isManagement = employee.hasRole('executive_chef') ||
+        employee.hasRole('sous_chef') ||
+        employee.hasRole('bar_manager') ||
+        employee.hasRole('floor_manager') ||
+        employee.department == 'management';
+    if (isOwner || isManagement) {
+      final dept = (employee.department == 'bar' || employee.hasRole('bar_manager'))
+          ? _InboxDeptTab.bar
+          : (employee.department == 'dining_room' || employee.hasRole('floor_manager'))
+              ? _InboxDeptTab.hall
+              : _InboxDeptTab.kitchen;
       setState(() {
-        _selectedDeptTab = _InboxDeptTab.kitchen;
+        _selectedDeptTab = dept;
         _selectedTypeTab = _InboxTypeTab.order; // Заказы по умолчанию
       });
     } else {
@@ -309,6 +320,13 @@ class _InboxScreenState extends State<InboxScreen> {
     final accountManager = context.watch<AccountManagerSupabase>();
     final employee = accountManager.currentEmployee;
     final isOwner = employee?.hasRole('owner') ?? false;
+    final isManagement = employee != null && (
+        employee.hasRole('executive_chef') ||
+        employee.hasRole('sous_chef') ||
+        employee.hasRole('bar_manager') ||
+        employee.hasRole('floor_manager') ||
+        employee.department == 'management'
+    );
     final visibleTabs = employee != null ? _visibleTabs(employee) : <_InboxTab>[];
 
     return Scaffold(
@@ -358,11 +376,11 @@ class _InboxScreenState extends State<InboxScreen> {
         children: [
           // Фильтр документов (Кухня/Бар/Зал, Заказы/Инвентаризация) — только для Входящих, не для Сообщений
           if (!widget.messagesOnly) ...[
-            if (isOwner) ...[
+            if (isOwner || isManagement) ...[
               _buildDeptFilter(loc),
               _buildTypeFilterForOwner(loc),
             ],
-            if (!isOwner && visibleTabs.isNotEmpty) _buildTypeFilter(loc, visibleTabs),
+            if (!isOwner && !isManagement && visibleTabs.isNotEmpty) _buildTypeFilter(loc, visibleTabs),
           ],
 
           Expanded(
@@ -390,6 +408,22 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   Widget _buildDeptFilter(LocalizationService loc) {
+    final emp = context.read<AccountManagerSupabase>().currentEmployee;
+    final isOwner = emp?.hasRole('owner') == true;
+    final allowed = <_InboxDeptTab>[];
+    if (!isOwner) {
+      final dept = emp?.department ?? 'kitchen';
+      if (dept == 'bar' || emp?.hasRole('bar_manager') == true) {
+        allowed.add(_InboxDeptTab.bar);
+      } else if (dept == 'dining_room' || dept == 'hall' || emp?.hasRole('floor_manager') == true) {
+        allowed.add(_InboxDeptTab.hall);
+      } else {
+        allowed.add(_InboxDeptTab.kitchen);
+      }
+    } else {
+      allowed.addAll([_InboxDeptTab.kitchen, _InboxDeptTab.bar, _InboxDeptTab.hall]);
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
@@ -405,11 +439,18 @@ class _InboxScreenState extends State<InboxScreen> {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _buildDeptChip(_InboxDeptTab.kitchen, loc.t('dept_kitchen') ?? 'Кухня', loc),
-            const SizedBox(width: 8),
-            _buildDeptChip(_InboxDeptTab.bar, loc.t('dept_bar') ?? 'Бар', loc),
-            const SizedBox(width: 8),
-            _buildDeptChip(_InboxDeptTab.hall, loc.t('dept_hall') ?? 'Зал', loc),
+            for (var i = 0; i < allowed.length; i++) ...[
+              if (i > 0) const SizedBox(width: 8),
+              _buildDeptChip(
+                allowed[i],
+                switch (allowed[i]) {
+                  _InboxDeptTab.kitchen => loc.t('dept_kitchen') ?? 'Кухня',
+                  _InboxDeptTab.bar => loc.t('dept_bar') ?? 'Бар',
+                  _InboxDeptTab.hall => loc.t('dept_hall') ?? 'Зал',
+                },
+                loc,
+              ),
+            ],
           ],
         ),
       ),

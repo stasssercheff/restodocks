@@ -44,26 +44,32 @@ class AppShell extends StatelessWidget {
 
     return Scaffold(
       body: showAccessPendingStub ? _AccessPendingPlaceholder(loc: loc) : child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selectedIndex,
-        onDestinationSelected: (i) => _onTap(context, i, middleAction, noDataAccess, isKitchenNoData, currentEmployee, selectedIndex),
-        destinations: [
-          NavigationDestination(
-            icon: const Icon(Icons.home_outlined),
-            selectedIcon: const Icon(Icons.home),
-            label: loc.t('home'),
-          ),
-          NavigationDestination(
-            icon: Icon(noDataAccess ? Icons.calendar_month_outlined : middleAction.iconOutlined),
-            selectedIcon: Icon(noDataAccess ? Icons.calendar_month : middleAction.icon),
-            label: middleLabel,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.person_outline),
-            selectedIcon: const Icon(Icons.person),
-            label: loc.t('personal_cabinet'),
-          ),
-        ],
+      bottomNavigationBar: NavigationBarTheme(
+        data: const NavigationBarThemeData(
+          height: 56,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+        ),
+        child: NavigationBar(
+          selectedIndex: selectedIndex,
+          onDestinationSelected: (i) => _onTap(context, i, middleAction, noDataAccess, isKitchenNoData, currentEmployee, selectedIndex),
+          destinations: [
+            NavigationDestination(
+              icon: const Icon(Icons.home_outlined),
+              selectedIcon: const Icon(Icons.home),
+              label: loc.t('home'),
+            ),
+            NavigationDestination(
+              icon: Icon(noDataAccess ? Icons.calendar_month_outlined : middleAction.iconOutlined),
+              selectedIcon: Icon(noDataAccess ? Icons.calendar_month : middleAction.icon),
+              label: middleLabel,
+            ),
+            NavigationDestination(
+              icon: const Icon(Icons.person_outline),
+              selectedIcon: const Icon(Icons.person),
+              label: loc.t('personal_cabinet'),
+            ),
+          ],
+        ),
       ),
     );
   }
