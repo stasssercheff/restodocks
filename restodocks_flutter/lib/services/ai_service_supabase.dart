@@ -1339,9 +1339,24 @@ class AiServiceSupabase implements AiService {
     while (r < rows.length) {
       final row = rows[r].map((c) => (c ?? '').toString().trim()).toList();
       if (row.every((c) => c.isEmpty)) { r++; continue; }
-      final dishName = row.isNotEmpty ? row[0].trim() : '';
-      if (dishName.length < 3 || !RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(dishName) ||
-          RegExp(r'^№$|^выход$|^итого$|^наименование$', caseSensitive: false).hasMatch(dishName.toLowerCase())) {
+      // В xlsx часто бывают смещения из‑за объединённых ячеек: название может оказаться не в col0.
+      // Берём первый “похожий на название” текст из первых 3 колонок.
+      String dishName = '';
+      int dishCol = 0;
+      for (var c = 0; c < row.length && c < 3; c++) {
+        final v = row[c].trim();
+        if (v.isEmpty) continue;
+        // Не брать строки технологии/мусор как “название блока”
+        final low = v.toLowerCase();
+        if (RegExp(r'^№$|^выход\b|^итого\b|^наименование\b', caseSensitive: false).hasMatch(low)) continue;
+        if (_isSkipForDishName(v)) continue;
+        if (v.length > 140) continue; // технология длиннее, чем названия ПФ
+        if (!RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(v)) continue;
+        dishName = v;
+        dishCol = c;
+        break;
+      }
+      if (dishName.length < 3) {
         r++;
         continue;
       }
@@ -1350,17 +1365,19 @@ class AiServiceSupabase implements AiService {
       // Вариант 1: заголовок в следующей строке (классический пф хц)
       if (r + 1 < rows.length) {
         final nextRow = rows[r + 1].map((c) => (c ?? '').toString().trim()).toList();
-        final h0 = nextRow.isNotEmpty ? nextRow[0].trim().toLowerCase() : '';
-        final h1 = nextRow.length > 1 ? nextRow[1].trim().toLowerCase() : '';
-        final h2 = nextRow.length > 2 ? nextRow[2].trim().toLowerCase() : '';
-        final h3 = nextRow.length > 3 ? nextRow[3].trim().toLowerCase() : '';
+        // Заголовок может быть сдвинут вправо на dishCol (если col0 пустой из‑за merged cells)
+        final shifted = dishCol > 0 && nextRow.length > dishCol ? nextRow.sublist(dishCol) : nextRow;
+        final h0 = shifted.isNotEmpty ? shifted[0].trim().toLowerCase() : '';
+        final h1 = shifted.length > 1 ? shifted[1].trim().toLowerCase() : '';
+        final h2 = shifted.length > 2 ? shifted[2].trim().toLowerCase() : '';
+        final h3 = shifted.length > 3 ? shifted[3].trim().toLowerCase() : '';
         final hasNormInHeader = h3.contains('норма') || h3.contains('закладк') || h2.contains('норма');
         final firstCellOk = h0.isEmpty || h0 == '№' || (h0.contains('наименование') && (h0.contains('продукт') || h0.contains('сырья')));
         final headerOk = firstCellOk &&
             (h1.contains('наименование') || h1.contains('ед') || h2.contains('ед')) &&
             (h2.contains('ед') || h2.contains('изм') || h2.contains('норма') || h3.contains('норма') || h3.contains('закладк'));
         if (headerOk || (hasNormInHeader && (h1.contains('наименование') || h0.contains('наименование')))) {
-          headerRow = nextRow;
+          headerRow = shifted;
           dataStartR = r + 2;
         } else {
           headerRow = [];
@@ -1372,11 +1389,11 @@ class AiServiceSupabase implements AiService {
       }
       // Вариант 2: заголовок в той же строке, что и название (xlsx: название в A1, Наименование продукта|Ед.изм|Норма в B1..F1)
       if (dataStartR < 0 && row.length >= 3) {
-        final rest = row.sublist(1).map((c) => c.toLowerCase()).toList();
+        final rest = row.sublist((dishCol + 1).clamp(1, row.length)).map((c) => c.toLowerCase()).toList();
         final hasNaimen = rest.any((c) => c.contains('наименование') && (c.contains('продукт') || c.contains('сырья')));
         final hasEdNorm = rest.any((c) => c.contains('ед') || c.contains('изм') || c.contains('норма') || c.contains('закладк'));
         if (hasNaimen && hasEdNorm) {
-          headerRow = row.sublist(1);
+          headerRow = row.sublist((dishCol + 1).clamp(1, row.length));
           dataStartR = r + 1;
         }
       }
@@ -1406,13 +1423,14 @@ class AiServiceSupabase implements AiService {
       while (dataR < rows.length) {
         final dr = rows[dataR].map((c) => (c ?? '').toString().trim()).toList();
         if (dr.every((c) => c.isEmpty)) { dataR++; continue; }
-        final d0 = dr.isNotEmpty ? dr[0].toLowerCase().trim() : '';
-        final d1 = dr.length > 1 ? dr[1].trim().toLowerCase() : '';
+        final shiftedDr = dishCol > 0 && dr.length > dishCol ? dr.sublist(dishCol) : dr;
+        final d0 = shiftedDr.isNotEmpty ? shiftedDr[0].toLowerCase().trim() : '';
+        final d1 = shiftedDr.length > 1 ? shiftedDr[1].trim().toLowerCase() : '';
         if (d0 == 'выход' || (d0.startsWith('выход') && d0.length < 20)) {
           // 1) Из карты: значение из той же колонки, что и «Норма» в заголовке (в строке Выход там обычно 0.700 кг).
           final sumGrams = ingredients.fold<double>(0, (s, ing) => s + (ing.outputGrams ?? 0));
-          if (headerNormCol >= 0 && headerNormCol < dr.length) {
-            final cell = dr[headerNormCol].trim();
+          if (headerNormCol >= 0 && headerNormCol < shiftedDr.length) {
+            final cell = shiftedDr[headerNormCol].trim();
             num? cellVal;
             if (cell.contains('/')) {
               var sum = 0.0;
@@ -1425,7 +1443,7 @@ class AiServiceSupabase implements AiService {
               cellVal = _parseNum(cell);
             }
             if (cellVal != null && cellVal > 0) {
-              final isKg = dr.join(' ').toLowerCase().contains('кг');
+              final isKg = shiftedDr.join(' ').toLowerCase().contains('кг');
               outputGrams = (isKg && cellVal < 100 ? cellVal * 1000 : cellVal.toDouble()).toDouble();
             }
           }
@@ -1434,8 +1452,8 @@ class AiServiceSupabase implements AiService {
           break;
         }
         if (d0 == '№' && d1.contains('наименование')) break;
-        final prodCol = (dr.length > 1 && RegExp(r'^\d+$').hasMatch(dr[0])) ? 1 : (dr[0].isEmpty && dr.length > 1 ? 1 : 0);
-        final product = dr.length > prodCol ? dr[prodCol].trim() : '';
+        final prodCol = (shiftedDr.length > 1 && RegExp(r'^\d+$').hasMatch(shiftedDr[0])) ? 1 : (shiftedDr[0].isEmpty && shiftedDr.length > 1 ? 1 : 0);
+        final product = shiftedDr.length > prodCol ? shiftedDr[prodCol].trim() : '';
         if (product.toLowerCase().contains('наименование') && product.toLowerCase().contains('продукт')) {
           dataR++; continue;
         }
@@ -1447,18 +1465,18 @@ class AiServiceSupabase implements AiService {
         final unitCol = normInCol2 ? -1 : prodCol + 1;
         final normCol = normInCol2 ? prodCol + 1 : prodCol + 2;
         final techCol = hasTechCol ? techColByHeader : prodCol + 3;
-        final unit = unitCol >= 0 && dr.length > unitCol ? dr[unitCol].trim().toLowerCase() : '';
-        final normStr = dr.length > normCol ? dr[normCol].trim() : '';
+        final unit = unitCol >= 0 && shiftedDr.length > unitCol ? shiftedDr[unitCol].trim().toLowerCase() : '';
+        final normStr = shiftedDr.length > normCol ? shiftedDr[normCol].trim() : '';
         if (product.isEmpty) {
-          if (hasTechCol && dr.length > techCol && dr[techCol].trim().length > 10) {
-            technologyText = (technologyText != null ? '$technologyText\n' : '') + dr[techCol].trim();
+          if (hasTechCol && shiftedDr.length > techCol && shiftedDr[techCol].trim().length > 10) {
+            technologyText = (technologyText != null ? '$technologyText\n' : '') + shiftedDr[techCol].trim();
           }
           dataR++; continue;
         }
         final norm = _parseNum(normStr);
         if (norm == null && !RegExp(r'\d').hasMatch(normStr)) {
-          if (hasTechCol && dr.length > techCol && dr[techCol].trim().length > 10) {
-            technologyText = (technologyText != null ? '$technologyText\n' : '') + dr[techCol].trim();
+          if (hasTechCol && shiftedDr.length > techCol && shiftedDr[techCol].trim().length > 10) {
+            technologyText = (technologyText != null ? '$technologyText\n' : '') + shiftedDr[techCol].trim();
           }
           dataR++; continue;
         }
@@ -1467,13 +1485,13 @@ class AiServiceSupabase implements AiService {
         if (unit.contains('л') && grams > 0 && grams < 10) grams *= 1000;
         if (unit.isEmpty && grams > 0 && grams < 50) grams *= 1000; // формат без Ед.изм — числа в кг
         if (grams <= 0) {
-          if (hasTechCol && dr.length > techCol && dr[techCol].trim().length > 10) {
-            technologyText = (technologyText != null ? '$technologyText\n' : '') + dr[techCol].trim();
+          if (hasTechCol && shiftedDr.length > techCol && shiftedDr[techCol].trim().length > 10) {
+            technologyText = (technologyText != null ? '$technologyText\n' : '') + shiftedDr[techCol].trim();
           }
           dataR++; continue;
         }
-        if (hasTechCol && dr.length > techCol && dr[techCol].trim().length > 10) {
-          technologyText = (technologyText != null ? '$technologyText\n' : '') + dr[techCol].trim();
+        if (hasTechCol && shiftedDr.length > techCol && shiftedDr[techCol].trim().length > 10) {
+          technologyText = (technologyText != null ? '$technologyText\n' : '') + shiftedDr[techCol].trim();
         }
         final isPf = RegExp(r'п/ф|пф\s', caseSensitive: false).hasMatch(product);
         ingredients.add(TechCardIngredientLine(
@@ -1496,9 +1514,11 @@ class AiServiceSupabase implements AiService {
           yieldGrams: outputGrams,
         ));
       }
-      final hitNextHeader = dataR < rows.length && rows[dataR].isNotEmpty &&
-          rows[dataR][0].trim().toLowerCase() == '№' &&
-          (rows[dataR].length > 1 && rows[dataR][1].trim().toLowerCase().contains('наименование'));
+      final nextRow = dataR < rows.length ? rows[dataR].map((c) => (c ?? '').toString().trim()).toList() : <String>[];
+      final shiftedNext = dishCol > 0 && nextRow.length > dishCol ? nextRow.sublist(dishCol) : nextRow;
+      final hitNextHeader = shiftedNext.isNotEmpty &&
+          shiftedNext[0].trim().toLowerCase() == '№' &&
+          (shiftedNext.length > 1 && shiftedNext[1].trim().toLowerCase().contains('наименование'));
       r = hitNextHeader && dataR > 0 ? dataR - 1 : dataR + 1;
     }
     return results;
