@@ -403,7 +403,7 @@ class AiServiceSupabase implements AiService {
         }
       }
       // Формат супы/Полное пособие: блоки без общего заголовка (название → ингредиенты → Выход или число)
-      final polnoe = AiServiceSupabase._tryParsePolnoePosobieFormat(expanded);
+      final polnoe = AiServiceSupabase._tryParsePolnoePosobieFormat(rows);
       if (polnoe.length > list.length) list = polnoe;
       // 3. Только если и там пусто — вызываем AI (лимит 3/день)
       if (list.isEmpty) {
