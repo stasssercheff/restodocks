@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -122,6 +123,7 @@ class _EditableShrinkageCell extends StatefulWidget {
 class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
   late TextEditingController _ctrl;
   final FocusNode _focusNode = FocusNode();
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -132,16 +134,24 @@ class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
   @override
   void didUpdateWidget(covariant _EditableShrinkageCell oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.value != widget.value && _ctrl.text != widget.value.toStringAsFixed(1)) {
+    if (!_focusNode.hasFocus &&
+        oldWidget.value != widget.value &&
+        _ctrl.text != widget.value.toStringAsFixed(1)) {
       _ctrl.text = widget.value.toStringAsFixed(1);
     }
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _focusNode.dispose();
     _ctrl.dispose();
     super.dispose();
+  }
+
+  void _scheduleSubmit() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), _submit);
   }
 
   void _submit() {
@@ -167,6 +177,7 @@ class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
           fillColor: fill,
         ),
         style: const TextStyle(fontSize: 12),
+        onChanged: (_) => _scheduleSubmit(),
         onSubmitted: (_) => _submit(),
         onTapOutside: (_) => _submit(),
       ),
@@ -188,6 +199,7 @@ class _EditableWasteCell extends StatefulWidget {
 class _EditableWasteCellState extends State<_EditableWasteCell> {
   late TextEditingController _ctrl;
   final FocusNode _focusNode = FocusNode();
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -198,16 +210,24 @@ class _EditableWasteCellState extends State<_EditableWasteCell> {
   @override
   void didUpdateWidget(covariant _EditableWasteCell oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.value != widget.value && _ctrl.text != widget.value.toStringAsFixed(1)) {
+    if (!_focusNode.hasFocus &&
+        oldWidget.value != widget.value &&
+        _ctrl.text != widget.value.toStringAsFixed(1)) {
       _ctrl.text = widget.value.toStringAsFixed(1);
     }
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _focusNode.dispose();
     _ctrl.dispose();
     super.dispose();
+  }
+
+  void _scheduleSubmit() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), _submit);
   }
 
   void _submit() {
@@ -233,6 +253,7 @@ class _EditableWasteCellState extends State<_EditableWasteCell> {
           fillColor: fill,
         ),
         style: const TextStyle(fontSize: 12),
+        onChanged: (_) => _scheduleSubmit(),
         onSubmitted: (_) => _submit(),
         onTapOutside: (_) => _submit(),
       ),
@@ -314,6 +335,7 @@ class _EditableGrossCell extends StatefulWidget {
 class _EditableGrossCellState extends State<_EditableGrossCell> {
   late TextEditingController _ctrl;
   final FocusNode _focusNode = FocusNode();
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -324,16 +346,24 @@ class _EditableGrossCellState extends State<_EditableGrossCell> {
   @override
   void didUpdateWidget(covariant _EditableGrossCell oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.grams != widget.grams && _ctrl.text != widget.grams.toStringAsFixed(0)) {
+    if (!_focusNode.hasFocus &&
+        oldWidget.grams != widget.grams &&
+        _ctrl.text != widget.grams.toStringAsFixed(0)) {
       _ctrl.text = widget.grams.toStringAsFixed(0);
     }
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _focusNode.dispose();
     _ctrl.dispose();
     super.dispose();
+  }
+
+  void _scheduleSubmit() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), _submit);
   }
 
   void _submit() {
@@ -359,6 +389,7 @@ class _EditableGrossCellState extends State<_EditableGrossCell> {
           fillColor: fill,
         ),
         style: const TextStyle(fontSize: 12),
+        onChanged: (_) => _scheduleSubmit(),
         onSubmitted: (_) => _submit(),
         onTapOutside: (_) => _submit(),
       ),
@@ -449,6 +480,7 @@ class _EditableCostCell extends StatefulWidget {
 class _EditableCostCellState extends State<_EditableCostCell> {
   late TextEditingController _ctrl;
   final FocusNode _focusNode = FocusNode();
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -459,16 +491,24 @@ class _EditableCostCellState extends State<_EditableCostCell> {
   @override
   void didUpdateWidget(covariant _EditableCostCell oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.cost != widget.cost && _ctrl.text != widget.cost.toStringAsFixed(2)) {
+    if (!_focusNode.hasFocus &&
+        oldWidget.cost != widget.cost &&
+        _ctrl.text != widget.cost.toStringAsFixed(2)) {
       _ctrl.text = widget.cost.toStringAsFixed(2);
     }
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _focusNode.dispose();
     _ctrl.dispose();
     super.dispose();
+  }
+
+  void _scheduleSubmit() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), _submit);
   }
 
   void _submit() {
@@ -493,6 +533,7 @@ class _EditableCostCellState extends State<_EditableCostCell> {
           fillColor: Theme.of(context).colorScheme.surfaceContainerLow.withValues(alpha: 0.7),
         ),
         style: const TextStyle(fontSize: 12),
+        onChanged: (_) => _scheduleSubmit(),
         onSubmitted: (_) => _submit(),
         onTapOutside: (_) => _submit(),
       ),
@@ -4438,6 +4479,7 @@ class _EditableNetCell extends StatefulWidget {
 class _EditableNetCellState extends State<_EditableNetCell> {
   late TextEditingController _ctrl;
   final FocusNode _focusNode = FocusNode();
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -4449,16 +4491,22 @@ class _EditableNetCellState extends State<_EditableNetCell> {
   void didUpdateWidget(covariant _EditableNetCell oldWidget) {
     super.didUpdateWidget(oldWidget);
     final fmt = widget._format(widget.value);
-    if (oldWidget.value != widget.value && _ctrl.text != fmt) {
+    if (!_focusNode.hasFocus && oldWidget.value != widget.value && _ctrl.text != fmt) {
       _ctrl.text = fmt;
     }
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _focusNode.dispose();
     _ctrl.dispose();
     super.dispose();
+  }
+
+  void _scheduleSubmit() {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), _submit);
   }
 
   void _submit() {
@@ -4483,6 +4531,7 @@ class _EditableNetCellState extends State<_EditableNetCell> {
           fillColor: Theme.of(context).colorScheme.surfaceContainerLow.withValues(alpha: 0.7),
         ),
         style: const TextStyle(fontSize: 12),
+        onChanged: (_) => _scheduleSubmit(),
         onSubmitted: (_) => _submit(),
         onTapOutside: (_) => _submit(),
       ),
