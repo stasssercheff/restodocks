@@ -402,6 +402,9 @@ class AiServiceSupabase implements AiService {
           if (iiko.isNotEmpty && iiko.first.ingredients.isNotEmpty) list = iiko;
         }
       }
+      // Формат супы/Полное пособие: блоки без общего заголовка (название → ингредиенты → Выход или число)
+      final polnoe = AiServiceSupabase._tryParsePolnoePosobieFormat(expanded);
+      if (polnoe.length > list.length) list = polnoe;
       // 3. Только если и там пусто — вызываем AI (лимит 3/день)
       if (list.isEmpty) {
         lastParseTechCardExcelReason = null;
@@ -1177,6 +1180,15 @@ class AiServiceSupabase implements AiService {
             }
           }
           if (yieldGrams == null && sumGrams > 0) yieldGrams = sumGrams;
+          dataRow++;
+          continue;
+        }
+        // Строка только с числом в col 1 (выход без слова «Выход») — напр. «Грибной крем суп» → ингредиенты → «400»
+        final onlyNum = dr.length > 1 && dr[1].trim().isNotEmpty && _parseNum(dr[1].trim()) != null &&
+            dr.where((c) => c.trim().isNotEmpty).length <= 2;
+        if (onlyNum && ingredients.isNotEmpty) {
+          final v = _parseNum(dr[1].trim());
+          if (v != null && v > 0) yieldGrams = v.toDouble();
           dataRow++;
           continue;
         }
@@ -2104,6 +2116,20 @@ class AiServiceSupabase implements AiService {
         flushCard(yieldGrams: outG);
         currentDish = null;
         return true;
+      }
+      // Строка только с числом (выход без слова «Выход») — формат супы.xlsx: после ингредиентов одна строка «400» в col 1
+      if (currentDish != null &&
+          currentIngredients.isNotEmpty &&
+          productVal.trim().isNotEmpty &&
+          _parseNum(productVal.trim()) != null &&
+          (grossVal.trim().isEmpty || _parseNum(grossVal.trim()) != null) &&
+          cells.where((c) => c.trim().isNotEmpty).length <= 2) {
+        final y = _parseNum(productVal.trim());
+        if (y != null && y > 0) {
+          flushCard(yieldGrams: y.toDouble());
+          currentDish = null;
+          return true;
+        }
       }
       // пф гц: новая карточка — название в col 0, col 1 пусто (Песто пф, База на лигурию п/ф)
       final c0Val = cells.isNotEmpty ? cells[0].trim() : '';

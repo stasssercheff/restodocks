@@ -785,19 +785,10 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     final loc = context.watch<LocalizationService>();
     final lang = loc.currentLanguageCode;
 
-    final canAdjustAll = _items.any(_canBenefitFromAdjustWaste);
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text('${loc.t('tech_cards_import_review_title')} (${_items.length})'),
-        actions: [
-          if (canAdjustAll)
-            TextButton.icon(
-              onPressed: _saving ? null : _adjustWasteForAllCards,
-              icon: const Icon(Icons.tune, size: 18),
-              label: Text(loc.t('ttk_adjust_waste_to_output') ?? 'Подстроить % отхода под целевой выход'),
-            ),
-        ],
       ),
       body: Column(
         children: [
