@@ -13,6 +13,7 @@ import '../services/services.dart';
 import '../services/home_layout_config_service.dart';
 import '../services/screen_layout_preference_service.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/getting_started_document.dart';
 import '../widgets/long_operation_progress_dialog.dart';
 
 const _adminEmails = <String>{'stasssercheff@gmail.com'};
@@ -1252,6 +1253,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  void _showGettingStartedTextDialog(BuildContext context, LocalizationService loc) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('getting_started') ?? 'Начало работы (текст)'),
+        content: SizedBox(
+          width: 400,
+          height: 500,
+          child: const GettingStartedDocument(showTitle: true),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(MaterialLocalizations.of(ctx).closeButtonLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildNotificationSettings(
     BuildContext context, LocalizationService loc, Employee emp, AccountManagerSupabase accountManager) {
     final prefs = context.watch<NotificationPreferencesService>();
@@ -1963,11 +1984,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
             const Divider(),
             ListTile(
-              leading: const Icon(Icons.school),
+              leading: const Icon(Icons.play_circle_outline),
               title: Text(localization.t('training') ?? 'Обучение'),
               subtitle: Text(localization.t('training_subtitle') ?? 'Видеоинструкции по работе с приложением'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showTrainingDialog(context, localization),
+            ),
+            ListTile(
+              leading: const Icon(Icons.menu_book),
+              title: Text(localization.t('getting_started') ?? 'Начало работы (текст)'),
+              subtitle: Text(localization.t('getting_started_subtitle') ?? 'Текстовая инструкция с раскрывающимися разделами'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _showGettingStartedTextDialog(context, localization),
             ),
             ListTile(
               leading: const Icon(Icons.support_agent),
