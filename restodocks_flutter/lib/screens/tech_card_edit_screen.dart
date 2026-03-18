@@ -1056,7 +1056,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 gross = gross * (gpp ?? 50);
                 if (net == (line.grossGrams ?? 0)) net = gross;
               }
-              final outW = outG > 0 ? outG : (net > 0 ? net : (gross > 0 ? gross : 100));
+              final outW = (outG > 0 ? outG : (net > 0 ? net : (gross > 0 ? gross : 100.0))).toDouble();
               _ingredients.add(TTIngredient(
                 id: DateTime.now().millisecondsSinceEpoch.toString() + _ingredients.length.toString(),
                 productId: null,
@@ -1856,7 +1856,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           gross = gross * (gpp ?? 50);
           if (net == (line.grossGrams ?? 0)) net = gross;
         }
-        final outW = outG > 0 ? outG : (net > 0 ? net : (gross > 0 ? gross : 100));
+        final outW = (outG > 0 ? outG : (net > 0 ? net : (gross > 0 ? gross : 100.0))).toDouble();
         _ingredients.add(TTIngredient(
           id: DateTime.now().millisecondsSinceEpoch.toString() + _ingredients.length.toString(),
           productId: null,
