@@ -904,21 +904,26 @@ class _WriteoffUnitDropdown extends StatelessWidget {
     final match = options.where((u) => u.toLowerCase() == current).firstOrNull;
     final displayValue = match ?? options.first;
     return DropdownButtonHideUnderline(
-      child: DropdownButton<String>(
-        value: displayValue,
-        isDense: true,
-        isExpanded: true,
-        items: options.map((u) => DropdownMenuItem(
-          value: u,
-          child: Text(
-            u == 'pkg' ? (lang == 'ru' ? 'упак.' : 'pkg')
-                : u == 'btl' ? (lang == 'ru' ? 'бутылка' : 'bottle')
-                : _unitDisplay(u, lang),
-            style: theme.textTheme.bodySmall,
-            overflow: TextOverflow.ellipsis,
-          ),
-        )).toList(),
-        onChanged: (v) => v != null ? onChanged(v) : null,
+      child: Center(
+        child: DropdownButton<String>(
+          value: displayValue,
+          isDense: true,
+          isExpanded: false, // компактно: стрелка рядом с текстом
+          alignment: Alignment.center,
+          icon: const Icon(Icons.arrow_drop_down, size: 18),
+          iconSize: 18,
+          items: options.map((u) => DropdownMenuItem(
+            value: u,
+            child: Text(
+              u == 'pkg' ? (lang == 'ru' ? 'упак.' : 'pkg')
+                  : u == 'btl' ? (lang == 'ru' ? 'бутылка' : 'bottle')
+                  : _unitDisplay(u, lang),
+              style: theme.textTheme.bodySmall,
+              overflow: TextOverflow.ellipsis,
+            ),
+          )).toList(),
+          onChanged: (v) => v != null ? onChanged(v) : null,
+        ),
       ),
     );
   }
