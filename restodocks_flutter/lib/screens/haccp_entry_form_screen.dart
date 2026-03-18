@@ -51,6 +51,15 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   DateTime? _medBookValidUntil;
   DateTime? _medBookIssuedAt;
   DateTime? _medBookReturnedAt;
+  /// Мобильные блоки (алиасы для совместимости с полями).
+  String? _medBookEmployeeId;
+  String? _medExamEmployeeId;
+  DateTime? get _medBookExpiryDate => _medBookValidUntil;
+  set _medBookExpiryDate(DateTime? v) => _medBookValidUntil = v;
+  DateTime? get _medBookReceivedDate => _medBookIssuedAt;
+  set _medBookReceivedDate(DateTime? v) => _medBookIssuedAt = v;
+  DateTime? get _medBookReturnedDate => _medBookReturnedAt;
+  set _medBookReturnedDate(DateTime? v) => _medBookReturnedAt = v;
   /// Медосмотры, дезсредства, генуборки, сита.
   DateTime? _medExamHireDate;
   DateTime? _medExamDate;
@@ -60,6 +69,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   DateTime? _disinfExpiryDate;
   DateTime? _genCleanDate;
   DateTime? _sieveCleaningDate;
+
+  DateTime? get _generalCleaningDate => _genCleanDate;
+  set _generalCleaningDate(DateTime? v) => _genCleanDate = v;
+  DateTime? get _sieveDate => _sieveCleaningDate;
+  set _sieveDate(DateTime? v) => _sieveCleaningDate = v;
 
   /// Гигиенический журнал: список сотрудников заведения и строки таблицы (каждая — один сотрудник).
   List<Employee> _healthEmployees = [];
@@ -157,6 +171,67 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     final s = _getText(key);
     if (s.isEmpty) return null;
     return double.tryParse(s.replaceAll(',', '.'));
+  }
+
+  /// Выбор сотрудника для мобильных форм (медкнижки/медосмотры).
+  Widget _employeePickerField(
+    String key,
+    String label,
+    String? currentId,
+    void Function(String?) onIdChanged,
+  ) {
+    if (_formEmployees.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final selected = _formEmployees.where((e) => e.id == currentId).firstOrNull;
+    return DropdownButtonFormField<Employee?>(
+      value: selected,
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+        isDense: true,
+      ),
+      items: _formEmployees
+          .map((e) => DropdownMenuItem<Employee?>(
+                value: e,
+                child: Text(e.surname != null ? '${e.surname} ${e.fullName}' : e.fullName),
+              ))
+          .toList(),
+      onChanged: (e) {
+        onIdChanged(e?.id);
+        // Дублируем ID в контроллер, чтобы сохранить в payload, даже если отдельные state-поля не используются.
+        _setText(key, e?.id ?? '');
+      },
+    );
+  }
+
+  /// Выбор даты для мобильных форм.
+  Widget _datePickerField(
+    String key,
+    String label,
+    DateTime? value,
+    void Function(DateTime?) onChanged,
+  ) {
+    return InkWell(
+      onTap: () async {
+        final d = await showDatePicker(
+          context: context,
+          initialDate: value ?? DateTime.now(),
+          firstDate: DateTime(2020),
+          lastDate: DateTime.now().add(const Duration(days: 3650)),
+        );
+        onChanged(d);
+        if (d != null) _setText(key, d.toIso8601String());
+      },
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+          isDense: true,
+        ),
+        child: Text(value != null ? DateFormat('dd.MM.yyyy').format(value) : 'Выбрать'),
+      ),
+    );
   }
 
   Widget _tableHeaderCell(String text) => Container(
