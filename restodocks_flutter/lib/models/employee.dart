@@ -128,6 +128,10 @@ class Employee extends Equatable {
   @JsonKey(name: 'getting_started_shown', defaultValue: false)
   final bool gettingStartedShown;
 
+  /// Время первой сессии в этой учётной записи. null = ни разу не входил → показать «Начало работы».
+  @JsonKey(name: 'first_session_at')
+  final DateTime? firstSessionAt;
+
   /// Тип оплаты: 'per_shift' — за смену, 'hourly' — почасовая.
   @JsonKey(name: 'payment_type')
   final String? paymentType;
@@ -193,6 +197,7 @@ class Employee extends Equatable {
     this.preferredLanguage = 'ru',
     this.preferredCurrency,
     this.gettingStartedShown = false,
+    this.firstSessionAt,
     this.paymentType,
     this.ratePerShift,
     this.hourlyRate,
@@ -224,6 +229,7 @@ class Employee extends Equatable {
     String? preferredLanguage,
     String? preferredCurrency,
     bool? gettingStartedShown,
+    DateTime? firstSessionAt,
     String? paymentType,
     double? ratePerShift,
     double? hourlyRate,
@@ -253,6 +259,7 @@ class Employee extends Equatable {
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
       preferredCurrency: preferredCurrency ?? this.preferredCurrency,
       gettingStartedShown: gettingStartedShown ?? this.gettingStartedShown,
+      firstSessionAt: firstSessionAt ?? this.firstSessionAt,
       paymentType: paymentType ?? this.paymentType,
       ratePerShift: ratePerShift ?? this.ratePerShift,
       hourlyRate: hourlyRate ?? this.hourlyRate,
@@ -462,6 +469,7 @@ class Employee extends Equatable {
     if (!m.containsKey('data_access_enabled')) m['data_access_enabled'] = false;
     if (!m.containsKey('can_edit_own_schedule')) m['can_edit_own_schedule'] = false;
     if (!m.containsKey('getting_started_shown')) m['getting_started_shown'] = false;
+    if (m['first_session_at'] != null && m['first_session_at'] is! String) m['first_session_at'] = null;
     return _$EmployeeFromJson(m);
   }
   static String _str(dynamic v, String fallback) {
@@ -492,6 +500,7 @@ class Employee extends Equatable {
     preferredLanguage,
     preferredCurrency,
     gettingStartedShown,
+    firstSessionAt,
     paymentType,
     ratePerShift,
     hourlyRate,

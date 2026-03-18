@@ -36,20 +36,20 @@ class _HomeScreenState extends State<HomeScreen> {
     final emp = accountManager.currentEmployee;
     if (emp == null) return;
     _firstEntryCheckDone = true;
-    // Prefer server-side flag (survives deploys / storage clears).
-    final alreadyShown = emp.gettingStartedShown || await GettingStartedReadService.isRead(emp.id);
-    if (!mounted) return;
-    if (alreadyShown) return;
-    // Mark as shown both locally and on the server.
-    await GettingStartedReadService.setRead(emp.id);
+    // Показываем только если не было ни одной сессии в этой учётной записи.
+    if (emp.firstSessionAt != null) return;
+    // Фиксируем первую сессию на сервере, затем показываем окно (один раз).
     try {
       await accountManager.supabase.client
           .from('employees')
-          .update({'getting_started_shown': true})
+          .update({'first_session_at': DateTime.now().toUtc().toIso8601String()})
           .eq('id', emp.id);
     } catch (_) {
-      // Ignore: local flag still prevents repeated showing in this browser.
+      // При ошибке сети не показываем, чтобы не спамить при каждом входе.
+      return;
     }
+    if (!mounted) return;
+    await GettingStartedReadService.setRead(emp.id);
     if (!mounted) return;
     _showFirstEntryDialog(context, emp.id);
   }
