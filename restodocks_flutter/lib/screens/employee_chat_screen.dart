@@ -334,11 +334,75 @@ String _formatMessageTime(DateTime dt) {
   return DateFormat('dd.MM.yyyy HH:mm').format(dt.toLocal());
 }
 
-/// Определяет язык текста: ru если есть кириллица, иначе en.
+/// Определяет язык текста (грубая эвристика) среди поддерживаемых: ru/en/es/tr/vi.
 String _detectLanguage(String text) {
-  if (text.isEmpty) return 'ru';
-  final hasCyrillic = text.runes.any((r) => r >= 0x0400 && r <= 0x04FF);
-  return hasCyrillic ? 'ru' : 'en';
+  if (text.trim().isEmpty) return 'en';
+  final runes = text.runes;
+
+  // Кириллица.
+  final hasCyrillic = runes.any((r) => r >= 0x0400 && r <= 0x04FF);
+  if (hasCyrillic) return 'ru';
+
+  // Вьетнамский: много латиницы с диакритикой + đặc biệt (đ/Đ).
+  final hasVietSpecial = runes.any((r) => r == 0x0111 || r == 0x0110); // đ/Đ
+  final hasLatinExtended = runes.any(
+    (r) =>
+        // Latin-1 Supplement + Latin Extended-A/B (часто встречается у vi/es/tr).
+        (r >= 0x00C0 && r <= 0x024F) ||
+        (r >= 0x1E00 && r <= 0x1EFF), // Latin Extended Additional
+  );
+  if (hasVietSpecial) return 'vi';
+
+  // Турецкий: ı/İ/ş/Ş/ğ/Ğ/ç/Ç/ö/Ö/ü/Ü.
+  final hasTurkishChars = runes.any((r) {
+    switch (r) {
+      case 0x0131: // ı
+      case 0x0130: // İ
+      case 0x015F: // ş
+      case 0x015E: // Ş
+      case 0x011F: // ğ
+      case 0x011E: // Ğ
+      case 0x00E7: // ç
+      case 0x00C7: // Ç
+      case 0x00F6: // ö
+      case 0x00D6: // Ö
+      case 0x00FC: // ü
+      case 0x00DC: // Ü
+        return true;
+    }
+    return false;
+  });
+  if (hasTurkishChars) return 'tr';
+
+  // Испанский: ñ/Ñ, ¡, ¿, áéíóúü.
+  final hasSpanishChars = runes.any((r) {
+    switch (r) {
+      case 0x00F1: // ñ
+      case 0x00D1: // Ñ
+      case 0x00A1: // ¡
+      case 0x00BF: // ¿
+      case 0x00E1: // á
+      case 0x00C1: // Á
+      case 0x00E9: // é
+      case 0x00C9: // É
+      case 0x00ED: // í
+      case 0x00CD: // Í
+      case 0x00F3: // ó
+      case 0x00D3: // Ó
+      case 0x00FA: // ú
+      case 0x00DA: // Ú
+      case 0x00FC: // ü
+      case 0x00DC: // Ü
+        return true;
+    }
+    return false;
+  });
+  if (hasSpanishChars) return 'es';
+
+  // Если есть расширенная латиница, но не распознали — скорее vi (чаще всего).
+  if (hasLatinExtended) return 'vi';
+
+  return 'en';
 }
 
 /// Пузырёк сообщения с переводом по выбранному языку.
@@ -359,10 +423,12 @@ class _ChatMessageBubble extends StatefulWidget {
 
 class _ChatMessageBubbleState extends State<_ChatMessageBubble> {
   String? _translatedContent;
+  String? _lastLang;
 
   @override
   void initState() {
     super.initState();
+    _lastLang = context.read<LocalizationService>().currentLanguageCode;
     _translateIfNeeded();
   }
 
@@ -386,6 +452,19 @@ class _ChatMessageBubbleState extends State<_ChatMessageBubble> {
       }
     } catch (e) {
       if (kDebugMode) devLog('[Chat] translate failed: $e');
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _ChatMessageBubble oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    if (oldWidget.message.id != widget.message.id ||
+        oldWidget.message.content != widget.message.content ||
+        _lastLang != lang) {
+      _lastLang = lang;
+      _translatedContent = null;
+      _translateIfNeeded();
     }
   }
 
