@@ -1046,36 +1046,44 @@ class _WriteoffRowTileState extends State<_WriteoffRowTile> {
             ),
           ),
           Expanded(
-            child: SingleChildScrollView(
-              controller: _hScroll,
-              scrollDirection: Axis.horizontal,
-              physics: const ClampingScrollPhysics(),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-                  color: widget.rowNumber.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    ...List.generate(qtyCols, (c) {
-                      final isLast = c == qtyCols - 1;
-                      final qty = c < row.quantities.length ? row.quantities[c] : 0.0;
-                      return Padding(
-                        padding: EdgeInsets.only(right: c < qtyCols - 1 ? _colGap : _colGap),
-                        child: SizedBox(
-                          width: _colQtyWidth,
-                          child: _QuantityField(
-                            value: qty,
-                            onChanged: (v) => widget.onSetQuantity(widget.rowIndex, c, v),
-                            onFocusLast: isLast ? () => widget.onLastCellFocused(widget.rowIndex) : null,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragUpdate: (d) {
+                if (!_hScroll.hasClients) return;
+                final next = (_hScroll.offset - d.delta.dx).clamp(0.0, _hScroll.position.maxScrollExtent);
+                _hScroll.jumpTo(next);
+              },
+              child: SingleChildScrollView(
+                controller: _hScroll,
+                scrollDirection: Axis.horizontal,
+                physics: const ClampingScrollPhysics(),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  decoration: BoxDecoration(
+                    border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+                    color: widget.rowNumber.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      ...List.generate(qtyCols, (c) {
+                        final isLast = c == qtyCols - 1;
+                        final qty = c < row.quantities.length ? row.quantities[c] : 0.0;
+                        return Padding(
+                          padding: EdgeInsets.only(right: c < qtyCols - 1 ? _colGap : _colGap),
+                          child: SizedBox(
+                            width: _colQtyWidth,
+                            child: _QuantityField(
+                              value: qty,
+                              onChanged: (v) => widget.onSetQuantity(widget.rowIndex, c, v),
+                              onFocusLast: isLast ? () => widget.onLastCellFocused(widget.rowIndex) : null,
+                            ),
                           ),
-                        ),
-                      );
-                    }),
-                    SizedBox(width: _colDeleteWidth, child: IconButton(icon: const Icon(Icons.delete_outline, size: 20), onPressed: () => widget.onRemove(widget.rowIndex), padding: EdgeInsets.zero, constraints: const BoxConstraints())),
-                  ],
+                        );
+                      }),
+                      SizedBox(width: _colDeleteWidth, child: IconButton(icon: const Icon(Icons.delete_outline, size: 20), onPressed: () => widget.onRemove(widget.rowIndex), padding: EdgeInsets.zero, constraints: const BoxConstraints())),
+                    ],
+                  ),
                 ),
               ),
             ),
