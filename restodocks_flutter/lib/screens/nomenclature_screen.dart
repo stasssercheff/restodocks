@@ -1308,7 +1308,6 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final iikoStore = context.watch<IikoProductStore>();
     final estId2 = account.dataEstablishmentId ?? '';
 
-    final isPhone = MediaQuery.of(context).size.width < 600;
     final canCreateProduct = (_selectedTab == _NomTab.nomenclature || _selectedTab == _NomTab.newProducts);
 
     return Scaffold(
@@ -1344,18 +1343,55 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               onPressed: () => _showDuplicates(),
               tooltip: loc.t('tooltip_show_duplicates'),
             ),
-            IconButton(
-              icon: const Icon(Icons.upload_file),
-              tooltip: loc.t('tooltip_upload_products'),
-              onPressed: () {
-                try {
-                  context.push('/products/upload');
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(loc.t('error_navigation').replaceFirst('%s', '$e'))),
-                  );
+            PopupMenuButton<String>(
+              tooltip: loc.t('add') ?? 'Добавить',
+              icon: const Icon(Icons.add),
+              onSelected: (v) {
+                if (v == 'create') {
+                  _showCreateProductDialog(loc);
+                  return;
+                }
+                if (v == 'upload_text') {
+                  context.push('/products/upload?method=text');
+                  return;
+                }
+                if (v == 'upload_file') {
+                  context.push('/products/upload?method=file');
+                  return;
                 }
               },
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'create',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.add_box_outlined, size: 20),
+                      const SizedBox(width: 10),
+                      Text(loc.t('create_product') ?? 'Создать новый'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'upload_file',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.upload_file, size: 20),
+                      const SizedBox(width: 10),
+                      Text(loc.t('upload_products') ?? 'Загрузить из файла'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'upload_text',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.text_snippet_outlined, size: 20),
+                      const SizedBox(width: 10),
+                      Text(loc.t('upload_from_text') ?? 'Загрузить из текста'),
+                    ],
+                  ),
+                ),
+              ],
             ),
             IconButton(
               icon: const Icon(Icons.attach_money),
@@ -1373,13 +1409,6 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           ),
         ],
       ),
-      floatingActionButton: isPhone && canCreateProduct
-          ? FloatingActionButton.extended(
-              onPressed: () => _showCreateProductDialog(loc),
-              icon: const Icon(Icons.add),
-              label: Text(loc.t('create_product') ?? 'Создать продукт'),
-            )
-          : null,
       body: PrimaryScrollController(
         controller: _scrollController,
         child: Column(

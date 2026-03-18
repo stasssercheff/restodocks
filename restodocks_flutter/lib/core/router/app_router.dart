@@ -524,8 +524,15 @@ class AppRouter {
             pageBuilder: (context, state) {
               final addToNom = state.queryParameters['addToNomenclature'];
               final defaultAddToNomenclature = addToNom != 'false';
+              final method = state.queryParameters['method'];
               try {
-                return _slideTransitionPage(state, ProductUploadScreen(defaultAddToNomenclature: defaultAddToNomenclature));
+                return _slideTransitionPage(
+                  state,
+                  ProductUploadScreen(
+                    defaultAddToNomenclature: defaultAddToNomenclature,
+                    initialMethod: method,
+                  ),
+                );
               } catch (e) {
                 devLog('=== Error building ProductUploadScreen: $e ===');
                 return _slideTransitionPage(state, Scaffold(

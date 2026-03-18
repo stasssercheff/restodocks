@@ -44,10 +44,17 @@ void _addDebugLog(String message) {
 
 /// Экран для загрузки продуктов в номенклатуру
 class ProductUploadScreen extends StatefulWidget {
-  const ProductUploadScreen({super.key, this.defaultAddToNomenclature = true});
+  const ProductUploadScreen({
+    super.key,
+    this.defaultAddToNomenclature = true,
+    this.initialMethod,
+  });
 
   /// По умолчанию true — добавлять в номенклатуру. false — только пополнение базы.
   final bool defaultAddToNomenclature;
+  /// Опционально: авто-запуск метода при открытии (beta UX).
+  /// 'text' | 'file'
+  final String? initialMethod;
 
   @override
   State<ProductUploadScreen> createState() => _ProductUploadScreenState();
@@ -93,6 +100,19 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       if (oldPrice != null && newPrice != null && (oldPrice - newPrice).abs() < 0.01) return false;
     }
     return true;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final m = (widget.initialMethod ?? '').trim().toLowerCase();
+      if (m == 'text') {
+        await _showTextUploadDialog();
+      } else if (m == 'file') {
+        await _uploadFromFileUnified();
+      }
+    });
   }
 
   @override
