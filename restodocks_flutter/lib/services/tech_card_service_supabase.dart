@@ -571,6 +571,13 @@ class TechCardServiceSupabase {
       var gross = line.grossGrams ?? 0.0;
       var net = line.netGrams ?? line.grossGrams ?? gross;
       final unit = line.unit?.trim().isNotEmpty == true ? line.unit! : 'g';
+      final isPcs = unit == 'шт' || unit == 'pcs';
+      const gppDefault = 50.0;
+      // Для шт/pcs парсер отдаёт количество штук (1, 2…). Конвертируем только когда значение похоже на штуки (малое целое 1–50), иначе это граммы с ошибочной единицей.
+      if (isPcs && gross > 0 && gross <= 50 && gross == gross.round()) {
+        gross = gross * gppDefault;
+        if (net == (line.grossGrams ?? 0)) net = gross;
+      }
       var wastePct = line.primaryWastePct;
       // Авторасчёт % отхода: нетто = брутто × (1 − отход/100) → отход = (1 − нетто/брутто)×100
       if (gross > 0 && net > 0 && net < gross && (wastePct == null || wastePct == 0)) {
@@ -615,6 +622,7 @@ class TechCardServiceSupabase {
         netWeight: net > 0 ? net : (gross > 0 ? gross : 100),
         outputWeight: output ?? net,
         unit: unit,
+        gramsPerPiece: isPcs ? gppDefault : null,
         primaryWastePct: wastePct,
         cookingLossPctOverride: cookingLoss,
         isNetWeightManual: line.netGrams != null,

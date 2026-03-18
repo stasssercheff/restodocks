@@ -1037,28 +1037,35 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             } else if (widget.initialSections != null && widget.initialSections!.isEmpty) {
               _selectedSections = [];
             }
-            // Вес порции из парсируемой карточки (ПФ и блюдо): берём выход из файла, без ограничений
+            // Вес порции: для ПФ по умолчанию 100 (редактируемый), для блюда = вес выхода итого из файла (редактируемый)
             if (ai.yieldGrams != null && ai.yieldGrams! > 0) {
-              _portionWeight = ai.yieldGrams!.toDouble();
+              _portionWeight = _isSemiFinished ? 100 : ai.yieldGrams!.toDouble();
             }
             _ingredients.clear();
             for (final line in ai.ingredients) {
               if (line.productName.trim().isEmpty) continue;
-              final gross = line.grossGrams ?? 0.0;
-              final net = line.netGrams ?? line.grossGrams ?? gross;
+              var gross = line.grossGrams ?? 0.0;
+              var net = line.netGrams ?? line.grossGrams ?? gross;
               final unit = line.unit?.trim().isNotEmpty == true ? line.unit! : 'g';
               final wastePct = (line.primaryWastePct ?? 0).clamp(0.0, 99.9);
               final outG = line.outputGrams != null && line.outputGrams! > 0 ? line.outputGrams! : 0.0;
-              final isEggsPcs = (unit == 'шт' || unit == 'pcs') && line.productName.trim().toLowerCase().contains('яйц');
+              final isPcs = unit == 'шт' || unit == 'pcs';
+              final gpp = isPcs ? 50.0 : null;
+              // Для шт/pcs парсер отдаёт количество штук (1, 2…). Конвертируем только когда значение похоже на штуки (малое целое 1–50), иначе это граммы с ошибочной единицей.
+              if (isPcs && gross > 0 && gross <= 50 && gross == gross.round()) {
+                gross = gross * (gpp ?? 50);
+                if (net == (line.grossGrams ?? 0)) net = gross;
+              }
+              final outW = outG > 0 ? outG : (net > 0 ? net : (gross > 0 ? gross : 100));
               _ingredients.add(TTIngredient(
                 id: DateTime.now().millisecondsSinceEpoch.toString() + _ingredients.length.toString(),
                 productId: null,
                 productName: line.productName.trim(),
                 grossWeight: gross > 0 ? gross : 100,
                 netWeight: net > 0 ? net : (gross > 0 ? gross : 100),
-                outputWeight: outG,
+                outputWeight: outW,
                 unit: unit,
-                gramsPerPiece: isEggsPcs ? 50.0 : null,
+                gramsPerPiece: gpp,
                 primaryWastePct: wastePct,
                 cookingLossPctOverride: line.cookingLossPct != null ? line.cookingLossPct!.clamp(0.0, 99.9) : null,
                 isNetWeightManual: line.netGrams != null,
@@ -1829,7 +1836,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     }
     if (ai.isSemiFinished != null) _isSemiFinished = ai.isSemiFinished!;
     if (ai.yieldGrams != null && ai.yieldGrams! > 0) {
-      _portionWeight = ai.yieldGrams!.toDouble();
+      _portionWeight = _isSemiFinished ? 100 : ai.yieldGrams!.toDouble();
     }
     final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
           final addPlaceholders = canEdit && !widget.forceViewMode;
@@ -1838,19 +1845,27 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       _ingredients.removeWhere((e) => e.isPlaceholder);
       for (final line in ai.ingredients) {
         if (line.productName.trim().isEmpty) continue;
-        final gross = line.grossGrams ?? 0.0;
-        final net = line.netGrams ?? line.grossGrams ?? gross;
+        var gross = line.grossGrams ?? 0.0;
+        var net = line.netGrams ?? line.grossGrams ?? gross;
         final outG = line.outputGrams != null && line.outputGrams! > 0 ? line.outputGrams! : 0.0;
         final unit = line.unit?.trim().isNotEmpty == true ? line.unit! : 'g';
         final wastePct = (line.primaryWastePct ?? 0).clamp(0.0, 99.9);
+        final isPcs = unit == 'шт' || unit == 'pcs';
+        final gpp = isPcs ? 50.0 : null;
+        if (isPcs && gross > 0 && gross <= 50 && gross == gross.round()) {
+          gross = gross * (gpp ?? 50);
+          if (net == (line.grossGrams ?? 0)) net = gross;
+        }
+        final outW = outG > 0 ? outG : (net > 0 ? net : (gross > 0 ? gross : 100));
         _ingredients.add(TTIngredient(
           id: DateTime.now().millisecondsSinceEpoch.toString() + _ingredients.length.toString(),
           productId: null,
           productName: line.productName.trim(),
           grossWeight: gross > 0 ? gross : 100,
           netWeight: net > 0 ? net : (gross > 0 ? gross : 100),
-          outputWeight: outG,
+          outputWeight: outW,
           unit: unit,
+          gramsPerPiece: gpp,
           primaryWastePct: wastePct,
           cookingLossPctOverride: line.cookingLossPct != null ? line.cookingLossPct!.clamp(0.0, 99.9) : null,
           isNetWeightManual: line.netGrams != null,
