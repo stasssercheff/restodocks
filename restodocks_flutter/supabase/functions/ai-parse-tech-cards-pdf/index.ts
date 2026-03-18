@@ -147,11 +147,12 @@ Deno.serve(async (req: Request) => {
     }
 
     let text: string;
+    let pageTexts: string[] = [];
     try {
       const pdf = await getDocumentProxy(bytes);
       // mergePages: false — иначе unpdf делает .replace(/\s+/g, ' ') и убивает переносы строк, нужные для таблиц
       const result = await extractText(pdf, { mergePages: false });
-      const pageTexts = (result?.text as string[] | undefined) ?? [];
+      pageTexts = (result?.text as string[] | undefined) ?? [];
       text = pageTexts.join("\n").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
@@ -171,7 +172,12 @@ Deno.serve(async (req: Request) => {
     }
 
     // 0. КК (калькуляционная карта ОП-1) — формат с ценами
-    const kkCards = parseKkOp1(text);
+    // Для unpdf у нас уже есть страницы: KК почти всегда "1 блюдо = 1 страница".
+    // Это надёжнее, чем пытаться резать один склеенный text по маркерам (которых может не быть в unpdf-выводе).
+    const kkCardsByPage = (pageTexts.length > 0)
+      ? pageTexts.flatMap((p) => parseKkOp1((p ?? "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim()))
+      : [];
+    const kkCards = kkCardsByPage.length > 0 ? kkCardsByPage : parseKkOp1(text);
     const looksLikeManyKkOp1 = (t: string): boolean => {
       const m1 = (t.match(/(?:^|\n)\s*Наименование\s+блюда\s*(?:\n|$)/gim) ?? []).length;
       const m2 = (t.match(/выход\s+одного\s+блюда/gi) ?? []).length;
