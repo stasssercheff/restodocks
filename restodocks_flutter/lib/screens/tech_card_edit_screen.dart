@@ -752,7 +752,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       _technologyController.text = data['technology'] as String? ?? '';
       _selectedCategory = data['category'] as String? ?? 'misc';
       _selectedSections = List<String>.from(data['sections'] as List<dynamic>? ?? []);
-      _isSemiFinished = data['isSemiFinished'] as bool? ?? true;
+      // При открытии из импорта тип ПФ/Блюдо управляется экраном проверки импорта (extra initialIsSemiFinished).
+      // Черновик не должен "откатывать" тип назад, иначе кнопка «Все ПФ» не фиксируется.
+      _isSemiFinished = widget.initialFromAi != null
+          ? (widget.initialIsSemiFinished ?? widget.initialFromAi?.isSemiFinished ?? true)
+          : (data['isSemiFinished'] as bool? ?? true);
       final fromDraft = (data['portionWeight'] as num?)?.toDouble();
       // Сумма выходов из восстанавливаемых ингредиентов (для расчёта веса порции при импорте)
       var sumFromData = 0.0;
@@ -3041,8 +3045,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   final p = store.findProductForIngredient(ing.productId, ing.productName);
                   if (p == null) continue;
                   final lacksKbju = (p.calories == null || p.calories == 0) && p.protein == null && p.fat == null && p.carbs == null;
-                  final lacksAllergens = p.containsGluten == null || p.containsLactose == null;
-                  if (lacksKbju || lacksAllergens) {
+                  // Не пугаем баннером из-за аллергенов: многие базы КБЖУ не содержат глютен/лактозу.
+                  // Баннер здесь — именно про КБЖУ, чтобы подсветить некорректный расчёт.
+                  if (lacksKbju) {
                     missingNames.add(p.getLocalizedName(loc.currentLanguageCode));
                   }
                 }
