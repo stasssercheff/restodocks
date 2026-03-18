@@ -361,6 +361,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   // Список элементов номенклатуры (продукты + ТТК ПФ)
   List<NomenclatureItem> _nomenclatureItems = [];
   bool _isLoading = true;
+  Object? _loadError;
   bool _hasRunAutoTranslationThisSession = false;
 
   // Активная вкладка
@@ -383,6 +384,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     final techCardService = context.read<TechCardServiceSupabase>();
 
+    if (mounted) setState(() => _loadError = null);
+
     try {
       await store.loadProducts(force: true);
       if (est.isBranch) {
@@ -398,6 +401,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     } catch (e) {
       devLog('❌ NomenclatureScreen: _ensureLoaded error: $e');
       if (mounted) {
+        setState(() => _loadError = e);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Ошибка загрузки номенклатуры: $e'), duration: const Duration(seconds: 6)),
         );
@@ -1420,6 +1424,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                               loc: loc,
                               sort: _nomSort,
                               filterType: _nomFilter,
+                              loadError: _loadError,
+                              onRetry: () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})),
                               onSortChanged: (s) => setState(() => _nomSort = s),
                               onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
                               onRefresh: () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})),
@@ -1487,6 +1493,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                               loc: loc,
                               sort: _nomSort,
                               filterType: _nomFilter,
+                              loadError: _loadError,
+                              onRetry: () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})),
                               onSortChanged: (s) => setState(() => _nomSort = s),
                               onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
                               onRefresh: () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})),
@@ -2167,6 +2175,8 @@ class _NomenclatureTab extends StatefulWidget {
     required this.loc,
     required this.sort,
     required this.filterType,
+    this.loadError,
+    this.onRetry,
     required this.onSortChanged,
     required this.onFilterTypeChanged,
     required this.onRefresh,
@@ -2189,6 +2199,8 @@ class _NomenclatureTab extends StatefulWidget {
   final LocalizationService loc;
   final _CatalogSort sort;
   final _NomenclatureFilter filterType;
+  final Object? loadError;
+  final VoidCallback? onRetry;
   final void Function(_CatalogSort) onSortChanged;
   final void Function(_NomenclatureFilter) onFilterTypeChanged;
   final VoidCallback onRefresh;
@@ -2227,6 +2239,8 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
     if (widget.items.isEmpty) {
       return _NomenclatureEmpty(
         loc: widget.loc,
+        loadError: widget.loadError,
+        onRetry: widget.onRetry,
         onSwitchToCatalog: widget.onSwitchToCatalog,
       );
     }
@@ -2338,31 +2352,61 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
 class _NomenclatureEmpty extends StatelessWidget {
   const _NomenclatureEmpty({
     required this.loc,
+    this.loadError,
+    this.onRetry,
     required this.onSwitchToCatalog,
   });
 
   final LocalizationService loc;
+  final Object? loadError;
+  final VoidCallback? onRetry;
   final VoidCallback onSwitchToCatalog;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Center(
       child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              loadError != null ? Icons.cloud_off_outlined : Icons.inventory_2_outlined,
+              size: 64,
+              color: loadError != null ? theme.colorScheme.error : Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            if (loadError != null) ...[
+              Text(
+                loc.t('nomenclature_load_error') ?? 'Ошибка загрузки номенклатуры',
+                style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.error),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                loadError.toString(),
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
               const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: Text(loc.t('retry') ?? 'Повторить'),
+              ),
+            ] else ...[
               Text(
                 loc.t('nomenclature_empty'),
-                style: Theme.of(context).textTheme.titleMedium,
+                style: theme.textTheme.titleMedium,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 loc.t('add_from_catalog'),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -2372,9 +2416,10 @@ class _NomenclatureEmpty extends StatelessWidget {
                 label: Text(loc.t('add_from_catalog')),
               ),
             ],
-          ),
+          ],
         ),
-      );
+      ),
+    );
   }
 }
 

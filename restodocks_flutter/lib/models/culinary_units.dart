@@ -67,30 +67,24 @@ class CulinaryUnits {
     'piece_slice': 20,
   };
 
-  /// Все единицы для выбора (id, отображаемое название)
+  /// Все единицы для выбора (id, отображаемое название).
+  /// Убраны из выбора: ч.л, ст.л, зубчик, коробка, долька, пучок, стакан.
   static const List<({String id, String ru, String en})> all = [
     (id: 'g', ru: 'г', en: 'g'),
     (id: 'kg', ru: 'кг', en: 'kg'),
     (id: 'mg', ru: 'мг', en: 'mg'),
-    (id: 'шт', ru: 'штуки', en: 'pcs'),
-    (id: 'pcs', ru: 'штуки', en: 'pcs'),
+    (id: 'шт', ru: 'штук', en: 'pcs'),
+    (id: 'pcs', ru: 'штук', en: 'pcs'),
     (id: 'lb', ru: 'фунт', en: 'lb'),
     (id: 'oz', ru: 'унция', en: 'oz'),
     (id: 'ml', ru: 'мл', en: 'ml'),
     (id: 'l', ru: 'л', en: 'L'),
     (id: 'gal', ru: 'галлон', en: 'gal'),
     (id: 'fl_oz', ru: 'ж.унция', en: 'fl oz'),
-    (id: 'cup', ru: 'стакан', en: 'cup'),
-    (id: 'bunch', ru: 'пучок', en: 'bunch'),
-    (id: 'slice', ru: 'долька', en: 'slice'),
     (id: 'pack', ru: 'упак.', en: 'pack'),
     (id: 'can', ru: 'банка', en: 'can'),
-    (id: 'box', ru: 'коробка', en: 'box'),
     (id: 'bottle', ru: 'бутылка', en: 'bottle'),
     (id: 'pkg', ru: 'упак.', en: 'pkg'),
-    (id: 'clove', ru: 'зубчик', en: 'clove'),
-    (id: 'tbsp', ru: 'ст.л', en: 'tbsp'),
-    (id: 'tsp', ru: 'ч.л', en: 'tsp'),
   ];
 
   /// Конвертировать значение в граммы

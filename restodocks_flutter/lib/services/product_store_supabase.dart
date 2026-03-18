@@ -38,49 +38,58 @@ class ProductStoreSupabase {
 
     _isLoading = true;
 
+    const maxAttempts = 3;
+    const retryDelay = Duration(seconds: 1);
+
     try {
-      devLog('DEBUG ProductStore: Loading ALL products from database (paginated)...');
-      // PostgREST ограничивает ответ 1000 строками по умолчанию.
-      // Грузим постранично пока не получим все записи.
-      const pageSize = 1000;
-      final allData = <Map<String, dynamic>>[];
-      var offset = 0;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        devLog('DEBUG ProductStore: Loading ALL products from database (paginated)... attempt $attempt/$maxAttempts');
+        // PostgREST ограничивает ответ 1000 строками по умолчанию.
+        // Грузим постранично пока не получим все записи.
+        const pageSize = 1000;
+        final allData = <Map<String, dynamic>>[];
+        var offset = 0;
 
-      while (true) {
-        final page = await _supabase.client
-            .from('products')
-            .select()
-            .order('name')
-            .range(offset, offset + pageSize - 1);
+        while (true) {
+          final page = await _supabase.client
+              .from('products')
+              .select()
+              .order('name')
+              .range(offset, offset + pageSize - 1);
 
-        final pageList = page as List;
-        for (final item in pageList) {
-          allData.add(item as Map<String, dynamic>);
+          final pageList = page as List;
+          for (final item in pageList) {
+            allData.add(item as Map<String, dynamic>);
+          }
+
+          devLog('DEBUG ProductStore: Page offset=$offset, got ${pageList.length} rows, total so far: ${allData.length}');
+
+          if (pageList.length < pageSize) break; // последняя страница
+          offset += pageSize;
+          if (offset > 50000) break; // защита от бесконечного цикла
         }
 
-        devLog('DEBUG ProductStore: Page offset=$offset, got ${pageList.length} rows, total so far: ${allData.length}');
+        devLog('DEBUG ProductStore: Loaded ${allData.length} products total');
+        _allProducts = allData.map((json) => Product.fromJson(json)).toList();
+        devLog('DEBUG ProductStore: Parsed ${_allProducts.length} products successfully');
 
-        if (pageList.length < pageSize) break; // последняя страница
-        offset += pageSize;
-        if (offset > 50000) break; // защита от бесконечного цикла
+        _categories = _allProducts
+            .map((product) => product.category)
+            .toSet()
+            .toList()
+          ..sort();
+
+        // Фоновая подгрузка КБЖУ для продуктов без калорий (в течение суток)
+        NutritionBackfillService().startBackgroundBackfill(this);
+
+        return;
+      } catch (e) {
+        devLog('❌ ProductStore: Error loading products (attempt $attempt/$maxAttempts): $e');
+        if (attempt == maxAttempts) rethrow;
+        await Future.delayed(retryDelay);
       }
-
-      devLog('DEBUG ProductStore: Loaded ${allData.length} products total');
-      _allProducts = allData.map((json) => Product.fromJson(json)).toList();
-      devLog('DEBUG ProductStore: Parsed ${_allProducts.length} products successfully');
-
-      _categories = _allProducts
-          .map((product) => product.category)
-          .toSet()
-          .toList()
-        ..sort();
-
-      // Фоновая подгрузка КБЖУ для продуктов без калорий (в течение суток)
-      NutritionBackfillService().startBackgroundBackfill(this);
-
-    } catch (e) {
-      devLog('❌ ProductStore: Error loading products: $e');
-      rethrow;
+    }
     } finally {
       _isLoading = false;
     }
