@@ -109,17 +109,18 @@ function isColumnFor10Portions(rows: string[][], rowIndex: number, colIndex: num
 
 function parseNum(s: string): number | null {
   if (!s || !s.trim()) return null;
-  // "Выход 420/70" (суп/гренка отдельно) и подобные значения: берём ПЕРВОЕ число как выход блюда.
+  // "Выход 420/70" (суп/гренка отдельно) и подобные значения: берём СУММУ частей как общий выход.
   // Иначе очистка превратит "420/70" в "42070" и сломает вес порции.
   if (s.includes("/")) {
+    let sum = 0;
     for (const part of s.split("/")) {
       const p = part.trim();
       if (!p) continue;
       const cleanedPart = p.replace(/,/g, ".").replace(/[^\d.\-]/g, "");
       const nPart = parseFloat(cleanedPart);
-      if (!Number.isNaN(nPart) && Number.isFinite(nPart) && nPart > 0) return nPart;
+      if (!Number.isNaN(nPart) && Number.isFinite(nPart) && nPart > 0) sum += nPart;
     }
-    return null;
+    return sum > 0 ? sum : null;
   }
   const cleaned = s.replace(/,/g, ".").replace(/[^\d.\-]/g, "");
   const n = parseFloat(cleaned);
