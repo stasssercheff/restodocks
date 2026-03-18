@@ -108,6 +108,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   /// Версия массового выбора типа (Все ПФ / Все блюда). Нужна, чтобы массовая команда могла перебить ручные правки в карточке.
   int _typeRevision = 0;
 
+  /// Массовый режим типа на экране проверки импорта. Если null — пользователь вручную правит карточки.
+  bool? _bulkIsSemiFinished; // true=все ПФ, false=все блюда, null=нет массового режима
+
   /// Индексы в _items, проходящие фильтр поиска по названию.
   List<int> get _filteredIndices {
     if (_searchQuery.isEmpty) return List.generate(_items.length, (i) => i);
@@ -870,9 +873,35 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      TextButton(
-                        onPressed: _saving ? null : () => setState(() {
+                      SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: Checkbox(
+                          value: _bulkIsSemiFinished == true,
+                          onChanged: _saving ? null : (v) => setState(() {
+                            if (v == true) {
+                              _typeRevision++;
+                              _bulkIsSemiFinished = true;
+                              _items = _items.map((item) => _ReviewItem(
+                                result: item.result.copyWith(isSemiFinished: true),
+                                originalDishName: item.originalDishName,
+                                category: item.category,
+                                sections: item.sections,
+                                isSemiFinished: true,
+                                alreadySaved: item.alreadySaved,
+                              )).toList();
+                            } else {
+                              _bulkIsSemiFinished = null; // сброс — дальше ручные правки
+                            }
+                          }),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: _saving ? null : () => setState(() {
                           _typeRevision++;
+                          _bulkIsSemiFinished = true;
                           _items = _items.map((item) => _ReviewItem(
                             result: item.result.copyWith(isSemiFinished: true),
                             originalDishName: item.originalDishName,
@@ -882,12 +911,42 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                             alreadySaved: item.alreadySaved,
                           )).toList();
                         }),
-                        child: Text(loc.t('ttk_import_all_pf') ?? 'Все ПФ'),
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Text(loc.t('ttk_import_all_pf') ?? 'Все ПФ'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: Checkbox(
+                          value: _bulkIsSemiFinished == false,
+                          onChanged: _saving ? null : (v) => setState(() {
+                            if (v == true) {
+                              _typeRevision++;
+                              _bulkIsSemiFinished = false;
+                              _items = _items.map((item) => _ReviewItem(
+                                result: item.result.copyWith(isSemiFinished: false),
+                                originalDishName: item.originalDishName,
+                                category: item.category,
+                                sections: item.sections,
+                                isSemiFinished: false,
+                                alreadySaved: item.alreadySaved,
+                              )).toList();
+                            } else {
+                              _bulkIsSemiFinished = null;
+                            }
+                          }),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                       ),
                       const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: _saving ? null : () => setState(() {
+                      GestureDetector(
+                        onTap: _saving ? null : () => setState(() {
                           _typeRevision++;
+                          _bulkIsSemiFinished = false;
                           _items = _items.map((item) => _ReviewItem(
                             result: item.result.copyWith(isSemiFinished: false),
                             originalDishName: item.originalDishName,
@@ -897,7 +956,11 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                             alreadySaved: item.alreadySaved,
                           )).toList();
                         }),
-                        child: Text(loc.t('ttk_import_all_dishes') ?? 'Все блюда'),
+                        behavior: HitTestBehavior.opaque,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Text(loc.t('ttk_import_all_dishes') ?? 'Все блюда'),
+                        ),
                       ),
                     ],
                   ),
@@ -1034,12 +1097,14 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                                           final r = e.value;
                                           final preservedType = _items[idx].isSemiFinished;
                                           if (idx == realIndex) {
+                                            final newType = result!.isSemiFinished ?? preservedType;
+                                            if (_bulkIsSemiFinished != null && newType != _bulkIsSemiFinished) _bulkIsSemiFinished = null;
                                             return _ReviewItem(
-                                              result: result!,
+                                              result: result!.copyWith(isSemiFinished: newType),
                                               originalDishName: _items[realIndex].originalDishName,
                                               category: _items[realIndex].category,
                                               sections: _items[realIndex].sections,
-                                              isSemiFinished: preservedType,
+                                              isSemiFinished: newType,
                                               alreadySaved: savedToSystem,
                                             );
                                           }
@@ -1059,12 +1124,14 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                                   if (result != null) {
                                     final r = result;
                                     setState(() {
+                                      final newType = r.isSemiFinished ?? _items[realIndex].isSemiFinished;
+                                      if (_bulkIsSemiFinished != null && newType != _bulkIsSemiFinished) _bulkIsSemiFinished = null;
                                       _items[realIndex] = _ReviewItem(
-                                        result: r,
+                                        result: r.copyWith(isSemiFinished: newType),
                                         originalDishName: _items[realIndex].originalDishName,
                                         category: _items[realIndex].category,
                                         sections: _items[realIndex].sections,
-                                        isSemiFinished: _items[realIndex].isSemiFinished,
+                                        isSemiFinished: newType,
                                         alreadySaved: savedToSystem,
                                       );
                                     });
@@ -1140,6 +1207,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                               ],
                               onChanged: (v) => setState(() {
                                 final isPf = v ?? item.isSemiFinished;
+                                if (_bulkIsSemiFinished != null && isPf != _bulkIsSemiFinished) _bulkIsSemiFinished = null;
                                 _items[realIndex] = _ReviewItem(
                                   result: item.result.copyWith(isSemiFinished: isPf),
                                   originalDishName: item.originalDishName,
