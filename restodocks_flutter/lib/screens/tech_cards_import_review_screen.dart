@@ -105,6 +105,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   /// Установить перед названием «ПФ» для всех ПФ при сохранении (если ещё нет).
   bool _ensurePfPrefix = true;
 
+  /// Версия массового выбора типа (Все ПФ / Все блюда). Нужна, чтобы массовая команда могла перебить ручные правки в карточке.
+  int _typeRevision = 0;
+
   /// Индексы в _items, проходящие фильтр поиска по названию.
   List<int> get _filteredIndices {
     if (_searchQuery.isEmpty) return List.generate(_items.length, (i) => i);
@@ -547,6 +550,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     try {
       final svc = context.read<TechCardServiceSupabase>();
       final productStore = context.read<ProductStoreSupabase>();
+      // ВАЖНО: для маппинга ингредиентов по названию нужен кэш products.
+      // loadNomenclature загружает только IDs/цены, но не сами продукты.
+      await productStore.loadProducts();
       await productStore.loadNomenclature(est.dataEstablishmentId);
       final products = productStore.getNomenclatureProducts(est.dataEstablishmentId);
       final allTc = await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
@@ -866,6 +872,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                     children: [
                       TextButton(
                         onPressed: _saving ? null : () => setState(() {
+                          _typeRevision++;
                           _items = _items.map((item) => _ReviewItem(
                             result: item.result.copyWith(isSemiFinished: true),
                             originalDishName: item.originalDishName,
@@ -880,6 +887,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                       const SizedBox(width: 8),
                       TextButton(
                         onPressed: _saving ? null : () => setState(() {
+                          _typeRevision++;
                           _items = _items.map((item) => _ReviewItem(
                             result: item.result.copyWith(isSemiFinished: false),
                             originalDishName: item.originalDishName,
@@ -973,6 +981,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                                     'category': _items[realIndex].category,
                                     'sections': _normalizeSections(_items[realIndex].sections),
                                     'isSemiFinished': _items[realIndex].isSemiFinished,
+                                    'typeRevision': _typeRevision,
                                     if (sig != null && sig.isNotEmpty) 'headerSignature': sig,
                                     if (rows != null && rows.isNotEmpty) 'sourceRows': rows,
                                   },

@@ -566,6 +566,7 @@ class TechCardEditScreen extends StatefulWidget {
     this.initialCategory,
     this.initialSections,
     this.initialIsSemiFinished,
+    this.initialTypeRevision,
     this.initialHeaderSignature,
     this.initialSourceRows,
   });
@@ -588,6 +589,8 @@ class TechCardEditScreen extends StatefulWidget {
   final String? initialCategory;
   final List<String>? initialSections;
   final bool? initialIsSemiFinished;
+  /// Версия массового выбора типа на экране проверки импорта. При изменении должна перебивать ручной выбор в черновике.
+  final int? initialTypeRevision;
 
   @override
   State<TechCardEditScreen> createState() => _TechCardEditScreenState();
@@ -721,6 +724,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       'sections': _selectedSections,
       'isSemiFinished': _isSemiFinished,
       'typeManuallyChanged': _typeManuallyChanged,
+      'typeRevision': widget.initialTypeRevision ?? 0,
       'portionWeight': _portionWeight,
       'descriptionForHall': _descriptionForHallController.text,
       'compositionForHall': _compositionForHallController.text,
@@ -758,7 +762,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       // При открытии из импорта тип ПФ/Блюдо управляется экраном проверки импорта (extra initialIsSemiFinished).
       // Но если пользователь вручную переключал тип внутри редактора — берём тип из черновика.
       final desiredFromImport = widget.initialIsSemiFinished ?? widget.initialFromAi?.isSemiFinished ?? true;
-      final manual = data['typeManuallyChanged'] == true;
+      final draftRev = (data['typeRevision'] is num) ? (data['typeRevision'] as num).toInt() : 0;
+      final currentRev = widget.initialTypeRevision ?? 0;
+      final revisionChanged = widget.initialFromAi != null && currentRev != draftRev;
+      final manual = !revisionChanged && data['typeManuallyChanged'] == true;
       _typeManuallyChanged = manual;
       _isSemiFinished = widget.initialFromAi != null
           ? (manual ? (data['isSemiFinished'] as bool? ?? desiredFromImport) : desiredFromImport)
