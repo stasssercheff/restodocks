@@ -762,9 +762,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         // ТТК ПФ: по умолчанию 100; из импорта или черновика (защита от ошибочно больших значений)
         _portionWeight = fromAi ?? (fromDraft != null && fromDraft > 0 && fromDraft <= 10000 ? fromDraft : null) ?? 100;
       } else {
-        // ТТК блюдо: по умолчанию = вес выхода итого; из импорта или черновика (черновик не берём если явно ошибочный, напр. 35000 при сумме 700)
+        // ТТК блюдо: по умолчанию = вес выхода итого; из импорта или черновика (черновик не берём если явно ошибочный, напр. 8690 при выходе ~492)
         double? draft = fromDraft != null && fromDraft > 0 ? fromDraft : null;
-        if (draft != null && sum > 0 && draft > 20 * sum) draft = null;
+        if (draft != null && sum > 0) {
+          final ratio = draft / sum;
+          if (ratio > 5 || ratio < 0.2) draft = null;
+        }
         _portionWeight = fromAi ?? draft ?? (sum > 0 ? sum : 100);
       }
       _descriptionForHallController.text = data['descriptionForHall'] as String? ?? '';
@@ -1113,7 +1116,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               // ТТК блюдо: по умолчанию = вес выхода итого (сумма); из БД если реалистично, иначе сброс на сумму (защита от ошибочных 35000 и т.п.)
               if (tc.portionWeight <= 0 && sumOutput > 0) {
                 _portionWeight = sumOutput;
-              } else if (sumOutput > 0 && tc.portionWeight > 20 * sumOutput) {
+            } else if (sumOutput > 0 && tc.portionWeight > 5 * sumOutput) {
                 _portionWeight = sumOutput;
               } else {
                 _portionWeight = tc.portionWeight;
