@@ -492,9 +492,9 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       if (outputColIsKg && outputG != null && outputG > 0 && outputG < 100) outputG = outputG * 1000;
       // Shama.Book: в таблице часто есть блок "на 1 порцию" и "на 10 порций".
       // Иногда колонка "Выход" попадает из блока "на 10 порций" (в 10 раз больше). Нормализуем к "на 1 порцию".
-      final baseOut = net ?? gross;
+      const baseOut = net ?? gross;
       if (outputG != null && baseOut != null && baseOut > 0 && outputG > 0) {
-        final ratio = outputG / baseOut;
+        const ratio = outputG / baseOut;
         if (ratio >= 5 && ratio <= 25) outputG = baseOut;
       }
       let waste = parseNum(wasteVal);
@@ -818,9 +818,9 @@ export function parseTtkByStoredTemplate(
       const outputColIsKg = outputCol >= 0 && outputCol < headerRow.length && headerRow[outputCol]?.includes("кг");
       if (outputColIsKg && outputG != null && outputG > 0 && outputG < 100) outputG = outputG * 1000;
       // Shama.Book: блок "на 10 порций" может попасть в outputCol. Если выход подозрительно в ~10 раз больше нормы — приводим к "на 1 порцию".
-      final baseOut = netNum ?? grossNum;
+      const baseOut = netNum ?? grossNum;
       if (outputG != null && baseOut != null && baseOut > 0 && outputG > 0) {
-        final ratio = outputG / baseOut;
+        const ratio = outputG / baseOut;
         if (ratio >= 5 && ratio <= 25) outputG = baseOut;
       }
       currentIngredients.push({
