@@ -668,6 +668,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   String _selectedCategory = 'misc';
   List<String> _selectedSections = []; // [] = Скрыто, ['all'] = Все цеха
   bool _isSemiFinished = true; // ПФ или блюдо (порция — в карточках блюд, отдельно)
+  // Если пользователь вручную переключил тип ПФ/Блюдо в редакторе, его выбор должен иметь приоритет над экраном импорта.
+  bool _typeManuallyChanged = false;
   final _technologyController = TextEditingController();
   final _descriptionForHallController = TextEditingController();
   final _compositionForHallController = TextEditingController();
@@ -718,6 +720,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       'category': _selectedCategory,
       'sections': _selectedSections,
       'isSemiFinished': _isSemiFinished,
+      'typeManuallyChanged': _typeManuallyChanged,
       'portionWeight': _portionWeight,
       'descriptionForHall': _descriptionForHallController.text,
       'compositionForHall': _compositionForHallController.text,
@@ -753,9 +756,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       _selectedCategory = data['category'] as String? ?? 'misc';
       _selectedSections = List<String>.from(data['sections'] as List<dynamic>? ?? []);
       // При открытии из импорта тип ПФ/Блюдо управляется экраном проверки импорта (extra initialIsSemiFinished).
-      // Черновик не должен "откатывать" тип назад, иначе кнопка «Все ПФ» не фиксируется.
+      // Но если пользователь вручную переключал тип внутри редактора — берём тип из черновика.
+      final desiredFromImport = widget.initialIsSemiFinished ?? widget.initialFromAi?.isSemiFinished ?? true;
+      final manual = data['typeManuallyChanged'] == true;
+      _typeManuallyChanged = manual;
       _isSemiFinished = widget.initialFromAi != null
-          ? (widget.initialIsSemiFinished ?? widget.initialFromAi?.isSemiFinished ?? true)
+          ? (manual ? (data['isSemiFinished'] as bool? ?? desiredFromImport) : desiredFromImport)
           : (data['isSemiFinished'] as bool? ?? true);
       final fromDraft = (data['portionWeight'] as num?)?.toDouble();
       // Сумма выходов из восстанавливаемых ингредиентов (для расчёта веса порции при импорте)
@@ -2999,6 +3005,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                 setState(() {
                                   final toPf = v.first;
                                   _isSemiFinished = toPf;
+                                  _typeManuallyChanged = true;
                                   if (toPf) {
                                     _portionWeight = 100; // ТТК ПФ: вес порции по умолчанию 100
                                   } else {
