@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/scroll_to_top_app_bar_title.dart';
 
 /// Экран «Поставщики» — только карточки поставщиков со списком продуктов, без заказов.
 /// Для каждого подразделения (кухня, бар, зал) свои поставщики.
@@ -275,7 +276,9 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text('${loc.t('order_tab_suppliers') ?? 'Поставщики'} — $_departmentLabel'),
+        title: ScrollToTopAppBarTitle(
+          child: Text('${loc.t('order_tab_suppliers') ?? 'Поставщики'} — $_departmentLabel'),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

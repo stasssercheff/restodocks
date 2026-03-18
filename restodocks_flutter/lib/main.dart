@@ -17,6 +17,7 @@ import 'core/supabase_url_resolver_stub.dart'
 import 'services/services.dart';
 import 'services/translation_manager.dart';
 import 'screens/screens.dart';
+import 'widgets/widgets.dart';
 
 const String _supabaseUrlEnv = String.fromEnvironment(
   'SUPABASE_URL',
@@ -111,7 +112,11 @@ class RestodocksApp extends StatelessWidget {
               final c = child ?? const SizedBox.shrink();
               final media = MediaQuery.of(context);
               final isPhone = media.size.shortestSide < 600;
-              if (!isPhone) return WebLocationCorrection(child: c);
+              if (!isPhone) {
+                return WebLocationCorrection(
+                  child: AppPrimaryScrollController(child: c),
+                );
+              }
 
               final factor = uiScale.scaleFactor;
               final scaled = MediaQuery(
@@ -122,7 +127,9 @@ class RestodocksApp extends StatelessWidget {
                 ),
                 child: c,
               );
-              return WebLocationCorrection(child: scaled);
+              return WebLocationCorrection(
+                child: AppPrimaryScrollController(child: scaled),
+              );
             },
             debugShowCheckedModeBanner: false,
           );

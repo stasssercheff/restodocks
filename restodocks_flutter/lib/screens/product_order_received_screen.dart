@@ -7,6 +7,7 @@ import '../services/inventory_download.dart';
 import '../services/services.dart';
 import '../utils/number_format_utils.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/scroll_to_top_app_bar_title.dart';
 
 /// Полученные и отправленные заказы продуктов: просмотр и скачивание.
 class ProductOrderReceivedScreen extends StatefulWidget {
@@ -70,7 +71,9 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('product_order')),
+        title: ScrollToTopAppBarTitle(
+          child: Text(loc.t('product_order')),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

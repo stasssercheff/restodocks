@@ -13,6 +13,7 @@ import 'excel_style_ttk_table.dart';
 import '../models/models.dart';
 import '../utils/dev_log.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/scroll_to_top_app_bar_title.dart';
 import '../services/ai_service.dart';
 import '../services/ai_service_supabase.dart';
 import '../services/services.dart';
@@ -888,7 +889,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 tooltip: loc.t('ttk_cancel_selection'),
               )
             : (widget.embedded ? null : appBarBackButton(context)),
-        title: Text(_selectionMode ? loc.t('ttk_select_count').replaceFirst('%s', '${_selectedTechCards.length}') : loc.t('tech_cards')),
+        title: ScrollToTopAppBarTitle(
+          child: Text(
+            _selectionMode
+                ? loc.t('ttk_select_count').replaceFirst('%s', '${_selectedTechCards.length}')
+                : loc.t('tech_cards'),
+          ),
+        ),
         actions: [
           // Счетчик ТТК
           if (!_selectionMode) Center(

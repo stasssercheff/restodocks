@@ -14,6 +14,7 @@ import '../../models/chat_room.dart';
 import '../../services/inbox_service.dart';
 import '../../services/group_chat_service.dart';
 import '../../widgets/app_bar_home_button.dart';
+import '../../widgets/scroll_to_top_app_bar_title.dart';
 
 /// Входящие: документы (заказы, чеклисты, инвентаризации). Сообщения: диалоги с сотрудниками — отдельно.
 class InboxScreen extends StatefulWidget {
@@ -332,7 +333,9 @@ class _InboxScreenState extends State<InboxScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: widget.embedded ? null : appBarBackButton(context),
-        title: Text(widget.messagesOnly ? (loc.t('inbox_tab_messages') ?? 'Сообщения') : loc.t('inbox')),
+        title: ScrollToTopAppBarTitle(
+          child: Text(widget.messagesOnly ? (loc.t('inbox_tab_messages') ?? 'Сообщения') : loc.t('inbox')),
+        ),
         actions: [
           if (!widget.messagesOnly) ...[
             if (!_isNotificationsTab(isOwner) && _getUnviewedIdsForCurrentTab(isOwner).isNotEmpty)
