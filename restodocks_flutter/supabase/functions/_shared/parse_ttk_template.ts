@@ -127,22 +127,6 @@ function parseNum(s: string): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
-/** В строках "Выход/Итого" иногда попадаются большие числа из колонок "порций/стоимость". Берём адекватный выход. */
-function pickReasonableYieldFromRow(cells: string[]): number | null {
-  const nums: number[] = [];
-  for (const c of cells) {
-    const n = parseNum(c);
-    if (n == null) continue;
-    if (!Number.isFinite(n) || n <= 0) continue;
-    nums.push(n);
-  }
-  if (nums.length === 0) return null;
-  // Для блюд/ПФ выход обычно в граммах: 10–5000. Берём максимальное в диапазоне.
-  const inRange = nums.filter((n) => n >= 0.5 && n <= 5000);
-  if (inRange.length > 0) return Math.max(...inRange);
-  return null;
-}
-
 export interface TtkIngredient {
   productName: string;
   grossGrams: number | null;
@@ -426,11 +410,10 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       const afterNums = rowText.replace(/^.*?\bитого\s*[\d,.\s]*/i, "").trim();
       if (afterNums.length > 30 && /[а-яё]/i.test(afterNums)) technologyParts.push(afterNums);
       let outG = parseNum(outputVal) || parseNum(grossVal) || parseNum(netVal);
-      if (outG == null && cells.length > 1) outG = parseNum(cells[1]);
-      // Защита от неверной колонки (например, "порций" или "стоимость")
-      if (outG != null && outG > 5000) {
-        const picked = pickReasonableYieldFromRow(cells);
-        if (picked != null) outG = picked;
+      // Если колонки выхода нет/не распознана — берём сумму выходов ингредиентов (или нетто/брутто).
+      if (outG == null) {
+        const sumOut = currentIngredients.reduce((s, i) => s + (i.outputGrams ?? i.netGrams ?? i.grossGrams ?? 0), 0);
+        if (sumOut > 0) outG = sumOut;
       }
       if (outputColIsKg && outG != null && outG > 0 && outG < 100) outG = outG * 1000;
       flushCard(outG);
@@ -440,10 +423,9 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
     // Строка «Выход» + число — конец карточки (формат супы.xlsx и др.)
     if (nameVal.trim().toLowerCase() === "выход" || productVal.trim().toLowerCase() === "выход") {
       let outG = parseNum(grossVal) || parseNum(netVal) || parseNum(outputVal);
-      if (outG == null && cells.length > 1) outG = parseNum(cells[1]);
-      if (outG != null && outG > 5000) {
-        const picked = pickReasonableYieldFromRow(cells);
-        if (picked != null) outG = picked;
+      if (outG == null) {
+        const sumOut = currentIngredients.reduce((s, i) => s + (i.outputGrams ?? i.netGrams ?? i.grossGrams ?? 0), 0);
+        if (sumOut > 0) outG = sumOut;
       }
       if (outputColIsKg && outG != null && outG > 0 && outG < 100) outG = outG * 1000;
       flushCard(outG ?? undefined);
@@ -770,10 +752,9 @@ export function parseTtkByStoredTemplate(
 
     if (nameVal.toLowerCase() === "итого" || productVal.toLowerCase() === "итого") {
       let outG = parseNum(outputVal) || parseNum(grossVal) || parseNum(netVal);
-      if (outG == null && cells.length > 1) outG = parseNum(cells[1]);
-      if (outG != null && outG > 5000) {
-        const picked = pickReasonableYieldFromRow(cells);
-        if (picked != null) outG = picked;
+      if (outG == null) {
+        const sumOut = currentIngredients.reduce((s, i) => s + (i.outputGrams ?? i.netGrams ?? i.grossGrams ?? 0), 0);
+        if (sumOut > 0) outG = sumOut;
       }
       const outputColIsKgStored = outputCol >= 0 && outputCol < headerRow.length && headerRow[outputCol]?.includes("кг");
       if (outputColIsKgStored && outG != null && outG > 0 && outG < 100) outG = outG * 1000;
@@ -783,10 +764,9 @@ export function parseTtkByStoredTemplate(
     }
     if (nameVal.trim().toLowerCase() === "выход" || productVal.trim().toLowerCase() === "выход") {
       let outG = parseNum(grossVal) || parseNum(netVal) || parseNum(outputVal);
-      if (outG == null && cells.length > 1) outG = parseNum(cells[1]);
-      if (outG != null && outG > 5000) {
-        const picked = pickReasonableYieldFromRow(cells);
-        if (picked != null) outG = picked;
+      if (outG == null) {
+        const sumOut = currentIngredients.reduce((s, i) => s + (i.outputGrams ?? i.netGrams ?? i.grossGrams ?? 0), 0);
+        if (sumOut > 0) outG = sumOut;
       }
       const outputColIsKgStored = outputCol >= 0 && outputCol < headerRow.length && headerRow[outputCol]?.includes("кг");
       if (outputColIsKgStored && outG != null && outG > 0 && outG < 100) outG = outG * 1000;
