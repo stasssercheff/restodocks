@@ -828,7 +828,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// Подтягивает цену за кг и стоимость из номенклатуры заведения по названию продукта (для импортированных ТТК).
   void _autoFillPriceFromNomenclature() {
     final store = context.read<ProductStoreSupabase>();
-    final establishmentId = context.read<AccountManagerSupabase>().dataEstablishmentId;
+    final est = context.read<AccountManagerSupabase>().establishment;
+    final establishmentId = est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
     if (establishmentId == null) return;
     final list = <TTIngredient>[];
     for (final ing in _ingredients) {
@@ -950,14 +951,26 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       await context.read<ProductStoreSupabase>().loadProducts();
       final est = context.read<AccountManagerSupabase>().establishment;
       if (est != null) {
-        await context.read<ProductStoreSupabase>().loadNomenclature(est.dataEstablishmentId);
+        final productStore = context.read<ProductStoreSupabase>();
+        if (est.isBranch) {
+          await productStore.loadNomenclatureForBranch(est.id, est.dataEstablishmentId!);
+        } else {
+          await productStore.loadNomenclature(est.dataEstablishmentId);
+        }
         // Оптимизация: при просмотре или создании из импорта — не блокировать первый рендер загрузкой всех ТТК.
         final deferTcLoad = (_isNew && widget.initialFromAi != null) || widget.forceViewMode;
         if (!deferTcLoad) {
           final tcSvc = context.read<TechCardServiceSupabase>();
-          final tcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
-          final customKitchen = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'kitchen');
-          final customBar = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'bar');
+          List<TechCard> tcs;
+          if (est.isBranch) {
+            final mainTcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId!);
+            final branchTcs = await tcSvc.getTechCardsForEstablishment(est.id);
+            tcs = [...mainTcs, ...branchTcs];
+          } else {
+            tcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
+          }
+          final customKitchen = await tcSvc.getCustomCategories(est.isBranch ? est.id : est.dataEstablishmentId!, 'kitchen');
+          final customBar = await tcSvc.getCustomCategories(est.isBranch ? est.id : est.dataEstablishmentId!, 'bar');
           if (mounted) {
             _pickerTechCards = _isNew ? tcs : tcs.where((t) => t.id != widget.techCardId).toList();
             _semiFinishedProducts = tcs.where((t) => t.isSemiFinished).toList();
@@ -970,9 +983,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           () async {
             try {
               final tcSvc = context.read<TechCardServiceSupabase>();
-              final tcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
-              final customKitchen = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'kitchen');
-              final customBar = await tcSvc.getCustomCategories(est.dataEstablishmentId, 'bar');
+              List<TechCard> tcs;
+              if (est.isBranch) {
+                final mainTcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId!);
+                final branchTcs = await tcSvc.getTechCardsForEstablishment(est.id);
+                tcs = [...mainTcs, ...branchTcs];
+              } else {
+                tcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
+              }
+              final customKitchen = await tcSvc.getCustomCategories(est.isBranch ? est.id : est.dataEstablishmentId!, 'kitchen');
+              final customBar = await tcSvc.getCustomCategories(est.isBranch ? est.id : est.dataEstablishmentId!, 'bar');
               if (!mounted) return;
               setState(() {
                 _pickerTechCards = _isNew ? tcs : tcs.where((t) => t.id != widget.techCardId).toList();
@@ -1097,7 +1117,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         // Если перевод технологии ещё не сохранён — запросить через DeepL
         if (tc != null) _translateTechnologyIfNeeded(tc);
         // Дополнить цены из номенклатуры (если productId есть, cost=0)
-        if (tc != null && est != null) _enrichPricesFromNomenclature(est.dataEstablishmentId);
+        if (tc != null && est != null) _enrichPricesFromNomenclature(est.isBranch ? est.id : est.dataEstablishmentId!);
         if (mounted) await restoreDraftNow();
       });
     } catch (e) {
@@ -1426,12 +1446,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     final translationManager = context.read<TranslationManager>();
     try {
       if (_isNew || tc == null) {
+        // Филиал создаёт ТТК в своём заведении (доп от филиала); головное — в своём.
         final created = await svc.createTechCard(
           dishName: name,
           category: category,
           sections: _selectedSections,
           isSemiFinished: _isSemiFinished,
-          establishmentId: est.dataEstablishmentId,
+          establishmentId: est.isBranch ? est.id : est.dataEstablishmentId,
           createdBy: emp.id,
         );
         final sellingPrice = _parseSellingPrice();
@@ -1562,6 +1583,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           }
         }
       } else {
+        // Редактирование существующей ТТК. Филиал не может сохранять карточки головного заведения (должен открываться с view=1).
         var photoUrls = List<String>.from(_photoUrls);
         if (_pendingPhotoBytes.isNotEmpty) {
           for (var i = 0; i < _pendingPhotoBytes.length; i++) {
@@ -1874,9 +1896,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (est == null) return [];
     final productStore = context.read<ProductStoreSupabase>();
     await productStore.loadProducts();
-    await productStore.loadNomenclature(est.dataEstablishmentId);
+    if (est.isBranch) {
+      await productStore.loadNomenclatureForBranch(est.id, est.dataEstablishmentId!);
+    } else {
+      await productStore.loadNomenclature(est.dataEstablishmentId);
+    }
     if (!mounted) return [];
-    return productStore.getNomenclatureProducts(est.dataEstablishmentId);
+    final effectiveId = est.isBranch ? est.id : est.dataEstablishmentId!;
+    return productStore.getNomenclatureProducts(effectiveId);
   }
 
   /// [replaceIndex] — если задан, заменяем строку вместо добавления (тап по ячейке «Продукт»).
@@ -2104,9 +2131,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (popNavigator) Navigator.of(context).pop();
     final loc = context.read<LocalizationService>();
     final accountManager = context.read<AccountManagerSupabase>();
-    final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
+    final est = accountManager.establishment;
+    final establishmentId = est != null && est.isBranch ? est.id : accountManager.dataEstablishmentId;
+    final currency = accountManager.currentEmployee?.currency ?? est?.defaultCurrency ?? 'RUB';
     final productStore = context.read<ProductStoreSupabase>();
-    final establishmentId = context.read<AccountManagerSupabase>().dataEstablishmentId;
     if (establishmentId != null && establishmentId.isNotEmpty) {
       final ep = productStore.getEstablishmentPrice(p.id, establishmentId);
       productStore.addToNomenclature(establishmentId, p.id, price: ep?.$1, currency: ep?.$2 ?? currency);
@@ -2147,9 +2175,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       if (!mounted) return;
       final loc = context.read<LocalizationService>();
       final accountManager = context.read<AccountManagerSupabase>();
-    final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
+      final est = accountManager.establishment;
+      final establishmentId = est != null && est.isBranch ? est.id : accountManager.dataEstablishmentId;
+    final currency = accountManager.currentEmployee?.currency ?? est?.defaultCurrency ?? 'RUB';
       final productStore = context.read<ProductStoreSupabase>();
-      final establishmentId = context.read<AccountManagerSupabase>().dataEstablishmentId;
       if (establishmentId != null && establishmentId.isNotEmpty) {
         try {
           await productStore.addToNomenclature(
@@ -2614,7 +2643,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final canEdit = context.watch<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
-    final effectiveCanEdit = canEdit && !widget.forceViewMode; // forceViewMode = режим «Просмотр ТТК»
+    final est = context.watch<AccountManagerSupabase>().establishment;
+    // Филиал не может редактировать карточки головного заведения (только просмотр).
+    final forceViewBecauseBranch = est != null && est.isBranch && _techCard != null && _techCard!.establishmentId != est.id;
+    final effectiveCanEdit = canEdit && !widget.forceViewMode && !forceViewBecauseBranch; // forceViewMode = режим «Просмотр ТТК»
     final employee = context.watch<AccountManagerSupabase>().currentEmployee;
     final isCook = employee?.department == 'kitchen' && !effectiveCanEdit; // Повар - кухня без прав редактирования
 

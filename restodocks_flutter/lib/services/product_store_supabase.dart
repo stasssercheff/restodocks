@@ -385,10 +385,15 @@ class ProductStoreSupabase {
   Set<String> _nomenclatureIds = {};
   Set<String> get nomenclatureProductIds => Set.from(_nomenclatureIds);
 
+  /// ID продуктов, добавленных только филиалом (доп от филиала). Заполняется при loadNomenclatureForBranch.
+  Set<String> _branchOnlyProductIds = {};
+  bool isBranchOnlyProduct(String productId) => _branchOnlyProductIds.contains(productId);
+
   /// Загрузить номенклатуру заведения (ID продуктов и цены)
   Future<void> loadNomenclature(String establishmentId) async {
     devLog('🔄 ProductStore: Loading nomenclature for establishment $establishmentId...');
 
+    _branchOnlyProductIds.clear();
     // Очищаем текущие данные
     _nomenclatureIds.clear();
     _priceCache.removeWhere((key, _) => key.startsWith('${establishmentId}_'));
@@ -415,6 +420,87 @@ class ProductStoreSupabase {
         rethrow; // Перебрасываем ошибку выше
       }
     }
+  }
+
+  /// Загрузить номенклатуру для филиала: объединение номенклатуры головного заведения и филиала.
+  /// Цены филиала перекрывают цены головного. Продукты только филиала помечаются как «доп от филиала».
+  Future<void> loadNomenclatureForBranch(String branchId, String mainId) async {
+    devLog('🔄 ProductStore: Loading nomenclature for branch $branchId (main $mainId)...');
+
+    _branchOnlyProductIds.clear();
+    _nomenclatureIds.clear();
+    _priceCache.removeWhere((key, _) => key.startsWith('${mainId}_') || key.startsWith('${branchId}_'));
+
+    List<dynamic> mainList = [];
+    List<dynamic> branchList = [];
+    try {
+      final mainResp = await _supabase.client
+          .from('establishment_products')
+          .select('product_id, price, currency')
+          .eq('establishment_id', mainId)
+          .limit(10000);
+      mainList = mainResp is List ? mainResp : [];
+    } catch (e) {
+      devLog('⚠️ ProductStore: Failed to load main nomenclature: $e');
+    }
+    try {
+      final branchResp = await _supabase.client
+          .from('establishment_products')
+          .select('product_id, price, currency')
+          .eq('establishment_id', branchId)
+          .limit(10000);
+      branchList = branchResp is List ? branchResp : [];
+    } catch (e) {
+      devLog('⚠️ ProductStore: Failed to load branch nomenclature: $e');
+    }
+
+    final mainIds = <String>{};
+    final mainPrices = <String, (double?, String?)>{};
+    for (final item in mainList) {
+      final productId = item['product_id'] as String? ?? item['id'] as String? ?? item['productId'] as String?;
+      if (productId == null || productId.isEmpty) continue;
+      mainIds.add(productId);
+      final price = item['price'];
+      final currency = item['currency'] as String?;
+      if (price != null && price is num) {
+        mainPrices[productId] = (price.toDouble(), currency);
+      } else {
+        mainPrices[productId] = null;
+      }
+    }
+
+    final branchIds = <String>{};
+    final branchPrices = <String, (double?, String?)>{};
+    for (final item in branchList) {
+      final productId = item['product_id'] as String? ?? item['id'] as String? ?? item['productId'] as String?;
+      if (productId == null || productId.isEmpty) continue;
+      branchIds.add(productId);
+      final price = item['price'];
+      final currency = item['currency'] as String?;
+      if (price != null && price is num) {
+        branchPrices[productId] = (price.toDouble(), currency);
+      } else {
+        branchPrices[productId] = null;
+      }
+    }
+
+    _nomenclatureIds = mainIds.union(branchIds);
+    _branchOnlyProductIds = branchIds.difference(mainIds);
+
+    for (final id in _nomenclatureIds) {
+      final cacheKey = '${branchId}_$id';
+      final branchVal = branchPrices[id];
+      final mainVal = mainPrices[id];
+      if (branchVal != null) {
+        _priceCache[cacheKey] = branchVal;
+      } else if (mainVal != null) {
+        _priceCache[cacheKey] = mainVal;
+      } else {
+        _priceCache[cacheKey] = null;
+      }
+    }
+
+    devLog('✅ ProductStore: Branch nomenclature: ${_nomenclatureIds.length} products, branch-only: ${_branchOnlyProductIds.length}');
   }
 
   /// Основной метод загрузки номенклатуры

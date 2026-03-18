@@ -115,7 +115,8 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
       aiService: context.read<AiServiceSupabase>(),
       supabase: context.read<SupabaseService>(),
     );
-    final estId = account.dataEstablishmentId;
+    final est = account.establishment;
+    final estId = est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
 
     if (estId == null) {
       if (mounted) {
@@ -375,14 +376,20 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
     final est = account.establishment;
-    final estId = est?.dataEstablishmentId;
+    if (est == null) return;
+    // Филиал: объединённая номенклатура головного + филиала, цены филиала; идентификатор для операций — id филиала.
+    final estId = est.isBranch ? est.id : est.dataEstablishmentId;
     if (estId == null) return;
 
     final techCardService = context.read<TechCardServiceSupabase>();
 
     try {
       await store.loadProducts(force: true);
-      await store.loadNomenclature(estId);
+      if (est.isBranch) {
+        await store.loadNomenclatureForBranch(est.id, est.dataEstablishmentId!);
+      } else {
+        await store.loadNomenclature(estId);
+      }
 
       // Загружаем элементы номенклатуры (продукты + ТТК ПФ)
       var items = await store.getAllNomenclatureItems(estId, techCardService);
@@ -897,7 +904,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         loc: loc,
         onRemove: (idsToRemove) async {
           final store = context.read<ProductStoreSupabase>();
-          final estId = context.read<AccountManagerSupabase>().dataEstablishmentId;
+          final est = context.read<AccountManagerSupabase>().establishment;
+          final estId = est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
           if (estId == null) return;
           for (final id in idsToRemove) {
             final item = idToItem[id];
@@ -937,7 +945,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
   void _showCreateProductDialog(LocalizationService loc) {
     final account = context.read<AccountManagerSupabase>();
-    final estId = account.dataEstablishmentId;
+    final est = account.establishment;
+    final estId = est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
     if (estId == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('no_establishment'))));
       return;
@@ -1039,8 +1048,14 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     final hideCategory = p.category == 'misc' || p.category == 'manual' || p.category == 'imported';
 
-    // КБЖУ и глютен/лактоза скрыты
-    return hideCategory ? priceText : '${_categoryLabel(p.category)} · $priceText';
+    // «доп от филиала» — продукт добавлен только в номенклатуру филиала
+    final branchOnly = store.isBranchOnlyProduct(p.id);
+    final base = hideCategory ? priceText : '${_categoryLabel(p.category)} · $priceText';
+    if (branchOnly) {
+      final label = loc.t('branch_only_product_label') ?? 'доп от филиала';
+      return '$base · $label';
+    }
+    return base;
   }
 
   String _currencySymbol(String currency) => Establishment.currencySymbolFor(currency);
@@ -1215,8 +1230,11 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final loc = context.watch<LocalizationService>();
     final store = context.watch<ProductStoreSupabase>();
     final account = context.watch<AccountManagerSupabase>();
-    final estId = account.dataEstablishmentId;
+    final est = account.establishment;
+    // Филиал: работа с номенклатурой и ценами по id филиала (головное — dataEstablishmentId).
+    final estId = est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
     final canEdit = account.currentEmployee?.canEditChecklistsAndTechCards ?? false;
+    final isBranch = est?.isBranch ?? false;
 
     // Фильтруем элементы номенклатуры
     var nomItems = _nomenclatureItems.where((item) {
@@ -1821,10 +1839,14 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     // Обновляем список после загрузки
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
-    final estId = account.dataEstablishmentId;
-    if (estId != null) {
+    final est = account.establishment;
+    if (est != null) {
       await store.loadProducts(force: true);
-      await store.loadNomenclature(estId);
+      if (est.isBranch) {
+        await store.loadNomenclatureForBranch(est.id, est.dataEstablishmentId!);
+      } else {
+        await store.loadNomenclature(est.dataEstablishmentId!);
+      }
     }
     if (mounted) setState(() {});
   }
