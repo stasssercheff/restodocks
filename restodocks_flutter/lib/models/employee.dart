@@ -123,6 +123,11 @@ class Employee extends Equatable {
   @JsonKey(name: 'preferred_currency')
   final String? preferredCurrency; // 'RUB', 'USD', 'VND', 'EUR', etc.
 
+  /// Показывали ли уже сотруднику окно «Начало работы».
+  /// Храним на сервере, чтобы не зависеть от localStorage/деплоев.
+  @JsonKey(name: 'getting_started_shown', defaultValue: false)
+  final bool gettingStartedShown;
+
   /// Тип оплаты: 'per_shift' — за смену, 'hourly' — почасовая.
   @JsonKey(name: 'payment_type')
   final String? paymentType;
@@ -187,6 +192,7 @@ class Employee extends Equatable {
     this.subscriptionPlan,
     this.preferredLanguage = 'ru',
     this.preferredCurrency,
+    this.gettingStartedShown = false,
     this.paymentType,
     this.ratePerShift,
     this.hourlyRate,
@@ -217,6 +223,7 @@ class Employee extends Equatable {
     String? avatarUrl,
     String? preferredLanguage,
     String? preferredCurrency,
+    bool? gettingStartedShown,
     String? paymentType,
     double? ratePerShift,
     double? hourlyRate,
@@ -245,6 +252,7 @@ class Employee extends Equatable {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
       preferredCurrency: preferredCurrency ?? this.preferredCurrency,
+      gettingStartedShown: gettingStartedShown ?? this.gettingStartedShown,
       paymentType: paymentType ?? this.paymentType,
       ratePerShift: ratePerShift ?? this.ratePerShift,
       hourlyRate: hourlyRate ?? this.hourlyRate,
@@ -453,6 +461,7 @@ class Employee extends Equatable {
     m['full_name'] = _str(m['full_name'], '');
     if (!m.containsKey('data_access_enabled')) m['data_access_enabled'] = false;
     if (!m.containsKey('can_edit_own_schedule')) m['can_edit_own_schedule'] = false;
+    if (!m.containsKey('getting_started_shown')) m['getting_started_shown'] = false;
     return _$EmployeeFromJson(m);
   }
   static String _str(dynamic v, String fallback) {
@@ -482,6 +491,7 @@ class Employee extends Equatable {
     subscriptionPlan,
     preferredLanguage,
     preferredCurrency,
+    gettingStartedShown,
     paymentType,
     ratePerShift,
     hourlyRate,

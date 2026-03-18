@@ -36,10 +36,20 @@ class _HomeScreenState extends State<HomeScreen> {
     final emp = accountManager.currentEmployee;
     if (emp == null) return;
     _firstEntryCheckDone = true;
-    final alreadyShown = await GettingStartedReadService.isRead(emp.id);
+    // Prefer server-side flag (survives deploys / storage clears).
+    final alreadyShown = emp.gettingStartedShown || await GettingStartedReadService.isRead(emp.id);
     if (!mounted) return;
     if (alreadyShown) return;
+    // Mark as shown both locally and on the server.
     await GettingStartedReadService.setRead(emp.id);
+    try {
+      await accountManager.supabase.client
+          .from('employees')
+          .update({'getting_started_shown': true})
+          .eq('id', emp.id);
+    } catch (_) {
+      // Ignore: local flag still prevents repeated showing in this browser.
+    }
     if (!mounted) return;
     _showFirstEntryDialog(context, emp.id);
   }
