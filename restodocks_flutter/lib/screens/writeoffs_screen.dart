@@ -376,6 +376,11 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
       payload['comment'] = comment;
       payload['commentSourceLang'] = loc.currentLanguageCode;
     }
+    final costTotal = _computeCostTotal(rows);
+    if (costTotal > 0) {
+      payload['costTotal'] = costTotal;
+      payload['costCurrency'] = establishment.defaultCurrency;
+    }
 
     final docService = InventoryDocumentService();
     final docSaved = await docService.save(
@@ -438,6 +443,28 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
       'rows': payloadRows,
       'sourceLang': lang,
     };
+  }
+
+  /// Сумма затрат по списанию (только продукты с ценой; ПФ не учитываются).
+  double _computeCostTotal(List<_WriteoffRow> rows) {
+    double sum = 0;
+    for (final r in rows) {
+      if (r.product == null) continue;
+      final p = _cachedProducts.where((e) => e.id == r.product!.id).firstOrNull;
+      if (p == null) continue;
+      final pricePerKg = p.computedPricePerKg ?? p.basePrice;
+      if (pricePerKg == null || pricePerKg <= 0) continue;
+      final u = (r.unit).toLowerCase().replaceAll(' ', '');
+      if (u == 'g' || u == 'г') {
+        sum += (r.total / 1000) * pricePerKg;
+      } else if (u == 'kg' || u == 'кг' || u == 'l' || u == 'л' || u == 'ml' || u == 'мл') {
+        sum += r.total * pricePerKg;
+      } else if (u == 'pcs' || u == 'шт' || u == 'штуки') {
+        final perPiece = p.basePrice ?? (p.gramsPerPiece != null && p.gramsPerPiece! > 0 ? (pricePerKg * p.gramsPerPiece! / 1000) : 0);
+        sum += r.total * (perPiece);
+      }
+    }
+    return sum;
   }
 
   List<int>? _buildExcelBytes(Map<String, dynamic> payload, LocalizationService loc) {
