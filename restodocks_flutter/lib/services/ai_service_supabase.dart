@@ -233,12 +233,13 @@ class AiServiceSupabase implements AiService {
     return 'csv';
   }
 
-  /// Многослойный парсинг ТТК (усиление без ломания существующего):
-  /// 1) Сохранённые шаблоны (tt_parse_templates + learned) — по header_signature;
-  /// 2) Спец-форматы: супы (Polnoe Posobie), ПФ-ПФ CSV с колонкой Технология, пф гц;
-  /// 3) Общий parseTtkByTemplate + КК + multi-block;
-  /// 4) Fallback: AI (лимит) или пусто → в перспективе сюда подключается ML по сырым rows.
-  /// После любого слоя: правки из обучения (_applyParseCorrections) + автоподстановка технологии из ПФ (_fillTechnologyFromStoredPf).
+  /// Многослойный парсинг ТТК. Поддерживаемые файлы (должны стабильно парситься):
+  /// — ттк.xlsx, супы.xlsx: Excel, одна или несколько карточек столбиком (один лист или выбор листа);
+  /// — супы.csv: CSV с блоками [название] → №|Наименование продукта|Вес гр/шт → Выход;
+  /// — пф хц.xlsx / пф гц.xlsx: блоки [название п/ф] → заголовок Норма → данные → Выход;
+  /// — КК Блюда *.pdf: через parseTechCardsFromPdf (EF ai-parse-tech-cards-pdf).
+  /// Цепочка: 1) сохранённые шаблоны; 2) пф гц (если не стандартный заголовок); 3) parseTtkByTemplate (keyword + колонки); 4) КК/multi-block/iiko; 5) AI при пусто.
+  /// После любого слоя: _applyParseCorrections + _fillTechnologyFromStoredPf.
   @override
   Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId, int? sheetIndex}) async {
     lastParseHeaderSignature = null;
@@ -441,12 +442,8 @@ class AiServiceSupabase implements AiService {
           list = list.map((c) => c.yieldGrams == null || c.yieldGrams! <= 0 ? c.copyWith(yieldGrams: yieldFromRows) : c).toList();
         }
       }
-      // Постобработка технологии: для форматов типа «Полное пособие» пытаемся
-      // дополнительно подтянуть технологию только из соответствующих колонок,
-      // не трогая ингредиенты и выход.
-      if (rows.isNotEmpty) {
-        list = _mergeTechnologyFromPolnoePosobie(rows, list);
-      }
+      // Раньше подтягивали технологию из формата «Полное пособие» — отключено, разбор только по общему формату (карточки столбиком).
+      // if (rows.isNotEmpty) list = _mergeTechnologyFromPolnoePosobie(rows, list);
       list = await _enrichTechnologyFromLearned(list, rows, lastParseHeaderSignature)
           .timeout(const Duration(seconds: 6), onTimeout: () => list);
       var corrected = await _applyParseCorrections(list, lastParseHeaderSignature, establishmentId)
@@ -1027,41 +1024,12 @@ class AiServiceSupabase implements AiService {
     return rows.length;
   }
 
-  /// Дополнительно подтянуть технологию из формата «Полное пособие»,
-  /// не трогая ингредиенты и выход. Работает поверх уже распарсенных карточек.
+  /// Ранее подтягивали технологию из формата «Полное пособие». Отключено — не используем этот формат.
   static List<TechCardRecognitionResult> _mergeTechnologyFromPolnoePosobie(
     List<List<String>> rows,
     List<TechCardRecognitionResult> cards,
-  ) {
-    if (rows.isEmpty || cards.isEmpty) return cards;
-    final parsed = _tryParsePolnoePosobieFormat(rows);
-    if (parsed.isEmpty) return cards;
-
-    String _norm(String s) => s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-
-    final techByName = <String, String>{};
-    for (final c in parsed) {
-      final name = (c.dishName ?? '').trim();
-      final tech = (c.technologyText ?? '').trim();
-      if (name.isEmpty || tech.length < 20) continue;
-      final key = _norm(name);
-      // Не перезаписываем, если уже есть технология для этого названия
-      techByName.putIfAbsent(key, () => tech);
-    }
-    if (techByName.isEmpty) return cards;
-
-    return cards.map((c) {
-      final existingTech = (c.technologyText ?? '').trim();
-      final name = (c.dishName ?? '').trim();
-      if (name.isEmpty) return c;
-      final key = _norm(name);
-      final tech = techByName[key];
-      if (tech == null) return c;
-      // Не трогаем карточки, где уже есть внятная технология
-      if (existingTech.length >= 20) return c;
-      return c.copyWith(technologyText: tech);
-    }).toList();
-  }
+  ) =>
+      cards;
 
   /// Формат «Полное пособие Кухня» (CSV/Excel): блоки ТТК подряд.
   /// Типы блюд: супы, салаты, антипасти, брускетты, севиче, пицца, рамен, горячее, сырная тарелка, оливки и т.д.
@@ -1145,19 +1113,29 @@ class AiServiceSupabase implements AiService {
         }
         final d0 = dr.isNotEmpty ? dr[0].toLowerCase() : '';
         if (d0 == 'выход') {
-          // Извлечь значение выхода (400, 420/70 → 420, 600/100/20 → 600) для веса порции
-          for (var i = 1; i < dr.length && i < 5; i++) {
-            final v = _parseNum(dr[i]);
-            if (v != null && v > 0) {
-              yieldGrams = v < 100 ? v * 1000 : v; // кг → г
-              break;
+          // Из карты: значение из той же колонки, что и вес (кол.2), иначе — сумма по ингредиентам. Не брать первое число подряд (в др. колонке может быть 5.766 → 5766 г).
+          final sumGrams = ingredients.fold<double>(0, (s, ing) => s + (ing.outputGrams ?? 0));
+          const weightCol = 2; // №|Наименование|Вес гр/шт
+          if (dr.length > weightCol) {
+            final cell = dr[weightCol].trim();
+            num? v;
+            if (cell.contains('/')) {
+              // 420/70 = две составляющие, итог 420+70=490; 600/100/20 = 720
+              var sum = 0.0;
+              for (final part in cell.split('/')) {
+                final n = _parseNum(part.trim());
+                if (n != null && n > 0) sum += n.toDouble();
+              }
+              v = sum > 0 ? sum : null;
+            } else {
+              v = _parseNum(cell);
             }
-            if (dr[i].contains('/')) {
-              final first = _parseNum(dr[i].split('/').first.trim());
-              if (first != null && first > 0) { yieldGrams = first < 100 ? first * 1000 : first; break; }
+            if (v != null && v > 0) {
+              final isKg = dr.join(' ').toLowerCase().contains('кг');
+              yieldGrams = (isKg && v < 100 ? v * 1000 : v.toDouble()).toDouble();
             }
           }
-          // Не выходим из цикла — в супах/«Полное пособие» технология часто идёт после строки «Выход»
+          if (yieldGrams == null && sumGrams > 0) yieldGrams = sumGrams;
           dataRow++;
           continue;
         }
@@ -1381,7 +1359,18 @@ class AiServiceSupabase implements AiService {
           // 1) Из карты: значение из той же колонки, что и «Норма» в заголовке (в строке Выход там обычно 0.700 кг).
           final sumGrams = ingredients.fold<double>(0, (s, ing) => s + (ing.outputGrams ?? 0));
           if (headerNormCol >= 0 && headerNormCol < dr.length) {
-            final cellVal = _parseNum(dr[headerNormCol]);
+            final cell = dr[headerNormCol].trim();
+            num? cellVal;
+            if (cell.contains('/')) {
+              var sum = 0.0;
+              for (final part in cell.split('/')) {
+                final n = _parseNum(part.trim());
+                if (n != null && n > 0) sum += n.toDouble();
+              }
+              cellVal = sum > 0 ? sum : null;
+            } else {
+              cellVal = _parseNum(cell);
+            }
             if (cellVal != null && cellVal > 0) {
               final isKg = dr.join(' ').toLowerCase().contains('кг');
               outputGrams = (isKg && cellVal < 100 ? cellVal * 1000 : cellVal.toDouble()).toDouble();
@@ -1754,10 +1743,6 @@ class AiServiceSupabase implements AiService {
     final gost2 = _tryParseGost2RowHeader(rows);
     if (gost2.isNotEmpty && gost2.first.ingredients.isNotEmpty) return gost2;
 
-    // Несколько блоков в одном файле (супы.xlsx и др.): название → №|Наименование продукта|Вес → Выход. Если нашли 2+ карточки — используем.
-    final polnoe = _tryParsePolnoePosobieFormat(rows);
-    if (polnoe.length >= 2) return polnoe;
-
     // Стандартный заголовок ровно «Наименование | Продукт | Брутто | Нетто» (кол.0 и 1) — разбирает только keyword-парсер. Иначе iiko (№|Наименование продукта|...) попадал бы под skip пф гц.
     final firstRowLower = rows.isNotEmpty ? rows[0].map((c) => (c ?? '').toString().trim().toLowerCase()).toList() : <String>[];
     final isStandardHeader = firstRowLower.length >= 3 &&
@@ -2036,22 +2021,37 @@ class AiServiceSupabase implements AiService {
         }
       }
 
-      // Выход — завершение карточки (формат «Полное пособие Кухня», ГОСТ «Выход блюда (в граммах): 190»). Парсим значение выхода для веса порции (блюдо).
+      // Выход — завершение карточки. Значение из колонки выхода/веса; 420/70 = две составляющие, итог 420+70=490 г.
       final c0 = cells.isNotEmpty ? cells[0].trim().toLowerCase() : '';
       final isYieldRow = c0 == 'выход' || (c0.contains('выход') && (c0.contains('блюда') || c0.contains('грамм') || c0.contains('порцию') || c0.contains('готовой')));
       if (isYieldRow) {
         double? outG;
-        if (outputCol >= 0 && outputCol < cells.length) {
-          outG = _parseNum(cells[outputCol]);
+        String? yieldCell;
+        if (outputCol >= 0 && outputCol < cells.length && cells[outputCol].trim().isNotEmpty) {
+          yieldCell = cells[outputCol].trim();
+        } else if (cells.length > 2) {
+          yieldCell = cells[2].trim().isNotEmpty ? cells[2] : (cells[1].trim().isNotEmpty ? cells[1] : null);
+        }
+        if (yieldCell != null && yieldCell.isNotEmpty) {
+          if (yieldCell.contains('/')) {
+            var sum = 0.0;
+            for (final part in yieldCell.split('/')) {
+              final n = _parseNum(part.trim());
+              if (n != null && n > 0) sum += n.toDouble();
+            }
+            outG = sum > 0 ? sum : null;
+          } else {
+            outG = _parseNum(yieldCell);
+          }
         }
         if (outG == null && cells.length > 1) outG = _parseNum(cells[1]);
         if (outG == null) {
           for (var i = 1; i < cells.length && i < 5; i++) {
-            outG = _parseNum(cells[i]);
-            if (outG != null && outG > 0) break;
+            final v = _parseNum(cells[i]);
+            if (v != null && v > 0) { outG = v; break; }
           }
         }
-        if (outG != null && outG > 0 && outG < 100) outG = outG * 1000; // кг → г
+        if (outG != null && outG > 0 && outG < 100 && cells.join(' ').toLowerCase().contains('кг')) outG = outG * 1000; // кг → г
         flushCard(yieldGrams: outG);
         currentDish = null;
         return true;
