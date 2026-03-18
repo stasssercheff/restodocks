@@ -50,7 +50,7 @@ function detectKkFormat(text: string): boolean {
 
 /**
  * Разбивает текст PDF на блоки (одна КК = один блок).
- * Разделитель: "-- N of M --" (pdf-parse) или повтор "наименование блюда" / "КАЛЬКУЛЯЦИОННАЯ КАРТА".
+ * Разделитель: "-- N of M --" (pdf-parse) или повтор "Калькуляционная карта" в начале строки (несколько КК в одном файле).
  */
 function splitKkBlocks(text: string): string[] {
   const blocks: string[] = [];
@@ -60,6 +60,23 @@ function splitKkBlocks(text: string): string[] {
     if (t.length > 50) blocks.push(t);
   }
   if (blocks.length > 0) return blocks;
+
+  // Несколько КК в одном файле без маркеров страниц: разбить по повторению "Калькуляционная карта" в начале строки
+  const kkHeaderRe = /\n\s*Калькуляционная\s+карта\s/gi;
+  const matches = [...text.matchAll(kkHeaderRe)];
+  if (matches.length >= 2) {
+    const firstBlock = text.slice(0, matches[0].index).trim();
+    const restBlocks = matches.map((m, i) =>
+      text.slice(m.index, matches[i + 1]?.index ?? text.length).trim(),
+    );
+    const firstCard = (firstBlock + "\n" + (restBlocks[0] ?? "")).trim();
+    if (firstCard.length > 50) blocks.push(firstCard);
+    for (let i = 1; i < restBlocks.length; i++) {
+      if (restBlocks[i].length > 50) blocks.push(restBlocks[i]);
+    }
+    if (blocks.length > 0) return blocks;
+  }
+
   return [text];
 }
 
