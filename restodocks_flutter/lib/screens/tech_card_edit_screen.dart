@@ -757,8 +757,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       final fromAi = widget.initialFromAi?.yieldGrams != null && widget.initialFromAi!.yieldGrams! > 0
           ? widget.initialFromAi!.yieldGrams!.toDouble()
           : null;
-      // При открытии из импорта приоритет — выход из файла (ВКС), иначе в «Итого» показывается 100 вместо реального выхода
-      _portionWeight = fromAi ?? fromDraft ?? 100;
+      // Вес порции из загружаемых данных: приоритет — выход из импорта (ВКС), иначе черновик, для блюда без данных — сумма выходов или 100
+      final sum = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+      _portionWeight = fromAi ?? (fromDraft != null && fromDraft > 0 ? fromDraft : null) ?? (sum > 0 ? sum : 100);
       _descriptionForHallController.text = data['descriptionForHall'] as String? ?? '';
       _compositionForHallController.text = data['compositionForHall'] as String? ?? '';
       _sellingPriceController.text = data['sellingPrice'] as String? ?? '';
@@ -1029,7 +1030,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             } else if (widget.initialSections != null && widget.initialSections!.isEmpty) {
               _selectedSections = [];
             }
-            // Вес в «Итого» из парсинга: для блюд это вес порции, для ПФ — выход/вес итого из файла.
+            // Вес порции из парсируемой карточки (ПФ и блюдо): берём выход из файла, без ограничений
             if (ai.yieldGrams != null && ai.yieldGrams! > 0) {
               _portionWeight = ai.yieldGrams!.toDouble();
             }
@@ -1090,7 +1091,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           _techCard = tc;
           _loading = false;
           if (tc != null) {
-            _portionWeight = tc.portionWeight;
+            final sumOutput = tc.ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+            // Вес порции берём из сохранённой карточки; только если 0 и тип блюдо — подставляем сумму выходов
+            if (!tc.isSemiFinished && (tc.portionWeight <= 0) && sumOutput > 0) {
+              _portionWeight = sumOutput;
+            } else {
+              _portionWeight = tc.portionWeight;
+            }
             _nameController.text = tc.getLocalizedDishName(context.read<LocalizationService>().currentLanguageCode);
             _selectedCategory = _categoryOptions.contains(tc.category) ? tc.category : 'misc'; // fallback if custom category was deleted
             _selectedSections = List<String>.from(tc.sections);
@@ -1807,8 +1814,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       _technologyController.text = ai.technologyText!.trim();
     }
     if (ai.isSemiFinished != null) _isSemiFinished = ai.isSemiFinished!;
-    // ТТК блюдо: вес порции = выход из парсинга (для ПФ не подставляем)
-    if (!_isSemiFinished && ai.yieldGrams != null && ai.yieldGrams! > 0) {
+    if (ai.yieldGrams != null && ai.yieldGrams! > 0) {
       _portionWeight = ai.yieldGrams!.toDouble();
     }
     final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
@@ -2839,7 +2845,19 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                             DropdownMenuItem(value: true, child: Row(children: [const Icon(Icons.inventory_2, size: 20), const SizedBox(width: 8), Text(loc.t('tt_type_pf'))])),
                             DropdownMenuItem(value: false, child: Row(children: [const Icon(Icons.restaurant, size: 20), const SizedBox(width: 8), Text(loc.t('tt_type_dish'))])),
                           ],
-                          onChanged: (v) { setState(() => _isSemiFinished = v ?? true); _scheduleDraftSave(); },
+                          onChanged: (v) {
+                            setState(() {
+                              final toPf = v ?? true;
+                              _isSemiFinished = toPf;
+                              if (toPf) {
+                                _portionWeight = 100; // ТТК ПФ: вес порции по умолчанию 100
+                              } else {
+                                final sum = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+                                _portionWeight = sum > 0 ? sum : 100; // ТТК блюдо: вес порции = вес выхода итого
+                              }
+                            });
+                            _scheduleDraftSave();
+                          },
                         )
                       : InputDecorator(
                           decoration: InputDecoration(
@@ -2939,7 +2957,19 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                   ),
                                 ],
                               selected: {_isSemiFinished},
-                              onSelectionChanged: (v) { setState(() => _isSemiFinished = v.first); _scheduleDraftSave(); },
+                              onSelectionChanged: (v) {
+                                setState(() {
+                                  final toPf = v.first;
+                                  _isSemiFinished = toPf;
+                                  if (toPf) {
+                                    _portionWeight = 100; // ТТК ПФ: вес порции по умолчанию 100
+                                  } else {
+                                    final sum = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+                                    _portionWeight = sum > 0 ? sum : 100; // ТТК блюдо: вес порции = вес выхода итого
+                                  }
+                                });
+                                _scheduleDraftSave();
+                              },
                               showSelectedIcon: false,
                               ),
                             )
