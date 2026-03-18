@@ -757,9 +757,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       final fromAi = widget.initialFromAi?.yieldGrams != null && widget.initialFromAi!.yieldGrams! > 0
           ? widget.initialFromAi!.yieldGrams!.toDouble()
           : null;
-      // Вес порции из загружаемых данных: приоритет — выход из импорта (ВКС), иначе черновик, для блюда без данных — сумма выходов или 100
       final sum = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
-      _portionWeight = fromAi ?? (fromDraft != null && fromDraft > 0 ? fromDraft : null) ?? (sum > 0 ? sum : 100);
+      if (_isSemiFinished) {
+        // ТТК ПФ: по умолчанию 100; из импорта или черновика (защита от ошибочно больших значений)
+        _portionWeight = fromAi ?? (fromDraft != null && fromDraft > 0 && fromDraft <= 10000 ? fromDraft : null) ?? 100;
+      } else {
+        // ТТК блюдо: по умолчанию = вес выхода итого; из импорта или черновика (черновик не берём если явно ошибочный, напр. 35000 при сумме 700)
+        double? draft = fromDraft != null && fromDraft > 0 ? fromDraft : null;
+        if (draft != null && sum > 0 && draft > 20 * sum) draft = null;
+        _portionWeight = fromAi ?? draft ?? (sum > 0 ? sum : 100);
+      }
       _descriptionForHallController.text = data['descriptionForHall'] as String? ?? '';
       _compositionForHallController.text = data['compositionForHall'] as String? ?? '';
       _sellingPriceController.text = data['sellingPrice'] as String? ?? '';
@@ -1092,11 +1099,18 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           _loading = false;
           if (tc != null) {
             final sumOutput = tc.ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
-            // Вес порции берём из сохранённой карточки; только если 0 и тип блюдо — подставляем сумму выходов
-            if (!tc.isSemiFinished && (tc.portionWeight <= 0) && sumOutput > 0) {
-              _portionWeight = sumOutput;
+            if (tc.isSemiFinished) {
+              // ТТК ПФ: по умолчанию 100; из БД только если задан
+              _portionWeight = tc.portionWeight > 0 ? tc.portionWeight : 100;
             } else {
-              _portionWeight = tc.portionWeight;
+              // ТТК блюдо: по умолчанию = вес выхода итого (сумма); из БД если реалистично, иначе сброс на сумму (защита от ошибочных 35000 и т.п.)
+              if (tc.portionWeight <= 0 && sumOutput > 0) {
+                _portionWeight = sumOutput;
+              } else if (sumOutput > 0 && tc.portionWeight > 20 * sumOutput) {
+                _portionWeight = sumOutput;
+              } else {
+                _portionWeight = tc.portionWeight;
+              }
             }
             _nameController.text = tc.getLocalizedDishName(context.read<LocalizationService>().currentLanguageCode);
             _selectedCategory = _categoryOptions.contains(tc.category) ? tc.category : 'misc'; // fallback if custom category was deleted
