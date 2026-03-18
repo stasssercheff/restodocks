@@ -36,9 +36,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final emp = accountManager.currentEmployee;
     if (emp == null) return;
     _firstEntryCheckDone = true;
-    final read = await GettingStartedReadService.isRead(emp.id);
+    final alreadyShown = await GettingStartedReadService.isRead(emp.id);
     if (!mounted) return;
-    if (read) return;
+    if (alreadyShown) return;
+    await GettingStartedReadService.setRead(emp.id);
+    if (!mounted) return;
     _showFirstEntryDialog(context, emp.id);
   }
 
