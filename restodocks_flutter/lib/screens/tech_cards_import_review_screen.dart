@@ -1006,7 +1006,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                                       est?.dataEstablishmentId != null) {
                                     final orig = _items[realIndex].originalDishName?.trim() ?? '';
                                     final corr = (result.dishName ?? '').trim();
-                                    if (orig.isNotEmpty && corr.isNotEmpty && orig != corr) {
+                                    if (orig.isNotEmpty && corr.isNotEmpty && orig != corr && est != null && est.dataEstablishmentId != null) {
                                       await AiServiceSupabase.saveLearningCorrection(
                                         headerSignature: sig,
                                         field: 'dish_name',
@@ -1055,16 +1055,18 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                                       return;
                                     }
                                   }
-                                  setState(() {
-                                    _items[realIndex] = _ReviewItem(
-                                      result: result,
-                                      originalDishName: _items[realIndex].originalDishName,
-                                      category: _items[realIndex].category,
-                                      sections: _items[realIndex].sections,
-                                      isSemiFinished: _items[realIndex].isSemiFinished,
-                                      alreadySaved: savedToSystem,
-                                    );
-                                  });
+                                  if (result != null) {
+                                    setState(() {
+                                      _items[realIndex] = _ReviewItem(
+                                        result: result,
+                                        originalDishName: _items[realIndex].originalDishName,
+                                        category: _items[realIndex].category,
+                                        sections: _items[realIndex].sections,
+                                        isSemiFinished: _items[realIndex].isSemiFinished,
+                                        alreadySaved: savedToSystem,
+                                      );
+                                    });
+                                  }
                                 }
                               },
                               icon: const Icon(Icons.open_in_new, size: 18),

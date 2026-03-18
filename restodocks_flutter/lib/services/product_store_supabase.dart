@@ -465,7 +465,7 @@ class ProductStoreSupabase {
       if (price != null && price is num) {
         mainPrices[productId] = (price.toDouble(), currency);
       } else {
-        mainPrices[productId] = null;
+        mainPrices[productId] = (null, null);
       }
     }
 
@@ -480,7 +480,7 @@ class ProductStoreSupabase {
       if (price != null && price is num) {
         branchPrices[productId] = (price.toDouble(), currency);
       } else {
-        branchPrices[productId] = null;
+        branchPrices[productId] = (null, null);
       }
     }
 
@@ -491,12 +491,14 @@ class ProductStoreSupabase {
       final cacheKey = '${branchId}_$id';
       final branchVal = branchPrices[id];
       final mainVal = mainPrices[id];
-      if (branchVal != null) {
+      final branchHasPrice = branchVal != null && branchVal.$1 != null;
+      final mainHasPrice = mainVal != null && mainVal.$1 != null;
+      if (branchHasPrice) {
         _priceCache[cacheKey] = branchVal;
-      } else if (mainVal != null) {
+      } else if (mainHasPrice) {
         _priceCache[cacheKey] = mainVal;
       } else {
-        _priceCache[cacheKey] = null;
+        _priceCache[cacheKey] = (null, null);
       }
     }
 
