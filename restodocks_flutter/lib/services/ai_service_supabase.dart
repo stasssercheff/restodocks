@@ -2049,6 +2049,36 @@ class AiServiceSupabase implements AiService {
     final currentIngredients = <TechCardIngredientLine>[];
     String? currentTechnologyText;
 
+    double _sumIngredientOutputsGrams() {
+      var sum = 0.0;
+      for (final ing in currentIngredients) {
+        final v = (ing.outputGrams != null && ing.outputGrams! > 0)
+            ? ing.outputGrams!
+            : ((ing.netGrams != null && ing.netGrams! > 0) ? ing.netGrams! : (ing.grossGrams ?? 0));
+        if (v > 0) sum += v;
+      }
+      return sum;
+    }
+
+    double? _sanitizeYieldFromCell(String? cell, {required double? parsed}) {
+      final raw = (cell ?? '').trim();
+      final low = raw.toLowerCase();
+      final sumOut = _sumIngredientOutputsGrams();
+      // Excel/PDF exports may include formula-like text: "SUM(D3:D5): 35000" — это не вес порции.
+      final looksLikeFormula = low.contains('sum(') || low.contains('сумм(') || RegExp(r'\bsum\b').hasMatch(low) || RegExp(r'[A-Z]{1,3}\d+\s*:\s*[A-Z]{1,3}\d+').hasMatch(raw);
+      if (looksLikeFormula) {
+        if (sumOut > 0) return sumOut;
+        return null;
+      }
+      if (parsed != null && parsed > 0) {
+        // Sanity: если «выход/итого» в разы больше суммы ингредиентов — считаем, что это *10/*50 и берём сумму.
+        if (sumOut > 0 && parsed > 5 * sumOut) return sumOut;
+        return parsed;
+      }
+      if (sumOut > 0) return sumOut;
+      return null;
+    }
+
     void flushCard({double? yieldGrams}) {
       if (currentDish != null && (currentDish!.isNotEmpty || currentIngredients.isNotEmpty)) {
         final tech = currentTechnologyText?.trim();
@@ -2141,6 +2171,7 @@ class AiServiceSupabase implements AiService {
           }
         }
         if (outG != null && outG > 0 && outG < 100 && cells.join(' ').toLowerCase().contains('кг')) outG = outG * 1000; // кг → г
+        outG = _sanitizeYieldFromCell(yieldCell, parsed: outG);
         flushCard(yieldGrams: outG);
         currentDish = null;
         return true;
@@ -2210,6 +2241,7 @@ class AiServiceSupabase implements AiService {
       if (nameVal.toLowerCase() == 'итого' || productVal.toLowerCase() == 'итого' || productVal.toLowerCase().startsWith('всего')) {
         double? outG = _parseNum(outputVal);
         if (outG != null && outG > 0 && outG < 100) outG = outG * 1000; // кг → г
+        outG = _sanitizeYieldFromCell(outputVal, parsed: outG);
         flushCard(yieldGrams: outG);
         currentDish = null;
         return true;
