@@ -2727,6 +2727,10 @@ class AiServiceSupabase implements AiService {
   static double? _parseNum(String s) {
     final t = s.trim();
     if (t.isEmpty) return null;
+    // Формулы Excel (SUM(D3:D5), =A1*1000): не парсим как числа, иначе получаем мусорные веса/выходы.
+    if (t.startsWith('=') || (RegExp(r'[A-Za-z]').hasMatch(t) && (t.contains('(') || t.contains(')') || t.contains(':')))) {
+      return null;
+    }
     final fracMatch = RegExp(r'^(\d+)/(\d+)$').firstMatch(t.replaceAll(' ', ''));
     if (fracMatch != null) {
       final a = int.tryParse(fracMatch.group(1) ?? ''), b = int.tryParse(fracMatch.group(2) ?? '');

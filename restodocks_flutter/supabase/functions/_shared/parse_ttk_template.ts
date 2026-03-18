@@ -109,6 +109,10 @@ function isColumnFor10Portions(rows: string[][], rowIndex: number, colIndex: num
 
 function parseNum(s: string): number | null {
   if (!s || !s.trim()) return null;
+  // Excel формулы (SUM(D3:D5), =A1*1000 и т.п.) нельзя интерпретировать как числа.
+  // Иначе "SUM(D3:D5)" превращается в "335" или "35000" и ломает выход/нормы.
+  const raw = s.trim();
+  if (raw.startsWith("=") || (/[A-Za-z]/.test(raw) && (raw.includes("(") || raw.includes(")") || raw.includes(":")))) return null;
   // "Выход 420/70" (суп/гренка отдельно) и подобные значения: берём СУММУ частей как общий выход.
   // Иначе очистка превратит "420/70" в "42070" и сломает вес порции.
   if (s.includes("/")) {
