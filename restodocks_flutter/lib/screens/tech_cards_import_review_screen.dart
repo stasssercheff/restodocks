@@ -1056,9 +1056,10 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                                     }
                                   }
                                   if (result != null) {
+                                    final r = result;
                                     setState(() {
                                       _items[realIndex] = _ReviewItem(
-                                        result: result,
+                                        result: r,
                                         originalDishName: _items[realIndex].originalDishName,
                                         category: _items[realIndex].category,
                                         sections: _items[realIndex].sections,
