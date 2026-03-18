@@ -94,19 +94,23 @@ class GettingStartedDocument extends StatelessWidget {
       _DocumentItem('Исключения в переводе — продукты импортированные из списков, в именах которых присутствуют неоднозначные символы либо непонятные сокращения.'),
     ]),
     _DocumentSection('13. Журналы', [
-      _DocumentItem('На данный момент в системе 12 журналов. Все они созданы по форме "СанПин" в соответствии с законом:'),
-      _DocumentItem('Гигиенический журнал (сотрудники)'),
-      _DocumentItem('Журнал учета температурного режима холодильного оборудования'),
-      _DocumentItem('Журнал учета температуры и влажности в складских помещениях'),
-      _DocumentItem('Журнал бракеража готовой пищевой продукции'),
-      _DocumentItem('Журнал бракеража скоропортящейся пищевой продукции'),
-      _DocumentItem('Учёт фритюрных жиров'),
-      _DocumentItem('Журнал учёта личных медицинских книжек'),
-      _DocumentItem('Журнал учёта прохождения работниками обязательных предварительных и периодических медицинских осмотров'),
-      _DocumentItem('Журнал учёта получения, расхода дезинфицирующих средств и проведения дезинфекционных работ на объекте'),
-      _DocumentItem('Журнал мойки и дезинфекции оборудования'),
-      _DocumentItem('Журнал-график проведения генеральных уборок'),
-      _DocumentItem('Журнал результатов проверки и очистки сит (фильтров) и магнитоуловителей'),
+      _DocumentItem(
+        'На данный момент в системе 12 журналов. Все они созданы по форме "СанПин" в соответствии с законом:',
+        [
+          _DocumentItem('Гигиенический журнал (сотрудники)'),
+          _DocumentItem('Журнал учета температурного режима холодильного оборудования'),
+          _DocumentItem('Журнал учета температуры и влажности в складских помещениях'),
+          _DocumentItem('Журнал бракеража готовой пищевой продукции'),
+          _DocumentItem('Журнал бракеража скоропортящейся пищевой продукции'),
+          _DocumentItem('Учёт фритюрных жиров'),
+          _DocumentItem('Журнал учёта личных медицинских книжек'),
+          _DocumentItem('Журнал учёта прохождения работниками обязательных предварительных и периодических медицинских осмотров'),
+          _DocumentItem('Журнал учёта получения, расхода дезинфицирующих средств и проведения дезинфекционных работ на объекте'),
+          _DocumentItem('Журнал мойки и дезинфекции оборудования'),
+          _DocumentItem('Журнал-график проведения генеральных уборок'),
+          _DocumentItem('Журнал результатов проверки и очистки сит (фильтров) и магнитоуловителей'),
+        ],
+      ),
       _DocumentItem('После заполнения данные невозможно изменить. Всё хранится на сервере в зашифрованном виде.'),
       _DocumentItem('В соответствии с этими данными и консультацией у компетентного специалиста, журналы допустимо вести в электронном виде при условии возможности их распечатать и хранить в течение 3 месяцев.'),
       _DocumentItem('Каждый сотрудник подписывает Соглашение о признании ПЭП (доступен для скачивания в настройках). По условиям соглашения, цифровая подпись (ПЭП) сотрудника из личной учетной записи приравнивается к подписи внутри компании.'),
@@ -149,6 +153,99 @@ class GettingStartedDocument extends StatelessWidget {
           children: section.children,
         );
       },
+    );
+  }
+}
+
+/// Вложенный раскрывающийся блок (например, список 12 журналов внутри п. 13).
+class _NestedExpandableItem extends StatefulWidget {
+  const _NestedExpandableItem({
+    required this.index,
+    required this.introText,
+    required this.nestedItems,
+    required this.theme,
+  });
+
+  final int index;
+  final String introText;
+  final List<_DocumentItem> nestedItems;
+  final ThemeData theme;
+
+  @override
+  State<_NestedExpandableItem> createState() => _NestedExpandableItemState();
+}
+
+class _NestedExpandableItemState extends State<_NestedExpandableItem> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = widget.theme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 6, 16, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: BorderRadius.circular(8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  _expanded ? Icons.expand_less : Icons.expand_more,
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '${widget.index}.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    widget.introText,
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (_expanded) ...[
+            const SizedBox(height: 6),
+            ...widget.nestedItems.asMap().entries.map((e) {
+              final j = e.key + 1;
+              final sub = e.value;
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(44, 4, 16, 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$j.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        sub.text,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -205,27 +302,35 @@ class _SectionExpansionState extends State<_SectionExpansion> {
             ...widget.children.asMap().entries.map((e) {
               final i = e.key + 1;
               final item = e.value;
-              return Padding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 16, 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '$i.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                        color: theme.colorScheme.primary,
+              if (item.nested == null || item.nested!.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 16, 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$i.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                          color: theme.colorScheme.primary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        item.text,
-                        style: theme.textTheme.bodyMedium,
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          item.text,
+                          style: theme.textTheme.bodyMedium,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                );
+              }
+              return _NestedExpandableItem(
+                index: i,
+                introText: item.text,
+                nestedItems: item.nested!,
+                theme: theme,
               );
             }),
             const SizedBox(height: 8),
