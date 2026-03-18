@@ -34,6 +34,9 @@ enum HaccpLogType {
   final String sanpinRef;
   final HaccpLogTable targetTable;
 
+  /// Ключ локализации для названия журнала.
+  String get displayNameKey => 'haccp_log_${code}_title';
+
   /// Журналы по рекомендуемым образцам СанПиН 2.3/2.4.3590-20 (Приложения 1–5).
   static const List<HaccpLogType> sanpinOnly = [
     HaccpLogType.healthHygiene,

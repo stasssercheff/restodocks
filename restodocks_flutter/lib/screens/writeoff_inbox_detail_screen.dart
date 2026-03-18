@@ -39,7 +39,7 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
     setState(() {
       _doc = doc;
       _loading = false;
-      if (doc == null) _error = 'Документ не найден';
+      if (doc == null) _error = context.read<LocalizationService>().t('document_not_found');
     });
     if (doc != null) {
       final estId = context.read<AccountManagerSupabase>().establishment?.id;
@@ -125,7 +125,8 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+        final loc = context.read<LocalizationService>();
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('error') ?? 'Ошибка'}: $e')));
       }
     }
   }
@@ -187,7 +188,7 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_error ?? 'Документ не найден', style: TextStyle(color: theme.colorScheme.error)),
+              Text(_error ?? loc.t('document_not_found'), style: TextStyle(color: theme.colorScheme.error)),
               const SizedBox(height: 16),
               FilledButton(onPressed: () => context.pop(), child: Text(loc.t('back') ?? 'Назад')),
             ],

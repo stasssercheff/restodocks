@@ -65,7 +65,7 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
     if (acc.establishment == null || acc.currentEmployee == null) {
       setState(() {
         _loading = false;
-        _error = 'Нет заведения или сотрудника';
+        _error = context.read<LocalizationService>().t('error_no_establishment_or_employee');
       });
       return;
     }
@@ -78,7 +78,7 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
       if (doc == null) {
         setState(() {
           _loading = false;
-          _error = 'Документ не найден';
+          _error = context.read<LocalizationService>().t('document_not_found');
         });
         return;
       }
@@ -87,7 +87,7 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
       if (!docs.any((d) => d.id == doc.id)) {
         setState(() {
           _loading = false;
-          _error = 'Доступ запрещён';
+          _error = context.read<LocalizationService>().t('access_denied') ?? 'Доступ запрещён';
         });
         return;
       }
@@ -146,7 +146,7 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(_error ?? 'Документ не найден', textAlign: TextAlign.center),
+                Text(_error ?? loc.t('document_not_found'), textAlign: TextAlign.center),
                 const SizedBox(height: 16),
                 FilledButton(onPressed: () => context.pop(), child: Text(loc.t('back') ?? 'Назад')),
               ],

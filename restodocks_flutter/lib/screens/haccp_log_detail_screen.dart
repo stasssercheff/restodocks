@@ -493,13 +493,13 @@ class HaccpLogDetailScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text('${loc.t('haccp_entry_view') ?? 'Запись'} — ${log.logType.displayNameRu}'),
+        title: Text('${loc.t('haccp_entry_view') ?? 'Запись'} — ${(loc.t(log.logType.displayNameKey) ?? log.logType.displayNameRu)}'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            'Рекомендуемый образец',
+            loc.t('haccp_recommended_sample') ?? 'Рекомендуемый образец',
             style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary),
           ),
           const SizedBox(height: 8),

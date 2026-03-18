@@ -1423,7 +1423,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text('${loc.t('haccp_add_entry') ?? 'Добавить'} — ${_logType!.displayNameRu}'),
+        title: Text('${loc.t('haccp_add_entry') ?? 'Добавить'} — ${(loc.t(_logType!.displayNameKey) ?? _logType!.displayNameRu)}'),
       ),
       body: Form(
         key: _formKey,
@@ -1440,14 +1440,14 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               ),
             const SizedBox(height: 16),
             Text(
-              'Рекомендуемый образец',
+              loc.t('haccp_recommended_sample') ?? 'Рекомендуемый образец',
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     color: Theme.of(context).colorScheme.primary,
                   ),
             ),
             const SizedBox(height: 4),
             Text(
-              'Таблица по форме СанПиН — при необходимости прокрутите вправо',
+              loc.t('haccp_scroll_right_hint') ?? 'Таблица по форме СанПиН — при необходимости прокрутите вправо',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
