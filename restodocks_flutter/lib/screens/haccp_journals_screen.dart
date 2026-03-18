@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/haccp_log_type.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/scroll_to_top_app_bar_title.dart';
 
 /// Экран «Журналы и ХАССП» — список включённых журналов.
 class HaccpJournalsScreen extends StatefulWidget {
@@ -33,7 +34,12 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
     final est = acc.establishment;
     if (est == null) {
       return Scaffold(
-        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('haccp_journals') ?? 'Журналы и ХАССП')),
+        appBar: AppBar(
+          leading: appBarBackButton(context),
+          title: ScrollToTopAppBarTitle(
+            child: Text(loc.t('haccp_journals') ?? 'Журналы и ХАССП'),
+          ),
+        ),
         body: Center(child: Text(loc.t('haccp_establishment_not_selected') ?? 'Заведение не выбрано')),
       );
     }
@@ -56,7 +62,9 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('haccp_journals') ?? 'Журналы и ХАССП'),
+        title: ScrollToTopAppBarTitle(
+          child: Text(loc.t('haccp_journals') ?? 'Журналы и ХАССП'),
+        ),
       ),
       body: journals.isEmpty
           ? _EmptyState(

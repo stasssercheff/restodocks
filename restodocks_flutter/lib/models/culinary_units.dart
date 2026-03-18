@@ -83,6 +83,7 @@ class CulinaryUnits {
     (id: 'fl_oz', ru: 'ж.унция', en: 'fl oz'),
     (id: 'pack', ru: 'упак.', en: 'pack'),
     (id: 'can', ru: 'банка', en: 'can'),
+    (id: 'box', ru: 'коробка', en: 'box'),
     (id: 'bottle', ru: 'бутылка', en: 'bottle'),
     (id: 'pkg', ru: 'упак.', en: 'pkg'),
   ];

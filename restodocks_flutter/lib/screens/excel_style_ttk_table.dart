@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../utils/dev_log.dart';
 import 'package:flutter/services.dart';
@@ -84,6 +86,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   // Контроллеры для полей ввода
   final Map<String, TextEditingController> _controllers = {};
+  final Map<String, FocusNode> _focusNodes = {};
+  final Map<String, Timer> _debounceTimers = {};
 
   @override
   void initState() {
@@ -124,11 +128,21 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     for (final controller in _controllers.values) {
       controller.dispose();
     }
+    for (final n in _focusNodes.values) {
+      n.dispose();
+    }
+    for (final t in _debounceTimers.values) {
+      t.cancel();
+    }
     super.dispose();
   }
 
   TextEditingController _getController(String key, String initialValue) {
     return _controllers[key] ??= TextEditingController(text: initialValue);
+  }
+
+  FocusNode _getFocusNode(String key) {
+    return _focusNodes[key] ??= FocusNode();
   }
 
   @override
@@ -362,7 +376,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     _buildNumericCell(
                       (ingredient.cookingLossPctOverride ?? 0).toStringAsFixed(0),
                       (value) {
-                      final loss = double.tryParse(value) ?? 0;
+                      final loss = double.tryParse(value.replaceFirst(',', '.')) ?? 0;
                       final clampedLoss = loss.clamp(0.0, 99.9);
                       // При изменении % ужарки пересчитываем выход по той же логике, что нетто от отхода: выход = нетто × (1 − ужарка/100)
                       final net = ingredient.netWeight;
@@ -428,7 +442,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       ? _buildNumericCell(
                           widget.weightPerPortion == 0 ? '' : widget.weightPerPortion.toStringAsFixed(0),
                           (value) {
-                            final v = double.tryParse(value) ?? 0;
+                            final v = double.tryParse(value.replaceFirst(',', '.')) ?? 0;
                             widget.onWeightPerPortionChanged?.call(v);
                           },
                           'weight_per_portion',
@@ -927,43 +941,40 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   Widget _buildNumericCell(String value, Function(String) onChanged, String key) {
     // Обновляем контроллер если значение изменилось
     final controller = _getController(key, value);
-    if (controller.text != value) {
+    final focusNode = _getFocusNode(key);
+    // Важно: не затираем ввод пользователя во время редактирования — иначе iOS часто
+    // «дожидается подтверждения», и соседние ячейки визуально не обновляются.
+    if (!focusNode.hasFocus && controller.text != value) {
       controller.text = value;
     }
 
     return Container(
       height: 44,
       child: widget.canEdit
-          ? GestureDetector(
-              onTap: () {
-                // Force focus on TextField when tapped
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  final focusNode = FocusNode();
-                  focusNode.requestFocus();
-                  // Dispose focus node after use
-                  Future.delayed(const Duration(milliseconds: 100), () {
-                    focusNode.dispose();
-                  });
+          ? TextField(
+              controller: controller,
+              focusNode: focusNode,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9\.,]')),
+              ],
+              style: const TextStyle(fontSize: 12),
+              textAlign: TextAlign.center,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+                isDense: true,
+                filled: true,
+                fillColor: Colors.white,
+              ),
+              onChanged: (v) {
+                _debounceTimers[key]?.cancel();
+                _debounceTimers[key] = Timer(const Duration(milliseconds: 60), () {
+                  if (!mounted) return;
+                  onChanged(v);
                 });
               },
-              child: TextField(
-                controller: controller,
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                ],
-                style: const TextStyle(fontSize: 12),
-                textAlign: TextAlign.center,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 12),
-                  isDense: true,
-                  filled: true,
-                  fillColor: Colors.white,
-                ),
-                onChanged: onChanged,
-                onSubmitted: onChanged,
-              ),
             )
           : Container(
               alignment: Alignment.center,
@@ -1110,6 +1121,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   void _updateIngredient(int index, TTIngredient updated) {
     widget.onUpdate(index, updated);
+    // Локальный rebuild, чтобы пересчёты видны сразу при вводе на web/iOS.
+    if (mounted) setState(() {});
   }
 
   Widget _buildDeleteButton(int rowIndex) {

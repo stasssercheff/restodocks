@@ -13,6 +13,7 @@ import 'excel_style_ttk_table.dart';
 import '../models/models.dart';
 import '../utils/dev_log.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/scroll_to_top_app_bar_title.dart';
 import '../services/ai_service.dart';
 import '../services/ai_service_supabase.dart';
 import '../services/services.dart';
@@ -263,6 +264,29 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           return true;
         }).toList();
       }
+
+      // Важно: ингредиенты могут ссылаться на ПФ из «другого» набора категорий/секций
+      // (ошибка разметки/импорта). Связь в карточке есть, но в поиске по ТТК такую
+      // карточку не найти, если мы её отфильтровали выше. Поэтому добавляем в список
+      // все ТТК, на которые есть ссылки из ингредиентов.
+      try {
+        final byId = {for (final tc in all) tc.id: tc};
+        final referencedIds = <String>{};
+        for (final tc in all) {
+          for (final ing in tc.ingredients) {
+            final id = ing.sourceTechCardId;
+            if (id != null && id.trim().isNotEmpty) referencedIds.add(id.trim());
+          }
+        }
+        final existing = list.map((e) => e.id).toSet();
+        for (final id in referencedIds) {
+          final ref = byId[id];
+          if (ref == null) continue;
+          if (existing.contains(id)) continue;
+          list.add(ref);
+          existing.add(id);
+        }
+      } catch (_) {}
       devLog('[ttk_list] _load: est=${est.dataEstablishmentId} dept=${widget.department} all=${all.length} afterFilter=${list.length}');
       if (mounted) {
         setState(() { _list = list; _loading = false; });
@@ -865,7 +889,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 tooltip: loc.t('ttk_cancel_selection'),
               )
             : (widget.embedded ? null : appBarBackButton(context)),
-        title: Text(_selectionMode ? loc.t('ttk_select_count').replaceFirst('%s', '${_selectedTechCards.length}') : loc.t('tech_cards')),
+        title: ScrollToTopAppBarTitle(
+          child: Text(
+            _selectionMode
+                ? loc.t('ttk_select_count').replaceFirst('%s', '${_selectedTechCards.length}')
+                : loc.t('tech_cards'),
+          ),
+        ),
         actions: [
           // Счетчик ТТК
           if (!_selectionMode) Center(

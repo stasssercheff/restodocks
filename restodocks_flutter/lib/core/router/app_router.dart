@@ -524,8 +524,15 @@ class AppRouter {
             pageBuilder: (context, state) {
               final addToNom = state.queryParameters['addToNomenclature'];
               final defaultAddToNomenclature = addToNom != 'false';
+              final method = state.queryParameters['method'];
               try {
-                return _slideTransitionPage(state, ProductUploadScreen(defaultAddToNomenclature: defaultAddToNomenclature));
+                return _slideTransitionPage(
+                  state,
+                  ProductUploadScreen(
+                    defaultAddToNomenclature: defaultAddToNomenclature,
+                    initialMethod: method,
+                  ),
+                );
               } catch (e) {
                 devLog('=== Error building ProductUploadScreen: $e ===');
                 return _slideTransitionPage(state, Scaffold(
@@ -576,7 +583,8 @@ class AppRouter {
             pageBuilder: (context, state) {
               final draft = state.extra as OrderList?;
               if (draft == null) return _slideTransitionPage(state, const _RedirectToProductOrder());
-              return _slideTransitionPage(state, OrderListProductsScreen(draft: draft));
+              final popCount = int.tryParse(state.queryParameters['pop'] ?? '') ?? 2;
+              return _slideTransitionPage(state, OrderListProductsScreen(draft: draft, popCountOnSave: popCount));
             },
           ),
           GoRoute(

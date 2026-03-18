@@ -1004,56 +1004,41 @@ class AccountManagerSupabase extends ChangeNotifier {
         ..remove('password_hash');
       // avatar_url сохраняем — колонка добавлена миграцией supabase_migration_employee_avatar.sql
 
-      try {
-        await _supabase.updateData(
-          'employees',
-          employeeData,
-          'id',
-          employee.id,
-        );
-      } catch (e) {
-        if (_isBirthdayColumnError(e)) {
-          employeeData = Map<String, dynamic>.from(employeeData)
-            ..remove('birthday');
+      // В Beta схема БД может отставать (часть колонок отсутствует).
+      // Делаем последовательный retry: выкидываем группы полей и повторяем update,
+      // чтобы базовые данные сотрудника всё равно сохранялись.
+      for (var attempt = 0; attempt < 6; attempt++) {
+        try {
           await _supabase.updateData(
             'employees',
             employeeData,
             'id',
             employee.id,
           );
-        } else if (_isSchemaColumnError(e)) {
-          employeeData = Map<String, dynamic>.from(employeeData)
-            ..remove('can_edit_own_schedule');
-          await _supabase.updateData(
-            'employees',
-            employeeData,
-            'id',
-            employee.id,
-          );
-        } else if (_isPaymentColumnError(e)) {
-          employeeData = Map<String, dynamic>.from(employeeData)
-            ..remove('payment_type')
-            ..remove('rate_per_shift')
-            ..remove('hourly_rate');
-          await _supabase.updateData(
-            'employees',
-            employeeData,
-            'id',
-            employee.id,
-          );
-        } else if (_isEmploymentColumnError(e)) {
-          employeeData = Map<String, dynamic>.from(employeeData)
-            ..remove('employment_status')
-            ..remove('employment_start_date')
-            ..remove('employment_end_date');
-          await _supabase.updateData(
-            'employees',
-            employeeData,
-            'id',
-            employee.id,
-          );
-        } else {
-          rethrow;
+          break;
+        } catch (e) {
+          final before = employeeData.length;
+          if (_isBirthdayColumnError(e)) {
+            employeeData = Map<String, dynamic>.from(employeeData)..remove('birthday');
+          } else if (_isSchemaColumnError(e)) {
+            employeeData = Map<String, dynamic>.from(employeeData)..remove('can_edit_own_schedule');
+          } else if (_isPaymentColumnError(e)) {
+            employeeData = Map<String, dynamic>.from(employeeData)
+              ..remove('payment_type')
+              ..remove('rate_per_shift')
+              ..remove('hourly_rate');
+          } else if (_isEmploymentColumnError(e)) {
+            employeeData = Map<String, dynamic>.from(employeeData)
+              ..remove('employment_status')
+              ..remove('employment_start_date')
+              ..remove('employment_end_date');
+          } else {
+            rethrow;
+          }
+          // Если на этом шаге ничего не убрали — не зацикливаемся.
+          if (employeeData.length == before) rethrow;
+          // Идём на следующий attempt с урезанным payload.
+          if (attempt == 5) rethrow;
         }
       }
 

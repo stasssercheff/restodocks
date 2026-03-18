@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/scroll_to_top_app_bar_title.dart';
 
 /// Экран «Меню»: блюда заведения (ТТК с категорией «блюдо»).
 /// Отображает состав как в ТТК и себестоимость всего блюда.
@@ -358,7 +359,9 @@ class _MenuScreenState extends State<MenuScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.t('menu')),
+        title: ScrollToTopAppBarTitle(
+          child: Text(loc.t('menu')),
+        ),
         leading: appBarBackButton(context),
         bottom: _isHallMenu && !_loading && (_dishesBar.isNotEmpty || _dishesKitchen.isNotEmpty)
             ? PreferredSize(

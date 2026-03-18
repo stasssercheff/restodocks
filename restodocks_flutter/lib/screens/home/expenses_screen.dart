@@ -11,6 +11,7 @@ import '../../services/inventory_download.dart';
 import '../../services/services.dart';
 import '../../utils/number_format_utils.dart';
 import '../../widgets/app_bar_home_button.dart';
+import '../../widgets/scroll_to_top_app_bar_title.dart';
 import '../salary_expense_screen.dart';
 
 /// Экран «Расходы» для собственника: вкладки «ФЗП», «Заказы продуктов», «Списания».
@@ -33,7 +34,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('expenses') ?? 'Расходы'),
+        title: ScrollToTopAppBarTitle(
+          child: Text(loc.t('expenses') ?? 'Расходы'),
+        ),
       ),
       body: Column(
         children: [

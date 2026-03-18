@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/scroll_to_top_app_bar_title.dart';
 
 /// Экран «Заказ продуктов» — сохранённые заказы. Поставщики — через иконку в AppBar и при создании заказа.
 /// [department] = kitchen|bar|hall для фильтрации по подразделению.
@@ -100,7 +101,9 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: widget.embedded ? null : appBarBackButton(context),
-        title: Text(loc.t('product_order')),
+        title: ScrollToTopAppBarTitle(
+          child: Text(loc.t('product_order')),
+        ),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

@@ -11,7 +11,16 @@ import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
 String _unitDisplay(String? unit, String lang) {
-  const ruToId = {'г': 'g', 'кг': 'kg', 'мл': 'ml', 'л': 'l', 'шт': 'pcs', 'штуки': 'pcs'};
+  const ruToId = {
+    'г': 'g',
+    'кг': 'kg',
+    'мл': 'ml',
+    'л': 'l',
+    'шт': 'pcs',
+    'штука': 'pcs',
+    'штуки': 'pcs',
+    'штук': 'pcs',
+  };
   final u = (unit ?? 'g').trim().toLowerCase();
   final id = ruToId[u] ?? u;
   return CulinaryUnits.displayName(id, lang);
@@ -459,7 +468,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
         sum += (r.total / 1000) * pricePerKg;
       } else if (u == 'kg' || u == 'кг' || u == 'l' || u == 'л' || u == 'ml' || u == 'мл') {
         sum += r.total * pricePerKg;
-      } else if (u == 'pcs' || u == 'шт' || u == 'штуки') {
+      } else if (u == 'pcs' || u == 'шт' || u == 'штуки' || u == 'штук') {
         final perPiece = p.basePrice ?? (p.gramsPerPiece != null && p.gramsPerPiece! > 0 ? (pricePerKg * p.gramsPerPiece! / 1000) : 0);
         sum += r.total * (perPiece);
       }
@@ -888,7 +897,7 @@ class _WriteoffUnitDropdown extends StatelessWidget {
     if (p == null) return _baseUnits;
     final options = List<String>.from(_baseUnits);
     final hasGpp = p.gramsPerPiece != null && p.gramsPerPiece! > 0;
-    if (hasGpp) options.addAll(['pcs', 'шт']);
+    if (hasGpp) options.add('pcs'); // без дублей
     final hasPkg = p.packageWeightGrams != null && p.packageWeightGrams! > 0;
     if (hasPkg) {
       options.add('pkg');
@@ -904,21 +913,26 @@ class _WriteoffUnitDropdown extends StatelessWidget {
     final match = options.where((u) => u.toLowerCase() == current).firstOrNull;
     final displayValue = match ?? options.first;
     return DropdownButtonHideUnderline(
-      child: DropdownButton<String>(
-        value: displayValue,
-        isDense: true,
-        isExpanded: true,
-        items: options.map((u) => DropdownMenuItem(
-          value: u,
-          child: Text(
-            u == 'pkg' ? (lang == 'ru' ? 'упак.' : 'pkg')
-                : u == 'btl' ? (lang == 'ru' ? 'бутылка' : 'bottle')
-                : _unitDisplay(u, lang),
-            style: theme.textTheme.bodySmall,
-            overflow: TextOverflow.ellipsis,
-          ),
-        )).toList(),
-        onChanged: (v) => v != null ? onChanged(v) : null,
+      child: Center(
+        child: DropdownButton<String>(
+          value: displayValue,
+          isDense: true,
+          isExpanded: false, // компактно: стрелка рядом с текстом
+          alignment: Alignment.center,
+          icon: const Icon(Icons.arrow_drop_down, size: 18),
+          iconSize: 18,
+          items: options.map((u) => DropdownMenuItem(
+            value: u,
+            child: Text(
+              u == 'pkg' ? (lang == 'ru' ? 'упак.' : 'pkg')
+                  : u == 'btl' ? (lang == 'ru' ? 'бутылка' : 'bottle')
+                  : _unitDisplay(u, lang),
+              style: theme.textTheme.bodySmall,
+              overflow: TextOverflow.ellipsis,
+            ),
+          )).toList(),
+          onChanged: (v) => v != null ? onChanged(v) : null,
+        ),
       ),
     );
   }
@@ -1046,36 +1060,44 @@ class _WriteoffRowTileState extends State<_WriteoffRowTile> {
             ),
           ),
           Expanded(
-            child: SingleChildScrollView(
-              controller: _hScroll,
-              scrollDirection: Axis.horizontal,
-              physics: const ClampingScrollPhysics(),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-                  color: widget.rowNumber.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    ...List.generate(qtyCols, (c) {
-                      final isLast = c == qtyCols - 1;
-                      final qty = c < row.quantities.length ? row.quantities[c] : 0.0;
-                      return Padding(
-                        padding: EdgeInsets.only(right: c < qtyCols - 1 ? _colGap : _colGap),
-                        child: SizedBox(
-                          width: _colQtyWidth,
-                          child: _QuantityField(
-                            value: qty,
-                            onChanged: (v) => widget.onSetQuantity(widget.rowIndex, c, v),
-                            onFocusLast: isLast ? () => widget.onLastCellFocused(widget.rowIndex) : null,
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onHorizontalDragUpdate: (d) {
+                if (!_hScroll.hasClients) return;
+                final next = (_hScroll.offset - d.delta.dx).clamp(0.0, _hScroll.position.maxScrollExtent);
+                _hScroll.jumpTo(next);
+              },
+              child: SingleChildScrollView(
+                controller: _hScroll,
+                scrollDirection: Axis.horizontal,
+                physics: const ClampingScrollPhysics(),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  decoration: BoxDecoration(
+                    border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+                    color: widget.rowNumber.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      ...List.generate(qtyCols, (c) {
+                        final isLast = c == qtyCols - 1;
+                        final qty = c < row.quantities.length ? row.quantities[c] : 0.0;
+                        return Padding(
+                          padding: EdgeInsets.only(right: c < qtyCols - 1 ? _colGap : _colGap),
+                          child: SizedBox(
+                            width: _colQtyWidth,
+                            child: _QuantityField(
+                              value: qty,
+                              onChanged: (v) => widget.onSetQuantity(widget.rowIndex, c, v),
+                              onFocusLast: isLast ? () => widget.onLastCellFocused(widget.rowIndex) : null,
+                            ),
                           ),
-                        ),
-                      );
-                    }),
-                    SizedBox(width: _colDeleteWidth, child: IconButton(icon: const Icon(Icons.delete_outline, size: 20), onPressed: () => widget.onRemove(widget.rowIndex), padding: EdgeInsets.zero, constraints: const BoxConstraints())),
-                  ],
+                        );
+                      }),
+                      SizedBox(width: _colDeleteWidth, child: IconButton(icon: const Icon(Icons.delete_outline, size: 20), onPressed: () => widget.onRemove(widget.rowIndex), padding: EdgeInsets.zero, constraints: const BoxConstraints())),
+                    ],
+                  ),
                 ),
               ),
             ),

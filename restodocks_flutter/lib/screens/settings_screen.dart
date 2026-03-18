@@ -1741,6 +1741,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
               leading: const Icon(Icons.dashboard_customize),
               title: Text(localization.t('home_layout_config') ?? 'Настройка домашнего экрана'),
               children: [
+                if (MediaQuery.of(context).size.shortestSide < 600)
+                  Consumer<MobileUiScaleService>(
+                    builder: (_, uiScale, __) => ListTile(
+                      leading: const SizedBox(width: 24),
+                      title: Text(localization.t('mobile_ui_scale') ?? 'Масштаб (мобильная версия)'),
+                      subtitle: Text(
+                        uiScale.preset == 1 ? '80%'
+                            : uiScale.preset == 2 ? '90%'
+                            : '100%',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => showDialog<void>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: Text(localization.t('mobile_ui_scale') ?? 'Масштаб (мобильная версия)'),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              RadioListTile<int>(
+                                value: 1,
+                                groupValue: uiScale.preset,
+                                title: const Text('80%'),
+                                onChanged: (v) async {
+                                  if (v == null) return;
+                                  await uiScale.setPreset(v);
+                                  if (ctx.mounted) Navigator.of(ctx).pop();
+                                },
+                              ),
+                              RadioListTile<int>(
+                                value: 2,
+                                groupValue: uiScale.preset,
+                                title: const Text('90%'),
+                                onChanged: (v) async {
+                                  if (v == null) return;
+                                  await uiScale.setPreset(v);
+                                  if (ctx.mounted) Navigator.of(ctx).pop();
+                                },
+                              ),
+                              RadioListTile<int>(
+                                value: 3,
+                                groupValue: uiScale.preset,
+                                title: const Text('100%'),
+                                onChanged: (v) async {
+                                  if (v == null) return;
+                                  await uiScale.setPreset(v);
+                                  if (ctx.mounted) Navigator.of(ctx).pop();
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ListTile(
                   leading: const SizedBox(width: 24),
                   title: Text(localization.t('home_layout_config_hint') ?? 'Изменить порядок кнопок на главной'),

@@ -2424,7 +2424,8 @@ class _ProductUnitDropdown extends StatelessWidget {
     final options = List<String>.from(_baseUnits);
     final hasGpp = p?.gramsPerPiece != null && p!.gramsPerPiece! > 0;
     if (hasGpp) {
-      options.addAll(['pcs', 'шт']);
+      // Храним канонически как pcs, чтобы не было дублей в UI.
+      options.add('pcs');
     }
     final hasPkg = p?.packageWeightGrams != null && p!.packageWeightGrams! > 0;
     if (hasPkg) {
@@ -2555,11 +2556,11 @@ class _QtyCellState extends State<_QtyCell> {
         FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),
       ],
       textAlign: TextAlign.center,
-      style: theme.textTheme.bodyMedium,
+      style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12, height: 1.0),
       decoration: InputDecoration(
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(3)),
         filled: true,
         fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
       ),

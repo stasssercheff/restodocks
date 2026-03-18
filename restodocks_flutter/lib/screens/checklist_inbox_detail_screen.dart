@@ -26,6 +26,8 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
   final Map<int, String> _translatedTitles = {};
   /// Перевод названия чеклиста
   String? _translatedChecklistName;
+  /// Перевод комментария к чеклисту (payload.comments)
+  String? _translatedComments;
 
   Future<void> _load() async {
     setState(() {
@@ -33,6 +35,7 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
       _error = null;
       _translatedTitles.clear();
       _translatedChecklistName = null;
+      _translatedComments = null;
     });
     final sub = await ChecklistSubmissionService().getById(widget.documentId);
     if (!mounted) return;
@@ -73,6 +76,23 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
         );
         if (translatedName != null && translatedName != sub.checklistName && mounted) {
           setState(() => _translatedChecklistName = translatedName);
+        }
+      }
+
+      // Перевод комментария (если есть)
+      final comments = (sub.payload['comments'] as String?)?.trim() ?? '';
+      if (comments.isNotEmpty) {
+        final commentHash = comments.hashCode.toRadixString(16);
+        final translatedComments = await translationSvc.translate(
+          entityType: TranslationEntityType.checklist,
+          entityId: sub.id,
+          fieldName: 'comments_$commentHash',
+          text: comments,
+          from: sourceLang,
+          to: targetLang,
+        );
+        if (translatedComments != null && translatedComments != comments && mounted) {
+          setState(() => _translatedComments = translatedComments);
         }
       }
 
@@ -150,7 +170,10 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
     final endTime = sub.payload['endTime'] != null
         ? DateTime.tryParse(sub.payload['endTime'].toString())
         : null;
-    final comments = sub.payload['comments'] as String?;
+    final commentsRaw = (sub.payload['comments'] as String?)?.trim();
+    final comments = (_translatedComments?.trim().isNotEmpty == true)
+        ? _translatedComments
+        : commentsRaw;
     final position = sub.payload['position'] as String?;
     final displayName = _translatedChecklistName ?? sub.checklistName;
 

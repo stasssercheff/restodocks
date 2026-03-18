@@ -17,6 +17,7 @@ import 'core/supabase_url_resolver_stub.dart'
 import 'services/services.dart';
 import 'services/translation_manager.dart';
 import 'screens/screens.dart';
+import 'widgets/widgets.dart';
 
 const String _supabaseUrlEnv = String.fromEnvironment(
   'SUPABASE_URL',
@@ -76,6 +77,7 @@ void main() async {
   await OwnerViewPreferenceService().initialize();
   await TtkBranchFilterService().initialize();
   await ScreenLayoutPreferenceService().initialize();
+  await MobileUiScaleService().initialize();
   AppToastService.init(AppRouter.rootNavigatorKey);
   runApp(const RestodocksApp());
 }
@@ -91,6 +93,7 @@ class RestodocksApp extends StatelessWidget {
       child: _TranslationManagerConnector(
         child: Consumer2<LocalizationService, ThemeService>(
         builder: (context, localization, themeService, child) {
+          final uiScale = context.watch<MobileUiScaleService>();
           return MaterialApp.router(
             title: localization.t('app_name'),
             theme: AppTheme.lightTheme,
@@ -105,7 +108,29 @@ class RestodocksApp extends StatelessWidget {
               FlutterQuillLocalizations.delegate,
             ],
             routerConfig: AppRouter.router,
-            builder: (context, child) => WebLocationCorrection(child: child),
+            builder: (context, child) {
+              final c = child ?? const SizedBox.shrink();
+              final media = MediaQuery.of(context);
+              final isPhone = media.size.shortestSide < 600;
+              if (!isPhone) {
+                return WebLocationCorrection(
+                  child: AppPrimaryScrollController(child: c),
+                );
+              }
+
+              final factor = uiScale.scaleFactor;
+              final scaled = MediaQuery(
+                data: media.copyWith(
+                  // Уменьшаем общий масштаб текста на телефоне (остальное подтягивается
+                  // за счёт компактных размеров в теме и плотной верстки экранов).
+                  textScaler: TextScaler.linear(media.textScaleFactor * factor),
+                ),
+                child: c,
+              );
+              return WebLocationCorrection(
+                child: AppPrimaryScrollController(child: scaled),
+              );
+            },
             debugShowCheckedModeBanner: false,
           );
         },
