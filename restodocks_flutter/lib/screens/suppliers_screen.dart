@@ -92,6 +92,175 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     }
   }
 
+  Future<void> _saveSupplierEdits(OrderList updated) async {
+    final acc = context.read<AccountManagerSupabase>();
+    final estId = acc.establishment?.id;
+    if (estId == null) return;
+    final dept = updated.department;
+    final lists = await loadOrderLists(estId, department: dept);
+    final idx = lists.indexWhere((l) => l.id == updated.id);
+    final merged = List<OrderList>.from(lists);
+    if (idx >= 0) {
+      merged[idx] = updated;
+    } else {
+      merged.add(updated);
+    }
+    await saveOrderLists(estId, merged, department: dept);
+  }
+
+  Future<void> _editSupplier(OrderList s) async {
+    final loc = context.read<LocalizationService>();
+    final nameCtrl = TextEditingController(text: s.supplierName);
+    final emailCtrl = TextEditingController(text: s.email ?? '');
+    final phoneCtrl = TextEditingController(text: s.phone ?? '');
+    final telegramCtrl = TextEditingController(text: s.telegram ?? '');
+    final zaloCtrl = TextEditingController(text: s.zalo ?? '');
+    final whatsappCtrl = TextEditingController(text: s.whatsapp ?? '');
+
+    OrderList? result;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
+        return Padding(
+          padding: EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 16 + bottomInset),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(loc.t('order_tab_suppliers') ?? 'Поставщик', style: Theme.of(ctx).textTheme.titleMedium),
+              const SizedBox(height: 12),
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: loc.t('order_list_supplier_name') ?? 'Поставщик',
+                  border: const OutlineInputBorder(),
+                ),
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: emailCtrl,
+                decoration: InputDecoration(
+                  labelText: loc.t('order_list_contact_email') ?? 'Email',
+                  border: const OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: phoneCtrl,
+                decoration: InputDecoration(
+                  labelText: loc.t('order_list_contact_phone') ?? 'Телефон',
+                  border: const OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: telegramCtrl,
+                decoration: InputDecoration(
+                  labelText: loc.t('order_list_contact_telegram') ?? 'Telegram',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: whatsappCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'WhatsApp',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: zaloCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Zalo',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: Text(loc.t('cancel') ?? 'Отмена'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        final supplierName = nameCtrl.text.trim();
+                        if (supplierName.isEmpty) return;
+                        result = s.copyWith(
+                          name: supplierName,
+                          supplierName: supplierName,
+                          email: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
+                          phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
+                          telegram: telegramCtrl.text.trim().isEmpty ? null : telegramCtrl.text.trim(),
+                          whatsapp: whatsappCtrl.text.trim().isEmpty ? null : whatsappCtrl.text.trim(),
+                          zalo: zaloCtrl.text.trim().isEmpty ? null : zaloCtrl.text.trim(),
+                        );
+                        Navigator.of(ctx).pop();
+                      },
+                      child: Text(loc.t('save') ?? 'Сохранить'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () {
+                  final supplierName = nameCtrl.text.trim();
+                  final draft = (supplierName.isEmpty ? s : s.copyWith(name: supplierName, supplierName: supplierName)).copyWith(
+                    email: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
+                    phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
+                    telegram: telegramCtrl.text.trim().isEmpty ? null : telegramCtrl.text.trim(),
+                    whatsapp: whatsappCtrl.text.trim().isEmpty ? null : whatsappCtrl.text.trim(),
+                    zalo: zaloCtrl.text.trim().isEmpty ? null : zaloCtrl.text.trim(),
+                  );
+                  result = draft;
+                  Navigator.of(ctx).pop();
+                  context.push('/product-order/new/products?pop=1', extra: draft);
+                },
+                icon: const Icon(Icons.edit),
+                label: Text(loc.t('order_list_add_products') ?? 'Редактировать продукты'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    nameCtrl.dispose();
+    emailCtrl.dispose();
+    phoneCtrl.dispose();
+    telegramCtrl.dispose();
+    zaloCtrl.dispose();
+    whatsappCtrl.dispose();
+
+    if (result == null) return;
+    final updated = result!;
+    // Сохраняем и локально обновляем список
+    try {
+      await _saveSupplierEdits(updated);
+      if (!mounted) return;
+      setState(() {
+        final idx = _suppliers.indexWhere((x) => x.id == updated.id);
+        if (idx >= 0) _suppliers[idx] = updated;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('save')} ✓')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('error_short') ?? 'Ошибка'}: $e')));
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -269,6 +438,11 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                 style: const TextStyle(fontWeight: FontWeight.w600),
                 overflow: TextOverflow.ellipsis,
               ),
+              trailing: IconButton(
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: loc.t('edit') ?? 'Редактировать',
+                onPressed: () => _editSupplier(s),
+              ),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -313,7 +487,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                                     ),
                                   ),
                                   Text(
-                                    '${item.unit}',
+                                    '${CulinaryUnits.displayName(item.unit, loc.currentLanguageCode)}',
                                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                                         ),

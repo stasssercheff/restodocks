@@ -587,10 +587,6 @@ class _EmployeeCard extends StatelessWidget {
 
 const _departmentKeys = ['kitchen', 'bar', 'dining_room', 'management'];
 const _departmentLabels = {'kitchen': 'Кухня', 'bar': 'Бар', 'dining_room': 'Зал', 'management': 'Управление'};
-const _roleOptions = [
-  'owner', 'executive_chef', 'sous_chef', 'cook', 'bartender', 'waiter',
-  'bar_manager', 'floor_manager', 'general_manager', 'brigadier', 'senior_cook', 'pizzaiolo', 'pastry_chef',
-];
 String _roleLabel(String code, LocalizationService loc) {
   final key = 'role_$code';
   final t = loc.t(key);
@@ -621,7 +617,8 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
   late TextEditingController _rateController;
   late String _department;
   late String? _section;
-  late List<String> _roles;
+  late bool _isOwner;
+  String? _positionRole;
   late String _paymentType;
   late bool _isActive;
   late bool _dataAccessEnabled;
@@ -644,7 +641,8 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
     );
     _department = widget.employee.department;
     _section = widget.employee.section;
-    _roles = List.from(widget.employee.roles);
+    _isOwner = widget.employee.hasRole('owner');
+    _positionRole = widget.employee.positionRole;
     _paymentType = widget.employee.paymentType ?? 'hourly';
     _isActive = widget.employee.isActive;
     _dataAccessEnabled = widget.employee.dataAccessEnabled;
@@ -653,6 +651,9 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
     _employmentStartDate = widget.employee.employmentStartDate;
     _employmentEndDate = widget.employee.employmentEndDate;
     _birthday = widget.employee.birthday;
+
+    // Если должность ещё не задана (например, только owner) — подставляем первую из доступных.
+    _positionRole ??= _positionOptionsFor(_department, _section).firstOrNull;
   }
 
   @override
@@ -662,6 +663,23 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
     super.dispose();
   }
 
+  List<String> _positionOptionsFor(String department, String? section) {
+    if (department == 'kitchen') {
+      final sec = (section?.trim().isNotEmpty == true)
+          ? section!.trim()
+          : (RolesConfig.kitchenSections().firstOrNull ?? 'hot_kitchen');
+      return RolesConfig.kitchenRolesForSection(sec).map((e) => e.roleCode).toList();
+    }
+    if (department == 'bar') return RolesConfig.barRoles().map((e) => e.roleCode).toList();
+    if (department == 'dining_room') return RolesConfig.hallRoles().map((e) => e.roleCode).toList();
+    // management
+    final base = RolesConfig.managementRoles().map((e) => e.roleCode).toList();
+    for (final extra in ['general_manager', 'bar_manager', 'sous_chef']) {
+      if (!base.contains(extra)) base.add(extra);
+    }
+    return base;
+  }
+
   Future<void> _save() async {
     final loc = context.read<LocalizationService>();
     final name = _nameController.text.trim();
@@ -669,18 +687,21 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
       setState(() => _error = 'Введите имя');
       return;
     }
-    if (_roles.isEmpty) {
-      setState(() => _error = 'Выберите хотя бы одну роль');
+    if (_positionRole == null || _positionRole!.trim().isEmpty) {
+      setState(() => _error = (loc.t('position') ?? 'Должность') + ': ' + (loc.t('required') ?? 'обязательно'));
       return;
     }
     final rate = double.tryParse(_rateController.text.trim());
     setState(() { _saving = true; _error = null; });
     try {
+      final roles = <String>[];
+      if (_isOwner) roles.add('owner');
+      roles.add(_positionRole!.trim());
       final updated = widget.employee.copyWith(
         fullName: name,
         department: _department,
         section: _department == 'kitchen' ? _section : null,
-        roles: _roles,
+        roles: roles,
         paymentType: _paymentType,
         ratePerShift: _paymentType == 'per_shift' ? (rate ?? 0) : null,
         hourlyRate: _paymentType == 'hourly' ? rate : null,
@@ -789,6 +810,10 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                         onChanged: (v) => setState(() {
                           _department = v ?? _department;
                           if (_department != 'kitchen') _section = null;
+                          final opts = _positionOptionsFor(_department, _section);
+                          if (_positionRole == null || !opts.contains(_positionRole)) {
+                            _positionRole = opts.isNotEmpty ? opts.first : null;
+                          }
                         }),
                       ),
                       if (_department == 'kitchen') ...[
@@ -800,25 +825,34 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                             const DropdownMenuItem(value: null, child: Text('—')),
                             ...RolesConfig.kitchenSections().map((s) => DropdownMenuItem(value: s, child: Text(loc.t('section_$s') != 'section_$s' ? loc.t('section_$s') : s))),
                           ],
-                          onChanged: (v) => setState(() => _section = v),
+                          onChanged: (v) => setState(() {
+                            _section = v;
+                            final opts = _positionOptionsFor(_department, _section);
+                            if (_positionRole == null || !opts.contains(_positionRole)) {
+                              _positionRole = opts.isNotEmpty ? opts.first : null;
+                            }
+                          }),
                         ),
                       ],
                       const SizedBox(height: 12),
-                      Text(loc.t('roles') ?? 'Роли', style: theme.textTheme.titleSmall),
+                      DropdownButtonFormField<String>(
+                        value: _positionRole,
+                        decoration: InputDecoration(
+                          labelText: loc.t('position') ?? 'Должность',
+                          border: const OutlineInputBorder(),
+                          filled: true,
+                        ),
+                        items: _positionOptionsFor(_department, _section)
+                            .map((code) => DropdownMenuItem(value: code, child: Text(_roleLabel(code, loc))))
+                            .toList(),
+                        onChanged: (v) => setState(() => _positionRole = v),
+                      ),
                       const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: _roleOptions.map((code) {
-                          final selected = _roles.contains(code);
-                          return FilterChip(
-                            label: Text(_roleLabel(code, loc)),
-                            selected: selected,
-                            onSelected: (v) => setState(() {
-                              if (v) _roles.add(code); else _roles.remove(code);
-                            }),
-                          );
-                        }).toList(),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(loc.t('role_owner') ?? 'Собственник'),
+                        value: _isOwner,
+                        onChanged: (v) => setState(() => _isOwner = v),
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(

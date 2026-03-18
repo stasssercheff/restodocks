@@ -576,7 +576,8 @@ class AppRouter {
             pageBuilder: (context, state) {
               final draft = state.extra as OrderList?;
               if (draft == null) return _slideTransitionPage(state, const _RedirectToProductOrder());
-              return _slideTransitionPage(state, OrderListProductsScreen(draft: draft));
+              final popCount = int.tryParse(state.queryParameters['pop'] ?? '') ?? 2;
+              return _slideTransitionPage(state, OrderListProductsScreen(draft: draft, popCountOnSave: popCount));
             },
           ),
           GoRoute(

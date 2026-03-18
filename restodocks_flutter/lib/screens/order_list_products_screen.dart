@@ -8,9 +8,10 @@ import '../widgets/app_bar_home_button.dart';
 
 /// Шаг 2: добавление продуктов в список заказа (для конкретного поставщика). У каждого продукта задаётся единица измерения.
 class OrderListProductsScreen extends StatefulWidget {
-  const OrderListProductsScreen({super.key, required this.draft});
+  const OrderListProductsScreen({super.key, required this.draft, this.popCountOnSave = 2});
 
   final OrderList draft;
+  final int popCountOnSave;
 
   @override
   State<OrderListProductsScreen> createState() => _OrderListProductsScreenState();
@@ -141,16 +142,23 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
     if (estId == null) return;
     final dept = _list.department;
     final lists = await loadOrderLists(estId, department: dept);
-    await saveOrderLists(estId, [...lists, _list], department: dept);
+    final idx = lists.indexWhere((l) => l.id == _list.id);
+    final merged = List<OrderList>.from(lists);
+    if (idx >= 0) {
+      merged[idx] = _list;
+    } else {
+      merged.add(_list);
+    }
+    await saveOrderLists(estId, merged, department: dept);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${loc.t('save')} ✓')),
       );
-      // pop дважды: сначала из экрана продуктов (/product-order/new/products),
-      // затем из экрана создания поставщика (/product-order/new) — это разрешает
-      // await context.push(...) в OrderListsScreen и триггерит _load() сразу.
-      if (context.canPop()) context.pop();
-      if (context.canPop()) context.pop();
+      // По умолчанию попаем 2 раза (create flow). Для редактирования можно popCountOnSave=1.
+      for (var i = 0; i < widget.popCountOnSave; i++) {
+        if (!context.canPop()) break;
+        context.pop();
+      }
     }
   }
 

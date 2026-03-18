@@ -367,10 +367,27 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   // Активная вкладка
   _NomTab _selectedTab = _NomTab.nomenclature;
 
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureLoaded());
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToTop() {
+    if (!_scrollController.hasClients) return;
+    _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   Future<void> _ensureLoaded({bool skipAutoTranslation = false}) async {
@@ -1291,10 +1308,17 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final iikoStore = context.watch<IikoProductStore>();
     final estId2 = account.dataEstablishmentId ?? '';
 
+    final isPhone = MediaQuery.of(context).size.width < 600;
+    final canCreateProduct = (_selectedTab == _NomTab.nomenclature || _selectedTab == _NomTab.newProducts);
+
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('nomenclature')),
+        title: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _scrollToTop,
+          child: Text(loc.t('nomenclature')),
+        ),
         actions: [
           // Счётчик: показываем для активной вкладки
           if (_selectedTab == _NomTab.nomenclature || _selectedTab == _NomTab.newProducts)
@@ -1349,8 +1373,17 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
+      floatingActionButton: isPhone && canCreateProduct
+          ? FloatingActionButton.extended(
+              onPressed: () => _showCreateProductDialog(loc),
+              icon: const Icon(Icons.add),
+              label: Text(loc.t('create_product') ?? 'Создать продукт'),
+            )
+          : null,
+      body: PrimaryScrollController(
+        controller: _scrollController,
+        child: Column(
+          children: [
           // ── Переключатель вкладок (FilterChip, как в Входящих) ──────────────
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1522,7 +1555,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               ],
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }
