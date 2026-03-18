@@ -9,7 +9,7 @@ class _DocumentSection {
 
 /// Элемент: либо подпункт (текст), либо вложенная секция (подзаголовок + подпункты).
 class _DocumentItem {
-  const _DocumentItem(this.text, [List<_DocumentItem>? nested]);
+  const _DocumentItem(this.text, [this.nested]);
   final String text;
   final List<_DocumentItem>? nested;
 }
