@@ -101,6 +101,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   List<Product> _finishedBrakerageProducts = [];
   String? _selectedFinishedBrakerageTechCardId;
   final HaccpFormPresetService _presetService = HaccpFormPresetService();
+  /// Сохранённые варианты по ключу поля формы (хранение в SharedPreferences под ключом logType:field).
   final Map<String, List<String>> _presetOptions = {};
 
   /// Сотрудники заведения для форм медкнижек, медосмотров и полей «ответственный»/«подпись».
@@ -124,8 +125,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadSavedFieldOptions());
   }
 
-  String _presetFieldKeyForLog(String fieldKey) =>
-      '${_logType?.code ?? 'unknown'}:$fieldKey';
+  String _presetStorageKey(String fieldKey) => '${_logType?.code ?? 'unknown'}:$fieldKey';
 
   List<String> _presetFieldsForCurrentLog() {
     switch (_logType) {
@@ -157,6 +157,18 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       default:
         return const [];
     }
+  }
+
+  static List<String> _mergeUniqueOptions(Iterable<String> a, Iterable<String> b) {
+    final map = <String, String>{};
+    for (final raw in [...a, ...b]) {
+      final t = raw.trim();
+      if (t.isEmpty) continue;
+      map.putIfAbsent(t.toLowerCase(), () => t);
+    }
+    final out = map.values.toList()
+      ..sort((x, y) => x.toLowerCase().compareTo(y.toLowerCase()));
+    return out;
   }
 
   Future<void> _loadFormEmployees() async {
@@ -201,11 +213,26 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       if (fields.isEmpty) return;
       final Map<String, List<String>> next = {};
       for (final f in fields) {
-        final key = _presetFieldKeyForLog(f);
-        final list = await _presetService.getOptions(
+        final scoped = _presetStorageKey(f);
+        var list = await _presetService.getOptions(
           establishmentId: est.id,
-          fieldKey: key,
+          fieldKey: scoped,
         );
+        // Миграция со старых ключей (до разделения по журналам)
+        if (_logType == HaccpLogType.fridgeTemperature && f == 'equipment') {
+          final legacy = await _presetService.getOptions(
+            establishmentId: est.id,
+            fieldKey: 'fridge_equipment',
+          );
+          list = _mergeUniqueOptions(list, legacy);
+        }
+        if (_logType == HaccpLogType.warehouseTempHumidity && f == 'warehouse_premises') {
+          final legacy = await _presetService.getOptions(
+            establishmentId: est.id,
+            fieldKey: 'warehouse_premises',
+          );
+          list = _mergeUniqueOptions(list, legacy);
+        }
         next[f] = list;
       }
       if (!mounted) return;
@@ -220,20 +247,27 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   Future<void> _saveCurrentOption({
     required String controllerKey,
     required String fieldKey,
+    bool showFeedback = false,
   }) async {
     final est = context.read<AccountManagerSupabase>().establishment;
     final value = _getText(controllerKey);
     if (est == null || value.isEmpty) return;
-    final scopedFieldKey = _presetFieldKeyForLog(fieldKey);
+    final storageKey = _presetStorageKey(fieldKey);
     final updated = await _presetService.addOption(
       establishmentId: est.id,
-      fieldKey: scopedFieldKey,
+      fieldKey: storageKey,
       value: value,
     );
     if (!mounted) return;
-    setState(() {
-      _presetOptions[fieldKey] = updated;
-    });
+    setState(() => _presetOptions[fieldKey] = updated);
+    if (showFeedback && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Вариант сохранён — выберите его из списка (стрелка) при следующей записи'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _loadFinishedBrakerageChoices() async {
@@ -391,8 +425,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             ? Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text(
-                  context.read<LocalizationService>().t('no_results') ?? 'Ничего не найдено',
+                  'Пока нет сохранённых вариантов.\nВведите текст в поле и нажмите «в список» (иконка с плюсом).',
                   textAlign: TextAlign.center,
+                  style: Theme.of(ctx).textTheme.bodyMedium,
                 ),
               )
             : ListView(
@@ -422,6 +457,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     required String presetFieldKey,
     String? hintText,
     String? Function(String?)? validator,
+    bool showHelperUnderField = false,
   }) {
     _controllers[key] ??= TextEditingController();
     return TextFormField(
@@ -429,33 +465,34 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       decoration: InputDecoration(
         labelText: label,
         hintText: hintText,
+        helperText: showHelperUnderField ? 'Плюс — в список, стрелка — выбрать' : null,
         border: const OutlineInputBorder(),
         isDense: true,
-        suffixIconConstraints: const BoxConstraints(minWidth: 84),
+        suffixIconConstraints: const BoxConstraints(minWidth: 96, minHeight: 40),
         suffixIcon: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              tooltip: context.read<LocalizationService>().t('save') ?? 'Сохранить',
-              icon: const Icon(Icons.bookmark_add_outlined),
+              tooltip: 'Сохранить в список (этот журнал)',
+              icon: const Icon(Icons.playlist_add),
               onPressed: () => _saveCurrentOption(
                 controllerKey: key,
                 fieldKey: presetFieldKey,
+                showFeedback: true,
               ),
             ),
-            if (options.isNotEmpty)
-              IconButton(
-                tooltip: label,
-                icon: const Icon(Icons.arrow_drop_down),
-                onPressed: () async {
-                  final picked = await _showSavedOptionsPicker(
-                    title: label,
-                    options: options,
-                  );
-                  if (picked == null) return;
-                  setState(() => _setText(key, picked));
-                },
-              ),
+            IconButton(
+              tooltip: 'Выбрать из сохранённых',
+              icon: const Icon(Icons.arrow_drop_down_circle_outlined),
+              onPressed: () async {
+                final picked = await _showSavedOptionsPicker(
+                  title: label,
+                  options: options,
+                );
+                if (picked == null) return;
+                setState(() => _setText(key, picked));
+              },
+            ),
           ],
         ),
       ),
@@ -1462,7 +1499,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   Widget _buildEquipmentWashingForm(LocalizationService loc) {
     return Table(
       columnWidths: const {
-        0: FlexColumnWidth(0.6), 1: FlexColumnWidth(0.5), 2: FlexColumnWidth(1), 3: FlexColumnWidth(0.9), 4: FlexColumnWidth(0.5),
+        0: FlexColumnWidth(0.6), 1: FlexColumnWidth(0.5), 2: FlexColumnWidth(1.35), 3: FlexColumnWidth(1.1), 4: FlexColumnWidth(0.5),
         5: FlexColumnWidth(0.9), 6: FlexColumnWidth(0.5), 7: FlexColumnWidth(0.5), 8: FlexColumnWidth(0.8), 9: FlexColumnWidth(0.8),
       },
       border: TableBorder.all(color: Theme.of(context).dividerColor),
@@ -2260,7 +2297,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       note: _getText('note').isNotEmpty ? _getText('note') : null,
     );
     for (final f in _presetFieldsForCurrentLog()) {
-      await _saveCurrentOption(controllerKey: f, fieldKey: f);
+      await _saveCurrentOption(controllerKey: f, fieldKey: f, showFeedback: false);
     }
   }
 
