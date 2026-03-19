@@ -1257,13 +1257,19 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       var loadedTechCards = <TechCard>[];
       if (est != null) {
         final productStore = context.read<ProductStoreSupabase>();
-        // Параллельная загрузка продуктов и номенклатуры
-        await Future.wait([
-          productStore.loadProducts().catchError((_) {}),
-          est.isBranch
-              ? productStore.loadNomenclatureForBranch(est.id, est.dataEstablishmentId!).catchError((_) {})
-              : productStore.loadNomenclature(est.dataEstablishmentId).catchError((_) {}),
-        ]);
+        // Загружаем только продукты для быстрого старта, номенклатуру - фоном
+        await productStore.loadProducts().catchError((_) {});
+        
+        // Номенклатура в фоне (для цен)
+        Future.microtask(() async {
+          try {
+            if (est.isBranch) {
+              await productStore.loadNomenclatureForBranch(est.id, est.dataEstablishmentId!);
+            } else {
+              await productStore.loadNomenclature(est.dataEstablishmentId);
+            }
+          } catch (_) {}
+        });
         // Не блокируем первый рендер загрузкой всех ТТК.
         // Справочник ТТК подтягиваем фоном и досчитываем вложенные ПФ после открытия экрана.
         final deferTcLoad = true;
@@ -1334,10 +1340,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               final customBar = customResults[1] as List<({String id, String name})>;
               
               tcs = tcs.map(stripInvalidNestedPfSelfLinks).toList();
-              tcs = await tcSvc.fillIngredientsForCardsBulk(tcs);
-              final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
-              if (estPriceId != null && estPriceId.isNotEmpty) {
-                tcs = TechCardCostHydrator.hydrate(tcs, productStore, estPriceId);
+              // Гидратация цен только если нужно для расчётов вложенных ПФ
+              final emp = context.read<AccountManagerSupabase>().currentEmployee;
+              final needsCostCalculation = emp?.canSeeCosts ?? false;
+              if (needsCostCalculation) {
+                tcs = await tcSvc.fillIngredientsForCardsBulk(tcs);
+                final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
+                if (estPriceId != null && estPriceId.isNotEmpty) {
+                  tcs = TechCardCostHydrator.hydrate(tcs, productStore, estPriceId);
+                }
               }
               if (!mounted) return;
               setState(() {

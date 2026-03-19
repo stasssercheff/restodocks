@@ -501,47 +501,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   Widget _buildReviewList(
       List<TechCard> techCards, LocalizationService loc, bool canEdit) {
     final lang = loc.currentLanguageCode;
-    bool hasMissingIngredientPrice(TechCard tc) {
-      for (final ing in tc.ingredients) {
-        final name = ing.productName.trim();
-        if (name.isEmpty) continue;
-        final nestedId = _inferNestedPfId(tc, ing);
-        if (nestedId != null && nestedId.isNotEmpty) {
-          final nested = _resolveTechCardCostOutput(nestedId, <String>{});
-          if (nested.cost <= 0 || nested.output <= 0) return true;
-          continue;
-        }
-        if (_leafIngredientMonetaryCost(ing) <= 0) return true;
-      }
-      return false;
-    }
-
-    bool hasOwnMissingPrice(TechCard tc) {
-      return tc.isSemiFinished
-          ? _calculateCostPerKg(tc) <= 0
-          : _calculateCostPerPortion(tc) <= 0;
-    }
-
     final list = techCards
-        .map((tc) => (
-              tc: tc,
-              ambiguous: _ambiguousPfIngredientCount(tc, loc),
-              ownMissingPrice: hasOwnMissingPrice(tc),
-              hasMissingIngredientPrice: hasMissingIngredientPrice(tc),
-            ))
-        .where((e) =>
-            e.ambiguous > 0 || e.ownMissingPrice || e.hasMissingIngredientPrice)
+        .map((tc) => (tc: tc, ambiguous: _ambiguousPfIngredientCount(tc, loc)))
+        .where((e) => e.ambiguous > 0)
         .toList()
-      ..sort((a, b) {
-        final scoreA = (a.ownMissingPrice ? 2 : 0) +
-            (a.hasMissingIngredientPrice ? 2 : 0) +
-            (a.ambiguous > 0 ? 1 : 0);
-        final scoreB = (b.ownMissingPrice ? 2 : 0) +
-            (b.hasMissingIngredientPrice ? 2 : 0) +
-            (b.ambiguous > 0 ? 1 : 0);
-        if (scoreA != scoreB) return scoreB.compareTo(scoreA);
-        return b.ambiguous.compareTo(a.ambiguous);
-      });
+      ..sort((a, b) => b.ambiguous.compareTo(a.ambiguous));
 
     if (list.isEmpty) {
       return Center(
@@ -567,21 +531,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           final item = list[i];
           final tc = item.tc;
           final name = tc.getDisplayNameInLists(lang);
-          final issues = <String>[];
-          if (item.ownMissingPrice) {
-            issues.add(tc.isSemiFinished ? 'Цена ТТК = 0 за кг' : 'Цена ТТК = 0 за порцию');
-          }
-          if (item.hasMissingIngredientPrice) {
-            issues.add('Есть ингредиенты без цены');
-          }
-          if (item.ambiguous > 0) {
-            issues.add('Неоднозначных ингредиентов: ${item.ambiguous}');
-          }
-          final est = context.read<AccountManagerSupabase>().establishment;
-          final viewOnlyCard = est != null && est.isBranch && tc.establishmentId != est.id;
-          final path = (canEdit && !viewOnlyCard)
-              ? '/tech-cards/${tc.id}'
-              : '/tech-cards/${tc.id}?view=1';
           return ListTile(
             tileColor: Theme.of(ctx).colorScheme.surfaceContainerLowest,
             shape: RoundedRectangleBorder(
@@ -589,15 +538,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 side: BorderSide(
                     color: Theme.of(ctx).colorScheme.outlineVariant)),
             title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-            subtitle: Text(issues.join(' • ')),
+            subtitle: Text('Неоднозначных ингредиентов: ${item.ambiguous}'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              if (item.ambiguous > 0) {
-                _showReviewBottomSheet(tc, loc);
-              } else {
-                context.push(path);
-              }
-            },
+            onTap: () => _showReviewBottomSheet(tc, loc),
           );
         },
       ),
@@ -982,13 +925,19 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         if (!identical(s, tc)) toPersistSelfLink.add(s);
       }
       
-      // Один bulk-запрос по ingredient'ам вместо N+1 догрузок по карточкам.
-      var processedAll = await svc.fillIngredientsForCardsBulk(sanitizedAll);
+      var processedAll = sanitizedAll;
 
-      // Та же гидратация, что в редакторе — «Итого стоимость за кг» = ₽/кг в списке.
-      final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
-      if (estPriceId != null && estPriceId.isNotEmpty) {
-        processedAll = TechCardCostHydrator.hydrate(processedAll, productStore, estPriceId);
+      // Гидратация цен только если пользователь может видеть стоимость
+      final emp = context.read<AccountManagerSupabase>().currentEmployee;
+      final canSeeCosts = emp?.canSeeCosts ?? false;
+      if (canSeeCosts) {
+        // Bulk-догрузка ингредиентов нужна только для расчёта цен
+        processedAll = await svc.fillIngredientsForCardsBulk(processedAll);
+        
+        final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
+        if (estPriceId != null && estPriceId.isNotEmpty) {
+          processedAll = TechCardCostHydrator.hydrate(processedAll, productStore, estPriceId);
+        }
       }
 
       _customCategoryNames.clear();
@@ -2180,33 +2129,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final reviewFiltered = filterBySectionAndCategory(filterBySearch(_list));
 
     _rebuildPfCandidatesIndex(loc);
-    bool hasMissingIngredientPrice(TechCard tc) {
-      for (final ing in tc.ingredients) {
-        final name = ing.productName.trim();
-        if (name.isEmpty) continue;
-        final nestedId = _inferNestedPfId(tc, ing);
-        if (nestedId != null && nestedId.isNotEmpty) {
-          final nested = _resolveTechCardCostOutput(nestedId, <String>{});
-          if (nested.cost <= 0 || nested.output <= 0) return true;
-          continue;
-        }
-        if (_leafIngredientMonetaryCost(ing) <= 0) return true;
-      }
-      return false;
-    }
-
-    bool hasOwnMissingPrice(TechCard tc) {
-      return tc.isSemiFinished
-          ? _calculateCostPerKg(tc) <= 0
-          : _calculateCostPerPortion(tc) <= 0;
-    }
-
-    final reviewCount = reviewFiltered.where((tc) {
-      if (_ambiguousPfIngredientCount(tc, loc) > 0) return true;
-      if (hasOwnMissingPrice(tc)) return true;
-      if (hasMissingIngredientPrice(tc)) return true;
-      return false;
-    }).length;
+    final reviewCount = reviewFiltered
+        .where((tc) => _ambiguousPfIngredientCount(tc, loc) > 0)
+        .length;
 
     final acc = context.read<AccountManagerSupabase>();
     final emp = acc.currentEmployee;

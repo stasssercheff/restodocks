@@ -215,11 +215,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         .fold<double>(0, (s, ing) => s + _lineCostForTotals(ing));
 
     // Расчет итоговой стоимости
+    // ПФ: стоимость за кг готового продукта.
+    // Блюдо: стоимость за порцию = общая стоимость * (вес порции / общий выход).
     final costPerKgFinishedProduct = widget.isSemiFinished
-        ? // Для ПФ: стоимость за кг готового продукта
-          (totalOutput > 0 ? ((totalCost / totalOutput) * 1000).ceil() : 0)
-        : // Для блюд: сумма стоимостей всех ингредиентов
-          totalCost;
+        ? (totalOutput > 0 ? ((totalCost / totalOutput) * 1000).ceil() : 0)
+        : (totalOutput > 0
+            ? (totalCost * (widget.weightPerPortion / totalOutput))
+            : 0);
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
