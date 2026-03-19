@@ -253,6 +253,20 @@ class NutritionProfileResolver {
     return null;
   }
 
+  Future<Map<String, dynamic>?> _fetchNutritionProfileByCanonicalKey(
+      String canonicalKey) async {
+    final rows = await _client
+        .from('nutrition_profiles')
+        .select(
+            'id, canonical_key, calories, protein, fat, carbs, contains_gluten, contains_lactose, confidence, status')
+        .eq('canonical_key', canonicalKey)
+        .limit(1);
+    if (rows is List && rows.isNotEmpty) {
+      return Map<String, dynamic>.from(rows.first as Map);
+    }
+    return null;
+  }
+
   Future<Map<String, dynamic>> _getOrCreateNutritionProfileFromCanonicalName({
     required String canonicalName,
     required String canonicalKey,
@@ -277,18 +291,28 @@ class NutritionProfileResolver {
     if (nutrition == null || !nutrition.hasData) {
       // Create empty-but-existing profile to keep links/aliases stable.
       final id = const Uuid().v4();
-      final inserted = await _client
-          .from('nutrition_profiles')
-          .insert({
-            'id': id,
-            'canonical_name': canonicalName,
-            'canonical_name_ru': canonicalName,
-            'canonical_key': canonicalKey,
-            'status': 'external_unverified',
-          })
-          .select()
-          .single();
-      return Map<String, dynamic>.from(inserted as Map);
+      try {
+        final inserted = await _client
+            .from('nutrition_profiles')
+            .insert({
+              'id': id,
+              'canonical_name': canonicalName,
+              'canonical_name_ru': canonicalName,
+              'canonical_key': canonicalKey,
+              'status': 'external_unverified',
+            })
+            .select()
+            .single();
+        return Map<String, dynamic>.from(inserted as Map);
+      } on PostgrestException catch (e) {
+        // Race condition: another request created same canonical_key first.
+        if (e.code == '23505' || e.code == '409') {
+          final existingByKey =
+              await _fetchNutritionProfileByCanonicalKey(canonicalKey);
+          if (existingByKey != null) return existingByKey;
+        }
+        rethrow;
+      }
     }
 
     final saneCal = NutritionApiService.saneCaloriesForProduct(canonicalName, nutrition.calories);
@@ -317,24 +341,34 @@ class NutritionProfileResolver {
     }
 
     final id = const Uuid().v4();
-    await _client.from('nutrition_profiles').insert({
-      'id': id,
-      'canonical_name': canonicalName,
-      'canonical_name_ru': canonicalName,
-      'canonical_key': canonicalKey,
-      'calories': saneCal ?? nutrition.calories,
-      'protein': nutrition.protein,
-      'fat': nutrition.fat,
-      'carbs': nutrition.carbs,
-      'contains_gluten': nutrition.containsGluten,
-      'contains_lactose': nutrition.containsLactose,
-      'source': 'openfoodfacts',
-      'source_ref': 'world.openfoodfacts.org',
-      'confidence': 0.7,
-      'status': 'external_unverified',
-      'last_verified_at': DateTime.now().toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
-    }).select().single();
+    try {
+      await _client.from('nutrition_profiles').insert({
+        'id': id,
+        'canonical_name': canonicalName,
+        'canonical_name_ru': canonicalName,
+        'canonical_key': canonicalKey,
+        'calories': saneCal ?? nutrition.calories,
+        'protein': nutrition.protein,
+        'fat': nutrition.fat,
+        'carbs': nutrition.carbs,
+        'contains_gluten': nutrition.containsGluten,
+        'contains_lactose': nutrition.containsLactose,
+        'source': 'openfoodfacts',
+        'source_ref': 'world.openfoodfacts.org',
+        'confidence': 0.7,
+        'status': 'external_unverified',
+        'last_verified_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      }).select().single();
+    } on PostgrestException catch (e) {
+      // Race condition: another request created same canonical_key first.
+      if (e.code == '23505' || e.code == '409') {
+        final existingByKey =
+            await _fetchNutritionProfileByCanonicalKey(canonicalKey);
+        if (existingByKey != null) return existingByKey;
+      }
+      rethrow;
+    }
 
     final profile = await _fetchNutritionProfile(id);
     if (profile != null) return profile;

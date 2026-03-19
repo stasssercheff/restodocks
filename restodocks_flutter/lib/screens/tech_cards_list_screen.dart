@@ -288,13 +288,17 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   double _costFromPricePerKgLine(double pricePerKg, TTIngredient ing) {
     if (pricePerKg <= 0) return 0.0;
+    final qty = ing.grossWeight > 0
+        ? ing.grossWeight
+        : (ing.netWeight > 0 ? ing.netWeight : ing.outputWeight);
+    if (qty <= 0) return 0.0;
     final u = ing.unit.toLowerCase().trim();
     if (u == 'шт' || u == 'pcs') {
       final gpp = ing.gramsPerPiece ?? 50.0;
       if (gpp <= 0) return 0.0;
-      return pricePerKg * (ing.grossWeight / gpp);
+      return pricePerKg * (qty / gpp);
     }
-    return pricePerKg * (ing.grossWeight / 1000.0);
+    return pricePerKg * (qty / 1000.0);
   }
 
   /// Стоимость строки-продукта: из ТТК, pricePerKg строки, номенклатуры (как в редакторе).
