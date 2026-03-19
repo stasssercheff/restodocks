@@ -101,8 +101,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   List<Product> _finishedBrakerageProducts = [];
   String? _selectedFinishedBrakerageTechCardId;
   final HaccpFormPresetService _presetService = HaccpFormPresetService();
-  List<String> _fridgeEquipmentOptions = [];
-  List<String> _warehousePremisesOptions = [];
+  final Map<String, List<String>> _presetOptions = {};
 
   /// Сотрудники заведения для форм медкнижек, медосмотров и полей «ответственный»/«подпись».
   List<Employee> _formEmployees = [];
@@ -119,11 +118,44 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadHealthEmployees());
     } else if (_logType == HaccpLogType.finishedProductBrakerage) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadFinishedBrakerageChoices());
-    } else if (_logType == HaccpLogType.fridgeTemperature ||
-        _logType == HaccpLogType.warehouseTempHumidity) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _loadSavedFieldOptions());
     } else if (_logType == HaccpLogType.medBookRegistry || _logType == HaccpLogType.medExaminations) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadFormEmployees());
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSavedFieldOptions());
+  }
+
+  String _presetFieldKeyForLog(String fieldKey) =>
+      '${_logType?.code ?? 'unknown'}:$fieldKey';
+
+  List<String> _presetFieldsForCurrentLog() {
+    switch (_logType) {
+      case HaccpLogType.fridgeTemperature:
+        return const ['equipment'];
+      case HaccpLogType.warehouseTempHumidity:
+        return const ['warehouse_premises'];
+      case HaccpLogType.equipmentWashing:
+        return const [
+          'wash_equipment_name',
+          'wash_solution_name',
+          'wash_disinfectant_name',
+        ];
+      case HaccpLogType.generalCleaningSchedule:
+        return const ['gen_clean_premises'];
+      case HaccpLogType.sieveFilterMagnet:
+        return const ['sieve_name_location', 'sieve_condition'];
+      case HaccpLogType.fryingOil:
+        return const ['oil_name', 'frying_equipment_type', 'frying_product_type'];
+      case HaccpLogType.incomingRawBrakerage:
+        return const ['manufacturer_supplier', 'storage_conditions', 'packaging'];
+      case HaccpLogType.disinfectantAccounting:
+        return const [
+          'disinf_object_name',
+          'disinf_treatment_type',
+          'disinf_agent_name',
+          'disinf_agent_name_receipt',
+        ];
+      default:
+        return const [];
     }
   }
 
@@ -165,18 +197,22 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     final est = context.read<AccountManagerSupabase>().establishment;
     if (est == null) return;
     try {
-      final fridge = await _presetService.getOptions(
-        establishmentId: est.id,
-        fieldKey: 'fridge_equipment',
-      );
-      final warehouse = await _presetService.getOptions(
-        establishmentId: est.id,
-        fieldKey: 'warehouse_premises',
-      );
+      final fields = _presetFieldsForCurrentLog();
+      if (fields.isEmpty) return;
+      final Map<String, List<String>> next = {};
+      for (final f in fields) {
+        final key = _presetFieldKeyForLog(f);
+        final list = await _presetService.getOptions(
+          establishmentId: est.id,
+          fieldKey: key,
+        );
+        next[f] = list;
+      }
       if (!mounted) return;
       setState(() {
-        _fridgeEquipmentOptions = fridge;
-        _warehousePremisesOptions = warehouse;
+        _presetOptions
+          ..clear()
+          ..addAll(next);
       });
     } catch (_) {}
   }
@@ -188,18 +224,15 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     final est = context.read<AccountManagerSupabase>().establishment;
     final value = _getText(controllerKey);
     if (est == null || value.isEmpty) return;
+    final scopedFieldKey = _presetFieldKeyForLog(fieldKey);
     final updated = await _presetService.addOption(
       establishmentId: est.id,
-      fieldKey: fieldKey,
+      fieldKey: scopedFieldKey,
       value: value,
     );
     if (!mounted) return;
     setState(() {
-      if (fieldKey == 'fridge_equipment') {
-        _fridgeEquipmentOptions = updated;
-      } else if (fieldKey == 'warehouse_premises') {
-        _warehousePremisesOptions = updated;
-      }
+      _presetOptions[fieldKey] = updated;
     });
   }
 
@@ -860,8 +893,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             _tableCell(_savedOptionTextField(
               key: 'equipment',
               label: loc.t('haccp_equipment') ?? 'Оборудование',
-              options: _fridgeEquipmentOptions,
-              presetFieldKey: 'fridge_equipment',
+              options: _presetOptions['equipment'] ?? const [],
+              presetFieldKey: 'equipment',
             )),
             _tableCell(Column(
               mainAxisSize: MainAxisSize.min,
@@ -897,7 +930,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             key: 'warehouse_premises',
             label: loc.t('haccp_warehouse_premises') ?? 'Наименование складского помещения',
             hintText: 'Например: Склад сухих продуктов, Овощной цех',
-            options: _warehousePremisesOptions,
+            options: _presetOptions['warehouse_premises'] ?? const [],
             presetFieldKey: 'warehouse_premises',
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Укажите помещение';
@@ -1055,12 +1088,27 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           children: [
             _tableCell(Text(DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()))),
             _tableCell(_textField('product', loc.t('haccp_product') ?? 'Наименование')),
-            _tableCell(_textField('packaging', 'Фасовка')),
-            _tableCell(_textField('manufacturer_supplier', 'Изготовитель/поставщик')),
+            _tableCell(_savedOptionTextField(
+              key: 'packaging',
+              label: 'Фасовка',
+              options: _presetOptions['packaging'] ?? const [],
+              presetFieldKey: 'packaging',
+            )),
+            _tableCell(_savedOptionTextField(
+              key: 'manufacturer_supplier',
+              label: 'Изготовитель/поставщик',
+              options: _presetOptions['manufacturer_supplier'] ?? const [],
+              presetFieldKey: 'manufacturer_supplier',
+            )),
             _tableCell(_textField('quantity_kg', 'кг/л/шт', keyboardType: TextInputType.number)),
             _tableCell(_textField('document_number', '№ док.')),
             _tableCell(_textField('result', loc.t('haccp_result') ?? 'Оценка', multiline: true)),
-            _tableCell(_textField('storage_conditions', 'Условия, срок')),
+            _tableCell(_savedOptionTextField(
+              key: 'storage_conditions',
+              label: 'Условия, срок',
+              options: _presetOptions['storage_conditions'] ?? const [],
+              presetFieldKey: 'storage_conditions',
+            )),
             _tableCell(InkWell(
               onTap: () async {
                 final d = await showDatePicker(
@@ -1222,10 +1270,25 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           children: [
             _tableCell(Text(DateFormat('dd.MM.yyyy').format(DateTime.now()))),
             _tableCell(Text(DateFormat('HH:mm').format(DateTime.now()))),
-            _tableCell(_textField('oil_name', 'Вид жира')),
+            _tableCell(_savedOptionTextField(
+              key: 'oil_name',
+              label: 'Вид жира',
+              options: _presetOptions['oil_name'] ?? const [],
+              presetFieldKey: 'oil_name',
+            )),
             _tableCell(_textField('organoleptic_start', 'Оценка на начало', multiline: true)),
-            _tableCell(_textField('frying_equipment_type', 'Тип оборудования')),
-            _tableCell(_textField('frying_product_type', 'Вид продукции')),
+            _tableCell(_savedOptionTextField(
+              key: 'frying_equipment_type',
+              label: 'Тип оборудования',
+              options: _presetOptions['frying_equipment_type'] ?? const [],
+              presetFieldKey: 'frying_equipment_type',
+            )),
+            _tableCell(_savedOptionTextField(
+              key: 'frying_product_type',
+              label: 'Вид продукции',
+              options: _presetOptions['frying_product_type'] ?? const [],
+              presetFieldKey: 'frying_product_type',
+            )),
             _tableCell(_textField('frying_end_time', 'Время (например 14:00)')),
             _tableCell(_textField('organoleptic_end', 'Оценка по окончании', multiline: true)),
             _tableCell(_textField('carry_over_kg', 'кг', keyboardType: TextInputType.number)),
@@ -1338,12 +1401,27 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 _tableHeaderCell('Раствор на 1 обр.'), _tableHeaderCell('Потребность 1 обр.'), _tableHeaderCell('В месяц'), _tableHeaderCell('В год'),
               ]),
               TableRow(children: [
-                _tableCell(_textField('disinf_object_name', 'Объект')),
+                _tableCell(_savedOptionTextField(
+                  key: 'disinf_object_name',
+                  label: 'Объект',
+                  options: _presetOptions['disinf_object_name'] ?? const [],
+                  presetFieldKey: 'disinf_object_name',
+                )),
                 _tableCell(_textField('disinf_object_count', 'Кол-во', keyboardType: TextInputType.number)),
                 _tableCell(_textField('disinf_area_sqm', 'м²', keyboardType: TextInputType.number)),
-                _tableCell(_textField('disinf_treatment_type', 'Т/Г')),
+                _tableCell(_savedOptionTextField(
+                  key: 'disinf_treatment_type',
+                  label: 'Т/Г',
+                  options: _presetOptions['disinf_treatment_type'] ?? const [],
+                  presetFieldKey: 'disinf_treatment_type',
+                )),
                 _tableCell(_textField('disinf_frequency', 'Кратность', keyboardType: TextInputType.number)),
-                _tableCell(_textField('disinf_agent_name', 'Дезсредство')),
+                _tableCell(_savedOptionTextField(
+                  key: 'disinf_agent_name',
+                  label: 'Дезсредство',
+                  options: _presetOptions['disinf_agent_name'] ?? const [],
+                  presetFieldKey: 'disinf_agent_name',
+                )),
                 _tableCell(_textField('disinf_concentration_pct', '%')),
                 _tableCell(_textField('disinf_consumption_per_sqm', 'Расход', keyboardType: TextInputType.number)),
                 _tableCell(_textField('disinf_solution_per_treatment', 'л/кг', keyboardType: TextInputType.number)),
@@ -1364,7 +1442,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             TableRow(children: [_tableHeaderCell('Дата'), _tableHeaderCell('Наименование'), _tableHeaderCell('Счёт, дата'), _tableHeaderCell('Кол-во'), _tableHeaderCell('Срок годности'), _tableHeaderCell('Ответственный')]),
             TableRow(children: [
               _tableCell(_datePickerCell('disinf_receipt_date', _disinfReceiptDate, (d) => setState(() => _disinfReceiptDate = d))),
-              _tableCell(_textField('disinf_agent_name_receipt', 'Наименование')),
+              _tableCell(_savedOptionTextField(
+                key: 'disinf_agent_name_receipt',
+                label: 'Наименование',
+                options: _presetOptions['disinf_agent_name_receipt'] ?? const [],
+                presetFieldKey: 'disinf_agent_name_receipt',
+              )),
               _tableCell(_textField('disinf_invoice_number', '№ счёта')),
               _tableCell(_textField('disinf_quantity', 'Кол-во', keyboardType: TextInputType.number)),
               _tableCell(_datePickerCell('disinf_expiry_date', _disinfExpiryDate, (d) => setState(() => _disinfExpiryDate = d))),
@@ -1392,10 +1475,25 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         TableRow(children: [
           _tableCell(Text(DateFormat('dd.MM.yyyy').format(DateTime.now()))),
           _tableCell(_textField('wash_time', 'Время')),
-          _tableCell(_textField('wash_equipment_name', 'Оборудование')),
-          _tableCell(_textField('wash_solution_name', 'Моющее')),
+          _tableCell(_savedOptionTextField(
+            key: 'wash_equipment_name',
+            label: 'Оборудование',
+            options: _presetOptions['wash_equipment_name'] ?? const [],
+            presetFieldKey: 'wash_equipment_name',
+          )),
+          _tableCell(_savedOptionTextField(
+            key: 'wash_solution_name',
+            label: 'Моющее',
+            options: _presetOptions['wash_solution_name'] ?? const [],
+            presetFieldKey: 'wash_solution_name',
+          )),
           _tableCell(_textField('wash_solution_concentration_pct', '%')),
-          _tableCell(_textField('wash_disinfectant_name', 'Дез. раствор')),
+          _tableCell(_savedOptionTextField(
+            key: 'wash_disinfectant_name',
+            label: 'Дез. раствор',
+            options: _presetOptions['wash_disinfectant_name'] ?? const [],
+            presetFieldKey: 'wash_disinfectant_name',
+          )),
           _tableCell(_textField('wash_disinfectant_concentration_pct', '%')),
           _tableCell(_textField('wash_rinsing_temp', 't°')),
           _tableCell(_signatureFromAccount()),
@@ -1413,7 +1511,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         TableRow(children: [_tableHeaderCell('№'), _tableHeaderCell('Помещение / зона'), _tableHeaderCell('Дата проведения'), _tableHeaderCell('Ответственный')]),
         TableRow(children: [
           _tableCell(const Text('1')),
-          _tableCell(_textField('gen_clean_premises', 'Помещение')),
+          _tableCell(_savedOptionTextField(
+            key: 'gen_clean_premises',
+            label: 'Помещение',
+            options: _presetOptions['gen_clean_premises'] ?? const [],
+            presetFieldKey: 'gen_clean_premises',
+          )),
           _tableCell(_datePickerCell('gen_clean_date', _genCleanDate, (d) => setState(() => _genCleanDate = d))),
           _tableCell(_signatureFromAccount()),
         ]),
@@ -1429,8 +1532,18 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         TableRow(children: [_tableHeaderCell('№ сита/магнита'), _tableHeaderCell('Наименование / Расположение'), _tableHeaderCell('Состояние'), _tableHeaderCell('Дата очистки'), _tableHeaderCell('ФИО, Подпись'), _tableHeaderCell('Комментарии')]),
         TableRow(children: [
           _tableCell(_textField('sieve_no', '№')),
-          _tableCell(_textField('sieve_name_location', 'Наименование')),
-          _tableCell(_textField('sieve_condition', 'Состояние')),
+          _tableCell(_savedOptionTextField(
+            key: 'sieve_name_location',
+            label: 'Наименование',
+            options: _presetOptions['sieve_name_location'] ?? const [],
+            presetFieldKey: 'sieve_name_location',
+          )),
+          _tableCell(_savedOptionTextField(
+            key: 'sieve_condition',
+            label: 'Состояние',
+            options: _presetOptions['sieve_condition'] ?? const [],
+            presetFieldKey: 'sieve_condition',
+          )),
           _tableCell(_datePickerCell('sieve_cleaning_date', _sieveCleaningDate, (d) => setState(() => _sieveCleaningDate = d))),
           _tableCell(_signatureFromAccount()),
           _tableCell(_textField('sieve_comments', 'Комментарии')),
@@ -1635,8 +1748,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             _savedOptionTextField(
               key: 'equipment',
               label: loc.t('haccp_equipment') ?? 'Оборудование',
-              options: _fridgeEquipmentOptions,
-              presetFieldKey: 'fridge_equipment',
+              options: _presetOptions['equipment'] ?? const [],
+              presetFieldKey: 'equipment',
             ),
             _mobileSlider(
               label: 'Температура',
@@ -1660,7 +1773,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 _savedOptionTextField(
                   key: 'warehouse_premises',
                   label: loc.t('haccp_warehouse_premises') ?? 'Наименование складского помещения',
-                  options: _warehousePremisesOptions,
+                  options: _presetOptions['warehouse_premises'] ?? const [],
                   presetFieldKey: 'warehouse_premises',
                   validator: (v) => (v == null || v.trim().isEmpty) ? 'Укажите помещение' : null,
                 ),
@@ -1717,12 +1830,27 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               readOnly: true,
             ),
             _textField('product', loc.t('haccp_product') ?? 'Наименование'),
-            _textField('packaging', 'Фасовка'),
-            _textField('manufacturer_supplier', 'Изготовитель/поставщик'),
+            _savedOptionTextField(
+              key: 'packaging',
+              label: 'Фасовка',
+              options: _presetOptions['packaging'] ?? const [],
+              presetFieldKey: 'packaging',
+            ),
+            _savedOptionTextField(
+              key: 'manufacturer_supplier',
+              label: 'Изготовитель/поставщик',
+              options: _presetOptions['manufacturer_supplier'] ?? const [],
+              presetFieldKey: 'manufacturer_supplier',
+            ),
             _textField('quantity_kg', 'Кол-во (кг/л/шт)', keyboardType: TextInputType.number),
             _textField('document_number', '№ документа'),
             _textField('result', loc.t('haccp_result') ?? 'Органолептическая оценка', multiline: true),
-            _textField('storage_conditions', 'Условия хранения, срок реализации'),
+            _savedOptionTextField(
+              key: 'storage_conditions',
+              label: 'Условия хранения, срок реализации',
+              options: _presetOptions['storage_conditions'] ?? const [],
+              presetFieldKey: 'storage_conditions',
+            ),
             InkWell(
               onTap: () async {
                 final d = await showDatePicker(
@@ -1797,12 +1925,27 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             _mobileBlock(
               'Расчёт потребности в дезинфицирующих средствах',
               [
-                _textField('disinf_object_name', 'Объект'),
+                _savedOptionTextField(
+                  key: 'disinf_object_name',
+                  label: 'Объект',
+                  options: _presetOptions['disinf_object_name'] ?? const [],
+                  presetFieldKey: 'disinf_object_name',
+                ),
                 _textField('disinf_object_count', 'Кол-во', keyboardType: TextInputType.number),
                 _textField('disinf_area_sqm', 'Площадь м²', keyboardType: TextInputType.number),
-                _textField('disinf_treatment_type', 'Вид Т/Г'),
+                _savedOptionTextField(
+                  key: 'disinf_treatment_type',
+                  label: 'Вид Т/Г',
+                  options: _presetOptions['disinf_treatment_type'] ?? const [],
+                  presetFieldKey: 'disinf_treatment_type',
+                ),
                 _textField('disinf_frequency', 'Кратность/мес', keyboardType: TextInputType.number),
-                _textField('disinf_agent_name', 'Дезсредство'),
+                _savedOptionTextField(
+                  key: 'disinf_agent_name',
+                  label: 'Дезсредство',
+                  options: _presetOptions['disinf_agent_name'] ?? const [],
+                  presetFieldKey: 'disinf_agent_name',
+                ),
                 _textField('disinf_concentration_pct', 'Конц.%'),
                 _textField('disinf_consumption_per_sqm', 'Расход/м²', keyboardType: TextInputType.number),
                 _textField('disinf_solution_per_treatment', 'Раствор на 1 обр. (л/кг)', keyboardType: TextInputType.number),
@@ -1815,7 +1958,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               'Поступление дезинфицирующих средств',
               [
                 _datePickerField('disinf_receipt_date', 'Дата', _disinfReceiptDate, (d) => setState(() => _disinfReceiptDate = d)),
-                _textField('disinf_agent_name_receipt', 'Наименование'),
+                _savedOptionTextField(
+                  key: 'disinf_agent_name_receipt',
+                  label: 'Наименование',
+                  options: _presetOptions['disinf_agent_name_receipt'] ?? const [],
+                  presetFieldKey: 'disinf_agent_name_receipt',
+                ),
                 _textField('disinf_invoice_number', 'Счёт №'),
                 _textField('disinf_quantity', 'Кол-во', keyboardType: TextInputType.number),
                 _datePickerField('disinf_expiry_date', 'Срок годности', _disinfExpiryDate, (d) => setState(() => _disinfExpiryDate = d)),
@@ -1834,10 +1982,25 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               readOnly: true,
             ),
             _textField('wash_time', 'Время мойки'),
-            _textField('wash_equipment_name', 'Оборудование'),
-            _textField('wash_solution_name', 'Моющий раствор'),
+            _savedOptionTextField(
+              key: 'wash_equipment_name',
+              label: 'Оборудование',
+              options: _presetOptions['wash_equipment_name'] ?? const [],
+              presetFieldKey: 'wash_equipment_name',
+            ),
+            _savedOptionTextField(
+              key: 'wash_solution_name',
+              label: 'Моющий раствор',
+              options: _presetOptions['wash_solution_name'] ?? const [],
+              presetFieldKey: 'wash_solution_name',
+            ),
             _textField('wash_solution_concentration_pct', 'Конц.%'),
-            _textField('wash_disinfectant_name', 'Дез. раствор'),
+            _savedOptionTextField(
+              key: 'wash_disinfectant_name',
+              label: 'Дез. раствор',
+              options: _presetOptions['wash_disinfectant_name'] ?? const [],
+              presetFieldKey: 'wash_disinfectant_name',
+            ),
             _textField('wash_disinfectant_concentration_pct', 'Конц.%'),
             _textField('wash_rinsing_temp', 'Ополаскивание t°', keyboardType: TextInputType.number),
             _signatureFromAccount(),
@@ -1847,10 +2010,13 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         return _mobileBlock(
           loc.t(HaccpLogType.generalCleaningSchedule.displayNameKey) ?? HaccpLogType.generalCleaningSchedule.displayNameRu,
           [
-            _textField('cleaning_object', 'Объект/помещение'),
-            _textField('cleaning_method', 'Способ уборки'),
-            _textField('cleaning_frequency', 'Периодичность'),
-            _datePickerField('cleaning_date', 'Дата', _generalCleaningDate, (d) => setState(() => _generalCleaningDate = d)),
+            _savedOptionTextField(
+              key: 'gen_clean_premises',
+              label: 'Помещение / зона',
+              options: _presetOptions['gen_clean_premises'] ?? const [],
+              presetFieldKey: 'gen_clean_premises',
+            ),
+            _datePickerField('gen_clean_date', 'Дата проведения', _genCleanDate, (d) => setState(() => _genCleanDate = d)),
             _signatureFromAccount(),
             _textField('note', loc.t('haccp_note') ?? 'Примечание'),
           ],
@@ -1859,11 +2025,22 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         return _mobileBlock(
           loc.t(HaccpLogType.sieveFilterMagnet.displayNameKey) ?? HaccpLogType.sieveFilterMagnet.displayNameRu,
           [
-            _textField('sieve_object', 'Оборудование/участок'),
-            _textField('sieve_status', 'Состояние/результат'),
-            _datePickerField('sieve_date', 'Дата', _sieveDate, (d) => setState(() => _sieveDate = d)),
+            _textField('sieve_no', '№ сита/магнита'),
+            _savedOptionTextField(
+              key: 'sieve_name_location',
+              label: 'Наименование / Расположение',
+              options: _presetOptions['sieve_name_location'] ?? const [],
+              presetFieldKey: 'sieve_name_location',
+            ),
+            _savedOptionTextField(
+              key: 'sieve_condition',
+              label: 'Состояние',
+              options: _presetOptions['sieve_condition'] ?? const [],
+              presetFieldKey: 'sieve_condition',
+            ),
+            _datePickerField('sieve_cleaning_date', 'Дата очистки', _sieveCleaningDate, (d) => setState(() => _sieveCleaningDate = d)),
             _signatureFromAccount(),
-            _textField('note', loc.t('haccp_note') ?? 'Примечание'),
+            _textField('sieve_comments', 'Комментарии'),
           ],
         );
       default:
@@ -1932,7 +2109,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         );
         await _saveCurrentOption(
           controllerKey: 'equipment',
-          fieldKey: 'fridge_equipment',
+          fieldKey: 'equipment',
         );
         break;
       case HaccpLogType.warehouseTempHumidity:
@@ -2082,6 +2259,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       sieveComments: isSieve && _getText('sieve_comments').isNotEmpty ? _getText('sieve_comments') : null,
       note: _getText('note').isNotEmpty ? _getText('note') : null,
     );
+    for (final f in _presetFieldsForCurrentLog()) {
+      await _saveCurrentOption(controllerKey: f, fieldKey: f);
+    }
   }
 
   int? _getInt(String key) {
