@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:async';
 
 import 'package:excel/excel.dart' hide Border;
 
@@ -47,9 +48,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   Map<String, List<TechCard>> _pfCandidatesByNormalizedName = {};
+  Timer? _reconcileTimer;
+  TechCardsReconcileNotifier? _reconcileNotifier;
+  int _lastReconcileNotifierVersion = 0;
+  bool _reconciling = false;
+  DateTime _lastReconcileAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void dispose() {
+    _reconcileTimer?.cancel();
+    if (_reconcileNotifier != null) {
+      _reconcileNotifier!.removeListener(_handleTechCardsReconcileSignal);
+    }
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -321,7 +331,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       if (name.isEmpty) continue;
       final key = _normalizeForTechCardName(_stripPfPrefix(name));
       final candidates = _pfCandidatesByNormalizedName[key] ?? const [];
-      if (candidates.length > 1) cnt++;
+      final sameEst = candidates
+          .where((c) => c.establishmentId == tc.establishmentId)
+          .toList();
+      final ambiguous =
+          sameEst.length > 1 || (sameEst.isEmpty && candidates.length > 1);
+      if (ambiguous) cnt++;
     }
     return cnt;
   }
@@ -387,8 +402,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       if (name.isEmpty) continue;
       final key = _normalizeForTechCardName(_stripPfPrefix(name));
       final candidates = _pfCandidatesByNormalizedName[key] ?? const [];
-      if (candidates.length > 1) {
-        matches.add((ing: ing, candidates: candidates));
+      final sameEst = candidates
+          .where((c) => c.establishmentId == tc.establishmentId)
+          .toList();
+      final effectiveCandidates = sameEst.isNotEmpty ? sameEst : candidates;
+      if (effectiveCandidates.length > 1) {
+        matches.add((ing: ing, candidates: effectiveCandidates));
       }
     }
     if (matches.isEmpty) return;
@@ -982,7 +1001,88 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _load();
+      if (!mounted) return;
+      _reconcileNotifier = context.read<TechCardsReconcileNotifier>();
+      _lastReconcileNotifierVersion = _reconcileNotifier!.version;
+      _reconcileNotifier!.addListener(_handleTechCardsReconcileSignal);
+      _reconcileTimer?.cancel();
+      _reconcileTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+        _tryReconcileTechCards(force: false);
+      });
+      _tryReconcileTechCards(force: false);
+    });
+  }
+
+  void _handleTechCardsReconcileSignal() {
+    if (!mounted) return;
+    final notifier =
+        _reconcileNotifier ?? context.read<TechCardsReconcileNotifier>();
+    if (notifier.version == _lastReconcileNotifierVersion) return;
+    _lastReconcileNotifierVersion = notifier.version;
+    _tryReconcileTechCards(force: true);
+  }
+
+  Future<void> _tryReconcileTechCards({required bool force}) async {
+    if (!mounted) return;
+    if (_reconciling) return;
+    final now = DateTime.now();
+    if (!force &&
+        now.difference(_lastReconcileAt) < const Duration(seconds: 30)) return;
+    if (_loading) return;
+    if (_list.isEmpty) return;
+
+    _reconciling = true;
+    _lastReconcileAt = now;
+    try {
+      final loc = context.read<LocalizationService>();
+      _rebuildPfCandidatesIndex(loc);
+      final svc = context.read<TechCardServiceSupabase>();
+      final lang = loc.currentLanguageCode;
+
+      final updated = <TechCard>[];
+      for (final tc in _list) {
+        if (tc.ingredients.isEmpty) continue;
+        var changed = false;
+        final newIngredients = tc.ingredients.map((ing) {
+          final hasSourceId =
+              ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty;
+          if (hasSourceId) return ing;
+          final name = ing.productName.trim();
+          if (name.isEmpty) return ing;
+          final key = _normalizeForTechCardName(_stripPfPrefix(name));
+          final candidatesAll = _pfCandidatesByNormalizedName[key] ?? const [];
+          final sameEst = candidatesAll
+              .where((c) => c.establishmentId == tc.establishmentId)
+              .toList();
+          if (sameEst.length != 1) return ing; // не угадываем
+          final picked = sameEst.first;
+          final display = picked.getDisplayNameInLists(lang);
+          changed = true;
+          return ing.copyWith(
+            sourceTechCardId: picked.id,
+            sourceTechCardName: display,
+            productName: display,
+          );
+        }).toList();
+        if (changed) updated.add(tc.copyWith(ingredients: newIngredients));
+      }
+
+      // Ограничиваем нагрузку: максимум 20 карточек за тик.
+      final toSave = updated.take(20).toList();
+      for (final tc in toSave) {
+        await svc.saveTechCard(tc, skipHistory: true);
+      }
+
+      if (toSave.isNotEmpty && mounted) {
+        await _load();
+      }
+    } catch (_) {
+      // Фоновая автодосвязка — не критична.
+    } finally {
+      _reconciling = false;
+    }
   }
 
   static const _maxFilesSingleTtk = 10;
