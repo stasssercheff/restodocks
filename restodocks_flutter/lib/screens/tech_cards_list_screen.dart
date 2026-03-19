@@ -281,13 +281,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   String _normalizeForTechCardName(String s) {
     final cleaned = s
-        .replaceAll(RegExp(r'[^a-zA-Zа-яА-ЯёЁ0-9\\s]+'), ' ')
+        .replaceAll(RegExp(r'[^a-zA-Zа-яА-ЯёЁ0-9\s]+'), ' ')
         .toLowerCase()
-        .replaceAll(RegExp(r'\\s+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
     if (cleaned.isEmpty) return cleaned;
     final tokens = cleaned
-        .split(RegExp(r'\\s+'))
+        .split(RegExp(r'\s+'))
         .where((t) => t.trim().isNotEmpty)
         .toList()
       ..sort();
@@ -296,7 +296,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   String _stripPfPrefix(String s) {
     final r =
-        RegExp(r'^(пф|п/ф|п\\.ф\\.|pf|prep|sf|hf)\\s*', caseSensitive: false);
+        RegExp(r'^(пф|п/ф|п\.ф\.|pf|prep|sf|hf)\s*', caseSensitive: false);
     return s.trim().replaceFirst(r, '').trim();
   }
 
@@ -324,13 +324,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     if (tc.ingredients.isEmpty) return 0;
     var cnt = 0;
     for (final ing in tc.ingredients) {
-      final hasSourceId =
-          ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty;
+      final sid = ing.sourceTechCardId;
+      final hasSourceId = sid != null && sid.isNotEmpty;
       if (hasSourceId) continue;
       final name = ing.productName.trim();
       if (name.isEmpty) continue;
       final key = _normalizeForTechCardName(_stripPfPrefix(name));
-      final candidates = _pfCandidatesByNormalizedName[key] ?? const [];
+      final candidates = (_pfCandidatesByNormalizedName[key] ?? const [])
+          .where((c) => c.id != tc.id)
+          .toList();
       final sameEst = candidates
           .where((c) => c.establishmentId == tc.establishmentId)
           .toList();
@@ -395,13 +397,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final lang = loc.currentLanguageCode;
     final matches = <({TTIngredient ing, List<TechCard> candidates})>[];
     for (final ing in tc.ingredients) {
-      final hasSourceId =
-          ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty;
+      final sid = ing.sourceTechCardId;
+      if (sid != null && sid.isNotEmpty && sid == tc.id) {
+        continue;
+      }
+      final hasSourceId = sid != null && sid.isNotEmpty;
       if (hasSourceId) continue;
       final name = ing.productName.trim();
       if (name.isEmpty) continue;
       final key = _normalizeForTechCardName(_stripPfPrefix(name));
-      final candidates = _pfCandidatesByNormalizedName[key] ?? const [];
+      final candidates = (_pfCandidatesByNormalizedName[key] ?? const [])
+          .where((c) => c.id != tc.id)
+          .toList();
       final sameEst = candidates
           .where((c) => c.establishmentId == tc.establishmentId)
           .toList();
@@ -723,6 +730,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       } else {
         all = await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
       }
+
+      final toPersistSelfLink = <TechCard>[];
+      final sanitizedAll = <TechCard>[];
+      for (final tc in all) {
+        final s = stripInvalidNestedPfSelfLinks(tc);
+        sanitizedAll.add(s);
+        if (!identical(s, tc)) toPersistSelfLink.add(s);
+      }
+      all = sanitizedAll;
+
       final results = await Future.wait([
         svc.getCustomCategories(est.dataEstablishmentId, 'kitchen'),
         svc.getCustomCategories(est.dataEstablishmentId, 'bar'),
@@ -835,6 +852,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         _resolvedCostMemo.clear();
         _ensureTechCardTranslations(svc, list);
         _warmPdfParser();
+      }
+
+      if (toPersistSelfLink.isNotEmpty && mounted) {
+        Future.microtask(() async {
+          final saveSvc = context.read<TechCardServiceSupabase>();
+          for (final tc in toPersistSelfLink.take(25)) {
+            if (!mounted) break;
+            try {
+              await saveSvc.saveTechCard(tc, skipHistory: true);
+            } catch (_) {}
+          }
+        });
       }
     } catch (e) {
       devLog('[ttk_list] _load error: $e');
@@ -1044,17 +1073,24 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       final updated = <TechCard>[];
       for (final tc in _list) {
         if (tc.ingredients.isEmpty) continue;
-        var changed = false;
-        final newIngredients = tc.ingredients.map((ing) {
-          final hasSourceId =
-              ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty;
+        var working = stripInvalidNestedPfSelfLinks(tc);
+        var changed = !identical(working, tc);
+        final newIngredients = working.ingredients.map((ing) {
+          final sid = ing.sourceTechCardId;
+          if (sid != null && sid.isNotEmpty && sid == working.id) {
+            changed = true;
+            return ing.copyWith(sourceTechCardId: null, sourceTechCardName: null);
+          }
+          final hasSourceId = sid != null && sid.isNotEmpty;
           if (hasSourceId) return ing;
           final name = ing.productName.trim();
           if (name.isEmpty) return ing;
           final key = _normalizeForTechCardName(_stripPfPrefix(name));
-          final candidatesAll = _pfCandidatesByNormalizedName[key] ?? const [];
+          final candidatesAll = (_pfCandidatesByNormalizedName[key] ?? const [])
+              .where((c) => c.id != working.id)
+              .toList();
           final sameEst = candidatesAll
-              .where((c) => c.establishmentId == tc.establishmentId)
+              .where((c) => c.establishmentId == working.establishmentId)
               .toList();
           if (sameEst.length != 1) return ing; // не угадываем
           final picked = sameEst.first;
@@ -1066,7 +1102,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             productName: display,
           );
         }).toList();
-        if (changed) updated.add(tc.copyWith(ingredients: newIngredients));
+        if (changed) {
+          updated.add(working.copyWith(ingredients: newIngredients));
+        }
       }
 
       // Ограничиваем нагрузку: максимум 20 карточек за тик.

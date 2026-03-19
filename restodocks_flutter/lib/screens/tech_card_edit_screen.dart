@@ -1278,6 +1278,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             tcs = await tcSvc
                 .getTechCardsForEstablishment(est.dataEstablishmentId);
           }
+          tcs = tcs.map(stripInvalidNestedPfSelfLinks).toList();
           tcs = _hydrateNestedTechCardCosts(tcs);
           loadedTechCards = tcs;
           final customKitchen = await tcSvc.getCustomCategories(
@@ -1309,6 +1310,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 tcs = await tcSvc
                     .getTechCardsForEstablishment(est.dataEstablishmentId);
               }
+              tcs = tcs.map(stripInvalidNestedPfSelfLinks).toList();
               tcs = _hydrateNestedTechCardCosts(tcs);
               final customKitchen = await tcSvc.getCustomCategories(
                   est.isBranch ? est.id : est.dataEstablishmentId!, 'kitchen');
@@ -1449,13 +1451,23 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       }
       final svc = context.read<TechCardServiceSupabase>();
       var tc = await svc.getTechCardById(widget.techCardId);
-      if (tc != null && loadedTechCards.isNotEmpty) {
-        final pfCards = loadedTechCards.where((t) => t.isSemiFinished).toList();
-        tc = _attachMissingPfSourceTechCardId(tc, pfCards);
-        final currentTechCardId = tc.id;
-        final hydrated = _hydrateNestedTechCardCosts([tc, ...loadedTechCards]);
-        tc = hydrated.firstWhere((item) => item.id == currentTechCardId,
-            orElse: () => tc!);
+      if (tc != null) {
+        var working = stripInvalidNestedPfSelfLinks(tc);
+        if (!identical(working, tc)) {
+          try {
+            await svc.saveTechCard(working, skipHistory: true);
+          } catch (_) {}
+        }
+        if (loadedTechCards.isNotEmpty) {
+          final pfCards = loadedTechCards.where((t) => t.isSemiFinished).toList();
+          working = _attachMissingPfSourceTechCardId(working, pfCards);
+          final currentTechCardId = working.id;
+          final hydrated =
+              _hydrateNestedTechCardCosts([working, ...loadedTechCards]);
+          working = hydrated.firstWhere((item) => item.id == currentTechCardId,
+              orElse: () => working);
+        }
+        tc = working;
       }
       if (!mounted) return;
       final canEdit = context
@@ -1609,6 +1621,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         final resolvedIngredients = techCard.ingredients.map((ingredient) {
           final sourceId = ingredient.sourceTechCardId;
           if (sourceId == null || sourceId.isEmpty) return ingredient;
+          if (sourceId == techCard.id) {
+            return ingredient.copyWith(
+              sourceTechCardId: null,
+              sourceTechCardName: null,
+            );
+          }
 
           final nested = byId[sourceId];
           if (nested == null) return ingredient;
@@ -1668,15 +1686,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
   String _normalizeForTechCardName(String s) {
     final cleaned = s
-        .replaceAll(RegExp(r'[^a-zA-Zа-яА-ЯёЁ0-9\\s]+'), ' ')
+        .replaceAll(RegExp(r'[^a-zA-Zа-яА-ЯёЁ0-9\s]+'), ' ')
         .toLowerCase()
-        .replaceAll(RegExp(r'\\s+'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
     if (cleaned.isEmpty) return cleaned;
     // Сортируем токены, чтобы порядок слов в названии (масло чесночное/чесночное масло)
     // не ломал совпадение.
     final tokens = cleaned
-        .split(RegExp(r'\\s+'))
+        .split(RegExp(r'\s+'))
         .where((t) => t.trim().isNotEmpty)
         .toList()
       ..sort();
@@ -1685,7 +1703,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
   String _stripPfPrefix(String s) {
     final r =
-        RegExp(r'^(пф|п/ф|п\.ф\.|pf|prep|sf|hf)\\s*', caseSensitive: false);
+        RegExp(r'^(пф|п/ф|п\.ф\.|pf|prep|sf|hf)\s*', caseSensitive: false);
     return s.trim().replaceFirst(r, '').trim();
   }
 
@@ -1693,12 +1711,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     required TechCard owner,
     required List<TechCard> candidates,
   }) {
-    if (candidates.isEmpty) return null;
-    if (candidates.length == 1) return candidates.first;
+    final filtered = candidates.where((c) => c.id != owner.id).toList();
+    if (filtered.isEmpty) return null;
+    if (filtered.length == 1) return filtered.first;
 
     // Не "угадываем" за пользователя.
     // Автосвязываем только если после фильтра по заведению остаётся ровно один кандидат.
-    final sameEst = candidates
+    final sameEst = filtered
         .where((c) => c.establishmentId == owner.establishmentId)
         .toList();
     if (sameEst.length == 1) return sameEst.first;
@@ -1713,12 +1732,20 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
     var changed = false;
     final updatedIngredients = tc.ingredients.map((ing) {
-      final hasSourceId =
-          ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty;
+      final sid = ing.sourceTechCardId;
+      if (sid != null && sid.isNotEmpty && sid == tc.id) {
+        changed = true;
+        return ing.copyWith(sourceTechCardId: null, sourceTechCardName: null);
+      }
+      final hasSourceId = sid != null && sid.isNotEmpty;
       if (hasSourceId) return ing;
       if (ing.productName.trim().isEmpty) return ing;
-      final candidates =
-          _findPfCandidatesForIngredientName(ing.productName, pfCards, lang);
+      final candidates = _findPfCandidatesForIngredientName(
+        ing.productName,
+        pfCards,
+        lang,
+        excludeTechCardId: tc.id,
+      );
       final picked = _pickBestPfCandidate(owner: tc, candidates: candidates);
       if (picked == null) return ing;
 
@@ -1735,12 +1762,17 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   }
 
   List<TechCard> _findPfCandidatesForIngredientName(
-      String ingredientName, List<TechCard> pfCards, String lang) {
+    String ingredientName,
+    List<TechCard> pfCards,
+    String lang, {
+    String? excludeTechCardId,
+  }) {
     final target = _normalizeForTechCardName(_stripPfPrefix(ingredientName));
     if (target.isEmpty) return const [];
 
     final byId = <String, TechCard>{};
     for (final pf in pfCards) {
+      if (excludeTechCardId != null && pf.id == excludeTechCardId) continue;
       final names = <String>[
         pf.getDisplayNameInLists(lang),
         pf.getLocalizedDishName(lang),
@@ -1985,12 +2017,18 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         all = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
       }
 
+      all = all.map(stripInvalidNestedPfSelfLinks).toList();
       final pfCards = all.where((t) => t.isSemiFinished).toList();
 
       final currentTc = _techCard!;
-      TechCard fixed;
-      // Назначаем однозначные совпадения (1 кандидат).
-      fixed = _attachMissingPfSourceTechCardId(currentTc, pfCards);
+      // Снимаем самоссылки и назначаем однозначные совпадения (1 кандидат).
+      var fixed = stripInvalidNestedPfSelfLinks(currentTc);
+      if (!identical(fixed, currentTc)) {
+        try {
+          await tcSvc.saveTechCard(fixed, skipHistory: true);
+        } catch (_) {}
+      }
+      fixed = _attachMissingPfSourceTechCardId(fixed, pfCards);
 
       final hydrated = _hydrateNestedTechCardCosts([fixed, ...pfCards]);
       final hydratedTc = hydrated.firstWhere((item) => item.id == fixed.id,

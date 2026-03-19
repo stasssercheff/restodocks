@@ -352,3 +352,22 @@ class TechCard extends Equatable {
     );
   }
 }
+
+/// Убирает ссылку на вложенную ТТК, если она указывает на саму эту карту
+/// (ломает себестоимость и даёт циклы при разворачивании ПФ).
+TechCard stripInvalidNestedPfSelfLinks(TechCard tc) {
+  final sid = tc.id;
+  var changed = false;
+  final next = <TTIngredient>[];
+  for (final ing in tc.ingredients) {
+    final s = ing.sourceTechCardId;
+    if (s != null && s.isNotEmpty && s == sid) {
+      changed = true;
+      next.add(ing.copyWith(sourceTechCardId: null, sourceTechCardName: null));
+    } else {
+      next.add(ing);
+    }
+  }
+  if (!changed) return tc;
+  return tc.copyWith(ingredients: next, updatedAt: DateTime.now());
+}
