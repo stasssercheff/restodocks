@@ -1072,7 +1072,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       if (q > 0) return ing.pricePerKg! * q;
     }
     final estId = widget.establishmentId;
-    if (estId == null) return 0;
+    if (estId == null || estId.isEmpty) return 0;
     final product = widget.productStore
         .findProductForIngredient(ing.productId, ing.productName);
     if (product == null) return 0;

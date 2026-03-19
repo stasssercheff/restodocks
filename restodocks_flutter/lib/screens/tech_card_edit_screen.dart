@@ -1714,6 +1714,23 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   c = item.pricePerKg! * item.grossWeight / 1000;
                 }
               }
+              // Листовой ингредиент без цены в БД — подтянуть из номенклатуры
+              if (c <= 0 && item.sourceTechCardId == null) {
+                final enriched = _enrichLeafIngredientForHydrate(item);
+                c = enriched.effectiveCost;
+                if (c <= 0 &&
+                    enriched.pricePerKg != null &&
+                    enriched.pricePerKg! > 0 &&
+                    enriched.grossWeight > 0) {
+                  final u = enriched.unit.toLowerCase().trim();
+                  if (u == 'шт' || u == 'pcs') {
+                    final gpp = enriched.gramsPerPiece ?? 50.0;
+                    if (gpp > 0) c = enriched.pricePerKg! * (enriched.grossWeight / gpp);
+                  } else {
+                    c = enriched.pricePerKg! * enriched.grossWeight / 1000;
+                  }
+                }
+              }
               return sum + (c > 0 ? c : 0);
             },
           );
@@ -2106,10 +2123,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       final hydrated = _hydrateNestedTechCardCosts([fixed, ...pfCards]);
       final hydratedTc = hydrated.firstWhere((item) => item.id == fixed.id,
           orElse: () => fixed);
+      final hydratedPfs = hydrated.where((t) => t.isSemiFinished).toList();
 
       if (!mounted) return;
       setState(() {
-        _semiFinishedProducts = pfCards;
+        _semiFinishedProducts = hydratedPfs;
         _techCard = hydratedTc;
         _ingredients
           ..clear()
@@ -4528,10 +4546,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                           _technologyController,
                                       productStore:
                                           context.read<ProductStoreSupabase>(),
-                                      establishmentId: context
-                                              .read<AccountManagerSupabase>()
-                                              .dataEstablishmentId ??
-                                          '',
+                                      establishmentId: (() {
+                                        final est = context
+                                            .read<AccountManagerSupabase>()
+                                            .establishment;
+                                        return est != null && est.isBranch
+                                            ? est.id
+                                            : (est?.dataEstablishmentId ?? '');
+                                      })(),
                                       semiFinishedProducts:
                                           _semiFinishedProducts,
                                       isCook: isCook,
