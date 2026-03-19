@@ -1062,6 +1062,62 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     return categoryTranslations[c]?[lang] ?? c;
   }
 
+  /// Продуктовая строка без вложенной ТТК: подставить цену из номенклатуры (для гидратации вложенных ПФ).
+  TTIngredient _enrichLeafIngredientForHydrate(TTIngredient ing) {
+    if (ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty) {
+      return ing;
+    }
+    if (ing.isPlaceholder || ing.productName.trim().isEmpty) return ing;
+    if (ing.effectiveCost > 0) return ing;
+    if (ing.pricePerKg != null &&
+        ing.pricePerKg! > 0 &&
+        ing.grossWeight > 0) {
+      final u = ing.unit.toLowerCase().trim();
+      if (u == 'шт' || u == 'pcs') {
+        final gpp = ing.gramsPerPiece ?? 50.0;
+        if (gpp <= 0) return ing;
+        final c = ing.pricePerKg! * (ing.grossWeight / gpp);
+        if (c > 0) return ing.copyWith(cost: c);
+      } else {
+        final c = ing.pricePerKg! * ing.grossWeight / 1000;
+        if (c > 0) return ing.copyWith(cost: c);
+      }
+    }
+    try {
+      final store = context.read<ProductStoreSupabase>();
+      final est = context.read<AccountManagerSupabase>().establishment;
+      final establishmentId =
+          est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
+      if (establishmentId == null) return ing;
+      final product =
+          store.findProductForIngredient(ing.productId, ing.productName);
+      if (product == null) return ing;
+      final priceInfo =
+          store.getEstablishmentPrice(product.id, establishmentId);
+      final pricePerKg = priceInfo?.$1 ?? 0.0;
+      if (pricePerKg <= 0) return ing;
+      final u = ing.unit.toLowerCase().trim();
+      if (u == 'шт' || u == 'pcs') {
+        final gpp = ing.gramsPerPiece ?? product.gramsPerPiece ?? 50.0;
+        if (gpp <= 0) return ing;
+        final cost = pricePerKg * (ing.grossWeight / gpp);
+        return ing.copyWith(
+          productId: product.id,
+          pricePerKg: pricePerKg,
+          cost: cost,
+        );
+      }
+      final cost = pricePerKg * ing.grossWeight / 1000;
+      return ing.copyWith(
+        productId: product.id,
+        pricePerKg: pricePerKg,
+        cost: cost,
+      );
+    } catch (_) {
+      return ing;
+    }
+  }
+
   /// Подтягивает цену за кг и стоимость из номенклатуры заведения по названию продукта (для импортированных ТТК).
   void _autoFillPriceFromNomenclature() {
     final store = context.read<ProductStoreSupabase>();
@@ -1620,7 +1676,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       try {
         final resolvedIngredients = techCard.ingredients.map((ingredient) {
           final sourceId = ingredient.sourceTechCardId;
-          if (sourceId == null || sourceId.isEmpty) return ingredient;
+          if (sourceId == null || sourceId.isEmpty) {
+            // Иначе вложенная ПФ считается с нулевой себестоимостью: в БД часто cost=0.
+            return _enrichLeafIngredientForHydrate(ingredient);
+          }
           if (sourceId == techCard.id) {
             return ingredient.copyWith(
               sourceTechCardId: null,
@@ -1641,8 +1700,22 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           );
           final nestedCost = nestedIngredients.fold<double>(
             0,
-            (sum, item) =>
-                sum + (item.effectiveCost > 0 ? item.effectiveCost : 0),
+            (sum, item) {
+              var c = item.effectiveCost;
+              if (c <= 0 &&
+                  item.pricePerKg != null &&
+                  item.pricePerKg! > 0 &&
+                  item.grossWeight > 0) {
+                final u = item.unit.toLowerCase().trim();
+                if (u == 'шт' || u == 'pcs') {
+                  final gpp = item.gramsPerPiece ?? 50.0;
+                  if (gpp > 0) c = item.pricePerKg! * (item.grossWeight / gpp);
+                } else {
+                  c = item.pricePerKg! * item.grossWeight / 1000;
+                }
+              }
+              return sum + (c > 0 ? c : 0);
+            },
           );
 
           final resolvedName =
@@ -7086,7 +7159,7 @@ class _SectionPicker extends StatelessWidget {
     if (!canEdit) {
       return InputDecorator(
         decoration: InputDecoration(
-          labelText: loc.t('ttk_section_label'),
+          labelText: loc.t('ttk_col_section'),
           isDense: true,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         ),
@@ -7120,7 +7193,7 @@ class _SectionPicker extends StatelessWidget {
       onTap: () => _showPicker(context),
       child: InputDecorator(
         decoration: InputDecoration(
-          labelText: loc.t('ttk_section_label'),
+          labelText: loc.t('ttk_col_section'),
           isDense: true,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
           suffixIcon: const Icon(Icons.arrow_drop_down),
