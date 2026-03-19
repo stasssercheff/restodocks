@@ -3,8 +3,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../utils/debug_console_stub.dart' if (dart.library.html) '../utils/debug_console_web.dart' as debug_console;
-
 import 'package:excel/excel.dart' hide Border;
 
 import '../utils/number_format_utils.dart';
@@ -282,7 +280,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     if (_ttkCostDebug && _costDebugCount < 3) {
       _costDebugCount++;
       final ing0 = tc.ingredients.isNotEmpty ? tc.ingredients.first : null;
-      debug_console.debugLogToConsole(
+      devLog(
         'ttk_cost_debug[$_costDebugCount] "${tc.dishName}": '
         'resolved=(cost=${resolved.cost}, output=${resolved.output}) '
         'yield=${tc.yield} ingCount=${tc.ingredients.length} '
@@ -1063,7 +1061,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         _resolvedCostMemo.clear();
         _costDebugCount = 0;
         if (_ttkCostDebug) {
-          debug_console.debugLogToConsole(
+          devLog(
             'ttk_cost_debug: list loaded, cards=${list.length} priceStore=${_priceProductStore != null} estId=$_priceEstablishmentId',
           );
         }
