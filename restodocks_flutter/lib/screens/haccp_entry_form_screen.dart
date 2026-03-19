@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../core/config/roles_config.dart';
 import '../models/employee.dart';
 import '../models/haccp_log.dart';
 import '../models/haccp_log_type.dart';
@@ -636,10 +637,19 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
   static const String _customPositionValue = '__custom_position__';
 
-  /// Коды должностей: enum + все роли из карточек сотрудников (confectioner и т.д.).
+  /// Коды должностей: все роли из RolesConfig + роли из карточек сотрудников.
   List<String> _healthPositionRoleCodes(LocalizationService loc) {
     final codes = <String>{
-      for (final r in EmployeeRole.values) r.code,
+      // Все роли из RolesConfig
+      for (final section in RolesConfig.kitchen.values)
+        for (final role in section) role.roleCode,
+      for (final role in RolesConfig.bar) role.roleCode,
+      for (final role in RolesConfig.hall) role.roleCode,
+      for (final role in RolesConfig.management) role.roleCode,
+      // Дополнительные роли менеджмента
+      'general_manager',
+      'bar_manager',
+      // Роли из карточек сотрудников (на случай кастомных)
       for (final e in _healthEmployees)
         for (final role in e.roles) role,
     };
