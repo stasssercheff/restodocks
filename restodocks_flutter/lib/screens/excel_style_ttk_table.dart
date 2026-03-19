@@ -1087,10 +1087,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   ({double cost, double output})? _resolvePfRecipeCostOutput(
       String pfId, Set<String> stack, {String? fallbackName}) {
     if (!stack.add(pfId)) return null;
+    TechCard? pf;
     try {
       final list = widget.semiFinishedProducts;
       if (list == null || list.isEmpty) return null;
-      TechCard? pf;
       for (final t in list) {
         if (t.id == pfId) {
           pf = t;
