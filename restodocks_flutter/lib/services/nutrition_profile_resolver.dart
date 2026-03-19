@@ -18,6 +18,31 @@ class NutritionProfileResolver {
   final SupabaseClient _client = Supabase.instance.client;
   final AiServiceSupabase _ai = AiServiceSupabase();
 
+  /// После первой ошибки «таблицы нет / не в schema cache» не дёргаем nutrition-таблицы
+  /// до перезагрузки приложения (иначе десятки 404 в консоли на Pages без миграций).
+  static bool _nutritionRelationsUnavailable = false;
+
+  static bool _isMissingNutritionRelationError(Object e) {
+    if (e is PostgrestException) {
+      final code = e.code;
+      if (code == 'PGRST205' || code == '42P01') return true;
+      final blob =
+          '${e.code ?? ''} ${e.message} ${e.details ?? ''} ${e.hint ?? ''}'
+              .toLowerCase();
+      if (blob.contains('pgrst205') ||
+          blob.contains('42p01') ||
+          blob.contains('does not exist') ||
+          blob.contains('schema cache') ||
+          blob.contains('could not find the table')) {
+        return true;
+      }
+    }
+    final s = e.toString().toLowerCase();
+    return s.contains('pgrst205') ||
+        s.contains('42p01') ||
+        s.contains('could not find the table');
+  }
+
   /// Normalize input to a deterministic key for alias/profile lookup.
   /// Keep it conservative: remove obvious noise (units/quantities/prefixes), but don't rewrite semantics.
   String normalizeNutritionKey(String input) {
@@ -66,13 +91,29 @@ class NutritionProfileResolver {
     final ruName = product.getLocalizedName('ru').trim();
     final anyName = ruName.isNotEmpty ? ruName : product.name.trim();
 
+    if (_nutritionRelationsUnavailable) return false;
+
     try {
       // 1) Existing link -> profile -> apply.
-      final linkRow = await _client
-          .from('product_nutrition_links')
-          .select('nutrition_profile_id, match_type, match_confidence, match_source')
-          .eq('product_id', product.id)
-          .limit(1);
+      final dynamic linkRow;
+      try {
+        linkRow = await _client
+            .from('product_nutrition_links')
+            .select(
+                'nutrition_profile_id, match_type, match_confidence, match_source')
+            .eq('product_id', product.id)
+            .limit(1);
+      } catch (e) {
+        if (_isMissingNutritionRelationError(e)) {
+          _nutritionRelationsUnavailable = true;
+          devLog(
+            'NutritionProfileResolver: product_nutrition_links unavailable, '
+            'skipping nutrition backfill until reload (apply DB migration if needed)',
+          );
+          return false;
+        }
+        rethrow;
+      }
       if (linkRow is List && linkRow.isNotEmpty) {
         final m = Map<String, dynamic>.from(linkRow.first as Map);
         final profileId = m['nutrition_profile_id']?.toString();
