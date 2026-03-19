@@ -1253,17 +1253,17 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       _error = null;
     });
     try {
-      await context.read<ProductStoreSupabase>().loadProducts();
       final est = context.read<AccountManagerSupabase>().establishment;
       var loadedTechCards = <TechCard>[];
       if (est != null) {
         final productStore = context.read<ProductStoreSupabase>();
-        if (est.isBranch) {
-          await productStore.loadNomenclatureForBranch(
-              est.id, est.dataEstablishmentId!);
-        } else {
-          await productStore.loadNomenclature(est.dataEstablishmentId);
-        }
+        // Параллельная загрузка продуктов и номенклатуры
+        await Future.wait([
+          productStore.loadProducts().catchError((_) {}),
+          est.isBranch
+              ? productStore.loadNomenclatureForBranch(est.id, est.dataEstablishmentId!).catchError((_) {})
+              : productStore.loadNomenclature(est.dataEstablishmentId).catchError((_) {}),
+        ]);
         // Не блокируем первый рендер загрузкой всех ТТК.
         // Справочник ТТК подтягиваем фоном и досчитываем вложенные ПФ после открытия экрана.
         final deferTcLoad = true;
@@ -1304,27 +1304,41 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           () async {
             try {
               final tcSvc = context.read<TechCardServiceSupabase>();
-              List<TechCard> tcs;
+              
+              // Параллельная загрузка ТТК и кастомных категорий
+              final futures = <Future>[];
+              
+              // ТТК
+              late Future<List<TechCard>> allCardsFuture;
               if (est.isBranch) {
-                final mainTcs = await tcSvc
-                    .getTechCardsForEstablishment(est.dataEstablishmentId!);
-                final branchTcs =
-                    await tcSvc.getTechCardsForEstablishment(est.id);
-                tcs = [...mainTcs, ...branchTcs];
+                allCardsFuture = Future.wait([
+                  tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId!),
+                  tcSvc.getTechCardsForEstablishment(est.id),
+                ]).then((results) => [...results[0], ...results[1]]);
               } else {
-                tcs = await tcSvc
-                    .getTechCardsForEstablishment(est.dataEstablishmentId);
+                allCardsFuture = tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
               }
+              futures.add(allCardsFuture);
+              
+              // Кастомные категории
+              final customCategoriesFuture = Future.wait([
+                tcSvc.getCustomCategories(est.isBranch ? est.id : est.dataEstablishmentId!, 'kitchen'),
+                tcSvc.getCustomCategories(est.isBranch ? est.id : est.dataEstablishmentId!, 'bar'),
+              ]);
+              futures.add(customCategoriesFuture);
+              
+              final results = await Future.wait(futures);
+              var tcs = results[0] as List<TechCard>;
+              final customResults = results[1] as List;
+              final customKitchen = customResults[0] as List<({String id, String name})>;
+              final customBar = customResults[1] as List<({String id, String name})>;
+              
               tcs = tcs.map(stripInvalidNestedPfSelfLinks).toList();
               tcs = await tcSvc.fillIngredientsForCardsBulk(tcs);
               final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
               if (estPriceId != null && estPriceId.isNotEmpty) {
                 tcs = TechCardCostHydrator.hydrate(tcs, productStore, estPriceId);
               }
-              final customKitchen = await tcSvc.getCustomCategories(
-                  est.isBranch ? est.id : est.dataEstablishmentId!, 'kitchen');
-              final customBar = await tcSvc.getCustomCategories(
-                  est.isBranch ? est.id : est.dataEstablishmentId!, 'bar');
               if (!mounted) return;
               setState(() {
                 _pickerTechCards = _isNew

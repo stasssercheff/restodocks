@@ -417,14 +417,12 @@ class ProductStoreSupabase {
 
   /// Загрузить номенклатуру заведения (ID продуктов и цены)
   Future<void> loadNomenclature(String establishmentId) async {
-    devLog('🔄 ProductStore: Loading nomenclature for establishment $establishmentId...');
 
     _branchOnlyProductIds.clear();
     // Очищаем текущие данные
     _nomenclatureIds.clear();
     _priceCache.removeWhere((key, _) => key.startsWith('${establishmentId}_'));
 
-    devLog('👤 ProductStore: Loading nomenclature for establishment: $establishmentId');
 
     // Пробуем основной метод загрузки
     try {
@@ -451,7 +449,6 @@ class ProductStoreSupabase {
   /// Загрузить номенклатуру для филиала: объединение номенклатуры головного заведения и филиала.
   /// Цены филиала перекрывают цены головного. Продукты только филиала помечаются как «доп от филиала».
   Future<void> loadNomenclatureForBranch(String branchId, String mainId) async {
-    devLog('🔄 ProductStore: Loading nomenclature for branch $branchId (main $mainId)...');
 
     _branchOnlyProductIds.clear();
     _nomenclatureIds.clear();
@@ -528,13 +525,10 @@ class ProductStoreSupabase {
       }
     }
 
-    devLog('✅ ProductStore: Branch nomenclature: ${_nomenclatureIds.length} products, branch-only: ${_branchOnlyProductIds.length}');
   }
 
   /// Основной метод загрузки номенклатуры
   Future<void> _loadNomenclatureDirect(String establishmentId) async {
-    devLog('🔍 ProductStore: Making query to establishment_products...');
-    devLog('🔍 ProductStore: establishment_id = $establishmentId');
 
     dynamic response;
     try {
@@ -553,7 +547,6 @@ class ProductStoreSupabase {
     }
 
     final list = response is List ? response : <dynamic>[];
-    devLog('📊 ProductStore: Raw response received, length: ${list.length}');
 
     if (list.isEmpty) {
       devLog('ℹ️ ProductStore: No nomenclature data found for establishment $establishmentId');
@@ -638,12 +631,10 @@ class ProductStoreSupabase {
       }
     }
 
-    devLog('✅ ProductStore: Nomenclature loaded successfully: $processedCount products, cache size: ${_priceCache.length}');
   }
 
   /// Проверить и восстановить номенклатуру при ошибках
   Future<void> ensureNomenclatureLoaded(String establishmentId) async {
-    devLog('🔄 ProductStore: Ensuring nomenclature is loaded for $establishmentId...');
 
     try {
       // Пробуем загрузить, если еще не загружено
@@ -655,7 +646,6 @@ class ProductStoreSupabase {
       if (_nomenclatureIds.isEmpty) {
         devLog('⚠️ ProductStore: Nomenclature is empty, this might be normal for new establishments');
       } else {
-        devLog('✅ ProductStore: Nomenclature verified: ${_nomenclatureIds.length} products');
       }
     } catch (e) {
       devLog('❌ ProductStore: Failed to ensure nomenclature loaded: $e');
@@ -694,7 +684,6 @@ class ProductStoreSupabase {
 
       // Теперь всегда устанавливаем цену, если она указана (даже если запись уже существовала)
       if (price != null) {
-        devLog('💰 ProductStore: Setting price for product $productId: $price $currency');
         await setEstablishmentPrice(establishmentId, productId, price, currency);
       }
 
@@ -754,7 +743,6 @@ class ProductStoreSupabase {
 
   /// Установить цену продукта в номенклатуре заведения
   Future<void> setEstablishmentPrice(String establishmentId, String productId, double? price, String? currency) async {
-    devLog('💰 ProductStore: Setting price for $productId in establishment $establishmentId: $price $currency');
 
     if (price != null) {
       final oldPrice = getEstablishmentPrice(productId, establishmentId)?.$1;
@@ -771,7 +759,6 @@ class ProductStoreSupabase {
             },
             onConflict: 'establishment_id,product_id',
           );
-      devLog('✅ ProductStore: Price upserted in establishment_products');
 
       // Записываем в историю изменений (если цена изменилась)
       if (oldPrice == null || (oldPrice - price).abs() > 0.001) {

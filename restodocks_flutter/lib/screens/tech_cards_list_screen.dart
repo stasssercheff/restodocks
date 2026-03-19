@@ -878,28 +878,44 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     try {
       final svc = context.read<TechCardServiceSupabase>();
       final productStore = context.read<ProductStoreSupabase>();
-      // Раньше один catch: если падал loadProducts, номенклатура не грузилась → кэш цен пустой и ₽/кг = 0.
-      try {
-        await productStore.loadProducts();
-      } catch (_) {}
-      try {
-        if (est.isBranch) {
-          await productStore.loadNomenclatureForBranch(
-              est.id, est.dataEstablishmentId!);
-        } else {
-          await productStore.loadNomenclature(est.dataEstablishmentId);
-        }
-      } catch (_) {}
-      // Филиал: карточки головного (только просмотр) + свои (редактируемые). Головное: только свои.
-      List<TechCard> all;
+      
+      // Параллельная загрузка продуктов, номенклатуры и ТТК
+      final futures = <Future>[];
+      
+      // Продукты и номенклатура
+      futures.add(productStore.loadProducts().catchError((_) {}));
       if (est.isBranch) {
-        final mainCards =
-            await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
-        final branchCards = await svc.getTechCardsForEstablishment(est.id);
-        all = [...mainCards, ...branchCards];
+        futures.add(productStore.loadNomenclatureForBranch(
+            est.id, est.dataEstablishmentId!).catchError((_) {}));
       } else {
-        all = await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
+        futures.add(productStore.loadNomenclature(est.dataEstablishmentId).catchError((_) {}));
       }
+      
+      // ТТК
+      late Future<List<TechCard>> allCardsFuture;
+      if (est.isBranch) {
+        allCardsFuture = Future.wait([
+          svc.getTechCardsForEstablishment(est.dataEstablishmentId),
+          svc.getTechCardsForEstablishment(est.id),
+        ]).then((results) => [...results[0], ...results[1]]);
+      } else {
+        allCardsFuture = svc.getTechCardsForEstablishment(est.dataEstablishmentId);
+      }
+      futures.add(allCardsFuture);
+      
+      // Кастомные категории
+      final customCategoriesFuture = Future.wait([
+        svc.getCustomCategories(est.dataEstablishmentId, 'kitchen'),
+        svc.getCustomCategories(est.dataEstablishmentId, 'bar'),
+      ]);
+      futures.add(customCategoriesFuture);
+      
+      // Ждём все запросы
+      final results = await Future.wait(futures);
+      final all = results[2] as List<TechCard>;
+      final customResults = results[3] as List;
+      final customKitchen = customResults[0] as List<({String id, String name})>;
+      final customBar = customResults[1] as List<({String id, String name})>;
 
       final toPersistSelfLink = <TechCard>[];
       final sanitizedAll = <TechCard>[];
@@ -918,12 +934,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         all = TechCardCostHydrator.hydrate(all, productStore, estPriceId);
       }
 
-      final results = await Future.wait([
-        svc.getCustomCategories(est.dataEstablishmentId, 'kitchen'),
-        svc.getCustomCategories(est.dataEstablishmentId, 'bar'),
-      ]);
-      final customKitchen = results[0] as List<({String id, String name})>;
-      final customBar = results[1] as List<({String id, String name})>;
       _customCategoryNames.clear();
       for (final c in customKitchen) _customCategoryNames[c.id] = c.name;
       for (final c in customBar) _customCategoryNames[c.id] = c.name;

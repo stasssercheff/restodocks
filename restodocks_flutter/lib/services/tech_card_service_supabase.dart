@@ -139,21 +139,14 @@ class TechCardServiceSupabase {
       var list = _parseTechCardsWithIngredients(data as List);
       final rawCount = (data as List).length;
       if (list.isEmpty && rawCount > 0) {
-        devLog('[ttk_svc] getTechCardsForEstablishment: embed $rawCount rows, parse=0 → retry without embed');
         list = await _fetchWithoutEmbed();
-        devLog('[ttk_svc] getTechCardsForEstablishment(est=$establishmentId) fallback → ${list.length} cards');
-      } else {
-        devLog('[ttk_svc] getTechCardsForEstablishment(est=$establishmentId) → ${list.length} cards');
       }
       return list;
     } catch (e) {
-      devLog('[ttk_svc] getTechCardsForEstablishment(est=$establishmentId) ERROR: $e → retry without embed');
       try {
         final list = await _fetchWithoutEmbed();
-        devLog('[ttk_svc] getTechCardsForEstablishment(est=$establishmentId) fallback → ${list.length} cards');
         return list;
       } catch (e2) {
-        devLog('[ttk_svc] getTechCardsForEstablishment fallback ERROR: $e2');
         return [];
       }
     }
@@ -178,11 +171,7 @@ class TechCardServiceSupabase {
         techCards.add(tc.copyWith(ingredients: ingredients));
       } catch (e) {
         skipCards++;
-        devLog('[ttk_svc] _parse skip card: $e');
       }
-    }
-    if (skipCards > 0) {
-      devLog('[ttk_svc] _parse: ok=${techCards.length}, skipCards=$skipCards');
     }
     return techCards;
   }
@@ -206,11 +195,9 @@ class TechCardServiceSupabase {
             .toList();
       } catch (_) {
         ingredients = await _fetchIngredientsForTechCard(techCardId);
-        devLog('[ttk_svc] getTechCardById: embed parse failed, loaded ${ingredients.length} ingredients separately');
       }
       return TechCard.fromJson(m).copyWith(ingredients: ingredients);
     } catch (e) {
-      devLog('[ttk_svc] getTechCardById($techCardId) ERROR: $e → fallback');
       try {
         final row = await _supabase.client
             .from('tech_cards')
@@ -221,7 +208,6 @@ class TechCardServiceSupabase {
         final ingredients = await _fetchIngredientsForTechCard(techCardId);
         return TechCard.fromJson(row as Map<String, dynamic>).copyWith(ingredients: ingredients);
       } catch (e2) {
-        devLog('[ttk_svc] getTechCardById fallback ERROR: $e2');
         return null;
       }
     }
