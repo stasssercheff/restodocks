@@ -1264,10 +1264,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         } else {
           await productStore.loadNomenclature(est.dataEstablishmentId);
         }
-        // Оптимизация: при создании из импорта — не блокировать первый рендер.
-        // Для существующей ТТК (в т.ч. view=1) всегда грузим все ТТК и гидратируем,
-        // иначе цены вложенных ПФ не подтягиваются.
-        final deferTcLoad = _isNew && widget.initialFromAi != null;
+        // Не блокируем первый рендер загрузкой всех ТТК.
+        // Справочник ТТК подтягиваем фоном и досчитываем вложенные ПФ после открытия экрана.
+        final deferTcLoad = true;
         if (!deferTcLoad) {
           final tcSvc = context.read<TechCardServiceSupabase>();
           List<TechCard> tcs;
@@ -1281,6 +1280,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 .getTechCardsForEstablishment(est.dataEstablishmentId);
           }
           tcs = tcs.map(stripInvalidNestedPfSelfLinks).toList();
+          tcs = await tcSvc.fillIngredientsForCardsBulk(tcs);
           final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
           if (estPriceId != null && estPriceId.isNotEmpty) {
             tcs = TechCardCostHydrator.hydrate(tcs, productStore, estPriceId);
@@ -1316,6 +1316,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                     .getTechCardsForEstablishment(est.dataEstablishmentId);
               }
               tcs = tcs.map(stripInvalidNestedPfSelfLinks).toList();
+              tcs = await tcSvc.fillIngredientsForCardsBulk(tcs);
               final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
               if (estPriceId != null && estPriceId.isNotEmpty) {
                 tcs = TechCardCostHydrator.hydrate(tcs, productStore, estPriceId);

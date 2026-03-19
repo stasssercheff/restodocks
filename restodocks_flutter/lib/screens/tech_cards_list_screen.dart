@@ -909,6 +909,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         if (!identical(s, tc)) toPersistSelfLink.add(s);
       }
       all = sanitizedAll;
+      // Один bulk-запрос по ingredient'ам вместо N+1 догрузок по карточкам.
+      all = await svc.fillIngredientsForCardsBulk(all);
 
       // Та же гидратация, что в редакторе — «Итого стоимость за кг» = ₽/кг в списке.
       final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;

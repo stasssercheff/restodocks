@@ -246,6 +246,35 @@ class TechCardServiceSupabase {
   /// Параллельная загрузка пачками, чтобы не тормозить при большом числе карточек.
   static const int _ensureIngredientsBatchSize = 8;
 
+  /// Догрузить ингредиенты одним bulk-запросом для набора карточек.
+  /// Используется как быстрый fallback, когда embed tt_ingredients пришёл пустым.
+  Future<List<TechCard>> fillIngredientsForCardsBulk(List<TechCard> cards) async {
+    if (cards.isEmpty) return cards;
+    final ids = cards.map((c) => c.id).toSet().toList();
+    if (ids.isEmpty) return cards;
+    try {
+      final data = await _supabase.client
+          .from('tt_ingredients')
+          .select('*')
+          .inFilter('tech_card_id', ids);
+      final grouped = <String, List<TTIngredient>>{};
+      for (final row in (data as List)) {
+        try {
+          final m = row as Map<String, dynamic>;
+          final tcId = (m['tech_card_id'] ?? '').toString();
+          if (tcId.isEmpty) continue;
+          final ing = TTIngredient.fromJson(m);
+          (grouped[tcId] ??= <TTIngredient>[]).add(ing);
+        } catch (_) {}
+      }
+      return cards
+          .map((tc) => tc.copyWith(ingredients: grouped[tc.id] ?? tc.ingredients))
+          .toList();
+    } catch (_) {
+      return cards;
+    }
+  }
+
   Future<List<TechCard>> ensureIngredientsForCards(List<TechCard> cards) async {
     final emptyIds = cards
         .where((tc) => tc.ingredients.isEmpty)
