@@ -675,6 +675,7 @@ class TechCardEditScreen extends StatefulWidget {
     super.key,
     required this.techCardId,
     this.initialFromAi,
+    this.initialTechCard,
     this.forceViewMode = false,
     this.department,
     this.forceHallView = false,
@@ -688,6 +689,9 @@ class TechCardEditScreen extends StatefulWidget {
 
   /// Пусто для «новой», иначе id существующей ТТК.
   final String techCardId;
+
+  /// Предзагруженная карточка (от _DeferredTechCardEdit). Пропускает getTechCardById.
+  final TechCard? initialTechCard;
 
   /// Предзаполнение из ИИ (фото/Excel). Используется только при techCardId == 'new'.
   final TechCardRecognitionResult? initialFromAi;
@@ -727,6 +731,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   bool _loading = true;
   bool _technologyTranslating = false;
   String? _error;
+  /// 0=подготовка, 1=полная форма. Растягиваем билд по кадрам — без замирания.
+  int _contentPhase = 0;
 
   /// 'photo' | 'excel' — какая кнопка сейчас загружает (чтобы показывать правильный текст).
   final _nameController = TextEditingController();
@@ -1491,13 +1497,17 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         return;
       }
       final svc = context.read<TechCardServiceSupabase>();
-      var tc = await svc.getTechCardById(widget.techCardId);
-      if (tc != null) {
-        // Иногда embed возвращает пустые ингредиенты — догружаем
-        if (tc.ingredients.isEmpty) {
+      TechCard? tc;
+      if (widget.initialTechCard != null) {
+        tc = widget.initialTechCard;
+      } else {
+        tc = await svc.getTechCardById(widget.techCardId);
+        if (tc != null && tc.ingredients.isEmpty) {
           final filled = await svc.fillIngredientsForCardsBulk([tc]);
           if (filled.isNotEmpty) tc = filled.first;
         }
+      }
+      if (tc != null) {
         var working = stripInvalidNestedPfSelfLinks(tc);
         if (!identical(working, tc)) {
           try {
@@ -1564,6 +1574,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               ..addAll(tc.ingredients);
             _ensurePlaceholderRowAtEnd();
           }
+          _contentPhase = 0; // подготовка, полная форма — в след. кадре
+        });
+        // Тяжёлый билд формы — в следующем кадре, без замирания
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          setState(() => _contentPhase = 1);
         });
         // Если перевод технологии ещё не сохранён — запросить через DeepL
         if (tc != null) _translateTechnologyIfNeeded(tc);
@@ -3834,6 +3850,37 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                           onPressed: () => context.pop(),
                           child: Text(loc.t('back')))
                     ]))),
+      );
+    }
+
+    // Фаза 0: лёгкий placeholder, полная форма — в след. кадре (без замирания)
+    if (!_isNew && _contentPhase == 0) {
+      final name = _techCard?.getDisplayNameInLists(loc.currentLanguageCode) ?? loc.t('tech_cards');
+      return Scaffold(
+        appBar: AppBar(
+          leading: appBarBackButton(context),
+          title: Text(name),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 32,
+                height: 32,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                loc.t('loading') ?? 'Загрузка...',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
       );
     }
 

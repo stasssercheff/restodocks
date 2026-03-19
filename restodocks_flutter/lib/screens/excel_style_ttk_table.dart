@@ -89,10 +89,17 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   final Map<String, FocusNode> _focusNodes = {};
   final Map<String, Timer> _debounceTimers = {};
 
+  /// Отложенный билд: сначала placeholder, тяжёлую таблицу — в след. кадре. Без замирания.
+  bool _tableBuilt = false;
+
   @override
   void initState() {
     super.initState();
     _ensureProductTranslations();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _tableBuilt = true);
+    });
   }
 
   @override
@@ -159,9 +166,35 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         return const Text('onUpdate callback is null', style: TextStyle(color: Colors.red));
       }
 
-      // Не используем ValueListenableBuilder для всей таблицы — иначе при изменении
-      // ingredients таблица не перестраивается (слушает только dishNameController).
-      // ValueListenableBuilder для названия блюда — только в ячейке.
+      // Отложенный билд: избегаем замирания при большом числе ингредиентов.
+      if (!_tableBuilt) {
+        return ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 1145, minHeight: 200),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    widget.loc.t('loading') ?? 'Загрузка...',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
       return _buildTtkTable(context);
     } catch (e, stackTrace) {
       // В случае ошибки в build показываем fallback

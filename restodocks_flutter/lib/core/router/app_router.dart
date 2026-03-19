@@ -886,8 +886,8 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-/// Placeholder для /tech-cards/:id: лёгкий Scaffold сначала, тяжёлый TechCardEditScreen в след. кадре.
-/// Устраняет замирание при открытии с телефона.
+/// Placeholder для /tech-cards/:id: загружаем ТТК в лёгком виджете, затем строим тяжёлый экран.
+/// Устраняет замирание: не строим TechCardEditScreen до получения данных.
 class _DeferredTechCardEdit extends StatefulWidget {
   const _DeferredTechCardEdit({
     required this.techCardId,
@@ -903,36 +903,87 @@ class _DeferredTechCardEdit extends StatefulWidget {
 }
 
 class _DeferredTechCardEditState extends State<_DeferredTechCardEdit> {
-  Widget? _child;
+  TechCard? _loadedCard;
+  String? _loadError;
+  bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadTechCard());
+  }
+
+  Future<void> _loadTechCard() async {
+    if (!mounted) return;
+    try {
+      final svc = context.read<TechCardServiceSupabase>();
+      var tc = await svc.getTechCardById(widget.techCardId);
+      if (tc != null && tc.ingredients.isEmpty) {
+        final filled = await svc.fillIngredientsForCardsBulk([tc]);
+        if (filled.isNotEmpty) tc = filled.first;
+      }
       if (!mounted) return;
       setState(() {
-        _child = TechCardEditScreen(
-          techCardId: widget.techCardId,
-          forceViewMode: widget.forceViewMode,
-          forceHallView: widget.forceHallView,
-        );
+        _loadedCard = tc;
+        _loading = false;
       });
-    });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = e.toString();
+        _loading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_child != null) return _child!;
-    final loc = context.read<LocalizationService>();
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+    if (_loading) {
+      final loc = context.read<LocalizationService>();
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(),
+          ),
+          title: Text(loc.t('tech_cards')),
         ),
-        title: Text(loc.t('tech_cards')),
-      ),
-      body: const Center(child: CircularProgressIndicator()),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_loadError != null) {
+      final loc = context.read<LocalizationService>();
+      return Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => context.pop(),
+          ),
+          title: Text(loc.t('tech_cards')),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(_loadError!),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => context.pop(),
+                  child: Text(loc.t('back')),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return TechCardEditScreen(
+      techCardId: widget.techCardId,
+      initialTechCard: _loadedCard,
+      forceViewMode: widget.forceViewMode,
+      forceHallView: widget.forceHallView,
     );
   }
 }
