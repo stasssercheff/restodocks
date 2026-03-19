@@ -156,15 +156,17 @@ class ProductStoreSupabase {
 
   /// Найти продукт для ингредиента: по productId, при неудаче — по productName (для совместимости с UUID-миграцией).
   /// Игнорирует префиксы iiko (Т., ТМЦ) при сопоставлении.
+  /// При дублях выбирает "лучший" вариант по полноте КБЖУ, чтобы не залипать на старых пустых дублях.
   Product? findProductForIngredient(String? productId, String productName) {
+    final candidates = <Product>[];
     if (productId != null && productId.isNotEmpty) {
-      final p = findProductById(productId);
-      if (p != null) return p;
+      final byId = findProductById(productId);
+      if (byId != null) candidates.add(byId);
     }
     final raw = productName.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
     final stripped = stripIikoPrefix(productName).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
     if (raw.isEmpty && stripped.isEmpty) return null;
-    return _allProducts.where((p) {
+    for (final p in _allProducts.where((p) {
       final n = (p.name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' '));
       final pStripped = stripIikoPrefix(p.name).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
       if (n == raw || n == stripped || pStripped == raw || pStripped == stripped) return true;
@@ -174,7 +176,22 @@ class ProductStoreSupabase {
         if (vn == raw || vn == stripped || vs == raw || vs == stripped) return true;
       }
       return false;
-    }).firstOrNull;
+    })) {
+      if (!candidates.any((c) => c.id == p.id)) candidates.add(p);
+    }
+    if (candidates.isEmpty) return null;
+    candidates.sort((a, b) => _ingredientProductScore(b).compareTo(_ingredientProductScore(a)));
+    return candidates.first;
+  }
+
+  int _ingredientProductScore(Product p) {
+    var score = 0;
+    if (p.calories != null && p.calories! > 0) score += 2;
+    if (p.protein != null) score += 1;
+    if (p.fat != null) score += 1;
+    if (p.carbs != null) score += 1;
+    if (p.names != null && p.names!.isNotEmpty) score += 1;
+    return score;
   }
 
   /// Добавить новый продукт. Возвращает сохранённый продукт с ID, подтверждённым сервером.

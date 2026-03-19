@@ -267,6 +267,8 @@ class TechCardServiceSupabase {
     String? changedByName,
     bool skipHistory = false,
   }) async {
+    final resolvedTechCard = await _relinkIngredientsToBestProducts(techCard);
+
     TechCard? oldCard;
     if (!skipHistory) {
       try {
@@ -274,22 +276,22 @@ class TechCardServiceSupabase {
       } catch (_) {}
     }
 
-    Map<String, dynamic> payload = _techCardPayloadForDb(techCard);
+    Map<String, dynamic> payload = _techCardPayloadForDb(resolvedTechCard);
     try {
       await _supabase.updateData(
         'tech_cards',
         payload,
         'id',
-        techCard.id,
+        resolvedTechCard.id,
       );
     } catch (e) {
       if (_isColumnNotFoundError(e)) {
-        payload = _techCardPayloadForDb(techCard, includeHallFields: false);
+        payload = _techCardPayloadForDb(resolvedTechCard, includeHallFields: false);
         await _supabase.updateData(
           'tech_cards',
           payload,
           'id',
-          techCard.id,
+          resolvedTechCard.id,
         );
       } else {
         devLog('Ошибка сохранения ТТК: $e');
@@ -301,23 +303,60 @@ class TechCardServiceSupabase {
     await _supabase.client
         .from('tt_ingredients')
         .delete()
-        .eq('tech_card_id', techCard.id);
+        .eq('tech_card_id', resolvedTechCard.id);
 
-    for (final ingredient in techCard.ingredients) {
+    for (final ingredient in resolvedTechCard.ingredients) {
       final ingredientData = _ingredientPayloadForDb(ingredient);
-      ingredientData['tech_card_id'] = techCard.id;
+      ingredientData['tech_card_id'] = resolvedTechCard.id;
       await _supabase.insertData('tt_ingredients', ingredientData);
     }
 
     if (!skipHistory) {
       await TechCardHistoryService().saveHistory(
-        techCardId: techCard.id,
-        establishmentId: techCard.establishmentId,
+        techCardId: resolvedTechCard.id,
+        establishmentId: resolvedTechCard.establishmentId,
         oldCard: oldCard,
-        newCard: techCard,
+        newCard: resolvedTechCard,
         changedByEmployeeId: changedByEmployeeId,
         changedByName: changedByName,
       );
+    }
+  }
+
+  /// При сохранении ТТК перепривязывает ингредиенты к "лучшему" продукту в каталоге:
+  /// если есть дубли, выбираем запись с более полным КБЖУ (через ProductStoreSupabase.findProductForIngredient).
+  Future<TechCard> _relinkIngredientsToBestProducts(TechCard techCard) async {
+    try {
+      final store = ProductStoreSupabase();
+      if (store.allProducts.isEmpty) {
+        try {
+          await store.loadProducts();
+        } catch (_) {}
+      }
+      if (store.allProducts.isEmpty) return techCard;
+
+      var changed = false;
+      final updated = <TTIngredient>[];
+      for (final ing in techCard.ingredients) {
+        if (ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty) {
+          updated.add(ing);
+          continue;
+        }
+        if ((ing.productId == null || ing.productId!.isEmpty) && ing.productName.trim().isEmpty) {
+          updated.add(ing);
+          continue;
+        }
+        final best = store.findProductForIngredient(ing.productId, ing.productName);
+        if (best != null && best.id != ing.productId) {
+          changed = true;
+          updated.add(ing.copyWith(productId: best.id));
+        } else {
+          updated.add(ing);
+        }
+      }
+      return changed ? techCard.copyWith(ingredients: updated) : techCard;
+    } catch (_) {
+      return techCard;
     }
   }
 

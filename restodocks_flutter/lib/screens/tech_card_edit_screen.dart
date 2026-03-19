@@ -4504,68 +4504,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                               .titleMedium
                               ?.copyWith(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      // Баннер: продукты без КБЖУ/лактозы/глютена
-                      Builder(
-                        builder: (ctx) {
-                          final store = context.read<ProductStoreSupabase>();
-                          final missingNames = <String>{};
-                          for (final ing in _ingredients.where((i) =>
-                              i.productId != null &&
-                              i.productName.isNotEmpty)) {
-                            final p = store.findProductForIngredient(
-                                ing.productId, ing.productName);
-                            if (p == null) continue;
-                            final lacksKbju =
-                                (p.calories == null || p.calories == 0) &&
-                                    p.protein == null &&
-                                    p.fat == null &&
-                                    p.carbs == null;
-                            // Не пугаем баннером из-за аллергенов: многие базы КБЖУ не содержат глютен/лактозу.
-                            // Баннер здесь — именно про КБЖУ, чтобы подсветить некорректный расчёт.
-                            if (lacksKbju) {
-                              missingNames.add(
-                                  p.getLocalizedName(loc.currentLanguageCode));
-                            }
-                          }
-                          if (missingNames.isEmpty)
-                            return const SizedBox.shrink();
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .errorContainer
-                                  .withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .error
-                                      .withOpacity(0.5)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(loc.t('tt_missing_nutrition'),
-                                    style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurface)),
-                                const SizedBox(height: 4),
-                                Text(
-                                    loc.t('tt_missing_products').replaceFirst(
-                                        '%s', missingNames.join(', ')),
-                                    style: const TextStyle(fontSize: 12)),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
                       // Таблица ТТК на странице: без «окна», при росте числа продуктов страница скроллится, технология остаётся ниже
                       Scrollbar(
                         thumbVisibility: true,
