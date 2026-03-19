@@ -896,7 +896,12 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               final pf = selectedItem.item as TechCard;
               double? pfPricePerKg;
               if (pf.ingredients.isNotEmpty) {
-                final totalCost = pf.ingredients.fold<double>(0, (sum, i) => sum + i.cost);
+                // Для импортированных вложенных ТТК `i.cost` может быть 0,
+                // а корректная цена хранится в `effectiveCost` (через pricePerKg × вес).
+                final totalCost = pf.ingredients.fold<double>(
+                  0,
+                  (sum, i) => sum + (i.effectiveCost > 0 ? i.effectiveCost : 0),
+                );
                 final totalOutput = pf.ingredients.fold<double>(0, (sum, i) => sum + i.outputWeight);
                 if (totalOutput > 0) pfPricePerKg = (totalCost / totalOutput) * 1000;
               }

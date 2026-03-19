@@ -1023,6 +1023,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     try {
       await context.read<ProductStoreSupabase>().loadProducts();
       final est = context.read<AccountManagerSupabase>().establishment;
+      var loadedTechCards = <TechCard>[];
       if (est != null) {
         final productStore = context.read<ProductStoreSupabase>();
         if (est.isBranch) {
@@ -1042,6 +1043,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           } else {
             tcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
           }
+          tcs = _hydrateNestedTechCardCosts(tcs);
+          loadedTechCards = tcs;
           final customKitchen = await tcSvc.getCustomCategories(est.isBranch ? est.id : est.dataEstablishmentId!, 'kitchen');
           final customBar = await tcSvc.getCustomCategories(est.isBranch ? est.id : est.dataEstablishmentId!, 'bar');
           if (mounted) {
@@ -1064,6 +1067,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               } else {
                 tcs = await tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
               }
+              tcs = _hydrateNestedTechCardCosts(tcs);
               final customKitchen = await tcSvc.getCustomCategories(est.isBranch ? est.id : est.dataEstablishmentId!, 'kitchen');
               final customBar = await tcSvc.getCustomCategories(est.isBranch ? est.id : est.dataEstablishmentId!, 'bar');
               if (!mounted) return;
@@ -1073,6 +1077,19 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 _customCategoriesKitchen = customKitchen;
                 _customCategoriesBar = customBar;
               });
+              // Если мы уже загрузили текущую ТТК — досвязываем вложенные ПФ и пересчитываем цену.
+              if (_techCard != null) {
+                final pfCards = tcs.where((t) => t.isSemiFinished).toList();
+                final fixed = _attachMissingPfSourceTechCardId(_techCard!, pfCards);
+                final hydrated = _hydrateNestedTechCardCosts([fixed, ...tcs]);
+                final hydratedTc = hydrated.firstWhere((item) => item.id == fixed.id, orElse: () => fixed);
+                setState(() {
+                  _techCard = hydratedTc;
+                  _ingredients
+                    ..clear()
+                    ..addAll(hydratedTc.ingredients);
+                });
+              }
               _ensureTechCardTranslations(tcs);
             } catch (_) {}
           }();
@@ -1158,7 +1175,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         return;
       }
       final svc = context.read<TechCardServiceSupabase>();
-      final tc = await svc.getTechCardById(widget.techCardId);
+      var tc = await svc.getTechCardById(widget.techCardId);
+      if (tc != null && loadedTechCards.isNotEmpty) {
+        final pfCards = loadedTechCards.where((t) => t.isSemiFinished).toList();
+        tc = _attachMissingPfSourceTechCardId(tc, pfCards);
+        final currentTechCardId = tc.id;
+        final hydrated = _hydrateNestedTechCardCosts([tc, ...loadedTechCards]);
+        tc = hydrated.firstWhere((item) => item.id == currentTechCardId, orElse: () => tc!);
+      }
       if (!mounted) return;
       final canEdit = context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
           final addPlaceholders = canEdit && !widget.forceViewMode;
@@ -1269,6 +1293,140 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   }
 
   void _scheduleDraftSave() => scheduleSave();
+
+  double _ingredientResolvedOutput(TTIngredient ingredient) {
+    if (ingredient.outputWeight > 0) return ingredient.outputWeight;
+    if (ingredient.netWeight > 0) return ingredient.netWeight;
+    return ingredient.grossWeight;
+  }
+
+  List<TechCard> _hydrateNestedTechCardCosts(List<TechCard> techCards) {
+    if (techCards.isEmpty) return techCards;
+
+    final byId = <String, TechCard>{
+      for (final tc in techCards) tc.id: tc,
+    };
+    final memo = <String, TechCard>{};
+    final resolving = <String>{};
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+
+    TechCard resolveCard(TechCard techCard) {
+      final cached = memo[techCard.id];
+      if (cached != null) return cached;
+      if (!resolving.add(techCard.id)) return techCard;
+
+      try {
+        final resolvedIngredients = techCard.ingredients.map((ingredient) {
+          final sourceId = ingredient.sourceTechCardId;
+          if (sourceId == null || sourceId.isEmpty) return ingredient;
+
+          final nested = byId[sourceId];
+          if (nested == null) return ingredient;
+
+          final resolvedNested = resolveCard(nested);
+          final nestedIngredients = resolvedNested.ingredients
+              .where((item) => item.productName.trim().isNotEmpty)
+              .toList();
+          final nestedOutput = nestedIngredients.fold<double>(
+            0,
+            (sum, item) => sum + _ingredientResolvedOutput(item),
+          );
+          final nestedCost = nestedIngredients.fold<double>(
+            0,
+            (sum, item) => sum + (item.effectiveCost > 0 ? item.effectiveCost : 0),
+          );
+
+          final resolvedName = ingredient.sourceTechCardName?.trim().isNotEmpty == true
+              ? ingredient.sourceTechCardName
+              : resolvedNested.getDisplayNameInLists(lang);
+
+          if (nestedOutput <= 0 || nestedCost <= 0) {
+            if (resolvedName == ingredient.sourceTechCardName) return ingredient;
+            return ingredient.copyWith(sourceTechCardName: resolvedName);
+          }
+
+          final resolvedPricePerKg = nestedCost * 1000 / nestedOutput;
+          final ingredientOutput = _ingredientResolvedOutput(ingredient);
+          final resolvedCost = ingredient.cost > 0
+              ? ingredient.cost
+              : resolvedPricePerKg * ingredientOutput / 1000;
+
+          return ingredient.copyWith(
+            sourceTechCardName: resolvedName,
+            pricePerKg: (ingredient.pricePerKg == null || ingredient.pricePerKg! <= 0)
+                ? resolvedPricePerKg
+                : ingredient.pricePerKg,
+            cost: resolvedCost,
+          );
+        }).toList();
+
+        final resolvedCard = techCard.copyWith(ingredients: resolvedIngredients);
+        memo[techCard.id] = resolvedCard;
+        return resolvedCard;
+      } finally {
+        resolving.remove(techCard.id);
+      }
+    }
+
+    return techCards.map(resolveCard).toList();
+  }
+
+  String _normalizeForTechCardName(String s) {
+    return s
+        .replaceAll(RegExp(r'[^a-zA-Zа-яА-ЯёЁ0-9\\s]+'), '')
+        .toLowerCase()
+        .replaceAll(RegExp(r'\\s+'), ' ')
+        .trim();
+  }
+
+  String _stripPfPrefix(String s) {
+    final r = RegExp(r'^(пф|п/ф|п\.ф\.|pf|prep|sf|hf)\\s*', caseSensitive: false);
+    return s.trim().replaceFirst(r, '').trim();
+  }
+
+  TechCard _attachMissingPfSourceTechCardId(TechCard tc, List<TechCard> pfCards) {
+    if (tc.ingredients.isEmpty || pfCards.isEmpty) return tc;
+
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    final pfNameToCard = <String, TechCard>{};
+
+    for (final pf in pfCards) {
+      final candidates = <String>[
+        pf.getDisplayNameInLists(lang),
+        pf.getLocalizedDishName(lang),
+        pf.dishName,
+      ];
+      for (final c in candidates) {
+        final k1 = _normalizeForTechCardName(c);
+        if (k1.isNotEmpty && !pfNameToCard.containsKey(k1)) pfNameToCard[k1] = pf;
+
+        final stripped = _stripPfPrefix(c);
+        final k2 = _normalizeForTechCardName(stripped);
+        if (k2.isNotEmpty && !pfNameToCard.containsKey(k2)) pfNameToCard[k2] = pf;
+      }
+    }
+
+    var changed = false;
+    final updatedIngredients = tc.ingredients.map((ing) {
+      final hasSourceId = ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty;
+      if (hasSourceId) return ing;
+      if (ing.productName.trim().isEmpty) return ing;
+
+      final k = _normalizeForTechCardName(ing.productName);
+      final pf = pfNameToCard[k];
+      if (pf == null) return ing;
+
+      changed = true;
+      final display = pf.getDisplayNameInLists(lang);
+      return ing.copyWith(
+        sourceTechCardId: pf.id,
+        sourceTechCardName: display,
+        productName: display,
+      );
+    }).toList();
+
+    return changed ? tc.copyWith(ingredients: updatedIngredients) : tc;
+  }
 
   @override
   void initState() {
