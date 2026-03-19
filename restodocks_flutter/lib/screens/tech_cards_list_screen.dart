@@ -297,22 +297,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return pricePerKg * (ing.grossWeight / 1000.0);
   }
 
-  /// Если в `establishment_products` нет цены — берём из глобального каталога (`base_price`, упаковка).
-  /// Для строк в шт. используем [Product.effectiveBasePrice] как цену за штуку.
-  double? _catalogFallbackUnitPrice(Product product, TTIngredient ing) {
-    final iu = ing.unit.toLowerCase().trim();
-    if (iu == 'шт' || iu == 'pcs') {
-      final v = product.effectiveBasePrice;
-      if (v != null && v > 0) return v;
-      return null;
-    }
-    final perKg = product.computedPricePerKg;
-    if (perKg != null && perKg > 0) return perKg;
-    final bp = product.basePrice;
-    if (bp != null && bp > 0) return bp;
-    return null;
-  }
-
   /// Стоимость строки-продукта: из ТТК, pricePerKg строки, номенклатуры (как в редакторе).
   /// Нужны loadProducts + loadNomenclature; для филиала ключ цены — id филиала, не головы.
   double _leafIngredientMonetaryCost(TTIngredient ing) {
@@ -334,11 +318,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     if (resolvedId == null || resolvedId.isEmpty) return 0.0;
 
     final ep = store.getEstablishmentPrice(resolvedId, estId);
-    var unitPrice = ep?.$1 ?? 0.0;
-    if (unitPrice <= 0 && product != null) {
-      final fb = _catalogFallbackUnitPrice(product, ing);
-      if (fb != null && fb > 0) unitPrice = fb;
-    }
+    final unitPrice = ep?.$1 ?? 0.0;
     return _costFromPricePerKgLine(unitPrice, ing);
   }
 
@@ -404,6 +384,49 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       if (ambiguous) cnt++;
     }
     return cnt;
+  }
+
+  List<TechCard> _pfCandidatesByIngredientName(String name) {
+    final key = _normalizeForTechCardName(_stripPfPrefix(name));
+    if (key.isEmpty) return const [];
+
+    final indexed = _pfCandidatesByNormalizedName[key];
+    if (indexed != null && indexed.isNotEmpty) return indexed;
+
+    // Fallback для расчёта цены: если индекс ещё не собран, ищем ПФ по всем загруженным ТТК.
+    final out = <TechCard>[];
+    for (final tc in _techCardsById.values) {
+      if (!tc.isSemiFinished) continue;
+      final names = <String>[
+        tc.dishName,
+        ...?tc.dishNameLocalized?.values,
+      ];
+      for (final n in names) {
+        final k = _normalizeForTechCardName(_stripPfPrefix(n));
+        if (k != key) continue;
+        if (!out.any((x) => x.id == tc.id)) out.add(tc);
+      }
+    }
+    return out;
+  }
+
+  String? _inferNestedPfId(TechCard owner, TTIngredient ing) {
+    final sid = ing.sourceTechCardId;
+    if (sid != null && sid.isNotEmpty) return sid;
+    final name = ing.productName.trim();
+    if (name.isEmpty) return null;
+
+    final candidates = _pfCandidatesByIngredientName(name)
+        .where((c) => c.id != owner.id)
+        .toList();
+    if (candidates.isEmpty) return null;
+
+    final sameEst = candidates
+        .where((c) => c.establishmentId == owner.establishmentId)
+        .toList();
+    if (sameEst.length == 1) return sameEst.first.id;
+    if (sameEst.isEmpty && candidates.length == 1) return candidates.first.id;
+    return null;
   }
 
   Widget _buildReviewList(
@@ -744,13 +767,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       final ingredientOutput = _ingredientResolvedOutput(ing);
       totalOutput += ingredientOutput;
 
+      final nestedId = _inferNestedPfId(tc, ing);
       // Продукты из номенклатуры: в БД часто cost=0 — подтягиваем цену из ProductStore.
-      if (ing.sourceTechCardId == null || ing.sourceTechCardId!.isEmpty) {
+      if (nestedId == null || nestedId.isEmpty) {
         totalCost += _leafIngredientMonetaryCost(ing);
         continue;
       }
-
-      final nestedId = ing.sourceTechCardId!;
       final nested = _resolveTechCardCostOutput(nestedId, resolving);
       if (ingredientOutput <= 0) continue;
 
