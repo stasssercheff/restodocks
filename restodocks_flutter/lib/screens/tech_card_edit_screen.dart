@@ -1689,6 +1689,29 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     return s.trim().replaceFirst(r, '').trim();
   }
 
+  TechCard? _pickBestPfCandidate({
+    required TechCard owner,
+    required List<TechCard> candidates,
+  }) {
+    if (candidates.isEmpty) return null;
+    if (candidates.length == 1) return candidates.first;
+
+    // Главная эвристика: если есть ПФ в том же заведении, что и текущая ТТК — берём его.
+    final sameEst = candidates
+        .where((c) => c.establishmentId == owner.establishmentId)
+        .toList();
+    if (sameEst.length == 1) return sameEst.first;
+    if (sameEst.length > 1) {
+      sameEst.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      return sameEst.first;
+    }
+
+    // Фолбэк: берём самый свежий, чтобы при дублях чаще попадать в актуальный.
+    final sorted = [...candidates]
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return sorted.first;
+  }
+
   TechCard _attachMissingPfSourceTechCardId(
       TechCard tc, List<TechCard> pfCards) {
     if (tc.ingredients.isEmpty || pfCards.isEmpty) return tc;
@@ -1703,14 +1726,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       if (ing.productName.trim().isEmpty) return ing;
       final candidates =
           _findPfCandidatesForIngredientName(ing.productName, pfCards, lang);
-      // Если неоднозначно (2+ совпадений) — не назначаем автоматически, это сделает диалог уточнения.
-      if (candidates.length != 1) return ing;
+      final picked = _pickBestPfCandidate(owner: tc, candidates: candidates);
+      if (picked == null) return ing;
 
       changed = true;
-      final pf = candidates.first;
-      final display = pf.getDisplayNameInLists(lang);
+      final display = picked.getDisplayNameInLists(lang);
       return ing.copyWith(
-        sourceTechCardId: pf.id,
+        sourceTechCardId: picked.id,
         sourceTechCardName: display,
         productName: display,
       );

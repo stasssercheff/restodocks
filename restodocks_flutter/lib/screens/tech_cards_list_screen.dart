@@ -321,7 +321,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       if (name.isEmpty) continue;
       final key = _normalizeForTechCardName(_stripPfPrefix(name));
       final candidates = _pfCandidatesByNormalizedName[key] ?? const [];
-      if (candidates.length > 1) cnt++;
+      // Если 2+ кандидата, но один из них в том же заведении — это не неоднозначность.
+      final sameEst = candidates
+          .where((c) => c.establishmentId == tc.establishmentId)
+          .toList();
+      final resolved = sameEst.isNotEmpty ? 1 : candidates.length;
+      if (resolved > 1) cnt++;
     }
     return cnt;
   }
@@ -387,8 +392,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       if (name.isEmpty) continue;
       final key = _normalizeForTechCardName(_stripPfPrefix(name));
       final candidates = _pfCandidatesByNormalizedName[key] ?? const [];
-      if (candidates.length > 1) {
-        matches.add((ing: ing, candidates: candidates));
+      final sameEst = candidates
+          .where((c) => c.establishmentId == tc.establishmentId)
+          .toList();
+      final effectiveCandidates = sameEst.isNotEmpty ? sameEst : candidates;
+      if (effectiveCandidates.length > 1) {
+        matches.add((ing: ing, candidates: effectiveCandidates));
       }
     }
     if (matches.isEmpty) return;
