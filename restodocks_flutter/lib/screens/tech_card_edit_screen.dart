@@ -2475,8 +2475,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               context.pop(
                   <String, dynamic>{'result': result, 'savedToSystem': true});
           } else {
-            final dept = widget.department ?? 'kitchen';
-            context.go('/tech-cards/$dept?refresh=1');
+            context.pop(true); // Новая карточка сохранена — список обновит в фоне
           }
         }
       } else {
@@ -2570,8 +2569,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           await clearDraft();
           AppToastService.show(
               context.read<LocalizationService>().t('save') + ' ✓');
-          final dept = widget.department ?? 'kitchen';
-          context.go('/tech-cards/$dept?refresh=1');
+          context.pop(true); // Список обновит данные в фоне, без полного перезагруза
         }
       }
     } catch (e) {
@@ -2753,8 +2751,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           .deleteTechCard(widget.techCardId);
       if (mounted) {
         AppToastService.show(loc.t('tech_card_deleted'));
-        final dept = widget.department ?? 'kitchen';
-        context.go('/tech-cards/$dept?refresh=1');
+        context.pop(true); // Список обновит в фоне
       }
     } catch (e) {
       if (mounted)

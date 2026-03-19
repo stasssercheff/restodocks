@@ -1017,7 +1017,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                           child: OutlinedButton(
                             onPressed: saving
                                 ? null
-                                : () => context.push('/tech-cards/${tc.id}'),
+                                : () async {
+                                    Navigator.of(ctx2).pop();
+                                    final needRefresh = await context.push<bool>('/tech-cards/${tc.id}');
+                                    if (mounted && needRefresh == true) _load(showLoading: false);
+                                  },
                             child: const Text('Открыть карточку'),
                           ),
                         ),
@@ -1214,7 +1218,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     }).toList();
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool showLoading = true}) async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     final emp = acc.currentEmployee;
@@ -1225,10 +1229,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       });
       return;
     }
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (showLoading) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final svc = context.read<TechCardServiceSupabase>();
       final productStore = context.read<ProductStoreSupabase>();
@@ -1617,7 +1623,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       }
 
       if (toSave.isNotEmpty && mounted) {
-        await _load();
+        await _load(showLoading: false);
       }
     } catch (_) {
       // Фоновая автодосвязка — не критична.
@@ -2212,9 +2218,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               tooltip: loc.t('create_tech_card'),
               onPressed: _loading
                   ? null
-                  : () => context.push(widget.department == 'bar'
-                      ? '/tech-cards/new?department=bar'
-                      : '/tech-cards/new'),
+                  : () async {
+                      final path = widget.department == 'bar'
+                          ? '/tech-cards/new?department=bar'
+                          : '/tech-cards/new';
+                      final needRefresh = await context.push<bool>(path);
+                      if (mounted && needRefresh == true) _load(showLoading: false);
+                    },
             ),
           if (canEdit)
             PopupMenuButton<String>(
@@ -2643,11 +2653,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       bool canEdit, bool showCost,
       {bool isDishesTab = false}) {
     final lang = loc.currentLanguageCode;
-    // «Цех»: шире, чтобы «Все цеха» не резалось; название забирает остаток Expanded.
-    const colSectionWidth = 118.0;
-    const colCatWidth = 84.0;
-    const colCostWidth = 56.0;
-    const colActionsWidth = 62.0;
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    // На мобильном — уже столбцы, чтобы название получало больше места.
+    final colSectionWidth = isMobile ? 72.0 : 118.0;
+    final colCatWidth = isMobile ? 52.0 : 84.0;
+    final colCostWidth = isMobile ? 48.0 : 56.0;
+    final colActionsWidth = isMobile ? 48.0 : 62.0;
     final est = context.read<AccountManagerSupabase>().establishment;
     final costSym = est?.currencySymbol ??
         Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
@@ -2793,18 +2804,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5)
           : null,
       child: InkWell(
-        onTap: () {
+        onTap: () async {
           if (_selectionMode) {
             _toggleTechCardSelection(tc.id);
           } else {
             final path = effectiveCanEdit
                 ? '/tech-cards/${tc.id}'
                 : '/tech-cards/${tc.id}?view=1';
-            context.push(path);
+            final needRefresh = await context.push<bool>(path);
+            if (mounted && needRefresh == true) _load(showLoading: false);
           }
         },
         onLongPress: effectiveCanEdit && !_selectionMode
-            ? () => context.push('/tech-cards/${tc.id}?view=1')
+            ? () async {
+                final needRefresh = await context.push<bool>('/tech-cards/${tc.id}?view=1');
+                if (mounted && needRefresh == true) _load(showLoading: false);
+              }
             : null,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
