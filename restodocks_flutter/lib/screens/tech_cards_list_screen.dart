@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'dart:typed_data';
 import 'dart:async';
 
@@ -263,12 +264,26 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return categoryTranslations[c]?[lang] ?? c;
   }
 
+  static int _costDebugCount = 0;
+
   /// То же, что «Итого стоимость за кг» в редакторе — один источник истины.
   /// Рекурсивно учитывает вложенные ПФ (sourceTechCardId) через _resolveTechCardCostOutput.
   /// Fallback: TechCardCostHydrator по гидратированным ингредиентам; выход — tc.yield если сумма по строкам 0.
   double _calculateCostPerKg(TechCard tc) {
     final resolved = _resolveTechCardCostOutput(tc.id, <String>{});
     final effectiveOutput = resolved.output > 0 ? resolved.output : (tc.yield > 0 ? tc.yield : 0.0);
+    // DEBUG: первые 3 карточки — в консоль браузера (F12 → Console)
+    if (_costDebugCount < 3) {
+      _costDebugCount++;
+      final ing0 = tc.ingredients.isNotEmpty ? tc.ingredients.first : null;
+      developer.log(
+        'ttk_cost_debug[$_costDebugCount] "${tc.dishName}": '
+        'resolved=(cost=${resolved.cost}, output=${resolved.output}) '
+        'yield=${tc.yield} ingCount=${tc.ingredients.length} '
+        'priceStore=${_priceProductStore != null} estId=${_priceEstablishmentId != null} '
+        'ing0=${ing0 != null ? "name=${ing0.productName} effCost=${ing0.effectiveCost} pricePerKg=${ing0.pricePerKg}" : "—"}',
+      );
+    }
     if (effectiveOutput > 0 && resolved.cost > 0) {
       return (resolved.cost / effectiveOutput) * 1000;
     }
@@ -1036,6 +1051,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         // Все ТТК заведения — чтобы рекурсия по вложенным ПФ находила карточки вне текущего фильтра списка.
         _techCardsById = {for (final tc in all) tc.id: tc};
         _resolvedCostMemo.clear();
+        _costDebugCount = 0;
         _ensureTechCardTranslations(svc, list);
         _warmPdfParser();
       }
