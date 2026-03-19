@@ -1233,15 +1233,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       final svc = context.read<TechCardServiceSupabase>();
       final productStore = context.read<ProductStoreSupabase>();
 
-      // Параллельная загрузка: продукты, номенклатура, ТТК, кастомные категории
-      final futures = <Future>[];
-      futures.add(productStore.loadProducts().catchError((_) {}));
-      if (est.isBranch) {
-        futures.add(productStore.loadNomenclatureForBranch(
-            est.id, est.dataEstablishmentId!).catchError((_) {}));
-      } else {
-        futures.add(productStore.loadNomenclature(est.dataEstablishmentId).catchError((_) {}));
-      }
+      // Минимум для показа списка: только ТТК и категории (без products, nomenclature, fillIngredients).
       late Future<List<TechCard>> allCardsFuture;
       if (est.isBranch) {
         allCardsFuture = Future.wait([
@@ -1251,15 +1243,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       } else {
         allCardsFuture = svc.getTechCardsForEstablishment(est.dataEstablishmentId);
       }
-      futures.add(allCardsFuture);
-      futures.add(Future.wait([
-        svc.getCustomCategories(est.dataEstablishmentId, 'kitchen'),
-        svc.getCustomCategories(est.dataEstablishmentId, 'bar'),
-      ]));
-
-      final results = await Future.wait(futures);
-      final all = results[2] as List<TechCard>;
-      final customResults = results[3] as List;
+      final results = await Future.wait([
+        allCardsFuture,
+        Future.wait([
+          svc.getCustomCategories(est.dataEstablishmentId, 'kitchen'),
+          svc.getCustomCategories(est.dataEstablishmentId, 'bar'),
+        ]),
+      ]);
+      final all = results[0] as List<TechCard>;
+      final customResults = results[1] as List;
       final customKitchen = customResults[0] as List<({String id, String name})>;
       final customBar = customResults[1] as List<({String id, String name})>;
       final customBarIds = customBar.map((c) => c.id).toSet();
@@ -1278,20 +1270,62 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           emp?.hasRole('sous_chef') == true ||
           emp?.hasRole('manager') == true ||
           emp?.hasRole('general_manager') == true;
-      if (canSeeCosts) {
-        processedAll = await svc.fillIngredientsForCardsBulk(processedAll);
-        final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
-        if (estPriceId != null && estPriceId.isNotEmpty) {
-          processedAll = TechCardCostHydrator.hydrate(processedAll, productStore, estPriceId);
-        }
-      }
+
+      // Тяжёлое (products, nomenclature, fillIngredients, hydrate, индекс цен) — в фоне
+      Future.microtask(() async {
+        try {
+          await productStore.loadProducts().catchError((_) {});
+          if (est.isBranch) {
+            await productStore.loadNomenclatureForBranch(est.id, est.dataEstablishmentId!).catchError((_) {});
+          } else {
+            await productStore.loadNomenclature(est.dataEstablishmentId).catchError((_) {});
+          }
+          if (!mounted) return;
+          var withData = List<TechCard>.from(processedAll);
+          if (canSeeCosts) {
+            withData = await svc.fillIngredientsForCardsBulk(withData);
+            final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
+            if (estPriceId != null && estPriceId.isNotEmpty) {
+              withData = TechCardCostHydrator.hydrate(withData, productStore, estPriceId);
+            }
+          }
+          if (!mounted) return;
+          await _buildNomenclatureNamePriceIndex(productStore, est.isBranch ? est.id : est.dataEstablishmentId);
+          if (!mounted) return;
+          var filteredList = _filterListByDepartment(withData, customBarIds);
+          final byId = {for (final tc in withData) tc.id: tc};
+          final referencedIds = <String>{};
+          for (final tc in withData) {
+            for (final ing in tc.ingredients) {
+              final id = ing.sourceTechCardId;
+              if (id != null && id.trim().isNotEmpty) referencedIds.add(id.trim());
+            }
+          }
+          final existing = filteredList.map((e) => e.id).toSet();
+          for (final id in referencedIds) {
+            final ref = byId[id];
+            if (ref != null && !existing.contains(id)) {
+              filteredList = [...filteredList, ref];
+              existing.add(id);
+            }
+          }
+          if (!mounted) return;
+          setState(() {
+            _list = filteredList;
+            _techCardsById = {for (final t in withData) t.id: t};
+            _priceProductStore = productStore;
+            _priceEstablishmentId = est.isBranch ? est.id : est.dataEstablishmentId;
+          });
+          if (mounted) _rebuildPfCandidatesIndex(context.read<LocalizationService>());
+        } catch (_) {}
+      });
 
       _customCategoryNames.clear();
       for (final c in customKitchen) _customCategoryNames[c.id] = c.name;
       for (final c in customBar) _customCategoryNames[c.id] = c.name;
       List<TechCard> list = _filterListByDepartment(processedAll, customBarIds);
 
-      // Добавляем ТТК, на которые есть ссылки из ингредиентов (могут быть в другой секции)
+      // Добавляем ТТК, на которые есть ссылки из ингредиентов
       try {
         final byId = {for (final tc in processedAll) tc.id: tc};
         final referencedIds = <String>{};
@@ -1313,12 +1347,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       } catch (_) {}
       if (mounted) {
         _priceProductStore = productStore;
-        _priceEstablishmentId =
-            est.isBranch ? est.id : est.dataEstablishmentId;
-        final estPriceId = _priceEstablishmentId;
-        if (estPriceId != null && estPriceId.isNotEmpty) {
-          await _buildNomenclatureNamePriceIndex(productStore, estPriceId);
-        }
+        _priceEstablishmentId = est.isBranch ? est.id : est.dataEstablishmentId;
         setState(() {
           _list = list;
           _loading = false;
@@ -1327,7 +1356,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         _resolvedCostMemo.clear();
         _ensureTechCardTranslations(svc, list);
         _warmPdfParser();
-        if (mounted) _rebuildPfCandidatesIndex(context.read<LocalizationService>());
       }
 
       if (toPersistSelfLink.isNotEmpty && mounted) {
@@ -2184,16 +2212,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               tooltip: loc.t('create_tech_card'),
               onPressed: _loading
                   ? null
-                  : () {
-                      // Откладываем на следующий кадр — кнопка снимает pressed state сразу,
-                      // иначе UI зависает на 3–5 сек (сборка маршрута блокирует главный поток).
-                      final path = widget.department == 'bar'
-                          ? '/tech-cards/new?department=bar'
-                          : '/tech-cards/new';
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (context.mounted) context.push(path);
-                      });
-                    },
+                  : () => context.push(widget.department == 'bar'
+                      ? '/tech-cards/new?department=bar'
+                      : '/tech-cards/new'),
             ),
           if (canEdit)
             PopupMenuButton<String>(

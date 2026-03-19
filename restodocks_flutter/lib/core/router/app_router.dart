@@ -742,8 +742,8 @@ class AppRouter {
                 initialFromAi = extra;
               }
               final department = state.queryParameters['department'];
-              return _slideTransitionPage(state, TechCardEditScreen(
-                techCardId: 'new',
+              // Placeholder сначала — push завершается мгновенно, тяжёлый TechCardEditScreen строим в след. кадре
+              return _slideTransitionPage(state, _DeferredTechCardNew(
                 initialFromAi: initialFromAi,
                 department: department,
                 initialCategory: initialCategory,
@@ -882,6 +882,73 @@ class _SplashScreenState extends State<SplashScreen> {
           fit: BoxFit.cover,
         ),
       ),
+    );
+  }
+}
+
+/// Placeholder для /tech-cards/new: лёгкий Scaffold сначала, TechCardEditScreen строим в след. кадре.
+/// Push завершается мгновенно — кнопка «Создать» не зависает.
+class _DeferredTechCardNew extends StatefulWidget {
+  const _DeferredTechCardNew({
+    this.initialFromAi,
+    this.department,
+    this.initialCategory,
+    this.initialSections,
+    this.initialIsSemiFinished,
+    this.initialTypeRevision,
+    this.initialHeaderSignature,
+    this.initialSourceRows,
+  });
+  final TechCardRecognitionResult? initialFromAi;
+  final String? department;
+  final String? initialCategory;
+  final List<String>? initialSections;
+  final bool? initialIsSemiFinished;
+  final int? initialTypeRevision;
+  final String? initialHeaderSignature;
+  final List<List<String>>? initialSourceRows;
+
+  @override
+  State<_DeferredTechCardNew> createState() => _DeferredTechCardNewState();
+}
+
+class _DeferredTechCardNewState extends State<_DeferredTechCardNew> {
+  Widget? _child;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _child = TechCardEditScreen(
+          techCardId: 'new',
+          initialFromAi: widget.initialFromAi,
+          department: widget.department,
+          initialCategory: widget.initialCategory,
+          initialSections: widget.initialSections,
+          initialIsSemiFinished: widget.initialIsSemiFinished,
+          initialTypeRevision: widget.initialTypeRevision,
+          initialHeaderSignature: widget.initialHeaderSignature,
+          initialSourceRows: widget.initialSourceRows,
+        );
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_child != null) return _child!;
+    final loc = context.read<LocalizationService>();
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
+        title: Text(loc.t('create_tech_card')),
+      ),
+      body: const Center(child: CircularProgressIndicator()),
     );
   }
 }
