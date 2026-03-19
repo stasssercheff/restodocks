@@ -1062,6 +1062,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         _techCardsById = {for (final tc in all) tc.id: tc};
         _resolvedCostMemo.clear();
         _costDebugCount = 0;
+        if (_ttkCostDebug) {
+          debug_console.debugLogToConsole(
+            'ttk_cost_debug: list loaded, cards=${list.length} priceStore=${_priceProductStore != null} estId=$_priceEstablishmentId',
+          );
+        }
         _ensureTechCardTranslations(svc, list);
         _warmPdfParser();
       }

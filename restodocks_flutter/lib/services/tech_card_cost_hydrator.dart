@@ -42,7 +42,10 @@ class TechCardCostHydrator {
     final product = store.findProductForIngredient(ing.productId, ing.productName);
     if (product == null) return ing;
     final priceInfo = store.getEstablishmentPrice(product.id, establishmentId);
-    final pricePerKg = priceInfo?.$1 ?? 0.0;
+    double pricePerKg = priceInfo?.$1 ?? 0.0;
+    if (pricePerKg <= 0 && product.basePrice != null && product.basePrice! > 0) {
+      pricePerKg = product.basePrice!;
+    }
     if (pricePerKg <= 0) return ing;
     final qty = _quantityForCost(ing);
     if (qty <= 0) return ing;
