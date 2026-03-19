@@ -1049,9 +1049,43 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     return ing.grossWeight;
   }
 
+  /// Количество для расчёта стоимости листового ингредиента (кг или шт).
+  double _quantityForCostNested(TTIngredient ing) {
+    final qty = ing.grossWeight > 0
+        ? ing.grossWeight
+        : (ing.netWeight > 0 ? ing.netWeight : ing.outputWeight);
+    if (qty <= 0) return 0;
+    final u = ing.unit.toLowerCase().trim();
+    if (u == 'шт' || u == 'pcs') {
+      final gpp = ing.gramsPerPiece ?? 50.0;
+      return gpp > 0 ? qty / gpp : qty / 1000;
+    }
+    return qty / 1000;
+  }
+
+  /// Стоимость листового (продуктового) ингредиента: из сохранённых данных или из номенклатуры.
+  double _resolveLeafIngredientCost(TTIngredient ing) {
+    var c = ing.effectiveCost;
+    if (c > 0) return c;
+    if (ing.pricePerKg != null && ing.pricePerKg! > 0) {
+      final q = _quantityForCostNested(ing);
+      if (q > 0) return ing.pricePerKg! * q;
+    }
+    final estId = widget.establishmentId;
+    if (estId == null) return 0;
+    final product = widget.productStore
+        .findProductForIngredient(ing.productId, ing.productName);
+    if (product == null) return 0;
+    final ep = widget.productStore.getEstablishmentPrice(product.id, estId);
+    final pricePerKg = ep?.$1 ?? 0.0;
+    if (pricePerKg <= 0) return 0;
+    final q = _quantityForCostNested(ing);
+    return q > 0 ? pricePerKg * q : 0;
+  }
+
   /// Рекурсивно: себестоимость и суммарный «выход» по рецепту ПФ (для цены/кг и строки в родителе).
   ({double cost, double output})? _resolvePfRecipeCostOutput(
-      String pfId, Set<String> stack) {
+      String pfId, Set<String> stack, {String? fallbackName}) {
     if (!stack.add(pfId)) return null;
     try {
       final list = widget.semiFinishedProducts;
@@ -1063,6 +1097,26 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
           break;
         }
       }
+      // Fallback: поиск по имени (sourceTechCardName / productName) при расхождении ID.
+      if (pf == null && fallbackName != null && fallbackName.trim().isNotEmpty) {
+        final norm = normalizeForPfMatching(fallbackName);
+        if (norm.isNotEmpty) {
+          for (final t in list) {
+            final dn = normalizeForPfMatching(t.dishName);
+            if (dn == norm) {
+              if (!stack.add(t.id)) return null;
+              pf = t;
+              break;
+            }
+            final display = t.getDisplayNameInLists(widget.loc.currentLanguageCode);
+            if (normalizeForPfMatching(display) == norm) {
+              if (!stack.add(t.id)) return null;
+              pf = t;
+              break;
+            }
+          }
+        }
+      }
       if (pf == null || pf.ingredients.isEmpty) return null;
 
       double totalCost = 0;
@@ -1072,21 +1126,28 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         if (io <= 0) continue;
         totalOutput += io;
         if (ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty) {
-          final nested =
-              _resolvePfRecipeCostOutput(ing.sourceTechCardId!, stack);
+          final nested = _resolvePfRecipeCostOutput(
+            ing.sourceTechCardId!,
+            stack,
+            fallbackName: ing.sourceTechCardName ?? ing.productName,
+          );
           if (nested != null && nested.output > 0 && nested.cost > 0) {
             totalCost += nested.cost * io / nested.output;
           } else if (ing.effectiveCost > 0) {
             totalCost += ing.effectiveCost;
           }
         } else {
-          totalCost += ing.effectiveCost > 0 ? ing.effectiveCost : 0;
+          // Листовой ингредиент (продукт): цена из номенклатуры, если cost=0 в БД
+          final leafCost = _resolveLeafIngredientCost(ing);
+          if (leafCost > 0) totalCost += leafCost;
         }
       }
       if (totalOutput <= 0) return null;
       return (cost: totalCost, output: totalOutput);
     } finally {
       stack.remove(pfId);
+      final resolvedId = pf?.id;
+      if (resolvedId != null && resolvedId != pfId) stack.remove(resolvedId);
     }
   }
 
@@ -1108,7 +1169,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     if (sid != null &&
         sid.isNotEmpty &&
         (widget.semiFinishedProducts?.isNotEmpty ?? false)) {
-      final r = _resolvePfRecipeCostOutput(sid, <String>{});
+      final r = _resolvePfRecipeCostOutput(
+        sid,
+        <String>{},
+        fallbackName: ingredient.sourceTechCardName ?? ingredient.productName,
+      );
       if (r != null && r.output > 0 && r.cost > 0) {
         return (r.cost / r.output) * 1000;
       }
