@@ -2184,9 +2184,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               tooltip: loc.t('create_tech_card'),
               onPressed: _loading
                   ? null
-                  : () => context.push(widget.department == 'bar'
-                      ? '/tech-cards/new?department=bar'
-                      : '/tech-cards/new'),
+                  : () {
+                      // Откладываем на следующий кадр — кнопка снимает pressed state сразу,
+                      // иначе UI зависает на 3–5 сек (сборка маршрута блокирует главный поток).
+                      final path = widget.department == 'bar'
+                          ? '/tech-cards/new?department=bar'
+                          : '/tech-cards/new';
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (context.mounted) context.push(path);
+                      });
+                    },
             ),
           if (canEdit)
             PopupMenuButton<String>(
