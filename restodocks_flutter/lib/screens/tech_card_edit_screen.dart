@@ -4438,22 +4438,28 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                         setState(() {
                                           if (_ingredients.isEmpty && i == 0) {
                                             _ingredients.add(ing);
-                                            if (ing.isPlaceholder &&
-                                                ing.hasData) {
+                                            if (ing.hasData) {
                                               _ingredients[0] =
-                                                  ing.withRealId();
-                                              _ingredients.add(TTIngredient
-                                                  .emptyPlaceholder());
+                                                  ing.isPlaceholder
+                                                      ? ing.withRealId()
+                                                      : ing;
+                                              _ingredients.add(
+                                                  TTIngredient.emptyPlaceholder());
                                             }
                                             return;
                                           }
                                           if (i >= _ingredients.length) return;
-                                          _ingredients[i] = ing;
-                                          if (ing.isPlaceholder &&
-                                              ing.hasData) {
-                                            _ingredients[i] = ing.withRealId();
-                                            _ingredients.add(TTIngredient
-                                                .emptyPlaceholder());
+                                          _ingredients[i] =
+                                              ing.isPlaceholder && ing.hasData
+                                                  ? ing.withRealId()
+                                                  : ing;
+                                          // Всегда добавляем пустую строку снизу при заполнении любой строки
+                                          if (ing.hasData &&
+                                              (_ingredients.isEmpty ||
+                                                  !_ingredients.last
+                                                      .isPlaceholder)) {
+                                            _ingredients.add(
+                                                TTIngredient.emptyPlaceholder());
                                           }
                                         });
                                         _scheduleDraftSave();
