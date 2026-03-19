@@ -455,6 +455,122 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return cnt;
   }
 
+  /// Проверяет, есть ли в ТТК проблемы с ценами (отсутствуют цены у ингредиентов или вложенных ПФ)
+  int _missingPriceIssuesCount(TechCard tc) {
+    if (tc.ingredients.isEmpty) return 0;
+    var cnt = 0;
+    for (final ing in tc.ingredients) {
+      // Проверяем листовые ингредиенты (продукты)
+      if (ing.sourceTechCardId == null || ing.sourceTechCardId!.isEmpty) {
+        if (ing.productName.trim().isNotEmpty) {
+          // Есть продукт, но нет цены
+          if (ing.effectiveCost <= 0 && (ing.pricePerKg == null || ing.pricePerKg! <= 0)) {
+            // Проверяем, есть ли цена в номенклатуре
+            final product = _priceProductStore?.findProductForIngredient(ing.productId, ing.productName);
+            if (product != null && _priceEstablishmentId != null) {
+              final priceInfo = _priceProductStore!.getEstablishmentPrice(product.id, _priceEstablishmentId!);
+              final pricePerKg = priceInfo?.$1 ?? 0.0;
+              final basePrice = product.basePrice ?? 0.0;
+              if (pricePerKg <= 0 && basePrice <= 0) {
+                cnt++; // Нет цены ни в номенклатуре, ни базовой
+              }
+            } else {
+              cnt++; // Продукт не найден или нет номенклатуры
+            }
+          }
+        }
+      } else {
+        // Проверяем вложенные ПФ
+        final pfId = ing.sourceTechCardId!;
+        final pf = _techCardsById[pfId];
+        if (pf != null) {
+          // Рекурсивно проверяем ПФ на отсутствие цен
+          final pfIssues = _missingPriceIssuesCount(pf);
+          if (pfIssues > 0) {
+            cnt++; // В ПФ есть проблемы с ценами
+          }
+        }
+      }
+    }
+    return cnt;
+  }
+
+  /// Проверяет, есть ли проблемы с весом в ТТК
+  int _missingWeightIssuesCount(TechCard tc) {
+    var cnt = 0;
+    
+    // Проверяем общий выход (вес готового продукта)
+    if (tc.yield <= 0) {
+      cnt++;
+    }
+    
+    // Проверяем вес порции для блюд
+    if (!tc.isSemiFinished && tc.portionWeight <= 0) {
+      cnt++;
+    }
+    
+    // Проверяем веса ингредиентов (нетто и брутто)
+    for (final ing in tc.ingredients) {
+      if (ing.netWeight <= 0 || ing.grossWeight <= 0) {
+        cnt++;
+      }
+    }
+    
+    return cnt;
+  }
+
+  /// Проверяет, есть ли проблемы с технологией в ТТК
+  int _missingTechnologyIssuesCount(TechCard tc) {
+    var cnt = 0;
+    
+    // Проверяем технологию приготовления (многоязычная)
+    if (tc.technologyLocalized == null || tc.technologyLocalized!.isEmpty) {
+      cnt++;
+    } else {
+      // Проверяем, что есть хотя бы одна непустая технология
+      final hasNonEmptyTechnology = tc.technologyLocalized!.values
+          .any((tech) => tech.trim().isNotEmpty);
+      if (!hasNonEmptyTechnology) {
+        cnt++;
+      }
+    }
+    
+    return cnt;
+  }
+
+  /// Общий счётчик проблем для вкладки "На проверку"
+  int _reviewIssuesCount(TechCard tc, LocalizationService loc) {
+    final ambiguousCount = _ambiguousPfIngredientCount(tc, loc);
+    final priceIssuesCount = _missingPriceIssuesCount(tc);
+    final weightIssuesCount = _missingWeightIssuesCount(tc);
+    final technologyIssuesCount = _missingTechnologyIssuesCount(tc);
+    return ambiguousCount + priceIssuesCount + weightIssuesCount + technologyIssuesCount;
+  }
+
+  /// Генерирует подзаголовок для элемента в списке "На проверку"
+  String _getReviewSubtitle(TechCard tc, LocalizationService loc) {
+    final ambiguousCount = _ambiguousPfIngredientCount(tc, loc);
+    final priceIssuesCount = _missingPriceIssuesCount(tc);
+    final weightIssuesCount = _missingWeightIssuesCount(tc);
+    final technologyIssuesCount = _missingTechnologyIssuesCount(tc);
+    
+    final issues = <String>[];
+    if (ambiguousCount > 0) {
+      issues.add('Неоднозначных ПФ: $ambiguousCount');
+    }
+    if (priceIssuesCount > 0) {
+      issues.add('Без цен: $priceIssuesCount');
+    }
+    if (weightIssuesCount > 0) {
+      issues.add('Без веса: $weightIssuesCount');
+    }
+    if (technologyIssuesCount > 0) {
+      issues.add('Без технологии: $technologyIssuesCount');
+    }
+    
+    return issues.join(', ');
+  }
+
   List<TechCard> _pfCandidatesByIngredientName(String name) {
     final key = _normalizeForTechCardName(_stripPfPrefix(name));
     if (key.isEmpty) return const [];
@@ -502,10 +618,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       List<TechCard> techCards, LocalizationService loc, bool canEdit) {
     final lang = loc.currentLanguageCode;
     final list = techCards
-        .map((tc) => (tc: tc, ambiguous: _ambiguousPfIngredientCount(tc, loc)))
-        .where((e) => e.ambiguous > 0)
+        .map((tc) => (tc: tc, issues: _reviewIssuesCount(tc, loc)))
+        .where((e) => e.issues > 0)
         .toList()
-      ..sort((a, b) => b.ambiguous.compareTo(a.ambiguous));
+      ..sort((a, b) => b.issues.compareTo(a.issues));
 
     if (list.isEmpty) {
       return Center(
@@ -538,7 +654,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 side: BorderSide(
                     color: Theme.of(ctx).colorScheme.outlineVariant)),
             title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-            subtitle: Text('Неоднозначных ингредиентов: ${item.ambiguous}'),
+            subtitle: Text(_getReviewSubtitle(tc, loc)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showReviewBottomSheet(tc, loc),
           );
@@ -547,9 +663,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     );
   }
 
-  Future<void> _showReviewBottomSheet(
-      TechCard tc, LocalizationService loc) async {
-    final lang = loc.currentLanguageCode;
+  /// Собирает список неоднозначных ПФ ингредиентов
+  List<({TTIngredient ing, List<TechCard> candidates})> _getAmbiguousPfIngredients(TechCard tc) {
     final matches = <({TTIngredient ing, List<TechCard> candidates})>[];
     for (final ing in tc.ingredients) {
       final sid = ing.sourceTechCardId;
@@ -572,10 +687,98 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         matches.add((ing: ing, candidates: effectiveCandidates));
       }
     }
-    if (matches.isEmpty) return;
+    return matches;
+  }
+
+  /// Собирает список ингредиентов без цен
+  List<TTIngredient> _getMissingPriceIngredients(TechCard tc) {
+    final missingPrice = <TTIngredient>[];
+    for (final ing in tc.ingredients) {
+      // Проверяем листовые ингредиенты (продукты)
+      if (ing.sourceTechCardId == null || ing.sourceTechCardId!.isEmpty) {
+        if (ing.productName.trim().isNotEmpty) {
+          // Есть продукт, но нет цены
+          if (ing.effectiveCost <= 0 && (ing.pricePerKg == null || ing.pricePerKg! <= 0)) {
+            // Проверяем, есть ли цена в номенклатуре
+            final product = _priceProductStore?.findProductForIngredient(ing.productId, ing.productName);
+            if (product != null && _priceEstablishmentId != null) {
+              final priceInfo = _priceProductStore!.getEstablishmentPrice(product.id, _priceEstablishmentId!);
+              final pricePerKg = priceInfo?.$1 ?? 0.0;
+              final basePrice = product.basePrice ?? 0.0;
+              if (pricePerKg <= 0 && basePrice <= 0) {
+                missingPrice.add(ing); // Нет цены ни в номенклатуре, ни базовой
+              }
+            } else {
+              missingPrice.add(ing); // Продукт не найден или нет номенклатуры
+            }
+          }
+        }
+      }
+    }
+    return missingPrice;
+  }
+
+  /// Собирает список проблем с весом
+  List<String> _getMissingWeightIssues(TechCard tc) {
+    final issues = <String>[];
+    
+    // Проверяем общий выход (вес готового продукта)
+    if (tc.yield <= 0) {
+      issues.add('Отсутствует общий выход (вес готового продукта)');
+    }
+    
+    // Проверяем вес порции для блюд
+    if (!tc.isSemiFinished && tc.portionWeight <= 0) {
+      issues.add('Отсутствует вес порции');
+    }
+    
+    // Проверяем веса ингредиентов (нетто и брутто)
+    for (final ing in tc.ingredients) {
+      if (ing.netWeight <= 0 || ing.grossWeight <= 0) {
+        final issuesList = <String>[];
+        if (ing.netWeight <= 0) issuesList.add('нетто');
+        if (ing.grossWeight <= 0) issuesList.add('брутто');
+        issues.add('Нет веса (${issuesList.join(', ')}): ${ing.productName}');
+      }
+    }
+    
+    return issues;
+  }
+
+  /// Собирает список проблем с технологией
+  List<String> _getMissingTechnologyIssues(TechCard tc) {
+    final issues = <String>[];
+    
+    // Проверяем технологию приготовления (многоязычная)
+    if (tc.technologyLocalized == null || tc.technologyLocalized!.isEmpty) {
+      issues.add('Отсутствует технология приготовления');
+    } else {
+      // Проверяем, что есть хотя бы одна непустая технология
+      final hasNonEmptyTechnology = tc.technologyLocalized!.values
+          .any((tech) => tech.trim().isNotEmpty);
+      if (!hasNonEmptyTechnology) {
+        issues.add('Все технологии приготовления пустые');
+      }
+    }
+    
+    return issues;
+  }
+
+  Future<void> _showReviewBottomSheet(
+      TechCard tc, LocalizationService loc) async {
+    final lang = loc.currentLanguageCode;
+    final ambiguousMatches = _getAmbiguousPfIngredients(tc);
+    final missingPriceIngredients = _getMissingPriceIngredients(tc);
+    final missingWeightIssues = _getMissingWeightIssues(tc);
+    final missingTechnologyIssues = _getMissingTechnologyIssues(tc);
+    
+    if (ambiguousMatches.isEmpty && 
+        missingPriceIngredients.isEmpty && 
+        missingWeightIssues.isEmpty && 
+        missingTechnologyIssues.isEmpty) return;
 
     final selected = <String, String>{
-      for (final m in matches) m.ing.id: m.candidates.first.id,
+      for (final m in ambiguousMatches) m.ing.id: m.candidates.first.id,
     };
     var saving = false;
 
@@ -620,73 +823,201 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                     ),
                     const SizedBox(height: 8),
                     Flexible(
-                      child: ListView.separated(
+                      child: ListView(
                         shrinkWrap: true,
-                        itemCount: matches.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (_, i) {
-                          final m = matches[i];
-                          final selId =
-                              selected[m.ing.id] ?? m.candidates.first.id;
-                          final selPf = m.candidates.firstWhere(
-                              (c) => c.id == selId,
-                              orElse: () => m.candidates.first);
-                          return Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              border: Border.all(
+                        children: [
+                          // Секция неоднозначных ПФ
+                          if (ambiguousMatches.isNotEmpty) ...[
+                            Text(
+                              'Неоднозначные полуфабрикаты (${ambiguousMatches.length})',
+                              style: Theme.of(ctx2).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.orange[700],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ...ambiguousMatches.map((m) {
+                              final selId = selected[m.ing.id] ?? m.candidates.first.id;
+                              final selPf = m.candidates.firstWhere(
+                                  (c) => c.id == selId,
+                                  orElse: () => m.candidates.first);
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                      color: Theme.of(ctx2)
+                                          .colorScheme
+                                          .outlineVariant),
+                                  borderRadius: BorderRadius.circular(10),
                                   color: Theme.of(ctx2)
                                       .colorScheme
-                                      .outlineVariant),
-                              borderRadius: BorderRadius.circular(10),
-                              color: Theme.of(ctx2)
-                                  .colorScheme
-                                  .surfaceContainerLowest,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(m.ing.productName,
-                                    style: Theme.of(ctx2)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                            fontWeight: FontWeight.w700)),
-                                const SizedBox(height: 8),
-                                DropdownButtonFormField<String>(
-                                  value: selId,
-                                  isExpanded: true,
-                                  decoration: const InputDecoration(
-                                      isDense: true, labelText: 'Кандидат ПФ'),
-                                  items: m.candidates
-                                      .map((c) => DropdownMenuItem<String>(
-                                            value: c.id,
-                                            child: Text(
-                                                c.getDisplayNameInLists(lang)),
-                                          ))
-                                      .toList(),
-                                  onChanged: saving
-                                      ? null
-                                      : (v) {
-                                          if (v == null) return;
-                                          setStateDlg(
-                                              () => selected[m.ing.id] = v);
-                                        },
+                                      .surfaceContainerLowest,
                                 ),
-                                const SizedBox(height: 8),
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: TextButton(
-                                    onPressed: () =>
-                                        _showTechCardCompositionDialog(
-                                            ctx2, selPf, lang),
-                                    child: const Text('Состав'),
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    Text(m.ing.productName,
+                                        style: Theme.of(ctx2)
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
+                                                fontWeight: FontWeight.w700)),
+                                    const SizedBox(height: 8),
+                                    DropdownButtonFormField<String>(
+                                      value: selId,
+                                      isExpanded: true,
+                                      decoration: const InputDecoration(
+                                          isDense: true, labelText: 'Кандидат ПФ'),
+                                      items: m.candidates
+                                          .map((c) => DropdownMenuItem<String>(
+                                                value: c.id,
+                                                child: Text(
+                                                    c.getDisplayNameInLists(lang)),
+                                              ))
+                                          .toList(),
+                                      onChanged: saving
+                                          ? null
+                                          : (v) {
+                                              if (v == null) return;
+                                              setStateDlg(
+                                                  () => selected[m.ing.id] = v);
+                                            },
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: TextButton(
+                                        onPressed: () =>
+                                            _showTechCardCompositionDialog(
+                                                ctx2, selPf, lang),
+                                        child: const Text('Состав'),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
+                              );
+                            }).toList(),
+                          ],
+                          // Секция ингредиентов без цен
+                          if (missingPriceIngredients.isNotEmpty) ...[
+                            if (ambiguousMatches.isNotEmpty) const SizedBox(height: 16),
+                            Text(
+                              'Ингредиенты без цен (${missingPriceIngredients.length})',
+                              style: Theme.of(ctx2).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.red[700],
+                              ),
                             ),
-                          );
-                        },
+                            const SizedBox(height: 8),
+                            ...missingPriceIngredients.map((ing) {
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                      color: Colors.red.withOpacity(0.3)),
+                                  borderRadius: BorderRadius.circular(10),
+                                  color: Colors.red.withOpacity(0.05),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.warning, 
+                                         color: Colors.red[700], 
+                                         size: 20),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        ing.productName,
+                                        style: Theme.of(ctx2).textTheme.bodyMedium,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ],
+                          // Секция проблем с весом
+                          if (missingWeightIssues.isNotEmpty) ...[
+                            if (ambiguousMatches.isNotEmpty || missingPriceIngredients.isNotEmpty) 
+                              const SizedBox(height: 16),
+                            Text(
+                              'Проблемы с весом (${missingWeightIssues.length})',
+                              style: Theme.of(ctx2).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.blue[700],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ...missingWeightIssues.map((issue) {
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                      color: Colors.blue.withOpacity(0.3)),
+                                  borderRadius: BorderRadius.circular(10),
+                                  color: Colors.blue.withOpacity(0.05),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.scale, 
+                                         color: Colors.blue[700], 
+                                         size: 20),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        issue,
+                                        style: Theme.of(ctx2).textTheme.bodyMedium,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ],
+                          // Секция проблем с технологией
+                          if (missingTechnologyIssues.isNotEmpty) ...[
+                            if (ambiguousMatches.isNotEmpty || 
+                                missingPriceIngredients.isNotEmpty || 
+                                missingWeightIssues.isNotEmpty) 
+                              const SizedBox(height: 16),
+                            Text(
+                              'Проблемы с технологией (${missingTechnologyIssues.length})',
+                              style: Theme.of(ctx2).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.purple[700],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ...missingTechnologyIssues.map((issue) {
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                      color: Colors.purple.withOpacity(0.3)),
+                                  borderRadius: BorderRadius.circular(10),
+                                  color: Colors.purple.withOpacity(0.05),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.engineering, 
+                                         color: Colors.purple[700], 
+                                         size: 20),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        issue,
+                                        style: Theme.of(ctx2).textTheme.bodyMedium,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ],
+                        ],
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -701,11 +1032,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: saving
-                                ? null
-                                : () async {
+                        if (ambiguousMatches.isNotEmpty)
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: saving
+                                  ? null
+                                  : () async {
                                     setStateDlg(() => saving = true);
                                     try {
                                       final svc = context
@@ -929,7 +1261,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
       // Гидратация цен только если пользователь может видеть стоимость
       final emp = context.read<AccountManagerSupabase>().currentEmployee;
-      final canSeeCosts = emp?.canSeeCosts ?? false;
+      final canSeeCosts = emp?.hasRole('owner') == true || 
+                          emp?.hasRole('executive_chef') == true || 
+                          emp?.hasRole('sous_chef') == true ||
+                          emp?.hasRole('manager') == true ||
+                          emp?.hasRole('general_manager') == true;
       if (canSeeCosts) {
         // Bulk-догрузка ингредиентов нужна только для расчёта цен
         processedAll = await svc.fillIngredientsForCardsBulk(processedAll);
@@ -2130,7 +2466,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
     _rebuildPfCandidatesIndex(loc);
     final reviewCount = reviewFiltered
-        .where((tc) => _ambiguousPfIngredientCount(tc, loc) > 0)
+        .where((tc) => _reviewIssuesCount(tc, loc) > 0)
         .length;
 
     final acc = context.read<AccountManagerSupabase>();

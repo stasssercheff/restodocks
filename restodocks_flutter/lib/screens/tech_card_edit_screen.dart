@@ -1342,7 +1342,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               tcs = tcs.map(stripInvalidNestedPfSelfLinks).toList();
               // Гидратация цен только если нужно для расчётов вложенных ПФ
               final emp = context.read<AccountManagerSupabase>().currentEmployee;
-              final needsCostCalculation = emp?.canSeeCosts ?? false;
+              final needsCostCalculation = emp?.hasRole('owner') == true || 
+                                          emp?.hasRole('executive_chef') == true || 
+                                          emp?.hasRole('sous_chef') == true ||
+                                          emp?.hasRole('manager') == true ||
+                                          emp?.hasRole('general_manager') == true;
               if (needsCostCalculation) {
                 tcs = await tcSvc.fillIngredientsForCardsBulk(tcs);
                 final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
