@@ -866,6 +866,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   bool _reconciling = false;
   DateTime _lastReconcileAt = DateTime.fromMillisecondsSinceEpoch(0);
 
+  /// Время последнего пользовательского взаимодействия (ввод/тап в таблице).
+  /// Используется, чтобы не запускать тяжёлый reconcile в момент, когда пользователь
+  /// прямо что-то меняет — иначе UI начинает "подвисать".
+  DateTime _lastUserInteractionAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// Дебаунс на запуск reconcile после пользовательских правок.
+  Timer? _reconcileDebounceTimer;
+
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
 
   @override
@@ -1654,7 +1662,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     }
   }
 
-  void _scheduleDraftSave() => scheduleSave();
+  void _scheduleDraftSave() {
+    _lastUserInteractionAt = DateTime.now();
+    scheduleSave();
+  }
 
   String _normalizeForTechCardName(String s) {
     final cleaned = s
@@ -1946,6 +1957,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       _reconcileNotifier!.removeListener(_handleTechCardsReconcileSignal);
     }
     _cookTableSyncDebounce?.cancel();
+    _reconcileDebounceTimer?.cancel();
     _nameController.dispose();
     _technologyController.dispose();
     _descriptionForHallController.dispose();
@@ -1960,7 +1972,24 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         _reconcileNotifier ?? context.read<TechCardsReconcileNotifier>();
     if (notifier.version == _lastReconcileNotifierVersion) return;
     _lastReconcileNotifierVersion = notifier.version;
-    _tryReconcileOpenCard(force: true);
+
+    // Пользователь мог только что обновить ингредиенты/веса.
+    // В этот момент reconcile запускается "мимо ожиданий" и CPU-часть может блокировать UI.
+    // Делаем небольшой idle-debounce: если правки были <2с назад — запускаем позже.
+    final sinceUser = DateTime.now().difference(_lastUserInteractionAt);
+    if (sinceUser < const Duration(seconds: 2)) {
+      _reconcileDebounceTimer?.cancel();
+      _reconcileDebounceTimer = Timer(const Duration(seconds: 2), () {
+        if (!mounted) return;
+        _tryReconcileOpenCard(force: true);
+      });
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _tryReconcileOpenCard(force: true);
+    });
   }
 
   Future<void> _tryReconcileOpenCard({bool force = false}) async {
