@@ -658,8 +658,8 @@ class AccountManagerSupabase extends ChangeNotifier {
     return Employee.fromJson(data);
   }
 
-  /// Вход по email и паролю: Supabase Auth или legacy (Edge Function)
-  /// На кастомном домене (restodocks.com) пробуем legacy первым — Auth иногда падает из‑за cookies/ошибок.
+  /// Вход по email и паролю: сначала Supabase Auth, затем legacy fallback (Edge Function).
+  /// Это убирает ложные 401 от legacy для аккаунтов, уже привязанных к auth.users.
   Future<({Employee employee, Establishment establishment})?> findEmployeeByEmailAndPasswordGlobal({
     required String email,
     required String password,
@@ -668,14 +668,6 @@ class AccountManagerSupabase extends ChangeNotifier {
     final passwordTrimmed = password.trim();
     lastLoginError = null;
     if (emailTrim.isEmpty) return null;
-
-    final isCustomDomain = kIsWeb && Uri.base.host.contains('restodocks');
-
-    // На кастомном домене: сначала legacy (обход проблем Auth на restodocks.com)
-    if (isCustomDomain) {
-      final legacyResult = await _findEmployeeByPasswordHashViaEdgeFunction(emailTrim, passwordTrimmed);
-      if (legacyResult != null) return legacyResult;
-    }
 
     // 1. Пробуем Supabase Auth (учётки в auth.users)
     try {
