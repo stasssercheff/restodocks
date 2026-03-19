@@ -1276,12 +1276,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       columnWidths: const {
         0: FlexColumnWidth(0.9),
         1: FlexColumnWidth(0.7),
-        2: FlexColumnWidth(1),
+        2: FlexColumnWidth(1.2),
         3: FlexColumnWidth(1),
-        4: FlexColumnWidth(1),
-        5: FlexColumnWidth(0.8),
-        6: FlexColumnWidth(1.2),
-        7: FlexColumnWidth(0.7),
+        4: FlexColumnWidth(1.15),
+        5: FlexColumnWidth(1.1),
+        6: FlexColumnWidth(0.8),
+        7: FlexColumnWidth(1.2),
         8: FlexColumnWidth(0.7),
         9: FlexColumnWidth(0.7),
         10: FlexColumnWidth(1),
@@ -1908,6 +1908,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           ],
         );
       case HaccpLogType.fryingOil:
+        // Те же поля, что и в табличной форме (СанПиН), чтобы сохранение в БД и пресеты совпадали с десктопом.
         return _mobileBlock(
           loc.t(HaccpLogType.fryingOil.displayNameKey) ?? HaccpLogType.fryingOil.displayNameRu,
           [
@@ -1916,10 +1917,38 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               decoration: const InputDecoration(labelText: 'Дата', border: OutlineInputBorder(), isDense: true),
               readOnly: true,
             ),
-            _textField('oil_name', 'Наименование жира'),
-            _textField('oil_usage_hours', 'Время использования (ч)', keyboardType: TextInputType.number),
-            _textField('oil_quality', 'Качество (цвет/запах/пенистость)', multiline: true),
-            _textField('oil_replaced', 'Замена (да/нет)'),
+            TextFormField(
+              initialValue: DateFormat('HH:mm').format(DateTime.now()),
+              decoration: const InputDecoration(
+                labelText: 'Время начала использования жира',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              readOnly: true,
+            ),
+            _savedOptionTextField(
+              key: 'oil_name',
+              label: 'Вид фритюрного жира',
+              options: _presetOptions['oil_name'] ?? const [],
+              presetFieldKey: 'oil_name',
+            ),
+            _textField('organoleptic_start', 'Органолептика на начало жарки', multiline: true),
+            _savedOptionTextField(
+              key: 'frying_equipment_type',
+              label: 'Тип жарочного оборудования',
+              options: _presetOptions['frying_equipment_type'] ?? const [],
+              presetFieldKey: 'frying_equipment_type',
+            ),
+            _savedOptionTextField(
+              key: 'frying_product_type',
+              label: 'Вид продукции',
+              options: _presetOptions['frying_product_type'] ?? const [],
+              presetFieldKey: 'frying_product_type',
+            ),
+            _textField('frying_end_time', 'Время окончания жарки (например 14:00)'),
+            _textField('organoleptic_end', 'Органолептика по окончании жарки', multiline: true),
+            _textField('carry_over_kg', 'Переходящий остаток, кг', keyboardType: TextInputType.number),
+            _textField('utilized_kg', 'Утилизированный жир, кг', keyboardType: TextInputType.number),
             _signatureFromAccount(),
             _textField('note', loc.t('haccp_note') ?? 'Примечание'),
           ],
