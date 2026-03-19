@@ -1094,7 +1094,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       if (product == null) return ing;
       final priceInfo =
           store.getEstablishmentPrice(product.id, establishmentId);
-      final pricePerKg = priceInfo?.$1 ?? 0.0;
+      double pricePerKg = priceInfo?.$1 ?? 0.0;
+      if (pricePerKg <= 0 && product.basePrice != null && product.basePrice! > 0) {
+        pricePerKg = product.basePrice!;
+      }
       if (pricePerKg <= 0) return ing;
       final u = ing.unit.toLowerCase().trim();
       if (u == 'шт' || u == 'pcs') {
@@ -1335,6 +1338,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 .getTechCardsForEstablishment(est.dataEstablishmentId);
           }
           tcs = tcs.map(stripInvalidNestedPfSelfLinks).toList();
+          tcs = await tcSvc.ensureIngredientsForCards(tcs);
           tcs = _hydrateNestedTechCardCosts(tcs);
           loadedTechCards = tcs;
           final customKitchen = await tcSvc.getCustomCategories(
@@ -1367,6 +1371,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                     .getTechCardsForEstablishment(est.dataEstablishmentId);
               }
               tcs = tcs.map(stripInvalidNestedPfSelfLinks).toList();
+              tcs = await tcSvc.ensureIngredientsForCards(tcs);
               tcs = _hydrateNestedTechCardCosts(tcs);
               final customKitchen = await tcSvc.getCustomCategories(
                   est.isBranch ? est.id : est.dataEstablishmentId!, 'kitchen');
@@ -2108,6 +2113,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       }
 
       all = all.map(stripInvalidNestedPfSelfLinks).toList();
+      all = await tcSvc.ensureIngredientsForCards(all);
       final pfCards = all.where((t) => t.isSemiFinished).toList();
 
       final currentTc = _techCard!;

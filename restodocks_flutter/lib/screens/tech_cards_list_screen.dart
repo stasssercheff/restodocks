@@ -1,6 +1,9 @@
-import 'dart:developer' as developer;
 import 'dart:typed_data';
 import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+
+import '../utils/debug_console_stub.dart' if (dart.library.html) '../utils/debug_console_web.dart' as debug_console;
 
 import 'package:excel/excel.dart' hide Border;
 
@@ -264,6 +267,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return categoryTranslations[c]?[lang] ?? c;
   }
 
+  /// Флаг: ?debug=ttk в URL → логи в консоль браузера (первые 3 карточки).
+  static bool get _ttkCostDebug =>
+      kIsWeb && Uri.base.queryParameters['debug'] == 'ttk';
+
   static int _costDebugCount = 0;
 
   /// То же, что «Итого стоимость за кг» в редакторе — один источник истины.
@@ -272,11 +279,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   double _calculateCostPerKg(TechCard tc) {
     final resolved = _resolveTechCardCostOutput(tc.id, <String>{});
     final effectiveOutput = resolved.output > 0 ? resolved.output : (tc.yield > 0 ? tc.yield : 0.0);
-    // DEBUG: первые 3 карточки — в консоль браузера (F12 → Console)
-    if (_costDebugCount < 3) {
+    if (_ttkCostDebug && _costDebugCount < 3) {
       _costDebugCount++;
       final ing0 = tc.ingredients.isNotEmpty ? tc.ingredients.first : null;
-      developer.log(
+      debug_console.debugLogToConsole(
         'ttk_cost_debug[$_costDebugCount] "${tc.dishName}": '
         'resolved=(cost=${resolved.cost}, output=${resolved.output}) '
         'yield=${tc.yield} ingCount=${tc.ingredients.length} '
@@ -352,7 +358,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     }
 
     final ep = store.getEstablishmentPrice(resolvedId, estId);
-    final unitPrice = ep?.$1 ?? 0.0;
+    double unitPrice = ep?.$1 ?? 0.0;
+    if (unitPrice <= 0 && product != null && product.basePrice != null && product.basePrice! > 0) {
+      unitPrice = product.basePrice!;
+    }
     return _costFromPricePerKgLine(unitPrice, ing);
   }
 
@@ -925,6 +934,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         if (!identical(s, tc)) toPersistSelfLink.add(s);
       }
       all = sanitizedAll;
+      all = await svc.ensureIngredientsForCards(all);
 
       // Та же гидратация, что в редакторе — «Итого стоимость за кг» = ₽/кг в списке.
       final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;

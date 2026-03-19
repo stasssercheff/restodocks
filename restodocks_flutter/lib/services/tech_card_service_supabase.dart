@@ -242,6 +242,26 @@ class TechCardServiceSupabase {
     }
   }
 
+  /// Догрузить ингредиенты для карточек с пустым составом (bulk-запрос иногда возвращает tt_ingredients пустыми).
+  Future<List<TechCard>> ensureIngredientsForCards(List<TechCard> cards) async {
+    final emptyIds = cards
+        .where((tc) => tc.ingredients.isEmpty)
+        .map((tc) => tc.id)
+        .toSet()
+        .toList();
+    if (emptyIds.isEmpty) return cards;
+    final byId = {for (final tc in cards) tc.id: tc};
+    for (final id in emptyIds) {
+      try {
+        final full = await getTechCardById(id);
+        if (full != null && full.ingredients.isNotEmpty) {
+          byId[id] = full;
+        }
+      } catch (_) {}
+    }
+    return cards.map((tc) => byId[tc.id] ?? tc).toList();
+  }
+
   /// Поиск ТТК по названию блюда (один запрос)
   Future<List<TechCard>> searchTechCards(String query, String establishmentId) async {
     try {
