@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../utils/dev_log.dart';
 import 'package:flutter/services.dart';
@@ -66,6 +67,14 @@ class ExcelStyleTtkTable extends StatefulWidget {
 
 class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
+
+  /// Включить для отладки: логи в консоль при ?debug=ttk в URL
+  static bool get _ttkDebug =>
+      kIsWeb && Uri.base.queryParameters['debug'] == 'ttk';
+
+  void _logTtk(String msg) {
+    if (_ttkDebug) debugPrint('[TTK_PF] $msg');
+  }
 
   /// Для unit=шт: true если можно отображать/вводить в штуках (gramsPerPiece или fallback 50).
   static bool _usesPieces(TTIngredient ing) {
@@ -1090,7 +1099,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     TechCard? pf;
     try {
       final list = widget.semiFinishedProducts;
-      if (list == null || list.isEmpty) return null;
+      _logTtk('resolvePF pfId=$pfId fallback=$fallbackName listLen=${list?.length ?? 0}');
+      if (list == null || list.isEmpty) {
+        _logTtk('resolvePF pfId=$pfId FAIL: semiFinishedProducts empty');
+        return null;
+      }
       for (final t in list) {
         if (t.id == pfId) {
           pf = t;
@@ -1117,7 +1130,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
           }
         }
       }
-      if (pf == null || pf.ingredients.isEmpty) return null;
+      if (pf == null || pf.ingredients.isEmpty) {
+        _logTtk('resolvePF pfId=$pfId FAIL: pf=${pf != null} ingCount=${pf?.ingredients.length ?? 0}');
+        return null;
+      }
 
       double totalCost = 0;
       double totalOutput = 0;
@@ -1142,7 +1158,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
           if (leafCost > 0) totalCost += leafCost;
         }
       }
-      if (totalOutput <= 0) return null;
+      if (totalOutput <= 0) {
+        _logTtk('resolvePF pfId=$pfId pfName=${pf.dishName} FAIL: totalCost=$totalCost totalOutput=$totalOutput');
+        return null;
+      }
+      _logTtk('resolvePF pfId=$pfId pfName=${pf.dishName} OK: cost=$totalCost output=$totalOutput');
       return (cost: totalCost, output: totalOutput);
     } finally {
       stack.remove(pfId);
@@ -1166,6 +1186,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     if (pricePerKg > 0) return pricePerKg;
 
     final sid = ingredient.sourceTechCardId;
+    if (sid != null && sid.isNotEmpty && !(widget.semiFinishedProducts?.isNotEmpty ?? false)) {
+      _logTtk('resolvePricePerKg PF ing=${ingredient.productName} sid=$sid SKIP: semiFinishedProducts empty');
+    }
     if (sid != null &&
         sid.isNotEmpty &&
         (widget.semiFinishedProducts?.isNotEmpty ?? false)) {
@@ -1174,6 +1197,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         <String>{},
         fallbackName: ingredient.sourceTechCardName ?? ingredient.productName,
       );
+      final ppk = r != null && r.output > 0 && r.cost > 0
+          ? (r.cost / r.output) * 1000
+          : 0.0;
+      _logTtk('resolvePricePerKg PF ing=${ingredient.productName} sid=$sid -> ppk=$ppk (r=${r?.cost}/${r?.output})');
       if (r != null && r.output > 0 && r.cost > 0) {
         return (r.cost / r.output) * 1000;
       }
