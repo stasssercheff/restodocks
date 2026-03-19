@@ -37,6 +37,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   // Индексы/кэши для рекурсивного расчёта себестоимости (включая вложенные ПФ из импортированных ТТК).
   Map<String, TechCard> _techCardsById = {};
   Map<String, ({double cost, double output})> _resolvedCostMemo = {};
+  /// Для расчёта ₽/кг в списке по ценам номенклатуры (ингредиенты в БД часто без cost/pricePerKg).
+  ProductStoreSupabase? _priceProductStore;
+  String? _priceEstablishmentId;
   bool _loading = true;
   bool _loadingExcel = false;
   bool _loadingTtkIsPdf = false;
@@ -281,6 +284,29 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     if (ing.outputWeight > 0) return ing.outputWeight;
     if (ing.netWeight > 0) return ing.netWeight;
     return ing.grossWeight;
+  }
+
+  /// Стоимость строки-продукта: из ТТК или из номенклатуры заведения (как в редакторе).
+  double _leafIngredientMonetaryCost(TTIngredient ing) {
+    if (ing.effectiveCost > 0) return ing.effectiveCost;
+    final store = _priceProductStore;
+    final estId = _priceEstablishmentId;
+    if (store == null || estId == null || estId.isEmpty) return 0.0;
+    final pid = ing.productId;
+    final name = ing.productName.trim();
+    if ((pid == null || pid.isEmpty) && name.isEmpty) return 0.0;
+    final product = store.findProductForIngredient(pid, name);
+    if (product == null) return 0.0;
+    final ep = store.getEstablishmentPrice(product.id, estId);
+    final pricePerKg = ep?.$1 ?? 0.0;
+    if (pricePerKg <= 0) return 0.0;
+    final u = ing.unit.toLowerCase().trim();
+    if (u == 'шт' || u == 'pcs') {
+      final gpp = ing.gramsPerPiece ?? 50.0;
+      if (gpp <= 0) return 0.0;
+      return pricePerKg * (ing.grossWeight / gpp);
+    }
+    return pricePerKg * (ing.grossWeight / 1000.0);
   }
 
   String _normalizeForTechCardName(String s) {
@@ -685,9 +711,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       final ingredientOutput = _ingredientResolvedOutput(ing);
       totalOutput += ingredientOutput;
 
-      // Листинг по обычным продуктам: используем effectiveCost (может быть построен из pricePerKg×вес).
+      // Продукты из номенклатуры: в БД часто cost=0 — подтягиваем цену из ProductStore.
       if (ing.sourceTechCardId == null || ing.sourceTechCardId!.isEmpty) {
-        totalCost += ing.effectiveCost > 0 ? ing.effectiveCost : 0.0;
+        totalCost += _leafIngredientMonetaryCost(ing);
         continue;
       }
 
@@ -728,6 +754,17 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     });
     try {
       final svc = context.read<TechCardServiceSupabase>();
+      final productStore = context.read<ProductStoreSupabase>();
+      try {
+        if (est.isBranch) {
+          await productStore.loadNomenclatureForBranch(
+              est.id, est.dataEstablishmentId!);
+        } else {
+          await productStore.loadNomenclature(est.dataEstablishmentId);
+        }
+      } catch (_) {
+        // Список ТТК должен открываться без номенклатуры; ₽/кг тогда только из полей ингредиента.
+      }
       // Филиал: карточки головного (только просмотр) + свои (редактируемые). Головное: только свои.
       List<TechCard> all;
       if (est.isBranch) {
@@ -852,6 +889,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       devLog(
           '[ttk_list] _load: est=${est.dataEstablishmentId} dept=${widget.department} all=${all.length} afterFilter=${list.length}');
       if (mounted) {
+        _priceProductStore = productStore;
+        _priceEstablishmentId = est.dataEstablishmentId;
         setState(() {
           _list = list;
           _loading = false;
@@ -2149,8 +2188,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       bool canEdit, bool showCost,
       {bool isDishesTab = false}) {
     final lang = loc.currentLanguageCode;
-    const colSectionWidth = 70.0;
-    const colCatWidth = 76.0;
+    // «Цех»: шире, чтобы «Все цеха» не резалось; название забирает остаток Expanded.
+    const colSectionWidth = 118.0;
+    const colCatWidth = 84.0;
     const colCostWidth = 56.0;
     const colActionsWidth = 62.0;
     final est = context.read<AccountManagerSupabase>().establishment;
@@ -2215,7 +2255,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               color: Theme.of(context).colorScheme.primaryContainer,
               onColor: Theme.of(context).colorScheme.onPrimaryContainer,
               labelName: loc.t('ttk_col_name'),
-              labelSection: loc.t('ttk_section_label'),
+              labelSection: loc.t('ttk_col_section'),
               labelCat: loc.t('column_category'),
               labelCost: costLabel,
               labelView: loc.t('ttk_col_view'),
@@ -2332,9 +2372,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               SizedBox(
                 width: colSectionWidth,
                 child: Text(
-                  sectionStr.length > 7
-                      ? '${sectionStr.substring(0, 6)}…'
-                      : sectionStr,
+                  sectionStr,
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -2347,7 +2385,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               SizedBox(
                 width: colCatWidth,
                 child: Text(
-                  cat.length > 6 ? '${cat.substring(0, 5)}…' : cat,
+                  cat,
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -2411,7 +2449,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   label: Text(loc.t('ttk_col_name'),
                       style: const TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(
-                  label: Text(loc.t('ttk_section_label'),
+                  label: Text(loc.t('ttk_col_section'),
                       style: const TextStyle(fontWeight: FontWeight.bold))),
               DataColumn(
                   label: Text(loc.t('ttk_col_category'),
@@ -2497,12 +2535,23 @@ class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
           ),
           SizedBox(
             width: colSectionWidth,
-            child:
-                Text(labelSection, style: style, textAlign: TextAlign.center),
+            child: Text(
+              labelSection,
+              style: style,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           SizedBox(
             width: colCatWidth,
-            child: Text(labelCat, style: style, textAlign: TextAlign.center),
+            child: Text(
+              labelCat,
+              style: style,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           SizedBox(
             width: colCostWidth,
