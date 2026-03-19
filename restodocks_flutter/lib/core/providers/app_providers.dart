@@ -60,6 +60,9 @@ class AppProviders {
         Provider<TechCardServiceSupabase>(
           create: (_) => TechCardServiceSupabase(),
         ),
+        ChangeNotifierProvider<TechCardsReconcileNotifier>(
+          create: (_) => TechCardsReconcileNotifier(),
+        ),
         Provider<ChecklistServiceSupabase>(
           create: (_) => ChecklistServiceSupabase(),
         ),

@@ -567,8 +567,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       for (final p in products) {
         productsForMapping.add((id: p.id, name: p.name));
         for (final n in p.names?.values ?? []) {
-          if (n.trim().isNotEmpty && n != p.name) {
-            productsForMapping.add((id: p.id, name: n));
+          final ns = n?.toString();
+          if (ns != null && ns.trim().isNotEmpty && ns != p.name) {
+            productsForMapping.add((id: p.id, name: ns));
           }
         }
       }
@@ -741,6 +742,11 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         }
       }
       devLog('[ttk_save] done: created=$created failed=${failed.length}');
+      if (created > 0) {
+        // Сигнал для открытых экранов редактирования/таблиц ТТК,
+        // чтобы они пересвязали вложенные ПФ без повторного открытия.
+        if (mounted) context.read<TechCardsReconcileNotifier>().markTechCardsUpdated();
+      }
       if (mounted) {
         setState(() => _saving = false);
         if (failed.isEmpty) {
