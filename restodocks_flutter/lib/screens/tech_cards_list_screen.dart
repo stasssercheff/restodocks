@@ -1182,6 +1182,38 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return resolved;
   }
 
+  List<TechCard> _filterListByDepartment(List<TechCard> processedAll, Set<String> customBarIds) {
+    if (widget.department == 'banquet-catering') {
+      return processedAll.where((tc) => tc.category == 'banquet' || tc.category == 'catering').toList();
+    }
+    if (widget.department == 'banquet-catering-bar') {
+      const barCategories = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zakuska'};
+      return processedAll.where((tc) =>
+          (tc.category == 'banquet' || tc.category == 'catering') &&
+          (tc.sections.contains('bar') || tc.sections.contains('all') || barCategories.contains(tc.category))).toList();
+    }
+    if (widget.department == 'bar') {
+      const barCats = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zakuska'};
+      final cat = (String c) => c.isEmpty ? 'misc' : c;
+      return processedAll.where((tc) {
+        final c = cat(tc.category);
+        if (barCats.contains(c)) return true;
+        if (tc.sections.contains('bar')) return true;
+        if (TechCardServiceSupabase.isCustomCategory(tc.category) && customBarIds.contains(TechCardServiceSupabase.customCategoryId(tc.category))) return true;
+        return false;
+      }).toList();
+    }
+    if (widget.department == 'hall') return [];
+    const barCats = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zakuska'};
+    final cat = (String c) => c.isEmpty ? 'misc' : c;
+    return processedAll.where((tc) {
+      final c = cat(tc.category);
+      if (barCats.contains(c)) return false;
+      if (TechCardServiceSupabase.isCustomCategory(tc.category) && customBarIds.contains(TechCardServiceSupabase.customCategoryId(tc.category))) return false;
+      return true;
+    }).toList();
+  }
+
   Future<void> _load() async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
@@ -1200,11 +1232,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     try {
       final svc = context.read<TechCardServiceSupabase>();
       final productStore = context.read<ProductStoreSupabase>();
-      
-      // Параллельная загрузка продуктов, номенклатуры и ТТК
+
+      // Параллельная загрузка: продукты, номенклатура, ТТК, кастомные категории
       final futures = <Future>[];
-      
-      // Продукты и номенклатура
       futures.add(productStore.loadProducts().catchError((_) {}));
       if (est.isBranch) {
         futures.add(productStore.loadNomenclatureForBranch(
@@ -1212,8 +1242,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       } else {
         futures.add(productStore.loadNomenclature(est.dataEstablishmentId).catchError((_) {}));
       }
-      
-      // ТТК
       late Future<List<TechCard>> allCardsFuture;
       if (est.isBranch) {
         allCardsFuture = Future.wait([
@@ -1224,20 +1252,17 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         allCardsFuture = svc.getTechCardsForEstablishment(est.dataEstablishmentId);
       }
       futures.add(allCardsFuture);
-      
-      // Кастомные категории
-      final customCategoriesFuture = Future.wait([
+      futures.add(Future.wait([
         svc.getCustomCategories(est.dataEstablishmentId, 'kitchen'),
         svc.getCustomCategories(est.dataEstablishmentId, 'bar'),
-      ]);
-      futures.add(customCategoriesFuture);
-      
-      // Ждём все запросы
+      ]));
+
       final results = await Future.wait(futures);
       final all = results[2] as List<TechCard>;
       final customResults = results[3] as List;
       final customKitchen = customResults[0] as List<({String id, String name})>;
       final customBar = customResults[1] as List<({String id, String name})>;
+      final customBarIds = customBar.map((c) => c.id).toSet();
 
       final toPersistSelfLink = <TechCard>[];
       final sanitizedAll = <TechCard>[];
@@ -1246,20 +1271,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         sanitizedAll.add(s);
         if (!identical(s, tc)) toPersistSelfLink.add(s);
       }
-      
       var processedAll = sanitizedAll;
 
-      // Гидратация цен только если пользователь может видеть стоимость
-      final emp = context.read<AccountManagerSupabase>().currentEmployee;
-      final canSeeCosts = emp?.hasRole('owner') == true || 
-                          emp?.hasRole('executive_chef') == true || 
-                          emp?.hasRole('sous_chef') == true ||
-                          emp?.hasRole('manager') == true ||
-                          emp?.hasRole('general_manager') == true;
+      final canSeeCosts = emp?.hasRole('owner') == true ||
+          emp?.hasRole('executive_chef') == true ||
+          emp?.hasRole('sous_chef') == true ||
+          emp?.hasRole('manager') == true ||
+          emp?.hasRole('general_manager') == true;
       if (canSeeCosts) {
-        // Bulk-догрузка ингредиентов нужна только для расчёта цен
         processedAll = await svc.fillIngredientsForCardsBulk(processedAll);
-        
         final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
         if (estPriceId != null && estPriceId.isNotEmpty) {
           processedAll = TechCardCostHydrator.hydrate(processedAll, productStore, estPriceId);
@@ -1269,79 +1289,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       _customCategoryNames.clear();
       for (final c in customKitchen) _customCategoryNames[c.id] = c.name;
       for (final c in customBar) _customCategoryNames[c.id] = c.name;
-      final customBarIds = customBar.map((c) => c.id).toSet();
-      List<TechCard> list;
-      if (widget.department == 'banquet-catering') {
-        list = processedAll
-            .where(
-                (tc) => tc.category == 'banquet' || tc.category == 'catering')
-            .toList();
-      } else if (widget.department == 'banquet-catering-bar') {
-        const barCategories = {
-          'beverages',
-          'alcoholic_cocktails',
-          'non_alcoholic_drinks',
-          'hot_drinks',
-          'drinks_pure',
-          'snacks',
-          'zakuska'
-        };
-        list = processedAll
-            .where((tc) =>
-                (tc.category == 'banquet' || tc.category == 'catering') &&
-                (tc.sections.contains('bar') ||
-                    tc.sections.contains('all') ||
-                    barCategories.contains(tc.category)))
-            .toList();
-      } else if (widget.department == 'bar') {
-        const barCats = {
-          'beverages',
-          'alcoholic_cocktails',
-          'non_alcoholic_drinks',
-          'hot_drinks',
-          'drinks_pure',
-          'snacks',
-          'zakuska'
-        };
-        final cat = (String c) => c.isEmpty ? 'misc' : c;
-        list = processedAll.where((tc) {
-          final c = cat(tc.category);
-          if (barCats.contains(c)) return true;
-          if (tc.sections.contains('bar')) return true;
-          if (TechCardServiceSupabase.isCustomCategory(tc.category) &&
-              customBarIds.contains(
-                  TechCardServiceSupabase.customCategoryId(tc.category)))
-            return true;
-          return false;
-        }).toList();
-      } else if (widget.department == 'hall') {
-        list = []; // Зал не имеет своих ТТК
-      } else {
-        const barCats = {
-          'beverages',
-          'alcoholic_cocktails',
-          'non_alcoholic_drinks',
-          'hot_drinks',
-          'drinks_pure',
-          'snacks',
-          'zakuska'
-        };
-        final cat = (String c) => c.isEmpty ? 'misc' : c;
-        list = processedAll.where((tc) {
-          final c = cat(tc.category);
-          if (barCats.contains(c)) return false;
-          if (TechCardServiceSupabase.isCustomCategory(tc.category) &&
-              customBarIds.contains(
-                  TechCardServiceSupabase.customCategoryId(tc.category)))
-            return false;
-          return true;
-        }).toList();
-      }
+      List<TechCard> list = _filterListByDepartment(processedAll, customBarIds);
 
-      // Важно: ингредиенты могут ссылаться на ПФ из «другого» набора категорий/секций
-      // (ошибка разметки/импорта). Связь в карточке есть, но в поиске по ТТК такую
-      // карточку не найти, если мы её отфильтровали выше. Поэтому добавляем в список
-      // все ТТК, на которые есть ссылки из ингредиентов.
+      // Добавляем ТТК, на которые есть ссылки из ингредиентов (могут быть в другой секции)
       try {
         final byId = {for (final tc in processedAll) tc.id: tc};
         final referencedIds = <String>{};
@@ -1363,7 +1313,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       } catch (_) {}
       if (mounted) {
         _priceProductStore = productStore;
-        // Кэш цен loadNomenclatureForBranch кладёт под ключом id филиала, не головного заведения.
         _priceEstablishmentId =
             est.isBranch ? est.id : est.dataEstablishmentId;
         final estPriceId = _priceEstablishmentId;
@@ -1374,11 +1323,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           _list = list;
           _loading = false;
         });
-        // Все ТТК заведения — чтобы рекурсия по вложенным ПФ находила карточки вне текущего фильтра списка.
         _techCardsById = {for (final tc in processedAll) tc.id: tc};
         _resolvedCostMemo.clear();
         _ensureTechCardTranslations(svc, list);
         _warmPdfParser();
+        if (mounted) _rebuildPfCandidatesIndex(context.read<LocalizationService>());
       }
 
       if (toPersistSelfLink.isNotEmpty && mounted) {

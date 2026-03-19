@@ -1257,10 +1257,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       var loadedTechCards = <TechCard>[];
       if (est != null) {
         final productStore = context.read<ProductStoreSupabase>();
-        // Загружаем только продукты для быстрого старта, номенклатуру - фоном
-        await productStore.loadProducts().catchError((_) {});
-        
-        // Номенклатура в фоне (для цен)
+        // Продукты и номенклатура — в фоне, не блокируем показ формы
+        Future.microtask(() async {
+          try {
+            await productStore.loadProducts().catchError((_) {});
+            if (!mounted) return;
+            setState(() {}); // обновить UI после загрузки продуктов
+          } catch (_) {}
+        });
         Future.microtask(() async {
           try {
             if (est.isBranch) {
@@ -1268,6 +1272,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             } else {
               await productStore.loadNomenclature(est.dataEstablishmentId);
             }
+            if (!mounted) return;
+            setState(() {}); // обновить цены в таблице
           } catch (_) {}
         });
         // Не блокируем первый рендер загрузкой всех ТТК.
