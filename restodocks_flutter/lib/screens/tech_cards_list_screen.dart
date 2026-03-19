@@ -924,14 +924,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         sanitizedAll.add(s);
         if (!identical(s, tc)) toPersistSelfLink.add(s);
       }
-      all = sanitizedAll;
+      
       // Один bulk-запрос по ingredient'ам вместо N+1 догрузок по карточкам.
-      all = await svc.fillIngredientsForCardsBulk(all);
+      var processedAll = await svc.fillIngredientsForCardsBulk(sanitizedAll);
 
       // Та же гидратация, что в редакторе — «Итого стоимость за кг» = ₽/кг в списке.
       final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
       if (estPriceId != null && estPriceId.isNotEmpty) {
-        all = TechCardCostHydrator.hydrate(all, productStore, estPriceId);
+        processedAll = TechCardCostHydrator.hydrate(processedAll, productStore, estPriceId);
       }
 
       _customCategoryNames.clear();
@@ -940,7 +940,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       final customBarIds = customBar.map((c) => c.id).toSet();
       List<TechCard> list;
       if (widget.department == 'banquet-catering') {
-        list = all
+        list = processedAll
             .where(
                 (tc) => tc.category == 'banquet' || tc.category == 'catering')
             .toList();
@@ -954,7 +954,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           'snacks',
           'zakuska'
         };
-        list = all
+        list = processedAll
             .where((tc) =>
                 (tc.category == 'banquet' || tc.category == 'catering') &&
                 (tc.sections.contains('bar') ||
@@ -972,7 +972,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           'zakuska'
         };
         final cat = (String c) => c.isEmpty ? 'misc' : c;
-        list = all.where((tc) {
+        list = processedAll.where((tc) {
           final c = cat(tc.category);
           if (barCats.contains(c)) return true;
           if (tc.sections.contains('bar')) return true;
@@ -995,7 +995,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           'zakuska'
         };
         final cat = (String c) => c.isEmpty ? 'misc' : c;
-        list = all.where((tc) {
+        list = processedAll.where((tc) {
           final c = cat(tc.category);
           if (barCats.contains(c)) return false;
           if (TechCardServiceSupabase.isCustomCategory(tc.category) &&
@@ -1011,9 +1011,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       // карточку не найти, если мы её отфильтровали выше. Поэтому добавляем в список
       // все ТТК, на которые есть ссылки из ингредиентов.
       try {
-        final byId = {for (final tc in all) tc.id: tc};
+        final byId = {for (final tc in processedAll) tc.id: tc};
         final referencedIds = <String>{};
-        for (final tc in all) {
+        for (final tc in processedAll) {
           for (final ing in tc.ingredients) {
             final id = ing.sourceTechCardId;
             if (id != null && id.trim().isNotEmpty)
@@ -1043,7 +1043,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           _loading = false;
         });
         // Все ТТК заведения — чтобы рекурсия по вложенным ПФ находила карточки вне текущего фильтра списка.
-        _techCardsById = {for (final tc in all) tc.id: tc};
+        _techCardsById = {for (final tc in processedAll) tc.id: tc};
         _resolvedCostMemo.clear();
         _ensureTechCardTranslations(svc, list);
         _warmPdfParser();
