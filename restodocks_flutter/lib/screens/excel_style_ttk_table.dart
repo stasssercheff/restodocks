@@ -913,9 +913,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             }
             if (updated != null) {
               _updateIngredient(idx, updated);
-              if (idx == widget.ingredients.length - 1) {
-                WidgetsBinding.instance.addPostFrameCallback((_) => widget.onAdd());
-              }
             }
           } catch (e, st) {
             devLog('TTK onProductSelected error: $e\n$st');
