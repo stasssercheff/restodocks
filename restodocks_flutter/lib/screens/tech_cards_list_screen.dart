@@ -321,12 +321,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       if (name.isEmpty) continue;
       final key = _normalizeForTechCardName(_stripPfPrefix(name));
       final candidates = _pfCandidatesByNormalizedName[key] ?? const [];
-      // Если 2+ кандидата, но один из них в том же заведении — это не неоднозначность.
       final sameEst = candidates
           .where((c) => c.establishmentId == tc.establishmentId)
           .toList();
-      final resolved = sameEst.isNotEmpty ? 1 : candidates.length;
-      if (resolved > 1) cnt++;
+      final ambiguous =
+          sameEst.length > 1 || (sameEst.isEmpty && candidates.length > 1);
+      if (ambiguous) cnt++;
     }
     return cnt;
   }

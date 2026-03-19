@@ -1696,20 +1696,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (candidates.isEmpty) return null;
     if (candidates.length == 1) return candidates.first;
 
-    // Главная эвристика: если есть ПФ в том же заведении, что и текущая ТТК — берём его.
+    // Не "угадываем" за пользователя.
+    // Автосвязываем только если после фильтра по заведению остаётся ровно один кандидат.
     final sameEst = candidates
         .where((c) => c.establishmentId == owner.establishmentId)
         .toList();
     if (sameEst.length == 1) return sameEst.first;
-    if (sameEst.length > 1) {
-      sameEst.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-      return sameEst.first;
-    }
-
-    // Фолбэк: берём самый свежий, чтобы при дублях чаще попадать в актуальный.
-    final sorted = [...candidates]
-      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return sorted.first;
+    return null;
   }
 
   TechCard _attachMissingPfSourceTechCardId(
