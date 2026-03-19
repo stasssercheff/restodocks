@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../utils/dev_log.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/employee.dart';
 import '../models/translation.dart';
 import 'translation_manager.dart';
 
@@ -23,7 +24,13 @@ class LocalizationService extends ChangeNotifier {
   ];
 
   /// Коды языков (продукты, ТТК, DeepL)
-  static const List<String> productLanguageCodes = ['ru', 'en', 'es', 'tr', 'vi'];
+  static const List<String> productLanguageCodes = [
+    'ru',
+    'en',
+    'es',
+    'tr',
+    'vi'
+  ];
 
   Locale _currentLocale = const Locale('ru', 'RU');
   Map<String, Map<String, String>> _translations = {};
@@ -46,7 +53,8 @@ class LocalizationService extends ChangeNotifier {
   /// Загрузка переводов
   Future<void> _loadTranslations() async {
     try {
-      final jsonString = await rootBundle.loadString('assets/translations/localizable.json');
+      final jsonString =
+          await rootBundle.loadString('assets/translations/localizable.json');
       final Map<String, dynamic> jsonData = json.decode(jsonString);
 
       _translations = {};
@@ -82,8 +90,10 @@ class LocalizationService extends ChangeNotifier {
 
   /// Установка текущей локали (сохраняется в SharedPreferences)
   Future<void> setLocale(Locale locale) async {
-    if (!supportedLocales.any((l) => l.languageCode == locale.languageCode)) return;
-    _currentLocale = supportedLocales.firstWhere((l) => l.languageCode == locale.languageCode);
+    if (!supportedLocales.any((l) => l.languageCode == locale.languageCode))
+      return;
+    _currentLocale = supportedLocales
+        .firstWhere((l) => l.languageCode == locale.languageCode);
     notifyListeners();
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -124,6 +134,28 @@ class LocalizationService extends ChangeNotifier {
     return translated == key ? roleCode : translated;
   }
 
+  /// Код роли латиницей (`confectioner`) → локализованная подпись; иначе текст как сохранили (свой вариант).
+  String formatStoredHealthPosition(String? stored) {
+    if (stored == null || stored.trim().isEmpty) return '';
+    final s = stored.trim();
+    if (RegExp(r'^[a-z][a-z0-9_]*$').hasMatch(s)) {
+      return roleDisplayName(s);
+    }
+    return s;
+  }
+
+  /// Должность в гигиеническом журнале: из JSON или из карточки сотрудника.
+  String healthHygienePositionLabel(
+      {String? storedPosition, Employee? employee}) {
+    if (storedPosition != null && storedPosition.trim().isNotEmpty) {
+      return formatStoredHealthPosition(storedPosition);
+    }
+    if (employee != null && employee.roles.isNotEmpty) {
+      return roleDisplayName(employee.roles.first);
+    }
+    return '—';
+  }
+
   /// Отображаемое название отдела по коду (department_kitchen и т.д.), если есть ключ.
   String departmentDisplayName(String departmentCode) {
     if (departmentCode.isEmpty) return departmentCode;
@@ -133,7 +165,8 @@ class LocalizationService extends ChangeNotifier {
   }
 
   /// Получение перевода для указанного языка (для экспорта списка заказа на выбранном языке)
-  String tForLanguage(String languageCode, String key, {Map<String, String>? args}) {
+  String tForLanguage(String languageCode, String key,
+      {Map<String, String>? args}) {
     var translation = _translations[languageCode]?[key] ??
         _translations['en']?[key] ??
         _translations['ru']?[key] ??

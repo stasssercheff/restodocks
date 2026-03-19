@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../models/haccp_log.dart';
 import '../models/haccp_log_type.dart';
+import 'localization_service.dart';
 
 /// Экспорт журналов ХАССП в PDF.
 /// Обложка, шапка СанПиН, лист прошивки.
@@ -30,11 +31,14 @@ class HaccpPdfExportService {
     return _theme!;
   }
 
-  static pw.Widget _cell(String text, {bool bold = false, pw.TextAlign align = pw.TextAlign.left}) =>
+  static pw.Widget _cell(String text,
+          {bool bold = false, pw.TextAlign align = pw.TextAlign.left}) =>
       pw.Padding(
         padding: pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
         child: pw.Align(
-          alignment: align == pw.TextAlign.center ? pw.Alignment.center : pw.Alignment.centerLeft,
+          alignment: align == pw.TextAlign.center
+              ? pw.Alignment.center
+              : pw.Alignment.centerLeft,
           child: pw.Text(
             text,
             textAlign: align,
@@ -53,17 +57,26 @@ class HaccpPdfExportService {
   static String _pdfTitle(HaccpLogType logType) {
     return switch (logType) {
       HaccpLogType.healthHygiene => 'Гигиенический журнал (сотрудники)',
-      HaccpLogType.fridgeTemperature => 'Журнал учета температурного режима холодильного оборудования',
-      HaccpLogType.warehouseTempHumidity => 'Журнал учета температуры и влажности в складских помещениях',
-      HaccpLogType.finishedProductBrakerage => 'Журнал бракеража готовой пищевой продукции',
-      HaccpLogType.incomingRawBrakerage => 'Журнал бракеража скоропортящейся пищевой продукции',
+      HaccpLogType.fridgeTemperature =>
+        'Журнал учета температурного режима холодильного оборудования',
+      HaccpLogType.warehouseTempHumidity =>
+        'Журнал учета температуры и влажности в складских помещениях',
+      HaccpLogType.finishedProductBrakerage =>
+        'Журнал бракеража готовой пищевой продукции',
+      HaccpLogType.incomingRawBrakerage =>
+        'Журнал бракеража скоропортящейся пищевой продукции',
       HaccpLogType.fryingOil => 'Журнал учета использования фритюрных жиров',
       HaccpLogType.medBookRegistry => 'Журнал учёта личных медицинских книжек',
-      HaccpLogType.medExaminations => 'Журнал учёта прохождения работниками обязательных предварительных и периодических медицинских осмотров',
-      HaccpLogType.disinfectantAccounting => 'Журнал учёта получения, расхода дезинфицирующих средств и проведения дезинфекционных работ на объекте',
-      HaccpLogType.equipmentWashing => 'Журнал мойки и дезинфекции оборудования',
-      HaccpLogType.generalCleaningSchedule => 'Журнал-график проведения генеральных уборок',
-      HaccpLogType.sieveFilterMagnet => 'Журнал результатов проверки и очистки сит (фильтров) и магнитоуловителей',
+      HaccpLogType.medExaminations =>
+        'Журнал учёта прохождения работниками обязательных предварительных и периодических медицинских осмотров',
+      HaccpLogType.disinfectantAccounting =>
+        'Журнал учёта получения, расхода дезинфицирующих средств и проведения дезинфекционных работ на объекте',
+      HaccpLogType.equipmentWashing =>
+        'Журнал мойки и дезинфекции оборудования',
+      HaccpLogType.generalCleaningSchedule =>
+        'Журнал-график проведения генеральных уборок',
+      HaccpLogType.sieveFilterMagnet =>
+        'Журнал результатов проверки и очистки сит (фильтров) и магнитоуловителей',
       _ => logType.displayNameRu,
     };
   }
@@ -72,16 +85,21 @@ class HaccpPdfExportService {
   static String _pdfFooter(HaccpLogType logType) {
     return switch (logType) {
       HaccpLogType.healthHygiene => 'Приложение № 1 к СанПиН 2.3/2.4.3590-20',
-      HaccpLogType.fridgeTemperature => 'Приложение № 2 к СанПиН 2.3/2.4.3590-20',
-      HaccpLogType.warehouseTempHumidity => 'Приложение № 3 к СанПиН 2.3/2.4.3590-20',
-      HaccpLogType.finishedProductBrakerage => 'Приложение № 4 к СанПиН 2.3/2.4.3590-20',
-      HaccpLogType.incomingRawBrakerage => 'Приложение № 5 к СанПиН 2.3/2.4.3590-20',
+      HaccpLogType.fridgeTemperature =>
+        'Приложение № 2 к СанПиН 2.3/2.4.3590-20',
+      HaccpLogType.warehouseTempHumidity =>
+        'Приложение № 3 к СанПиН 2.3/2.4.3590-20',
+      HaccpLogType.finishedProductBrakerage =>
+        'Приложение № 4 к СанПиН 2.3/2.4.3590-20',
+      HaccpLogType.incomingRawBrakerage =>
+        'Приложение № 5 к СанПиН 2.3/2.4.3590-20',
       HaccpLogType.fryingOil => 'Приложение № 8 к СанПиН 2.3/2.4.3590-20',
       HaccpLogType.medBookRegistry => 'Рекомендуемая форма учёта',
       HaccpLogType.medExaminations => 'Рекомендуемая форма учёта',
       HaccpLogType.disinfectantAccounting => 'Рекомендуемая форма учёта',
       HaccpLogType.equipmentWashing => 'Рекомендуемая форма учёта',
-      HaccpLogType.generalCleaningSchedule => 'Приложение № 10 к СанПиН 2.3/2.4.3590-20',
+      HaccpLogType.generalCleaningSchedule =>
+        'Приложение № 10 к СанПиН 2.3/2.4.3590-20',
       HaccpLogType.sieveFilterMagnet => 'Рекомендуемая форма учёта',
       _ => 'СанПиН 2.3/2.4.3590-20',
     };
@@ -96,7 +114,8 @@ class HaccpPdfExportService {
   }) {
     (String name, String position) _parseEmp(String s) {
       final idx = s.lastIndexOf(', ');
-      if (idx > 0) return (s.substring(0, idx).trim(), s.substring(idx + 2).trim());
+      if (idx > 0)
+        return (s.substring(0, idx).trim(), s.substring(idx + 2).trim());
       return (s, '');
     }
 
@@ -113,7 +132,10 @@ class HaccpPdfExportService {
     pw.Widget _headerCell(String text) => pw.Padding(
           padding: pw.EdgeInsets.all(2),
           child: pw.Center(
-            child: pw.Text(text, style: pw.TextStyle(fontSize: 5, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
+            child: pw.Text(text,
+                style:
+                    pw.TextStyle(fontSize: 5, fontWeight: pw.FontWeight.bold),
+                textAlign: pw.TextAlign.center),
           ),
         );
 
@@ -136,9 +158,12 @@ class HaccpPdfExportService {
           _headerCell('Дата'),
           _headerCell('Ф. И. О. работника (последнее при наличии)'),
           _headerCell('Должность'),
-          _headerCell('Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов семьи'),
-          _headerCell('Подпись сотрудника об отсутствии заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук и открытых поверхностей тела'),
-          _headerCell('Результат осмотра медицинским работником (ответственным лицом) (допущен / отстранен)'),
+          _headerCell(
+              'Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов семьи'),
+          _headerCell(
+              'Подпись сотрудника об отсутствии заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук и открытых поверхностей тела'),
+          _headerCell(
+              'Результат осмотра медицинским работником (ответственным лицом) (допущен / отстранен)'),
           _headerCell('Подпись медицинского работника (ответственного лица)'),
         ],
       ),
@@ -159,7 +184,9 @@ class HaccpPdfExportService {
 
     String col7(HaccpLog? log) {
       if (log == null) return '';
-      return log.statusOk == true ? 'допущен' : (log.statusOk == false ? 'отстранен' : '');
+      return log.statusOk == true
+          ? 'допущен'
+          : (log.statusOk == false ? 'отстранен' : '');
     }
 
     final dateFmt = DateFormat('dd.MM.yyyy');
@@ -176,7 +203,12 @@ class HaccpPdfExportService {
         final full = employeeIdToName[subjectId] ?? '';
         final parsedEmp = _parseEmp(full);
         name = parsed.employeeNameSnapshot ?? parsedEmp.$1;
-        position = parsed.positionOverride ?? parsedEmp.$2;
+        final rawPos = (parsed.positionOverride != null &&
+                parsed.positionOverride!.trim().isNotEmpty)
+            ? parsed.positionOverride!.trim()
+            : parsedEmp.$2.trim();
+        position = LocalizationService()
+            .formatStoredHealthPosition(rawPos.isEmpty ? null : rawPos);
         creatorFull = employeeIdToName[log.createdByEmployeeId] ?? '';
       }
       headerRows.add(
@@ -198,7 +230,8 @@ class HaccpPdfExportService {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        pw.Table(border: tableBorder, columnWidths: colWidths, children: headerRows),
+        pw.Table(
+            border: tableBorder, columnWidths: colWidths, children: headerRows),
         pw.SizedBox(height: 12),
         pw.Center(
           child: pw.Text(
@@ -213,19 +246,28 @@ class HaccpPdfExportService {
   static pw.Widget _tableCell(String text) => pw.Padding(
         padding: pw.EdgeInsets.all(3),
         child: pw.Center(
-          child: pw.Text(text, style: pw.TextStyle(fontSize: 8), textAlign: pw.TextAlign.center),
+          child: pw.Text(text,
+              style: pw.TextStyle(fontSize: 8), textAlign: pw.TextAlign.center),
         ),
       );
 
   static pw.TableBorder get _tableBorder {
     const b = pw.BorderSide(color: PdfColors.black, width: 0.5);
-    return pw.TableBorder(left: b, top: b, right: b, bottom: b, horizontalInside: b, verticalInside: b);
+    return pw.TableBorder(
+        left: b,
+        top: b,
+        right: b,
+        bottom: b,
+        horizontalInside: b,
+        verticalInside: b);
   }
 
   static pw.Widget _headerCellSmall(String text) => pw.Padding(
         padding: pw.EdgeInsets.all(2),
         child: pw.Center(
-          child: pw.Text(text, style: pw.TextStyle(fontSize: 5, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center),
+          child: pw.Text(text,
+              style: pw.TextStyle(fontSize: 5, fontWeight: pw.FontWeight.bold),
+              textAlign: pw.TextAlign.center),
         ),
       );
 
@@ -249,7 +291,9 @@ class HaccpPdfExportService {
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(1.2),
       1: const pw.FlexColumnWidth(1.5),
-      ...List.generate(dayCount, (i) => i + 2).asMap().map((i, _) => MapEntry(i + 2, const pw.FlexColumnWidth(0.35))),
+      ...List.generate(dayCount, (i) => i + 2)
+          .asMap()
+          .map((i, _) => MapEntry(i + 2, const pw.FlexColumnWidth(0.35))),
     };
 
     final rows = <pw.TableRow>[
@@ -265,7 +309,9 @@ class HaccpPdfExportService {
         final dayValues = byEquipment[equip] ?? {};
         return pw.TableRow(
           children: [
-            _tableCell(equipmentList.isNotEmpty && equip == equipmentList.first ? establishmentName : ''),
+            _tableCell(equipmentList.isNotEmpty && equip == equipmentList.first
+                ? establishmentName
+                : ''),
             _tableCell(equip),
             ...List.generate(dayCount, (d) {
               final v = dayValues[d + 1];
@@ -290,7 +336,10 @@ class HaccpPdfExportService {
       children: [
         pw.Table(border: _tableBorder, columnWidths: colWidths, children: rows),
         pw.SizedBox(height: 10),
-        pw.Center(child: pw.Text(_pdfFooter(HaccpLogType.fridgeTemperature), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+        pw.Center(
+            child: pw.Text(_pdfFooter(HaccpLogType.fridgeTemperature),
+                style:
+                    pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
       ],
     );
   }
@@ -339,7 +388,8 @@ class HaccpPdfExportService {
         _tableCell(log.value1 != null ? log.value1!.toStringAsFixed(1) : ''),
       ];
       if (includeHumidity) {
-        cells.add(_tableCell(log.value2 != null ? log.value2!.toStringAsFixed(0) : ''));
+        cells.add(_tableCell(
+            log.value2 != null ? log.value2!.toStringAsFixed(0) : ''));
       }
       cells.add(_tableCell(employeeIdToName[log.createdByEmployeeId] ?? ''));
       cells.add(_tableCell(''));
@@ -348,11 +398,13 @@ class HaccpPdfExportService {
     const emptyRows = 15;
     for (var i = logs.length; i < emptyRows; i++) {
       rows.add(pw.TableRow(
-        children: List.generate(colCount, (j) => _tableCell(j == 0 ? '${i + 1}' : '')),
+        children: List.generate(
+            colCount, (j) => _tableCell(j == 0 ? '${i + 1}' : '')),
       ));
     }
 
-    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: rows);
+    return pw.Table(
+        border: _tableBorder, columnWidths: colWidths, children: rows);
   }
 
   /// Приложение № 3: 5 обязательных колонок. Группировка по наименованию помещения. Шрифт Roboto — кириллица.
@@ -392,7 +444,9 @@ class HaccpPdfExportService {
     final children = <pw.Widget>[];
     for (final premises in premisesList) {
       final premLogs = premises == '—'
-          ? logs.where((l) => l.equipment == null || l.equipment!.trim().isEmpty).toList()
+          ? logs
+              .where((l) => l.equipment == null || l.equipment!.trim().isEmpty)
+              .toList()
           : logs.where((l) => l.equipment == premises).toList();
       premLogs.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       final rows = <pw.TableRow>[headerRow];
@@ -404,8 +458,11 @@ class HaccpPdfExportService {
             children: [
               _tableCell('${i + 1}'),
               _tableCell(dateFmt.format(log.createdAt)),
-              _tableCell(log.value1 != null ? log.value1!.toStringAsFixed(0) : ''),
-              _tableCell(log.value2 != null ? '${log.value2!.toStringAsFixed(0)}%' : ''),
+              _tableCell(
+                  log.value1 != null ? log.value1!.toStringAsFixed(0) : ''),
+              _tableCell(log.value2 != null
+                  ? '${log.value2!.toStringAsFixed(0)}%'
+                  : ''),
               _tableCell(sign),
             ],
           ),
@@ -419,16 +476,19 @@ class HaccpPdfExportService {
               padding: pw.EdgeInsets.only(bottom: 6),
               child: pw.Text(
                 'Наименование складского помещения: $premises',
-                style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+                style:
+                    pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
               ),
             ),
-            pw.Table(border: _tableBorder, columnWidths: colWidths, children: rows),
+            pw.Table(
+                border: _tableBorder, columnWidths: colWidths, children: rows),
             pw.SizedBox(height: 16),
           ],
         ),
       );
     }
-    return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: children);
+    return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: children);
   }
 
   /// Приложение 4: Журнал бракеража готовой пищевой продукции — макет как в образце.
@@ -479,7 +539,8 @@ class HaccpPdfExportService {
         ),
       );
     }
-    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Table(
+        border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
   /// Приложение 5: Журнал бракеража скоропортящейся пищевой продукции — макет как в образце.
@@ -522,8 +583,10 @@ class HaccpPdfExportService {
     final rowCount = logs.isEmpty ? 20 : logs.length;
     for (var i = 0; i < rowCount; i++) {
       final log = i < logs.length ? logs[i] : null;
-      final dateSoldStr = log?.dateSold != null ? dateFmt.format(log!.dateSold!) : '';
-      final empName = log != null ? (employeeIdToName[log.createdByEmployeeId] ?? '') : '';
+      final dateSoldStr =
+          log?.dateSold != null ? dateFmt.format(log!.dateSold!) : '';
+      final empName =
+          log != null ? (employeeIdToName[log.createdByEmployeeId] ?? '') : '';
       dataRows.add(
         pw.TableRow(
           children: [
@@ -531,7 +594,9 @@ class HaccpPdfExportService {
             _tableCell(log?.productName ?? ''),
             _tableCell(log?.packaging ?? ''),
             _tableCell(log?.manufacturerSupplier ?? ''),
-            _tableCell(log?.quantityKg != null ? log!.quantityKg!.toStringAsFixed(2) : ''),
+            _tableCell(log?.quantityKg != null
+                ? log!.quantityKg!.toStringAsFixed(2)
+                : ''),
             _tableCell(log?.documentNumber ?? ''),
             _tableCell(log?.result ?? ''),
             _tableCell(log?.storageConditions ?? ''),
@@ -542,7 +607,8 @@ class HaccpPdfExportService {
         ),
       );
     }
-    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Table(
+        border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
   /// Приложение 8: Журнал учета использования фритюрных жиров — макет как в образце.
@@ -586,7 +652,11 @@ class HaccpPdfExportService {
     final rowCount = logs.isEmpty ? 15 : logs.length;
     for (var i = 0; i < rowCount; i++) {
       final log = i < logs.length ? logs[i] : null;
-      final empName = log != null ? (log.commissionSignatures ?? employeeIdToName[log.createdByEmployeeId] ?? '') : '';
+      final empName = log != null
+          ? (log.commissionSignatures ??
+              employeeIdToName[log.createdByEmployeeId] ??
+              '')
+          : '';
       dataRows.add(
         pw.TableRow(
           children: [
@@ -598,14 +668,19 @@ class HaccpPdfExportService {
             _tableCell(log?.fryingProductType ?? ''),
             _tableCell(log?.fryingEndTime ?? ''),
             _tableCell(log?.organolepticEnd ?? ''),
-            _tableCell(log?.carryOverKg != null ? log!.carryOverKg!.toStringAsFixed(2) : ''),
-            _tableCell(log?.utilizedKg != null ? log!.utilizedKg!.toStringAsFixed(2) : ''),
+            _tableCell(log?.carryOverKg != null
+                ? log!.carryOverKg!.toStringAsFixed(2)
+                : ''),
+            _tableCell(log?.utilizedKg != null
+                ? log!.utilizedKg!.toStringAsFixed(2)
+                : ''),
             _tableCell(empName),
           ],
         ),
       );
     }
-    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Table(
+        border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
   /// Журнал учёта личных медицинских книжек: 7 колонок по бланку.
@@ -639,9 +714,14 @@ class HaccpPdfExportService {
     final rowCount = logs.isEmpty ? 20 : logs.length;
     for (var i = 0; i < rowCount; i++) {
       final log = i < logs.length ? logs[i] : null;
-      final sign = log != null ? (employeeIdToName[log.createdByEmployeeId] ?? '') : '';
-      final issued = log?.medBookIssuedAt != null ? dateFmt.format(log!.medBookIssuedAt!) : '';
-      final returned = log?.medBookReturnedAt != null ? dateFmt.format(log!.medBookReturnedAt!) : '';
+      final sign =
+          log != null ? (employeeIdToName[log.createdByEmployeeId] ?? '') : '';
+      final issued = log?.medBookIssuedAt != null
+          ? dateFmt.format(log!.medBookIssuedAt!)
+          : '';
+      final returned = log?.medBookReturnedAt != null
+          ? dateFmt.format(log!.medBookReturnedAt!)
+          : '';
       dataRows.add(
         pw.TableRow(
           children: [
@@ -649,69 +729,215 @@ class HaccpPdfExportService {
             _tableCell(log?.medBookEmployeeName ?? ''),
             _tableCell(log?.medBookPosition ?? ''),
             _tableCell(log?.medBookNumber ?? ''),
-            _tableCell(log?.medBookValidUntil != null ? dateFmt.format(log!.medBookValidUntil!) : ''),
+            _tableCell(log?.medBookValidUntil != null
+                ? dateFmt.format(log!.medBookValidUntil!)
+                : ''),
             _tableCell(issued.isEmpty ? '' : '$issued\n$sign'),
             _tableCell(returned.isEmpty ? '' : '$returned\n$sign'),
           ],
         ),
       );
     }
-    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Table(
+        border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
-  static pw.Widget _buildMedExaminationsPdfPage(List<HaccpLog> logs, Map<String, String> employeeIdToName, DateFormat dateFmt) {
-    final colWidths = <int, pw.TableColumnWidth>{0: const pw.FlexColumnWidth(0.3), 1: const pw.FlexColumnWidth(1), 2: const pw.FlexColumnWidth(0.7), 3: const pw.FlexColumnWidth(0.6), 4: const pw.FlexColumnWidth(0.8), 5: const pw.FlexColumnWidth(0.7), 6: const pw.FlexColumnWidth(0.7)};
-    final headerRow = pw.TableRow(decoration: const pw.BoxDecoration(color: PdfColors.grey300), children: ['№', 'Ф. И. О.', 'Должность', 'Дата осмотра', 'Заключение', 'Решение', 'Подпись'].map((h) => _headerCellSmall(h)).toList());
+  static pw.Widget _buildMedExaminationsPdfPage(List<HaccpLog> logs,
+      Map<String, String> employeeIdToName, DateFormat dateFmt) {
+    final colWidths = <int, pw.TableColumnWidth>{
+      0: const pw.FlexColumnWidth(0.3),
+      1: const pw.FlexColumnWidth(1),
+      2: const pw.FlexColumnWidth(0.7),
+      3: const pw.FlexColumnWidth(0.6),
+      4: const pw.FlexColumnWidth(0.8),
+      5: const pw.FlexColumnWidth(0.7),
+      6: const pw.FlexColumnWidth(0.7)
+    };
+    final headerRow = pw.TableRow(
+        decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+        children: [
+          '№',
+          'Ф. И. О.',
+          'Должность',
+          'Дата осмотра',
+          'Заключение',
+          'Решение',
+          'Подпись'
+        ].map((h) => _headerCellSmall(h)).toList());
     final dataRows = <pw.TableRow>[headerRow];
     for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
       final log = i < logs.length ? logs[i] : null;
-      dataRows.add(pw.TableRow(children: ['${i + 1}', log?.medExamEmployeeName ?? '', log?.medExamPosition ?? '', log?.medExamDate != null ? dateFmt.format(log!.medExamDate!) : '', log?.medExamConclusion ?? '', log?.medExamEmployerDecision ?? '', log != null ? (employeeIdToName[log.createdByEmployeeId] ?? '') : ''].map((c) => _tableCell(c)).toList()));
+      dataRows.add(pw.TableRow(
+          children: [
+        '${i + 1}',
+        log?.medExamEmployeeName ?? '',
+        log?.medExamPosition ?? '',
+        log?.medExamDate != null ? dateFmt.format(log!.medExamDate!) : '',
+        log?.medExamConclusion ?? '',
+        log?.medExamEmployerDecision ?? '',
+        log != null ? (employeeIdToName[log.createdByEmployeeId] ?? '') : ''
+      ].map((c) => _tableCell(c)).toList()));
     }
-    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Table(
+        border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
-  static pw.Widget _buildDisinfectantPdfPage(List<HaccpLog> logs, Map<String, String> employeeIdToName, DateFormat dateFmt) {
-    final colWidths = <int, pw.TableColumnWidth>{0: const pw.FlexColumnWidth(0.6), 1: const pw.FlexColumnWidth(1.2), 2: const pw.FlexColumnWidth(0.5), 3: const pw.FlexColumnWidth(0.6), 4: const pw.FlexColumnWidth(0.8)};
-    final headerRow = pw.TableRow(decoration: const pw.BoxDecoration(color: PdfColors.grey300), children: ['Дата', 'Объект/Дезсредство', 'Кол-во', 'Поступление', 'Ответственный'].map((h) => _headerCellSmall(h)).toList());
+  static pw.Widget _buildDisinfectantPdfPage(List<HaccpLog> logs,
+      Map<String, String> employeeIdToName, DateFormat dateFmt) {
+    final colWidths = <int, pw.TableColumnWidth>{
+      0: const pw.FlexColumnWidth(0.6),
+      1: const pw.FlexColumnWidth(1.2),
+      2: const pw.FlexColumnWidth(0.5),
+      3: const pw.FlexColumnWidth(0.6),
+      4: const pw.FlexColumnWidth(0.8)
+    };
+    final headerRow = pw.TableRow(
+        decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+        children: [
+          'Дата',
+          'Объект/Дезсредство',
+          'Кол-во',
+          'Поступление',
+          'Ответственный'
+        ].map((h) => _headerCellSmall(h)).toList());
     final dataRows = <pw.TableRow>[headerRow];
     for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
       final log = i < logs.length ? logs[i] : null;
-      dataRows.add(pw.TableRow(children: [log != null ? dateFmt.format(log.createdAt) : '', log?.disinfObjectName ?? log?.disinfAgentName ?? '', log?.disinfObjectCount?.toString() ?? log?.disinfQuantity?.toString() ?? '', log?.disinfReceiptDate != null ? dateFmt.format(log!.disinfReceiptDate!) : '', log != null ? (log.disinfResponsibleName ?? employeeIdToName[log.createdByEmployeeId] ?? '') : ''].map((c) => _tableCell(c)).toList()));
+      dataRows.add(pw.TableRow(
+          children: [
+        log != null ? dateFmt.format(log.createdAt) : '',
+        log?.disinfObjectName ?? log?.disinfAgentName ?? '',
+        log?.disinfObjectCount?.toString() ??
+            log?.disinfQuantity?.toString() ??
+            '',
+        log?.disinfReceiptDate != null
+            ? dateFmt.format(log!.disinfReceiptDate!)
+            : '',
+        log != null
+            ? (log.disinfResponsibleName ??
+                employeeIdToName[log.createdByEmployeeId] ??
+                '')
+            : ''
+      ].map((c) => _tableCell(c)).toList()));
     }
-    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Table(
+        border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
-  static pw.Widget _buildEquipmentWashingPdfPage(List<HaccpLog> logs, Map<String, String> employeeIdToName, DateFormat dateFmt) {
-    final colWidths = <int, pw.TableColumnWidth>{0: const pw.FlexColumnWidth(0.6), 1: const pw.FlexColumnWidth(0.4), 2: const pw.FlexColumnWidth(1), 3: const pw.FlexColumnWidth(0.8), 4: const pw.FlexColumnWidth(0.8), 5: const pw.FlexColumnWidth(0.7)};
-    final headerRow = pw.TableRow(decoration: const pw.BoxDecoration(color: PdfColors.grey300), children: ['Дата', 'Время', 'Оборудование', 'Моющее', 'Дез. раствор', 'Контролёр'].map((h) => _headerCellSmall(h)).toList());
+  static pw.Widget _buildEquipmentWashingPdfPage(List<HaccpLog> logs,
+      Map<String, String> employeeIdToName, DateFormat dateFmt) {
+    final colWidths = <int, pw.TableColumnWidth>{
+      0: const pw.FlexColumnWidth(0.6),
+      1: const pw.FlexColumnWidth(0.4),
+      2: const pw.FlexColumnWidth(1),
+      3: const pw.FlexColumnWidth(0.8),
+      4: const pw.FlexColumnWidth(0.8),
+      5: const pw.FlexColumnWidth(0.7)
+    };
+    final headerRow = pw.TableRow(
+        decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+        children: [
+          'Дата',
+          'Время',
+          'Оборудование',
+          'Моющее',
+          'Дез. раствор',
+          'Контролёр'
+        ].map((h) => _headerCellSmall(h)).toList());
     final dataRows = <pw.TableRow>[headerRow];
     for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
       final log = i < logs.length ? logs[i] : null;
-      dataRows.add(pw.TableRow(children: [log != null ? dateFmt.format(log.createdAt) : '', log?.washTime ?? '', log?.washEquipmentName ?? '', log?.washSolutionName ?? '', log?.washDisinfectantName ?? '', log != null ? (log.washControllerSignature ?? employeeIdToName[log.createdByEmployeeId] ?? '') : ''].map((c) => _tableCell(c)).toList()));
+      dataRows.add(pw.TableRow(
+          children: [
+        log != null ? dateFmt.format(log.createdAt) : '',
+        log?.washTime ?? '',
+        log?.washEquipmentName ?? '',
+        log?.washSolutionName ?? '',
+        log?.washDisinfectantName ?? '',
+        log != null
+            ? (log.washControllerSignature ??
+                employeeIdToName[log.createdByEmployeeId] ??
+                '')
+            : ''
+      ].map((c) => _tableCell(c)).toList()));
     }
-    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Table(
+        border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
-  static pw.Widget _buildGeneralCleaningPdfPage(List<HaccpLog> logs, Map<String, String> employeeIdToName, DateFormat dateFmt) {
-    final colWidths = <int, pw.TableColumnWidth>{0: const pw.FlexColumnWidth(0.3), 1: const pw.FlexColumnWidth(1.2), 2: const pw.FlexColumnWidth(0.6), 3: const pw.FlexColumnWidth(0.8)};
-    final headerRow = pw.TableRow(decoration: const pw.BoxDecoration(color: PdfColors.grey300), children: ['№', 'Помещение', 'Дата', 'Ответственный'].map((h) => _headerCellSmall(h)).toList());
+  static pw.Widget _buildGeneralCleaningPdfPage(List<HaccpLog> logs,
+      Map<String, String> employeeIdToName, DateFormat dateFmt) {
+    final colWidths = <int, pw.TableColumnWidth>{
+      0: const pw.FlexColumnWidth(0.3),
+      1: const pw.FlexColumnWidth(1.2),
+      2: const pw.FlexColumnWidth(0.6),
+      3: const pw.FlexColumnWidth(0.8)
+    };
+    final headerRow = pw.TableRow(
+        decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+        children: ['№', 'Помещение', 'Дата', 'Ответственный']
+            .map((h) => _headerCellSmall(h))
+            .toList());
     final dataRows = <pw.TableRow>[headerRow];
     for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
       final log = i < logs.length ? logs[i] : null;
-      dataRows.add(pw.TableRow(children: ['${i + 1}', log?.genCleanPremises ?? '', log?.genCleanDate != null ? dateFmt.format(log!.genCleanDate!) : '', log != null ? (log.genCleanResponsible ?? employeeIdToName[log.createdByEmployeeId] ?? '') : ''].map((c) => _tableCell(c)).toList()));
+      dataRows.add(pw.TableRow(
+          children: [
+        '${i + 1}',
+        log?.genCleanPremises ?? '',
+        log?.genCleanDate != null ? dateFmt.format(log!.genCleanDate!) : '',
+        log != null
+            ? (log.genCleanResponsible ??
+                employeeIdToName[log.createdByEmployeeId] ??
+                '')
+            : ''
+      ].map((c) => _tableCell(c)).toList()));
     }
-    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Table(
+        border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
-  static pw.Widget _buildSieveFilterMagnetPdfPage(List<HaccpLog> logs, Map<String, String> employeeIdToName, DateFormat dateFmt) {
-    final colWidths = <int, pw.TableColumnWidth>{0: const pw.FlexColumnWidth(0.4), 1: const pw.FlexColumnWidth(1), 2: const pw.FlexColumnWidth(0.6), 3: const pw.FlexColumnWidth(0.6), 4: const pw.FlexColumnWidth(0.7), 5: const pw.FlexColumnWidth(0.6)};
-    final headerRow = pw.TableRow(decoration: const pw.BoxDecoration(color: PdfColors.grey300), children: ['№ сита/магнита', 'Наименование', 'Состояние', 'Дата очистки', 'ФИО', 'Комментарии'].map((h) => _headerCellSmall(h)).toList());
+  static pw.Widget _buildSieveFilterMagnetPdfPage(List<HaccpLog> logs,
+      Map<String, String> employeeIdToName, DateFormat dateFmt) {
+    final colWidths = <int, pw.TableColumnWidth>{
+      0: const pw.FlexColumnWidth(0.4),
+      1: const pw.FlexColumnWidth(1),
+      2: const pw.FlexColumnWidth(0.6),
+      3: const pw.FlexColumnWidth(0.6),
+      4: const pw.FlexColumnWidth(0.7),
+      5: const pw.FlexColumnWidth(0.6)
+    };
+    final headerRow = pw.TableRow(
+        decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+        children: [
+          '№ сита/магнита',
+          'Наименование',
+          'Состояние',
+          'Дата очистки',
+          'ФИО',
+          'Комментарии'
+        ].map((h) => _headerCellSmall(h)).toList());
     final dataRows = <pw.TableRow>[headerRow];
     for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
       final log = i < logs.length ? logs[i] : null;
-      dataRows.add(pw.TableRow(children: [log?.sieveNo ?? '', log?.sieveNameLocation ?? '', log?.sieveCondition ?? '', log?.sieveCleaningDate != null ? dateFmt.format(log!.sieveCleaningDate!) : '', log != null ? (log.sieveSignature ?? employeeIdToName[log.createdByEmployeeId] ?? '') : '', log?.sieveComments ?? ''].map((c) => _tableCell(c)).toList()));
+      dataRows.add(pw.TableRow(
+          children: [
+        log?.sieveNo ?? '',
+        log?.sieveNameLocation ?? '',
+        log?.sieveCondition ?? '',
+        log?.sieveCleaningDate != null
+            ? dateFmt.format(log!.sieveCleaningDate!)
+            : '',
+        log != null
+            ? (log.sieveSignature ??
+                employeeIdToName[log.createdByEmployeeId] ??
+                '')
+            : '',
+        log?.sieveComments ?? ''
+      ].map((c) => _tableCell(c)).toList()));
     }
-    return pw.Table(border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Table(
+        border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
   /// Параметры экспорта.
@@ -737,7 +963,8 @@ class HaccpPdfExportService {
     final doc = pw.Document(
       theme: theme,
       title: title,
-      subject: 'Журнал учёта. Документ для просмотра и печати. Редактирование не допускается.',
+      subject:
+          'Журнал учёта. Документ для просмотра и печати. Редактирование не допускается.',
       producer: 'Restodocks (СанПиН 2.3/2.4.3590-20)',
     );
 
@@ -757,7 +984,8 @@ class HaccpPdfExportService {
               pw.Center(
                 child: pw.Text(
                   title,
-                  style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(
+                      fontSize: 16, fontWeight: pw.FontWeight.bold),
                 ),
               ),
               pw.SizedBox(height: 24),
@@ -765,9 +993,11 @@ class HaccpPdfExportService {
                 child: pw.Column(
                   mainAxisSize: pw.MainAxisSize.min,
                   children: [
-                    pw.Text('Наименование организации', style: pw.TextStyle(fontSize: 10)),
+                    pw.Text('Наименование организации',
+                        style: pw.TextStyle(fontSize: 10)),
                     pw.SizedBox(height: 4),
-                    pw.Text(establishmentName, style: pw.TextStyle(fontSize: 14)),
+                    pw.Text(establishmentName,
+                        style: pw.TextStyle(fontSize: 14)),
                   ],
                 ),
               ),
@@ -798,11 +1028,15 @@ class HaccpPdfExportService {
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                child: pw.Text('Рекомендуемый образец',
+                    style: pw.TextStyle(
+                        fontSize: 10, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text(title, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                child: pw.Text(title,
+                    style: pw.TextStyle(
+                        fontSize: 14, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 8),
               _buildHealthHygienePage(
@@ -812,7 +1046,10 @@ class HaccpPdfExportService {
                 dateTimeFmt: dateTimeFmt,
               ),
               pw.SizedBox(height: 10),
-              pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+              pw.Center(
+                  child: pw.Text(_pdfFooter(logType),
+                      style: pw.TextStyle(
+                          fontSize: 9, fontWeight: pw.FontWeight.bold))),
             ],
           ),
         ),
@@ -828,15 +1065,20 @@ class HaccpPdfExportService {
             children: [
               pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9)),
+                child: pw.Text(_pdfFooter(logType),
+                    style: pw.TextStyle(fontSize: 9)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                child: pw.Text('Рекомендуемый образец',
+                    style: pw.TextStyle(
+                        fontSize: 10, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text(title, style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+                child: pw.Text(title,
+                    style: pw.TextStyle(
+                        fontSize: 12, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 8),
               _buildFridgeTemperaturePage(
@@ -846,7 +1088,10 @@ class HaccpPdfExportService {
                 dateTo: dateTo,
               ),
               pw.SizedBox(height: 10),
-              pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+              pw.Center(
+                  child: pw.Text(_pdfFooter(logType),
+                      style: pw.TextStyle(
+                          fontSize: 9, fontWeight: pw.FontWeight.bold))),
             ],
           ),
         ),
@@ -862,15 +1107,20 @@ class HaccpPdfExportService {
             children: [
               pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9)),
+                child: pw.Text(_pdfFooter(logType),
+                    style: pw.TextStyle(fontSize: 9)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                child: pw.Text('Рекомендуемый образец',
+                    style: pw.TextStyle(
+                        fontSize: 10, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text(title, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                child: pw.Text(title,
+                    style: pw.TextStyle(
+                        fontSize: 10, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 8),
               _buildWarehouseTempHumidityPage(
@@ -880,7 +1130,10 @@ class HaccpPdfExportService {
                 dateFmt: dateFmt,
               ),
               pw.SizedBox(height: 10),
-              pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+              pw.Center(
+                  child: pw.Text(_pdfFooter(logType),
+                      style: pw.TextStyle(
+                          fontSize: 9, fontWeight: pw.FontWeight.bold))),
             ],
           ),
         ),
@@ -895,15 +1148,20 @@ class HaccpPdfExportService {
             children: [
               pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9)),
+                child: pw.Text(_pdfFooter(logType),
+                    style: pw.TextStyle(fontSize: 9)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                child: pw.Text('Рекомендуемый образец',
+                    style: pw.TextStyle(
+                        fontSize: 10, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text(title, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                child: pw.Text(title,
+                    style: pw.TextStyle(
+                        fontSize: 11, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 8),
               _buildBrakerageFinishedProductPage(
@@ -912,7 +1170,10 @@ class HaccpPdfExportService {
                 dateTimeFmt: dateTimeFmt,
               ),
               pw.SizedBox(height: 10),
-              pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+              pw.Center(
+                  child: pw.Text(_pdfFooter(logType),
+                      style: pw.TextStyle(
+                          fontSize: 9, fontWeight: pw.FontWeight.bold))),
             ],
           ),
         ),
@@ -928,15 +1189,20 @@ class HaccpPdfExportService {
             children: [
               pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9)),
+                child: pw.Text(_pdfFooter(logType),
+                    style: pw.TextStyle(fontSize: 9)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                child: pw.Text('Рекомендуемый образец',
+                    style: pw.TextStyle(
+                        fontSize: 10, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text(title, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                child: pw.Text(title,
+                    style: pw.TextStyle(
+                        fontSize: 11, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 8),
               _buildBrakerageIncomingRawPage(
@@ -945,7 +1211,10 @@ class HaccpPdfExportService {
                 dateTimeFmt: dateTimeFmt,
               ),
               pw.SizedBox(height: 10),
-              pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+              pw.Center(
+                  child: pw.Text(_pdfFooter(logType),
+                      style: pw.TextStyle(
+                          fontSize: 9, fontWeight: pw.FontWeight.bold))),
             ],
           ),
         ),
@@ -961,15 +1230,21 @@ class HaccpPdfExportService {
             children: [
               pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9)),
+                child: pw.Text(_pdfFooter(logType),
+                    style: pw.TextStyle(fontSize: 9)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text('Рекомендуемая форма контроля замены фритюрных жиров', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                child: pw.Text(
+                    'Рекомендуемая форма контроля замены фритюрных жиров',
+                    style: pw.TextStyle(
+                        fontSize: 10, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text(title, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                child: pw.Text(title,
+                    style: pw.TextStyle(
+                        fontSize: 11, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 8),
               _buildFryingOilPage(
@@ -978,7 +1253,10 @@ class HaccpPdfExportService {
                 dateTimeFmt: dateTimeFmt,
               ),
               pw.SizedBox(height: 10),
-              pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+              pw.Center(
+                  child: pw.Text(_pdfFooter(logType),
+                      style: pw.TextStyle(
+                          fontSize: 9, fontWeight: pw.FontWeight.bold))),
             ],
           ),
         ),
@@ -993,15 +1271,20 @@ class HaccpPdfExportService {
             children: [
               pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9)),
+                child: pw.Text(_pdfFooter(logType),
+                    style: pw.TextStyle(fontSize: 9)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                child: pw.Text('Рекомендуемый образец',
+                    style: pw.TextStyle(
+                        fontSize: 10, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text(title, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                child: pw.Text(title,
+                    style: pw.TextStyle(
+                        fontSize: 11, fontWeight: pw.FontWeight.bold)),
               ),
               pw.SizedBox(height: 8),
               _buildMedBookPage(
@@ -1010,21 +1293,163 @@ class HaccpPdfExportService {
                 dateFmt: dateFmt,
               ),
               pw.SizedBox(height: 10),
-              pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold))),
+              pw.Center(
+                  child: pw.Text(_pdfFooter(logType),
+                      style: pw.TextStyle(
+                          fontSize: 9, fontWeight: pw.FontWeight.bold))),
             ],
           ),
         ),
       );
     } else if (logType == HaccpLogType.medExaminations) {
-      doc.addPage(pw.Page(pageFormat: PdfPageFormat.a4, margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50), build: (ctx) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9))), pw.SizedBox(height: 4), pw.Center(child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 4), pw.Center(child: pw.Text(title, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 8), _buildMedExaminationsPdfPage(logs, employeeIdToName, dateFmt), pw.SizedBox(height: 10), pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)))])));
+      doc.addPage(pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50),
+          build: (ctx) => pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                  children: [
+                    pw.Align(
+                        alignment: pw.Alignment.centerRight,
+                        child: pw.Text(_pdfFooter(logType),
+                            style: pw.TextStyle(fontSize: 9))),
+                    pw.SizedBox(height: 4),
+                    pw.Center(
+                        child: pw.Text('Рекомендуемый образец',
+                            style: pw.TextStyle(
+                                fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                    pw.SizedBox(height: 4),
+                    pw.Center(
+                        child: pw.Text(title,
+                            style: pw.TextStyle(
+                                fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                    pw.SizedBox(height: 8),
+                    _buildMedExaminationsPdfPage(
+                        logs, employeeIdToName, dateFmt),
+                    pw.SizedBox(height: 10),
+                    pw.Center(
+                        child: pw.Text(_pdfFooter(logType),
+                            style: pw.TextStyle(
+                                fontSize: 9, fontWeight: pw.FontWeight.bold)))
+                  ])));
     } else if (logType == HaccpLogType.disinfectantAccounting) {
-      doc.addPage(pw.Page(pageFormat: PdfPageFormat.a4, margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50), build: (ctx) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9))), pw.SizedBox(height: 4), pw.Center(child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 4), pw.Center(child: pw.Text(title, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 8), _buildDisinfectantPdfPage(logs, employeeIdToName, dateFmt), pw.SizedBox(height: 10), pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)))])));
+      doc.addPage(pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50),
+          build: (ctx) => pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                  children: [
+                    pw.Align(
+                        alignment: pw.Alignment.centerRight,
+                        child: pw.Text(_pdfFooter(logType),
+                            style: pw.TextStyle(fontSize: 9))),
+                    pw.SizedBox(height: 4),
+                    pw.Center(
+                        child: pw.Text('Рекомендуемый образец',
+                            style: pw.TextStyle(
+                                fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                    pw.SizedBox(height: 4),
+                    pw.Center(
+                        child: pw.Text(title,
+                            style: pw.TextStyle(
+                                fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                    pw.SizedBox(height: 8),
+                    _buildDisinfectantPdfPage(logs, employeeIdToName, dateFmt),
+                    pw.SizedBox(height: 10),
+                    pw.Center(
+                        child: pw.Text(_pdfFooter(logType),
+                            style: pw.TextStyle(
+                                fontSize: 9, fontWeight: pw.FontWeight.bold)))
+                  ])));
     } else if (logType == HaccpLogType.equipmentWashing) {
-      doc.addPage(pw.Page(pageFormat: PdfPageFormat.a4, margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50), build: (ctx) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9))), pw.SizedBox(height: 4), pw.Center(child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 4), pw.Center(child: pw.Text(title, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 8), _buildEquipmentWashingPdfPage(logs, employeeIdToName, dateFmt), pw.SizedBox(height: 10), pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)))])));
+      doc.addPage(pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50),
+          build: (ctx) => pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                  children: [
+                    pw.Align(
+                        alignment: pw.Alignment.centerRight,
+                        child: pw.Text(_pdfFooter(logType),
+                            style: pw.TextStyle(fontSize: 9))),
+                    pw.SizedBox(height: 4),
+                    pw.Center(
+                        child: pw.Text('Рекомендуемый образец',
+                            style: pw.TextStyle(
+                                fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                    pw.SizedBox(height: 4),
+                    pw.Center(
+                        child: pw.Text(title,
+                            style: pw.TextStyle(
+                                fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                    pw.SizedBox(height: 8),
+                    _buildEquipmentWashingPdfPage(
+                        logs, employeeIdToName, dateFmt),
+                    pw.SizedBox(height: 10),
+                    pw.Center(
+                        child: pw.Text(_pdfFooter(logType),
+                            style: pw.TextStyle(
+                                fontSize: 9, fontWeight: pw.FontWeight.bold)))
+                  ])));
     } else if (logType == HaccpLogType.generalCleaningSchedule) {
-      doc.addPage(pw.Page(pageFormat: PdfPageFormat.a4, margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50), build: (ctx) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9))), pw.SizedBox(height: 4), pw.Center(child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 4), pw.Center(child: pw.Text(title, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 8), _buildGeneralCleaningPdfPage(logs, employeeIdToName, dateFmt), pw.SizedBox(height: 10), pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)))])));
+      doc.addPage(pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50),
+          build: (ctx) => pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                  children: [
+                    pw.Align(
+                        alignment: pw.Alignment.centerRight,
+                        child: pw.Text(_pdfFooter(logType),
+                            style: pw.TextStyle(fontSize: 9))),
+                    pw.SizedBox(height: 4),
+                    pw.Center(
+                        child: pw.Text('Рекомендуемый образец',
+                            style: pw.TextStyle(
+                                fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                    pw.SizedBox(height: 4),
+                    pw.Center(
+                        child: pw.Text(title,
+                            style: pw.TextStyle(
+                                fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                    pw.SizedBox(height: 8),
+                    _buildGeneralCleaningPdfPage(
+                        logs, employeeIdToName, dateFmt),
+                    pw.SizedBox(height: 10),
+                    pw.Center(
+                        child: pw.Text(_pdfFooter(logType),
+                            style: pw.TextStyle(
+                                fontSize: 9, fontWeight: pw.FontWeight.bold)))
+                  ])));
     } else if (logType == HaccpLogType.sieveFilterMagnet) {
-      doc.addPage(pw.Page(pageFormat: PdfPageFormat.a4, margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50), build: (ctx) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9))), pw.SizedBox(height: 4), pw.Center(child: pw.Text('Рекомендуемый образец', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 4), pw.Center(child: pw.Text(title, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))), pw.SizedBox(height: 8), _buildSieveFilterMagnetPdfPage(logs, employeeIdToName, dateFmt), pw.SizedBox(height: 10), pw.Center(child: pw.Text(_pdfFooter(logType), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)))])));
+      doc.addPage(pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.fromLTRB(16, 40, 16, 50),
+          build: (ctx) => pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                  children: [
+                    pw.Align(
+                        alignment: pw.Alignment.centerRight,
+                        child: pw.Text(_pdfFooter(logType),
+                            style: pw.TextStyle(fontSize: 9))),
+                    pw.SizedBox(height: 4),
+                    pw.Center(
+                        child: pw.Text('Рекомендуемый образец',
+                            style: pw.TextStyle(
+                                fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                    pw.SizedBox(height: 4),
+                    pw.Center(
+                        child: pw.Text(title,
+                            style: pw.TextStyle(
+                                fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                    pw.SizedBox(height: 8),
+                    _buildSieveFilterMagnetPdfPage(
+                        logs, employeeIdToName, dateFmt),
+                    pw.SizedBox(height: 10),
+                    pw.Center(
+                        child: pw.Text(_pdfFooter(logType),
+                            style: pw.TextStyle(
+                                fontSize: 9, fontWeight: pw.FontWeight.bold)))
+                  ])));
     } else {
       final colKeys = logs.isNotEmpty
           ? _collectColumnKeys(logs)
@@ -1040,12 +1465,14 @@ class HaccpPdfExportService {
               pw.Center(
                 child: pw.Text(
                   title,
-                  style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(
+                      fontSize: 12, fontWeight: pw.FontWeight.bold),
                 ),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text(establishmentName, style: pw.TextStyle(fontSize: 9)),
+                child: pw.Text(establishmentName,
+                    style: pw.TextStyle(fontSize: 9)),
               ),
             ],
           ),
@@ -1072,11 +1499,14 @@ class HaccpPdfExportService {
             for (var i = 0; i < rowCount; i++) {
               final cells = <pw.Widget>[
                 _cell('${i + 1}'),
-                _cell(logs.length > i ? dateTimeFmt.format(logs[i].createdAt) : ''),
+                _cell(logs.length > i
+                    ? dateTimeFmt.format(logs[i].createdAt)
+                    : ''),
                 ...colKeys.map((k) => _cell(
                     logs.length > i ? (logs[i].toPdfRow()[k] ?? '') : '')),
                 _cell(logs.length > i
-                    ? (employeeIdToName[logs[i].createdByEmployeeId] ?? logs[i].createdByEmployeeId)
+                    ? (employeeIdToName[logs[i].createdByEmployeeId] ??
+                        logs[i].createdByEmployeeId)
                     : ''),
               ];
               rows.add(pw.TableRow(children: cells));
@@ -1117,7 +1547,8 @@ class HaccpPdfExportService {
                 style: pw.TextStyle(fontSize: 11),
               ),
               pw.SizedBox(height: 24),
-              pw.Text('М.П. _______________________ / [Подпись руководителя]', style: pw.TextStyle(fontSize: 10)),
+              pw.Text('М.П. _______________________ / [Подпись руководителя]',
+                  style: pw.TextStyle(fontSize: 10)),
             ],
           ),
         ),
@@ -1150,7 +1581,10 @@ class HaccpPdfExportService {
         };
       case HaccpLogTable.status:
         return switch (logType) {
-          HaccpLogType.healthHygiene || HaccpLogType.pediculosis => ['status', 'note'],
+          HaccpLogType.healthHygiene || HaccpLogType.pediculosis => [
+              'status',
+              'note'
+            ],
           HaccpLogType.dishwasherControl => ['status', 'status2', 'note'],
           HaccpLogType.glassCeramicsBreakage => ['description', 'location'],
           HaccpLogType.emergencyIncidents => ['description', 'note'],
@@ -1159,11 +1593,21 @@ class HaccpPdfExportService {
       case HaccpLogTable.quality:
         return switch (logType) {
           HaccpLogType.finishedProductBrakerage ||
-          HaccpLogType.incomingRawBrakerage => ['product', 'result', 'note'],
+          HaccpLogType.incomingRawBrakerage =>
+            ['product', 'result', 'note'],
           HaccpLogType.fryingOil => ['action', 'oil_name', 'note'],
           HaccpLogType.foodWaste => ['weight', 'reason', 'note'],
           HaccpLogType.disinsectionDeratization => ['agent', 'note'],
-          _ => ['product', 'result', 'weight', 'reason', 'action', 'agent', 'concentration', 'note'],
+          _ => [
+              'product',
+              'result',
+              'weight',
+              'reason',
+              'action',
+              'agent',
+              'concentration',
+              'note'
+            ],
         };
     }
   }

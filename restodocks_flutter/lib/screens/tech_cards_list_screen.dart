@@ -258,19 +258,23 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 
   double _calculateCostPerKg(TechCard tc) {
-    if (tc.ingredients.isEmpty || tc.yield <= 0) return 0.0;
+    if (tc.ingredients.isEmpty) return 0.0;
     final resolved = _resolveTechCardCostOutput(tc.id, <String>{});
-    return resolved.output > 0 ? (resolved.cost / tc.yield) * 1000 : 0.0;
+    if (resolved.cost <= 0 || resolved.output <= 0) return 0.0;
+    // Если выход карточки не задан (часто у ПФ в БД), берём сумму выходов по строкам.
+    final yieldG = tc.yield > 0 ? tc.yield : resolved.output;
+    if (yieldG <= 0) return 0.0;
+    return (resolved.cost / yieldG) * 1000;
   }
 
   /// Себестоимость за порцию (для блюд): totalCost * portionWeight / yield.
   double _calculateCostPerPortion(TechCard tc) {
-    if (tc.ingredients.isEmpty || tc.yield <= 0 || tc.portionWeight <= 0)
-      return 0.0;
+    if (tc.ingredients.isEmpty || tc.portionWeight <= 0) return 0.0;
     final resolved = _resolveTechCardCostOutput(tc.id, <String>{});
-    return resolved.output > 0
-        ? resolved.cost * tc.portionWeight / tc.yield
-        : 0.0;
+    if (resolved.cost <= 0 || resolved.output <= 0) return 0.0;
+    final yieldG = tc.yield > 0 ? tc.yield : resolved.output;
+    if (yieldG <= 0) return 0.0;
+    return resolved.cost * tc.portionWeight / yieldG;
   }
 
   double _ingredientResolvedOutput(TTIngredient ing) {
@@ -689,11 +693,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
       final nestedId = ing.sourceTechCardId!;
       final nested = _resolveTechCardCostOutput(nestedId, resolving);
-      if (ingredientOutput <= 0 || nested.output <= 0 || nested.cost <= 0)
-        continue;
+      if (ingredientOutput <= 0) continue;
 
       // Масштабируем себестоимость вложенной ТТК пропорционально "выходу" этой строки.
-      totalCost += nested.cost * ingredientOutput / nested.output;
+      if (nested.output > 0 && nested.cost > 0) {
+        totalCost += nested.cost * ingredientOutput / nested.output;
+      } else if (ing.effectiveCost > 0) {
+        // Fallback: в строке могла сохраниться стоимость после гидратации в редакторе.
+        totalCost += ing.effectiveCost;
+      }
     }
 
     final resolved = (cost: totalCost, output: totalOutput);
@@ -848,7 +856,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           _list = list;
           _loading = false;
         });
-        _techCardsById = {for (final tc in list) tc.id: tc};
+        // Все ТТК заведения — чтобы рекурсия по вложенным ПФ находила карточки вне текущего фильтра списка.
+        _techCardsById = {for (final tc in all) tc.id: tc};
         _resolvedCostMemo.clear();
         _ensureTechCardTranslations(svc, list);
         _warmPdfParser();

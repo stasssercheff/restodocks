@@ -463,6 +463,10 @@
     "haccp_no_entries": "Записей пока нет",
     "haccp_empty_journal_subtitle": "Добавьте первую запись в журнал — нажмите кнопку ниже",
     "haccp_add_entry": "Добавить запись",
+    "haccp_add_row": "+ Добавить строку",
+    "haccp_add_employee_row": "Добавить сотрудника",
+    "haccp_all_employees_added": "Все сотрудники уже добавлены",
+    "haccp_add_at_least_one": "Добавьте хотя бы одного сотрудника",
     "haccp_export_pdf": "Экспорт в PDF",
     "haccp_pdf_cover": "Титульный лист",
     "haccp_pdf_cover_hint": "Название организации, даты",
@@ -1379,7 +1383,7 @@
     "status_inventory_sent": "Отправлена",
     "order_id_label": "Заказ ID",
     "order_data_label": "Данные заказа",
-    "ttk_section_label": "Цех",
+    "ttk_section_label": "Подразделение",
     "ttk_sections_count": "%s цеха",
     "ttk_sections_all": "Все цеха",
     "ttk_sections_hidden": "Скрыто",
@@ -2862,7 +2866,11 @@
     "requisites": "Company details",
     "requisites_hint": "For the employee agreement form",
     "notification_settings": "Notifications",
-    "notification_settings_hint": "Notification types and which are enabled"
+    "notification_settings_hint": "Notification types and which are enabled",
+    "haccp_add_row": "+ Add row",
+    "haccp_add_employee_row": "Add employee",
+    "haccp_all_employees_added": "All employees are already added",
+    "haccp_add_at_least_one": "Add at least one employee"
   },
   "es": {
     "app_name": "Restodocks",

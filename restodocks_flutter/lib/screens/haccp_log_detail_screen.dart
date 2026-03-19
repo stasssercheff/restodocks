@@ -21,10 +21,13 @@ class HaccpLogDetailScreen extends StatelessWidget {
 
   final HaccpLog log;
   final Employee? employee;
+
   /// Для гигиенического журнала: кто заполнил запись (подпись медработника).
   final Employee? creator;
+
   /// Снимок ФИО субъекта (для гигиенического журнала при удалённом сотруднике).
   final String? subjectNameSnapshot;
+
   /// Снимок должности субъекта (для гигиенического журнала при удалённом сотруднике).
   final String? subjectPositionSnapshot;
 
@@ -41,7 +44,8 @@ class HaccpLogDetailScreen extends StatelessWidget {
             bottom: BorderSide(color: Colors.grey.shade400),
           ),
         ),
-        child: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+        child: Text(text,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
       );
 
   Widget _cell(String text, {Color? color}) => Container(
@@ -58,17 +62,31 @@ class HaccpLogDetailScreen extends StatelessWidget {
 
   /// Приложение 1: Гигиенический журнал (сотрудники).
   Widget _buildHealthHygieneTable(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     final parsed = HaccpLog.parseHealthHygieneDescription(log.description);
-    final empName = subjectNameSnapshot ?? parsed.employeeNameSnapshot ?? (employee != null
-        ? '${employee!.fullName}${employee!.surname != null ? ' ${employee!.surname}' : ''}'
-        : null) ?? '—';
-    final position = subjectPositionSnapshot ?? parsed.positionOverride ?? employee?.roleDisplayName ?? '—';
+    final empName = subjectNameSnapshot ??
+        parsed.employeeNameSnapshot ??
+        (employee != null
+            ? '${employee!.fullName}${employee!.surname != null ? ' ${employee!.surname}' : ''}'
+            : null) ??
+        '—';
+    final position = (subjectPositionSnapshot != null &&
+            subjectPositionSnapshot!.trim().isNotEmpty)
+        ? loc.formatStoredHealthPosition(subjectPositionSnapshot)
+        : loc.healthHygienePositionLabel(
+            storedPosition: parsed.positionOverride,
+            employee: employee,
+          );
     final creatorName = creator != null
         ? '${creator!.fullName}${creator!.surname != null ? ' ${creator!.surname}' : ''}'
         : '—';
-    final sign1 = log.status2Ok == true ? 'Да' : (log.status2Ok == false ? 'Нет' : '—');
-    final sign2 = log.statusOk == true ? 'Да' : (log.statusOk == false ? 'Нет' : '—');
-    final result = log.statusOk == true ? 'допущен' : (log.statusOk == false ? 'отстранен' : '—');
+    final sign1 =
+        log.status2Ok == true ? 'Да' : (log.status2Ok == false ? 'Нет' : '—');
+    final sign2 =
+        log.statusOk == true ? 'Да' : (log.statusOk == false ? 'Нет' : '—');
+    final result = log.statusOk == true
+        ? 'допущен'
+        : (log.statusOk == false ? 'отстранен' : '—');
     return Table(
       columnWidths: const {
         0: FlexColumnWidth(0.5),
@@ -88,9 +106,12 @@ class HaccpLogDetailScreen extends StatelessWidget {
             _header('Дата'),
             _header('Ф. И. О. работника (последнее при наличии)'),
             _header('Должность'),
-            _header('Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов семьи'),
-            _header('Подпись сотрудника об отсутствии заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук и открытых поверхностей тела'),
-            _header('Результат осмотра медицинским работником (ответственным лицом) (допущен / отстранен)'),
+            _header(
+                'Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов семьи'),
+            _header(
+                'Подпись сотрудника об отсутствии заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук и открытых поверхностей тела'),
+            _header(
+                'Результат осмотра медицинским работником (ответственным лицом) (допущен / отстранен)'),
             _header('Подпись медицинского работника (ответственного лица)'),
           ],
         ),
@@ -111,7 +132,8 @@ class HaccpLogDetailScreen extends StatelessWidget {
   }
 
   /// Приложение 2: Журнал учета температурного режима холодильного оборудования.
-  Widget _buildFridgeTemperatureTable(BuildContext context, String establishmentName) {
+  Widget _buildFridgeTemperatureTable(
+      BuildContext context, String establishmentName) {
     return Table(
       columnWidths: const {
         0: FlexColumnWidth(1.5),
@@ -139,7 +161,8 @@ class HaccpLogDetailScreen extends StatelessWidget {
   }
 
   /// Приложение 3: 5 обязательных колонок. Наименование помещения — в шапке.
-  Widget _buildWarehouseTempHumidityTable(BuildContext context, String establishmentName) {
+  Widget _buildWarehouseTempHumidityTable(
+      BuildContext context, String establishmentName) {
     final tempVal = log.value1;
     final humVal = log.value2;
     final temp = tempVal != null ? tempVal.toStringAsFixed(0) : '—';
@@ -155,7 +178,10 @@ class HaccpLogDetailScreen extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
               'Наименование складского помещения: ${log.equipment}',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
           ),
         Table(
@@ -237,7 +263,8 @@ class HaccpLogDetailScreen extends StatelessWidget {
 
   /// Приложение 5: Журнал бракеража скоропортящейся пищевой продукции.
   Widget _buildIncomingRawBrakerageTable(BuildContext context) {
-    final dateSoldStr = log.dateSold != null ? _dateFmt.format(log.dateSold!) : '—';
+    final dateSoldStr =
+        log.dateSold != null ? _dateFmt.format(log.dateSold!) : '—';
     return Table(
       columnWidths: const {
         0: FlexColumnWidth(1),
@@ -275,7 +302,9 @@ class HaccpLogDetailScreen extends StatelessWidget {
             _cell(log.productName ?? '—'),
             _cell(log.packaging ?? '—'),
             _cell(log.manufacturerSupplier ?? '—'),
-            _cell(log.quantityKg != null ? log.quantityKg!.toStringAsFixed(2) : '—'),
+            _cell(log.quantityKg != null
+                ? log.quantityKg!.toStringAsFixed(2)
+                : '—'),
             _cell(log.documentNumber ?? '—'),
             _cell(log.result ?? '—'),
             _cell(log.storageConditions ?? '—'),
@@ -291,17 +320,33 @@ class HaccpLogDetailScreen extends StatelessWidget {
   Widget _buildFryingOilTable(BuildContext context) {
     return Table(
       columnWidths: const {
-        0: FlexColumnWidth(0.9), 1: FlexColumnWidth(0.6), 2: FlexColumnWidth(1), 3: FlexColumnWidth(1.2),
-        4: FlexColumnWidth(1), 5: FlexColumnWidth(1), 6: FlexColumnWidth(0.8), 7: FlexColumnWidth(1.2),
-        8: FlexColumnWidth(0.7), 9: FlexColumnWidth(0.7), 10: FlexColumnWidth(1),
+        0: FlexColumnWidth(0.9),
+        1: FlexColumnWidth(0.6),
+        2: FlexColumnWidth(1),
+        3: FlexColumnWidth(1.2),
+        4: FlexColumnWidth(1),
+        5: FlexColumnWidth(1),
+        6: FlexColumnWidth(0.8),
+        7: FlexColumnWidth(1.2),
+        8: FlexColumnWidth(0.7),
+        9: FlexColumnWidth(0.7),
+        10: FlexColumnWidth(1),
       },
       border: TableBorder.all(color: Colors.grey),
       children: [
         TableRow(
           children: [
-            _header('Дата'), _header('Время начала'), _header('Вид жира'), _header('Оценка на начало'),
-            _header('Оборудование'), _header('Вид продукции'), _header('Время окончания'),
-            _header('Оценка по окончании'), _header('Переходящий остаток, кг'), _header('Утилизировано, кг'), _header('Контролёр'),
+            _header('Дата'),
+            _header('Время начала'),
+            _header('Вид жира'),
+            _header('Оценка на начало'),
+            _header('Оборудование'),
+            _header('Вид продукции'),
+            _header('Время окончания'),
+            _header('Оценка по окончании'),
+            _header('Переходящий остаток, кг'),
+            _header('Утилизировано, кг'),
+            _header('Контролёр'),
           ],
         ),
         TableRow(
@@ -314,8 +359,12 @@ class HaccpLogDetailScreen extends StatelessWidget {
             _cell(log.fryingProductType ?? '—'),
             _cell(log.fryingEndTime ?? '—'),
             _cell(log.organolepticEnd ?? '—'),
-            _cell(log.carryOverKg != null ? log.carryOverKg!.toStringAsFixed(2) : '—'),
-            _cell(log.utilizedKg != null ? log.utilizedKg!.toStringAsFixed(2) : '—'),
+            _cell(log.carryOverKg != null
+                ? log.carryOverKg!.toStringAsFixed(2)
+                : '—'),
+            _cell(log.utilizedKg != null
+                ? log.utilizedKg!.toStringAsFixed(2)
+                : '—'),
             _cell(log.commissionSignatures ?? employee?.fullName ?? '—'),
           ],
         ),
@@ -327,12 +376,21 @@ class HaccpLogDetailScreen extends StatelessWidget {
     final sign = creator != null
         ? '${creator!.fullName}${creator!.surname != null ? ' ${creator!.surname}' : ''}'
         : '—';
-    final issued = log.medBookIssuedAt != null ? _dateFmt.format(log.medBookIssuedAt!) : '—';
-    final returned = log.medBookReturnedAt != null ? _dateFmt.format(log.medBookReturnedAt!) : '—';
+    final issued = log.medBookIssuedAt != null
+        ? _dateFmt.format(log.medBookIssuedAt!)
+        : '—';
+    final returned = log.medBookReturnedAt != null
+        ? _dateFmt.format(log.medBookReturnedAt!)
+        : '—';
     return Table(
       columnWidths: const {
-        0: FlexColumnWidth(0.4), 1: FlexColumnWidth(1.2), 2: FlexColumnWidth(0.9),
-        3: FlexColumnWidth(0.8), 4: FlexColumnWidth(0.9), 5: FlexColumnWidth(1), 6: FlexColumnWidth(1),
+        0: FlexColumnWidth(0.4),
+        1: FlexColumnWidth(1.2),
+        2: FlexColumnWidth(0.9),
+        3: FlexColumnWidth(0.8),
+        4: FlexColumnWidth(0.9),
+        5: FlexColumnWidth(1),
+        6: FlexColumnWidth(1),
       },
       border: TableBorder.all(color: Colors.grey),
       children: [
@@ -353,7 +411,9 @@ class HaccpLogDetailScreen extends StatelessWidget {
             _cell(log.medBookEmployeeName ?? '—'),
             _cell(log.medBookPosition ?? '—'),
             _cell(log.medBookNumber ?? '—'),
-            _cell(log.medBookValidUntil != null ? _dateFmt.format(log.medBookValidUntil!) : '—'),
+            _cell(log.medBookValidUntil != null
+                ? _dateFmt.format(log.medBookValidUntil!)
+                : '—'),
             _cell('$issued\n$sign'),
             _cell('$returned\n$sign'),
           ],
@@ -398,18 +458,38 @@ class HaccpLogDetailScreen extends StatelessWidget {
 
   Widget _buildMedExaminationsTable(BuildContext context) {
     return Table(
-      columnWidths: const {0: FlexColumnWidth(0.4), 1: FlexColumnWidth(1), 2: FlexColumnWidth(0.7), 3: FlexColumnWidth(0.6), 4: FlexColumnWidth(0.8), 5: FlexColumnWidth(0.7), 6: FlexColumnWidth(0.7)},
+      columnWidths: const {
+        0: FlexColumnWidth(0.4),
+        1: FlexColumnWidth(1),
+        2: FlexColumnWidth(0.7),
+        3: FlexColumnWidth(0.6),
+        4: FlexColumnWidth(0.8),
+        5: FlexColumnWidth(0.7),
+        6: FlexColumnWidth(0.7)
+      },
       border: TableBorder.all(color: Colors.grey),
       children: [
-        TableRow(children: [_header('№'), _header('Ф. И. О.'), _header('Должность'), _header('Дата осмотра'), _header('Заключение'), _header('Решение'), _header('Подпись')]),
+        TableRow(children: [
+          _header('№'),
+          _header('Ф. И. О.'),
+          _header('Должность'),
+          _header('Дата осмотра'),
+          _header('Заключение'),
+          _header('Решение'),
+          _header('Подпись')
+        ]),
         TableRow(children: [
           _cell('1'),
           _cell(log.medExamEmployeeName ?? '—'),
           _cell(log.medExamPosition ?? '—'),
-          _cell(log.medExamDate != null ? _dateFmt.format(log.medExamDate!) : '—'),
+          _cell(log.medExamDate != null
+              ? _dateFmt.format(log.medExamDate!)
+              : '—'),
           _cell(log.medExamConclusion ?? '—'),
           _cell(log.medExamEmployerDecision ?? '—'),
-          _cell(creator != null ? '${creator!.fullName}${creator!.surname != null ? ' ${creator!.surname}' : ''}' : '—'),
+          _cell(creator != null
+              ? '${creator!.fullName}${creator!.surname != null ? ' ${creator!.surname}' : ''}'
+              : '—'),
         ]),
       ],
     );
@@ -417,15 +497,33 @@ class HaccpLogDetailScreen extends StatelessWidget {
 
   Widget _buildDisinfectantAccountingTable(BuildContext context) {
     return Table(
-      columnWidths: const {0: FlexColumnWidth(0.6), 1: FlexColumnWidth(1.2), 2: FlexColumnWidth(0.5), 3: FlexColumnWidth(0.6), 4: FlexColumnWidth(0.8)},
+      columnWidths: const {
+        0: FlexColumnWidth(0.6),
+        1: FlexColumnWidth(1.2),
+        2: FlexColumnWidth(0.5),
+        3: FlexColumnWidth(0.6),
+        4: FlexColumnWidth(0.8)
+      },
       border: TableBorder.all(color: Colors.grey),
       children: [
-        TableRow(children: [_header('Дата'), _header('Объект/Дезсредство'), _header('Кол-во'), _header('Поступление'), _header('Ответственный')]),
+        TableRow(children: [
+          _header('Дата'),
+          _header('Объект/Дезсредство'),
+          _header('Кол-во'),
+          _header('Поступление'),
+          _header('Ответственный')
+        ]),
         TableRow(children: [
           _cell(_dateFmt.format(log.createdAt)),
           _cell(log.disinfObjectName ?? log.disinfAgentName ?? '—'),
-          _cell(log.disinfObjectCount != null ? log.disinfObjectCount.toString() : (log.disinfQuantity != null ? log.disinfQuantity.toString() : '—')),
-          _cell(log.disinfReceiptDate != null ? _dateFmt.format(log.disinfReceiptDate!) : '—'),
+          _cell(log.disinfObjectCount != null
+              ? log.disinfObjectCount.toString()
+              : (log.disinfQuantity != null
+                  ? log.disinfQuantity.toString()
+                  : '—')),
+          _cell(log.disinfReceiptDate != null
+              ? _dateFmt.format(log.disinfReceiptDate!)
+              : '—'),
           _cell(log.disinfResponsibleName ?? creator?.fullName ?? '—'),
         ]),
       ],
@@ -434,10 +532,24 @@ class HaccpLogDetailScreen extends StatelessWidget {
 
   Widget _buildEquipmentWashingTable(BuildContext context) {
     return Table(
-      columnWidths: const {0: FlexColumnWidth(0.6), 1: FlexColumnWidth(0.4), 2: FlexColumnWidth(1), 3: FlexColumnWidth(0.8), 4: FlexColumnWidth(0.8), 5: FlexColumnWidth(0.7)},
+      columnWidths: const {
+        0: FlexColumnWidth(0.6),
+        1: FlexColumnWidth(0.4),
+        2: FlexColumnWidth(1),
+        3: FlexColumnWidth(0.8),
+        4: FlexColumnWidth(0.8),
+        5: FlexColumnWidth(0.7)
+      },
       border: TableBorder.all(color: Colors.grey),
       children: [
-        TableRow(children: [_header('Дата'), _header('Время'), _header('Оборудование'), _header('Моющее'), _header('Дез. раствор'), _header('Контролёр')]),
+        TableRow(children: [
+          _header('Дата'),
+          _header('Время'),
+          _header('Оборудование'),
+          _header('Моющее'),
+          _header('Дез. раствор'),
+          _header('Контролёр')
+        ]),
         TableRow(children: [
           _cell(_dateFmt.format(log.createdAt)),
           _cell(log.washTime ?? '—'),
@@ -452,14 +564,26 @@ class HaccpLogDetailScreen extends StatelessWidget {
 
   Widget _buildGeneralCleaningTable(BuildContext context) {
     return Table(
-      columnWidths: const {0: FlexColumnWidth(0.3), 1: FlexColumnWidth(1.2), 2: FlexColumnWidth(0.6), 3: FlexColumnWidth(0.8)},
+      columnWidths: const {
+        0: FlexColumnWidth(0.3),
+        1: FlexColumnWidth(1.2),
+        2: FlexColumnWidth(0.6),
+        3: FlexColumnWidth(0.8)
+      },
       border: TableBorder.all(color: Colors.grey),
       children: [
-        TableRow(children: [_header('№'), _header('Помещение'), _header('Дата'), _header('Ответственный')]),
+        TableRow(children: [
+          _header('№'),
+          _header('Помещение'),
+          _header('Дата'),
+          _header('Ответственный')
+        ]),
         TableRow(children: [
           _cell('1'),
           _cell(log.genCleanPremises ?? '—'),
-          _cell(log.genCleanDate != null ? _dateFmt.format(log.genCleanDate!) : '—'),
+          _cell(log.genCleanDate != null
+              ? _dateFmt.format(log.genCleanDate!)
+              : '—'),
           _cell(log.genCleanResponsible ?? creator?.fullName ?? '—'),
         ]),
       ],
@@ -468,15 +592,31 @@ class HaccpLogDetailScreen extends StatelessWidget {
 
   Widget _buildSieveFilterMagnetTable(BuildContext context) {
     return Table(
-      columnWidths: const {0: FlexColumnWidth(0.4), 1: FlexColumnWidth(1), 2: FlexColumnWidth(0.6), 3: FlexColumnWidth(0.6), 4: FlexColumnWidth(0.7), 5: FlexColumnWidth(0.6)},
+      columnWidths: const {
+        0: FlexColumnWidth(0.4),
+        1: FlexColumnWidth(1),
+        2: FlexColumnWidth(0.6),
+        3: FlexColumnWidth(0.6),
+        4: FlexColumnWidth(0.7),
+        5: FlexColumnWidth(0.6)
+      },
       border: TableBorder.all(color: Colors.grey),
       children: [
-        TableRow(children: [_header('№ сита/магнита'), _header('Наименование'), _header('Состояние'), _header('Дата очистки'), _header('ФИО'), _header('Комментарии')]),
+        TableRow(children: [
+          _header('№ сита/магнита'),
+          _header('Наименование'),
+          _header('Состояние'),
+          _header('Дата очистки'),
+          _header('ФИО'),
+          _header('Комментарии')
+        ]),
         TableRow(children: [
           _cell(log.sieveNo ?? '—'),
           _cell(log.sieveNameLocation ?? '—'),
           _cell(log.sieveCondition ?? '—'),
-          _cell(log.sieveCleaningDate != null ? _dateFmt.format(log.sieveCleaningDate!) : '—'),
+          _cell(log.sieveCleaningDate != null
+              ? _dateFmt.format(log.sieveCleaningDate!)
+              : '—'),
           _cell(log.sieveSignature ?? creator?.fullName ?? '—'),
           _cell(log.sieveComments ?? '—'),
         ]),
@@ -488,19 +628,22 @@ class HaccpLogDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
-    final establishmentName = context.watch<AccountManagerSupabase>().establishment?.name ?? '—';
+    final establishmentName =
+        context.watch<AccountManagerSupabase>().establishment?.name ?? '—';
 
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text('${loc.t('haccp_entry_view') ?? 'Запись'} — ${(loc.t(log.logType.displayNameKey) ?? log.logType.displayNameRu)}'),
+        title: Text(
+            '${loc.t('haccp_entry_view') ?? 'Запись'} — ${(loc.t(log.logType.displayNameKey) ?? log.logType.displayNameRu)}'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Text(
             loc.t('haccp_recommended_sample') ?? 'Рекомендуемый образец',
-            style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.primary),
+            style: theme.textTheme.titleSmall
+                ?.copyWith(color: theme.colorScheme.primary),
           ),
           const SizedBox(height: 8),
           SingleChildScrollView(
@@ -519,12 +662,15 @@ class HaccpLogDetailScreen extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.lock_outline, size: 20, color: theme.colorScheme.onSurfaceVariant),
+                Icon(Icons.lock_outline,
+                    size: 20, color: theme.colorScheme.onSurfaceVariant),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    loc.t('haccp_entry_immutable_hint') ?? 'Только просмотр. Редактирование записей журнала недоступно.',
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    loc.t('haccp_entry_immutable_hint') ??
+                        'Только просмотр. Редактирование записей журнала недоступно.',
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),
                 ),
               ],

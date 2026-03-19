@@ -212,7 +212,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     final totalCost = indexedRows
         .map((e) => e.value)
         .where((ing) => ing.productName.isNotEmpty)
-        .fold<double>(0, (s, ing) => s + (ing.effectiveCost < 0 ? 0 : ing.effectiveCost));
+        .fold<double>(0, (s, ing) => s + _lineCostForTotals(ing));
 
     // Расчет итоговой стоимости
     final costPerKgFinishedProduct = widget.isSemiFinished
@@ -896,14 +896,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               final pf = selectedItem.item as TechCard;
               double? pfPricePerKg;
               if (pf.ingredients.isNotEmpty) {
-                // Для импортированных вложенных ТТК `i.cost` может быть 0,
-                // а корректная цена хранится в `effectiveCost` (через pricePerKg × вес).
-                final totalCost = pf.ingredients.fold<double>(
-                  0,
-                  (sum, i) => sum + (i.effectiveCost > 0 ? i.effectiveCost : 0),
-                );
-                final totalOutput = pf.ingredients.fold<double>(0, (sum, i) => sum + i.outputWeight);
-                if (totalOutput > 0) pfPricePerKg = (totalCost / totalOutput) * 1000;
+                final r = _resolvePfRecipeCostOutput(pf.id, <String>{});
+                if (r != null && r.output > 0 && r.cost > 0) {
+                  pfPricePerKg = (r.cost / r.output) * 1000;
+                }
               }
               final gross = ingredient.grossWeight;
               updated = ingredient.copyWith(
@@ -1046,12 +1042,84 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     );
   }
 
+  /// Граммы выхода строки для расчёта вложенных ПФ (как в списке ТТК).
+  double _rowOutputGramsForNested(TTIngredient ing) {
+    if (ing.outputWeight > 0) return ing.outputWeight;
+    if (ing.netWeight > 0) return ing.netWeight;
+    return ing.grossWeight;
+  }
+
+  /// Рекурсивно: себестоимость и суммарный «выход» по рецепту ПФ (для цены/кг и строки в родителе).
+  ({double cost, double output})? _resolvePfRecipeCostOutput(
+      String pfId, Set<String> stack) {
+    if (!stack.add(pfId)) return null;
+    try {
+      final list = widget.semiFinishedProducts;
+      if (list == null || list.isEmpty) return null;
+      TechCard? pf;
+      for (final t in list) {
+        if (t.id == pfId) {
+          pf = t;
+          break;
+        }
+      }
+      if (pf == null || pf.ingredients.isEmpty) return null;
+
+      double totalCost = 0;
+      double totalOutput = 0;
+      for (final ing in pf.ingredients) {
+        final io = _rowOutputGramsForNested(ing);
+        if (io <= 0) continue;
+        totalOutput += io;
+        if (ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty) {
+          final nested =
+              _resolvePfRecipeCostOutput(ing.sourceTechCardId!, stack);
+          if (nested != null && nested.output > 0 && nested.cost > 0) {
+            totalCost += nested.cost * io / nested.output;
+          } else if (ing.effectiveCost > 0) {
+            totalCost += ing.effectiveCost;
+          }
+        } else {
+          totalCost += ing.effectiveCost > 0 ? ing.effectiveCost : 0;
+        }
+      }
+      if (totalOutput <= 0) return null;
+      return (cost: totalCost, output: totalOutput);
+    } finally {
+      stack.remove(pfId);
+    }
+  }
+
+  /// Стоимость строки для строки «Итого» (учитывает вложенные ПФ по рецепту).
+  double _lineCostForTotals(TTIngredient ing) {
+    final ppk = _resolvePricePerKg(ing);
+    if (ppk > 0) {
+      final line = ppk * _quantityForCost(ing);
+      if (line > 0) return line;
+    }
+    return ing.effectiveCost < 0 ? 0 : ing.effectiveCost;
+  }
+
   double _resolvePricePerKg(TTIngredient ingredient) {
-    double pricePerKg = ingredient.pricePerKg ?? 0;
-    if (pricePerKg == 0 && (ingredient.productId != null || ingredient.productName.isNotEmpty)) {
-      final product = widget.productStore?.findProductForIngredient(ingredient.productId, ingredient.productName);
+    var pricePerKg = ingredient.pricePerKg ?? 0;
+    if (pricePerKg > 0) return pricePerKg;
+
+    final sid = ingredient.sourceTechCardId;
+    if (sid != null &&
+        sid.isNotEmpty &&
+        (widget.semiFinishedProducts?.isNotEmpty ?? false)) {
+      final r = _resolvePfRecipeCostOutput(sid, <String>{});
+      if (r != null && r.output > 0 && r.cost > 0) {
+        return (r.cost / r.output) * 1000;
+      }
+    }
+
+    if (ingredient.productId != null || ingredient.productName.isNotEmpty) {
+      final product = widget.productStore
+          .findProductForIngredient(ingredient.productId, ingredient.productName);
       if (product != null) {
-        final ep = widget.productStore?.getEstablishmentPrice(product.id, widget.establishmentId);
+        final ep = widget.productStore
+            .getEstablishmentPrice(product.id, widget.establishmentId);
         pricePerKg = ep?.$1 ?? 0.0;
       }
     }

@@ -62,12 +62,15 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   bool _saving = false;
   DateTime? _expiryDate;
   DateTime? _dateSold;
+
   /// Разрешение к реализации: true = разрешено, false = запрещено, null = не выбрано.
   bool? _approvalToSell;
+
   /// Журнал медкнижек: даты.
   DateTime? _medBookValidUntil;
   DateTime? _medBookIssuedAt;
   DateTime? _medBookReturnedAt;
+
   /// Мобильные блоки (алиасы для совместимости с полями).
   String? _medBookEmployeeId;
   String? _medExamEmployeeId;
@@ -77,6 +80,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   set _medBookReceivedDate(DateTime? v) => _medBookIssuedAt = v;
   DateTime? get _medBookReturnedDate => _medBookReturnedAt;
   set _medBookReturnedDate(DateTime? v) => _medBookReturnedAt = v;
+
   /// Медосмотры, дезсредства, генуборки, сита.
   DateTime? _medExamHireDate;
   DateTime? _medExamDate;
@@ -101,6 +105,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   List<Product> _finishedBrakerageProducts = [];
   String? _selectedFinishedBrakerageTechCardId;
   final HaccpFormPresetService _presetService = HaccpFormPresetService();
+
   /// Сохранённые варианты по ключу поля формы (хранение в SharedPreferences под ключом logType:field).
   final Map<String, List<String>> _presetOptions = {};
 
@@ -116,16 +121,21 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   void initState() {
     super.initState();
     if (_logType == HaccpLogType.healthHygiene) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _loadHealthEmployees());
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _loadHealthEmployees());
     } else if (_logType == HaccpLogType.finishedProductBrakerage) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _loadFinishedBrakerageChoices());
-    } else if (_logType == HaccpLogType.medBookRegistry || _logType == HaccpLogType.medExaminations) {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _loadFinishedBrakerageChoices());
+    } else if (_logType == HaccpLogType.medBookRegistry ||
+        _logType == HaccpLogType.medExaminations) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadFormEmployees());
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSavedFieldOptions());
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _loadSavedFieldOptions());
   }
 
-  String _presetStorageKey(String fieldKey) => '${_logType?.code ?? 'unknown'}:$fieldKey';
+  String _presetStorageKey(String fieldKey) =>
+      '${_logType?.code ?? 'unknown'}:$fieldKey';
 
   List<String> _presetFieldsForCurrentLog() {
     switch (_logType) {
@@ -144,9 +154,17 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       case HaccpLogType.sieveFilterMagnet:
         return const ['sieve_name_location', 'sieve_condition'];
       case HaccpLogType.fryingOil:
-        return const ['oil_name', 'frying_equipment_type', 'frying_product_type'];
+        return const [
+          'oil_name',
+          'frying_equipment_type',
+          'frying_product_type'
+        ];
       case HaccpLogType.incomingRawBrakerage:
-        return const ['manufacturer_supplier', 'storage_conditions', 'packaging'];
+        return const [
+          'manufacturer_supplier',
+          'storage_conditions',
+          'packaging'
+        ];
       case HaccpLogType.disinfectantAccounting:
         return const [
           'disinf_object_name',
@@ -159,7 +177,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     }
   }
 
-  static List<String> _mergeUniqueOptions(Iterable<String> a, Iterable<String> b) {
+  static List<String> _mergeUniqueOptions(
+      Iterable<String> a, Iterable<String> b) {
     final map = <String, String>{};
     for (final raw in [...a, ...b]) {
       final t = raw.trim();
@@ -177,7 +196,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     if (est == null) return;
     try {
       final list = await acc.getEmployeesForEstablishment(est.id);
-      if (mounted) setState(() => _formEmployees = list.where((e) => e.isActive).toList());
+      if (mounted)
+        setState(() => _formEmployees = list.where((e) => e.isActive).toList());
     } catch (_) {}
   }
 
@@ -192,13 +212,15 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         setState(() {
           _healthEmployees = list.where((e) => e.isActive).toList();
           if (_healthRows.isEmpty && _healthEmployees.isNotEmpty) {
-            _healthRows = _healthEmployees.map((e) => _HealthHygieneRow(
-              employeeId: e.id,
-              positionOverride: null,
-              positionIsCustom: false,
-              statusOk: true,
-              status2Ok: true,
-            )).toList();
+            _healthRows = _healthEmployees
+                .map((e) => _HealthHygieneRow(
+                      employeeId: e.id,
+                      positionOverride: null,
+                      positionIsCustom: false,
+                      statusOk: true,
+                      status2Ok: true,
+                    ))
+                .toList();
           }
         });
       }
@@ -226,7 +248,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           );
           list = _mergeUniqueOptions(list, legacy);
         }
-        if (_logType == HaccpLogType.warehouseTempHumidity && f == 'warehouse_premises') {
+        if (_logType == HaccpLogType.warehouseTempHumidity &&
+            f == 'warehouse_premises') {
           final legacy = await _presetService.getOptions(
             establishmentId: est.id,
             fieldKey: 'warehouse_premises',
@@ -263,7 +286,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     if (showFeedback && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Вариант сохранён — выберите его из списка (стрелка) при следующей записи'),
+          content: Text(
+              'Вариант сохранён — выберите его из списка (стрелка) при следующей записи'),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -281,7 +305,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       final store = context.read<ProductStoreSupabase>();
       final all = await svc.getTechCardsForEstablishment(dataEstId);
       await store.loadNomenclature(est.id);
-      final visible = emp == null ? all : all.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
+      final visible = emp == null
+          ? all
+          : all.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
       final products = List<Product>.from(store.getProducts());
       if (!mounted) return;
       setState(() {
@@ -331,7 +357,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       items: _formEmployees
           .map((e) => DropdownMenuItem<Employee?>(
                 value: e,
-                child: Text(e.surname != null ? '${e.surname} ${e.fullName}' : e.fullName),
+                child: Text(e.surname != null
+                    ? '${e.surname} ${e.fullName}'
+                    : e.fullName),
               ))
           .toList(),
       onChanged: (e) {
@@ -366,7 +394,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           border: const OutlineInputBorder(),
           isDense: true,
         ),
-        child: Text(value != null ? DateFormat('dd.MM.yyyy').format(value) : 'Выбрать'),
+        child: Text(
+            value != null ? DateFormat('dd.MM.yyyy').format(value) : 'Выбрать'),
       ),
     );
   }
@@ -399,7 +428,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         child: child,
       );
 
-  Widget _textField(String key, String label, {bool multiline = false, TextInputType? keyboardType}) {
+  Widget _textField(String key, String label,
+      {bool multiline = false, TextInputType? keyboardType}) {
     _controllers[key] ??= TextEditingController();
     return TextFormField(
       controller: _controllers[key],
@@ -465,10 +495,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       decoration: InputDecoration(
         labelText: label,
         hintText: hintText,
-        helperText: showHelperUnderField ? 'Плюс — в список, стрелка — выбрать' : null,
+        helperText:
+            showHelperUnderField ? 'Плюс — в список, стрелка — выбрать' : null,
         border: const OutlineInputBorder(),
         isDense: true,
-        suffixIconConstraints: const BoxConstraints(minWidth: 96, minHeight: 40),
+        suffixIconConstraints:
+            const BoxConstraints(minWidth: 96, minHeight: 40),
         suffixIcon: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -500,13 +532,15 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     );
   }
 
-  String _finishedBrakerageTypeLabel(LocalizationService loc, {required bool isProduct, required bool isSemiFinished}) {
+  String _finishedBrakerageTypeLabel(LocalizationService loc,
+      {required bool isProduct, required bool isSemiFinished}) {
     if (isProduct) return loc.t('products') ?? 'Продукты';
     if (isSemiFinished) return loc.t('ttk_pf') ?? 'ТТК ПФ';
     return loc.t('ttk_dish') ?? 'Блюдо';
   }
 
-  List<_FinishedBrakerageChoice> _buildFinishedBrakerageChoices(LocalizationService loc) {
+  List<_FinishedBrakerageChoice> _buildFinishedBrakerageChoices(
+      LocalizationService loc) {
     final lang = loc.currentLanguageCode;
     final choices = <_FinishedBrakerageChoice>[
       ..._finishedBrakerageProducts.map((product) {
@@ -514,7 +548,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         return _FinishedBrakerageChoice(
           displayName: label,
           searchTokens: '$label ${product.name} ${product.category}',
-          typeLabel: _finishedBrakerageTypeLabel(loc, isProduct: true, isSemiFinished: false),
+          typeLabel: _finishedBrakerageTypeLabel(loc,
+              isProduct: true, isSemiFinished: false),
           productName: label,
         );
       }),
@@ -523,13 +558,15 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         return _FinishedBrakerageChoice(
           displayName: label,
           searchTokens: '$label ${tc.dishName} ${tc.category}',
-          typeLabel: _finishedBrakerageTypeLabel(loc, isProduct: false, isSemiFinished: tc.isSemiFinished),
+          typeLabel: _finishedBrakerageTypeLabel(loc,
+              isProduct: false, isSemiFinished: tc.isSemiFinished),
           techCardId: tc.id,
           productName: label,
         );
       }),
     ];
-    choices.sort((a, b) => a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
+    choices.sort((a, b) =>
+        a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
     return choices;
   }
 
@@ -552,6 +589,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
   /// Выпадающий список выбора сотрудника (подставляет ФИО/должность в форму).
   Widget _employeeSelectorDropdown({
+    required LocalizationService loc,
     required List<Employee> employees,
     required String label,
     required void Function(Employee?) onSelected,
@@ -565,11 +603,14 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       ),
       value: null,
       items: [
-        const DropdownMenuItem<Employee?>(value: null, child: Text('— Выбрать из списка —')),
+        const DropdownMenuItem<Employee?>(
+            value: null, child: Text('— Выбрать из списка —')),
         ...employees.map((e) => DropdownMenuItem<Employee?>(
-          value: e,
-          child: Text('${e.surname != null ? '${e.surname} ' : ''}${e.fullName} (${e.roleDisplayName})'),
-        )),
+              value: e,
+              child: Text(
+                '${e.surname != null ? '${e.surname} ' : ''}${e.fullName} (${e.roles.isNotEmpty ? loc.roleDisplayName(e.roles.first) : ''})',
+              ),
+            )),
       ],
       onChanged: (e) => onSelected(e),
     );
@@ -581,7 +622,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       builder: (_, acc, __) {
         final emp = acc.currentEmployee;
         final name = emp != null
-            ? (emp.surname != null ? '${emp.surname} ${emp.fullName}' : emp.fullName)
+            ? (emp.surname != null
+                ? '${emp.surname} ${emp.fullName}'
+                : emp.fullName)
             : '—';
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
@@ -593,60 +636,93 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
   static const String _customPositionValue = '__custom_position__';
 
-  /// Список должностей: все из EmployeeRole + уникальные из карточек сотрудников всех подразделений.
-  List<String> get _healthPositionOptions {
-    final fromRoles = EmployeeRole.values.map((r) => r.displayName).toSet();
-    final fromEmployees = _healthEmployees.map((e) => e.roleDisplayName).where((s) => s.isNotEmpty).toSet();
-    final combined = [...fromRoles, ...fromEmployees.where((s) => !fromRoles.contains(s))]..sort();
-    return combined;
+  /// Коды должностей: enum + все роли из карточек сотрудников (confectioner и т.д.).
+  List<String> _healthPositionRoleCodes(LocalizationService loc) {
+    final codes = <String>{
+      for (final r in EmployeeRole.values) r.code,
+      for (final e in _healthEmployees)
+        for (final role in e.roles) role,
+    };
+    final list = codes.toList()
+      ..sort((a, b) => loc
+          .roleDisplayName(a)
+          .toLowerCase()
+          .compareTo(loc.roleDisplayName(b).toLowerCase()));
+    return list;
   }
 
-  Employee? _healthEmployeeById(String id) => _healthEmployees.cast<Employee?>().firstWhere((e) => e?.id == id, orElse: () => null);
+  Employee? _healthEmployeeById(String id) => _healthEmployees
+      .cast<Employee?>()
+      .firstWhere((e) => e?.id == id, orElse: () => null);
 
-  String _healthPositionDisplayForRow(_HealthHygieneRow row) {
-    final emp = _healthEmployeeById(row.employeeId);
-    if (row.positionIsCustom && row.positionOverride != null && row.positionOverride!.isNotEmpty) return row.positionOverride!;
-    return emp?.roleDisplayName ?? '';
-  }
-
-  Widget _healthPositionDropdownForRow(int index) {
+  Widget _healthPositionDropdownForRow(int index, LocalizationService loc) {
     final row = _healthRows[index];
-    final positionOptions = _healthPositionOptions;
-    final currentDisplay = _healthPositionDisplayForRow(row);
-    final effectiveValue = row.positionIsCustom
-        ? _customPositionValue
-        : (positionOptions.contains(currentDisplay) ? currentDisplay : (positionOptions.isNotEmpty ? positionOptions.first : _customPositionValue));
+    final codes = _healthPositionRoleCodes(loc);
+    final String effectiveValue;
+    if (row.positionIsCustom) {
+      effectiveValue = _customPositionValue;
+    } else {
+      final o = (row.positionOverride ?? '').trim();
+      if (o.isNotEmpty && codes.contains(o)) {
+        effectiveValue = o;
+      } else {
+        final emp = _healthEmployeeById(row.employeeId);
+        final c = emp != null && emp.roles.isNotEmpty ? emp.roles.first : null;
+        effectiveValue = (c != null && codes.contains(c))
+            ? c
+            : (codes.isNotEmpty ? codes.first : _customPositionValue);
+      }
+    }
     return DropdownButtonHideUnderline(
       child: DropdownButton<String>(
         value: effectiveValue,
         isExpanded: true,
         isDense: true,
         items: [
-          ...positionOptions.map((r) => DropdownMenuItem(value: r, child: Text(r, overflow: TextOverflow.ellipsis))),
+          ...codes.map(
+            (code) => DropdownMenuItem(
+              value: code,
+              child: Text(
+                loc.roleDisplayName(code),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
           DropdownMenuItem(
             value: _customPositionValue,
             child: Row(
               children: [
-                Icon(Icons.add_circle_outline, size: 18, color: Theme.of(context).colorScheme.primary),
+                Icon(Icons.add_circle_outline,
+                    size: 18, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 6),
-                Text(row.positionIsCustom && (row.positionOverride ?? '').isNotEmpty ? 'Свой вариант: ${row.positionOverride}' : 'Свой вариант', overflow: TextOverflow.ellipsis),
+                Text(
+                    row.positionIsCustom &&
+                            (row.positionOverride ?? '').isNotEmpty
+                        ? 'Свой вариант: ${row.positionOverride}'
+                        : 'Свой вариант',
+                    overflow: TextOverflow.ellipsis),
               ],
             ),
           ),
         ],
         onChanged: (v) async {
           if (v == _customPositionValue) {
-            final text = await _showCustomPositionDialog(initial: row.positionOverride);
-            if (text != null && mounted) setState(() {
-              row.positionOverride = text;
-              row.positionIsCustom = true;
-            });
+            final text =
+                await _showCustomPositionDialog(initial: row.positionOverride);
+            if (text != null && mounted) {
+              setState(() {
+                row.positionOverride = text;
+                row.positionIsCustom = true;
+              });
+            }
             return;
           }
-          if (v != null) setState(() {
-            row.positionOverride = v;
-            row.positionIsCustom = false;
-          });
+          if (v != null) {
+            setState(() {
+              row.positionOverride = v;
+              row.positionIsCustom = false;
+            });
+          }
         },
       ),
     );
@@ -665,12 +741,16 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             border: OutlineInputBorder(),
           ),
           autofocus: true,
-          onSubmitted: (_) => Navigator.of(ctx).pop(ctrl.text.trim().isEmpty ? null : ctrl.text.trim()),
+          onSubmitted: (_) => Navigator.of(ctx)
+              .pop(ctrl.text.trim().isEmpty ? null : ctrl.text.trim()),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel)),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel)),
           FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim().isEmpty ? null : ctrl.text.trim()),
+            onPressed: () => Navigator.of(ctx)
+                .pop(ctrl.text.trim().isEmpty ? null : ctrl.text.trim()),
             child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
           ),
         ],
@@ -683,10 +763,13 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   Widget _finishedProductPickerCell(LocalizationService loc) {
     _controllers['product'] ??= TextEditingController();
     final controller = _controllers['product']!;
-    final title = controller.text.isNotEmpty ? controller.text : (loc.t('haccp_product') ?? 'Продукция / Сырьё');
+    final title = controller.text.isNotEmpty
+        ? controller.text
+        : (loc.t('haccp_product') ?? 'Продукция / Сырьё');
     return InkWell(
       onTap: () async {
-        if (_finishedBrakerageTechCards.isEmpty && _finishedBrakerageProducts.isEmpty) {
+        if (_finishedBrakerageTechCards.isEmpty &&
+            _finishedBrakerageProducts.isEmpty) {
           await _loadFinishedBrakerageChoices();
         }
         final allChoices = _buildFinishedBrakerageChoices(loc);
@@ -700,9 +783,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               filtered = q.isEmpty
                   ? List.of(allChoices)
                   : allChoices
-                      .where((item) => item.searchTokens.toLowerCase().contains(q))
+                      .where(
+                          (item) => item.searchTokens.toLowerCase().contains(q))
                       .toList();
             }
+
             applyFilter();
             return StatefulBuilder(
               builder: (ctx, setStateDialog) {
@@ -749,7 +834,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(ctx).pop(),
-                      child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+                      child:
+                          Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
                     ),
                   ],
                 );
@@ -792,7 +878,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     final dateStr = DateFormat('dd.MM.yyyy').format(DateTime.now());
     final currentEmp = context.watch<AccountManagerSupabase>().currentEmployee;
     final creatorName = currentEmp != null
-        ? (currentEmp.surname != null ? '${currentEmp.surname} ${currentEmp.fullName}' : currentEmp.fullName)
+        ? (currentEmp.surname != null
+            ? '${currentEmp.surname} ${currentEmp.fullName}'
+            : currentEmp.fullName)
         : '—';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -818,44 +906,70 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 _tableHeaderCell('Дата'),
                 _tableHeaderCell('Ф. И. О. работника (последнее при наличии)'),
                 _tableHeaderCell('Должность'),
-                _tableHeaderCell('Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов семьи'),
-                _tableHeaderCell('Подпись сотрудника об отсутствии заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук и открытых поверхностей тела'),
-                _tableHeaderCell('Результат осмотра медицинским работником (ответственным лицом) (допущен / отстранен)'),
-                _tableHeaderCell('Подпись медицинского работника (ответственного лица)'),
+                _tableHeaderCell(
+                    'Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов семьи'),
+                _tableHeaderCell(
+                    'Подпись сотрудника об отсутствии заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук и открытых поверхностей тела'),
+                _tableHeaderCell(
+                    'Результат осмотра медицинским работником (ответственным лицом) (допущен / отстранен)'),
+                _tableHeaderCell(
+                    'Подпись медицинского работника (ответственного лица)'),
                 _tableHeaderCell(''),
               ],
             ),
             ...List.generate(_healthRows.length, (i) {
               final row = _healthRows[i];
               final emp = _healthEmployeeById(row.employeeId);
-              final name = emp != null ? (emp.surname != null ? '${emp.surname} ${emp.fullName}' : emp.fullName) : '—';
+              final name = emp != null
+                  ? (emp.surname != null
+                      ? '${emp.surname} ${emp.fullName}'
+                      : emp.fullName)
+                  : '—';
               return TableRow(
                 children: [
                   _tableCell(Text('${i + 1}')),
                   _tableCell(Text(dateStr)),
                   _tableCell(Text(name)),
-                  _tableCell(_healthPositionDropdownForRow(i)),
+                  _tableCell(_healthPositionDropdownForRow(i, loc)),
                   _tableCell(Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Switch(value: row.statusOk, onChanged: (v) => setState(() => row.statusOk = v ?? true)),
-                      Text(row.statusOk ? 'Да' : 'Нет', style: TextStyle(fontSize: 12, color: row.statusOk ? Colors.green : Colors.orange)),
+                      Switch(
+                          value: row.statusOk,
+                          onChanged: (v) =>
+                              setState(() => row.statusOk = v ?? true)),
+                      Text(row.statusOk ? 'Да' : 'Нет',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color:
+                                  row.statusOk ? Colors.green : Colors.orange)),
                     ],
                   )),
                   _tableCell(Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Switch(value: row.status2Ok, onChanged: (v) => setState(() => row.status2Ok = v ?? true)),
-                      Text(row.status2Ok ? 'Да' : 'Нет', style: TextStyle(fontSize: 12, color: row.status2Ok ? Colors.green : Colors.orange)),
+                      Switch(
+                          value: row.status2Ok,
+                          onChanged: (v) =>
+                              setState(() => row.status2Ok = v ?? true)),
+                      Text(row.status2Ok ? 'Да' : 'Нет',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: row.status2Ok
+                                  ? Colors.green
+                                  : Colors.orange)),
                     ],
                   )),
-                  _tableCell(Text(row.statusOk ? 'допущен' : 'отстранен', style: const TextStyle(fontSize: 12))),
-                  _tableCell(Text(creatorName, style: const TextStyle(fontSize: 11))),
+                  _tableCell(Text(row.statusOk ? 'допущен' : 'отстранен',
+                      style: const TextStyle(fontSize: 12))),
+                  _tableCell(
+                      Text(creatorName, style: const TextStyle(fontSize: 11))),
                   _tableCell(IconButton(
                     icon: const Icon(Icons.remove_circle_outline, size: 22),
                     onPressed: () => setState(() => _healthRows.removeAt(i)),
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    constraints:
+                        const BoxConstraints(minWidth: 32, minHeight: 32),
                   )),
                 ],
               );
@@ -866,25 +980,36 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         OutlinedButton.icon(
           onPressed: () async {
             final usedIds = _healthRows.map((r) => r.employeeId).toSet();
-            final available = _healthEmployees.where((e) => !usedIds.contains(e.id)).toList();
+            final available =
+                _healthEmployees.where((e) => !usedIds.contains(e.id)).toList();
             if (available.isEmpty) {
-              if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(loc.t('haccp_all_employees_added') ?? 'Все сотрудники уже добавлены')),
-              );
+              if (mounted)
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                      content: Text(loc.t('haccp_all_employees_added') ??
+                          'Все сотрудники уже добавлены')),
+                );
               return;
             }
             final picked = await showDialog<String>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: Text(loc.t('haccp_add_employee_row') ?? 'Добавить сотрудника'),
+                title: Text(
+                    loc.t('haccp_add_employee_row') ?? 'Добавить сотрудника'),
                 content: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: available.map((e) {
-                      final name = e.surname != null ? '${e.surname} ${e.fullName}' : e.fullName;
+                      final name = e.surname != null
+                          ? '${e.surname} ${e.fullName}'
+                          : e.fullName;
                       return ListTile(
                         title: Text(name),
-                        subtitle: Text(e.roleDisplayName),
+                        subtitle: Text(
+                          e.roles.isNotEmpty
+                              ? loc.roleDisplayName(e.roles.first)
+                              : '',
+                        ),
                         onTap: () => Navigator.of(ctx).pop(e.id),
                       );
                     }).toList(),
@@ -892,9 +1017,15 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 ),
               ),
             );
-            if (picked != null && mounted) setState(() {
-              _healthRows.add(_HealthHygieneRow(employeeId: picked, positionOverride: null, positionIsCustom: false, statusOk: true, status2Ok: true));
-            });
+            if (picked != null && mounted)
+              setState(() {
+                _healthRows.add(_HealthHygieneRow(
+                    employeeId: picked,
+                    positionOverride: null,
+                    positionIsCustom: false,
+                    statusOk: true,
+                    status2Ok: true));
+              });
           },
           icon: const Icon(Icons.add),
           label: Text(loc.t('haccp_add_row') ?? 'Добавить строку'),
@@ -965,7 +1096,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           padding: const EdgeInsets.only(bottom: 8),
           child: _savedOptionTextField(
             key: 'warehouse_premises',
-            label: loc.t('haccp_warehouse_premises') ?? 'Наименование складского помещения',
+            label: loc.t('haccp_warehouse_premises') ??
+                'Наименование складского помещения',
             hintText: 'Например: Склад сухих продуктов, Овощной цех',
             options: _presetOptions['warehouse_premises'] ?? const [],
             presetFieldKey: 'warehouse_premises',
@@ -997,7 +1129,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             TableRow(
               children: [
                 _tableCell(const Text('1')),
-                _tableCell(Text(DateFormat('dd.MM.yyyy').format(DateTime.now()))),
+                _tableCell(
+                    Text(DateFormat('dd.MM.yyyy').format(DateTime.now()))),
                 _tableCell(Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1074,10 +1207,13 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         ),
         TableRow(
           children: [
-            _tableCell(Text(DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()))),
+            _tableCell(
+                Text(DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()))),
             _tableCell(_textField('time_brakerage', 'Время (например 12:00)')),
             _tableCell(_finishedProductPickerCell(loc)),
-            _tableCell(_textField('result', loc.t('haccp_result') ?? 'Результат оценки', multiline: true)),
+            _tableCell(_textField(
+                'result', loc.t('haccp_result') ?? 'Результат оценки',
+                multiline: true)),
             _tableCell(_approvalSelector()),
             _tableCell(_signatureFromAccount()),
             _tableCell(_textField('weighing_result', 'Взвешивание')),
@@ -1123,8 +1259,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         ),
         TableRow(
           children: [
-            _tableCell(Text(DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()))),
-            _tableCell(_textField('product', loc.t('haccp_product') ?? 'Наименование')),
+            _tableCell(
+                Text(DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()))),
+            _tableCell(_textField(
+                'product', loc.t('haccp_product') ?? 'Наименование')),
             _tableCell(_savedOptionTextField(
               key: 'packaging',
               label: 'Фасовка',
@@ -1137,9 +1275,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               options: _presetOptions['manufacturer_supplier'] ?? const [],
               presetFieldKey: 'manufacturer_supplier',
             )),
-            _tableCell(_textField('quantity_kg', 'кг/л/шт', keyboardType: TextInputType.number)),
+            _tableCell(_textField('quantity_kg', 'кг/л/шт',
+                keyboardType: TextInputType.number)),
             _tableCell(_textField('document_number', '№ док.')),
-            _tableCell(_textField('result', loc.t('haccp_result') ?? 'Оценка', multiline: true)),
+            _tableCell(_textField('result', loc.t('haccp_result') ?? 'Оценка',
+                multiline: true)),
             _tableCell(_savedOptionTextField(
               key: 'storage_conditions',
               label: 'Условия, срок',
@@ -1156,13 +1296,63 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 );
                 if (d != null) setState(() => _dateSold = d);
               },
-              child: Text(_dateSold != null ? DateFormat('dd.MM.yyyy').format(_dateSold!) : 'Выбрать'),
+              child: Text(_dateSold != null
+                  ? DateFormat('dd.MM.yyyy').format(_dateSold!)
+                  : 'Выбрать'),
             )),
             _tableCell(_signatureFromAccount()),
             _tableCell(_textField('note', loc.t('haccp_note') ?? 'Прим.')),
           ],
         ),
       ],
+    );
+  }
+
+  /// Выбор сотрудника для журнала медкнижек (десктоп): одно поле «Ф. И. О.», без дубляжа с отдельным TextField.
+  Widget _medBookEmployeeDropdown(LocalizationService loc) {
+    if (_formEmployees.isEmpty) {
+      return _textField('med_book_employee_name', 'Ф. И. О.');
+    }
+    final selected =
+        _formEmployees.where((e) => e.id == _medBookEmployeeId).firstOrNull;
+    return DropdownButtonFormField<Employee?>(
+      value: selected,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        labelText: 'Ф. И. О.',
+        border: OutlineInputBorder(),
+        isDense: true,
+      ),
+      items: _formEmployees
+          .map(
+            (e) => DropdownMenuItem<Employee?>(
+              value: e,
+              child: Text(
+                e.surname != null ? '${e.surname} ${e.fullName}' : e.fullName,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: (e) {
+        setState(() {
+          _medBookEmployeeId = e?.id;
+          _setText('med_book_employee_id', e?.id ?? '');
+          if (e != null) {
+            _setText(
+              'med_book_employee_name',
+              e.surname != null ? '${e.surname} ${e.fullName}' : e.fullName,
+            );
+            _setText(
+              'med_book_position',
+              e.roles.isNotEmpty ? loc.roleDisplayName(e.roles.first) : '',
+            );
+          } else {
+            _setText('med_book_employee_name', '');
+            _setText('med_book_position', '');
+          }
+        });
+      },
     );
   }
 
@@ -1194,37 +1384,23 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         TableRow(
           children: [
             _tableCell(const Text('1')),
-            _tableCell(Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _employeeSelectorDropdown(
-                  employees: _formEmployees,
-                  label: 'Сотрудник',
-                  onSelected: (e) {
-                    if (e != null) {
-                      _setText('med_book_employee_name', e.surname != null ? '${e.surname} ${e.fullName}' : e.fullName);
-                      _setText('med_book_position', e.roleDisplayName);
-                      setState(() {});
-                    }
-                  },
-                ),
-                _textField('med_book_employee_name', 'Ф. И. О.'),
-              ],
-            )),
+            _tableCell(_medBookEmployeeDropdown(loc)),
             _tableCell(_textField('med_book_position', 'Должность')),
             _tableCell(_textField('med_book_number', 'Номер медкнижки')),
             _tableCell(InkWell(
               onTap: () async {
                 final d = await showDatePicker(
                   context: context,
-                  initialDate: _medBookValidUntil ?? DateTime.now().add(const Duration(days: 365)),
+                  initialDate: _medBookValidUntil ??
+                      DateTime.now().add(const Duration(days: 365)),
                   firstDate: DateTime(2020),
                   lastDate: DateTime.now().add(const Duration(days: 3650)),
                 );
                 if (d != null) setState(() => _medBookValidUntil = d);
               },
-              child: Text(_medBookValidUntil != null ? DateFormat('dd.MM.yyyy').format(_medBookValidUntil!) : 'Выбрать дату'),
+              child: Text(_medBookValidUntil != null
+                  ? DateFormat('dd.MM.yyyy').format(_medBookValidUntil!)
+                  : 'Выбрать дату'),
             )),
             _tableCell(Column(
               mainAxisSize: MainAxisSize.min,
@@ -1240,7 +1416,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                     );
                     if (d != null) setState(() => _medBookIssuedAt = d);
                   },
-                  child: Text(_medBookIssuedAt != null ? DateFormat('dd.MM.yyyy').format(_medBookIssuedAt!) : 'Дата получения'),
+                  child: Text(_medBookIssuedAt != null
+                      ? DateFormat('dd.MM.yyyy').format(_medBookIssuedAt!)
+                      : 'Дата получения'),
                 ),
                 _signatureFromAccount(),
               ],
@@ -1259,7 +1437,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                     );
                     if (d != null) setState(() => _medBookReturnedAt = d);
                   },
-                  child: Text(_medBookReturnedAt != null ? DateFormat('dd.MM.yyyy').format(_medBookReturnedAt!) : 'Дата возврата'),
+                  child: Text(_medBookReturnedAt != null
+                      ? DateFormat('dd.MM.yyyy').format(_medBookReturnedAt!)
+                      : 'Дата возврата'),
                 ),
                 _signatureFromAccount(),
               ],
@@ -1313,7 +1493,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               options: _presetOptions['oil_name'] ?? const [],
               presetFieldKey: 'oil_name',
             )),
-            _tableCell(_textField('organoleptic_start', 'Оценка на начало', multiline: true)),
+            _tableCell(_textField('organoleptic_start', 'Оценка на начало',
+                multiline: true)),
             _tableCell(_savedOptionTextField(
               key: 'frying_equipment_type',
               label: 'Тип оборудования',
@@ -1327,9 +1508,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               presetFieldKey: 'frying_product_type',
             )),
             _tableCell(_textField('frying_end_time', 'Время (например 14:00)')),
-            _tableCell(_textField('organoleptic_end', 'Оценка по окончании', multiline: true)),
-            _tableCell(_textField('carry_over_kg', 'кг', keyboardType: TextInputType.number)),
-            _tableCell(_textField('utilized_kg', 'кг', keyboardType: TextInputType.number)),
+            _tableCell(_textField('organoleptic_end', 'Оценка по окончании',
+                multiline: true)),
+            _tableCell(_textField('carry_over_kg', 'кг',
+                keyboardType: TextInputType.number)),
+            _tableCell(_textField('utilized_kg', 'кг',
+                keyboardType: TextInputType.number)),
             _tableCell(_signatureFromAccount()),
           ],
         ),
@@ -1346,14 +1530,27 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: _employeeSelectorDropdown(
+            loc: loc,
             employees: _formEmployees,
             label: 'Сотрудник',
             onSelected: (e) {
               if (e != null) {
-                _setText('med_exam_employee_name', e.surname != null ? '${e.surname} ${e.fullName}' : e.fullName);
-                _setText('med_exam_dob', e.birthday != null ? DateFormat('dd.MM.yyyy').format(e.birthday!) : '');
-                _setText('med_exam_position', e.roleDisplayName);
-                _setText('med_exam_department', e.employeeDepartment?.displayName ?? e.department);
+                _setText(
+                    'med_exam_employee_name',
+                    e.surname != null
+                        ? '${e.surname} ${e.fullName}'
+                        : e.fullName);
+                _setText(
+                    'med_exam_dob',
+                    e.birthday != null
+                        ? DateFormat('dd.MM.yyyy').format(e.birthday!)
+                        : '');
+                _setText(
+                  'med_exam_position',
+                  e.roles.isNotEmpty ? loc.roleDisplayName(e.roles.first) : '',
+                );
+                _setText('med_exam_department',
+                    e.employeeDepartment?.displayName ?? e.department);
                 setState(() {});
               }
             },
@@ -1363,41 +1560,86 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           columnWidths: const {0: FlexColumnWidth(1), 1: FlexColumnWidth(1)},
           border: TableBorder.all(color: Theme.of(context).dividerColor),
           children: [
-            TableRow(children: [_tableHeaderCell('Ф. И. О.'), _tableHeaderCell('Возраст (дата рождения)')]),
-            TableRow(children: [_tableCell(_textField('med_exam_employee_name', 'Ф. И. О.')), _tableCell(_textField('med_exam_dob', 'Дата рождения'))]),
-            TableRow(children: [_tableHeaderCell('Пол'), _tableHeaderCell('Должность')]),
-            TableRow(children: [_tableCell(_textField('med_exam_gender', 'Пол')), _tableCell(_textField('med_exam_position', 'Должность'))]),
-            TableRow(children: [_tableHeaderCell('Структурное подразделение'), _tableHeaderCell('Дата приёма на работу')]),
+            TableRow(children: [
+              _tableHeaderCell('Ф. И. О.'),
+              _tableHeaderCell('Возраст (дата рождения)')
+            ]),
+            TableRow(children: [
+              _tableCell(_textField('med_exam_employee_name', 'Ф. И. О.')),
+              _tableCell(_textField('med_exam_dob', 'Дата рождения'))
+            ]),
+            TableRow(children: [
+              _tableHeaderCell('Пол'),
+              _tableHeaderCell('Должность')
+            ]),
+            TableRow(children: [
+              _tableCell(_textField('med_exam_gender', 'Пол')),
+              _tableCell(_textField('med_exam_position', 'Должность'))
+            ]),
+            TableRow(children: [
+              _tableHeaderCell('Структурное подразделение'),
+              _tableHeaderCell('Дата приёма на работу')
+            ]),
             TableRow(children: [
               _tableCell(_textField('med_exam_department', 'Подразделение')),
-              _tableCell(_datePickerCell('med_exam_hire_date', _medExamHireDate, (d) => setState(() => _medExamHireDate = d))),
+              _tableCell(_datePickerCell('med_exam_hire_date', _medExamHireDate,
+                  (d) => setState(() => _medExamHireDate = d))),
             ]),
           ],
         ),
         const SizedBox(height: 12),
-        Text('Медицинский осмотр', style: Theme.of(context).textTheme.titleSmall),
+        Text('Медицинский осмотр',
+            style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 4),
         Table(
           columnWidths: const {0: FlexColumnWidth(1), 1: FlexColumnWidth(1)},
           border: TableBorder.all(color: Theme.of(context).dividerColor),
           children: [
-            TableRow(children: [_tableHeaderCell('Вид (предварительный/периодический)'), _tableHeaderCell('ЛПУ')]),
-            TableRow(children: [_tableCell(_textField('med_exam_type', 'Вид')), _tableCell(_textField('med_exam_institution', 'Лечебное учреждение'))]),
-            TableRow(children: [_tableHeaderCell('Вредный фактор №90'), _tableHeaderCell('Вредный фактор №83')]),
-            TableRow(children: [_tableCell(_textField('med_exam_harmful_1', '№ по приказу 90')), _tableCell(_textField('med_exam_harmful_2', '№ по приказу 83'))]),
-            TableRow(children: [_tableHeaderCell('Дата прохождения'), _tableHeaderCell('Заключение')]),
             TableRow(children: [
-              _tableCell(_datePickerCell('med_exam_date', _medExamDate, (d) => setState(() => _medExamDate = d))),
+              _tableHeaderCell('Вид (предварительный/периодический)'),
+              _tableHeaderCell('ЛПУ')
+            ]),
+            TableRow(children: [
+              _tableCell(_textField('med_exam_type', 'Вид')),
+              _tableCell(
+                  _textField('med_exam_institution', 'Лечебное учреждение'))
+            ]),
+            TableRow(children: [
+              _tableHeaderCell('Вредный фактор №90'),
+              _tableHeaderCell('Вредный фактор №83')
+            ]),
+            TableRow(children: [
+              _tableCell(_textField('med_exam_harmful_1', '№ по приказу 90')),
+              _tableCell(_textField('med_exam_harmful_2', '№ по приказу 83'))
+            ]),
+            TableRow(children: [
+              _tableHeaderCell('Дата прохождения'),
+              _tableHeaderCell('Заключение')
+            ]),
+            TableRow(children: [
+              _tableCell(_datePickerCell('med_exam_date', _medExamDate,
+                  (d) => setState(() => _medExamDate = d))),
               _tableCell(_textField('med_exam_conclusion', 'Заключение')),
             ]),
-            TableRow(children: [_tableHeaderCell('Решение работодателя'), _tableHeaderCell('Дата следующего осмотра')]),
             TableRow(children: [
-              _tableCell(_textField('med_exam_employer_decision', 'Допущен/отстранён/переведён/уволен')),
-              _tableCell(_datePickerCell('med_exam_next_date', _medExamNextDate, (d) => setState(() => _medExamNextDate = d))),
+              _tableHeaderCell('Решение работодателя'),
+              _tableHeaderCell('Дата следующего осмотра')
             ]),
-            TableRow(children: [_tableHeaderCell('Дата исключения из списков'), _tableHeaderCell('Примечание')]),
             TableRow(children: [
-              _tableCell(_datePickerCell('med_exam_exclusion_date', _medExamExclusionDate, (d) => setState(() => _medExamExclusionDate = d))),
+              _tableCell(_textField('med_exam_employer_decision',
+                  'Допущен/отстранён/переведён/уволен')),
+              _tableCell(_datePickerCell('med_exam_next_date', _medExamNextDate,
+                  (d) => setState(() => _medExamNextDate = d))),
+            ]),
+            TableRow(children: [
+              _tableHeaderCell('Дата исключения из списков'),
+              _tableHeaderCell('Примечание')
+            ]),
+            TableRow(children: [
+              _tableCell(_datePickerCell(
+                  'med_exam_exclusion_date',
+                  _medExamExclusionDate,
+                  (d) => setState(() => _medExamExclusionDate = d))),
               _tableCell(_textField('med_exam_note', 'Примечание')),
             ]),
           ],
@@ -1406,13 +1648,22 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     );
   }
 
-  Widget _datePickerCell(String key, DateTime? value, void Function(DateTime) onDate) {
+  Widget _datePickerCell(
+      String key, DateTime? value, void Function(DateTime) onDate) {
     return InkWell(
       onTap: () async {
-        final d = await showDatePicker(context: context, initialDate: value ?? DateTime.now(), firstDate: DateTime(2020), lastDate: DateTime.now().add(const Duration(days: 3650)));
+        final d = await showDatePicker(
+            context: context,
+            initialDate: value ?? DateTime.now(),
+            firstDate: DateTime(2020),
+            lastDate: DateTime.now().add(const Duration(days: 3650)));
         if (d != null) onDate(d);
       },
-      child: Padding(padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8), child: Text(value != null ? DateFormat('dd.MM.yyyy').format(value) : 'Выбрать дату')),
+      child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+          child: Text(value != null
+              ? DateFormat('dd.MM.yyyy').format(value)
+              : 'Выбрать дату')),
     );
   }
 
@@ -1420,74 +1671,130 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Расчёт потребности в дезинфицирующих средствах', style: Theme.of(context).textTheme.titleSmall),
+        Text('Расчёт потребности в дезинфицирующих средствах',
+            style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 4),
+        // Без фиксированной ширины Table внутри горизонтального scroll получает
+        // неограниченный maxWidth — FlexColumnWidth схлопывает колонки (текст «в столбик»).
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: Table(
-            columnWidths: const {
-              0: FlexColumnWidth(0.6), 1: FlexColumnWidth(0.8), 2: FlexColumnWidth(0.5), 3: FlexColumnWidth(0.5),
-              4: FlexColumnWidth(0.4), 5: FlexColumnWidth(0.5), 6: FlexColumnWidth(0.6), 7: FlexColumnWidth(0.5),
-              8: FlexColumnWidth(0.5), 9: FlexColumnWidth(0.5), 10: FlexColumnWidth(0.5), 11: FlexColumnWidth(0.5), 12: FlexColumnWidth(0.5),
-            },
-            border: TableBorder.all(color: Theme.of(context).dividerColor),
-            children: [
-              TableRow(children: [
-                _tableHeaderCell('Объект'), _tableHeaderCell('Кол-во'), _tableHeaderCell('Площадь м²'), _tableHeaderCell('Вид Т/Г'),
-                _tableHeaderCell('Кратность/мес'), _tableHeaderCell('Дезсредство'), _tableHeaderCell('Конц.%'), _tableHeaderCell('Расход/м²'),
-                _tableHeaderCell('Раствор на 1 обр.'), _tableHeaderCell('Потребность 1 обр.'), _tableHeaderCell('В месяц'), _tableHeaderCell('В год'),
-              ]),
-              TableRow(children: [
-                _tableCell(_savedOptionTextField(
-                  key: 'disinf_object_name',
-                  label: 'Объект',
-                  options: _presetOptions['disinf_object_name'] ?? const [],
-                  presetFieldKey: 'disinf_object_name',
-                )),
-                _tableCell(_textField('disinf_object_count', 'Кол-во', keyboardType: TextInputType.number)),
-                _tableCell(_textField('disinf_area_sqm', 'м²', keyboardType: TextInputType.number)),
-                _tableCell(_savedOptionTextField(
-                  key: 'disinf_treatment_type',
-                  label: 'Т/Г',
-                  options: _presetOptions['disinf_treatment_type'] ?? const [],
-                  presetFieldKey: 'disinf_treatment_type',
-                )),
-                _tableCell(_textField('disinf_frequency', 'Кратность', keyboardType: TextInputType.number)),
-                _tableCell(_savedOptionTextField(
-                  key: 'disinf_agent_name',
-                  label: 'Дезсредство',
-                  options: _presetOptions['disinf_agent_name'] ?? const [],
-                  presetFieldKey: 'disinf_agent_name',
-                )),
-                _tableCell(_textField('disinf_concentration_pct', '%')),
-                _tableCell(_textField('disinf_consumption_per_sqm', 'Расход', keyboardType: TextInputType.number)),
-                _tableCell(_textField('disinf_solution_per_treatment', 'л/кг', keyboardType: TextInputType.number)),
-                _tableCell(_textField('disinf_need_per_treatment', 'л/кг', keyboardType: TextInputType.number)),
-                _tableCell(_textField('disinf_need_per_month', 'л/кг', keyboardType: TextInputType.number)),
-                _tableCell(_textField('disinf_need_per_year', 'л/кг', keyboardType: TextInputType.number)),
-              ]),
-            ],
+          child: SizedBox(
+            width: 1280,
+            child: Table(
+              columnWidths: const {
+                0: FlexColumnWidth(0.6),
+                1: FlexColumnWidth(0.8),
+                2: FlexColumnWidth(0.5),
+                3: FlexColumnWidth(0.5),
+                4: FlexColumnWidth(0.4),
+                5: FlexColumnWidth(0.5),
+                6: FlexColumnWidth(0.6),
+                7: FlexColumnWidth(0.5),
+                8: FlexColumnWidth(0.5),
+                9: FlexColumnWidth(0.5),
+                10: FlexColumnWidth(0.5),
+                11: FlexColumnWidth(0.5),
+              },
+              border: TableBorder.all(color: Theme.of(context).dividerColor),
+              children: [
+                TableRow(children: [
+                  _tableHeaderCell('Объект'),
+                  _tableHeaderCell('Кол-во'),
+                  _tableHeaderCell('Площадь м²'),
+                  _tableHeaderCell('Вид Т/Г'),
+                  _tableHeaderCell('Кратность/мес'),
+                  _tableHeaderCell('Дезсредство'),
+                  _tableHeaderCell('Конц.%'),
+                  _tableHeaderCell('Расход/м²'),
+                  _tableHeaderCell('Раствор на 1 обр.'),
+                  _tableHeaderCell('Потребность 1 обр.'),
+                  _tableHeaderCell('В месяц'),
+                  _tableHeaderCell('В год'),
+                ]),
+                TableRow(children: [
+                  _tableCell(_savedOptionTextField(
+                    key: 'disinf_object_name',
+                    label: 'Объект',
+                    options: _presetOptions['disinf_object_name'] ?? const [],
+                    presetFieldKey: 'disinf_object_name',
+                  )),
+                  _tableCell(_textField('disinf_object_count', 'Кол-во',
+                      keyboardType: TextInputType.number)),
+                  _tableCell(_textField('disinf_area_sqm', 'м²',
+                      keyboardType: TextInputType.number)),
+                  _tableCell(_savedOptionTextField(
+                    key: 'disinf_treatment_type',
+                    label: 'Т/Г',
+                    options:
+                        _presetOptions['disinf_treatment_type'] ?? const [],
+                    presetFieldKey: 'disinf_treatment_type',
+                  )),
+                  _tableCell(_textField('disinf_frequency', 'Кратность',
+                      keyboardType: TextInputType.number)),
+                  _tableCell(_savedOptionTextField(
+                    key: 'disinf_agent_name',
+                    label: 'Дезсредство',
+                    options: _presetOptions['disinf_agent_name'] ?? const [],
+                    presetFieldKey: 'disinf_agent_name',
+                  )),
+                  _tableCell(_textField('disinf_concentration_pct', '%')),
+                  _tableCell(_textField('disinf_consumption_per_sqm', 'Расход',
+                      keyboardType: TextInputType.number)),
+                  _tableCell(_textField('disinf_solution_per_treatment', 'л/кг',
+                      keyboardType: TextInputType.number)),
+                  _tableCell(_textField('disinf_need_per_treatment', 'л/кг',
+                      keyboardType: TextInputType.number)),
+                  _tableCell(_textField('disinf_need_per_month', 'л/кг',
+                      keyboardType: TextInputType.number)),
+                  _tableCell(_textField('disinf_need_per_year', 'л/кг',
+                      keyboardType: TextInputType.number)),
+                ]),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 12),
-        Text('Поступление дезинфицирующих средств', style: Theme.of(context).textTheme.titleSmall),
+        Text('Поступление дезинфицирующих средств',
+            style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 4),
         Table(
-          columnWidths: const {0: FlexColumnWidth(0.5), 1: FlexColumnWidth(1), 2: FlexColumnWidth(0.8), 3: FlexColumnWidth(0.6), 4: FlexColumnWidth(0.6), 5: FlexColumnWidth(1)},
+          columnWidths: const {
+            0: FlexColumnWidth(0.5),
+            1: FlexColumnWidth(1),
+            2: FlexColumnWidth(0.8),
+            3: FlexColumnWidth(0.6),
+            4: FlexColumnWidth(0.6),
+            5: FlexColumnWidth(1)
+          },
           border: TableBorder.all(color: Theme.of(context).dividerColor),
           children: [
-            TableRow(children: [_tableHeaderCell('Дата'), _tableHeaderCell('Наименование'), _tableHeaderCell('Счёт, дата'), _tableHeaderCell('Кол-во'), _tableHeaderCell('Срок годности'), _tableHeaderCell('Ответственный')]),
             TableRow(children: [
-              _tableCell(_datePickerCell('disinf_receipt_date', _disinfReceiptDate, (d) => setState(() => _disinfReceiptDate = d))),
+              _tableHeaderCell('Дата'),
+              _tableHeaderCell('Наименование'),
+              _tableHeaderCell('Счёт, дата'),
+              _tableHeaderCell('Кол-во'),
+              _tableHeaderCell('Срок годности'),
+              _tableHeaderCell('Ответственный')
+            ]),
+            TableRow(children: [
+              _tableCell(_datePickerCell(
+                  'disinf_receipt_date',
+                  _disinfReceiptDate,
+                  (d) => setState(() => _disinfReceiptDate = d))),
               _tableCell(_savedOptionTextField(
                 key: 'disinf_agent_name_receipt',
                 label: 'Наименование',
-                options: _presetOptions['disinf_agent_name_receipt'] ?? const [],
+                options:
+                    _presetOptions['disinf_agent_name_receipt'] ?? const [],
                 presetFieldKey: 'disinf_agent_name_receipt',
               )),
               _tableCell(_textField('disinf_invoice_number', '№ счёта')),
-              _tableCell(_textField('disinf_quantity', 'Кол-во', keyboardType: TextInputType.number)),
-              _tableCell(_datePickerCell('disinf_expiry_date', _disinfExpiryDate, (d) => setState(() => _disinfExpiryDate = d))),
+              _tableCell(_textField('disinf_quantity', 'Кол-во',
+                  keyboardType: TextInputType.number)),
+              _tableCell(_datePickerCell(
+                  'disinf_expiry_date',
+                  _disinfExpiryDate,
+                  (d) => setState(() => _disinfExpiryDate = d))),
               _tableCell(_signatureFromAccount()),
             ]),
           ],
@@ -1499,15 +1806,30 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   Widget _buildEquipmentWashingForm(LocalizationService loc) {
     return Table(
       columnWidths: const {
-        0: FlexColumnWidth(0.6), 1: FlexColumnWidth(0.5), 2: FlexColumnWidth(1.35), 3: FlexColumnWidth(1.1), 4: FlexColumnWidth(0.5),
-        5: FlexColumnWidth(0.9), 6: FlexColumnWidth(0.5), 7: FlexColumnWidth(0.5), 8: FlexColumnWidth(0.8), 9: FlexColumnWidth(0.8),
+        0: FlexColumnWidth(0.6),
+        1: FlexColumnWidth(0.5),
+        2: FlexColumnWidth(1.35),
+        3: FlexColumnWidth(1.1),
+        4: FlexColumnWidth(0.5),
+        5: FlexColumnWidth(0.9),
+        6: FlexColumnWidth(0.5),
+        7: FlexColumnWidth(0.5),
+        8: FlexColumnWidth(0.8),
+        9: FlexColumnWidth(0.8),
       },
       border: TableBorder.all(color: Theme.of(context).dividerColor),
       children: [
         TableRow(children: [
-          _tableHeaderCell('Дата'), _tableHeaderCell('Время мойки'), _tableHeaderCell('Оборудование'), _tableHeaderCell('Моющий раствор'),
-          _tableHeaderCell('Конц.%'), _tableHeaderCell('Дез. раствор'), _tableHeaderCell('Конц.%'), _tableHeaderCell('Ополаскивание t°'),
-          _tableHeaderCell('Ф.И.О. мойщика'), _tableHeaderCell('Контроль'),
+          _tableHeaderCell('Дата'),
+          _tableHeaderCell('Время мойки'),
+          _tableHeaderCell('Оборудование'),
+          _tableHeaderCell('Моющий раствор'),
+          _tableHeaderCell('Конц.%'),
+          _tableHeaderCell('Дез. раствор'),
+          _tableHeaderCell('Конц.%'),
+          _tableHeaderCell('Ополаскивание t°'),
+          _tableHeaderCell('Ф.И.О. мойщика'),
+          _tableHeaderCell('Контроль'),
         ]),
         TableRow(children: [
           _tableCell(Text(DateFormat('dd.MM.yyyy').format(DateTime.now()))),
@@ -1542,10 +1864,20 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
   Widget _buildGeneralCleaningForm(LocalizationService loc) {
     return Table(
-      columnWidths: const {0: FlexColumnWidth(0.5), 1: FlexColumnWidth(1.5), 2: FlexColumnWidth(1), 3: FlexColumnWidth(1)},
+      columnWidths: const {
+        0: FlexColumnWidth(0.5),
+        1: FlexColumnWidth(1.5),
+        2: FlexColumnWidth(1),
+        3: FlexColumnWidth(1)
+      },
       border: TableBorder.all(color: Theme.of(context).dividerColor),
       children: [
-        TableRow(children: [_tableHeaderCell('№'), _tableHeaderCell('Помещение / зона'), _tableHeaderCell('Дата проведения'), _tableHeaderCell('Ответственный')]),
+        TableRow(children: [
+          _tableHeaderCell('№'),
+          _tableHeaderCell('Помещение / зона'),
+          _tableHeaderCell('Дата проведения'),
+          _tableHeaderCell('Ответственный')
+        ]),
         TableRow(children: [
           _tableCell(const Text('1')),
           _tableCell(_savedOptionTextField(
@@ -1554,7 +1886,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             options: _presetOptions['gen_clean_premises'] ?? const [],
             presetFieldKey: 'gen_clean_premises',
           )),
-          _tableCell(_datePickerCell('gen_clean_date', _genCleanDate, (d) => setState(() => _genCleanDate = d))),
+          _tableCell(_datePickerCell('gen_clean_date', _genCleanDate,
+              (d) => setState(() => _genCleanDate = d))),
           _tableCell(_signatureFromAccount()),
         ]),
       ],
@@ -1563,10 +1896,24 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
   Widget _buildSieveFilterMagnetForm(LocalizationService loc) {
     return Table(
-      columnWidths: const {0: FlexColumnWidth(0.5), 1: FlexColumnWidth(1.2), 2: FlexColumnWidth(0.8), 3: FlexColumnWidth(0.8), 4: FlexColumnWidth(0.8), 5: FlexColumnWidth(0.8)},
+      columnWidths: const {
+        0: FlexColumnWidth(0.5),
+        1: FlexColumnWidth(1.2),
+        2: FlexColumnWidth(0.8),
+        3: FlexColumnWidth(0.8),
+        4: FlexColumnWidth(0.8),
+        5: FlexColumnWidth(0.8)
+      },
       border: TableBorder.all(color: Theme.of(context).dividerColor),
       children: [
-        TableRow(children: [_tableHeaderCell('№ сита/магнита'), _tableHeaderCell('Наименование / Расположение'), _tableHeaderCell('Состояние'), _tableHeaderCell('Дата очистки'), _tableHeaderCell('ФИО, Подпись'), _tableHeaderCell('Комментарии')]),
+        TableRow(children: [
+          _tableHeaderCell('№ сита/магнита'),
+          _tableHeaderCell('Наименование / Расположение'),
+          _tableHeaderCell('Состояние'),
+          _tableHeaderCell('Дата очистки'),
+          _tableHeaderCell('ФИО, Подпись'),
+          _tableHeaderCell('Комментарии')
+        ]),
         TableRow(children: [
           _tableCell(_textField('sieve_no', '№')),
           _tableCell(_savedOptionTextField(
@@ -1581,7 +1928,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             options: _presetOptions['sieve_condition'] ?? const [],
             presetFieldKey: 'sieve_condition',
           )),
-          _tableCell(_datePickerCell('sieve_cleaning_date', _sieveCleaningDate, (d) => setState(() => _sieveCleaningDate = d))),
+          _tableCell(_datePickerCell('sieve_cleaning_date', _sieveCleaningDate,
+              (d) => setState(() => _sieveCleaningDate = d))),
           _tableCell(_signatureFromAccount()),
           _tableCell(_textField('sieve_comments', 'Комментарии')),
         ]),
@@ -1631,9 +1979,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+            Text(title,
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w700)),
             const SizedBox(height: 10),
-            ...children.expand((w) => [w, const SizedBox(height: 10)]).toList()..removeLast(),
+            ...children.expand((w) => [w, const SizedBox(height: 10)]).toList()
+              ..removeLast(),
           ],
         ),
       ),
@@ -1657,7 +2008,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         Row(
           children: [
             Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
-            Text('${value.toStringAsFixed(fractionDigits)} $unit', style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+            Text('${value.toStringAsFixed(fractionDigits)} $unit',
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(fontWeight: FontWeight.w600)),
           ],
         ),
         Slider(
@@ -1675,9 +2028,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     switch (_logType) {
       case HaccpLogType.healthHygiene:
         final dateStr = DateFormat('dd.MM.yyyy').format(DateTime.now());
-        final currentEmp = context.watch<AccountManagerSupabase>().currentEmployee;
+        final currentEmp =
+            context.watch<AccountManagerSupabase>().currentEmployee;
         final creatorName = currentEmp != null
-            ? (currentEmp.surname != null ? '${currentEmp.surname} ${currentEmp.fullName}' : currentEmp.fullName)
+            ? (currentEmp.surname != null
+                ? '${currentEmp.surname} ${currentEmp.fullName}'
+                : currentEmp.fullName)
             : '—';
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1685,7 +2041,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             ...List.generate(_healthRows.length, (i) {
               final row = _healthRows[i];
               final emp = _healthEmployeeById(row.employeeId);
-              final name = emp != null ? (emp.surname != null ? '${emp.surname} ${emp.fullName}' : emp.fullName) : '—';
+              final name = emp != null
+                  ? (emp.surname != null
+                      ? '${emp.surname} ${emp.fullName}'
+                      : emp.fullName)
+                  : '—';
               return Card(
                 margin: const EdgeInsets.only(bottom: 10),
                 child: Padding(
@@ -1696,32 +2056,42 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                       Row(
                         children: [
                           Expanded(
-                            child: Text('$name · $dateStr', style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                            child: Text('$name · $dateStr',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w600)),
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete_outline),
-                            onPressed: () => setState(() => _healthRows.removeAt(i)),
+                            onPressed: () =>
+                                setState(() => _healthRows.removeAt(i)),
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
-                      _healthPositionDropdownForRow(i),
+                      _healthPositionDropdownForRow(i, loc),
                       const SizedBox(height: 8),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('Нет признаков инфекционных заболеваний (у сотрудника и семьи)'),
+                        title: const Text(
+                            'Нет признаков инфекционных заболеваний (у сотрудника и семьи)'),
                         value: row.statusOk,
                         onChanged: (v) => setState(() => row.statusOk = v),
                       ),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('Нет заболеваний ВДП и гнойничковых заболеваний кожи'),
+                        title: const Text(
+                            'Нет заболеваний ВДП и гнойничковых заболеваний кожи'),
                         value: row.status2Ok,
                         onChanged: (v) => setState(() => row.status2Ok = v),
                       ),
                       const Divider(),
-                      Text('Результат: ${row.statusOk ? 'допущен' : 'отстранён'}', style: const TextStyle(fontSize: 12)),
-                      Text('Ответственный: $creatorName', style: const TextStyle(fontSize: 12)),
+                      Text(
+                          'Результат: ${row.statusOk ? 'допущен' : 'отстранён'}',
+                          style: const TextStyle(fontSize: 12)),
+                      Text('Ответственный: $creatorName',
+                          style: const TextStyle(fontSize: 12)),
                     ],
                   ),
                 ),
@@ -1730,25 +2100,37 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             OutlinedButton.icon(
               onPressed: () async {
                 final usedIds = _healthRows.map((r) => r.employeeId).toSet();
-                final available = _healthEmployees.where((e) => !usedIds.contains(e.id)).toList();
+                final available = _healthEmployees
+                    .where((e) => !usedIds.contains(e.id))
+                    .toList();
                 if (available.isEmpty) {
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(loc.t('haccp_all_employees_added') ?? 'Все сотрудники уже добавлены')),
-                  );
+                  if (mounted)
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                          content: Text(loc.t('haccp_all_employees_added') ??
+                              'Все сотрудники уже добавлены')),
+                    );
                   return;
                 }
                 final picked = await showDialog<String>(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    title: Text(loc.t('haccp_add_employee_row') ?? 'Добавить сотрудника'),
+                    title: Text(loc.t('haccp_add_employee_row') ??
+                        'Добавить сотрудника'),
                     content: SingleChildScrollView(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: available.map((e) {
-                          final name = e.surname != null ? '${e.surname} ${e.fullName}' : e.fullName;
+                          final name = e.surname != null
+                              ? '${e.surname} ${e.fullName}'
+                              : e.fullName;
                           return ListTile(
                             title: Text(name),
-                            subtitle: Text(e.roleDisplayName),
+                            subtitle: Text(
+                              e.roles.isNotEmpty
+                                  ? loc.roleDisplayName(e.roles.first)
+                                  : '',
+                            ),
                             onTap: () => Navigator.of(ctx).pop(e.id),
                           );
                         }).toList(),
@@ -1756,9 +2138,15 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                     ),
                   ),
                 );
-                if (picked != null && mounted) setState(() {
-                  _healthRows.add(_HealthHygieneRow(employeeId: picked, positionOverride: null, positionIsCustom: false, statusOk: true, status2Ok: true));
-                });
+                if (picked != null && mounted)
+                  setState(() {
+                    _healthRows.add(_HealthHygieneRow(
+                        employeeId: picked,
+                        positionOverride: null,
+                        positionIsCustom: false,
+                        statusOk: true,
+                        status2Ok: true));
+                  });
               },
               icon: const Icon(Icons.add),
               label: Text(loc.t('haccp_add_row') ?? 'Добавить строку'),
@@ -1769,7 +2157,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         );
       case HaccpLogType.fridgeTemperature:
         return _mobileBlock(
-          loc.t(HaccpLogType.fridgeTemperature.displayNameKey) ?? HaccpLogType.fridgeTemperature.displayNameRu,
+          loc.t(HaccpLogType.fridgeTemperature.displayNameKey) ??
+              HaccpLogType.fridgeTemperature.displayNameRu,
           [
             Consumer<AccountManagerSupabase>(
               builder: (_, acc, __) => TextFormField(
@@ -1805,14 +2194,18 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         return Column(
           children: [
             _mobileBlock(
-              loc.t(HaccpLogType.warehouseTempHumidity.displayNameKey) ?? HaccpLogType.warehouseTempHumidity.displayNameRu,
+              loc.t(HaccpLogType.warehouseTempHumidity.displayNameKey) ??
+                  HaccpLogType.warehouseTempHumidity.displayNameRu,
               [
                 _savedOptionTextField(
                   key: 'warehouse_premises',
-                  label: loc.t('haccp_warehouse_premises') ?? 'Наименование складского помещения',
+                  label: loc.t('haccp_warehouse_premises') ??
+                      'Наименование складского помещения',
                   options: _presetOptions['warehouse_premises'] ?? const [],
                   presetFieldKey: 'warehouse_premises',
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Укажите помещение' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Укажите помещение'
+                      : null,
                 ),
                 _mobileSlider(
                   label: 'Температура',
@@ -1841,29 +2234,43 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         );
       case HaccpLogType.finishedProductBrakerage:
         return _mobileBlock(
-          loc.t(HaccpLogType.finishedProductBrakerage.displayNameKey) ?? HaccpLogType.finishedProductBrakerage.displayNameRu,
+          loc.t(HaccpLogType.finishedProductBrakerage.displayNameKey) ??
+              HaccpLogType.finishedProductBrakerage.displayNameRu,
           [
             TextFormField(
-              initialValue: DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()),
-              decoration: const InputDecoration(labelText: 'Дата и час изготовления блюда', border: OutlineInputBorder(), isDense: true),
+              initialValue:
+                  DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()),
+              decoration: const InputDecoration(
+                  labelText: 'Дата и час изготовления блюда',
+                  border: OutlineInputBorder(),
+                  isDense: true),
               readOnly: true,
             ),
-            _textField('time_brakerage', 'Время снятия бракеража (например 12:00)'),
+            _textField(
+                'time_brakerage', 'Время снятия бракеража (например 12:00)'),
             _finishedProductPickerCell(loc),
-            _textField('result', loc.t('haccp_result') ?? 'Результаты органолептической оценки', multiline: true),
+            _textField('result',
+                loc.t('haccp_result') ?? 'Результаты органолептической оценки',
+                multiline: true),
             _approvalSelector(),
             _signatureFromAccount(),
-            _textField('weighing_result', 'Результаты взвешивания порционных блюд'),
+            _textField(
+                'weighing_result', 'Результаты взвешивания порционных блюд'),
             _textField('note', loc.t('haccp_note') ?? 'Примечание'),
           ],
         );
       case HaccpLogType.incomingRawBrakerage:
         return _mobileBlock(
-          loc.t(HaccpLogType.incomingRawBrakerage.displayNameKey) ?? HaccpLogType.incomingRawBrakerage.displayNameRu,
+          loc.t(HaccpLogType.incomingRawBrakerage.displayNameKey) ??
+              HaccpLogType.incomingRawBrakerage.displayNameRu,
           [
             TextFormField(
-              initialValue: DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()),
-              decoration: const InputDecoration(labelText: 'Дата и час поступления', border: OutlineInputBorder(), isDense: true),
+              initialValue:
+                  DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()),
+              decoration: const InputDecoration(
+                  labelText: 'Дата и час поступления',
+                  border: OutlineInputBorder(),
+                  isDense: true),
               readOnly: true,
             ),
             _textField('product', loc.t('haccp_product') ?? 'Наименование'),
@@ -1879,9 +2286,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               options: _presetOptions['manufacturer_supplier'] ?? const [],
               presetFieldKey: 'manufacturer_supplier',
             ),
-            _textField('quantity_kg', 'Кол-во (кг/л/шт)', keyboardType: TextInputType.number),
+            _textField('quantity_kg', 'Кол-во (кг/л/шт)',
+                keyboardType: TextInputType.number),
             _textField('document_number', '№ документа'),
-            _textField('result', loc.t('haccp_result') ?? 'Органолептическая оценка', multiline: true),
+            _textField(
+                'result', loc.t('haccp_result') ?? 'Органолептическая оценка',
+                multiline: true),
             _savedOptionTextField(
               key: 'storage_conditions',
               label: 'Условия хранения, срок реализации',
@@ -1899,8 +2309,13 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 if (d != null) setState(() => _dateSold = d);
               },
               child: InputDecorator(
-                decoration: const InputDecoration(labelText: 'Дата реализации', border: OutlineInputBorder(), isDense: true),
-                child: Text(_dateSold != null ? DateFormat('dd.MM.yyyy').format(_dateSold!) : 'Выбрать'),
+                decoration: const InputDecoration(
+                    labelText: 'Дата реализации',
+                    border: OutlineInputBorder(),
+                    isDense: true),
+                child: Text(_dateSold != null
+                    ? DateFormat('dd.MM.yyyy').format(_dateSold!)
+                    : 'Выбрать'),
               ),
             ),
             _signatureFromAccount(),
@@ -1910,11 +2325,15 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       case HaccpLogType.fryingOil:
         // Те же поля, что и в табличной форме (СанПиН), чтобы сохранение в БД и пресеты совпадали с десктопом.
         return _mobileBlock(
-          loc.t(HaccpLogType.fryingOil.displayNameKey) ?? HaccpLogType.fryingOil.displayNameRu,
+          loc.t(HaccpLogType.fryingOil.displayNameKey) ??
+              HaccpLogType.fryingOil.displayNameRu,
           [
             TextFormField(
               initialValue: DateFormat('dd.MM.yyyy').format(DateTime.now()),
-              decoration: const InputDecoration(labelText: 'Дата', border: OutlineInputBorder(), isDense: true),
+              decoration: const InputDecoration(
+                  labelText: 'Дата',
+                  border: OutlineInputBorder(),
+                  isDense: true),
               readOnly: true,
             ),
             TextFormField(
@@ -1955,33 +2374,83 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         );
       case HaccpLogType.medBookRegistry:
         return _mobileBlock(
-          loc.t(HaccpLogType.medBookRegistry.displayNameKey) ?? HaccpLogType.medBookRegistry.displayNameRu,
+          loc.t(HaccpLogType.medBookRegistry.displayNameKey) ??
+              HaccpLogType.medBookRegistry.displayNameRu,
           [
-            _employeePickerField('med_book_employee_id', 'Сотрудник', _medBookEmployeeId, (id) => setState(() => _medBookEmployeeId = id)),
+            _employeePickerField(
+                'med_book_employee_id',
+                'Сотрудник',
+                _medBookEmployeeId,
+                (id) => setState(() {
+                      _medBookEmployeeId = id;
+                      final emp =
+                          _formEmployees.where((e) => e.id == id).firstOrNull;
+                      if (emp != null) {
+                        _setText(
+                          'med_book_employee_name',
+                          emp.surname != null
+                              ? '${emp.surname} ${emp.fullName}'
+                              : emp.fullName,
+                        );
+                        _setText(
+                          'med_book_position',
+                          emp.roles.isNotEmpty
+                              ? loc.roleDisplayName(emp.roles.first)
+                              : '',
+                        );
+                      } else {
+                        _setText('med_book_employee_name', '');
+                        _setText('med_book_position', '');
+                      }
+                    })),
             _textField('med_book_position', 'Должность'),
             _textField('med_book_number', 'Номер медицинской книжки'),
-            _datePickerField('med_book_expiry_date', 'Срок действия', _medBookExpiryDate, (d) => setState(() => _medBookExpiryDate = d)),
-            _datePickerField('med_book_received_date', 'Получение (дата)', _medBookReceivedDate, (d) => setState(() => _medBookReceivedDate = d)),
-            _datePickerField('med_book_returned_date', 'Возврат (дата)', _medBookReturnedDate, (d) => setState(() => _medBookReturnedDate = d)),
+            _datePickerField(
+                'med_book_expiry_date',
+                'Срок действия',
+                _medBookExpiryDate,
+                (d) => setState(() => _medBookExpiryDate = d)),
+            _datePickerField(
+                'med_book_received_date',
+                'Получение (дата)',
+                _medBookReceivedDate,
+                (d) => setState(() => _medBookReceivedDate = d)),
+            _datePickerField(
+                'med_book_returned_date',
+                'Возврат (дата)',
+                _medBookReturnedDate,
+                (d) => setState(() => _medBookReturnedDate = d)),
           ],
         );
       case HaccpLogType.medExaminations:
         return _mobileBlock(
-          loc.t(HaccpLogType.medExaminations.displayNameKey) ?? HaccpLogType.medExaminations.displayNameRu,
+          loc.t(HaccpLogType.medExaminations.displayNameKey) ??
+              HaccpLogType.medExaminations.displayNameRu,
           [
-            _employeePickerField('med_exam_employee_id', 'Сотрудник', _medExamEmployeeId, (id) => setState(() => _medExamEmployeeId = id)),
+            _employeePickerField(
+                'med_exam_employee_id',
+                'Сотрудник',
+                _medExamEmployeeId,
+                (id) => setState(() => _medExamEmployeeId = id)),
             _textField('med_exam_position', 'Должность'),
             _textField('med_exam_department', 'Подразделение'),
-            _datePickerField('med_exam_hire_date', 'Дата приёма', _medExamHireDate, (d) => setState(() => _medExamHireDate = d)),
+            _datePickerField('med_exam_hire_date', 'Дата приёма',
+                _medExamHireDate, (d) => setState(() => _medExamHireDate = d)),
             _textField('med_exam_type', 'Вид (предварительный/периодический)'),
             _textField('med_exam_institution', 'ЛПУ'),
             _textField('med_exam_harmful_1', 'Вредный фактор №90'),
             _textField('med_exam_harmful_2', 'Вредный фактор №83'),
-            _datePickerField('med_exam_date', 'Дата прохождения', _medExamDate, (d) => setState(() => _medExamDate = d)),
+            _datePickerField('med_exam_date', 'Дата прохождения', _medExamDate,
+                (d) => setState(() => _medExamDate = d)),
             _textField('med_exam_conclusion', 'Заключение'),
             _textField('med_exam_employer_decision', 'Решение работодателя'),
-            _datePickerField('med_exam_next_date', 'Дата следующего осмотра', _medExamNextDate, (d) => setState(() => _medExamNextDate = d)),
-            _datePickerField('med_exam_exclusion_date', 'Дата исключения из списков', _medExamExclusionDate, (d) => setState(() => _medExamExclusionDate = d)),
+            _datePickerField('med_exam_next_date', 'Дата следующего осмотра',
+                _medExamNextDate, (d) => setState(() => _medExamNextDate = d)),
+            _datePickerField(
+                'med_exam_exclusion_date',
+                'Дата исключения из списков',
+                _medExamExclusionDate,
+                (d) => setState(() => _medExamExclusionDate = d)),
             _textField('med_exam_note', 'Примечание'),
           ],
         );
@@ -1997,15 +2466,18 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   options: _presetOptions['disinf_object_name'] ?? const [],
                   presetFieldKey: 'disinf_object_name',
                 ),
-                _textField('disinf_object_count', 'Кол-во', keyboardType: TextInputType.number),
-                _textField('disinf_area_sqm', 'Площадь м²', keyboardType: TextInputType.number),
+                _textField('disinf_object_count', 'Кол-во',
+                    keyboardType: TextInputType.number),
+                _textField('disinf_area_sqm', 'Площадь м²',
+                    keyboardType: TextInputType.number),
                 _savedOptionTextField(
                   key: 'disinf_treatment_type',
                   label: 'Вид Т/Г',
                   options: _presetOptions['disinf_treatment_type'] ?? const [],
                   presetFieldKey: 'disinf_treatment_type',
                 ),
-                _textField('disinf_frequency', 'Кратность/мес', keyboardType: TextInputType.number),
+                _textField('disinf_frequency', 'Кратность/мес',
+                    keyboardType: TextInputType.number),
                 _savedOptionTextField(
                   key: 'disinf_agent_name',
                   label: 'Дезсредство',
@@ -2013,26 +2485,43 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   presetFieldKey: 'disinf_agent_name',
                 ),
                 _textField('disinf_concentration_pct', 'Конц.%'),
-                _textField('disinf_consumption_per_sqm', 'Расход/м²', keyboardType: TextInputType.number),
-                _textField('disinf_solution_per_treatment', 'Раствор на 1 обр. (л/кг)', keyboardType: TextInputType.number),
-                _textField('disinf_need_per_treatment', 'Потребность 1 обр. (л/кг)', keyboardType: TextInputType.number),
-                _textField('disinf_need_per_month', 'В месяц (л/кг)', keyboardType: TextInputType.number),
-                _textField('disinf_need_per_year', 'В год (л/кг)', keyboardType: TextInputType.number),
+                _textField('disinf_consumption_per_sqm', 'Расход/м²',
+                    keyboardType: TextInputType.number),
+                _textField(
+                    'disinf_solution_per_treatment', 'Раствор на 1 обр. (л/кг)',
+                    keyboardType: TextInputType.number),
+                _textField(
+                    'disinf_need_per_treatment', 'Потребность 1 обр. (л/кг)',
+                    keyboardType: TextInputType.number),
+                _textField('disinf_need_per_month', 'В месяц (л/кг)',
+                    keyboardType: TextInputType.number),
+                _textField('disinf_need_per_year', 'В год (л/кг)',
+                    keyboardType: TextInputType.number),
               ],
             ),
             _mobileBlock(
               'Поступление дезинфицирующих средств',
               [
-                _datePickerField('disinf_receipt_date', 'Дата', _disinfReceiptDate, (d) => setState(() => _disinfReceiptDate = d)),
+                _datePickerField(
+                    'disinf_receipt_date',
+                    'Дата',
+                    _disinfReceiptDate,
+                    (d) => setState(() => _disinfReceiptDate = d)),
                 _savedOptionTextField(
                   key: 'disinf_agent_name_receipt',
                   label: 'Наименование',
-                  options: _presetOptions['disinf_agent_name_receipt'] ?? const [],
+                  options:
+                      _presetOptions['disinf_agent_name_receipt'] ?? const [],
                   presetFieldKey: 'disinf_agent_name_receipt',
                 ),
                 _textField('disinf_invoice_number', 'Счёт №'),
-                _textField('disinf_quantity', 'Кол-во', keyboardType: TextInputType.number),
-                _datePickerField('disinf_expiry_date', 'Срок годности', _disinfExpiryDate, (d) => setState(() => _disinfExpiryDate = d)),
+                _textField('disinf_quantity', 'Кол-во',
+                    keyboardType: TextInputType.number),
+                _datePickerField(
+                    'disinf_expiry_date',
+                    'Срок годности',
+                    _disinfExpiryDate,
+                    (d) => setState(() => _disinfExpiryDate = d)),
                 _signatureFromAccount(),
               ],
             ),
@@ -2040,11 +2529,15 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         );
       case HaccpLogType.equipmentWashing:
         return _mobileBlock(
-          loc.t(HaccpLogType.equipmentWashing.displayNameKey) ?? HaccpLogType.equipmentWashing.displayNameRu,
+          loc.t(HaccpLogType.equipmentWashing.displayNameKey) ??
+              HaccpLogType.equipmentWashing.displayNameRu,
           [
             TextFormField(
               initialValue: DateFormat('dd.MM.yyyy').format(DateTime.now()),
-              decoration: const InputDecoration(labelText: 'Дата', border: OutlineInputBorder(), isDense: true),
+              decoration: const InputDecoration(
+                  labelText: 'Дата',
+                  border: OutlineInputBorder(),
+                  isDense: true),
               readOnly: true,
             ),
             _textField('wash_time', 'Время мойки'),
@@ -2068,13 +2561,15 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               presetFieldKey: 'wash_disinfectant_name',
             ),
             _textField('wash_disinfectant_concentration_pct', 'Конц.%'),
-            _textField('wash_rinsing_temp', 'Ополаскивание t°', keyboardType: TextInputType.number),
+            _textField('wash_rinsing_temp', 'Ополаскивание t°',
+                keyboardType: TextInputType.number),
             _signatureFromAccount(),
           ],
         );
       case HaccpLogType.generalCleaningSchedule:
         return _mobileBlock(
-          loc.t(HaccpLogType.generalCleaningSchedule.displayNameKey) ?? HaccpLogType.generalCleaningSchedule.displayNameRu,
+          loc.t(HaccpLogType.generalCleaningSchedule.displayNameKey) ??
+              HaccpLogType.generalCleaningSchedule.displayNameRu,
           [
             _savedOptionTextField(
               key: 'gen_clean_premises',
@@ -2082,14 +2577,16 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               options: _presetOptions['gen_clean_premises'] ?? const [],
               presetFieldKey: 'gen_clean_premises',
             ),
-            _datePickerField('gen_clean_date', 'Дата проведения', _genCleanDate, (d) => setState(() => _genCleanDate = d)),
+            _datePickerField('gen_clean_date', 'Дата проведения', _genCleanDate,
+                (d) => setState(() => _genCleanDate = d)),
             _signatureFromAccount(),
             _textField('note', loc.t('haccp_note') ?? 'Примечание'),
           ],
         );
       case HaccpLogType.sieveFilterMagnet:
         return _mobileBlock(
-          loc.t(HaccpLogType.sieveFilterMagnet.displayNameKey) ?? HaccpLogType.sieveFilterMagnet.displayNameRu,
+          loc.t(HaccpLogType.sieveFilterMagnet.displayNameKey) ??
+              HaccpLogType.sieveFilterMagnet.displayNameRu,
           [
             _textField('sieve_no', '№ сита/магнита'),
             _savedOptionTextField(
@@ -2104,7 +2601,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               options: _presetOptions['sieve_condition'] ?? const [],
               presetFieldKey: 'sieve_condition',
             ),
-            _datePickerField('sieve_cleaning_date', 'Дата очистки', _sieveCleaningDate, (d) => setState(() => _sieveCleaningDate = d)),
+            _datePickerField(
+                'sieve_cleaning_date',
+                'Дата очистки',
+                _sieveCleaningDate,
+                (d) => setState(() => _sieveCleaningDate = d)),
             _signatureFromAccount(),
             _textField('sieve_comments', 'Комментарии'),
           ],
@@ -2124,15 +2625,21 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     final est = acc.establishment;
     final emp = acc.currentEmployee;
     if (est == null) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('haccp_establishment_not_selected') ?? 'Заведение не выбрано')),
-      );
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(loc.t('haccp_establishment_not_selected') ??
+                  'Заведение не выбрано')),
+        );
       return;
     }
     if (emp == null) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('haccp_employee_required') ?? 'Войдите под учётной записью сотрудника заведения')),
-      );
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(loc.t('haccp_employee_required') ??
+                  'Войдите под учётной записью сотрудника заведения')),
+        );
       return;
     }
 
@@ -2154,7 +2661,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${context.read<LocalizationService>().t('error')}: $e')),
+          SnackBar(
+              content: Text(
+                  '${context.read<LocalizationService>().t('error')}: $e')),
         );
       }
     } finally {
@@ -2162,7 +2671,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     }
   }
 
-  Future<void> _saveNumeric(HaccpLogServiceSupabase svc, String estId, String empId) async {
+  Future<void> _saveNumeric(
+      HaccpLogServiceSupabase svc, String estId, String empId) async {
     switch (_logType!) {
       case HaccpLogType.fridgeTemperature:
         await svc.insertNumeric(
@@ -2170,7 +2680,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           createdByEmployeeId: empId,
           logType: _logType!,
           value1: _tempValue,
-          equipment: _getText('equipment').isNotEmpty ? _getText('equipment') : null,
+          equipment:
+              _getText('equipment').isNotEmpty ? _getText('equipment') : null,
           note: _getText('note').isNotEmpty ? _getText('note') : null,
         );
         await _saveCurrentOption(
@@ -2185,7 +2696,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           logType: _logType!,
           value1: _tempValue,
           value2: _humidityValue,
-          equipment: _getText('warehouse_premises').trim().isNotEmpty ? _getText('warehouse_premises').trim() : null,
+          equipment: _getText('warehouse_premises').trim().isNotEmpty
+              ? _getText('warehouse_premises').trim()
+              : null,
           note: _getText('note').isNotEmpty ? _getText('note') : null,
         );
         await _saveCurrentOption(
@@ -2198,20 +2711,44 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     }
   }
 
-  Future<void> _saveStatus(HaccpLogServiceSupabase svc, String estId, String empId) async {
+  Future<void> _saveStatus(
+      HaccpLogServiceSupabase svc, String estId, String empId) async {
     if (_logType == HaccpLogType.healthHygiene) {
       if (_healthRows.isEmpty) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.read<LocalizationService>().t('haccp_add_at_least_one') ?? 'Добавьте хотя бы одного сотрудника')),
-        );
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text(context
+                        .read<LocalizationService>()
+                        .t('haccp_add_at_least_one') ??
+                    'Добавьте хотя бы одного сотрудника')),
+          );
         return;
       }
       final note = _getText('note').isNotEmpty ? _getText('note') : null;
       for (final row in _healthRows) {
-        final posOverride = (row.positionOverride ?? '').trim().isEmpty ? null : (row.positionOverride ?? '').trim();
-        final emp = _healthEmployees.where((e) => e.id == row.employeeId).firstOrNull;
-        final employeeNameSnapshot = emp != null ? '${emp.fullName}${emp.surname != null ? ' ${emp.surname}' : ''}' : null;
-        final description = HaccpLog.buildHealthHygieneDescription(employeeId: row.employeeId, positionOverride: posOverride, employeeName: employeeNameSnapshot);
+        final emp =
+            _healthEmployees.where((e) => e.id == row.employeeId).firstOrNull;
+        final String? posOverride;
+        if (row.positionIsCustom) {
+          final t = (row.positionOverride ?? '').trim();
+          posOverride = t.isEmpty ? null : t;
+        } else {
+          final o = (row.positionOverride ?? '').trim();
+          if (o.isNotEmpty) {
+            posOverride = o;
+          } else {
+            posOverride =
+                (emp != null && emp.roles.isNotEmpty) ? emp.roles.first : null;
+          }
+        }
+        final employeeNameSnapshot = emp != null
+            ? '${emp.fullName}${emp.surname != null ? ' ${emp.surname}' : ''}'
+            : null;
+        final description = HaccpLog.buildHealthHygieneDescription(
+            employeeId: row.employeeId,
+            positionOverride: posOverride,
+            employeeName: employeeNameSnapshot);
         await svc.insertStatus(
           establishmentId: estId,
           createdByEmployeeId: empId,
@@ -2227,16 +2764,21 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     }
   }
 
-  Future<void> _saveQuality(HaccpLogServiceSupabase svc, String estId, String empId) async {
+  Future<void> _saveQuality(
+      HaccpLogServiceSupabase svc, String estId, String empId) async {
     final emp = context.read<AccountManagerSupabase>().currentEmployee;
     final signatureName = emp != null
-        ? (emp.surname != null ? '${emp.surname} ${emp.fullName}' : emp.fullName)
+        ? (emp.surname != null
+            ? '${emp.surname} ${emp.fullName}'
+            : emp.fullName)
         : null;
-    final approvalStr = _logType == HaccpLogType.finishedProductBrakerage && _approvalToSell != null
+    final approvalStr = _logType == HaccpLogType.finishedProductBrakerage &&
+            _approvalToSell != null
         ? (_approvalToSell! ? 'разрешено' : 'запрещено')
         : null;
     final isFryingOil = _logType == HaccpLogType.fryingOil;
-    final isFinishedBrakerage = _logType == HaccpLogType.finishedProductBrakerage;
+    final isFinishedBrakerage =
+        _logType == HaccpLogType.finishedProductBrakerage;
     final isMedBook = _logType == HaccpLogType.medBookRegistry;
     final isMedExam = _logType == HaccpLogType.medExaminations;
     final isDisinf = _logType == HaccpLogType.disinfectantAccounting;
@@ -2247,86 +2789,196 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       establishmentId: estId,
       createdByEmployeeId: empId,
       logType: _logType!,
-      techCardId: isFinishedBrakerage ? _selectedFinishedBrakerageTechCardId : null,
+      techCardId:
+          isFinishedBrakerage ? _selectedFinishedBrakerageTechCardId : null,
       productName: _getText('product').isNotEmpty ? _getText('product') : null,
       result: _getText('result').isNotEmpty ? _getText('result') : null,
-      timeBrakerage: _getText('time_brakerage').isNotEmpty ? _getText('time_brakerage') : null,
-      approvalToSell: approvalStr ?? (_getText('approval_to_sell').isNotEmpty ? _getText('approval_to_sell') : null),
+      timeBrakerage: _getText('time_brakerage').isNotEmpty
+          ? _getText('time_brakerage')
+          : null,
+      approvalToSell: approvalStr ??
+          (_getText('approval_to_sell').isNotEmpty
+              ? _getText('approval_to_sell')
+              : null),
       commissionSignatures: signatureName,
-      weighingResult: _getText('weighing_result').isNotEmpty ? _getText('weighing_result') : null,
-      packaging: _getText('packaging').isNotEmpty ? _getText('packaging') : null,
-      manufacturerSupplier: _getText('manufacturer_supplier').isNotEmpty ? _getText('manufacturer_supplier') : null,
+      weighingResult: _getText('weighing_result').isNotEmpty
+          ? _getText('weighing_result')
+          : null,
+      packaging:
+          _getText('packaging').isNotEmpty ? _getText('packaging') : null,
+      manufacturerSupplier: _getText('manufacturer_supplier').isNotEmpty
+          ? _getText('manufacturer_supplier')
+          : null,
       quantityKg: _getNum('quantity_kg'),
-      documentNumber: _getText('document_number').isNotEmpty ? _getText('document_number') : null,
-      storageConditions: _getText('storage_conditions').isNotEmpty ? _getText('storage_conditions') : null,
+      documentNumber: _getText('document_number').isNotEmpty
+          ? _getText('document_number')
+          : null,
+      storageConditions: _getText('storage_conditions').isNotEmpty
+          ? _getText('storage_conditions')
+          : null,
       dateSold: _dateSold,
-      oilName: isFryingOil && _getText('oil_name').isNotEmpty ? _getText('oil_name') : null,
-      organolepticStart: isFryingOil && _getText('organoleptic_start').isNotEmpty ? _getText('organoleptic_start') : null,
-      fryingEquipmentType: isFryingOil && _getText('frying_equipment_type').isNotEmpty ? _getText('frying_equipment_type') : null,
-      fryingProductType: isFryingOil && _getText('frying_product_type').isNotEmpty ? _getText('frying_product_type') : null,
-      fryingEndTime: isFryingOil && _getText('frying_end_time').isNotEmpty ? _getText('frying_end_time') : null,
-      organolepticEnd: isFryingOil && _getText('organoleptic_end').isNotEmpty ? _getText('organoleptic_end') : null,
+      oilName: isFryingOil && _getText('oil_name').isNotEmpty
+          ? _getText('oil_name')
+          : null,
+      organolepticStart:
+          isFryingOil && _getText('organoleptic_start').isNotEmpty
+              ? _getText('organoleptic_start')
+              : null,
+      fryingEquipmentType:
+          isFryingOil && _getText('frying_equipment_type').isNotEmpty
+              ? _getText('frying_equipment_type')
+              : null,
+      fryingProductType:
+          isFryingOil && _getText('frying_product_type').isNotEmpty
+              ? _getText('frying_product_type')
+              : null,
+      fryingEndTime: isFryingOil && _getText('frying_end_time').isNotEmpty
+          ? _getText('frying_end_time')
+          : null,
+      organolepticEnd: isFryingOil && _getText('organoleptic_end').isNotEmpty
+          ? _getText('organoleptic_end')
+          : null,
       carryOverKg: isFryingOil ? _getNum('carry_over_kg') : null,
       utilizedKg: isFryingOil ? _getNum('utilized_kg') : null,
-      medBookEmployeeName: isMedBook && _getText('med_book_employee_name').isNotEmpty ? _getText('med_book_employee_name') : null,
-      medBookPosition: isMedBook && _getText('med_book_position').isNotEmpty ? _getText('med_book_position') : null,
-      medBookNumber: isMedBook && _getText('med_book_number').isNotEmpty ? _getText('med_book_number') : null,
+      medBookEmployeeName:
+          isMedBook && _getText('med_book_employee_name').isNotEmpty
+              ? _getText('med_book_employee_name')
+              : null,
+      medBookPosition: isMedBook && _getText('med_book_position').isNotEmpty
+          ? _getText('med_book_position')
+          : null,
+      medBookNumber: isMedBook && _getText('med_book_number').isNotEmpty
+          ? _getText('med_book_number')
+          : null,
       medBookValidUntil: isMedBook ? _medBookValidUntil : null,
       medBookIssuedAt: isMedBook ? _medBookIssuedAt : null,
       medBookReturnedAt: isMedBook ? _medBookReturnedAt : null,
-      medExamEmployeeName: isMedExam && _getText('med_exam_employee_name').isNotEmpty ? _getText('med_exam_employee_name') : null,
-      medExamDob: isMedExam && _getText('med_exam_dob').isNotEmpty ? _getText('med_exam_dob') : null,
-      medExamGender: isMedExam && _getText('med_exam_gender').isNotEmpty ? _getText('med_exam_gender') : null,
-      medExamPosition: isMedExam && _getText('med_exam_position').isNotEmpty ? _getText('med_exam_position') : null,
-      medExamDepartment: isMedExam && _getText('med_exam_department').isNotEmpty ? _getText('med_exam_department') : null,
+      medExamEmployeeName:
+          isMedExam && _getText('med_exam_employee_name').isNotEmpty
+              ? _getText('med_exam_employee_name')
+              : null,
+      medExamDob: isMedExam && _getText('med_exam_dob').isNotEmpty
+          ? _getText('med_exam_dob')
+          : null,
+      medExamGender: isMedExam && _getText('med_exam_gender').isNotEmpty
+          ? _getText('med_exam_gender')
+          : null,
+      medExamPosition: isMedExam && _getText('med_exam_position').isNotEmpty
+          ? _getText('med_exam_position')
+          : null,
+      medExamDepartment: isMedExam && _getText('med_exam_department').isNotEmpty
+          ? _getText('med_exam_department')
+          : null,
       medExamHireDate: isMedExam ? _medExamHireDate : null,
-      medExamType: isMedExam && _getText('med_exam_type').isNotEmpty ? _getText('med_exam_type') : null,
-      medExamInstitution: isMedExam && _getText('med_exam_institution').isNotEmpty ? _getText('med_exam_institution') : null,
-      medExamHarmful1: isMedExam && _getText('med_exam_harmful_1').isNotEmpty ? _getText('med_exam_harmful_1') : null,
-      medExamHarmful2: isMedExam && _getText('med_exam_harmful_2').isNotEmpty ? _getText('med_exam_harmful_2') : null,
+      medExamType: isMedExam && _getText('med_exam_type').isNotEmpty
+          ? _getText('med_exam_type')
+          : null,
+      medExamInstitution:
+          isMedExam && _getText('med_exam_institution').isNotEmpty
+              ? _getText('med_exam_institution')
+              : null,
+      medExamHarmful1: isMedExam && _getText('med_exam_harmful_1').isNotEmpty
+          ? _getText('med_exam_harmful_1')
+          : null,
+      medExamHarmful2: isMedExam && _getText('med_exam_harmful_2').isNotEmpty
+          ? _getText('med_exam_harmful_2')
+          : null,
       medExamDate: isMedExam ? _medExamDate : null,
-      medExamConclusion: isMedExam && _getText('med_exam_conclusion').isNotEmpty ? _getText('med_exam_conclusion') : null,
-      medExamEmployerDecision: isMedExam && _getText('med_exam_employer_decision').isNotEmpty ? _getText('med_exam_employer_decision') : null,
+      medExamConclusion: isMedExam && _getText('med_exam_conclusion').isNotEmpty
+          ? _getText('med_exam_conclusion')
+          : null,
+      medExamEmployerDecision:
+          isMedExam && _getText('med_exam_employer_decision').isNotEmpty
+              ? _getText('med_exam_employer_decision')
+              : null,
       medExamNextDate: isMedExam ? _medExamNextDate : null,
       medExamExclusionDate: isMedExam ? _medExamExclusionDate : null,
-      disinfObjectName: isDisinf && _getText('disinf_object_name').isNotEmpty ? _getText('disinf_object_name') : null,
+      disinfObjectName: isDisinf && _getText('disinf_object_name').isNotEmpty
+          ? _getText('disinf_object_name')
+          : null,
       disinfObjectCount: isDisinf ? _getNum('disinf_object_count') : null,
       disinfAreaSqm: isDisinf ? _getNum('disinf_area_sqm') : null,
-      disinfTreatmentType: isDisinf && _getText('disinf_treatment_type').isNotEmpty ? _getText('disinf_treatment_type') : null,
+      disinfTreatmentType:
+          isDisinf && _getText('disinf_treatment_type').isNotEmpty
+              ? _getText('disinf_treatment_type')
+              : null,
       disinfFrequencyPerMonth: isDisinf ? _getInt('disinf_frequency') : null,
-      disinfAgentName: isDisinf && (_getText('disinf_agent_name').isNotEmpty || _getText('disinf_agent_name_receipt').isNotEmpty) ? (_getText('disinf_agent_name').isNotEmpty ? _getText('disinf_agent_name') : _getText('disinf_agent_name_receipt')) : null,
-      disinfConcentrationPct: isDisinf && _getText('disinf_concentration_pct').isNotEmpty ? _getText('disinf_concentration_pct') : null,
-      disinfConsumptionPerSqm: isDisinf ? _getNum('disinf_consumption_per_sqm') : null,
-      disinfSolutionPerTreatment: isDisinf ? _getNum('disinf_solution_per_treatment') : null,
-      disinfNeedPerTreatment: isDisinf ? _getNum('disinf_need_per_treatment') : null,
+      disinfAgentName: isDisinf &&
+              (_getText('disinf_agent_name').isNotEmpty ||
+                  _getText('disinf_agent_name_receipt').isNotEmpty)
+          ? (_getText('disinf_agent_name').isNotEmpty
+              ? _getText('disinf_agent_name')
+              : _getText('disinf_agent_name_receipt'))
+          : null,
+      disinfConcentrationPct:
+          isDisinf && _getText('disinf_concentration_pct').isNotEmpty
+              ? _getText('disinf_concentration_pct')
+              : null,
+      disinfConsumptionPerSqm:
+          isDisinf ? _getNum('disinf_consumption_per_sqm') : null,
+      disinfSolutionPerTreatment:
+          isDisinf ? _getNum('disinf_solution_per_treatment') : null,
+      disinfNeedPerTreatment:
+          isDisinf ? _getNum('disinf_need_per_treatment') : null,
       disinfNeedPerMonth: isDisinf ? _getNum('disinf_need_per_month') : null,
       disinfNeedPerYear: isDisinf ? _getNum('disinf_need_per_year') : null,
       disinfReceiptDate: isDisinf ? _disinfReceiptDate : null,
-      disinfInvoiceNumber: isDisinf && _getText('disinf_invoice_number').isNotEmpty ? _getText('disinf_invoice_number') : null,
+      disinfInvoiceNumber:
+          isDisinf && _getText('disinf_invoice_number').isNotEmpty
+              ? _getText('disinf_invoice_number')
+              : null,
       disinfQuantity: isDisinf ? _getNum('disinf_quantity') : null,
       disinfExpiryDate: isDisinf ? _disinfExpiryDate : null,
       disinfResponsibleName: isDisinf ? signatureName : null,
-      washTime: isWash && _getText('wash_time').isNotEmpty ? _getText('wash_time') : null,
-      washEquipmentName: isWash && _getText('wash_equipment_name').isNotEmpty ? _getText('wash_equipment_name') : null,
-      washSolutionName: isWash && _getText('wash_solution_name').isNotEmpty ? _getText('wash_solution_name') : null,
-      washSolutionConcentrationPct: isWash && _getText('wash_solution_concentration_pct').isNotEmpty ? _getText('wash_solution_concentration_pct') : null,
-      washDisinfectantName: isWash && _getText('wash_disinfectant_name').isNotEmpty ? _getText('wash_disinfectant_name') : null,
-      washDisinfectantConcentrationPct: isWash && _getText('wash_disinfectant_concentration_pct').isNotEmpty ? _getText('wash_disinfectant_concentration_pct') : null,
-      washRinsingTemp: isWash && _getText('wash_rinsing_temp').isNotEmpty ? _getText('wash_rinsing_temp') : null,
+      washTime: isWash && _getText('wash_time').isNotEmpty
+          ? _getText('wash_time')
+          : null,
+      washEquipmentName: isWash && _getText('wash_equipment_name').isNotEmpty
+          ? _getText('wash_equipment_name')
+          : null,
+      washSolutionName: isWash && _getText('wash_solution_name').isNotEmpty
+          ? _getText('wash_solution_name')
+          : null,
+      washSolutionConcentrationPct:
+          isWash && _getText('wash_solution_concentration_pct').isNotEmpty
+              ? _getText('wash_solution_concentration_pct')
+              : null,
+      washDisinfectantName:
+          isWash && _getText('wash_disinfectant_name').isNotEmpty
+              ? _getText('wash_disinfectant_name')
+              : null,
+      washDisinfectantConcentrationPct:
+          isWash && _getText('wash_disinfectant_concentration_pct').isNotEmpty
+              ? _getText('wash_disinfectant_concentration_pct')
+              : null,
+      washRinsingTemp: isWash && _getText('wash_rinsing_temp').isNotEmpty
+          ? _getText('wash_rinsing_temp')
+          : null,
       washControllerSignature: isWash ? signatureName : null,
-      genCleanPremises: isGenClean && _getText('gen_clean_premises').isNotEmpty ? _getText('gen_clean_premises') : null,
+      genCleanPremises: isGenClean && _getText('gen_clean_premises').isNotEmpty
+          ? _getText('gen_clean_premises')
+          : null,
       genCleanDate: isGenClean ? _genCleanDate : null,
       genCleanResponsible: isGenClean ? signatureName : null,
-      sieveNo: isSieve && _getText('sieve_no').isNotEmpty ? _getText('sieve_no') : null,
-      sieveNameLocation: isSieve && _getText('sieve_name_location').isNotEmpty ? _getText('sieve_name_location') : null,
-      sieveCondition: isSieve && _getText('sieve_condition').isNotEmpty ? _getText('sieve_condition') : null,
+      sieveNo: isSieve && _getText('sieve_no').isNotEmpty
+          ? _getText('sieve_no')
+          : null,
+      sieveNameLocation: isSieve && _getText('sieve_name_location').isNotEmpty
+          ? _getText('sieve_name_location')
+          : null,
+      sieveCondition: isSieve && _getText('sieve_condition').isNotEmpty
+          ? _getText('sieve_condition')
+          : null,
       sieveCleaningDate: isSieve ? _sieveCleaningDate : null,
       sieveSignature: isSieve ? signatureName : null,
-      sieveComments: isSieve && _getText('sieve_comments').isNotEmpty ? _getText('sieve_comments') : null,
+      sieveComments: isSieve && _getText('sieve_comments').isNotEmpty
+          ? _getText('sieve_comments')
+          : null,
       note: _getText('note').isNotEmpty ? _getText('note') : null,
     );
     for (final f in _presetFieldsForCurrentLog()) {
-      await _saveCurrentOption(controllerKey: f, fieldKey: f, showFeedback: false);
+      await _saveCurrentOption(
+          controllerKey: f, fieldKey: f, showFeedback: false);
     }
   }
 
@@ -2342,7 +2994,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     final emp = context.watch<AccountManagerSupabase>().currentEmployee;
     if (_logType == null) {
       return Scaffold(
-        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('haccp_journals') ?? 'Журналы ХАССП')),
+        appBar: AppBar(
+            leading: appBarBackButton(context),
+            title: Text(loc.t('haccp_journals') ?? 'Журналы ХАССП')),
         body: Center(child: Text(loc.t('error') ?? 'Неизвестный тип журнала')),
       );
     }
@@ -2350,7 +3004,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text('${loc.t('haccp_add_entry') ?? 'Добавить'} — ${(loc.t(_logType!.displayNameKey) ?? _logType!.displayNameRu)}'),
+        title: Text(
+            '${loc.t('haccp_add_entry') ?? 'Добавить'} — ${(loc.t(_logType!.displayNameKey) ?? _logType!.displayNameRu)}'),
       ),
       body: Form(
         key: _formKey,
@@ -2375,7 +3030,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             const SizedBox(height: 4),
             if (MediaQuery.of(context).size.shortestSide >= 600) ...[
               Text(
-                loc.t('haccp_scroll_right_hint') ?? 'Таблица по форме СанПиН — при необходимости прокрутите вправо',
+                loc.t('haccp_scroll_right_hint') ??
+                    'Таблица по форме СанПиН — при необходимости прокрутите вправо',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -2396,7 +3052,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             FilledButton(
               onPressed: _saving ? null : _save,
               child: _saving
-                  ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2))
                   : Text(loc.t('save')),
             ),
           ],
