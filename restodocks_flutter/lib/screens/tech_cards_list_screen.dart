@@ -869,12 +869,19 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       } catch (e) {
         devLog('[ttk_list] loadProducts failed (TTK list still loads): $e');
       }
-      try {
+      Future<void> loadNom() async {
         if (est.isBranch) {
           await productStore.loadNomenclatureForBranch(
               est.id, est.dataEstablishmentId!);
         } else {
           await productStore.loadNomenclature(est.dataEstablishmentId);
+        }
+      }
+      try {
+        await loadNom();
+        if (productStore.nomenclatureProductIds.isEmpty) {
+          await Future.delayed(const Duration(milliseconds: 600));
+          await loadNom();
         }
       } catch (e) {
         devLog('[ttk_list] loadNomenclature failed: $e');
