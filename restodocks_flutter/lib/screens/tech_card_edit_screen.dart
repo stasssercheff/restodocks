@@ -17,6 +17,7 @@ import '../mixins/input_change_listener_mixin.dart';
 import '../services/ai_service_supabase.dart';
 import '../services/app_toast_service.dart';
 import '../services/services.dart';
+import '../services/tech_card_cost_hydrator.dart';
 import '../utils/number_format_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 import 'excel_style_ttk_table.dart';
@@ -1062,65 +1063,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     return categoryTranslations[c]?[lang] ?? c;
   }
 
-  /// Продуктовая строка без вложенной ТТК: подставить цену из номенклатуры (для гидратации вложенных ПФ).
-  TTIngredient _enrichLeafIngredientForHydrate(TTIngredient ing) {
-    if (ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty) {
-      return ing;
-    }
-    if (ing.isPlaceholder || ing.productName.trim().isEmpty) return ing;
-    if (ing.effectiveCost > 0) return ing;
-    if (ing.pricePerKg != null &&
-        ing.pricePerKg! > 0 &&
-        ing.grossWeight > 0) {
-      final u = ing.unit.toLowerCase().trim();
-      if (u == 'шт' || u == 'pcs') {
-        final gpp = ing.gramsPerPiece ?? 50.0;
-        if (gpp <= 0) return ing;
-        final c = ing.pricePerKg! * (ing.grossWeight / gpp);
-        if (c > 0) return ing.copyWith(cost: c);
-      } else {
-        final c = ing.pricePerKg! * ing.grossWeight / 1000;
-        if (c > 0) return ing.copyWith(cost: c);
-      }
-    }
-    try {
-      final store = context.read<ProductStoreSupabase>();
-      final est = context.read<AccountManagerSupabase>().establishment;
-      final establishmentId =
-          est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
-      if (establishmentId == null) return ing;
-      final product =
-          store.findProductForIngredient(ing.productId, ing.productName);
-      if (product == null) return ing;
-      final priceInfo =
-          store.getEstablishmentPrice(product.id, establishmentId);
-      double pricePerKg = priceInfo?.$1 ?? 0.0;
-      if (pricePerKg <= 0 && product.basePrice != null && product.basePrice! > 0) {
-        pricePerKg = product.basePrice!;
-      }
-      if (pricePerKg <= 0) return ing;
-      final u = ing.unit.toLowerCase().trim();
-      if (u == 'шт' || u == 'pcs') {
-        final gpp = ing.gramsPerPiece ?? product.gramsPerPiece ?? 50.0;
-        if (gpp <= 0) return ing;
-        final cost = pricePerKg * (ing.grossWeight / gpp);
-        return ing.copyWith(
-          productId: product.id,
-          pricePerKg: pricePerKg,
-          cost: cost,
-        );
-      }
-      final cost = pricePerKg * ing.grossWeight / 1000;
-      return ing.copyWith(
-        productId: product.id,
-        pricePerKg: pricePerKg,
-        cost: cost,
-      );
-    } catch (_) {
-      return ing;
-    }
-  }
-
   /// Подтягивает цену за кг и стоимость из номенклатуры заведения по названию продукта (для импортированных ТТК).
   void _autoFillPriceFromNomenclature() {
     final store = context.read<ProductStoreSupabase>();
@@ -1322,9 +1264,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         } else {
           await productStore.loadNomenclature(est.dataEstablishmentId);
         }
-        // Оптимизация: при просмотре или создании из импорта — не блокировать первый рендер загрузкой всех ТТК.
-        final deferTcLoad =
-            (_isNew && widget.initialFromAi != null) || widget.forceViewMode;
+        // Оптимизация: при создании из импорта — не блокировать первый рендер.
+        // Для существующей ТТК (в т.ч. view=1) всегда грузим все ТТК и гидратируем,
+        // иначе цены вложенных ПФ не подтягиваются.
+        final deferTcLoad = _isNew && widget.initialFromAi != null;
         if (!deferTcLoad) {
           final tcSvc = context.read<TechCardServiceSupabase>();
           List<TechCard> tcs;
@@ -1338,8 +1281,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 .getTechCardsForEstablishment(est.dataEstablishmentId);
           }
           tcs = tcs.map(stripInvalidNestedPfSelfLinks).toList();
-          tcs = await tcSvc.ensureIngredientsForCards(tcs);
-          tcs = _hydrateNestedTechCardCosts(tcs);
+          final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
+          if (estPriceId != null && estPriceId.isNotEmpty) {
+            tcs = TechCardCostHydrator.hydrate(tcs, productStore, estPriceId);
+          }
           loadedTechCards = tcs;
           final customKitchen = await tcSvc.getCustomCategories(
               est.isBranch ? est.id : est.dataEstablishmentId!, 'kitchen');
@@ -1371,8 +1316,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                     .getTechCardsForEstablishment(est.dataEstablishmentId);
               }
               tcs = tcs.map(stripInvalidNestedPfSelfLinks).toList();
-              tcs = await tcSvc.ensureIngredientsForCards(tcs);
-              tcs = _hydrateNestedTechCardCosts(tcs);
+              final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
+              if (estPriceId != null && estPriceId.isNotEmpty) {
+                tcs = TechCardCostHydrator.hydrate(tcs, productStore, estPriceId);
+              }
               final customKitchen = await tcSvc.getCustomCategories(
                   est.isBranch ? est.id : est.dataEstablishmentId!, 'kitchen');
               final customBar = await tcSvc.getCustomCategories(
@@ -1392,7 +1339,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 final pfCards = tcs.where((t) => t.isSemiFinished).toList();
                 final fixed =
                     _attachMissingPfSourceTechCardId(_techCard!, pfCards);
-                final hydrated = _hydrateNestedTechCardCosts([fixed, ...tcs]);
+                final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
+                final hydrated = (estPriceId != null && estPriceId.isNotEmpty)
+                    ? TechCardCostHydrator.hydrate([fixed, ...tcs], productStore, estPriceId)
+                    : [fixed, ...tcs];
                 final hydratedTc = hydrated.firstWhere(
                     (item) => item.id == fixed.id,
                     orElse: () => fixed);
@@ -1523,8 +1473,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           final pfCards = loadedTechCards.where((t) => t.isSemiFinished).toList();
           working = _attachMissingPfSourceTechCardId(working, pfCards);
           final currentTechCardId = working.id;
-          final hydrated =
-              _hydrateNestedTechCardCosts([working, ...loadedTechCards]);
+          final productStore = context.read<ProductStoreSupabase>();
+          final est = context.read<AccountManagerSupabase>().establishment;
+          final estPriceId = est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
+          final hydrated = (estPriceId != null && estPriceId.isNotEmpty)
+              ? TechCardCostHydrator.hydrate([working, ...loadedTechCards], productStore, estPriceId)
+              : [working, ...loadedTechCards];
           working = hydrated.firstWhere((item) => item.id == currentTechCardId,
               orElse: () => working);
         }
@@ -1656,128 +1610,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   }
 
   void _scheduleDraftSave() => scheduleSave();
-
-  double _ingredientResolvedOutput(TTIngredient ingredient) {
-    if (ingredient.outputWeight > 0) return ingredient.outputWeight;
-    if (ingredient.netWeight > 0) return ingredient.netWeight;
-    return ingredient.grossWeight;
-  }
-
-  List<TechCard> _hydrateNestedTechCardCosts(List<TechCard> techCards) {
-    if (techCards.isEmpty) return techCards;
-
-    final byId = <String, TechCard>{
-      for (final tc in techCards) tc.id: tc,
-    };
-    final memo = <String, TechCard>{};
-    final resolving = <String>{};
-    final lang = context.read<LocalizationService>().currentLanguageCode;
-
-    TechCard resolveCard(TechCard techCard) {
-      final cached = memo[techCard.id];
-      if (cached != null) return cached;
-      if (!resolving.add(techCard.id)) return techCard;
-
-      try {
-        final resolvedIngredients = techCard.ingredients.map((ingredient) {
-          final sourceId = ingredient.sourceTechCardId;
-          if (sourceId == null || sourceId.isEmpty) {
-            // Иначе вложенная ПФ считается с нулевой себестоимостью: в БД часто cost=0.
-            return _enrichLeafIngredientForHydrate(ingredient);
-          }
-          if (sourceId == techCard.id) {
-            return ingredient.copyWith(
-              sourceTechCardId: null,
-              sourceTechCardName: null,
-            );
-          }
-
-          final nested = byId[sourceId];
-          if (nested == null) return ingredient;
-
-          final resolvedNested = resolveCard(nested);
-          final nestedIngredients = resolvedNested.ingredients
-              .where((item) => item.productName.trim().isNotEmpty)
-              .toList();
-          final nestedOutput = nestedIngredients.fold<double>(
-            0,
-            (sum, item) => sum + _ingredientResolvedOutput(item),
-          );
-          final nestedCost = nestedIngredients.fold<double>(
-            0,
-            (sum, item) {
-              var c = item.effectiveCost;
-              if (c <= 0 &&
-                  item.pricePerKg != null &&
-                  item.pricePerKg! > 0 &&
-                  item.grossWeight > 0) {
-                final u = item.unit.toLowerCase().trim();
-                if (u == 'шт' || u == 'pcs') {
-                  final gpp = item.gramsPerPiece ?? 50.0;
-                  if (gpp > 0) c = item.pricePerKg! * (item.grossWeight / gpp);
-                } else {
-                  c = item.pricePerKg! * item.grossWeight / 1000;
-                }
-              }
-              // Листовой ингредиент без цены в БД — подтянуть из номенклатуры
-              if (c <= 0 && item.sourceTechCardId == null) {
-                final enriched = _enrichLeafIngredientForHydrate(item);
-                c = enriched.effectiveCost;
-                if (c <= 0 &&
-                    enriched.pricePerKg != null &&
-                    enriched.pricePerKg! > 0 &&
-                    enriched.grossWeight > 0) {
-                  final u = enriched.unit.toLowerCase().trim();
-                  if (u == 'шт' || u == 'pcs') {
-                    final gpp = enriched.gramsPerPiece ?? 50.0;
-                    if (gpp > 0) c = enriched.pricePerKg! * (enriched.grossWeight / gpp);
-                  } else {
-                    c = enriched.pricePerKg! * enriched.grossWeight / 1000;
-                  }
-                }
-              }
-              return sum + (c > 0 ? c : 0);
-            },
-          );
-
-          final resolvedName =
-              ingredient.sourceTechCardName?.trim().isNotEmpty == true
-                  ? ingredient.sourceTechCardName
-                  : resolvedNested.getDisplayNameInLists(lang);
-
-          if (nestedOutput <= 0 || nestedCost <= 0) {
-            if (resolvedName == ingredient.sourceTechCardName)
-              return ingredient;
-            return ingredient.copyWith(sourceTechCardName: resolvedName);
-          }
-
-          final resolvedPricePerKg = nestedCost * 1000 / nestedOutput;
-          final ingredientOutput = _ingredientResolvedOutput(ingredient);
-          final resolvedCost = ingredient.cost > 0
-              ? ingredient.cost
-              : resolvedPricePerKg * ingredientOutput / 1000;
-
-          return ingredient.copyWith(
-            sourceTechCardName: resolvedName,
-            pricePerKg:
-                (ingredient.pricePerKg == null || ingredient.pricePerKg! <= 0)
-                    ? resolvedPricePerKg
-                    : ingredient.pricePerKg,
-            cost: resolvedCost,
-          );
-        }).toList();
-
-        final resolvedCard =
-            techCard.copyWith(ingredients: resolvedIngredients);
-        memo[techCard.id] = resolvedCard;
-        return resolvedCard;
-      } finally {
-        resolving.remove(techCard.id);
-      }
-    }
-
-    return techCards.map(resolveCard).toList();
-  }
 
   String _normalizeForTechCardName(String s) {
     final cleaned = s
@@ -2113,7 +1945,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       }
 
       all = all.map(stripInvalidNestedPfSelfLinks).toList();
-      all = await tcSvc.ensureIngredientsForCards(all);
       final pfCards = all.where((t) => t.isSemiFinished).toList();
 
       final currentTc = _techCard!;
@@ -2126,7 +1957,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       }
       fixed = _attachMissingPfSourceTechCardId(fixed, pfCards);
 
-      final hydrated = _hydrateNestedTechCardCosts([fixed, ...pfCards]);
+      final productStore = context.read<ProductStoreSupabase>();
+      final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
+      final hydrated = (estPriceId != null && estPriceId.isNotEmpty)
+          ? TechCardCostHydrator.hydrate([fixed, ...all], productStore, estPriceId)
+          : [fixed, ...all];
       final hydratedTc = hydrated.firstWhere((item) => item.id == fixed.id,
           orElse: () => fixed);
       final hydratedPfs = hydrated.where((t) => t.isSemiFinished).toList();
@@ -4597,7 +4432,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                       onSuggestWaste: _suggestWasteForRow,
                                       hideTechnologyBlock: true,
                                       onTapPfIngredient: (id) => context
-                                          .push('/tech-cards/$id?view=1'),
+                                          .push('/tech-cards/$id'),
                                     )
                                   : ConstrainedBox(
                                       constraints: const BoxConstraints(

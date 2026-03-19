@@ -243,6 +243,9 @@ class TechCardServiceSupabase {
   }
 
   /// Догрузить ингредиенты для карточек с пустым составом (bulk-запрос иногда возвращает tt_ingredients пустыми).
+  /// Параллельная загрузка пачками, чтобы не тормозить при большом числе карточек.
+  static const int _ensureIngredientsBatchSize = 8;
+
   Future<List<TechCard>> ensureIngredientsForCards(List<TechCard> cards) async {
     final emptyIds = cards
         .where((tc) => tc.ingredients.isEmpty)
@@ -250,14 +253,23 @@ class TechCardServiceSupabase {
         .toSet()
         .toList();
     if (emptyIds.isEmpty) return cards;
-    final byId = {for (final tc in cards) tc.id: tc};
-    for (final id in emptyIds) {
-      try {
-        final full = await getTechCardById(id);
-        if (full != null && full.ingredients.isNotEmpty) {
-          byId[id] = full;
-        }
-      } catch (_) {}
+    final byId = <String, TechCard>{for (final tc in cards) tc.id: tc};
+    for (var i = 0; i < emptyIds.length; i += _ensureIngredientsBatchSize) {
+      final batch = emptyIds.skip(i).take(_ensureIngredientsBatchSize).toList();
+      final results = await Future.wait(
+        batch.map((id) async {
+          try {
+            final full = await getTechCardById(id);
+            if (full != null && full.ingredients.isNotEmpty) {
+              return MapEntry(id, full);
+            }
+          } catch (_) {}
+          return null;
+        }),
+      );
+      for (final r in results) {
+        if (r != null) byId[r.key] = r.value;
+      }
     }
     return cards.map((tc) => byId[tc.id] ?? tc).toList();
   }
