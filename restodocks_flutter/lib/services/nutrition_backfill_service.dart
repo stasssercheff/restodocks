@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/product.dart';
-import 'nutrition_api_service.dart';
 import 'product_store_supabase.dart';
+import 'nutrition_profile_resolver.dart';
 
 const _keyLastRun = 'nutrition_backfill_last_run_ms';
 const _keyProcessedToday = 'nutrition_backfill_processed_today';
@@ -61,22 +61,12 @@ class NutritionBackfillService {
       var updated = 0;
       for (final p in candidates) {
         try {
-          final name = p.getLocalizedName('ru');
-          if (name.trim().isEmpty) continue;
-          final result = await NutritionApiService.fetchNutrition(name);
-          if (result != null && result.hasData) {
-            final saneCal = NutritionApiService.saneCaloriesForProduct(name, result.calories);
-            final updatedProduct = p.copyWith(
-              calories: saneCal ?? result.calories,
-              protein: result.protein ?? p.protein,
-              fat: result.fat ?? p.fat,
-              carbs: result.carbs ?? p.carbs,
-              containsGluten: result.containsGluten ?? p.containsGluten,
-              containsLactose: result.containsLactose ?? p.containsLactose,
-            );
-            await store.updateProduct(updatedProduct);
-            updated++;
-          }
+          final did = await NutritionProfileResolver().resolveAndApplyMissingNutrition(
+            store: store,
+            product: p,
+            reason: 'missing_fields',
+          );
+          if (did) updated++;
         } catch (_) {}
         await Future.delayed(_delayBetweenRequests);
       }
@@ -91,9 +81,9 @@ class NutritionBackfillService {
   }
 
   bool _needsKbju(Product p) =>
-      (p.calories == null || p.calories == 0) &&
-      p.protein == null &&
-      p.fat == null &&
+      (p.calories == null || p.calories == 0) ||
+      p.protein == null ||
+      p.fat == null ||
       p.carbs == null;
 
   /// Сбросить счётчик «за сегодня» (например, в полночь).
