@@ -832,7 +832,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                               'Неоднозначные полуфабрикаты (${ambiguousMatches.length})',
                               style: Theme.of(ctx2).textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: Colors.orange[700],
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -906,7 +905,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                               'Ингредиенты без цен (${missingPriceIngredients.length})',
                               style: Theme.of(ctx2).textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: Colors.red[700],
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -916,15 +914,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   border: Border.all(
-                                      color: Colors.red.withOpacity(0.3)),
+                                      color: Theme.of(ctx2).colorScheme.outlineVariant),
                                   borderRadius: BorderRadius.circular(10),
-                                  color: Colors.red.withOpacity(0.05),
+                                  color: Theme.of(ctx2).colorScheme.surfaceContainerLowest,
                                 ),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.warning, 
-                                         color: Colors.red[700], 
-                                         size: 20),
+                                    const Icon(Icons.warning, size: 20),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
@@ -945,7 +941,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                               'Проблемы с весом (${missingWeightIssues.length})',
                               style: Theme.of(ctx2).textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: Colors.blue[700],
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -955,15 +950,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   border: Border.all(
-                                      color: Colors.blue.withOpacity(0.3)),
+                                      color: Theme.of(ctx2).colorScheme.outlineVariant),
                                   borderRadius: BorderRadius.circular(10),
-                                  color: Colors.blue.withOpacity(0.05),
+                                  color: Theme.of(ctx2).colorScheme.surfaceContainerLowest,
                                 ),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.scale, 
-                                         color: Colors.blue[700], 
-                                         size: 20),
+                                    const Icon(Icons.scale, size: 20),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
@@ -986,7 +979,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                               'Проблемы с технологией (${missingTechnologyIssues.length})',
                               style: Theme.of(ctx2).textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: Colors.purple[700],
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -996,15 +988,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   border: Border.all(
-                                      color: Colors.purple.withOpacity(0.3)),
+                                      color: Theme.of(ctx2).colorScheme.outlineVariant),
                                   borderRadius: BorderRadius.circular(10),
-                                  color: Colors.purple.withOpacity(0.05),
+                                  color: Theme.of(ctx2).colorScheme.surfaceContainerLowest,
                                 ),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.engineering, 
-                                         color: Colors.purple[700], 
-                                         size: 20),
+                                    const Icon(Icons.engineering, size: 20),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
