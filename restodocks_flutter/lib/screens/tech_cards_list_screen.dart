@@ -286,19 +286,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return ing.grossWeight;
   }
 
-  /// Стоимость строки-продукта: из ТТК или из номенклатуры заведения (как в редакторе).
-  double _leafIngredientMonetaryCost(TTIngredient ing) {
-    if (ing.effectiveCost > 0) return ing.effectiveCost;
-    final store = _priceProductStore;
-    final estId = _priceEstablishmentId;
-    if (store == null || estId == null || estId.isEmpty) return 0.0;
-    final pid = ing.productId;
-    final name = ing.productName.trim();
-    if ((pid == null || pid.isEmpty) && name.isEmpty) return 0.0;
-    final product = store.findProductForIngredient(pid, name);
-    if (product == null) return 0.0;
-    final ep = store.getEstablishmentPrice(product.id, estId);
-    final pricePerKg = ep?.$1 ?? 0.0;
+  double _costFromPricePerKgLine(double pricePerKg, TTIngredient ing) {
     if (pricePerKg <= 0) return 0.0;
     final u = ing.unit.toLowerCase().trim();
     if (u == 'шт' || u == 'pcs') {
@@ -307,6 +295,31 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       return pricePerKg * (ing.grossWeight / gpp);
     }
     return pricePerKg * (ing.grossWeight / 1000.0);
+  }
+
+  /// Стоимость строки-продукта: из ТТК, pricePerKg строки, номенклатуры (как в редакторе).
+  /// Нужны loadProducts + loadNomenclature; для филиала ключ цены — id филиала, не головы.
+  double _leafIngredientMonetaryCost(TTIngredient ing) {
+    if (ing.effectiveCost > 0) return ing.effectiveCost;
+    // В БД часто netWeight=0 при ненулевом брутто — effectiveCost даёт 0, хотя pricePerKg задан.
+    if (ing.pricePerKg != null && ing.pricePerKg! > 0 && ing.grossWeight > 0) {
+      final fromLine = _costFromPricePerKgLine(ing.pricePerKg!, ing);
+      if (fromLine > 0) return fromLine;
+    }
+    final store = _priceProductStore;
+    final estId = _priceEstablishmentId;
+    if (store == null || estId == null || estId.isEmpty) return 0.0;
+    final pid = ing.productId;
+    final name = ing.productName.trim();
+    if ((pid == null || pid.isEmpty) && name.isEmpty) return 0.0;
+
+    final product = store.findProductForIngredient(pid, name);
+    final resolvedId = product?.id ?? (pid != null && pid.isNotEmpty ? pid : null);
+    if (resolvedId == null || resolvedId.isEmpty) return 0.0;
+
+    final ep = store.getEstablishmentPrice(resolvedId, estId);
+    final pricePerKg = ep?.$1 ?? 0.0;
+    return _costFromPricePerKgLine(pricePerKg, ing);
   }
 
   String _normalizeForTechCardName(String s) {
@@ -756,6 +769,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       final svc = context.read<TechCardServiceSupabase>();
       final productStore = context.read<ProductStoreSupabase>();
       try {
+        // Без каталога продуктов findProductForIngredient не сработает (только кэш цен в номенклатуре).
+        await productStore.loadProducts();
         if (est.isBranch) {
           await productStore.loadNomenclatureForBranch(
               est.id, est.dataEstablishmentId!);
@@ -890,7 +905,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           '[ttk_list] _load: est=${est.dataEstablishmentId} dept=${widget.department} all=${all.length} afterFilter=${list.length}');
       if (mounted) {
         _priceProductStore = productStore;
-        _priceEstablishmentId = est.dataEstablishmentId;
+        // Кэш цен loadNomenclatureForBranch кладёт под ключом id филиала, не головного заведения.
+        _priceEstablishmentId =
+            est.isBranch ? est.id : est.dataEstablishmentId;
         setState(() {
           _list = list;
           _loading = false;
