@@ -13,7 +13,6 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
-import '../utils/dev_log.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/scroll_to_top_app_bar_title.dart';
 import '../services/ai_service.dart';
@@ -265,29 +264,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return categoryTranslations[c]?[lang] ?? c;
   }
 
-  /// Флаг: ?debug=ttk в URL → логи в консоль браузера (первые 3 карточки).
-  static bool get _ttkCostDebug =>
-      kIsWeb && Uri.base.queryParameters['debug'] == 'ttk';
-
-  static int _costDebugCount = 0;
-
   /// То же, что «Итого стоимость за кг» в редакторе — один источник истины.
   /// Рекурсивно учитывает вложенные ПФ (sourceTechCardId) через _resolveTechCardCostOutput.
   /// Fallback: TechCardCostHydrator по гидратированным ингредиентам; выход — tc.yield если сумма по строкам 0.
   double _calculateCostPerKg(TechCard tc) {
     final resolved = _resolveTechCardCostOutput(tc.id, <String>{});
     final effectiveOutput = resolved.output > 0 ? resolved.output : (tc.yield > 0 ? tc.yield : 0.0);
-    if (_ttkCostDebug && _costDebugCount < 3) {
-      _costDebugCount++;
-      final ing0 = tc.ingredients.isNotEmpty ? tc.ingredients.first : null;
-      devLog(
-        'ttk_cost_debug[$_costDebugCount] "${tc.dishName}": '
-        'resolved=(cost=${resolved.cost}, output=${resolved.output}) '
-        'yield=${tc.yield} ingCount=${tc.ingredients.length} '
-        'priceStore=${_priceProductStore != null} estId=${_priceEstablishmentId != null} '
-        'ing0=${ing0 != null ? "name=${ing0.productName} effCost=${ing0.effectiveCost} pricePerKg=${ing0.pricePerKg}" : "—"}',
-      );
-    }
     if (effectiveOutput > 0 && resolved.cost > 0) {
       return (resolved.cost / effectiveOutput) * 1000;
     }
@@ -883,7 +865,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final est = acc.establishment;
     final emp = acc.currentEmployee;
     if (est == null) {
-      devLog('[ttk_list] _load: est=null, skip');
       setState(() {
         _loading = false;
         _error = 'no_establishment';
@@ -900,9 +881,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       // Раньше один catch: если падал loadProducts, номенклатура не грузилась → кэш цен пустой и ₽/кг = 0.
       try {
         await productStore.loadProducts();
-      } catch (e) {
-        devLog('[ttk_list] loadProducts failed (TTK list still loads): $e');
-      }
+      } catch (_) {}
       try {
         if (est.isBranch) {
           await productStore.loadNomenclatureForBranch(
@@ -910,9 +889,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         } else {
           await productStore.loadNomenclature(est.dataEstablishmentId);
         }
-      } catch (e) {
-        devLog('[ttk_list] loadNomenclature failed: $e');
-      }
+      } catch (_) {}
       // Филиал: карточки головного (только просмотр) + свои (редактируемые). Головное: только свои.
       List<TechCard> all;
       if (est.isBranch) {
@@ -932,7 +909,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         if (!identical(s, tc)) toPersistSelfLink.add(s);
       }
       all = sanitizedAll;
-      all = await svc.ensureIngredientsForCards(all);
 
       // Та же гидратация, что в редакторе — «Итого стоимость за кг» = ₽/кг в списке.
       final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
@@ -1041,8 +1017,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           existing.add(id);
         }
       } catch (_) {}
-      devLog(
-          '[ttk_list] _load: est=${est.dataEstablishmentId} dept=${widget.department} all=${all.length} afterFilter=${list.length}');
       if (mounted) {
         _priceProductStore = productStore;
         // Кэш цен loadNomenclatureForBranch кладёт под ключом id филиала, не головного заведения.
@@ -1059,12 +1033,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         // Все ТТК заведения — чтобы рекурсия по вложенным ПФ находила карточки вне текущего фильтра списка.
         _techCardsById = {for (final tc in all) tc.id: tc};
         _resolvedCostMemo.clear();
-        _costDebugCount = 0;
-        if (_ttkCostDebug) {
-          devLog(
-            'ttk_cost_debug: list loaded, cards=${list.length} priceStore=${_priceProductStore != null} estId=$_priceEstablishmentId',
-          );
-        }
         _ensureTechCardTranslations(svc, list);
         _warmPdfParser();
       }
@@ -1081,7 +1049,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         });
       }
     } catch (e) {
-      devLog('[ttk_list] _load error: $e');
       if (mounted)
         setState(() {
           _error = e.toString();
@@ -2402,11 +2369,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               isSection: false
             ))
         .toList();
-    final costLabel = showCost
-        ? (isDishesTab
-            ? loc.t('ttk_col_cost_per_portion').replaceFirst('%s', costSym)
-            : '$costSym/${loc.t('kg')}')
-        : '—';
+    final costLabel = isDishesTab
+        ? loc.t('ttk_col_cost_per_portion').replaceFirst('%s', costSym)
+        : '$costSym/${loc.t('kg')}';
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -2419,6 +2384,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               colCatWidth: colCatWidth,
               colCostWidth: colCostWidth,
               colActionsWidth: colActionsWidth,
+              showCost: showCost,
               color: Theme.of(context).colorScheme.primaryContainer,
               onColor: Theme.of(context).colorScheme.onPrimaryContainer,
               labelName: loc.t('ttk_col_name'),
@@ -2501,11 +2467,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final name = tc.getDisplayNameInLists(lang);
     final sectionStr = _sectionLabelForDisplay(tc, loc);
     final cat = _categoryLabel(tc.category, loc);
-    final cost = showCost
-        ? (isDishesTab
-            ? '${NumberFormatUtils.formatDecimal(_calculateCostPerPortion(tc))} $costSym'
-            : NumberFormatUtils.formatInt(_calculateCostPerKg(tc)))
-        : '—';
     return Material(
       color: selected
           ? Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5)
@@ -2562,17 +2523,20 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   textAlign: TextAlign.center,
                 ),
               ),
-              SizedBox(
-                width: colCostWidth,
-                child: Text(
-                  cost,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+              if (showCost)
+                SizedBox(
+                  width: colCostWidth,
+                  child: Text(
+                    isDishesTab
+                        ? '${NumberFormatUtils.formatDecimal(_calculateCostPerPortion(tc))} $costSym'
+                        : NumberFormatUtils.formatInt(_calculateCostPerKg(tc)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
                 ),
-              ),
               SizedBox(
                 width: colActionsWidth,
                 child: _selectionMode
@@ -2653,13 +2617,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 }
 
-/// Делегат для липкой шапки таблицы ТТК (Название | Цех | Категория | ₽/кг | Просмотр).
+/// Делегат для липкой шапки таблицы ТТК (Название | Цех | Категория | [₽/кг] | Просмотр).
+/// Колонка ₽/кг показывается только если showCost == true (руководство).
 class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
   _TableHeaderDelegate({
     required this.colSectionWidth,
     required this.colCatWidth,
     required this.colCostWidth,
     required this.colActionsWidth,
+    required this.showCost,
     required this.color,
     required this.onColor,
     required this.labelName,
@@ -2673,6 +2639,7 @@ class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
   final double colCatWidth;
   final double colCostWidth;
   final double colActionsWidth;
+  final bool showCost;
   final Color color;
   final Color onColor;
   final String labelName;
@@ -2720,10 +2687,11 @@ class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          SizedBox(
-            width: colCostWidth,
-            child: Text(labelCost, style: style, textAlign: TextAlign.center),
-          ),
+          if (showCost)
+            SizedBox(
+              width: colCostWidth,
+              child: Text(labelCost, style: style, textAlign: TextAlign.center),
+            ),
           SizedBox(
             width: colActionsWidth,
             child: Text(labelView,
@@ -2742,6 +2710,7 @@ class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
         oldDelegate.colCatWidth != colCatWidth ||
         oldDelegate.colCostWidth != colCostWidth ||
         oldDelegate.colActionsWidth != colActionsWidth ||
+        oldDelegate.showCost != showCost ||
         oldDelegate.color != color ||
         oldDelegate.onColor != onColor ||
         oldDelegate.labelName != labelName ||
