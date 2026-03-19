@@ -297,6 +297,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return pricePerKg * (ing.grossWeight / 1000.0);
   }
 
+  /// Если в `establishment_products` нет цены — берём из глобального каталога (`base_price`, упаковка).
+  /// Для строк в шт. используем [Product.effectiveBasePrice] как цену за штуку.
+  double? _catalogFallbackUnitPrice(Product product, TTIngredient ing) {
+    final iu = ing.unit.toLowerCase().trim();
+    if (iu == 'шт' || iu == 'pcs') {
+      final v = product.effectiveBasePrice;
+      if (v != null && v > 0) return v;
+      return null;
+    }
+    final perKg = product.computedPricePerKg;
+    if (perKg != null && perKg > 0) return perKg;
+    final bp = product.basePrice;
+    if (bp != null && bp > 0) return bp;
+    return null;
+  }
+
   /// Стоимость строки-продукта: из ТТК, pricePerKg строки, номенклатуры (как в редакторе).
   /// Нужны loadProducts + loadNomenclature; для филиала ключ цены — id филиала, не головы.
   double _leafIngredientMonetaryCost(TTIngredient ing) {
@@ -318,8 +334,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     if (resolvedId == null || resolvedId.isEmpty) return 0.0;
 
     final ep = store.getEstablishmentPrice(resolvedId, estId);
-    final pricePerKg = ep?.$1 ?? 0.0;
-    return _costFromPricePerKgLine(pricePerKg, ing);
+    var unitPrice = ep?.$1 ?? 0.0;
+    if (unitPrice <= 0 && product != null) {
+      final fb = _catalogFallbackUnitPrice(product, ing);
+      if (fb != null && fb > 0) unitPrice = fb;
+    }
+    return _costFromPricePerKgLine(unitPrice, ing);
   }
 
   String _normalizeForTechCardName(String s) {
@@ -768,17 +788,21 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     try {
       final svc = context.read<TechCardServiceSupabase>();
       final productStore = context.read<ProductStoreSupabase>();
+      // Раньше один catch: если падал loadProducts, номенклатура не грузилась → кэш цен пустой и ₽/кг = 0.
       try {
-        // Без каталога продуктов findProductForIngredient не сработает (только кэш цен в номенклатуре).
         await productStore.loadProducts();
+      } catch (e) {
+        devLog('[ttk_list] loadProducts failed (TTK list still loads): $e');
+      }
+      try {
         if (est.isBranch) {
           await productStore.loadNomenclatureForBranch(
               est.id, est.dataEstablishmentId!);
         } else {
           await productStore.loadNomenclature(est.dataEstablishmentId);
         }
-      } catch (_) {
-        // Список ТТК должен открываться без номенклатуры; ₽/кг тогда только из полей ингредиента.
+      } catch (e) {
+        devLog('[ttk_list] loadNomenclature failed: $e');
       }
       // Филиал: карточки головного (только просмотр) + свои (редактируемые). Головное: только свои.
       List<TechCard> all;
