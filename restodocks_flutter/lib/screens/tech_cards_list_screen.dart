@@ -8,8 +8,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import 'excel_style_ttk_table.dart';
-
 import '../models/models.dart';
 import '../utils/dev_log.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -23,7 +21,8 @@ enum _TtkImportMode { single, multi }
 
 /// Список ТТК заведения. Создание и переход к редактированию.
 class TechCardsListScreen extends StatefulWidget {
-  const TechCardsListScreen({super.key, this.department = 'kitchen', this.embedded = false});
+  const TechCardsListScreen(
+      {super.key, this.department = 'kitchen', this.embedded = false});
 
   final String department;
   final bool embedded;
@@ -47,6 +46,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   String? _filterCategory; // null = все категории
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  Map<String, List<TechCard>> _pfCandidatesByNormalizedName = {};
 
   @override
   void dispose() {
@@ -56,11 +56,41 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 
   /// Порядок категорий: кухня (без напитков) и бар (только напитки/снеки)
-  static const _kitchenCategoryOrder = ['sauce', 'vegetables', 'zagotovka', 'salad', 'zakuska', 'meat', 'seafood', 'poultry', 'side', 'subside', 'bakery', 'dessert', 'decor', 'soup', 'misc', 'banquet', 'catering'];
-  static const _barCategoryOrder = ['alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zakuska', 'beverages'];
+  static const _kitchenCategoryOrder = [
+    'sauce',
+    'vegetables',
+    'zagotovka',
+    'salad',
+    'zakuska',
+    'meat',
+    'seafood',
+    'poultry',
+    'side',
+    'subside',
+    'bakery',
+    'dessert',
+    'decor',
+    'soup',
+    'misc',
+    'banquet',
+    'catering'
+  ];
+  static const _barCategoryOrder = [
+    'alcoholic_cocktails',
+    'non_alcoholic_drinks',
+    'hot_drinks',
+    'drinks_pure',
+    'snacks',
+    'zakuska',
+    'beverages'
+  ];
 
-  List<({String category, List<TechCard> cards})> _groupByCategory(List<TechCard> cards) {
-    final order = (widget.department == 'bar' || widget.department == 'banquet-catering-bar') ? _barCategoryOrder : _kitchenCategoryOrder;
+  List<({String category, List<TechCard> cards})> _groupByCategory(
+      List<TechCard> cards) {
+    final order = (widget.department == 'bar' ||
+            widget.department == 'banquet-catering-bar')
+        ? _barCategoryOrder
+        : _kitchenCategoryOrder;
     final grouped = <String, List<TechCard>>{};
     for (final tc in cards) {
       final cat = tc.category.isNotEmpty ? tc.category : 'misc';
@@ -69,7 +99,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final result = <({String category, List<TechCard> cards})>[];
     for (final cat in order) {
       final list = grouped.remove(cat);
-      if (list != null && list.isNotEmpty) result.add((category: cat, cards: list));
+      if (list != null && list.isNotEmpty)
+        result.add((category: cat, cards: list));
     }
     for (final e in grouped.entries) {
       result.add((category: e.key, cards: e.value));
@@ -78,9 +109,25 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 
   /// Группировка по цеху.
-  static const _sectionOrder = ['all', 'hot_kitchen', 'cold_kitchen', 'preparation', 'prep', 'confectionery', 'pastry', 'grill', 'pizza', 'sushi', 'bakery', 'banquet_catering', 'bar', 'hidden'];
+  static const _sectionOrder = [
+    'all',
+    'hot_kitchen',
+    'cold_kitchen',
+    'preparation',
+    'prep',
+    'confectionery',
+    'pastry',
+    'grill',
+    'pizza',
+    'sushi',
+    'bakery',
+    'banquet_catering',
+    'bar',
+    'hidden'
+  ];
 
-  List<({String section, List<TechCard> cards})> _groupBySection(List<TechCard> cards) {
+  List<({String section, List<TechCard> cards})> _groupBySection(
+      List<TechCard> cards) {
     final grouped = <String, List<TechCard>>{};
     for (final tc in cards) {
       final key = _sectionKeyForGroup(tc);
@@ -110,7 +157,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   String _sectionLabelForDisplay(TechCard tc, LocalizationService loc) {
     if (tc.sections.isEmpty) return loc.t('ttk_sections_hidden');
     if (tc.sections.contains('all')) return loc.t('ttk_sections_all');
-    final labels = tc.sections.map((s) => _sectionCodeToLabel(s, loc)).where((l) => l.isNotEmpty);
+    final labels = tc.sections
+        .map((s) => _sectionCodeToLabel(s, loc))
+        .where((l) => l.isNotEmpty);
     return labels.join(', ');
   }
 
@@ -179,8 +228,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       'soup': {'ru': 'Суп', 'en': 'Soup'},
       'misc': {'ru': 'Разное', 'en': 'Misc'},
       'beverages': {'ru': 'Напитки', 'en': 'Beverages'},
-      'alcoholic_cocktails': {'ru': 'Алкогольные коктейли', 'en': 'Alcoholic cocktails'},
-      'non_alcoholic_drinks': {'ru': 'Безалкогольные напитки', 'en': 'Non-alcoholic drinks'},
+      'alcoholic_cocktails': {
+        'ru': 'Алкогольные коктейли',
+        'en': 'Alcoholic cocktails'
+      },
+      'non_alcoholic_drinks': {
+        'ru': 'Безалкогольные напитки',
+        'en': 'Non-alcoholic drinks'
+      },
       'hot_drinks': {'ru': 'Горячие напитки', 'en': 'Hot drinks'},
       'drinks_pure': {'ru': 'Напитки в чистом виде', 'en': 'Drinks (neat)'},
       'snacks': {'ru': 'Снеки', 'en': 'Snacks'},
@@ -200,15 +255,377 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   /// Себестоимость за порцию (для блюд): totalCost * portionWeight / yield.
   double _calculateCostPerPortion(TechCard tc) {
-    if (tc.ingredients.isEmpty || tc.yield <= 0 || tc.portionWeight <= 0) return 0.0;
+    if (tc.ingredients.isEmpty || tc.yield <= 0 || tc.portionWeight <= 0)
+      return 0.0;
     final resolved = _resolveTechCardCostOutput(tc.id, <String>{});
-    return resolved.output > 0 ? resolved.cost * tc.portionWeight / tc.yield : 0.0;
+    return resolved.output > 0
+        ? resolved.cost * tc.portionWeight / tc.yield
+        : 0.0;
   }
 
   double _ingredientResolvedOutput(TTIngredient ing) {
     if (ing.outputWeight > 0) return ing.outputWeight;
     if (ing.netWeight > 0) return ing.netWeight;
     return ing.grossWeight;
+  }
+
+  String _normalizeForTechCardName(String s) {
+    final cleaned = s
+        .replaceAll(RegExp(r'[^a-zA-Zа-яА-ЯёЁ0-9\\s]+'), ' ')
+        .toLowerCase()
+        .replaceAll(RegExp(r'\\s+'), ' ')
+        .trim();
+    if (cleaned.isEmpty) return cleaned;
+    final tokens = cleaned
+        .split(RegExp(r'\\s+'))
+        .where((t) => t.trim().isNotEmpty)
+        .toList()
+      ..sort();
+    return tokens.join(' ');
+  }
+
+  String _stripPfPrefix(String s) {
+    final r =
+        RegExp(r'^(пф|п/ф|п\\.ф\\.|pf|prep|sf|hf)\\s*', caseSensitive: false);
+    return s.trim().replaceFirst(r, '').trim();
+  }
+
+  void _rebuildPfCandidatesIndex(LocalizationService loc) {
+    final lang = loc.currentLanguageCode;
+    final pfCards = _list.where((t) => t.isSemiFinished).toList();
+    final map = <String, List<TechCard>>{};
+    for (final pf in pfCards) {
+      final names = <String>[
+        pf.getDisplayNameInLists(lang),
+        pf.getLocalizedDishName(lang),
+        pf.dishName,
+      ];
+      for (final n in names) {
+        final k = _normalizeForTechCardName(_stripPfPrefix(n));
+        if (k.isEmpty) continue;
+        final list = map.putIfAbsent(k, () => []);
+        if (!list.any((x) => x.id == pf.id)) list.add(pf);
+      }
+    }
+    _pfCandidatesByNormalizedName = map;
+  }
+
+  int _ambiguousPfIngredientCount(TechCard tc, LocalizationService loc) {
+    if (tc.ingredients.isEmpty) return 0;
+    var cnt = 0;
+    for (final ing in tc.ingredients) {
+      final hasSourceId =
+          ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty;
+      if (hasSourceId) continue;
+      final name = ing.productName.trim();
+      if (name.isEmpty) continue;
+      final key = _normalizeForTechCardName(_stripPfPrefix(name));
+      final candidates = _pfCandidatesByNormalizedName[key] ?? const [];
+      if (candidates.length > 1) cnt++;
+    }
+    return cnt;
+  }
+
+  Widget _buildReviewList(
+      List<TechCard> techCards, LocalizationService loc, bool canEdit) {
+    final lang = loc.currentLanguageCode;
+    final list = techCards
+        .map((tc) => (tc: tc, ambiguous: _ambiguousPfIngredientCount(tc, loc)))
+        .where((e) => e.ambiguous > 0)
+        .toList()
+      ..sort((a, b) => b.ambiguous.compareTo(a.ambiguous));
+
+    if (list.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(
+            'Нет ТТК на проверку',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.separated(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        itemCount: list.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemBuilder: (ctx, i) {
+          final item = list[i];
+          final tc = item.tc;
+          final name = tc.getDisplayNameInLists(lang);
+          return ListTile(
+            tileColor: Theme.of(ctx).colorScheme.surfaceContainerLowest,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+                side: BorderSide(
+                    color: Theme.of(ctx).colorScheme.outlineVariant)),
+            title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+            subtitle: Text('Неоднозначных ингредиентов: ${item.ambiguous}'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showReviewBottomSheet(tc, loc),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _showReviewBottomSheet(
+      TechCard tc, LocalizationService loc) async {
+    final lang = loc.currentLanguageCode;
+    final matches = <({TTIngredient ing, List<TechCard> candidates})>[];
+    for (final ing in tc.ingredients) {
+      final hasSourceId =
+          ing.sourceTechCardId != null && ing.sourceTechCardId!.isNotEmpty;
+      if (hasSourceId) continue;
+      final name = ing.productName.trim();
+      if (name.isEmpty) continue;
+      final key = _normalizeForTechCardName(_stripPfPrefix(name));
+      final candidates = _pfCandidatesByNormalizedName[key] ?? const [];
+      if (candidates.length > 1) {
+        matches.add((ing: ing, candidates: candidates));
+      }
+    }
+    if (matches.isEmpty) return;
+
+    final selected = <String, String>{
+      for (final m in matches) m.ing.id: m.candidates.first.id,
+    };
+    var saving = false;
+
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx2, setStateDlg) {
+            return SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 12,
+                  right: 12,
+                  top: 12,
+                  bottom: 12 + MediaQuery.of(ctx2).viewInsets.bottom,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'На проверку: ${tc.getDisplayNameInLists(lang)}',
+                            style: Theme.of(ctx2)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed:
+                              saving ? null : () => Navigator.of(ctx2).pop(),
+                          icon: const Icon(Icons.close),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: matches.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (_, i) {
+                          final m = matches[i];
+                          final selId =
+                              selected[m.ing.id] ?? m.candidates.first.id;
+                          final selPf = m.candidates.firstWhere(
+                              (c) => c.id == selId,
+                              orElse: () => m.candidates.first);
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                  color: Theme.of(ctx2)
+                                      .colorScheme
+                                      .outlineVariant),
+                              borderRadius: BorderRadius.circular(10),
+                              color: Theme.of(ctx2)
+                                  .colorScheme
+                                  .surfaceContainerLowest,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Text(m.ing.productName,
+                                    style: Theme.of(ctx2)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
+                                            fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 8),
+                                DropdownButtonFormField<String>(
+                                  value: selId,
+                                  isExpanded: true,
+                                  decoration: const InputDecoration(
+                                      isDense: true, labelText: 'Кандидат ПФ'),
+                                  items: m.candidates
+                                      .map((c) => DropdownMenuItem<String>(
+                                            value: c.id,
+                                            child: Text(
+                                                c.getDisplayNameInLists(lang)),
+                                          ))
+                                      .toList(),
+                                  onChanged: saving
+                                      ? null
+                                      : (v) {
+                                          if (v == null) return;
+                                          setStateDlg(
+                                              () => selected[m.ing.id] = v);
+                                        },
+                                ),
+                                const SizedBox(height: 8),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton(
+                                    onPressed: () =>
+                                        _showTechCardCompositionDialog(
+                                            ctx2, selPf, lang),
+                                    child: const Text('Состав'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: saving
+                                ? null
+                                : () => context.push('/tech-cards/${tc.id}'),
+                            child: const Text('Открыть карточку'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: saving
+                                ? null
+                                : () async {
+                                    setStateDlg(() => saving = true);
+                                    try {
+                                      final svc = context
+                                          .read<TechCardServiceSupabase>();
+                                      final updatedIngredients =
+                                          tc.ingredients.map((ing) {
+                                        final pickedId = selected[ing.id];
+                                        if (pickedId == null) return ing;
+                                        final pf = _list.firstWhere(
+                                          (x) => x.id == pickedId,
+                                          orElse: () =>
+                                              _pfCandidatesByNormalizedName
+                                                  .values
+                                                  .expand((e) => e)
+                                                  .firstWhere(
+                                                      (x) => x.id == pickedId),
+                                        );
+                                        final display =
+                                            pf.getDisplayNameInLists(lang);
+                                        return ing.copyWith(
+                                          sourceTechCardId: pf.id,
+                                          sourceTechCardName: display,
+                                          productName: display,
+                                        );
+                                      }).toList();
+                                      final updatedTc = tc.copyWith(
+                                          ingredients: updatedIngredients);
+                                      await svc.saveTechCard(updatedTc);
+                                      if (mounted) {
+                                        await _load();
+                                      }
+                                      if (ctx2.mounted)
+                                        Navigator.of(ctx2).pop();
+                                    } catch (e) {
+                                      if (ctx2.mounted) {
+                                        ScaffoldMessenger.of(ctx2).showSnackBar(
+                                            SnackBar(
+                                                content: Text(
+                                                    'Ошибка сохранения: $e')));
+                                      }
+                                    } finally {
+                                      if (ctx2.mounted)
+                                        setStateDlg(() => saving = false);
+                                    }
+                                  },
+                            child: saving
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2))
+                                : const Text('Применить'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showTechCardCompositionDialog(
+      BuildContext ctx, TechCard tc, String lang) {
+    final items = tc.ingredients
+        .where((i) => i.productName.trim().isNotEmpty)
+        .toList(growable: false);
+    final text = items.isEmpty
+        ? '—'
+        : items.map((i) {
+            final w = i.outputWeight > 0
+                ? i.outputWeight
+                : (i.netWeight > 0 ? i.netWeight : i.grossWeight);
+            final unit =
+                i.unit?.trim().isNotEmpty == true ? i.unit!.trim() : 'г';
+            return '${i.productName} — ${w.toStringAsFixed(0)} $unit';
+          }).join('\n');
+
+    showDialog<void>(
+      context: ctx,
+      builder: (dctx) => AlertDialog(
+        title: Text(tc.getDisplayNameInLists(lang)),
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child:
+                Text(text, style: const TextStyle(fontSize: 13, height: 1.35)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dctx).pop(),
+            child: Text(MaterialLocalizations.of(dctx).closeButtonLabel),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Возвращает рекурсивно посчитанную себестоимость ТТК и её "выход" (сумма выходов по строкам).
@@ -246,7 +663,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
       final nestedId = ing.sourceTechCardId!;
       final nested = _resolveTechCardCostOutput(nestedId, resolving);
-      if (ingredientOutput <= 0 || nested.output <= 0 || nested.cost <= 0) continue;
+      if (ingredientOutput <= 0 || nested.output <= 0 || nested.cost <= 0)
+        continue;
 
       // Масштабируем себестоимость вложенной ТТК пропорционально "выходу" этой строки.
       totalCost += nested.cost * ingredientOutput / nested.output;
@@ -264,16 +682,23 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final emp = acc.currentEmployee;
     if (est == null) {
       devLog('[ttk_list] _load: est=null, skip');
-      setState(() { _loading = false; _error = 'no_establishment'; });
+      setState(() {
+        _loading = false;
+        _error = 'no_establishment';
+      });
       return;
     }
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final svc = context.read<TechCardServiceSupabase>();
       // Филиал: карточки головного (только просмотр) + свои (редактируемые). Головное: только свои.
       List<TechCard> all;
       if (est.isBranch) {
-        final mainCards = await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
+        final mainCards =
+            await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
         final branchCards = await svc.getTechCardsForEstablishment(est.id);
         all = [...mainCards, ...branchCards];
       } else {
@@ -291,32 +716,68 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       final customBarIds = customBar.map((c) => c.id).toSet();
       List<TechCard> list;
       if (widget.department == 'banquet-catering') {
-        list = all.where((tc) =>
-            tc.category == 'banquet' || tc.category == 'catering').toList();
+        list = all
+            .where(
+                (tc) => tc.category == 'banquet' || tc.category == 'catering')
+            .toList();
       } else if (widget.department == 'banquet-catering-bar') {
-        const barCategories = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zakuska'};
-        list = all.where((tc) =>
-            (tc.category == 'banquet' || tc.category == 'catering') &&
-            (tc.sections.contains('bar') || tc.sections.contains('all') || barCategories.contains(tc.category))).toList();
+        const barCategories = {
+          'beverages',
+          'alcoholic_cocktails',
+          'non_alcoholic_drinks',
+          'hot_drinks',
+          'drinks_pure',
+          'snacks',
+          'zakuska'
+        };
+        list = all
+            .where((tc) =>
+                (tc.category == 'banquet' || tc.category == 'catering') &&
+                (tc.sections.contains('bar') ||
+                    tc.sections.contains('all') ||
+                    barCategories.contains(tc.category)))
+            .toList();
       } else if (widget.department == 'bar') {
-        const barCats = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zakuska'};
+        const barCats = {
+          'beverages',
+          'alcoholic_cocktails',
+          'non_alcoholic_drinks',
+          'hot_drinks',
+          'drinks_pure',
+          'snacks',
+          'zakuska'
+        };
         final cat = (String c) => c.isEmpty ? 'misc' : c;
         list = all.where((tc) {
           final c = cat(tc.category);
           if (barCats.contains(c)) return true;
           if (tc.sections.contains('bar')) return true;
-          if (TechCardServiceSupabase.isCustomCategory(tc.category) && customBarIds.contains(TechCardServiceSupabase.customCategoryId(tc.category))) return true;
+          if (TechCardServiceSupabase.isCustomCategory(tc.category) &&
+              customBarIds.contains(
+                  TechCardServiceSupabase.customCategoryId(tc.category)))
+            return true;
           return false;
         }).toList();
       } else if (widget.department == 'hall') {
         list = []; // Зал не имеет своих ТТК
       } else {
-        const barCats = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zakuska'};
+        const barCats = {
+          'beverages',
+          'alcoholic_cocktails',
+          'non_alcoholic_drinks',
+          'hot_drinks',
+          'drinks_pure',
+          'snacks',
+          'zakuska'
+        };
         final cat = (String c) => c.isEmpty ? 'misc' : c;
         list = all.where((tc) {
           final c = cat(tc.category);
           if (barCats.contains(c)) return false;
-          if (TechCardServiceSupabase.isCustomCategory(tc.category) && customBarIds.contains(TechCardServiceSupabase.customCategoryId(tc.category))) return false;
+          if (TechCardServiceSupabase.isCustomCategory(tc.category) &&
+              customBarIds.contains(
+                  TechCardServiceSupabase.customCategoryId(tc.category)))
+            return false;
           return true;
         }).toList();
       }
@@ -331,7 +792,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         for (final tc in all) {
           for (final ing in tc.ingredients) {
             final id = ing.sourceTechCardId;
-            if (id != null && id.trim().isNotEmpty) referencedIds.add(id.trim());
+            if (id != null && id.trim().isNotEmpty)
+              referencedIds.add(id.trim());
           }
         }
         final existing = list.map((e) => e.id).toSet();
@@ -343,9 +805,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           existing.add(id);
         }
       } catch (_) {}
-      devLog('[ttk_list] _load: est=${est.dataEstablishmentId} dept=${widget.department} all=${all.length} afterFilter=${list.length}');
+      devLog(
+          '[ttk_list] _load: est=${est.dataEstablishmentId} dept=${widget.department} all=${all.length} afterFilter=${list.length}');
       if (mounted) {
-        setState(() { _list = list; _loading = false; });
+        setState(() {
+          _list = list;
+          _loading = false;
+        });
         _techCardsById = {for (final tc in list) tc.id: tc};
         _resolvedCostMemo.clear();
         _ensureTechCardTranslations(svc, list);
@@ -353,7 +819,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       }
     } catch (e) {
       devLog('[ttk_list] _load error: $e');
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      if (mounted)
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
     }
   }
 
@@ -362,23 +832,30 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     if (ai is AiServiceSupabase) ai.warmPdfParser();
   }
 
-  Future<void> _ensureTechCardTranslations(TechCardServiceSupabase svc, List<TechCard> cards) async {
+  Future<void> _ensureTechCardTranslations(
+      TechCardServiceSupabase svc, List<TechCard> cards) async {
     final lang = context.read<LocalizationService>().currentLanguageCode;
     if (lang == 'ru') return;
-    final missing = cards.where(
-      (tc) => !(tc.dishNameLocalized?.containsKey(lang) == true &&
-               (tc.dishNameLocalized![lang]?.trim().isNotEmpty ?? false)),
-    ).toList();
+    final missing = cards
+        .where(
+          (tc) => !(tc.dishNameLocalized?.containsKey(lang) == true &&
+              (tc.dishNameLocalized![lang]?.trim().isNotEmpty ?? false)),
+        )
+        .toList();
     for (final tc in missing) {
       if (!mounted) break;
       try {
-        final translated = await svc.translateTechCardName(tc.id, tc.dishName, lang)
+        final translated = await svc
+            .translateTechCardName(tc.id, tc.dishName, lang)
             .timeout(const Duration(seconds: 5), onTimeout: () => null);
         if (translated != null && mounted) {
           final idx = _list.indexWhere((c) => c.id == tc.id);
           if (idx >= 0) {
             final updated = _list[idx].copyWith(
-              dishNameLocalized: {...(_list[idx].dishNameLocalized ?? {}), lang: translated},
+              dishNameLocalized: {
+                ...(_list[idx].dishNameLocalized ?? {}),
+                lang: translated
+              },
             );
             setState(() => _list[idx] = updated);
           }
@@ -392,16 +869,20 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     try {
       await ExcelExportService().exportSingleTechCard(techCard);
       if (mounted) {
-          final loc = context.read<LocalizationService>();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.t('ttk_exported').replaceFirst('%s', techCard.dishName))),
-          );
-        }
+        final loc = context.read<LocalizationService>();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  loc.t('ttk_exported').replaceFirst('%s', techCard.dishName))),
+        );
+      }
     } catch (e) {
       if (mounted) {
         final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('ttk_export_error').replaceFirst('%s', '$e'))),
+          SnackBar(
+              content:
+                  Text(loc.t('ttk_export_error').replaceFirst('%s', '$e'))),
         );
       }
     }
@@ -409,7 +890,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   /// Экспорт выбранных ТТК
   Future<void> _exportSelectedTechCards() async {
-    final selectedCards = _list.where((card) => _selectedTechCards.contains(card.id)).toList();
+    final selectedCards =
+        _list.where((card) => _selectedTechCards.contains(card.id)).toList();
     if (selectedCards.isEmpty) {
       final loc = context.read<LocalizationService>();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -423,18 +905,23 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       if (mounted) {
         final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('ttk_exported_selected').replaceFirst('%s', '${selectedCards.length}'))),
+          SnackBar(
+              content: Text(loc
+                  .t('ttk_exported_selected')
+                  .replaceFirst('%s', '${selectedCards.length}'))),
         );
         setState(() {
           _selectedTechCards.clear();
           _selectionMode = false;
         });
       }
-      } catch (e) {
+    } catch (e) {
       if (mounted) {
         final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('ttk_export_error').replaceFirst('%s', '$e'))),
+          SnackBar(
+              content:
+                  Text(loc.t('ttk_export_error').replaceFirst('%s', '$e'))),
         );
       }
     }
@@ -454,13 +941,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       await ExcelExportService().exportAllTechCards(_list);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('ttk_exported_all').replaceFirst('%s', '${_list.length}'))),
+          SnackBar(
+              content: Text(loc
+                  .t('ttk_exported_all')
+                  .replaceFirst('%s', '${_list.length}'))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('ttk_export_error').replaceFirst('%s', '$e'))),
+          SnackBar(
+              content:
+                  Text(loc.t('ttk_export_error').replaceFirst('%s', '$e'))),
         );
       }
     }
@@ -496,7 +988,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   static const _maxFilesSingleTtk = 10;
   static const _maxFilesMultiTtk = 10;
 
-  Future<void> _createFromExcel(BuildContext context, LocalizationService loc) async {
+  Future<void> _createFromExcel(
+      BuildContext context, LocalizationService loc) async {
     _TtkImportMode dialogMode = _TtkImportMode.single;
     final mode = await showDialog<_TtkImportMode>(
       context: context,
@@ -514,30 +1007,36 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                     RadioListTile<_TtkImportMode>(
                       value: _TtkImportMode.single,
                       groupValue: dialogMode,
-                      onChanged: (_) => setState(() => dialogMode = _TtkImportMode.single),
-                      title: Text(l.t('ttk_import_mode_single') ?? 'Одна ТТК в документе'),
+                      onChanged: (_) =>
+                          setState(() => dialogMode = _TtkImportMode.single),
+                      title: Text(l.t('ttk_import_mode_single') ??
+                          'Одна ТТК в документе'),
                       controlAffinity: ListTileControlAffinity.leading,
                       contentPadding: EdgeInsets.zero,
                     ),
                     Padding(
                       padding: const EdgeInsets.only(left: 48, bottom: 8),
                       child: Text(
-                        l.t('ttk_import_mode_single_hint') ?? 'Можно выбрать до 10 файлов (в каждом файле — одна карточка).',
+                        l.t('ttk_import_mode_single_hint') ??
+                            'Можно выбрать до 10 файлов (в каждом файле — одна карточка).',
                         style: Theme.of(ctx).textTheme.bodySmall,
                       ),
                     ),
                     RadioListTile<_TtkImportMode>(
                       value: _TtkImportMode.multi,
                       groupValue: dialogMode,
-                      onChanged: (_) => setState(() => dialogMode = _TtkImportMode.multi),
-                      title: Text(l.t('ttk_import_mode_multi') ?? 'Несколько ТТК в документе'),
+                      onChanged: (_) =>
+                          setState(() => dialogMode = _TtkImportMode.multi),
+                      title: Text(l.t('ttk_import_mode_multi') ??
+                          'Несколько ТТК в документе'),
                       controlAffinity: ListTileControlAffinity.leading,
                       contentPadding: EdgeInsets.zero,
                     ),
                     Padding(
                       padding: const EdgeInsets.only(left: 48),
                       child: Text(
-                        l.t('ttk_import_multi_format_hint') ?? 'Excel и Word: карточки — друг под другом, в один столбец (не рядом в 2 колонки). Одинаковая разметка: у каждой ТТК те же колонки (название, продукты, вес, технология). Иначе система не распознает.',
+                        l.t('ttk_import_multi_format_hint') ??
+                            'Excel и Word: карточки — друг под другом, в один столбец (не рядом в 2 колонки). Одинаковая разметка: у каждой ТТК те же колонки (название, продукты, вес, технология). Иначе система не распознает.',
                         style: Theme.of(ctx).textTheme.bodySmall,
                       ),
                     ),
@@ -551,7 +1050,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 ),
                 FilledButton(
                   onPressed: () => Navigator.of(ctx).pop(dialogMode),
-                  child: Text(l.t('ttk_import_select_files') ?? 'Выбрать файлы'),
+                  child:
+                      Text(l.t('ttk_import_select_files') ?? 'Выбрать файлы'),
                 ),
               ],
             );
@@ -569,24 +1069,35 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     );
     if (!mounted) return;
     if (result == null || result.files.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_not_selected'))));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(loc.t('file_not_selected'))));
       return;
     }
-    final files = result.files.where((f) => f.bytes != null && f.bytes!.isNotEmpty).toList();
+    final files = result.files
+        .where((f) => f.bytes != null && f.bytes!.isNotEmpty)
+        .toList();
     if (files.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_read_failed'))));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(loc.t('file_read_failed'))));
       return;
     }
-    final maxFiles = mode == _TtkImportMode.single ? _maxFilesSingleTtk : _maxFilesMultiTtk;
+    final maxFiles =
+        mode == _TtkImportMode.single ? _maxFilesSingleTtk : _maxFilesMultiTtk;
     if (files.length > maxFiles) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(mode == _TtkImportMode.single
-            ? (loc.t('ttk_import_max_files') ?? 'Выберите до $_maxFilesSingleTtk файлов (1 файл = 1 ТТК)')
-            : (loc.t('ttk_import_max_files_multi') ?? 'Выберите до $_maxFilesMultiTtk файлов')),
+            ? (loc.t('ttk_import_max_files') ??
+                'Выберите до $_maxFilesSingleTtk файлов (1 файл = 1 ТТК)')
+            : (loc.t('ttk_import_max_files_multi') ??
+                'Выберите до $_maxFilesMultiTtk файлов')),
       ));
       return;
     }
-    setState(() { _loadingExcel = true; _loadingTtkIsPdf = files.any((f) => (f.extension?.toLowerCase() ?? '').contains('pdf')); });
+    setState(() {
+      _loadingExcel = true;
+      _loadingTtkIsPdf =
+          files.any((f) => (f.extension?.toLowerCase() ?? '').contains('pdf'));
+    });
     try {
       final est = context.read<AccountManagerSupabase>().establishment;
       final establishmentId = est?.dataEstablishmentId;
@@ -599,27 +1110,36 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         final isPdf = (file.extension?.toLowerCase() ?? '').contains('pdf');
         List<TechCardRecognitionResult> list;
         if (isPdf) {
-          list = await ai.parseTechCardsFromPdf(uBytes, establishmentId: establishmentId);
+          list = await ai.parseTechCardsFromPdf(uBytes,
+              establishmentId: establishmentId);
         } else {
           int? sheetIndex;
           if (ai is AiServiceSupabase) {
-            final sheetNames = await AiServiceSupabase.getExcelSheetNames(uBytes);
+            final sheetNames =
+                await AiServiceSupabase.getExcelSheetNames(uBytes);
             if (sheetNames.length > 1 && mounted) {
-              sheetIndex = await _showSheetPicker(context, loc, file.name, sheetNames);
+              sheetIndex =
+                  await _showSheetPicker(context, loc, file.name, sheetNames);
               if (!mounted) return;
               if (sheetIndex == null) continue; // пользователь отменил
             } else if (sheetNames.length == 1) {
               sheetIndex = 0;
             }
           }
-          list = await ai.parseTechCardsFromExcel(uBytes, establishmentId: establishmentId, sheetIndex: sheetIndex);
+          list = await ai.parseTechCardsFromExcel(uBytes,
+              establishmentId: establishmentId, sheetIndex: sheetIndex);
           // Если парсер вернул пусто и «несколько листов» — показываем выбор листа и парсим выбранный
-          if (list.isEmpty && ai is AiServiceSupabase && AiServiceSupabase.lastParseMultipleSheetNames != null && AiServiceSupabase.lastParseMultipleSheetNames!.isNotEmpty && mounted) {
+          if (list.isEmpty &&
+              ai is AiServiceSupabase &&
+              AiServiceSupabase.lastParseMultipleSheetNames != null &&
+              AiServiceSupabase.lastParseMultipleSheetNames!.isNotEmpty &&
+              mounted) {
             final names = AiServiceSupabase.lastParseMultipleSheetNames!;
             sheetIndex = await _showSheetPicker(context, loc, file.name, names);
             if (!mounted) return;
             if (sheetIndex != null) {
-              list = await ai.parseTechCardsFromExcel(uBytes, establishmentId: establishmentId, sheetIndex: sheetIndex);
+              list = await ai.parseTechCardsFromExcel(uBytes,
+                  establishmentId: establishmentId, sheetIndex: sheetIndex);
             }
           }
           if (list.isEmpty) list = _parseSimpleExcelNames(uBytes);
@@ -632,7 +1152,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         if (mode == _TtkImportMode.single && list.length > 1) {
           if (mounted) setState(() => _loadingExcel = false);
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text((loc.t('ttk_import_multi_card_in_file') ?? 'В файле «%s» несколько карточек. Выберите режим «Несколько ТТК в документе» или загрузите файлы по одному.').replaceFirst('%s', file.name)),
+            content: Text((loc.t('ttk_import_multi_card_in_file') ??
+                    'В файле «%s» несколько карточек. Выберите режим «Несколько ТТК в документе» или загрузите файлы по одному.')
+                .replaceFirst('%s', file.name)),
             duration: const Duration(seconds: 5),
           ));
           if (!mounted) return;
@@ -648,7 +1170,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           // Одна карточка в режиме «несколько» — всё равно ведём на проверку (парсер мог не найти все блоки)
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text((loc.t('ttk_import_one_card_in_multi') ?? 'В файле «%s» распознана 1 карточка. Если их больше — выберите режим «Одна ТТК в документе» для каждого или проверьте разметку.').replaceFirst('%s', file.name)),
+              content: Text((loc.t('ttk_import_one_card_in_multi') ??
+                      'В файле «%s» распознана 1 карточка. Если их больше — выберите режим «Одна ТТК в документе» для каждого или проверьте разметку.')
+                  .replaceFirst('%s', file.name)),
               duration: const Duration(seconds: 4),
             ));
           }
@@ -658,24 +1182,34 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       if (allCards.isEmpty) {
         String msg;
         if (context.read<AiService>() is AiServiceSupabase) {
-          final reason = AiServiceSupabase.lastParseTechCardExcelReason ?? AiServiceSupabase.lastParseTechCardPdfReason;
+          final reason = AiServiceSupabase.lastParseTechCardExcelReason ??
+              AiServiceSupabase.lastParseTechCardPdfReason;
           if (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day') {
             msg = loc.t('ai_ttk_limit_3_per_day') ?? '';
           } else if (reason == 'service_unavailable') {
-            msg = loc.t('ai_ttk_pdf_service_unavailable') ?? 'Сервис распознавания временно недоступен. Экспортируйте PDF в Word или Excel и загрузите снова.';
+            msg = loc.t('ai_ttk_pdf_service_unavailable') ??
+                'Сервис распознавания временно недоступен. Экспортируйте PDF в Word или Excel и загрузите снова.';
           } else if (reason == 'timeout_or_network') {
-            msg = loc.t('ai_ttk_pdf_timeout') ?? (loc.t('ai_tech_card_pdf_format_hint') ?? 'Таймаут загрузки PDF');
+            msg = loc.t('ai_ttk_pdf_timeout') ??
+                (loc.t('ai_tech_card_pdf_format_hint') ??
+                    'Таймаут загрузки PDF');
           } else if (reason != null && reason.startsWith('extraction_failed')) {
-            msg = loc.t('ai_ttk_pdf_extraction_failed') ?? (loc.t('ai_tech_card_pdf_format_hint') ?? 'Не удалось извлечь текст из PDF');
+            msg = loc.t('ai_ttk_pdf_extraction_failed') ??
+                (loc.t('ai_tech_card_pdf_format_hint') ??
+                    'Не удалось извлечь текст из PDF');
           } else if (reason == 'empty_text') {
-            msg = loc.t('ai_ttk_pdf_empty_text') ?? (loc.t('ai_tech_card_pdf_format_hint') ?? 'PDF без текста');
+            msg = loc.t('ai_ttk_pdf_empty_text') ??
+                (loc.t('ai_tech_card_pdf_format_hint') ?? 'PDF без текста');
           } else if (reason != null && reason.isNotEmpty) {
-            msg = '${loc.t(failedCount == files.length && files.any((f) => (f.extension ?? '').toLowerCase().contains('pdf')) ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК'} ($reason)';
+            msg =
+                '${loc.t(failedCount == files.length && files.any((f) => (f.extension ?? '').toLowerCase().contains('pdf')) ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК'} ($reason)';
           } else {
-            msg = loc.t('ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК';
+            msg = loc.t('ai_tech_card_excel_format_hint') ??
+                'Не удалось распознать ТТК';
           }
         } else {
-          msg = loc.t('ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК';
+          msg = loc.t('ai_tech_card_excel_format_hint') ??
+              'Не удалось распознать ТТК';
         }
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(msg),
@@ -687,43 +1221,66 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       if (!mounted) return;
       if (failedCount > 0 && allCards.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text((loc.t('ttk_import_partial') ?? 'Загружено %s из %s файлов').replaceFirst('%s', '${allCards.length}').replaceFirst('%s', '${files.length}')),
+          content: Text(
+              (loc.t('ttk_import_partial') ?? 'Загружено %s из %s файлов')
+                  .replaceFirst('%s', '${allCards.length}')
+                  .replaceFirst('%s', '${files.length}')),
           duration: const Duration(seconds: 3),
         ));
       }
       if (allCards.length == 1 && allCards.first.ingredients.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('ai_tech_card_loaded_names').replaceAll('%s', '1'))),
+          SnackBar(
+              content: Text(
+                  loc.t('ai_tech_card_loaded_names').replaceAll('%s', '1'))),
         );
       }
-      final hasValidationErrors = context.read<AiService>() is AiServiceSupabase &&
-          AiServiceSupabase.lastParseTechCardErrors != null &&
-          AiServiceSupabase.lastParseTechCardErrors!.isNotEmpty;
+      final hasValidationErrors =
+          context.read<AiService>() is AiServiceSupabase &&
+              AiServiceSupabase.lastParseTechCardErrors != null &&
+              AiServiceSupabase.lastParseTechCardErrors!.isNotEmpty;
       if (allCards.length == 1 && !hasValidationErrors) {
-        final sig = context.read<AiService>() is AiServiceSupabase ? AiServiceSupabase.lastParseHeaderSignature : null;
-        final sourceRows = context.read<AiService>() is AiServiceSupabase ? AiServiceSupabase.lastParsedRows : null;
+        final sig = context.read<AiService>() is AiServiceSupabase
+            ? AiServiceSupabase.lastParseHeaderSignature
+            : null;
+        final sourceRows = context.read<AiService>() is AiServiceSupabase
+            ? AiServiceSupabase.lastParsedRows
+            : null;
         final hasMeta = sig != null && sig.isNotEmpty;
         context.push(
-          widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new',
+          widget.department == 'bar'
+              ? '/tech-cards/new?department=bar'
+              : '/tech-cards/new',
           extra: hasMeta || sourceRows != null
-              ? {'result': allCards.single, 'headerSignature': sig, 'sourceRows': sourceRows}
+              ? {
+                  'result': allCards.single,
+                  'headerSignature': sig,
+                  'sourceRows': sourceRows
+                }
               : allCards.single,
         );
       } else {
-        final sig = context.read<AiService>() is AiServiceSupabase ? AiServiceSupabase.lastParseHeaderSignature : null;
-        final sourceRows = context.read<AiService>() is AiServiceSupabase ? AiServiceSupabase.lastParsedRows : null;
-        context.push('/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}', extra: {
-          'cards': allCards,
-          'headerSignature': sig,
-          'sourceRows': sourceRows,
-        });
+        final sig = context.read<AiService>() is AiServiceSupabase
+            ? AiServiceSupabase.lastParseHeaderSignature
+            : null;
+        final sourceRows = context.read<AiService>() is AiServiceSupabase
+            ? AiServiceSupabase.lastParsedRows
+            : null;
+        context.push(
+            '/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}',
+            extra: {
+              'cards': allCards,
+              'headerSignature': sig,
+              'sourceRows': sourceRows,
+            });
       }
     } finally {
       if (mounted) setState(() => _loadingExcel = false);
     }
   }
 
-  Future<void> _createFromText(BuildContext context, LocalizationService loc) async {
+  Future<void> _createFromText(
+      BuildContext context, LocalizationService loc) async {
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
@@ -735,7 +1292,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             controller: controller,
             maxLines: 12,
             decoration: InputDecoration(
-              hintText: 'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
+              hintText:
+                  'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
               border: const OutlineInputBorder(),
             ),
           ),
@@ -758,18 +1316,28 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     try {
       final est = context.read<AccountManagerSupabase>().establishment;
       final establishmentId = est?.dataEstablishmentId;
-      final list = await context.read<AiService>().parseTechCardsFromText(result, establishmentId: establishmentId);
+      final list = await context
+          .read<AiService>()
+          .parseTechCardsFromText(result, establishmentId: establishmentId);
       if (!mounted) return;
       if (list.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК в тексте')),
+          SnackBar(
+              content: Text(loc.t('ai_tech_card_excel_format_hint') ??
+                  'Не удалось распознать ТТК в тексте')),
         );
         return;
       }
       if (list.length == 1) {
-        context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new', extra: list.single);
+        context.push(
+            widget.department == 'bar'
+                ? '/tech-cards/new?department=bar'
+                : '/tech-cards/new',
+            extra: list.single);
       } else {
-        context.push('/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}', extra: list);
+        context.push(
+            '/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}',
+            extra: list);
       }
     } finally {
       if (mounted) setState(() => _loadingExcel = false);
@@ -777,7 +1345,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 
   /// Диалог выбора листа Excel при нескольких листах в файле. Возвращает индекс (0-based) или null при отмене.
-  static Future<int?> _showSheetPicker(BuildContext context, LocalizationService loc, String fileName, List<String> sheetNames) async {
+  static Future<int?> _showSheetPicker(BuildContext context,
+      LocalizationService loc, String fileName, List<String> sheetNames) async {
     return showDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -789,7 +1358,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                (loc.t('ttk_import_select_sheet_hint') ?? 'В файле «%s» несколько листов. Импортировать за раз можно только один лист.')
+                (loc.t('ttk_import_select_sheet_hint') ??
+                        'В файле «%s» несколько листов. Импортировать за раз можно только один лист.')
                     .replaceFirst('%s', fileName),
                 style: Theme.of(ctx).textTheme.bodyMedium,
               ),
@@ -799,7 +1369,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: List.generate(sheetNames.length, (i) {
-                      final name = sheetNames[i].isEmpty ? '${loc.t('ttk_sheet') ?? 'Лист'} ${i + 1}' : sheetNames[i];
+                      final name = sheetNames[i].isEmpty
+                          ? '${loc.t('ttk_sheet') ?? 'Лист'} ${i + 1}'
+                          : sheetNames[i];
                       return ListTile(
                         title: Text(name),
                         onTap: () => Navigator.of(ctx).pop(i),
@@ -825,30 +1397,43 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     if (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day') {
       return loc.t('ai_ttk_limit_3_per_day');
     }
-    if (reason.startsWith('empty_text')) return 'PDF не содержит извлекаемого текста.';
-    if (reason.startsWith('extraction_failed')) return 'Не удалось прочитать PDF.';
-    if (reason.startsWith('ai_error') || reason.contains('429') || reason.contains('quota')) {
+    if (reason.startsWith('empty_text'))
+      return 'PDF не содержит извлекаемого текста.';
+    if (reason.startsWith('extraction_failed'))
+      return 'Не удалось прочитать PDF.';
+    if (reason.startsWith('ai_error') ||
+        reason.contains('429') ||
+        reason.contains('quota')) {
       return 'Лимит ИИ исчерпан. Попробуйте позже.';
     }
     if (reason == 'ai_empty_response' || reason == 'ai_no_cards') {
       return loc.t('ai_tech_card_pdf_format_hint');
     }
-    if (reason == 'invoke_null') return 'Сервер не ответил (503). Первый запрос после паузы может занять до минуты — подождите и попробуйте снова.';
+    if (reason == 'invoke_null')
+      return 'Сервер не ответил (503). Первый запрос после паузы может занять до минуты — подождите и попробуйте снова.';
     return loc.t('ai_tech_card_pdf_format_hint');
   }
 
   /// Простой разбор Excel: столбец A или B — названия ПФ/блюд.
-  static List<TechCardRecognitionResult> _parseSimpleExcelNames(Uint8List bytes) {
+  static List<TechCardRecognitionResult> _parseSimpleExcelNames(
+      Uint8List bytes) {
     try {
       final excel = Excel.decodeBytes(bytes.toList());
-      final sheetName = excel.tables.keys.isNotEmpty ? excel.tables.keys.first : null;
+      final sheetName =
+          excel.tables.keys.isNotEmpty ? excel.tables.keys.first : null;
       if (sheetName == null) return [];
       final sheet = excel.tables[sheetName]!;
       final list = <TechCardRecognitionResult>[];
       for (var r = 0; r < sheet.maxRows; r++) {
-        String name = _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: r)).value).trim();
+        String name = _excelCellToStr(sheet
+                .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: r))
+                .value)
+            .trim();
         if (name.isEmpty && sheet.maxColumns > 1) {
-          name = _excelCellToStr(sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: r)).value).trim();
+          name = _excelCellToStr(sheet
+                  .cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: r))
+                  .value)
+              .trim();
         }
         if (name.isEmpty) continue;
         list.add(TechCardRecognitionResult(
@@ -935,7 +1520,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final accountManager = context.watch<AccountManagerSupabase>();
-    final canEdit = accountManager.currentEmployee?.canEditChecklistsAndTechCards ?? false;
+    final canEdit =
+        accountManager.currentEmployee?.canEditChecklistsAndTechCards ?? false;
     final showCost = _canSeeCost(accountManager);
 
     return Scaffold(
@@ -950,33 +1536,44 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         title: ScrollToTopAppBarTitle(
           child: Text(
             _selectionMode
-                ? loc.t('ttk_select_count').replaceFirst('%s', '${_selectedTechCards.length}')
+                ? loc
+                    .t('ttk_select_count')
+                    .replaceFirst('%s', '${_selectedTechCards.length}')
                 : loc.t('tech_cards'),
           ),
         ),
         actions: [
           // Счетчик ТТК
-          if (!_selectionMode) Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${_list.length}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
+          if (!_selectionMode)
+            Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest
+                      .withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_list.length}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
               ),
             ),
-          ),
           if (canEdit)
             IconButton(
-              icon: Icon(Icons.add, color: _loading ? Theme.of(context).disabledColor : null),
+              icon: Icon(Icons.add,
+                  color: _loading ? Theme.of(context).disabledColor : null),
               tooltip: loc.t('create_tech_card'),
-              onPressed: _loading ? null : () => context.push(widget.department == 'bar' ? '/tech-cards/new?department=bar' : '/tech-cards/new'),
+              onPressed: _loading
+                  ? null
+                  : () => context.push(widget.department == 'bar'
+                      ? '/tech-cards/new?department=bar'
+                      : '/tech-cards/new'),
             ),
           if (canEdit)
             PopupMenuButton<String>(
@@ -986,7 +1583,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 if (value == 'excel') await _createFromExcel(context, loc);
               },
               itemBuilder: (_) => [
-                PopupMenuItem(value: 'excel', child: Text(loc.t('ttk_import_file'))),
+                PopupMenuItem(
+                    value: 'excel', child: Text(loc.t('ttk_import_file'))),
               ],
             ),
           // Кнопка экспорта
@@ -1010,8 +1608,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                             itemBuilder: (context, index) {
                               final techCard = _list[index];
                               return ListTile(
-                                title: Text(techCard.getDisplayNameInLists(l.currentLanguageCode)),
-                                subtitle: Text(techCard.isSemiFinished ? l.t('ttk_semi_finished') : l.t('ttk_dish_label')),
+                                title: Text(techCard.getDisplayNameInLists(
+                                    l.currentLanguageCode)),
+                                subtitle: Text(techCard.isSemiFinished
+                                    ? l.t('ttk_semi_finished')
+                                    : l.t('ttk_dish_label')),
                                 onTap: () {
                                   Navigator.of(context).pop();
                                   _exportSingleTechCard(techCard);
@@ -1050,7 +1651,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               PopupMenuItem(
                 value: 'selected',
                 child: Text(_selectionMode
-                    ? loc.t('ttk_export_selected').replaceFirst('%s', '${_selectedTechCards.length}')
+                    ? loc
+                        .t('ttk_export_selected')
+                        .replaceFirst('%s', '${_selectedTechCards.length}')
                     : loc.t('ttk_export_selected_short')),
               ),
               PopupMenuItem(
@@ -1059,7 +1662,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               ),
             ],
           ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
+          IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _loading ? null : _load,
+              tooltip: loc.t('refresh')),
         ],
       ),
       body: Stack(
@@ -1075,9 +1681,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+                        const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2)),
                         const SizedBox(height: 16),
-                        Text(_loadingTtkIsPdf ? loc.t('loading_ttk_pdf') : loc.t('loading_excel')),
+                        Text(_loadingTtkIsPdf
+                            ? loc.t('loading_ttk_pdf')
+                            : loc.t('loading_excel')),
                       ],
                     ),
                   ),
@@ -1093,7 +1704,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   Widget _buildBody(LocalizationService loc, bool canEdit, bool showCost) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
-      final errorText = _error == 'no_establishment' ? loc.t('no_establishment') : _error!;
+      final errorText =
+          _error == 'no_establishment' ? loc.t('no_establishment') : _error!;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -1117,9 +1729,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             children: [
               Icon(Icons.description, size: 64, color: Colors.grey[400]),
               const SizedBox(height: 16),
-              Text(loc.t('tech_cards'), style: Theme.of(context).textTheme.titleLarge),
+              Text(loc.t('tech_cards'),
+                  style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: 8),
-              Text(loc.t('tech_cards_empty'), style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]), textAlign: TextAlign.center),
+              Text(loc.t('tech_cards_empty'),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: Colors.grey[600]),
+                  textAlign: TextAlign.center),
             ],
           ),
         ),
@@ -1128,49 +1746,82 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
     // Разделяем список на ПФ и Блюда, фильтруем по поиску, цеху и категории
     final query = _searchController.text.trim().toLowerCase();
-    final catOrder = (widget.department == 'bar' || widget.department == 'banquet-catering-bar') ? _barCategoryOrder : _kitchenCategoryOrder;
-    final customCatsInList = _list.map((tc) => tc.category).where(TechCardServiceSupabase.isCustomCategory).toSet().toList();
+    final catOrder = (widget.department == 'bar' ||
+            widget.department == 'banquet-catering-bar')
+        ? _barCategoryOrder
+        : _kitchenCategoryOrder;
+    final customCatsInList = _list
+        .map((tc) => tc.category)
+        .where(TechCardServiceSupabase.isCustomCategory)
+        .toSet()
+        .toList();
     final filterCatOrder = [...catOrder, ...customCatsInList];
     List<TechCard> filterBySearch(List<TechCard> list) {
       if (query.isEmpty) return list;
       final loc = context.read<LocalizationService>();
       final lang = loc.currentLanguageCode;
-      return list.where((tc) => tc.getDisplayNameInLists(lang).toLowerCase().contains(query)).toList();
+      return list
+          .where((tc) =>
+              tc.getDisplayNameInLists(lang).toLowerCase().contains(query))
+          .toList();
     }
+
     List<TechCard> filterBySectionAndCategory(List<TechCard> list) {
       var result = list;
       if (_filterSection != null) {
-        result = result.where((tc) => tc.sections.contains(_filterSection) || tc.sections.contains('all')).toList();
+        result = result
+            .where((tc) =>
+                tc.sections.contains(_filterSection) ||
+                tc.sections.contains('all'))
+            .toList();
       }
       if (_filterCategory != null) {
-        result = result.where((tc) => (tc.category.isEmpty ? 'misc' : tc.category) == _filterCategory).toList();
+        result = result
+            .where((tc) =>
+                (tc.category.isEmpty ? 'misc' : tc.category) == _filterCategory)
+            .toList();
       }
       return result;
     }
-    final semiFinishedFiltered = filterBySectionAndCategory(filterBySearch(_list.where((tc) => tc.isSemiFinished).toList()));
-    final dishFiltered = filterBySectionAndCategory(filterBySearch(_list.where((tc) => !tc.isSemiFinished).toList()));
+
+    final semiFinishedFiltered = filterBySectionAndCategory(
+        filterBySearch(_list.where((tc) => tc.isSemiFinished).toList()));
+    final dishFiltered = filterBySectionAndCategory(
+        filterBySearch(_list.where((tc) => !tc.isSemiFinished).toList()));
+    final reviewFiltered = filterBySectionAndCategory(filterBySearch(_list));
+
+    _rebuildPfCandidatesIndex(loc);
+    final reviewCount = reviewFiltered
+        .where((tc) => _ambiguousPfIngredientCount(tc, loc) > 0)
+        .length;
 
     final acc = context.read<AccountManagerSupabase>();
     final emp = acc.currentEmployee;
-    final showBranchFilter = (emp?.hasRole('executive_chef') == true || emp?.hasRole('sous_chef') == true) &&
+    final showBranchFilter = (emp?.hasRole('executive_chef') == true ||
+            emp?.hasRole('sous_chef') == true) &&
         acc.establishment?.isMain == true;
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Column(
         children: [
           if (showBranchFilter)
             FutureBuilder<List<Establishment>>(
               future: acc.getBranchesForEstablishment(acc.establishment!.id),
               builder: (ctx, snap) {
-                if (!snap.hasData || snap.data!.isEmpty) return const SizedBox.shrink();
+                if (!snap.hasData || snap.data!.isEmpty)
+                  return const SizedBox.shrink();
                 final branches = snap.data!;
                 return Consumer<TtkBranchFilterService>(
                   builder: (_, branchFilter, __) {
                     final selId = branchFilter.selectedBranchId;
                     final label = selId == null
                         ? loc.t('main_establishment_short')
-                        : branches.where((b) => b.id == selId).map((b) => b.name).firstOrNull ?? selId;
+                        : branches
+                                .where((b) => b.id == selId)
+                                .map((b) => b.name)
+                                .firstOrNull ??
+                            selId;
                     return Padding(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                       child: Row(
@@ -1179,7 +1830,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                             avatar: const Icon(Icons.account_tree, size: 18),
                             label: Text(label),
                             selected: selId != null,
-                            onSelected: (_) => _showTtkBranchFilterPicker(context, loc, acc, branches),
+                            onSelected: (_) => _showTtkBranchFilterPicker(
+                                context, loc, acc, branches),
                           ),
                         ],
                       ),
@@ -1193,21 +1845,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Row(
               children: [
-                Icon(Icons.business, size: 20, color: Theme.of(context).colorScheme.primary),
+                Icon(Icons.business,
+                    size: 20, color: Theme.of(context).colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   loc.t('ttk_section'),
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   _departmentHeaderLabel(loc),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                 ),
               ],
             ),
@@ -1216,6 +1869,33 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             tabs: [
               Tab(text: loc.t('ttk_tab_pf')),
               Tab(text: loc.t('ttk_tab_dishes')),
+              Tab(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('На проверку'),
+                    if (reviewCount > 0) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '$reviewCount',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ],
           ),
           // Поиск и сортировка
@@ -1241,7 +1921,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                           )
                         : null,
                     border: const OutlineInputBorder(),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
@@ -1255,14 +1936,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                           labelText: loc.t('ttk_section_label'),
                           isDense: true,
                           border: const OutlineInputBorder(),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                         ),
                         items: [
-                          DropdownMenuItem(value: null, child: Text(loc.t('all') ?? 'Все')),
-                          ..._sectionOrder.where((s) => s != 'hidden' && s != 'all').map((s) => DropdownMenuItem(
-                            value: s,
-                            child: Text(_sectionCodeToLabel(s, loc)),
-                          )),
+                          DropdownMenuItem(
+                              value: null, child: Text(loc.t('all') ?? 'Все')),
+                          ..._sectionOrder
+                              .where((s) => s != 'hidden' && s != 'all')
+                              .map((s) => DropdownMenuItem(
+                                    value: s,
+                                    child: Text(_sectionCodeToLabel(s, loc)),
+                                  )),
                         ],
                         onChanged: (v) => setState(() => _filterSection = v),
                       ),
@@ -1275,14 +1960,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                           labelText: loc.t('column_category'),
                           isDense: true,
                           border: const OutlineInputBorder(),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
                         ),
                         items: [
-                          DropdownMenuItem(value: null, child: Text(loc.t('all') ?? 'Все')),
+                          DropdownMenuItem(
+                              value: null, child: Text(loc.t('all') ?? 'Все')),
                           ...filterCatOrder.map((c) => DropdownMenuItem(
-                            value: c,
-                            child: Text(_categoryLabel(c, loc)),
-                          )),
+                                value: c,
+                                child: Text(_categoryLabel(c, loc)),
+                              )),
                         ],
                         onChanged: (v) => setState(() => _filterCategory = v),
                       ),
@@ -1295,8 +1982,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           Expanded(
             child: TabBarView(
               children: [
-                _buildTechCardsTable(semiFinishedFiltered, loc, canEdit, showCost, isDishesTab: false),
-                _buildTechCardsTable(dishFiltered, loc, canEdit, showCost, isDishesTab: true),
+                _buildTechCardsTable(
+                    semiFinishedFiltered, loc, canEdit, showCost,
+                    isDishesTab: false),
+                _buildTechCardsTable(dishFiltered, loc, canEdit, showCost,
+                    isDishesTab: true),
+                _buildReviewList(reviewFiltered, loc, canEdit),
               ],
             ),
           ),
@@ -1307,38 +1998,60 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   /// Компактная таблица с шапкой и группировкой по категории или цеху.
   /// isDishesTab: для блюд — себестоимость за порцию, для ПФ — стоимость за кг.
-  Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc, bool canEdit, bool showCost, {bool isDishesTab = false}) {
+  Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc,
+      bool canEdit, bool showCost,
+      {bool isDishesTab = false}) {
     final lang = loc.currentLanguageCode;
     const colSectionWidth = 70.0;
     const colCatWidth = 76.0;
     const colCostWidth = 56.0;
     const colActionsWidth = 62.0;
     final est = context.read<AccountManagerSupabase>().establishment;
-    final costSym = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
-    final catOrder = (widget.department == 'bar' || widget.department == 'banquet-catering-bar') ? _barCategoryOrder : _kitchenCategoryOrder;
+    final costSym = est?.currencySymbol ??
+        Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
+    final catOrder = (widget.department == 'bar' ||
+            widget.department == 'banquet-catering-bar')
+        ? _barCategoryOrder
+        : _kitchenCategoryOrder;
     List<TechCard> sortCards(List<TechCard> cards, bool bySection) {
-      return List.from(cards)..sort((a, b) {
-        if (bySection) {
-          final sa = _sectionOrder.indexOf(_sectionKeyForGroup(a));
-          final sb = _sectionOrder.indexOf(_sectionKeyForGroup(b));
-          if (sa != sb) return sa.compareTo(sb);
-          final ca = catOrder.indexOf(a.category.isNotEmpty ? a.category : 'misc');
-          final cb = catOrder.indexOf(b.category.isNotEmpty ? b.category : 'misc');
-          if (ca != cb) return ca.compareTo(cb);
-        } else {
-          final ca = catOrder.indexOf(a.category.isNotEmpty ? a.category : 'misc');
-          final cb = catOrder.indexOf(b.category.isNotEmpty ? b.category : 'misc');
-          if (ca != cb) return ca.compareTo(cb);
-          final sa = _sectionOrder.indexOf(_sectionKeyForGroup(a));
-          final sb = _sectionOrder.indexOf(_sectionKeyForGroup(b));
-          if (sa != sb) return sa.compareTo(sb);
-        }
-        return (a.getDisplayNameInLists(lang)).toLowerCase().compareTo((b.getDisplayNameInLists(lang)).toLowerCase());
-      });
+      return List.from(cards)
+        ..sort((a, b) {
+          if (bySection) {
+            final sa = _sectionOrder.indexOf(_sectionKeyForGroup(a));
+            final sb = _sectionOrder.indexOf(_sectionKeyForGroup(b));
+            if (sa != sb) return sa.compareTo(sb);
+            final ca =
+                catOrder.indexOf(a.category.isNotEmpty ? a.category : 'misc');
+            final cb =
+                catOrder.indexOf(b.category.isNotEmpty ? b.category : 'misc');
+            if (ca != cb) return ca.compareTo(cb);
+          } else {
+            final ca =
+                catOrder.indexOf(a.category.isNotEmpty ? a.category : 'misc');
+            final cb =
+                catOrder.indexOf(b.category.isNotEmpty ? b.category : 'misc');
+            if (ca != cb) return ca.compareTo(cb);
+            final sa = _sectionOrder.indexOf(_sectionKeyForGroup(a));
+            final sb = _sectionOrder.indexOf(_sectionKeyForGroup(b));
+            if (sa != sb) return sa.compareTo(sb);
+          }
+          return (a.getDisplayNameInLists(lang))
+              .toLowerCase()
+              .compareTo((b.getDisplayNameInLists(lang)).toLowerCase());
+        });
     }
-    final groups = _groupByCategory(techCards).map((g) => (category: g.category, cards: sortCards(g.cards, false), isSection: false)).toList();
+
+    final groups = _groupByCategory(techCards)
+        .map((g) => (
+              category: g.category,
+              cards: sortCards(g.cards, false),
+              isSection: false
+            ))
+        .toList();
     final costLabel = showCost
-        ? (isDishesTab ? loc.t('ttk_col_cost_per_portion').replaceFirst('%s', costSym) : '$costSym/${loc.t('kg')}')
+        ? (isDishesTab
+            ? loc.t('ttk_col_cost_per_portion').replaceFirst('%s', costSym)
+            : '$costSym/${loc.t('kg')}')
         : '—';
 
     return RefreshIndicator(
@@ -1362,41 +2075,46 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             ),
           ),
           ...groups.expand((g) => [
-            SliverToBoxAdapter(
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                child: Text(
-                  g.isSection ? _sectionGroupLabel(g.category, loc) : _categoryLabel(g.category, loc),
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.onSurface,
+                SliverToBoxAdapter(
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    color:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                    child: Text(
+                      g.isSection
+                          ? _sectionGroupLabel(g.category, loc)
+                          : _categoryLabel(g.category, loc),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, i) => _buildTechCardRow(
-                  techCards: g.cards,
-                  index: i,
-                  lang: lang,
-                  loc: loc,
-                  canEdit: canEdit,
-                  showCost: showCost,
-                  isDishesTab: isDishesTab,
-                  colSectionWidth: colSectionWidth,
-                  colCatWidth: colCatWidth,
-                  colCostWidth: colCostWidth,
-                  colActionsWidth: colActionsWidth,
-                  costSym: costSym,
-                  establishment: context.read<AccountManagerSupabase>().establishment,
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => _buildTechCardRow(
+                      techCards: g.cards,
+                      index: i,
+                      lang: lang,
+                      loc: loc,
+                      canEdit: canEdit,
+                      showCost: showCost,
+                      isDishesTab: isDishesTab,
+                      colSectionWidth: colSectionWidth,
+                      colCatWidth: colCatWidth,
+                      colCostWidth: colCostWidth,
+                      colActionsWidth: colActionsWidth,
+                      costSym: costSym,
+                      establishment:
+                          context.read<AccountManagerSupabase>().establishment,
+                    ),
+                    childCount: g.cards.length,
+                  ),
                 ),
-                childCount: g.cards.length,
-              ),
-            ),
-          ]),
+              ]),
           const SliverPadding(padding: EdgeInsets.only(bottom: 80)),
         ],
       ),
@@ -1419,9 +2137,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     Establishment? establishment,
   }) {
     final tc = techCards[index];
-    final est = establishment ?? context.read<AccountManagerSupabase>().establishment;
+    final est =
+        establishment ?? context.read<AccountManagerSupabase>().establishment;
     // В филиале карточки головного заведения — только просмотр; свои — редактируемые.
-    final viewOnlyCard = est != null && est.isBranch && tc.establishmentId != est.id;
+    final viewOnlyCard =
+        est != null && est.isBranch && tc.establishmentId != est.id;
     final effectiveCanEdit = canEdit && !viewOnlyCard;
     final selected = _selectedTechCards.contains(tc.id);
     final name = tc.getDisplayNameInLists(lang);
@@ -1441,7 +2161,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           if (_selectionMode) {
             _toggleTechCardSelection(tc.id);
           } else {
-            final path = effectiveCanEdit ? '/tech-cards/${tc.id}' : '/tech-cards/${tc.id}?view=1';
+            final path = effectiveCanEdit
+                ? '/tech-cards/${tc.id}'
+                : '/tech-cards/${tc.id}?view=1';
             context.push(path);
           }
         },
@@ -1463,7 +2185,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               SizedBox(
                 width: colSectionWidth,
                 child: Text(
-                  sectionStr.length > 7 ? '${sectionStr.substring(0, 6)}…' : sectionStr,
+                  sectionStr.length > 7
+                      ? '${sectionStr.substring(0, 6)}…'
+                      : sectionStr,
                   style: TextStyle(
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1507,7 +2231,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                     : IconButton(
                         icon: const Icon(Icons.visibility_outlined, size: 20),
                         tooltip: loc.t('ttk_view'),
-                        onPressed: () => context.push('/tech-cards/${tc.id}?view=1'),
+                        onPressed: () =>
+                            context.push('/tech-cards/${tc.id}?view=1'),
                         style: IconButton.styleFrom(
                           minimumSize: const Size(36, 36),
                           padding: EdgeInsets.zero,
@@ -1522,7 +2247,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 
   /// Широкая таблица для планшетов и десктопов.
-  Widget _buildWideTable(List<TechCard> techCards, LocalizationService loc, String lang) {
+  Widget _buildWideTable(
+      List<TechCard> techCards, LocalizationService loc, String lang) {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
       scrollDirection: Axis.vertical,
@@ -1531,27 +2257,41 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 1000),
           child: DataTable(
-            headingRowColor: WidgetStateProperty.all(Theme.of(context).colorScheme.primaryContainer),
+            headingRowColor: WidgetStateProperty.all(
+                Theme.of(context).colorScheme.primaryContainer),
             columns: [
-              DataColumn(label: Text(loc.t('ttk_col_name'), style: const TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text(loc.t('ttk_section_label'), style: const TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text(loc.t('ttk_col_category'), style: const TextStyle(fontWeight: FontWeight.bold))),
-              DataColumn(label: Text(loc.t('ttk_col_cost_per_kg'), style: const TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(
+                  label: Text(loc.t('ttk_col_name'),
+                      style: const TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(
+                  label: Text(loc.t('ttk_section_label'),
+                      style: const TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(
+                  label: Text(loc.t('ttk_col_category'),
+                      style: const TextStyle(fontWeight: FontWeight.bold))),
+              DataColumn(
+                  label: Text(loc.t('ttk_col_cost_per_kg'),
+                      style: const TextStyle(fontWeight: FontWeight.bold))),
             ],
             rows: List.generate(techCards.length, (i) {
               final tc = techCards[i];
               final est = context.read<AccountManagerSupabase>().establishment;
-              final viewOnlyCard = est != null && est.isBranch && tc.establishmentId != est.id;
-              final path = viewOnlyCard ? '/tech-cards/${tc.id}?view=1' : '/tech-cards/${tc.id}';
+              final viewOnlyCard =
+                  est != null && est.isBranch && tc.establishmentId != est.id;
+              final path = viewOnlyCard
+                  ? '/tech-cards/${tc.id}?view=1'
+                  : '/tech-cards/${tc.id}';
               return DataRow(
                 selected: _selectedTechCards.contains(tc.id),
                 cells: [
                   DataCell(Text(tc.getDisplayNameInLists(lang))),
                   DataCell(Text(_sectionLabelForDisplay(tc, loc))),
                   DataCell(Text(_categoryLabel(tc.category, loc))),
-                  DataCell(Text(NumberFormatUtils.formatInt(_calculateCostPerKg(tc)))),
+                  DataCell(Text(
+                      NumberFormatUtils.formatInt(_calculateCostPerKg(tc)))),
                 ],
-                onSelectChanged: _selectionMode ? null : (_) => context.push(path),
+                onSelectChanged:
+                    _selectionMode ? null : (_) => context.push(path),
               );
             }),
           ),
@@ -1596,8 +2336,10 @@ class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => 40;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    final style = TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: onColor);
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final style =
+        TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: onColor);
     return Container(
       color: color,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -1608,7 +2350,8 @@ class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
           ),
           SizedBox(
             width: colSectionWidth,
-            child: Text(labelSection, style: style, textAlign: TextAlign.center),
+            child:
+                Text(labelSection, style: style, textAlign: TextAlign.center),
           ),
           SizedBox(
             width: colCatWidth,
@@ -1620,7 +2363,10 @@ class _TableHeaderDelegate extends SliverPersistentHeaderDelegate {
           ),
           SizedBox(
             width: colActionsWidth,
-            child: Text(labelView, style: style, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
+            child: Text(labelView,
+                style: style,
+                textAlign: TextAlign.center,
+                overflow: TextOverflow.ellipsis),
           ),
         ],
       ),
