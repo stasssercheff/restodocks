@@ -18,6 +18,7 @@ import '../services/ai_service.dart';
 import '../services/ai_service_supabase.dart';
 import '../services/services.dart';
 import '../services/excel_export_service.dart';
+import '../services/tech_card_cost_hydrator.dart';
 
 enum _TtkImportMode { single, multi }
 
@@ -262,14 +263,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return categoryTranslations[c]?[lang] ?? c;
   }
 
+  /// То же, что «Итого стоимость за кг» в редакторе — один источник истины.
   double _calculateCostPerKg(TechCard tc) {
-    if (tc.ingredients.isEmpty) return 0.0;
-    final resolved = _resolveTechCardCostOutput(tc.id, <String>{});
-    if (resolved.cost <= 0 || resolved.output <= 0) return 0.0;
-    // Если выход карточки не задан (часто у ПФ в БД), берём сумму выходов по строкам.
-    final yieldG = tc.yield > 0 ? tc.yield : resolved.output;
-    if (yieldG <= 0) return 0.0;
-    return (resolved.cost / yieldG) * 1000;
+    return TechCardCostHydrator.costPerKgOutput(tc);
   }
 
   /// Себестоимость за порцию (для блюд): totalCost * portionWeight / yield.
@@ -902,6 +898,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         if (!identical(s, tc)) toPersistSelfLink.add(s);
       }
       all = sanitizedAll;
+
+      // Та же гидратация, что в редакторе — «Итого стоимость за кг» = ₽/кг в списке.
+      final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
+      if (estPriceId != null && estPriceId.isNotEmpty) {
+        all = TechCardCostHydrator.hydrate(all, productStore, estPriceId);
+      }
 
       final results = await Future.wait([
         svc.getCustomCategories(est.dataEstablishmentId, 'kitchen'),
