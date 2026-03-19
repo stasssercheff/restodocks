@@ -734,6 +734,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// 0=подготовка, 1=полная форма. Растягиваем билд по кадрам — без замирания.
   int _contentPhase = 0;
 
+  /// В режиме просмотра для повара `_TtkCookTable` пересчитывает значения локально.
+  /// Синхронизацию обратно в родителя и автосохранение делаем с debounce и без `setState`,
+  /// чтобы не блокировать UI при каждом пересчёте.
+  Timer? _cookTableSyncDebounce;
+
   /// 'photo' | 'excel' — какая кнопка сейчас загружает (чтобы показывать правильный текст).
   final _nameController = TextEditingController();
 
@@ -1940,6 +1945,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (_reconcileNotifier != null) {
       _reconcileNotifier!.removeListener(_handleTechCardsReconcileSignal);
     }
+    _cookTableSyncDebounce?.cancel();
     _nameController.dispose();
     _technologyController.dispose();
     _descriptionForHallController.dispose();
@@ -4466,16 +4472,22 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                         onTapPfIngredient: (id) => context
                                             .push('/tech-cards/$id?view=1'),
                                         onIngredientsChanged: (list) {
-                                          WidgetsBinding.instance
-                                              .addPostFrameCallback((_) {
-                                            if (!mounted) return;
-                                            setState(() {
-                                              _ingredients.clear();
-                                              _ingredients.addAll(list);
+                                          // Не делаем setState на каждом пересчёте внутри таблицы:
+                                          // `_TtkCookTable` пересчитывает и перерисовывает себя локально.
+                                          // Родителю синхронизируем и автосохраняем только после паузы ввода.
+                                          _cookTableSyncDebounce?.cancel();
+                                          final snapshot = List<TTIngredient>.from(list);
+                                          _cookTableSyncDebounce = Timer(
+                                            const Duration(milliseconds: 450),
+                                            () {
+                                              if (!mounted) return;
+                                              _ingredients
+                                                ..clear()
+                                                ..addAll(snapshot);
                                               _ensurePlaceholderRowAtEnd();
-                                            });
-                                            _scheduleDraftSave();
-                                          });
+                                              _scheduleDraftSave();
+                                            },
+                                          );
                                         },
                                       ),
                                     ),
