@@ -264,8 +264,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 
   /// То же, что «Итого стоимость за кг» в редакторе — один источник истины.
+  /// Рекурсивно учитывает вложенные ПФ (sourceTechCardId) через _resolveTechCardCostOutput.
   double _calculateCostPerKg(TechCard tc) {
-    return TechCardCostHydrator.costPerKgOutput(tc);
+    final resolved = _resolveTechCardCostOutput(tc.id, <String>{});
+    if (resolved.output <= 0) return 0.0;
+    return (resolved.cost / resolved.output) * 1000;
   }
 
   /// Себестоимость за порцию (для блюд): totalCost * portionWeight / yield.
