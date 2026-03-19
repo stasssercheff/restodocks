@@ -994,20 +994,25 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               TTIngredient.fromJson(Map<String, dynamic>.from(item as Map)));
         } catch (_) {}
       }
-      final canEdit = context
-              .read<AccountManagerSupabase>()
-              .currentEmployee
-              ?.canEditChecklistsAndTechCards ??
-          false;
-      if (canEdit && !widget.forceViewMode && _ingredients.isEmpty) {
-        _ingredients.add(TTIngredient.emptyPlaceholder());
-        _ingredients.add(TTIngredient.emptyPlaceholder());
-      } else if (canEdit &&
-          !widget.forceViewMode &&
-          !_ingredients.last.isPlaceholder) {
-        _ingredients.add(TTIngredient.emptyPlaceholder());
-      }
+      _ensurePlaceholderRowAtEnd();
     });
+  }
+
+  /// Всегда держать хотя бы одну пустую строку для ввода в конце таблицы ингредиентов.
+  void _ensurePlaceholderRowAtEnd() {
+    if (!mounted) return;
+    final canEdit = context
+            .read<AccountManagerSupabase>()
+            .currentEmployee
+            ?.canEditChecklistsAndTechCards ??
+        false;
+    if (!canEdit || widget.forceViewMode) return;
+    if (_ingredients.isEmpty) {
+      _ingredients.add(TTIngredient.emptyPlaceholder());
+      _ingredients.add(TTIngredient.emptyPlaceholder());
+    } else if (!_ingredients.last.isPlaceholder) {
+      _ingredients.add(TTIngredient.emptyPlaceholder());
+    }
   }
 
   /// Макс. фото: ПФ — 10, блюдо — 1
@@ -1387,6 +1392,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   _ingredients
                     ..clear()
                     ..addAll(hydratedTc.ingredients);
+                  _ensurePlaceholderRowAtEnd();
                 });
               }
               _ensureTechCardTranslations(tcs);
@@ -1397,12 +1403,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       if (_isNew) {
         if (mounted) {
           final ai = widget.initialFromAi;
-          final canEdit = context
-                  .read<AccountManagerSupabase>()
-                  .currentEmployee
-                  ?.canEditChecklistsAndTechCards ??
-              false;
-          final addPlaceholders = canEdit && !widget.forceViewMode;
           if (ai != null) {
             _nameController.text = ai.dishName?.trim() ?? '';
             _technologyController.text = ai.technologyText?.trim() ?? '';
@@ -1479,15 +1479,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 : (ai.yieldGrams != null && ai.yieldGrams! > 0
                     ? ai.yieldGrams!.toDouble()
                     : (sumOutput > 0 ? sumOutput : 100));
-            if (addPlaceholders && _ingredients.isEmpty) {
-              _ingredients.add(TTIngredient.emptyPlaceholder());
-              _ingredients.add(TTIngredient.emptyPlaceholder());
-            } else if (addPlaceholders && !_ingredients.last.isPlaceholder) {
-              _ingredients.add(TTIngredient.emptyPlaceholder());
-            }
-          } else if (addPlaceholders && _ingredients.isEmpty) {
-            _ingredients.add(TTIngredient.emptyPlaceholder());
-            _ingredients.add(TTIngredient.emptyPlaceholder());
+            _ensurePlaceholderRowAtEnd();
+          } else {
+            _ensurePlaceholderRowAtEnd();
           }
           setState(() {
             _loading = false;
@@ -1499,6 +1493,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       final svc = context.read<TechCardServiceSupabase>();
       var tc = await svc.getTechCardById(widget.techCardId);
       if (tc != null) {
+        // Иногда embed возвращает пустые ингредиенты — догружаем
+        if (tc.ingredients.isEmpty) {
+          final filled = await svc.fillIngredientsForCardsBulk([tc]);
+          if (filled.isNotEmpty) tc = filled.first;
+        }
         var working = stripInvalidNestedPfSelfLinks(tc);
         if (!identical(working, tc)) {
           try {
@@ -1521,12 +1520,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         tc = working;
       }
       if (!mounted) return;
-      final canEdit = context
-              .read<AccountManagerSupabase>()
-              .currentEmployee
-              ?.canEditChecklistsAndTechCards ??
-          false;
-      final addPlaceholders = canEdit && !widget.forceViewMode;
       // Откладываем тяжёлый setState на следующий кадр, чтобы не блокировать UI при большом числе ингредиентов
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
@@ -1569,12 +1562,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             _ingredients
               ..clear()
               ..addAll(tc.ingredients);
-            if (addPlaceholders && _ingredients.isEmpty) {
-              _ingredients.add(TTIngredient.emptyPlaceholder());
-              _ingredients.add(TTIngredient.emptyPlaceholder());
-            } else if (addPlaceholders && !_ingredients.last.isPlaceholder) {
-              _ingredients.add(TTIngredient.emptyPlaceholder());
-            }
+            _ensurePlaceholderRowAtEnd();
           }
         });
         // Если перевод технологии ещё не сохранён — запросить через DeepL
@@ -2009,6 +1997,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         _ingredients
           ..clear()
           ..addAll(hydratedTc.ingredients);
+        _ensurePlaceholderRowAtEnd();
       });
     } catch (_) {
       // Фоновая автодосвязка — не критична для UX; если не получилось — просто пропускаем тик.
@@ -2600,12 +2589,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       ),
     );
     if (ok != true || !mounted) return;
-    final canEdit = context
-            .read<AccountManagerSupabase>()
-            .currentEmployee
-            ?.canEditChecklistsAndTechCards ??
-        false;
-    final addPlaceholders = canEdit && !widget.forceViewMode;
     setState(() {
       _nameController.clear();
       _technologyController.clear();
@@ -2619,10 +2602,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       _photoUrls = [];
       _pendingPhotoBytes = [];
       _ingredients.clear();
-      if (addPlaceholders) {
-        _ingredients.add(TTIngredient.emptyPlaceholder());
-        _ingredients.add(TTIngredient.emptyPlaceholder());
-      }
+      _ensurePlaceholderRowAtEnd();
     });
     await clearDraft();
   }
@@ -2772,12 +2752,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       _technologyController.text = ai.technologyText!.trim();
     }
     if (ai.isSemiFinished != null) _isSemiFinished = ai.isSemiFinished!;
-    final canEdit = context
-            .read<AccountManagerSupabase>()
-            .currentEmployee
-            ?.canEditChecklistsAndTechCards ??
-        false;
-    final addPlaceholders = canEdit && !widget.forceViewMode;
     final hadPlaceholder =
         _ingredients.isNotEmpty && _ingredients.last.isPlaceholder;
     if (ai.ingredients.isNotEmpty) {
@@ -2822,10 +2796,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           cost: 0,
         ));
       }
-      if (addPlaceholders &&
-          (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
-        _ingredients.add(TTIngredient.emptyPlaceholder());
-      }
+      _ensurePlaceholderRowAtEnd();
       final sumOutput =
           _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
       _portionWeight = _isSemiFinished
@@ -2835,8 +2806,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               : (sumOutput > 0 ? sumOutput : 100));
     } else if (hadPlaceholder && _ingredients.isNotEmpty) {
       // сохраняем плейсхолдер
-    } else if (addPlaceholders && _ingredients.isEmpty) {
-      _ingredients.add(TTIngredient.emptyPlaceholder());
+    } else {
+      _ensurePlaceholderRowAtEnd();
     }
     _autoFillBruttoFromNomenclature();
   }
@@ -2883,6 +2854,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     setState(() {
       _ingredients.clear();
       _ingredients.addAll(newList);
+      _ensurePlaceholderRowAtEnd();
     });
     _scheduleDraftSave();
   }
@@ -3247,16 +3219,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       } else {
         _ingredients.add(ing);
       }
-      final canEdit = context
-              .read<AccountManagerSupabase>()
-              .currentEmployee
-              ?.canEditChecklistsAndTechCards ??
-          false;
-      final addPlaceholders = canEdit && !widget.forceViewMode;
-      if (addPlaceholders &&
-          (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
-        _ingredients.add(TTIngredient.emptyPlaceholder());
-      }
+      _ensurePlaceholderRowAtEnd();
     });
     _scheduleDraftSave();
   }
@@ -3304,18 +3267,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       setState(() {
         if (replaceIndex >= 0 && replaceIndex < _ingredients.length) {
           _ingredients[replaceIndex] = ing;
-          final canEdit = context
-                  .read<AccountManagerSupabase>()
-                  .currentEmployee
-                  ?.canEditChecklistsAndTechCards ??
-              false;
-          final addPlaceholders = canEdit && !widget.forceViewMode;
-          if (addPlaceholders &&
-              (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
-            _ingredients.add(TTIngredient.emptyPlaceholder());
-          }
+          _ensurePlaceholderRowAtEnd();
         } else {
           _ingredients.add(ing);
+          _ensurePlaceholderRowAtEnd();
         }
       });
       _scheduleDraftSave();
@@ -3352,16 +3307,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       } else {
         _ingredients.add(ing);
       }
-      final canEdit = context
-              .read<AccountManagerSupabase>()
-              .currentEmployee
-              ?.canEditChecklistsAndTechCards ??
-          false;
-      final addPlaceholders = canEdit && !widget.forceViewMode;
-      if (addPlaceholders &&
-          (_ingredients.isEmpty || !_ingredients.last.isPlaceholder)) {
-        _ingredients.add(TTIngredient.emptyPlaceholder());
-      }
+      _ensurePlaceholderRowAtEnd();
     });
     _scheduleDraftSave();
   }
@@ -3375,7 +3321,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         .withRealId();
     setState(() {
       _ingredients.add(ing);
-      _ingredients.add(TTIngredient.emptyPlaceholder());
+      _ensurePlaceholderRowAtEnd();
     });
     _scheduleDraftSave();
   }
@@ -3383,18 +3329,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   void _removeIngredient(int i) {
     setState(() {
       _ingredients.removeAt(i);
-      final canEdit = context
-              .read<AccountManagerSupabase>()
-              .currentEmployee
-              ?.canEditChecklistsAndTechCards ??
-          false;
-      final addPlaceholders = canEdit && !widget.forceViewMode;
-      if (addPlaceholders && _ingredients.isEmpty) {
-        _ingredients.add(TTIngredient.emptyPlaceholder());
-        _ingredients.add(TTIngredient.emptyPlaceholder());
-      } else if (addPlaceholders && !_ingredients.last.isPlaceholder) {
-        _ingredients.add(TTIngredient.emptyPlaceholder());
-      }
+      _ensurePlaceholderRowAtEnd();
     });
     _scheduleDraftSave();
   }
@@ -4446,9 +4381,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                                   ing.isPlaceholder
                                                       ? ing.withRealId()
                                                       : ing;
-                                              _ingredients.add(
-                                                  TTIngredient.emptyPlaceholder());
                                             }
+                                            _ensurePlaceholderRowAtEnd();
                                             return;
                                           }
                                           if (i >= _ingredients.length) return;
@@ -4456,14 +4390,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                               ing.isPlaceholder && ing.hasData
                                                   ? ing.withRealId()
                                                   : ing;
-                                          // Всегда добавляем пустую строку снизу при заполнении любой строки
-                                          if (ing.hasData &&
-                                              (_ingredients.isEmpty ||
-                                                  !_ingredients.last
-                                                      .isPlaceholder)) {
-                                            _ingredients.add(
-                                                TTIngredient.emptyPlaceholder());
-                                          }
+                                          _ensurePlaceholderRowAtEnd();
                                         });
                                         _scheduleDraftSave();
                                       },
@@ -4498,6 +4425,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                             setState(() {
                                               _ingredients.clear();
                                               _ingredients.addAll(list);
+                                              _ensurePlaceholderRowAtEnd();
                                             });
                                             _scheduleDraftSave();
                                           });

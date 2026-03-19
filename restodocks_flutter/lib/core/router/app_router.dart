@@ -795,7 +795,7 @@ class AppRouter {
               }
               final viewOnly = state.queryParameters['view'] == '1';
               final hallView = state.queryParameters['hall'] == '1';
-              return _slideTransitionPage(state, TechCardEditScreen(techCardId: segment, forceViewMode: viewOnly, forceHallView: hallView));
+              return _slideTransitionPage(state, _DeferredTechCardEdit(techCardId: segment, forceViewMode: viewOnly, forceHallView: hallView));
             },
           ),
 
@@ -882,6 +882,57 @@ class _SplashScreenState extends State<SplashScreen> {
           fit: BoxFit.cover,
         ),
       ),
+    );
+  }
+}
+
+/// Placeholder для /tech-cards/:id: лёгкий Scaffold сначала, тяжёлый TechCardEditScreen в след. кадре.
+/// Устраняет замирание при открытии с телефона.
+class _DeferredTechCardEdit extends StatefulWidget {
+  const _DeferredTechCardEdit({
+    required this.techCardId,
+    this.forceViewMode = false,
+    this.forceHallView = false,
+  });
+  final String techCardId;
+  final bool forceViewMode;
+  final bool forceHallView;
+
+  @override
+  State<_DeferredTechCardEdit> createState() => _DeferredTechCardEditState();
+}
+
+class _DeferredTechCardEditState extends State<_DeferredTechCardEdit> {
+  Widget? _child;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _child = TechCardEditScreen(
+          techCardId: widget.techCardId,
+          forceViewMode: widget.forceViewMode,
+          forceHallView: widget.forceHallView,
+        );
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_child != null) return _child!;
+    final loc = context.read<LocalizationService>();
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
+        title: Text(loc.t('tech_cards')),
+      ),
+      body: const Center(child: CircularProgressIndicator()),
     );
   }
 }

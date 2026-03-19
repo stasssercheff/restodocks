@@ -55,6 +55,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   Map<String, List<TechCard>> _pfCandidatesByNormalizedName = {};
+  List<({TechCard tc, int issues, String subtitle})>? _cachedReviewList;
+  int? _cachedReviewCount;
+  Object? _lastReviewCacheKey;
+  bool _reviewCacheScheduled = false;
+  int _listVersion = 0;
+  Timer? _searchDebounceTimer;
   Timer? _reconcileTimer;
   TechCardsReconcileNotifier? _reconcileNotifier;
   int _lastReconcileNotifierVersion = 0;
@@ -63,6 +69,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   @override
   void dispose() {
+    _searchDebounceTimer?.cancel();
     _reconcileTimer?.cancel();
     if (_reconcileNotifier != null) {
       _reconcileNotifier!.removeListener(_handleTechCardsReconcileSignal);
@@ -432,6 +439,64 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     _pfCandidatesByNormalizedName = map;
   }
 
+  /// Отфильтрованный список для вкладки «На проверку».
+  List<TechCard> _getReviewFilteredList(LocalizationService loc) {
+    final query = _searchController.text.trim().toLowerCase();
+    var result = _list;
+    if (query.isNotEmpty) {
+      final lang = loc.currentLanguageCode;
+      result = result
+          .where((tc) =>
+              tc.getDisplayNameInLists(lang).toLowerCase().contains(query))
+          .toList();
+    }
+    if (_filterSection != null) {
+      result = result
+          .where((tc) =>
+              tc.sections.contains(_filterSection) ||
+              tc.sections.contains('all'))
+          .toList();
+    }
+    if (_filterCategory != null) {
+      result = result
+          .where((tc) =>
+              (tc.category.isEmpty ? 'misc' : tc.category) == _filterCategory)
+          .toList();
+    }
+    return result;
+  }
+
+  /// Ключ для инвалидации кэша «На проверку» — меняется при смене списка/фильтров.
+  Object _reviewCacheKey(List<TechCard> reviewFiltered) =>
+      (_listVersion, _filterSection, _filterCategory, _searchController.text);
+
+  /// Тяжёлые вычисления для вкладки «На проверку» — в след. кадре, чтобы не блокировать UI.
+  void _ensureReviewCache(LocalizationService loc, List<TechCard> reviewFiltered) {
+    final key = _reviewCacheKey(reviewFiltered);
+    if (_lastReviewCacheKey == key) return;
+    if (_reviewCacheScheduled) return;
+    _reviewCacheScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _reviewCacheScheduled = false;
+      if (!mounted) return;
+      _rebuildPfCandidatesIndex(loc);
+      final list = reviewFiltered
+          .map((tc) {
+            final issues = _reviewIssuesCount(tc, loc);
+            return (tc: tc, issues: issues, subtitle: _getReviewSubtitle(tc, loc));
+          })
+          .where((e) => e.issues > 0)
+          .toList()
+        ..sort((a, b) => b.issues.compareTo(a.issues));
+      if (!mounted) return;
+      setState(() {
+        _lastReviewCacheKey = key;
+        _cachedReviewList = list;
+        _cachedReviewCount = list.length;
+      });
+    });
+  }
+
   int _ambiguousPfIngredientCount(TechCard tc, LocalizationService loc) {
     if (tc.ingredients.isEmpty) return 0;
     var cnt = 0;
@@ -614,15 +679,20 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return null;
   }
 
-  Widget _buildReviewList(
-      List<TechCard> techCards, LocalizationService loc, bool canEdit) {
+  Widget _buildReviewList(LocalizationService loc, bool canEdit) {
     final lang = loc.currentLanguageCode;
-    final list = techCards
-        .map((tc) => (tc: tc, issues: _reviewIssuesCount(tc, loc)))
-        .where((e) => e.issues > 0)
-        .toList()
-      ..sort((a, b) => b.issues.compareTo(a.issues));
+    final list = _cachedReviewList;
 
+    if (list == null) {
+      return const Center(child: Padding(
+        padding: EdgeInsets.all(24),
+        child: SizedBox(
+          width: 32,
+          height: 32,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ));
+    }
     if (list.isEmpty) {
       return Center(
         child: Padding(
@@ -654,7 +724,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 side: BorderSide(
                     color: Theme.of(ctx).colorScheme.outlineVariant)),
             title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-            subtitle: Text(_getReviewSubtitle(tc, loc)),
+            subtitle: Text(item.subtitle),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showReviewBottomSheet(tc, loc),
           );
@@ -1318,11 +1388,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           if (!mounted) return;
           setState(() {
             _list = filteredList;
+            _listVersion++;
+            _cachedReviewList = null;
+            _cachedReviewCount = null;
+            _lastReviewCacheKey = null;
             _techCardsById = {for (final t in withData) t.id: t};
             _priceProductStore = productStore;
             _priceEstablishmentId = est.isBranch ? est.id : est.dataEstablishmentId;
           });
-          if (mounted) _rebuildPfCandidatesIndex(context.read<LocalizationService>());
+          if (mounted) {
+            _rebuildPfCandidatesIndex(context.read<LocalizationService>());
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted || _list.isEmpty) return;
+              final loc = context.read<LocalizationService>();
+              _ensureReviewCache(loc, _getReviewFilteredList(loc));
+            });
+          }
         } catch (_) {}
       });
 
@@ -1356,12 +1437,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         _priceEstablishmentId = est.isBranch ? est.id : est.dataEstablishmentId;
         setState(() {
           _list = list;
+          _listVersion++;
+          _cachedReviewList = null;
+          _cachedReviewCount = null;
+          _lastReviewCacheKey = null;
           _loading = false;
         });
         _techCardsById = {for (final tc in processedAll) tc.id: tc};
         _resolvedCostMemo.clear();
         _ensureTechCardTranslations(svc, list);
         _warmPdfParser();
+        // Предзагрузка кэша «На проверку» — чтобы при переключении вкладки данные были готовы
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _list.isEmpty) return;
+          final loc = context.read<LocalizationService>();
+          _ensureReviewCache(loc, _getReviewFilteredList(loc));
+        });
       }
 
       if (toPersistSelfLink.isNotEmpty && mounted) {
@@ -2439,12 +2530,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         filterBySearch(_list.where((tc) => tc.isSemiFinished).toList()));
     final dishFiltered = filterBySectionAndCategory(
         filterBySearch(_list.where((tc) => !tc.isSemiFinished).toList()));
-    final reviewFiltered = filterBySectionAndCategory(filterBySearch(_list));
-
-    _rebuildPfCandidatesIndex(loc);
-    final reviewCount = reviewFiltered
-        .where((tc) => _reviewIssuesCount(tc, loc) > 0)
-        .length;
+    final reviewFiltered = _getReviewFilteredList(loc);
+    _ensureReviewCache(loc, reviewFiltered);
+    final reviewCount = _cachedReviewCount ?? 0;
 
     final acc = context.read<AccountManagerSupabase>();
     final emp = acc.currentEmployee;
@@ -2562,11 +2650,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                     hintText: loc.t('ttk_search_hint'),
                     isDense: true,
                     prefixIcon: const Icon(Icons.search, size: 20),
-                    suffixIcon: _searchController.text.isNotEmpty
+                        suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear, size: 20),
                             onPressed: () {
                               _searchController.clear();
+                              _searchDebounceTimer?.cancel();
                               setState(() {});
                             },
                           )
@@ -2575,7 +2664,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 10),
                   ),
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (_) {
+                    _searchDebounceTimer?.cancel();
+                    _searchDebounceTimer = Timer(
+                      const Duration(milliseconds: 150),
+                      () {
+                        if (mounted) setState(() {});
+                      },
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -2638,7 +2735,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                     isDishesTab: false),
                 _buildTechCardsTable(dishFiltered, loc, canEdit, showCost,
                     isDishesTab: true),
-                _buildReviewList(reviewFiltered, loc, canEdit),
+                _buildReviewList(loc, canEdit),
               ],
             ),
           ),
