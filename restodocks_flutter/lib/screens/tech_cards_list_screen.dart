@@ -34,6 +34,9 @@ class TechCardsListScreen extends StatefulWidget {
 
 class _TechCardsListScreenState extends State<TechCardsListScreen> {
   List<TechCard> _list = [];
+  // Индексы/кэши для рекурсивного расчёта себестоимости (включая вложенные ПФ из импортированных ТТК).
+  Map<String, TechCard> _techCardsById = {};
+  Map<String, ({double cost, double output})> _resolvedCostMemo = {};
   bool _loading = true;
   bool _loadingExcel = false;
   bool _loadingTtkIsPdf = false;
@@ -191,15 +194,68 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   double _calculateCostPerKg(TechCard tc) {
     if (tc.ingredients.isEmpty || tc.yield <= 0) return 0.0;
-    final totalCost = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
-    return (totalCost / tc.yield) * 1000;
+    final resolved = _resolveTechCardCostOutput(tc.id, <String>{});
+    return resolved.output > 0 ? (resolved.cost / tc.yield) * 1000 : 0.0;
   }
 
   /// Себестоимость за порцию (для блюд): totalCost * portionWeight / yield.
   double _calculateCostPerPortion(TechCard tc) {
     if (tc.ingredients.isEmpty || tc.yield <= 0 || tc.portionWeight <= 0) return 0.0;
-    final totalCost = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
-    return totalCost * tc.portionWeight / tc.yield;
+    final resolved = _resolveTechCardCostOutput(tc.id, <String>{});
+    return resolved.output > 0 ? resolved.cost * tc.portionWeight / tc.yield : 0.0;
+  }
+
+  double _ingredientResolvedOutput(TTIngredient ing) {
+    if (ing.outputWeight > 0) return ing.outputWeight;
+    if (ing.netWeight > 0) return ing.netWeight;
+    return ing.grossWeight;
+  }
+
+  /// Возвращает рекурсивно посчитанную себестоимость ТТК и её "выход" (сумма выходов по строкам).
+  /// Важно: для импортированных вложенных ПФ `ingredient.cost` может быть 0, поэтому считаем глубоко.
+  ({double cost, double output}) _resolveTechCardCostOutput(
+    String techCardId,
+    Set<String> resolving,
+  ) {
+    final cached = _resolvedCostMemo[techCardId];
+    if (cached != null) return cached;
+
+    if (!resolving.add(techCardId)) {
+      // Цикл ссылок (ошибка данных) — чтобы не уйти в бесконечную рекурсию.
+      return (cost: 0.0, output: 0.0);
+    }
+
+    final tc = _techCardsById[techCardId];
+    if (tc == null) {
+      resolving.remove(techCardId);
+      return (cost: 0.0, output: 0.0);
+    }
+
+    double totalCost = 0.0;
+    double totalOutput = 0.0;
+
+    for (final ing in tc.ingredients) {
+      final ingredientOutput = _ingredientResolvedOutput(ing);
+      totalOutput += ingredientOutput;
+
+      // Листинг по обычным продуктам: используем effectiveCost (может быть построен из pricePerKg×вес).
+      if (ing.sourceTechCardId == null || ing.sourceTechCardId!.isEmpty) {
+        totalCost += ing.effectiveCost > 0 ? ing.effectiveCost : 0.0;
+        continue;
+      }
+
+      final nestedId = ing.sourceTechCardId!;
+      final nested = _resolveTechCardCostOutput(nestedId, resolving);
+      if (ingredientOutput <= 0 || nested.output <= 0 || nested.cost <= 0) continue;
+
+      // Масштабируем себестоимость вложенной ТТК пропорционально "выходу" этой строки.
+      totalCost += nested.cost * ingredientOutput / nested.output;
+    }
+
+    final resolved = (cost: totalCost, output: totalOutput);
+    _resolvedCostMemo[techCardId] = resolved;
+    resolving.remove(techCardId);
+    return resolved;
   }
 
   Future<void> _load() async {
@@ -290,6 +346,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       devLog('[ttk_list] _load: est=${est.dataEstablishmentId} dept=${widget.department} all=${all.length} afterFilter=${list.length}');
       if (mounted) {
         setState(() { _list = list; _loading = false; });
+        _techCardsById = {for (final tc in list) tc.id: tc};
+        _resolvedCostMemo.clear();
         _ensureTechCardTranslations(svc, list);
         _warmPdfParser();
       }

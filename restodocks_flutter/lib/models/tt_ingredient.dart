@@ -133,6 +133,10 @@ class TTIngredient extends Equatable {
     double? gramsPerPiece,
   }) {
     final factor = totalNetWeight > 0 ? grossWeight / totalNetWeight : 0.0;
+    // Для вложенного ПФ в UI показываем цену за кг: стоимость базовая / нетто базовое × 1000.
+    // Иначе `pricePerKg` останется null, а `ExcelStyleTtkTable` не сможет восстановить цену,
+    // потому что у такого ингредиента нет `productId`.
+    final resolvedPricePerKg = totalNetWeight > 0 ? (totalCost / totalNetWeight) * 1000 : 0.0;
     return TTIngredient(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       productId: null,
@@ -153,7 +157,7 @@ class TTIngredient extends Equatable {
       finalFat: totalFat * factor,
       finalCarbs: totalCarbs * factor,
       cost: totalCost * factor,
-      pricePerKg: null,
+      pricePerKg: resolvedPricePerKg,
     );
   }
 

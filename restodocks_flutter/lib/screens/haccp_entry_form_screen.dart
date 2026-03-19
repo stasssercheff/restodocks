@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../models/employee.dart';
 import '../models/haccp_log.dart';
 import '../models/haccp_log_type.dart';
+import '../models/product.dart';
 import '../models/tech_card.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -24,6 +25,22 @@ class _HealthHygieneRow {
   bool positionIsCustom;
   bool statusOk;
   bool status2Ok;
+}
+
+class _FinishedBrakerageChoice {
+  const _FinishedBrakerageChoice({
+    required this.displayName,
+    required this.searchTokens,
+    required this.typeLabel,
+    this.techCardId,
+    this.productName,
+  });
+
+  final String displayName;
+  final String searchTokens;
+  final String typeLabel;
+  final String? techCardId;
+  final String? productName;
 }
 
 /// Форма добавления записи в журнал ХАССП.
@@ -81,7 +98,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
   /// Журнал бракеража готовой продукции: ТТК для выбора блюда.
   List<TechCard> _finishedBrakerageTechCards = [];
+  List<Product> _finishedBrakerageProducts = [];
   String? _selectedFinishedBrakerageTechCardId;
+  final HaccpFormPresetService _presetService = HaccpFormPresetService();
+  List<String> _fridgeEquipmentOptions = [];
+  List<String> _warehousePremisesOptions = [];
 
   /// Сотрудники заведения для форм медкнижек, медосмотров и полей «ответственный»/«подпись».
   List<Employee> _formEmployees = [];
@@ -97,7 +118,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     if (_logType == HaccpLogType.healthHygiene) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadHealthEmployees());
     } else if (_logType == HaccpLogType.finishedProductBrakerage) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _loadFinishedBrakerageTechCards());
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadFinishedBrakerageChoices());
+    } else if (_logType == HaccpLogType.fridgeTemperature ||
+        _logType == HaccpLogType.warehouseTempHumidity) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadSavedFieldOptions());
     } else if (_logType == HaccpLogType.medBookRegistry || _logType == HaccpLogType.medExaminations) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadFormEmployees());
     }
@@ -137,19 +161,65 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     } catch (_) {}
   }
 
-  Future<void> _loadFinishedBrakerageTechCards() async {
+  Future<void> _loadSavedFieldOptions() async {
+    final est = context.read<AccountManagerSupabase>().establishment;
+    if (est == null) return;
+    try {
+      final fridge = await _presetService.getOptions(
+        establishmentId: est.id,
+        fieldKey: 'fridge_equipment',
+      );
+      final warehouse = await _presetService.getOptions(
+        establishmentId: est.id,
+        fieldKey: 'warehouse_premises',
+      );
+      if (!mounted) return;
+      setState(() {
+        _fridgeEquipmentOptions = fridge;
+        _warehousePremisesOptions = warehouse;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _saveCurrentOption({
+    required String controllerKey,
+    required String fieldKey,
+  }) async {
+    final est = context.read<AccountManagerSupabase>().establishment;
+    final value = _getText(controllerKey);
+    if (est == null || value.isEmpty) return;
+    final updated = await _presetService.addOption(
+      establishmentId: est.id,
+      fieldKey: fieldKey,
+      value: value,
+    );
+    if (!mounted) return;
+    setState(() {
+      if (fieldKey == 'fridge_equipment') {
+        _fridgeEquipmentOptions = updated;
+      } else if (fieldKey == 'warehouse_premises') {
+        _warehousePremisesOptions = updated;
+      }
+    });
+  }
+
+  Future<void> _loadFinishedBrakerageChoices() async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     final emp = acc.currentEmployee;
     final dataEstId = est?.dataEstablishmentId;
-    if (dataEstId == null) return;
+    if (dataEstId == null || est == null) return;
     try {
       final svc = context.read<TechCardServiceSupabase>();
+      final store = context.read<ProductStoreSupabase>();
       final all = await svc.getTechCardsForEstablishment(dataEstId);
+      await store.loadNomenclature(est.id);
       final visible = emp == null ? all : all.where((tc) => emp.canSeeTechCard(tc.sections)).toList();
+      final products = List<Product>.from(store.getProducts());
       if (!mounted) return;
       setState(() {
         _finishedBrakerageTechCards = visible;
+        _finishedBrakerageProducts = products;
       });
     } catch (_) {}
   }
@@ -274,6 +344,123 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       maxLines: multiline ? 2 : 1,
       keyboardType: keyboardType,
     );
+  }
+
+  Future<String?> _showSavedOptionsPicker({
+    required String title,
+    required List<String> options,
+  }) async {
+    return showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: options.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  context.read<LocalizationService>().t('no_results') ?? 'Ничего не найдено',
+                  textAlign: TextAlign.center,
+                ),
+              )
+            : ListView(
+                shrinkWrap: true,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                    child: Text(
+                      title,
+                      style: Theme.of(ctx).textTheme.titleMedium,
+                    ),
+                  ),
+                  ...options.map((option) => ListTile(
+                        title: Text(option),
+                        onTap: () => Navigator.of(ctx).pop(option),
+                      )),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _savedOptionTextField({
+    required String key,
+    required String label,
+    required List<String> options,
+    required String presetFieldKey,
+    String? hintText,
+    String? Function(String?)? validator,
+  }) {
+    _controllers[key] ??= TextEditingController();
+    return TextFormField(
+      controller: _controllers[key],
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hintText,
+        border: const OutlineInputBorder(),
+        isDense: true,
+        suffixIconConstraints: const BoxConstraints(minWidth: 84),
+        suffixIcon: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: context.read<LocalizationService>().t('save') ?? 'Сохранить',
+              icon: const Icon(Icons.bookmark_add_outlined),
+              onPressed: () => _saveCurrentOption(
+                controllerKey: key,
+                fieldKey: presetFieldKey,
+              ),
+            ),
+            if (options.isNotEmpty)
+              IconButton(
+                tooltip: label,
+                icon: const Icon(Icons.arrow_drop_down),
+                onPressed: () async {
+                  final picked = await _showSavedOptionsPicker(
+                    title: label,
+                    options: options,
+                  );
+                  if (picked == null) return;
+                  setState(() => _setText(key, picked));
+                },
+              ),
+          ],
+        ),
+      ),
+      validator: validator,
+    );
+  }
+
+  String _finishedBrakerageTypeLabel(LocalizationService loc, {required bool isProduct, required bool isSemiFinished}) {
+    if (isProduct) return loc.t('products') ?? 'Продукты';
+    if (isSemiFinished) return loc.t('ttk_pf') ?? 'ТТК ПФ';
+    return loc.t('ttk_dish') ?? 'Блюдо';
+  }
+
+  List<_FinishedBrakerageChoice> _buildFinishedBrakerageChoices(LocalizationService loc) {
+    final lang = loc.currentLanguageCode;
+    final choices = <_FinishedBrakerageChoice>[
+      ..._finishedBrakerageProducts.map((product) {
+        final label = product.getLocalizedName(lang);
+        return _FinishedBrakerageChoice(
+          displayName: label,
+          searchTokens: '$label ${product.name} ${product.category}',
+          typeLabel: _finishedBrakerageTypeLabel(loc, isProduct: true, isSemiFinished: false),
+          productName: label,
+        );
+      }),
+      ..._finishedBrakerageTechCards.map((tc) {
+        final label = tc.getDisplayNameInLists(lang);
+        return _FinishedBrakerageChoice(
+          displayName: label,
+          searchTokens: '$label ${tc.dishName} ${tc.category}',
+          typeLabel: _finishedBrakerageTypeLabel(loc, isProduct: false, isSemiFinished: tc.isSemiFinished),
+          techCardId: tc.id,
+          productName: label,
+        );
+      }),
+    ];
+    choices.sort((a, b) => a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
+    return choices;
   }
 
   /// Селектор «Разрешение к реализации»: разрешено / запрещено.
@@ -421,27 +608,29 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     );
   }
 
-  /// Ячейка выбора блюда для журнала бракеража готовой продукции: выпадающий список с поиском по ТТК.
+  /// Выбор продукции/сырья для журнала бракеража готовой продукции:
+  /// продукты из номенклатуры + ТТК ПФ + ТТК блюда.
   Widget _finishedProductPickerCell(LocalizationService loc) {
     _controllers['product'] ??= TextEditingController();
     final controller = _controllers['product']!;
-    final title = controller.text.isNotEmpty ? controller.text : (loc.t('haccp_product') ?? 'Выбрать блюдо');
+    final title = controller.text.isNotEmpty ? controller.text : (loc.t('haccp_product') ?? 'Продукция / Сырьё');
     return InkWell(
       onTap: () async {
-        if (_finishedBrakerageTechCards.isEmpty) {
-          await _loadFinishedBrakerageTechCards();
+        if (_finishedBrakerageTechCards.isEmpty && _finishedBrakerageProducts.isEmpty) {
+          await _loadFinishedBrakerageChoices();
         }
-        final picked = await showDialog<TechCard?>(
+        final allChoices = _buildFinishedBrakerageChoices(loc);
+        final picked = await showDialog<_FinishedBrakerageChoice?>(
           context: context,
           builder: (ctx) {
             final searchCtrl = TextEditingController();
-            List<TechCard> filtered = List.of(_finishedBrakerageTechCards);
+            List<_FinishedBrakerageChoice> filtered = List.of(allChoices);
             void applyFilter() {
               final q = searchCtrl.text.trim().toLowerCase();
               filtered = q.isEmpty
-                  ? List.of(_finishedBrakerageTechCards)
-                  : _finishedBrakerageTechCards
-                      .where((tc) => tc.dishName.toLowerCase().contains(q))
+                  ? List.of(allChoices)
+                  : allChoices
+                      .where((item) => item.searchTokens.toLowerCase().contains(q))
                       .toList();
             }
             applyFilter();
@@ -456,10 +645,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                       children: [
                         TextField(
                           controller: searchCtrl,
-                          decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.search),
-                            hintText: 'Поиск по названию ТТК',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            prefixIcon: const Icon(Icons.search),
+                            hintText: loc.t('search') ?? 'Поиск',
+                            border: const OutlineInputBorder(),
                           ),
                           onChanged: (_) {
                             setStateDialog(() {
@@ -475,11 +664,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                                   shrinkWrap: true,
                                   itemCount: filtered.length,
                                   itemBuilder: (ctx, index) {
-                                    final tc = filtered[index];
+                                    final item = filtered[index];
                                     return ListTile(
-                                      title: Text(tc.dishName),
-                                      subtitle: tc.category.isNotEmpty ? Text(tc.category) : null,
-                                      onTap: () => Navigator.of(ctx).pop(tc),
+                                      title: Text(item.displayName),
+                                      subtitle: Text(item.typeLabel),
+                                      onTap: () => Navigator.of(ctx).pop(item),
                                     );
                                   },
                                 ),
@@ -500,13 +689,17 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         );
         if (picked != null && mounted) {
           setState(() {
-            controller.text = picked.dishName;
-            _selectedFinishedBrakerageTechCardId = picked.id;
+            controller.text = picked.productName ?? picked.displayName;
+            _selectedFinishedBrakerageTechCardId = picked.techCardId;
           });
         }
       },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: loc.t('haccp_product') ?? 'Продукция / Сырьё',
+          border: const OutlineInputBorder(),
+          isDense: true,
+        ),
         child: Row(
           children: [
             Expanded(
@@ -664,7 +857,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             _tableCell(Consumer<AccountManagerSupabase>(
               builder: (_, acc, __) => Text(acc.establishment?.name ?? '—'),
             )),
-            _tableCell(_textField('equipment', loc.t('haccp_equipment') ?? 'Оборудование')),
+            _tableCell(_savedOptionTextField(
+              key: 'equipment',
+              label: loc.t('haccp_equipment') ?? 'Оборудование',
+              options: _fridgeEquipmentOptions,
+              presetFieldKey: 'fridge_equipment',
+            )),
             _tableCell(Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -695,14 +893,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
-          child: TextFormField(
-            controller: _controllers['warehouse_premises'],
-            decoration: InputDecoration(
-              labelText: 'Наименование складского помещения',
-              hintText: 'Например: Склад сухих продуктов, Овощной цех',
-              border: const OutlineInputBorder(),
-              isDense: true,
-            ),
+          child: _savedOptionTextField(
+            key: 'warehouse_premises',
+            label: loc.t('haccp_warehouse_premises') ?? 'Наименование складского помещения',
+            hintText: 'Например: Склад сухих продуктов, Овощной цех',
+            options: _warehousePremisesOptions,
+            presetFieldKey: 'warehouse_premises',
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Укажите помещение';
               return null;
@@ -1436,7 +1632,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 readOnly: true,
               ),
             ),
-            _textField('equipment', loc.t('haccp_equipment') ?? 'Оборудование'),
+            _savedOptionTextField(
+              key: 'equipment',
+              label: loc.t('haccp_equipment') ?? 'Оборудование',
+              options: _fridgeEquipmentOptions,
+              presetFieldKey: 'fridge_equipment',
+            ),
             _mobileSlider(
               label: 'Температура',
               value: _tempValue,
@@ -1456,13 +1657,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             _mobileBlock(
               loc.t(HaccpLogType.warehouseTempHumidity.displayNameKey) ?? HaccpLogType.warehouseTempHumidity.displayNameRu,
               [
-                TextFormField(
-                  controller: _controllers['warehouse_premises'],
-                  decoration: const InputDecoration(
-                    labelText: 'Наименование складского помещения',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
+                _savedOptionTextField(
+                  key: 'warehouse_premises',
+                  label: loc.t('haccp_warehouse_premises') ?? 'Наименование складского помещения',
+                  options: _warehousePremisesOptions,
+                  presetFieldKey: 'warehouse_premises',
                   validator: (v) => (v == null || v.trim().isEmpty) ? 'Укажите помещение' : null,
                 ),
                 _mobileSlider(
@@ -1731,6 +1930,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           equipment: _getText('equipment').isNotEmpty ? _getText('equipment') : null,
           note: _getText('note').isNotEmpty ? _getText('note') : null,
         );
+        await _saveCurrentOption(
+          controllerKey: 'equipment',
+          fieldKey: 'fridge_equipment',
+        );
         break;
       case HaccpLogType.warehouseTempHumidity:
         await svc.insertNumeric(
@@ -1741,6 +1944,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           value2: _humidityValue,
           equipment: _getText('warehouse_premises').trim().isNotEmpty ? _getText('warehouse_premises').trim() : null,
           note: _getText('note').isNotEmpty ? _getText('note') : null,
+        );
+        await _saveCurrentOption(
+          controllerKey: 'warehouse_premises',
+          fieldKey: 'warehouse_premises',
         );
         break;
       default:
