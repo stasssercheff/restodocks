@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import '../utils/dev_log.dart';
@@ -40,6 +41,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   /// Для расчёта ₽/кг в списке по ценам номенклатуры (ингредиенты в БД часто без cost/pricePerKg).
   ProductStoreSupabase? _priceProductStore;
   String? _priceEstablishmentId;
+  final Map<String, double> _nomenclaturePriceByName = {};
   bool _loading = true;
   bool _loadingExcel = false;
   bool _loadingTtkIsPdf = false;
@@ -319,11 +321,62 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
     final product = store.findProductForIngredient(pid, name);
     final resolvedId = product?.id ?? (pid != null && pid.isNotEmpty ? pid : null);
-    if (resolvedId == null || resolvedId.isEmpty) return 0.0;
+    if (resolvedId == null || resolvedId.isEmpty) {
+      final byName =
+          _nomenclaturePriceByName[_normalizeForTechCardName(_stripPfPrefix(name))] ??
+              0.0;
+      return _costFromPricePerKgLine(byName, ing);
+    }
 
     final ep = store.getEstablishmentPrice(resolvedId, estId);
     final unitPrice = ep?.$1 ?? 0.0;
     return _costFromPricePerKgLine(unitPrice, ing);
+  }
+
+  Future<void> _buildNomenclatureNamePriceIndex(
+      ProductStoreSupabase store, String estId) async {
+    _nomenclaturePriceByName.clear();
+    final ids = store.nomenclatureProductIds.toList(growable: false);
+    if (ids.isEmpty) return;
+
+    const chunkSize = 500;
+    final client = Supabase.instance.client;
+    for (var i = 0; i < ids.length; i += chunkSize) {
+      final chunk = ids.sublist(i, i + chunkSize > ids.length ? ids.length : i + chunkSize);
+      try {
+        final data = await client
+            .from('products')
+            .select('id, name, names')
+            .inFilter('id', chunk);
+        final list = data as List;
+        for (final row in list) {
+          final m = Map<String, dynamic>.from(row as Map);
+          final id = (m['id'] ?? '').toString();
+          if (id.isEmpty) continue;
+          final ep = store.getEstablishmentPrice(id, estId);
+          final price = ep?.$1 ?? 0.0;
+          if (price <= 0) continue;
+
+          final rawNames = <String>[
+            (m['name'] ?? '').toString(),
+          ];
+          final namesObj = m['names'];
+          if (namesObj is Map) {
+            for (final v in namesObj.values) {
+              if (v != null) rawNames.add(v.toString());
+            }
+          }
+
+          for (final n in rawNames) {
+            final key = _normalizeForTechCardName(_stripPfPrefix(n));
+            if (key.isEmpty) continue;
+            _nomenclaturePriceByName.putIfAbsent(key, () => price);
+          }
+        }
+      } catch (_) {
+        // Не блокируем открытие списка ТТК.
+      }
+    }
   }
 
   String _normalizeForTechCardName(String s) {
@@ -958,6 +1011,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         // Кэш цен loadNomenclatureForBranch кладёт под ключом id филиала, не головного заведения.
         _priceEstablishmentId =
             est.isBranch ? est.id : est.dataEstablishmentId;
+        final estPriceId = _priceEstablishmentId;
+        if (estPriceId != null && estPriceId.isNotEmpty) {
+          await _buildNomenclatureNamePriceIndex(productStore, estPriceId);
+        }
         setState(() {
           _list = list;
           _loading = false;
