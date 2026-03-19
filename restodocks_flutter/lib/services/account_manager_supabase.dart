@@ -16,6 +16,7 @@ const _supabaseAnonKey = String.fromEnvironment(
   'SUPABASE_ANON_KEY',
   defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE',
 );
+const _strictLegacyAuthSession = bool.fromEnvironment('AUTH_STRICT_SESSION', defaultValue: true);
 const _keyRememberPin = 'restodocks_remember_pin';
 const _keyRememberEmail = 'restodocks_remember_email';
 const _keyRememberPassword = 'restodocks_remember_password';
@@ -778,13 +779,8 @@ class AccountManagerSupabase extends ChangeNotifier {
             : (resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : null);
         lastResult = (status: resp.statusCode ?? 0, data: data);
 
-        // 4xx (в т.ч. 401) — retry при invalid_credentials (proxy/маршрутизация может обрывать запрос)
+        // 4xx — бизнес-ответ. Не retry, чтобы не маскировать неверные креды.
         if (resp.statusCode != null && resp.statusCode! >= 400 && resp.statusCode! < 500) {
-          if (resp.statusCode == 401 &&
-              (data?['error'] == 'invalid_credentials') &&
-              attempt < maxRetries - 1) {
-            continue;
-          }
           return lastResult;
         }
         // 2xx — успех
@@ -805,6 +801,27 @@ class AccountManagerSupabase extends ChangeNotifier {
       }
     }
     return lastResult;
+  }
+
+  Future<bool> _ensureSupabaseSessionAfterLegacy(String email, String password) async {
+    const maxAttempts = 3;
+    const retryDelays = [350, 900];
+
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(Duration(milliseconds: retryDelays[attempt - 1]));
+        devLog('🔐 Legacy->Auth session retry $attempt/$maxAttempts');
+      }
+      try {
+        await _supabase.signInWithEmail(email.trim(), password);
+        if (_supabase.isAuthenticated) return true;
+      } catch (e) {
+        final msg = e.toString().toLowerCase();
+        final isInvalidCreds = msg.contains('invalid login credentials');
+        if (isInvalidCreds) return false;
+      }
+    }
+    return _supabase.isAuthenticated;
   }
 
   /// Legacy: BCrypt-проверка пароля через Edge Function authenticate-employee.
@@ -853,16 +870,18 @@ class AccountManagerSupabase extends ChangeNotifier {
       final employee = Employee.fromJson(empData);
       final establishment = Establishment.fromJson(Map<String, dynamic>.from(estRaw as Map));
 
-      // Если сервер создал auth user — входим в Supabase Auth для последующих запросов с JWT (RLS)
-      final authUserCreated = data['authUserCreated'] == true;
-      if (authUserCreated) {
-        try {
-          await _supabase.signInWithEmail(email.trim(), password);
-          if (_supabase.isAuthenticated) {
-            devLog('🔐 Login: Legacy → Supabase Auth session established for ${employee.email}');
+      // После legacy-входа всегда пытаемся поднять Supabase Auth session (JWT для RLS).
+      final needsAuthSession = data['authUserCreated'] == true;
+      if (needsAuthSession) {
+        final sessionReady = await _ensureSupabaseSessionAfterLegacy(email, password);
+        if (sessionReady) {
+          devLog('🔐 Login: Legacy → Supabase Auth session established for ${employee.email}');
+        } else {
+          lastLoginError = (lastLoginError != null ? '$lastLoginError → ' : '') + 'Legacy: session_not_ready';
+          devLog('🔐 Login: Legacy authenticated, but Auth session was not established');
+          if (_strictLegacyAuthSession) {
+            return null;
           }
-        } catch (signInErr) {
-          devLog('🔐 Login: signInWithPassword after authUserCreated failed (continuing with legacy): $signInErr');
         }
       }
 
