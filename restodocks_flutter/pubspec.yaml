@@ -69,8 +69,9 @@ dependencies:
   # Supabase
   supabase_flutter: ^2.0.0
 
-  # Guided tour / spotlight
-  feature_spotlight: ^1.1.4
+  # Guided tour / spotlight (локальная копия с fixed tooltip и scroll)
+  feature_spotlight:
+    path: packages/feature_spotlight
 
   # Environment variables
   flutter_dotenv: ^5.1.0

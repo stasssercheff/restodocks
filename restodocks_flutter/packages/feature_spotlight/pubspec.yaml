@@ -1,0 +1,12 @@
+name: feature_spotlight
+description: A simple, declarative Flutter package for creating guided tours and feature showcases with smooth animations and customizable tooltips.
+version: 1.1.4
+repository: https://github.com/febin52/feature_spotlight
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.10.0'
+
+dependencies:
+  flutter:
+    sdk: flutter

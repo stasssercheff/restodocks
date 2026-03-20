@@ -81,6 +81,8 @@ class _HomeScreenState extends State<HomeScreen> {
             text: ownerSteps[i].text(loc),
             shape: SpotlightShape.rectangle,
             padding: const EdgeInsets.all(4),
+            fixedTooltipPosition: true,
+            skipButtonOnTooltip: true,
             tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
               text: ownerSteps[i].text(loc),
               onNext: onNext,
@@ -97,6 +99,8 @@ class _HomeScreenState extends State<HomeScreen> {
           text: PageTourService.getHomeTourNav(loc),
           shape: SpotlightShape.rectangle,
           padding: const EdgeInsets.all(4),
+          fixedTooltipPosition: true,
+          skipButtonOnTooltip: true,
           tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
             text: PageTourService.getHomeTourNav(loc),
             onNext: onNext,
@@ -116,6 +120,8 @@ class _HomeScreenState extends State<HomeScreen> {
           text: PageTourService.getHomeTourBody(loc),
           shape: SpotlightShape.rectangle,
           padding: const EdgeInsets.all(4),
+          fixedTooltipPosition: true,
+          skipButtonOnTooltip: true,
           tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
             text: PageTourService.getHomeTourBody(loc),
             onNext: onNext,
@@ -132,6 +138,8 @@ class _HomeScreenState extends State<HomeScreen> {
           text: PageTourService.getHomeTourNav(loc),
           shape: SpotlightShape.rectangle,
           padding: const EdgeInsets.all(4),
+          fixedTooltipPosition: true,
+          skipButtonOnTooltip: true,
           tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
             text: PageTourService.getHomeTourNav(loc),
             onNext: onNext,
@@ -365,6 +373,8 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
           text: PageTourService.getPersonalCabinetTourProfile(loc),
           shape: SpotlightShape.rectangle,
           padding: const EdgeInsets.all(4),
+          fixedTooltipPosition: true,
+          skipButtonOnTooltip: true,
           tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
             text: PageTourService.getPersonalCabinetTourProfile(loc),
             onNext: onNext,
@@ -381,6 +391,8 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
           text: PageTourService.getPersonalCabinetTourSettings(loc),
           shape: SpotlightShape.rectangle,
           padding: const EdgeInsets.all(4),
+          fixedTooltipPosition: true,
+          skipButtonOnTooltip: true,
           tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
             text: PageTourService.getPersonalCabinetTourSettings(loc),
             onNext: onNext,

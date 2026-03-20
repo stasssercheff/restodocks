@@ -7,14 +7,68 @@ import '../../services/services.dart';
 
 /// Домашняя страница владельца: график, кухня, бар, зал, менеджмент, уведомления, расходы.
 /// Визуал как у менеджмента/сотрудника — Card + ListTile, без цветных плиток.
-class OwnerHomeContent extends StatelessWidget {
+class OwnerHomeContent extends StatefulWidget {
   const OwnerHomeContent({super.key, this.tourController});
 
   final SpotlightController? tourController;
 
+  @override
+  State<OwnerHomeContent> createState() => _OwnerHomeContentState();
+}
+
+class _OwnerHomeContentState extends State<OwnerHomeContent> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.tourController?.addListener(_onTourStepChanged);
+  }
+
+  @override
+  void didUpdateWidget(OwnerHomeContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.tourController != widget.tourController) {
+      oldWidget.tourController?.removeListener(_onTourStepChanged);
+      widget.tourController?.addListener(_onTourStepChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.tourController?.removeListener(_onTourStepChanged);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onTourStepChanged() {
+    final ctrl = widget.tourController;
+    if (ctrl == null || !ctrl.isTourActive) return;
+    final key = ctrl.getKeyForCurrentStep();
+    if (key == null) return;
+    final ctx = key.currentContext;
+    if (ctx != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final currentCtx = key.currentContext;
+        if (currentCtx != null) {
+          Scrollable.ensureVisible(
+            currentCtx,
+            alignment: 0.3,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+        }
+      });
+    }
+  }
+
   Widget _wrap(Widget child, String id) {
-    if (tourController == null) return child;
-    return SpotlightTarget(id: id, controller: tourController!, child: child);
+    if (widget.tourController == null) return child;
+    return SpotlightTarget(
+      id: id,
+      controller: widget.tourController!,
+      child: child,
+    );
   }
 
   @override
@@ -23,6 +77,7 @@ class OwnerHomeContent extends StatelessWidget {
     final screenPref = context.watch<ScreenLayoutPreferenceService>();
 
     return ListView(
+      controller: _scrollController,
       padding: const EdgeInsets.all(16),
       children: [
         _SectionTitle(title: loc.t('management')),
