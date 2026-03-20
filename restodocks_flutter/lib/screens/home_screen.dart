@@ -10,6 +10,7 @@ import '../services/services.dart';
 import '../models/models.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/getting_started_document.dart';
+import '../widgets/tour_tooltip.dart';
 
 /// Главный экран — контент домашней вкладки по роли.
 /// Нижняя навигация управляется AppShell (ShellRoute).
@@ -70,13 +71,33 @@ class _HomeScreenState extends State<HomeScreen> {
           id: 'home-content',
           text: PageTourService.getHomeTourBody(loc),
           shape: SpotlightShape.rectangle,
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(4),
+          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            text: PageTourService.getHomeTourBody(loc),
+            onNext: onNext,
+            onPrevious: onPrev,
+            onSkip: onSkip,
+            isFirstStep: true,
+            isLastStep: false,
+            nextLabel: PageTourService.getTourNext(loc),
+            skipLabel: PageTourService.getTourSkip(loc),
+          ),
         ),
         SpotlightStep(
           id: 'home-bottom-nav',
           text: PageTourService.getHomeTourNav(loc),
           shape: SpotlightShape.rectangle,
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(4),
+          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            text: PageTourService.getHomeTourNav(loc),
+            onNext: onNext,
+            onPrevious: onPrev,
+            onSkip: onSkip,
+            isFirstStep: false,
+            isLastStep: true,
+            nextLabel: PageTourService.getTourDone(loc),
+            skipLabel: PageTourService.getTourSkip(loc),
+          ),
         ),
       ],
       onTourCompleted: () async {
@@ -126,34 +147,26 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final tourService = context.watch<PageTourService>();
-    final controller = tourService.homeTourController;
-
     return Scaffold(
       appBar: AppBar(
         leading: GoRouter.of(context).canPop() ? appBarBackButton(context) : null,
         title: Text(loc.t('app_name')),
       ),
-      body: controller != null
-          ? SpotlightTarget(
-              id: 'home-content',
-              controller: controller,
-              child: _buildContent(context, currentEmployee),
-            )
-          : _buildContent(context, currentEmployee),
+      body: _buildContent(context, currentEmployee),
     );
   }
 
   Widget _buildContent(BuildContext context, Employee employee) {
+    final tourCtrl = context.watch<PageTourService>().homeTourController;
     if (employee.hasRole('owner')) {
       final pref = context.read<OwnerViewPreferenceService>();
       if (employee.positionRole != null && !pref.viewAsOwner) {
         if (employee.canViewDepartment('management')) {
-          return ManagementHomeContent(employee: employee);
+          return ManagementHomeContent(employee: employee, tourController: tourCtrl);
         }
-        return StaffHomeContent(employee: employee);
+        return StaffHomeContent(employee: employee, tourController: tourCtrl);
       }
-      return const OwnerHomeContent();
+      return OwnerHomeContent(tourController: tourCtrl);
     }
     if (employee.canViewDepartment('management')) {
       return ManagementHomeContent(employee: employee);
@@ -303,13 +316,33 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
           id: 'cabinet-profile',
           text: PageTourService.getPersonalCabinetTourProfile(loc),
           shape: SpotlightShape.rectangle,
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(4),
+          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            text: PageTourService.getPersonalCabinetTourProfile(loc),
+            onNext: onNext,
+            onPrevious: onPrev,
+            onSkip: onSkip,
+            isFirstStep: true,
+            isLastStep: false,
+            nextLabel: PageTourService.getTourNext(loc),
+            skipLabel: PageTourService.getTourSkip(loc),
+          ),
         ),
         SpotlightStep(
           id: 'cabinet-settings',
           text: PageTourService.getPersonalCabinetTourSettings(loc),
           shape: SpotlightShape.rectangle,
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(4),
+          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            text: PageTourService.getPersonalCabinetTourSettings(loc),
+            onNext: onNext,
+            onPrevious: onPrev,
+            onSkip: onSkip,
+            isFirstStep: false,
+            isLastStep: true,
+            nextLabel: PageTourService.getTourDone(loc),
+            skipLabel: PageTourService.getTourSkip(loc),
+          ),
         ),
       ],
       onTourCompleted: () async {

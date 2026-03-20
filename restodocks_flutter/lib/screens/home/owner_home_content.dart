@@ -1,3 +1,4 @@
+import 'package:feature_spotlight/feature_spotlight.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -8,19 +9,25 @@ import '../../services/screen_layout_preference_service.dart';
 /// Домашняя страница владельца: график, кухня, бар, зал, менеджмент, уведомления, расходы.
 /// Визуал как у менеджмента/сотрудника — Card + ListTile, без цветных плиток.
 class OwnerHomeContent extends StatelessWidget {
-  const OwnerHomeContent({super.key});
+  const OwnerHomeContent({super.key, this.tourController});
+
+  final SpotlightController? tourController;
 
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final screenPref = context.watch<ScreenLayoutPreferenceService>();
 
+    final firstTile = _Tile(icon: Icons.description_outlined, title: loc.t('documentation') ?? 'Документация', onTap: () => context.go('/documentation'));
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         // Управление — сверху: сообщения и входящие
         _SectionTitle(title: loc.t('management')),
-        _Tile(icon: Icons.description_outlined, title: loc.t('documentation') ?? 'Документация', onTap: () => context.go('/documentation')),
+        if (tourController != null)
+          SpotlightTarget(id: 'home-content', controller: tourController!, child: firstTile)
+        else
+          firstTile,
         _Tile(icon: Icons.assignment, title: loc.t('haccp_journals') ?? 'Журналы и ХАССП', onTap: () => context.go('/haccp-journals')),
         _Tile(icon: Icons.chat_bubble_outline, title: loc.t('inbox_tab_messages') ?? 'Сообщения', onTap: () => context.go('/notifications?tab=messages')),
         _Tile(icon: Icons.inbox, title: loc.t('inbox'), onTap: () => context.go('/inbox')),

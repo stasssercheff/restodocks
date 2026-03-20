@@ -1,3 +1,4 @@
+import 'package:feature_spotlight/feature_spotlight.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -10,9 +11,10 @@ import 'expandable_banquet_section.dart';
 /// Домашняя страница менеджмента (шеф, барменеджер, менеджер зала, управляющий).
 /// Каждый видит только данные своего отдела.
 class ManagementHomeContent extends StatelessWidget {
-  const ManagementHomeContent({super.key, required this.employee});
+  const ManagementHomeContent({super.key, required this.employee, this.tourController});
 
   final Employee employee;
+  final SpotlightController? tourController;
 
   /// Подразделение для роутов (dining_room -> hall, management -> kitchen для шефа)
   static String _deptForRoute(String d) => d == 'dining_room' ? 'hall' : (d == 'management' ? 'kitchen' : d);
@@ -36,15 +38,18 @@ class ManagementHomeContent extends StatelessWidget {
 
     // Без доступа к данным
     if (!employee.hasRole('owner') && !employee.effectiveDataAccess) {
-      // Все отделы: только личный график и сообщения (диалог с шефом)
+      final firstTile = _Tile(
+        icon: Icons.calendar_month,
+        title: loc.t('personal_schedule'),
+        onTap: () => context.go('/schedule?personal=1'),
+      );
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _Tile(
-            icon: Icons.calendar_month,
-            title: loc.t('personal_schedule'),
-            onTap: () => context.go('/schedule?personal=1'),
-          ),
+          if (tourController != null)
+            SpotlightTarget(id: 'home-content', controller: tourController!, child: firstTile)
+          else
+            firstTile,
           _Tile(
             icon: Icons.chat_bubble_outline,
             title: loc.t('inbox_tab_messages') ?? 'Сообщения',
@@ -61,10 +66,14 @@ class ManagementHomeContent extends StatelessWidget {
       );
     }
 
+    final firstTile = _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), onTap: () => context.go('/schedule/${_deptForRoute(employee.department)}'));
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), onTap: () => context.go('/schedule/${_deptForRoute(employee.department)}')),
+        if (tourController != null)
+          SpotlightTarget(id: 'home-content', controller: tourController!, child: firstTile)
+        else
+          firstTile,
         _Tile(icon: Icons.description_outlined, title: loc.t('documentation') ?? 'Документация', onTap: () => context.go('/documentation')),
         _Tile(icon: Icons.assignment, title: loc.t('haccp_journals') ?? 'Журналы и ХАССП', onTap: () => context.go('/haccp-journals')),
         _Tile(icon: Icons.chat_bubble_outline, title: loc.t('inbox_tab_messages') ?? 'Сообщения', onTap: () => context.go('/notifications?tab=messages')),

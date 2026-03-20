@@ -1,3 +1,4 @@
+import 'package:feature_spotlight/feature_spotlight.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -10,9 +11,10 @@ import 'expandable_banquet_section.dart';
 
 /// Домашняя страница сотрудника (кухня/бар/зал): график, меню, ТТК, чеклисты.
 class StaffHomeContent extends StatelessWidget {
-  const StaffHomeContent({super.key, required this.employee});
+  const StaffHomeContent({super.key, required this.employee, this.tourController});
 
   final Employee employee;
+  final SpotlightController? tourController;
 
   /// Подразделение для роутов (dining_room -> hall)
   static String _deptForRoute(String d) => d == 'dining_room' ? 'hall' : d;
@@ -23,15 +25,18 @@ class StaffHomeContent extends StatelessWidget {
 
     // Без доступа к данным (в т.ч. временный с истёкшим периодом)
     if (!employee.hasRole('owner') && !employee.effectiveDataAccess) {
-      // Все отделы: только личный график и сообщения (диалог с шефом)
+      final firstTile = _Tile(
+        icon: Icons.calendar_month,
+        title: loc.t('personal_schedule'),
+        onTap: () => context.go('/schedule?personal=1'),
+      );
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _Tile(
-            icon: Icons.calendar_month,
-            title: loc.t('personal_schedule'),
-            onTap: () => context.go('/schedule?personal=1'),
-          ),
+          if (tourController != null)
+            SpotlightTarget(id: 'home-content', controller: tourController!, child: firstTile)
+          else
+            firstTile,
           _Tile(
             icon: Icons.chat_bubble_outline,
             title: loc.t('inbox_tab_messages') ?? 'Сообщения',
@@ -127,9 +132,15 @@ class StaffHomeContent extends StatelessWidget {
       }
       if (tiles.containsKey(id)) ordered.add(tiles[id]!);
     }
+    final children = tourController != null && ordered.isNotEmpty
+        ? [
+            SpotlightTarget(id: 'home-content', controller: tourController!, child: ordered.first),
+            ...ordered.skip(1),
+          ]
+        : ordered;
     return ListView(
       padding: const EdgeInsets.all(16),
-      children: ordered,
+      children: children,
     );
   }
 }
