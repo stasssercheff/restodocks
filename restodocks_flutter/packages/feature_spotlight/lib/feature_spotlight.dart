@@ -54,6 +54,10 @@ class SpotlightStep {
   /// When true, no dark overlay — only glow on the target button.
   final bool useGlowOnly;
 
+  /// Цвет подсветки (glow) для тёмного фона (напр. красная панель).
+  /// Если null — используется colorScheme.primary.
+  final Color? glowColor;
+
   /// Creates a [SpotlightStep].
   ///
   /// Either [text] or [tooltipBuilder] must be provided.
@@ -67,6 +71,7 @@ class SpotlightStep {
     this.fixedTooltipPosition = false,
     this.skipButtonOnTooltip = false,
     this.useGlowOnly = false,
+    this.glowColor,
   }) : assert(text != null || tooltipBuilder != null,
             'Either text or tooltipBuilder must be provided.');
 }
@@ -352,6 +357,8 @@ class _SpotlightTargetState extends State<SpotlightTarget> {
         widget.controller.currentStep?.id == widget.id;
     final useGlow = isActive &&
         (widget.controller.currentStep?.useGlowOnly ?? false);
+    final glowColor = widget.controller.currentStep?.glowColor ??
+        Theme.of(context).colorScheme.primary;
 
     return Container(
       key: _key,
@@ -361,18 +368,18 @@ class _SpotlightTargetState extends State<SpotlightTarget> {
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.35),
+                  color: glowColor.withValues(alpha: 0.35),
                   blurRadius: 12,
                   spreadRadius: 1,
                 ),
                 BoxShadow(
-                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                  color: glowColor.withValues(alpha: 0.2),
                   blurRadius: 20,
                   spreadRadius: 0,
                 ),
               ],
               border: Border.all(
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
+                color: glowColor.withValues(alpha: 0.7),
                 width: 2,
               ),
             )

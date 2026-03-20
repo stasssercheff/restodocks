@@ -121,12 +121,22 @@ class PageTourService extends ChangeNotifier {
       loc.t('tour_inventory') ?? 'Бланк инвентаризации: продукты и полуфабрикаты. Завершение отправляет во Входящие.';
 
   /// Тексты тура ТТК (многошаговый).
-  static String getTourTtkActions(LocalizationService loc) =>
-      loc.t('tour_ttk_actions') ?? 'Счётчик карточек, создание, импорт из Excel, экспорт, обновление списка.';
+  static String getTourTtkSubdivision(LocalizationService loc) =>
+      loc.t('tour_ttk_subdivision') ?? 'Подразделение заведения: кухня, бар, зал.';
   static String getTourTtkTabPf(LocalizationService loc) =>
       loc.t('tour_ttk_tab_pf') ?? 'Полуфабрикаты — заготовки и основы. Стоимость за кг.';
   static String getTourTtkTabDishes(LocalizationService loc) =>
       loc.t('tour_ttk_tab_dishes') ?? 'Блюда — готовые позиции меню. Себестоимость за порцию.';
   static String getTourTtkTabReview(LocalizationService loc) =>
       loc.t('tour_ttk_tab_review') ?? 'На проверку: ТТК с проблемами (нет цен у ингредиентов, неоднозначные ПФ). Удобно для доработки себестоимости.';
+  static String getTourTtkCount(LocalizationService loc) =>
+      loc.t('tour_ttk_count') ?? 'Количество карточек. Меняется при смене подразделения.';
+  static String getTourTtkCreate(LocalizationService loc) =>
+      loc.t('tour_ttk_create') ?? 'Создать новую ТТК.';
+  static String getTourTtkImport(LocalizationService loc) =>
+      loc.t('tour_ttk_import') ?? 'Импортировать ТТК из Excel.';
+  static String getTourTtkExport(LocalizationService loc) =>
+      loc.t('tour_ttk_export') ?? 'Скачать ТТК на устройство.';
+  static String getTourTtkRefresh(LocalizationService loc) =>
+      loc.t('tour_ttk_refresh') ?? 'Обновить страницу.';
 }

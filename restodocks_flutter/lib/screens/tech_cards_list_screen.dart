@@ -102,18 +102,20 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     if (!forceReplay && await tourService.isPageTourSeen(employee.id, PageTourKeys.techCards)) return;
     if (!mounted) return;
     final loc = context.read<LocalizationService>();
+    // Цвет подсветки для кнопок в красной AppBar
+    const actionGlowColor = Colors.white;
     final controller = SpotlightController(
       steps: [
         SpotlightStep(
-          id: 'ttk-actions',
-          text: PageTourService.getTourTtkActions(loc),
+          id: 'ttk-subdivision',
+          text: PageTourService.getTourTtkSubdivision(loc),
           shape: SpotlightShape.rectangle,
           padding: const EdgeInsets.all(4),
           fixedTooltipPosition: true,
           skipButtonOnTooltip: true,
           useGlowOnly: true,
           tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
-            text: PageTourService.getTourTtkActions(loc),
+            text: PageTourService.getTourTtkSubdivision(loc),
             onNext: onNext,
             onPrevious: onPrev,
             onSkip: onSkip,
@@ -175,6 +177,106 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             onPrevious: onPrev,
             onSkip: onSkip,
             isFirstStep: false,
+            isLastStep: false,
+            nextLabel: PageTourService.getTourNext(loc),
+            skipLabel: PageTourService.getTourFinish(loc),
+          ),
+        ),
+        SpotlightStep(
+          id: 'ttk-count',
+          text: PageTourService.getTourTtkCount(loc),
+          shape: SpotlightShape.rectangle,
+          padding: const EdgeInsets.all(4),
+          fixedTooltipPosition: true,
+          skipButtonOnTooltip: true,
+          useGlowOnly: true,
+          glowColor: actionGlowColor,
+          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            text: PageTourService.getTourTtkCount(loc),
+            onNext: onNext,
+            onPrevious: onPrev,
+            onSkip: onSkip,
+            isFirstStep: false,
+            isLastStep: false,
+            nextLabel: PageTourService.getTourNext(loc),
+            skipLabel: PageTourService.getTourFinish(loc),
+          ),
+        ),
+        SpotlightStep(
+          id: 'ttk-create',
+          text: PageTourService.getTourTtkCreate(loc),
+          shape: SpotlightShape.rectangle,
+          padding: const EdgeInsets.all(4),
+          fixedTooltipPosition: true,
+          skipButtonOnTooltip: true,
+          useGlowOnly: true,
+          glowColor: actionGlowColor,
+          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            text: PageTourService.getTourTtkCreate(loc),
+            onNext: onNext,
+            onPrevious: onPrev,
+            onSkip: onSkip,
+            isFirstStep: false,
+            isLastStep: false,
+            nextLabel: PageTourService.getTourNext(loc),
+            skipLabel: PageTourService.getTourFinish(loc),
+          ),
+        ),
+        SpotlightStep(
+          id: 'ttk-import',
+          text: PageTourService.getTourTtkImport(loc),
+          shape: SpotlightShape.rectangle,
+          padding: const EdgeInsets.all(4),
+          fixedTooltipPosition: true,
+          skipButtonOnTooltip: true,
+          useGlowOnly: true,
+          glowColor: actionGlowColor,
+          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            text: PageTourService.getTourTtkImport(loc),
+            onNext: onNext,
+            onPrevious: onPrev,
+            onSkip: onSkip,
+            isFirstStep: false,
+            isLastStep: false,
+            nextLabel: PageTourService.getTourNext(loc),
+            skipLabel: PageTourService.getTourFinish(loc),
+          ),
+        ),
+        SpotlightStep(
+          id: 'ttk-export',
+          text: PageTourService.getTourTtkExport(loc),
+          shape: SpotlightShape.rectangle,
+          padding: const EdgeInsets.all(4),
+          fixedTooltipPosition: true,
+          skipButtonOnTooltip: true,
+          useGlowOnly: true,
+          glowColor: actionGlowColor,
+          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            text: PageTourService.getTourTtkExport(loc),
+            onNext: onNext,
+            onPrevious: onPrev,
+            onSkip: onSkip,
+            isFirstStep: false,
+            isLastStep: false,
+            nextLabel: PageTourService.getTourNext(loc),
+            skipLabel: PageTourService.getTourFinish(loc),
+          ),
+        ),
+        SpotlightStep(
+          id: 'ttk-refresh',
+          text: PageTourService.getTourTtkRefresh(loc),
+          shape: SpotlightShape.rectangle,
+          padding: const EdgeInsets.all(4),
+          fixedTooltipPosition: true,
+          skipButtonOnTooltip: true,
+          useGlowOnly: true,
+          glowColor: actionGlowColor,
+          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            text: PageTourService.getTourTtkRefresh(loc),
+            onNext: onNext,
+            onPrevious: onPrev,
+            onSkip: onSkip,
+            isFirstStep: false,
             isLastStep: true,
             nextLabel: PageTourService.getTourDone(loc),
             skipLabel: PageTourService.getTourFinish(loc),
@@ -192,7 +294,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     );
     if (!mounted) return;
     setState(() => _ttkTourController = controller);
-    // Ждём 2 кадра + 400мс — чтобы таргет ttk-actions успел отрендериться и подсветиться.
+    // Ждём 2 кадра + 400мс — чтобы таргет ttk-subdivision успел отрендериться и подсветиться.
     void startWhenReady() {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -2445,147 +2547,146 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 
   List<Widget> _buildAppBarActions(LocalizationService loc, bool canEdit) {
-    final actions = <Widget>[
-      if (!_selectionMode)
-        Center(
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Theme.of(context)
-                  .colorScheme
-                  .surfaceContainerHighest
-                  .withOpacity(0.8),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '${_list.length}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
-          ),
-        ),
-      if (canEdit)
-        IconButton(
-          icon: Icon(Icons.add,
-              color: _loading ? Theme.of(context).disabledColor : null),
-          tooltip: loc.t('create_tech_card'),
-          onPressed: _loading
-              ? null
-              : () async {
-                  final path = widget.department == 'bar'
-                      ? '/tech-cards/new?department=bar'
-                      : '/tech-cards/new';
-                  final needRefresh = await context.push<bool>(path);
-                  if (mounted && needRefresh == true) _load(showLoading: false);
-                },
-        ),
-      if (canEdit)
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.upload),
-          tooltip: loc.t('ttk_import_file'),
-          onSelected: (value) async {
-            if (value == 'excel') await _createFromExcel(context, loc);
-          },
-          itemBuilder: (_) => [
-            PopupMenuItem(
-                value: 'excel', child: Text(loc.t('ttk_import_file'))),
-          ],
-        ),
-      PopupMenuButton<String>(
-        icon: const Icon(Icons.download),
-        tooltip: loc.t('ttk_export_excel'),
-        onSelected: (value) async {
-          switch (value) {
-            case 'single':
-              showDialog(
-                context: context,
-                builder: (ctx) {
-                  final l = ctx.read<LocalizationService>();
-                  return AlertDialog(
-                    title: Text(l.t('ttk_select_for_export')),
-                    content: SizedBox(
-                      width: double.maxFinite,
-                      height: 300,
-                      child: ListView.builder(
-                        itemCount: _list.length,
-                        itemBuilder: (context, index) {
-                          final techCard = _list[index];
-                          return ListTile(
-                            title: Text(techCard.getDisplayNameInLists(
-                                l.currentLanguageCode)),
-                            subtitle: Text(techCard.isSemiFinished
-                                ? l.t('ttk_semi_finished')
-                                : l.t('ttk_dish_label')),
-                            onTap: () {
-                              Navigator.of(context).pop();
-                              _exportSingleTechCard(techCard);
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: Text(l.t('cancel')),
-                      ),
-                    ],
-                  );
-                },
-              );
-              break;
-            case 'selected':
-              if (_selectionMode) {
-                await _exportSelectedTechCards();
-              } else {
-                _toggleSelectionMode();
-              }
-              break;
-            case 'all':
-              await _exportAllTechCards();
-              break;
-          }
-        },
-        itemBuilder: (_) => [
-          PopupMenuItem(
-            value: 'single',
-            child: Text(loc.t('ttk_export_single')),
-          ),
-          PopupMenuItem(
-            value: 'selected',
-            child: Text(_selectionMode
-                ? loc
-                    .t('ttk_export_selected')
-                    .replaceFirst('%s', '${_selectedTechCards.length}')
-                : loc.t('ttk_export_selected_short')),
-          ),
-          PopupMenuItem(
-            value: 'all',
-            child: Text(loc.t('ttk_export_all')),
-          ),
-        ],
-      ),
-      IconButton(
-          icon: const Icon(Icons.refresh),
-          onPressed: _loading ? null : _load,
-          tooltip: loc.t('refresh')),
-    ];
     final ctrl = _ttkTourController;
-    if (ctrl != null) {
-      return [
-        SpotlightTarget(
-          id: 'ttk-actions',
-          controller: ctrl,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: actions,
-          ),
+    Widget wrap(String id, Widget w) =>
+        ctrl != null ? SpotlightTarget(id: id, controller: ctrl, child: w) : w;
+
+    final countWidget = !_selectionMode
+        ? Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerHighest
+                    .withOpacity(0.8),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${_list.length}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+          )
+        : null;
+    final createWidget = canEdit
+        ? IconButton(
+            icon: Icon(Icons.add,
+                color: _loading ? Theme.of(context).disabledColor : null),
+            tooltip: loc.t('create_tech_card'),
+            onPressed: _loading
+                ? null
+                : () async {
+                    final path = widget.department == 'bar'
+                        ? '/tech-cards/new?department=bar'
+                        : '/tech-cards/new';
+                    final needRefresh = await context.push<bool>(path);
+                    if (mounted && needRefresh == true) _load(showLoading: false);
+                  },
+          )
+        : null;
+    final importWidget = canEdit
+        ? PopupMenuButton<String>(
+            icon: const Icon(Icons.upload),
+            tooltip: loc.t('ttk_import_file'),
+            onSelected: (value) async {
+              if (value == 'excel') await _createFromExcel(context, loc);
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                  value: 'excel', child: Text(loc.t('ttk_import_file'))),
+            ],
+          )
+        : null;
+    final exportWidget = PopupMenuButton<String>(
+      icon: const Icon(Icons.download),
+      tooltip: loc.t('ttk_export_excel'),
+      onSelected: (value) async {
+        switch (value) {
+          case 'single':
+            showDialog(
+              context: context,
+              builder: (ctx) {
+                final l = ctx.read<LocalizationService>();
+                return AlertDialog(
+                  title: Text(l.t('ttk_select_for_export')),
+                  content: SizedBox(
+                    width: double.maxFinite,
+                    height: 300,
+                    child: ListView.builder(
+                      itemCount: _list.length,
+                      itemBuilder: (context, index) {
+                        final techCard = _list[index];
+                        return ListTile(
+                          title: Text(techCard.getDisplayNameInLists(
+                              l.currentLanguageCode)),
+                          subtitle: Text(techCard.isSemiFinished
+                              ? l.t('ttk_semi_finished')
+                              : l.t('ttk_dish_label')),
+                          onTap: () {
+                            Navigator.of(context).pop();
+                            _exportSingleTechCard(techCard);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text(l.t('cancel')),
+                    ),
+                  ],
+                );
+              },
+            );
+            break;
+          case 'selected':
+            if (_selectionMode) {
+              await _exportSelectedTechCards();
+            } else {
+              _toggleSelectionMode();
+            }
+            break;
+          case 'all':
+            await _exportAllTechCards();
+            break;
+        }
+      },
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'single',
+          child: Text(loc.t('ttk_export_single')),
         ),
-      ];
-    }
-    return actions;
+        PopupMenuItem(
+          value: 'selected',
+          child: Text(_selectionMode
+              ? loc
+                  .t('ttk_export_selected')
+                  .replaceFirst('%s', '${_selectedTechCards.length}')
+              : loc.t('ttk_export_selected_short')),
+        ),
+        PopupMenuItem(
+          value: 'all',
+          child: Text(loc.t('ttk_export_all')),
+        ),
+      ],
+    );
+    final refreshWidget = IconButton(
+        icon: const Icon(Icons.refresh),
+        onPressed: _loading ? null : _load,
+        tooltip: loc.t('refresh'));
+
+    final result = <Widget>[];
+    if (countWidget != null) result.add(wrap('ttk-count', countWidget));
+    if (createWidget != null) result.add(wrap('ttk-create', createWidget));
+    if (importWidget != null) result.add(wrap('ttk-import', importWidget));
+    result.add(wrap('ttk-export', exportWidget));
+    result.add(wrap('ttk-refresh', refreshWidget));
+    return result;
   }
 
   List<Widget> _buildTabBarTabs(LocalizationService loc, int reviewCount) {
@@ -2809,27 +2910,53 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           // Шапка: цех (подразделение) над вкладками ТТК/ПФ
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: Row(
-              children: [
-                Icon(Icons.business,
-                    size: 20, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  loc.t('ttk_section'),
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+            child: _ttkTourController != null
+                ? SpotlightTarget(
+                    id: 'ttk-subdivision',
+                    controller: _ttkTourController!,
+                    child: Row(
+                      children: [
+                        Icon(Icons.business,
+                            size: 20, color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          loc.t('ttk_section'),
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _departmentHeaderLabel(loc),
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                        ),
+                      ],
+                    ),
+                  )
+                : Row(
+                    children: [
+                      Icon(Icons.business,
+                          size: 20, color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        loc.t('ttk_section'),
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
                       ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _departmentHeaderLabel(loc),
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.onSurface,
+                      const SizedBox(width: 8),
+                      Text(
+                        _departmentHeaderLabel(loc),
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
                       ),
-                ),
-              ],
-            ),
+                    ],
+                  ),
           ),
           TabBar(
             tabs: _buildTabBarTabs(loc, reviewCount),
