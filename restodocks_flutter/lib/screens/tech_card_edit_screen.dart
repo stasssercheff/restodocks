@@ -181,7 +181,7 @@ class _EditableShrinkageCellState extends State<_EditableShrinkageCell> {
 
   void _scheduleSubmit() {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 250), _submit);
+    _debounce = Timer(const Duration(milliseconds: 80), _submit);
   }
 
   void _submit() {
@@ -261,7 +261,7 @@ class _EditableWasteCellState extends State<_EditableWasteCell> {
 
   void _scheduleSubmit() {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 250), _submit);
+    _debounce = Timer(const Duration(milliseconds: 80), _submit);
   }
 
   void _submit() {
@@ -407,7 +407,7 @@ class _EditableGrossCellState extends State<_EditableGrossCell> {
 
   void _scheduleSubmit() {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 250), _submit);
+    _debounce = Timer(const Duration(milliseconds: 80), _submit);
   }
 
   void _submit() {
@@ -562,7 +562,7 @@ class _EditableCostCellState extends State<_EditableCostCell> {
 
   void _scheduleSubmit() {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 250), _submit);
+    _debounce = Timer(const Duration(milliseconds: 80), _submit);
   }
 
   void _submit() {
@@ -4507,7 +4507,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                           _cookTableSyncDebounce?.cancel();
                                           final snapshot = List<TTIngredient>.from(list);
                                           _cookTableSyncDebounce = Timer(
-                                            const Duration(milliseconds: 450),
+                                            const Duration(milliseconds: 150),
                                             () {
                                               if (!mounted) return;
                                               _ingredients
@@ -6220,7 +6220,7 @@ class _EditableNetCellState extends State<_EditableNetCell> {
 
   void _scheduleSubmit() {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 250), _submit);
+    _debounce = Timer(const Duration(milliseconds: 80), _submit);
   }
 
   void _submit() {

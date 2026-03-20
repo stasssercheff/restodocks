@@ -97,6 +97,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   static const int _chunkRows = 25;
   int _rowsToShow = _initialRows;
 
+  /// Кэш списка продуктов для дропдауна — собирается 1 раз за билд, переиспользуется во всех ячейках.
+  List<SelectableItem>? _cachedProductItems;
+  Object? _cachedProductItemsKey;
+
   @override
   void initState() {
     super.initState();
@@ -158,6 +162,58 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   FocusNode _getFocusNode(String key) {
     return _focusNodes[key] ??= FocusNode();
+  }
+
+  /// Список продуктов+ПФ для выбора — кэшируется, чтобы не строить 20+ раз за билд.
+  List<SelectableItem> _getProductItemsForDropdown() {
+    final products = widget.establishmentId != null
+        ? widget.productStore.getNomenclatureProducts(widget.establishmentId!)
+        : <Product>[];
+    final key = Object.hash(
+      widget.establishmentId,
+      widget.semiFinishedProducts?.length ?? 0,
+      products.length,
+    );
+    if (_cachedProductItems != null && _cachedProductItemsKey == key) {
+      return _cachedProductItems!;
+    }
+    final allItems = <SelectableItem>[];
+    var nomenclatureProducts = products;
+    if (nomenclatureProducts.isEmpty) {
+      nomenclatureProducts = List.from(widget.productStore.allProducts);
+    }
+    final lang = widget.loc.currentLanguageCode;
+    for (final product in nomenclatureProducts) {
+      allItems.add(SelectableItem(
+        type: 'product',
+        item: product,
+        displayName: product.getLocalizedName(lang),
+        searchName: product.name.toLowerCase(),
+      ));
+    }
+    if (widget.semiFinishedProducts != null) {
+      for (final pf in widget.semiFinishedProducts!) {
+        allItems.add(SelectableItem(
+          type: 'pf',
+          item: pf,
+          displayName: pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
+          searchName: pf.dishName.toLowerCase(),
+        ));
+      }
+    }
+    final seenDisplayNames = <String>{};
+    allItems.retainWhere((item) {
+      if (seenDisplayNames.contains(item.displayName)) return false;
+      seenDisplayNames.add(item.displayName);
+      return true;
+    });
+    allItems.sort((a, b) {
+      if (a.type != b.type) return a.type == 'product' ? -1 : 1;
+      return a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
+    });
+    _cachedProductItems = allItems;
+    _cachedProductItemsKey = key;
+    return allItems;
   }
 
   @override
@@ -812,61 +868,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildSearchableProductDropdown(TTIngredient ingredient, int rowIndex) {
     try {
-      // Создаем объединенный список: продукты + ПФ
-      final allItems = <SelectableItem>[];
-
-      // Добавляем продукты только из номенклатуры (где есть стоимость за кг/шт)
-      var nomenclatureProducts = widget.establishmentId != null
-          ? widget.productStore.getNomenclatureProducts(widget.establishmentId!)
-          : <Product>[]; // Пустой список, если establishmentId null
-
-      // Fallback: если номенклатурные продукты пустые, используем все продукты
-      if (nomenclatureProducts.isEmpty) {
-        nomenclatureProducts = List.from(widget.productStore.allProducts);
-      }
-
-      final lang = widget.loc.currentLanguageCode;
-      for (final product in nomenclatureProducts) {
-        allItems.add(SelectableItem(
-          type: 'product',
-          item: product,
-          displayName: product.getLocalizedName(lang),
-          searchName: product.name.toLowerCase(),
-        ));
-      }
-
-      // Добавляем ПФ
-      if (widget.semiFinishedProducts != null) {
-        for (final pf in widget.semiFinishedProducts!) {
-          allItems.add(SelectableItem(
-            type: 'pf',
-            item: pf,
-            displayName: pf.getDisplayNameInLists(widget.loc.currentLanguageCode),
-            searchName: pf.dishName.toLowerCase(),
-          ));
-        }
-      }
-
-      // Удаляем дубликаты по displayName (сохраняем первый найденный)
-      final seenDisplayNames = <String>{};
-      allItems.retainWhere((item) {
-        if (seenDisplayNames.contains(item.displayName)) {
-          return false;
-        }
-        seenDisplayNames.add(item.displayName);
-        return true;
-      });
-
-      // Сортируем: сначала продукты А-Я, потом ПФ А-Я
-      allItems.sort((a, b) {
-        if (a.type != b.type) {
-          // продукты ('product') идут перед ПФ ('pf')
-          if (a.type == 'product') return -1;
-          return 1;
-        }
-        return a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
-      });
-
+      final allItems = _getProductItemsForDropdown();
       return _ProductSearchDropdown(
         items: allItems,
         loc: widget.loc,
@@ -1022,7 +1024,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               ),
               onChanged: (v) {
                 _debounceTimers[key]?.cancel();
-                _debounceTimers[key] = Timer(const Duration(milliseconds: 60), () {
+                _debounceTimers[key] = Timer(const Duration(milliseconds: 40), () {
                   if (!mounted) return;
                   onChanged(v);
                 });
