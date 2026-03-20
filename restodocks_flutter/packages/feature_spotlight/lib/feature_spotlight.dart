@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 /// Defines the shape of the spotlight highlight.
@@ -204,8 +202,7 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
 
   /// Starts a tour using the provided [controller].
   void startTour(SpotlightController controller) {
-    _navTimer?.cancel();
-    _navTimer = null;
+    _pendingNav = null;
     _targetNotFoundRetries = 0;
     setState(() {
       _activeController = controller;
@@ -235,18 +232,23 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
     });
   }
 
-  /// Отложенный next/previous с объединением — при быстром «назад»+«вперёд» выполняется только последнее.
-  Timer? _navTimer;
+  /// Next/previous через кадр — без задержки 100ms, coalescing при быстром нажатии.
+  String? _pendingNav;
+  bool _navScheduled = false;
 
   void _deferredNext() => _scheduleNav('next');
   void _deferredPrevious() => _scheduleNav('previous');
 
   void _scheduleNav(String action) {
-    _navTimer?.cancel();
-    _navTimer = Timer(const Duration(milliseconds: 100), () {
-      _navTimer = null;
-      if (!mounted || !(_activeController?.isTourActive ?? false)) return;
-      if (action == 'next') {
+    _pendingNav = action;
+    if (_navScheduled) return;
+    _navScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _navScheduled = false;
+      final a = _pendingNav;
+      _pendingNav = null;
+      if (a == null || !mounted || !(_activeController?.isTourActive ?? false)) return;
+      if (a == 'next') {
         _activeController?.next();
       } else {
         _activeController?.previous();
@@ -256,8 +258,7 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
 
   /// Stops the currently active tour.
   void _stopTour() {
-    _navTimer?.cancel();
-    _navTimer = null;
+    _pendingNav = null;
     _activeController?.removeListener(_onControllerUpdate);
     _activeController?.stop();
     _overlayEntry?.remove();
