@@ -77,6 +77,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowTtkTour());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _load();
+      if (!mounted) return;
+      _reconcileNotifier = context.read<TechCardsReconcileNotifier>();
+      _lastReconcileNotifierVersion = _reconcileNotifier!.version;
+      _reconcileNotifier!.addListener(_handleTechCardsReconcileSignal);
+      _reconcileTimer?.cancel();
+      _reconcileTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+        _tryReconcileTechCards(force: false);
+      });
+      _tryReconcileTechCards(force: false);
+    });
   }
 
   Future<void> _maybeShowTtkTour() async {
@@ -1751,23 +1763,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     });
   }
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _load();
-      if (!mounted) return;
-      _reconcileNotifier = context.read<TechCardsReconcileNotifier>();
-      _lastReconcileNotifierVersion = _reconcileNotifier!.version;
-      _reconcileNotifier!.addListener(_handleTechCardsReconcileSignal);
-      _reconcileTimer?.cancel();
-      _reconcileTimer = Timer.periodic(const Duration(minutes: 5), (_) {
-        _tryReconcileTechCards(force: false);
-      });
-      _tryReconcileTechCards(force: false);
-    });
-  }
-
   void _handleTechCardsReconcileSignal() {
     if (!mounted) return;
     final notifier =
@@ -2434,7 +2429,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               ),
             ),
         ],
-        ),
       ),
       floatingActionButton: null,
     );
