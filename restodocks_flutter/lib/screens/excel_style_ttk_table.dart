@@ -92,10 +92,18 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   /// Отложенный билд: сначала placeholder, тяжёлую таблицу — в след. кадре. Без замирания.
   bool _tableBuilt = false;
 
+  /// Поэтапная подгрузка строк: первые N — сразу, остальные — в след. кадрах. Убирает 10+ сек задержку до первой реакции.
+  static const int _initialRows = 20;
+  static const int _chunkRows = 25;
+  int _rowsToShow = _initialRows;
+
   @override
   void initState() {
     super.initState();
-    _ensureProductTranslations();
+    // Переводы — в фоне, не блокируем первую реакцию
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) _ensureProductTranslations();
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       setState(() => _tableBuilt = true);
@@ -256,6 +264,17 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             ? (totalCost * (widget.weightPerPortion / totalOutput))
             : 0);
 
+    // Подгрузка остальных строк в следующих кадрах — убирает задержку до первой реакции
+    final totalRows = indexedRows.length;
+    if (_rowsToShow < totalRows) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _rowsToShow = (_rowsToShow + _chunkRows).clamp(0, totalRows);
+        });
+      });
+    }
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: SingleChildScrollView(
@@ -309,8 +328,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   _buildHeaderCell(''), // Столбец удаления
                 ],
               ),
-              // Строки с данными
-              ...indexedRows.map((entry) {
+              // Строки с данными — сначала первые N, остальные подгружаются в следующих кадрах
+              ...indexedRows.take(_rowsToShow).map((entry) {
                 final rowIndex = entry.key;
                 final ingredient = entry.value;
                 return TableRow(
@@ -498,7 +517,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     left: 0,
                     top: 44,
                     width: 50,
-                    height: indexedRows.length * 44 + 2,
+                    height: (_rowsToShow.clamp(0, indexedRows.length) * 44 + 2).toDouble(),
                     child: Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -516,7 +535,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     left: 50,  // граница между колонками 0 и 1
                     top: 44,   // сразу под шапкой
                     width: 120,
-                    height: indexedRows.length * 44 + 2,
+                    height: (_rowsToShow.clamp(0, indexedRows.length) * 44 + 2).toDouble(),
                     child: Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
