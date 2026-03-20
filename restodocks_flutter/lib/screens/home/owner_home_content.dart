@@ -18,6 +18,7 @@ class OwnerHomeContent extends StatefulWidget {
 
 class _OwnerHomeContentState extends State<OwnerHomeContent> {
   final ScrollController _scrollController = ScrollController();
+  int _lastScrolledStepIndex = -1;
 
   @override
   void initState() {
@@ -43,7 +44,14 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
 
   void _onTourStepChanged() {
     final ctrl = widget.tourController;
-    if (ctrl == null || !ctrl.isTourActive) return;
+    if (ctrl == null) return;
+    if (!ctrl.isTourActive) {
+      _lastScrolledStepIndex = -1;
+      return;
+    }
+    final idx = ctrl.currentIndex;
+    if (idx == _lastScrolledStepIndex) return;
+    _lastScrolledStepIndex = idx;
     final key = ctrl.getKeyForCurrentStep();
     if (key == null) return;
     final ctx = key.currentContext;
@@ -54,12 +62,13 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
           Scrollable.ensureVisible(
             currentCtx,
             alignment: 0.3,
-            duration: const Duration(milliseconds: 250),
+            duration: const Duration(milliseconds: 200),
             curve: Curves.easeOut,
           );
-          // Обновить подсветку после прокрутки
-          Future.delayed(const Duration(milliseconds: 280), () {
-            if (mounted) ctrl.notifyListeners();
+          Future.delayed(const Duration(milliseconds: 220), () {
+            if (mounted) {
+              ctrl.notifyListeners();
+            }
           });
         }
       });

@@ -240,7 +240,7 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
               );
             }
             _targetNotFoundRetries++;
-            Future.delayed(const Duration(milliseconds: 80), () {
+            Future.delayed(const Duration(milliseconds: 150), () {
               if (mounted) _updateOverlay();
             });
             return const SizedBox.shrink();
