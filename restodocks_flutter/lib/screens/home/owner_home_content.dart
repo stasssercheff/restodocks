@@ -57,6 +57,10 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
           );
+          // Обновить подсветку после прокрутки — иначе она остаётся на старом месте
+          Future.delayed(const Duration(milliseconds: 350), () {
+            ctrl.notifyListeners();
+          });
         }
       });
     }

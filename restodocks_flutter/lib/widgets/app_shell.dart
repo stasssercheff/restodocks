@@ -73,15 +73,44 @@ class AppShell extends StatelessWidget {
         ),
       );
 
+    final bottomBar = tourController != null
+        ? Stack(
+            children: [
+              navBar,
+              Positioned.fill(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SpotlightTarget(
+                        id: 'home-nav-home',
+                        controller: tourController,
+                        child: const SizedBox.expand(),
+                      ),
+                    ),
+                    Expanded(
+                      child: SpotlightTarget(
+                        id: 'home-nav-middle',
+                        controller: tourController,
+                        child: const SizedBox.expand(),
+                      ),
+                    ),
+                    Expanded(
+                      child: SpotlightTarget(
+                        id: 'home-nav-cabinet',
+                        controller: tourController,
+                        child: const SizedBox.expand(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          )
+        : navBar;
+
     return Scaffold(
       body: showAccessPendingStub ? _AccessPendingPlaceholder(loc: loc) : child,
-      bottomNavigationBar: tourController != null
-          ? SpotlightTarget(
-              id: 'home-bottom-nav',
-              controller: tourController,
-              child: navBar,
-            )
-          : navBar,
+      bottomNavigationBar: bottomBar,
     );
   }
 
