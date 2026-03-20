@@ -50,3 +50,4 @@ export 'haccp_form_preset_service.dart';
 export 'haccp_pdf_export_service.dart';
 export 'documentation_service_supabase.dart';
 export 'getting_started_read_service.dart';
+export 'page_tour_service.dart';

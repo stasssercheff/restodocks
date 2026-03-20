@@ -41,6 +41,9 @@ class AppProviders {
         ChangeNotifierProvider<NotificationPreferencesService>(
           create: (_) => NotificationPreferencesService(),
         ),
+        ChangeNotifierProvider<PageTourService>(
+          create: (_) => PageTourService(),
+        ),
         ChangeNotifierProvider<HaccpConfigService>(
           create: (_) => HaccpConfigService(),
         ),

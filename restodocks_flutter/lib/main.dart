@@ -1,3 +1,4 @@
+import 'package:feature_spotlight/feature_spotlight.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
@@ -112,23 +113,20 @@ class RestodocksApp extends StatelessWidget {
               final c = child ?? const SizedBox.shrink();
               final media = MediaQuery.of(context);
               final isPhone = media.size.shortestSide < 600;
-              if (!isPhone) {
-                return WebLocationCorrection(
-                  child: AppPrimaryScrollController(child: c),
+              Widget content = c;
+              if (isPhone) {
+                final factor = uiScale.scaleFactor;
+                content = MediaQuery(
+                  data: media.copyWith(
+                    textScaler: TextScaler.linear(media.textScaleFactor * factor),
+                  ),
+                  child: c,
                 );
               }
-
-              final factor = uiScale.scaleFactor;
-              final scaled = MediaQuery(
-                data: media.copyWith(
-                  // Уменьшаем общий масштаб текста на телефоне (остальное подтягивается
-                  // за счёт компактных размеров в теме и плотной верстки экранов).
-                  textScaler: TextScaler.linear(media.textScaleFactor * factor),
-                ),
-                child: c,
-              );
               return WebLocationCorrection(
-                child: AppPrimaryScrollController(child: scaled),
+                child: AppPrimaryScrollController(
+                  child: FeatureSpotlight(child: content),
+                ),
               );
             },
             debugShowCheckedModeBanner: false,

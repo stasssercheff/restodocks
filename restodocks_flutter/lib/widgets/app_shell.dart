@@ -1,3 +1,4 @@
+import 'package:feature_spotlight/feature_spotlight.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +7,7 @@ import '../models/models.dart';
 import '../services/localization_service.dart';
 import '../services/account_manager_supabase.dart';
 import '../services/home_button_config_service.dart';
+import '../services/page_tour_service.dart';
 
 /// Оболочка с нижней навигацией для всех рабочих экранов (кроме инвентаризации).
 class AppShell extends StatelessWidget {
@@ -42,9 +44,8 @@ class AppShell extends StatelessWidget {
     final isDataRequiredRoute = _dataAccessRequiredPaths.any((p) => location.startsWith(p));
     final showAccessPendingStub = noDataAccess && isDataRequiredRoute;
 
-    return Scaffold(
-      body: showAccessPendingStub ? _AccessPendingPlaceholder(loc: loc) : child,
-      bottomNavigationBar: NavigationBarTheme(
+    final tourController = context.watch<PageTourService>().homeTourController;
+    final navBar = NavigationBarTheme(
         data: const NavigationBarThemeData(
           height: 56,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
@@ -70,7 +71,17 @@ class AppShell extends StatelessWidget {
             ),
           ],
         ),
-      ),
+      );
+
+    return Scaffold(
+      body: showAccessPendingStub ? _AccessPendingPlaceholder(loc: loc) : child,
+      bottomNavigationBar: tourController != null
+          ? SpotlightTarget(
+              id: 'home-bottom-nav',
+              controller: tourController,
+              child: navBar,
+            )
+          : navBar,
     );
   }
 

@@ -1,3 +1,4 @@
+import 'package:feature_spotlight/feature_spotlight.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -36,27 +37,67 @@ class _HomeScreenState extends State<HomeScreen> {
     final emp = accountManager.currentEmployee;
     if (emp == null) return;
     _firstEntryCheckDone = true;
-    // Показываем только если не было ни одной сессии в этой учётной записи.
-    if (emp.firstSessionAt != null) return;
-    // Фиксируем первую сессию на сервере, затем показываем окно (один раз).
-    try {
-      await accountManager.supabase.client
-          .from('employees')
-          .update({'first_session_at': DateTime.now().toUtc().toIso8601String()})
-          .eq('id', emp.id);
-    } catch (_) {
-      // При ошибке сети не показываем, чтобы не спамить при каждом входе.
-      return;
+    // Показываем «Начало работы» только если не было ни одной сессии.
+    if (emp.firstSessionAt == null) {
+      try {
+        await accountManager.supabase.client
+            .from('employees')
+            .update({'first_session_at': DateTime.now().toUtc().toIso8601String()})
+            .eq('id', emp.id);
+      } catch (_) {
+        if (!mounted) return;
+        _maybeShowHomeTour(emp.id);
+        return;
+      }
+      if (!mounted) return;
+      await GettingStartedReadService.setRead(emp.id);
+      if (!mounted) return;
+      await _showFirstEntryDialog(context, emp.id);
     }
     if (!mounted) return;
-    await GettingStartedReadService.setRead(emp.id);
-    if (!mounted) return;
-    _showFirstEntryDialog(context, emp.id);
+    _maybeShowHomeTour(emp.id);
   }
 
-  static void _showFirstEntryDialog(BuildContext context, String employeeId) {
+  Future<void> _maybeShowHomeTour(String employeeId) async {
+    final tourService = context.read<PageTourService>();
+    final forceReplay = tourService.consumeReplayRequest(PageTourKeys.home);
+    if (!forceReplay && await tourService.isPageTourSeen(employeeId, PageTourKeys.home)) return;
+    if (!mounted) return;
     final loc = context.read<LocalizationService>();
-    showDialog<void>(
+    final controller = SpotlightController(
+      steps: [
+        SpotlightStep(
+          id: 'home-content',
+          text: PageTourService.getHomeTourBody(loc),
+          shape: SpotlightShape.rectangle,
+          padding: const EdgeInsets.all(8),
+        ),
+        SpotlightStep(
+          id: 'home-bottom-nav',
+          text: PageTourService.getHomeTourNav(loc),
+          shape: SpotlightShape.rectangle,
+          padding: const EdgeInsets.all(8),
+        ),
+      ],
+      onTourCompleted: () async {
+        if (!forceReplay) await tourService.markPageTourSeen(employeeId, PageTourKeys.home);
+        tourService.clearHomeTourController();
+      },
+      onTourSkipped: () async {
+        if (!forceReplay) await tourService.markPageTourSeen(employeeId, PageTourKeys.home);
+        tourService.clearHomeTourController();
+      },
+    );
+    tourService.setHomeTourController(controller);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      FeatureSpotlight.of(context).startTour(controller);
+    });
+  }
+
+  static Future<void> _showFirstEntryDialog(BuildContext context, String employeeId) async {
+    final loc = context.read<LocalizationService>();
+    await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => _FirstEntryDialog(
@@ -79,12 +120,21 @@ class _HomeScreenState extends State<HomeScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final tourService = context.watch<PageTourService>();
+    final controller = tourService.homeTourController;
+
     return Scaffold(
       appBar: AppBar(
         leading: GoRouter.of(context).canPop() ? appBarBackButton(context) : null,
         title: Text(loc.t('app_name')),
       ),
-      body: _buildContent(context, currentEmployee),
+      body: controller != null
+          ? SpotlightTarget(
+              id: 'home-content',
+              controller: controller,
+              child: _buildContent(context, currentEmployee),
+            )
+          : _buildContent(context, currentEmployee),
     );
   }
 
@@ -213,8 +263,71 @@ class _FirstEntryDialogState extends State<_FirstEntryDialog> {
 }
 
 /// Экран личного кабинета — меню: Профиль, Настройки, Выход.
-class PersonalCabinetScreen extends StatelessWidget {
+class PersonalCabinetScreen extends StatefulWidget {
   const PersonalCabinetScreen({super.key});
+
+  @override
+  State<PersonalCabinetScreen> createState() => _PersonalCabinetScreenState();
+}
+
+class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
+  bool _tourCheckDone = false;
+  SpotlightController? _tourController;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowTour());
+  }
+
+  Future<void> _maybeShowTour() async {
+    if (_tourCheckDone) return;
+    final accountManager = context.read<AccountManagerSupabase>();
+    final employee = accountManager.currentEmployee;
+    if (employee == null) return;
+    _tourCheckDone = true;
+    final tourService = context.read<PageTourService>();
+    final forceReplay = tourService.consumeReplayRequest(PageTourKeys.personalCabinet);
+    if (!forceReplay && await tourService.isPageTourSeen(employee.id, PageTourKeys.personalCabinet)) return;
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    final controller = SpotlightController(
+      steps: [
+        SpotlightStep(
+          id: 'cabinet-profile',
+          text: PageTourService.getPersonalCabinetTourProfile(loc),
+          shape: SpotlightShape.rectangle,
+          padding: const EdgeInsets.all(8),
+        ),
+        SpotlightStep(
+          id: 'cabinet-settings',
+          text: PageTourService.getPersonalCabinetTourSettings(loc),
+          shape: SpotlightShape.rectangle,
+          padding: const EdgeInsets.all(8),
+        ),
+      ],
+      onTourCompleted: () async {
+        if (!forceReplay) await tourService.markPageTourSeen(employee.id, PageTourKeys.personalCabinet);
+        if (mounted) setState(() => _tourController = null);
+      },
+      onTourSkipped: () async {
+        if (!forceReplay) await tourService.markPageTourSeen(employee.id, PageTourKeys.personalCabinet);
+        if (mounted) setState(() => _tourController = null);
+      },
+    );
+    if (!mounted) return;
+    setState(() => _tourController = controller);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      FeatureSpotlight.of(context).startTour(controller);
+    });
+  }
+
+  Widget _wrapIfTour(Widget child, String id) {
+    final ctrl = _tourController;
+    if (ctrl == null) return child;
+    return SpotlightTarget(id: id, controller: ctrl, child: child);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -231,17 +344,23 @@ class PersonalCabinetScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            ListTile(
-              leading: const Icon(Icons.person),
-              title: Text(loc.t('profile')),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/profile'),
+            _wrapIfTour(
+              ListTile(
+                leading: const Icon(Icons.person),
+                title: Text(loc.t('profile')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/profile'),
+              ),
+              'cabinet-profile',
             ),
-            ListTile(
-              leading: const Icon(Icons.settings),
-              title: Text(loc.t('settings')),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => context.push('/settings'),
+            _wrapIfTour(
+              ListTile(
+                leading: const Icon(Icons.settings),
+                title: Text(loc.t('settings')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings'),
+              ),
+              'cabinet-settings',
             ),
             const Divider(),
             ListTile(

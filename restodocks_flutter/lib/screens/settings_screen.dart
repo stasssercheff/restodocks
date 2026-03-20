@@ -1204,6 +1204,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showTrainingDialog(BuildContext context, LocalizationService loc) {
     final accountManager = context.read<AccountManagerSupabase>();
+    final tourService = context.read<PageTourService>();
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1212,7 +1213,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
           width: 340,
           child: ListView(
             shrinkWrap: true,
-            children: _trainingVideos.entries.map((e) {
+            children: [
+              ListTile(
+                leading: const Icon(Icons.tour_outlined),
+                title: Text(loc.t('tour_replay') ?? 'Пройти тур'),
+                subtitle: Text(loc.t('tour_replay_subtitle') ?? 'Подсветка рабочего стола и нижней панели'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  tourService.requestTourReplay(PageTourKeys.home);
+                  context.go('/home');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.person_outline),
+                title: Text(loc.t('tour_replay_cabinet') ?? 'Пройти тур личного кабинета'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  tourService.requestTourReplay(PageTourKeys.personalCabinet);
+                  context.go('/personal-cabinet');
+                },
+              ),
+              const Divider(),
+              ..._trainingVideos.entries.map((e) {
               final title = loc.t(e.key) == e.key ? e.key : loc.t(e.key);
               return ListTile(
                 leading: const Icon(Icons.play_circle_outline, color: Colors.red),
@@ -1242,7 +1266,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   }
                 },
               );
-            }).toList(),
+            }),
+            ],
           ),
         ),
         actions: [

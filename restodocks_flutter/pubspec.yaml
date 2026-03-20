@@ -69,6 +69,9 @@ dependencies:
   # Supabase
   supabase_flutter: ^2.0.0
 
+  # Guided tour / spotlight
+  feature_spotlight: ^1.1.4
+
   # Environment variables
   flutter_dotenv: ^5.1.0
 
