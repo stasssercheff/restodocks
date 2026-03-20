@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _keyShowBanquetCatering = 'restodocks_show_banquet_catering';
+const _keyShowBarSection = 'restodocks_show_bar_section';
+const _keyShowHallSection = 'restodocks_show_hall_section';
 const _keyShowNameTranslit = 'restodocks_show_name_translit';
 const _keyShowTranslationNotifications = 'restodocks_show_translation_notifications';
 const _keyBirthdayNotifyDays = 'restodocks_birthday_notify_days';
@@ -30,12 +32,16 @@ class ScreenLayoutPreferenceService extends ChangeNotifier {
   ScreenLayoutPreferenceService._internal();
 
   bool _showBanquetCatering = true;
+  bool _showBarSection = true;
+  bool _showHallSection = true;
   bool _showNameTranslit = false;
   bool _showTranslationNotifications = false;
   int _birthdayNotifyDays = 0;
   String _birthdayNotifyTime = '09:00';
 
   bool get showBanquetCatering => _showBanquetCatering;
+  bool get showBarSection => _showBarSection;
+  bool get showHallSection => _showHallSection;
   bool get showNameTranslit => _showNameTranslit;
   bool get showTranslationNotifications => _showTranslationNotifications;
   /// За сколько дней до ДР уведомлять (0 = без уведомлений, 1–5).
@@ -47,6 +53,8 @@ class ScreenLayoutPreferenceService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       _showBanquetCatering = prefs.getBool(_keyShowBanquetCatering) ?? true;
+      _showBarSection = prefs.getBool(_keyShowBarSection) ?? true;
+      _showHallSection = prefs.getBool(_keyShowHallSection) ?? true;
       _showNameTranslit = prefs.getBool(_keyShowNameTranslit) ?? false;
       _showTranslationNotifications = prefs.getBool(_keyShowTranslationNotifications) ?? false;
       _birthdayNotifyDays = prefs.getInt(_keyBirthdayNotifyDays) ?? 0;
@@ -72,6 +80,26 @@ class ScreenLayoutPreferenceService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_keyShowBanquetCatering, value);
+    } catch (_) {}
+  }
+
+  Future<void> setShowBarSection(bool value) async {
+    if (_showBarSection == value) return;
+    _showBarSection = value;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyShowBarSection, value);
+    } catch (_) {}
+  }
+
+  Future<void> setShowHallSection(bool value) async {
+    if (_showHallSection == value) return;
+    _showHallSection = value;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyShowHallSection, value);
     } catch (_) {}
   }
 

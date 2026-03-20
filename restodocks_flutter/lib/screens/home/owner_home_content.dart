@@ -50,16 +50,16 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
     if (ctx != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final currentCtx = key.currentContext;
-        if (currentCtx != null) {
+        if (currentCtx != null && mounted) {
           Scrollable.ensureVisible(
             currentCtx,
             alignment: 0.3,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
           );
-          // Обновить подсветку после прокрутки — иначе она остаётся на старом месте
-          Future.delayed(const Duration(milliseconds: 350), () {
-            ctrl.notifyListeners();
+          // Обновить подсветку после прокрутки
+          Future.delayed(const Duration(milliseconds: 280), () {
+            if (mounted) ctrl.notifyListeners();
           });
         }
       });
@@ -103,26 +103,28 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
         _wrap(_Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')), 'home-writeoffs-kitchen'),
         _wrap(_Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=kitchen')), 'home-checklists-kitchen'),
 
-        const SizedBox(height: 16),
-        _SectionTitle(title: loc.t('bar')),
-        _wrap(_Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.go('/schedule/bar')), 'home-schedule-bar'),
-        _wrap(_Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/bar')), 'home-menu-bar'),
-        _wrap(_Tile(icon: Icons.description, title: loc.t('ttk_bar') ?? 'ТТК бара', onTap: () => context.go('/tech-cards/bar')), 'home-ttk-bar'),
-        _wrap(_Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature/bar')), 'home-nomenclature-bar'),
-        _wrap(_Tile(icon: Icons.add_business, title: loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.push('/suppliers/bar')), 'home-suppliers-bar'),
-        _wrap(_Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=bar')), 'home-order-bar'),
-        _wrap(_Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')), 'home-writeoffs-bar'),
-        _wrap(_Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=bar')), 'home-checklists-bar'),
-
-        const SizedBox(height: 16),
-        _SectionTitle(title: loc.t('dining_room')),
-        _wrap(_Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.go('/schedule/hall')), 'home-schedule-hall'),
-        _wrap(_Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/hall')), 'home-menu-hall'),
-        _wrap(_Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=hall')), 'home-checklists-hall'),
-        _wrap(_Tile(icon: Icons.add_business, title: loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.push('/suppliers/hall')), 'home-suppliers-hall'),
-        _wrap(_Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=hall')), 'home-order-hall'),
-        _wrap(_Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')), 'home-writeoffs-hall'),
-
+        if (screenPref.showBarSection) ...[
+          const SizedBox(height: 16),
+          _SectionTitle(title: loc.t('bar')),
+          _wrap(_Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.go('/schedule/bar')), 'home-schedule-bar'),
+          _wrap(_Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/bar')), 'home-menu-bar'),
+          _wrap(_Tile(icon: Icons.description, title: loc.t('ttk_bar') ?? 'ТТК бара', onTap: () => context.go('/tech-cards/bar')), 'home-ttk-bar'),
+          _wrap(_Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature/bar')), 'home-nomenclature-bar'),
+          _wrap(_Tile(icon: Icons.add_business, title: loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.push('/suppliers/bar')), 'home-suppliers-bar'),
+          _wrap(_Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=bar')), 'home-order-bar'),
+          _wrap(_Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')), 'home-writeoffs-bar'),
+          _wrap(_Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=bar')), 'home-checklists-bar'),
+        ],
+        if (screenPref.showHallSection) ...[
+          const SizedBox(height: 16),
+          _SectionTitle(title: loc.t('dining_room')),
+          _wrap(_Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.go('/schedule/hall')), 'home-schedule-hall'),
+          _wrap(_Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/hall')), 'home-menu-hall'),
+          _wrap(_Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=hall')), 'home-checklists-hall'),
+          _wrap(_Tile(icon: Icons.add_business, title: loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.push('/suppliers/hall')), 'home-suppliers-hall'),
+          _wrap(_Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=hall')), 'home-order-hall'),
+          _wrap(_Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')), 'home-writeoffs-hall'),
+        ],
         if (screenPref.showBanquetCatering) ...[
           const SizedBox(height: 16),
           _ExpandableBanquetSection(loc: loc),

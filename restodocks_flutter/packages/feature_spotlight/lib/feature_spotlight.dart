@@ -215,6 +215,7 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
   }
 
   void _updateOverlay() {
+    if (!mounted) return;
     _overlayEntry?.remove();
     _overlayEntry = null;
     if (_activeController?.isTourActive ?? false) {
@@ -239,7 +240,7 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
               );
             }
             _targetNotFoundRetries++;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
+            Future.delayed(const Duration(milliseconds: 80), () {
               if (mounted) _updateOverlay();
             });
             return const SizedBox.shrink();
@@ -310,11 +311,14 @@ class SpotlightTarget extends StatefulWidget {
 
 class _SpotlightTargetState extends State<SpotlightTarget> {
   final GlobalKey _key = GlobalKey();
+  bool _wasActive = false;
 
   @override
   void initState() {
     super.initState();
     widget.controller._registerTarget(widget.id, _key);
+    _wasActive = widget.controller.isTourActive &&
+        widget.controller.currentStep?.id == widget.id;
     widget.controller.addListener(_onControllerChanged);
   }
 
@@ -333,7 +337,14 @@ class _SpotlightTargetState extends State<SpotlightTarget> {
     super.dispose();
   }
 
-  void _onControllerChanged() => setState(() {});
+  void _onControllerChanged() {
+    final isActive = widget.controller.isTourActive &&
+        widget.controller.currentStep?.id == widget.id;
+    if (_wasActive != isActive) {
+      _wasActive = isActive;
+      setState(() {});
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -344,24 +355,25 @@ class _SpotlightTargetState extends State<SpotlightTarget> {
 
     return Container(
       key: _key,
+      padding: useGlow ? const EdgeInsets.all(2) : null,
       decoration: useGlow
           ? BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
                   color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.35),
-                  blurRadius: 16,
-                  spreadRadius: 2,
+                  blurRadius: 12,
+                  spreadRadius: 1,
                 ),
                 BoxShadow(
                   color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-                  blurRadius: 24,
+                  blurRadius: 20,
                   spreadRadius: 0,
                 ),
               ],
               border: Border.all(
                 color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
-                width: 2.5,
+                width: 2,
               ),
             )
           : null,

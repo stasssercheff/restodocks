@@ -1210,10 +1210,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (ctx) => AlertDialog(
         title: Text(loc.t('training') ?? 'Обучение'),
         content: SizedBox(
-          width: 340,
+          width: 360,
           child: ListView(
             shrinkWrap: true,
             children: [
+              // Секция: Тур (весь и частями)
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 4),
+                child: Text(
+                  loc.t('training_section_tour') ?? 'Тур',
+                  style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
+                    color: Theme.of(ctx).colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
               ListTile(
                 leading: const Icon(Icons.tour_outlined),
                 title: Text(loc.t('tour_replay') ?? 'Пройти тур'),
@@ -1266,37 +1277,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
               const Divider(),
+              // Секция: Видео
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 4),
+                child: Text(
+                  loc.t('training_section_videos') ?? 'Видео',
+                  style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
+                    color: Theme.of(ctx).colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
               ..._trainingVideos.entries.map((e) {
-              final title = loc.t(e.key) == e.key ? e.key : loc.t(e.key);
-              return ListTile(
-                leading: const Icon(Icons.play_circle_outline, color: Colors.red),
-                title: Text(title, style: const TextStyle(fontSize: 14)),
-                trailing: const Icon(Icons.open_in_new, size: 18),
-                dense: true,
-                onTap: () async {
-                  final videoId = _videoId(e.value);
-                  String? url = _fallbackYoutubeUrl(e.value);
-                  if (videoId != null) {
-                    try {
-                      final res = await accountManager.supabase.client.functions.invoke(
-                        'get-training-video-url',
-                        queryParameters: {'id': videoId},
-                      );
-                      if (res.status == 200 && res.data is Map) {
-                        final data = res.data as Map<String, dynamic>;
-                        url = data['url']?.toString();
-                      }
-                    } catch (_) {}
-                  }
-                  if (url != null) {
-                    final uri = Uri.parse(url);
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                final title = loc.t(e.key) == e.key ? e.key : loc.t(e.key);
+                return ListTile(
+                  leading: const Icon(Icons.play_circle_outline, color: Colors.red),
+                  title: Text(title, style: const TextStyle(fontSize: 14)),
+                  trailing: const Icon(Icons.open_in_new, size: 18),
+                  dense: true,
+                  onTap: () async {
+                    final videoId = _videoId(e.value);
+                    String? url = _fallbackYoutubeUrl(e.value);
+                    if (videoId != null) {
+                      try {
+                        final res = await accountManager.supabase.client.functions.invoke(
+                          'get-training-video-url',
+                          queryParameters: {'id': videoId},
+                        );
+                        if (res.status == 200 && res.data is Map) {
+                          final data = res.data as Map<String, dynamic>;
+                          url = data['url']?.toString();
+                        }
+                      } catch (_) {}
                     }
-                  }
+                    if (url != null) {
+                      final uri = Uri.parse(url);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      }
+                    }
+                  },
+                );
+              }),
+              const Divider(),
+              // Секция: Начало работы
+              Padding(
+                padding: const EdgeInsets.only(top: 8, bottom: 4),
+                child: Text(
+                  loc.t('training_section_getting_started') ?? 'Начало работы',
+                  style: Theme.of(ctx).textTheme.titleSmall?.copyWith(
+                    color: Theme.of(ctx).colorScheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.menu_book),
+                title: Text(loc.t('getting_started') ?? 'Начало работы с Restodocks'),
+                subtitle: Text(loc.t('getting_started_subtitle') ?? 'Текстовая инструкция с раскрывающимися разделами'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _showGettingStartedTextDialog(context, loc);
                 },
-              );
-            }),
+              ),
             ],
           ),
         ),
@@ -1855,6 +1899,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onChanged: (v) => screenPref.setShowBanquetCatering(v),
                   ),
                 ),
+                if (currentEmployee.hasRole('owner')) ...[
+                  Consumer<ScreenLayoutPreferenceService>(
+                    builder: (_, screenPref, __) => SwitchListTile(
+                      secondary: const Icon(Icons.local_bar),
+                      title: Text(localization.t('show_bar_section') ?? 'Раздел «Бар» на главной'),
+                      subtitle: Text(localization.t('show_bar_section_hint') ?? 'Показывать секцию Бар (график, меню, ТТК и др.)'),
+                      value: screenPref.showBarSection,
+                      onChanged: (v) => screenPref.setShowBarSection(v),
+                    ),
+                  ),
+                  Consumer<ScreenLayoutPreferenceService>(
+                    builder: (_, screenPref, __) => SwitchListTile(
+                      secondary: const Icon(Icons.table_restaurant),
+                      title: Text(localization.t('show_hall_section') ?? 'Раздел «Зал» на главной'),
+                      subtitle: Text(localization.t('show_hall_section_hint') ?? 'Показывать секцию Зал (график, меню, чеклисты и др.)'),
+                      value: screenPref.showHallSection,
+                      onChanged: (v) => screenPref.setShowHallSection(v),
+                    ),
+                  ),
+                ],
               ],
             ),
             if (currentEmployee.hasRole('owner') ||
@@ -2107,16 +2171,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ListTile(
               leading: const Icon(Icons.play_circle_outline),
               title: Text(localization.t('training') ?? 'Обучение'),
-              subtitle: Text(localization.t('training_subtitle') ?? 'Видеоинструкции по работе с приложением'),
+              subtitle: Text(localization.t('training_subtitle') ?? 'Видео, тур и начало работы'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showTrainingDialog(context, localization),
-            ),
-            ListTile(
-              leading: const Icon(Icons.menu_book),
-              title: Text(localization.t('getting_started') ?? 'Начало работы (текст)'),
-              subtitle: Text(localization.t('getting_started_subtitle') ?? 'Текстовая инструкция с раскрывающимися разделами'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _showGettingStartedTextDialog(context, localization),
             ),
             ListTile(
               leading: const Icon(Icons.support_agent),
