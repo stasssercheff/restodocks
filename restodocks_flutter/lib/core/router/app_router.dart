@@ -706,6 +706,10 @@ class AppRouter {
             ],
           ),
           GoRoute(
+            path: '/haccp-documentation',
+            pageBuilder: (context, state) => _slideTransitionPage(state, const HaccpDocumentationScreen()),
+          ),
+          GoRoute(
             path: '/tech-cards',
             pageBuilder: (context, state) {
               final refresh = state.queryParameters['refresh'] == '1';

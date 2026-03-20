@@ -1485,7 +1485,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ListTile(
               leading: const Icon(Icons.email_outlined, color: Colors.redAccent),
               title: Text(loc.t('email')),
-              subtitle: const Text('stassserchef@gmail.com'),
+              subtitle: const Text('info@restodocks.com'),
               onTap: () {
                 Navigator.of(ctx).pop();
                 _showSupportEmailForm(context, loc);
@@ -1716,26 +1716,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
               const Divider(),
             ],
-            if (currentEmployee.hasRole('owner') && establishment != null)
-              ExpansionTile(
-                initiallyExpanded: false,
-                leading: const Icon(Icons.business),
-                title: Text(localization.t('requisites') ?? 'Реквизиты'),
-                subtitle: Text(
-                  localization.t('requisites_hint') ?? 'Для бланка соглашения с сотрудником',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                children: [
-                  _RequisitesForm(
-                    establishment: establishment!,
-                    onSave: (e) async {
-                      await accountManager.updateEstablishment(e);
-                      if (mounted) setState(() {});
-                    },
-                    loc: localization,
-                  ),
-                ],
-              ),
             ExpansionTile(
               initiallyExpanded: false,
               leading: const Icon(Icons.dashboard_customize),
@@ -1896,6 +1876,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 currentEmployee.hasRole('bar_manager') ||
                 currentEmployee.hasRole('floor_manager') ||
                 currentEmployee.hasRole('general_manager')) ...[
+              ListTile(
+                leading: const Icon(Icons.menu_book),
+                title: Text(localization.t('documentation') ?? 'Документация'),
+                subtitle: const Text('Законы, бланки и приказы по ПЭП'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/haccp-documentation'),
+              ),
               ExpansionTile(
                 initiallyExpanded: false,
                 leading: const Icon(Icons.assignment),
@@ -1930,34 +1917,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 onTap: () => _toggleHaccpJournal(context, config, est.id, t, !isOn, localization),
                               );
                             }),
-                            const Divider(height: 32),
-                            Text(
-                              localization.t('haccp_legal_legitimacy') ?? 'Юридическая легитимность',
-                              style: Theme.of(context).textTheme.titleSmall,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              localization.t('haccp_legal_text') ??
-                                  'Легитимность цифровых журналов:\nСогласно СанПиН 2.3/2.4.3590-20 (п. 2.1), допускается ведение производственных журналов в электронном виде. Это применимо ко всей территории РФ и гармонизировано с санитарными нормами стран СНГ.\n\nЮридическая сила подписи (ПЭП):\nВвод данных под уникальным логином и паролем является использованием Простой электронной подписи (ПЭП). Согласно ФЗ №63 (РФ), Законам об ЭЦП (РК, РБ, РУз) и международным стандартам, такая подпись равнозначна собственноручной при наличии внутреннего Соглашения с сотрудником.\n\nМеждународный стандарт безопасности (HACCP):\nСистема соответствует требованиям Технического регламента ТР ТС 021/2011 "О безопасности пищевой продукции", обязывающего предприятия фиксировать критические контрольные точки.\n\nНеизменность данных (Audit Trail):\nRestoDocks фиксирует точное время (Timestamp) каждой записи на сервере. Это исключает фальсификацию данных "задним числом" и подтверждает достоверность учёта перед контролирующими органами.',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              localization.t('haccp_legal_sp_extract') ?? 'Извлечение из СП 2.3/2.4.3590-20 «Санитарно-эпидемиологические требования к организации общественного питания населения»',
-                              style: Theme.of(context).textTheme.titleSmall,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              localization.t('haccp_legal_sp_paragraphs') ??
-                                  '2.22. Медицинский персонал (при наличии) или назначенное ответственное лицо предприятия общественного питания должен проводить ежедневный осмотр работников, занятых изготовлением продукции общественного питания и работников, непосредственно контактирующих с пищевой продукцией, в том числе с продовольственным сырьём, на наличие гнойничковых заболеваний кожи рук и открытых поверхностей тела, признаков инфекционных заболеваний. Результаты осмотра должны заноситься в гигиенический журнал (рекомендуемый образец приведён в приложении № 1 к Правилам) на бумажном и/или электронном носителях. Список работников, отмеченных в журнале на день осмотра, должен соответствовать числу работников на этот день в смену. Список работников в приложении берётся из списка сотрудников заведения.\n\n3.8. В целях контроля за риском возникновения условий для размножения патогенных микроорганизмов необходимо вести ежедневную регистрацию показателей температурного режима хранения пищевой продукции в холодильном оборудовании и складских помещениях на бумажном и (или) электронном носителях и влажности — в складских помещениях.\n\n4.3. Фритюрные жиры, используемые при производстве (изготовлении) пищевой продукции во фритюре, подлежат ежедневному контролю. Информация о замене фритюрных жиров должна фиксироваться ответственным должностным лицом в электронном или бумажном виде и храниться не менее трёх месяцев. Ответственные лица и работники в журналах выбираются из списка сотрудников заведения.',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 16),
-                            FilledButton.icon(
-                              onPressed: () => _downloadHaccpAgreement(context, localization),
-                              icon: const Icon(Icons.download),
-                              label: Text(localization.t('haccp_download_agreement') ?? 'Скачать Соглашение с сотрудником (PDF)'),
-                            ),
                           ],
                         ),
                       );
@@ -2146,24 +2105,45 @@ class _RequisitesForm extends StatefulWidget {
 }
 
 class _RequisitesFormState extends State<_RequisitesForm> {
-  late TextEditingController _nameController;
+  late TextEditingController _legalNameController;
   late TextEditingController _innBinController;
   late TextEditingController _addressController;
+  late TextEditingController _ogrnOgrnipController;
+  late TextEditingController _kppController;
+  late TextEditingController _bankRsController;
+  late TextEditingController _bankBikController;
+  late TextEditingController _bankNameController;
+  late TextEditingController _directorFioController;
+  late TextEditingController _directorPositionController;
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.establishment.name);
+    _legalNameController = TextEditingController(text: widget.establishment.legalName ?? widget.establishment.name);
     _innBinController = TextEditingController(text: widget.establishment.innBin ?? '');
     _addressController = TextEditingController(text: widget.establishment.address ?? '');
+    _ogrnOgrnipController = TextEditingController(text: widget.establishment.ogrnOgrnip ?? '');
+    _kppController = TextEditingController(text: widget.establishment.kpp ?? '');
+    _bankRsController = TextEditingController(text: widget.establishment.bankRs ?? '');
+    _bankBikController = TextEditingController(text: widget.establishment.bankBik ?? '');
+    _bankNameController = TextEditingController(text: widget.establishment.bankName ?? '');
+    _directorFioController = TextEditingController(text: widget.establishment.directorFio ?? '');
+    _directorPositionController = TextEditingController(text: widget.establishment.directorPosition ?? '');
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _legalNameController.dispose();
     _innBinController.dispose();
     _addressController.dispose();
+    _ogrnOgrnipController.dispose();
+    _kppController.dispose();
+    _bankRsController.dispose();
+    _bankBikController.dispose();
+    _bankNameController.dispose();
+    _directorFioController.dispose();
+    _directorPositionController.dispose();
     super.dispose();
   }
 
@@ -2175,9 +2155,9 @@ class _RequisitesFormState extends State<_RequisitesForm> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           TextField(
-            controller: _nameController,
+            controller: _legalNameController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_organization') ?? 'Организация',
+              labelText: widget.loc.t('requisites_organization') ?? 'Юр. название',
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -2187,6 +2167,69 @@ class _RequisitesFormState extends State<_RequisitesForm> {
             controller: _innBinController,
             decoration: InputDecoration(
               labelText: widget.loc.t('requisites_inn_bin') ?? 'ИНН / БИН',
+              border: const OutlineInputBorder(),
+              filled: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _ogrnOgrnipController,
+            decoration: InputDecoration(
+              labelText: 'ОГРН / ОГРНИП',
+              border: const OutlineInputBorder(),
+              filled: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _kppController,
+            decoration: InputDecoration(
+              labelText: 'КПП',
+              border: const OutlineInputBorder(),
+              filled: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _bankRsController,
+            decoration: InputDecoration(
+              labelText: 'Р/С',
+              border: const OutlineInputBorder(),
+              filled: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _bankBikController,
+            decoration: InputDecoration(
+              labelText: 'БИК',
+              border: const OutlineInputBorder(),
+              filled: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _bankNameController,
+            decoration: InputDecoration(
+              labelText: 'Банк',
+              border: const OutlineInputBorder(),
+              filled: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _directorFioController,
+            decoration: InputDecoration(
+              labelText: 'ФИО руководителя',
+              border: const OutlineInputBorder(),
+              filled: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _directorPositionController,
+            decoration: InputDecoration(
+              labelText: 'Должность руководителя',
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -2208,11 +2251,18 @@ class _RequisitesFormState extends State<_RequisitesForm> {
                 : () async {
                     setState(() => _saving = true);
                     try {
-                      final name = _nameController.text.trim();
+                      final legalName = _legalNameController.text.trim();
                       final updated = widget.establishment.copyWith(
-                        name: name.isEmpty ? widget.establishment.name : name,
+                        legalName: legalName.isEmpty ? null : legalName,
                         innBin: _innBinController.text.trim().isEmpty ? null : _innBinController.text.trim(),
                         address: _addressController.text.trim().isEmpty ? null : _addressController.text.trim(),
+                        ogrnOgrnip: _ogrnOgrnipController.text.trim().isEmpty ? null : _ogrnOgrnipController.text.trim(),
+                        kpp: _kppController.text.trim().isEmpty ? null : _kppController.text.trim(),
+                        bankRs: _bankRsController.text.trim().isEmpty ? null : _bankRsController.text.trim(),
+                        bankBik: _bankBikController.text.trim().isEmpty ? null : _bankBikController.text.trim(),
+                        bankName: _bankNameController.text.trim().isEmpty ? null : _bankNameController.text.trim(),
+                        directorFio: _directorFioController.text.trim().isEmpty ? null : _directorFioController.text.trim(),
+                        directorPosition: _directorPositionController.text.trim().isEmpty ? null : _directorPositionController.text.trim(),
                         updatedAt: DateTime.now(),
                       );
                       await widget.onSave(updated);

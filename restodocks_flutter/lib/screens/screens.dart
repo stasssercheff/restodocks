@@ -46,3 +46,4 @@ export 'haccp_log_detail_screen.dart';
 export 'documentation_screen.dart';
 export 'documentation_edit_screen.dart';
 export 'documentation_view_screen.dart';
+export 'haccp_documentation_screen.dart';

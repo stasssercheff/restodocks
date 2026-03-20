@@ -100,7 +100,10 @@ class HaccpAgreementPdfService {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text('${organizationLabel ?? 'Организация'}: ${establishment.name}', style: headerStyle),
+                    pw.Text(
+                      '${organizationLabel ?? 'Организация'}: ${establishment.legalName ?? establishment.name}',
+                      style: headerStyle,
+                    ),
                     if (establishment.innBin != null && establishment.innBin!.isNotEmpty)
                       pw.Text('${innBinLabel ?? 'ИНН/БИН'}: ${establishment.innBin}', style: headerStyle),
                     if (establishment.address != null && establishment.address!.isNotEmpty)

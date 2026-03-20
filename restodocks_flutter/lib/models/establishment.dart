@@ -26,6 +26,35 @@ class Establishment extends Equatable {
   @JsonKey(name: 'inn_bin')
   final String? innBin;
 
+  /// Полное юридическое наименование (для приказов/документов)
+  @JsonKey(name: 'legal_name')
+  final String? legalName;
+
+  /// ОГРН / ОГРНИП
+  @JsonKey(name: 'ogrn_ogrnip')
+  final String? ogrnOgrnip;
+
+  /// КПП (только для ООО)
+  @JsonKey(name: 'kpp')
+  final String? kpp;
+
+  /// Банковские реквизиты
+  @JsonKey(name: 'bank_rs')
+  final String? bankRs;
+
+  @JsonKey(name: 'bank_bik')
+  final String? bankBik;
+
+  @JsonKey(name: 'bank_name')
+  final String? bankName;
+
+  /// ФИО и должность руководителя (для подписей в документах)
+  @JsonKey(name: 'director_fio')
+  final String? directorFio;
+
+  @JsonKey(name: 'director_position')
+  final String? directorPosition;
+
   @JsonKey(name: 'phone')
   final String? phone;
 
@@ -69,6 +98,14 @@ class Establishment extends Equatable {
     required this.ownerId,
     this.address,
     this.innBin,
+    this.legalName,
+    this.ogrnOgrnip,
+    this.kpp,
+    this.bankRs,
+    this.bankBik,
+    this.bankName,
+    this.directorFio,
+    this.directorPosition,
     this.phone,
     this.email,
     this.defaultCurrency = 'RUB',
@@ -86,6 +123,14 @@ class Establishment extends Equatable {
     String? ownerId,
     String? address,
     String? innBin,
+    String? legalName,
+    String? ogrnOgrnip,
+    String? kpp,
+    String? bankRs,
+    String? bankBik,
+    String? bankName,
+    String? directorFio,
+    String? directorPosition,
     String? phone,
     String? email,
     String? defaultCurrency,
@@ -101,6 +146,14 @@ class Establishment extends Equatable {
       ownerId: ownerId ?? this.ownerId,
       address: address ?? this.address,
       innBin: innBin ?? this.innBin,
+      legalName: legalName ?? this.legalName,
+      ogrnOgrnip: ogrnOgrnip ?? this.ogrnOgrnip,
+      kpp: kpp ?? this.kpp,
+      bankRs: bankRs ?? this.bankRs,
+      bankBik: bankBik ?? this.bankBik,
+      bankName: bankName ?? this.bankName,
+      directorFio: directorFio ?? this.directorFio,
+      directorPosition: directorPosition ?? this.directorPosition,
       phone: phone ?? this.phone,
       email: email ?? this.email,
       defaultCurrency: defaultCurrency ?? this.defaultCurrency,
@@ -172,6 +225,14 @@ class Establishment extends Equatable {
     ownerId,
     address,
     innBin,
+    legalName,
+    ogrnOgrnip,
+    kpp,
+    bankRs,
+    bankBik,
+    bankName,
+    directorFio,
+    directorPosition,
     phone,
     email,
     defaultCurrency,
