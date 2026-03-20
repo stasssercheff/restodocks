@@ -198,7 +198,7 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
   SpotlightController? _activeController;
   OverlayEntry? _overlayEntry;
   int _targetNotFoundRetries = 0;
-  static const int _maxTargetRetries = 25;
+  static const int _maxTargetRetries = 5;
 
   /// Starts a tour using the provided [controller].
   void startTour(SpotlightController controller) {
@@ -214,6 +214,8 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
   void _stopTour() {
     _activeController?.removeListener(_updateOverlay);
     _activeController?.stop();
+    _overlayEntry?.remove();
+    _overlayEntry = null;
     setState(() {
       _activeController = null;
     });

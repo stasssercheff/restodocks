@@ -134,7 +134,7 @@ class PageTourService extends ChangeNotifier {
   static String getTourTtkCreate(LocalizationService loc) =>
       loc.t('tour_ttk_create') ?? 'Создать новую ТТК.';
   static String getTourTtkImport(LocalizationService loc) =>
-      loc.t('tour_ttk_import') ?? 'Импортировать ТТК из Excel.';
+      loc.t('tour_ttk_import') ?? 'Импорт ТТК из файла.';
   static String getTourTtkExport(LocalizationService loc) =>
       loc.t('tour_ttk_export') ?? 'Скачать ТТК на устройство.';
   static String getTourTtkRefresh(LocalizationService loc) =>
