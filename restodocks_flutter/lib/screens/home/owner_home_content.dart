@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/services.dart';
-import '../../services/screen_layout_preference_service.dart';
 
 /// Домашняя страница владельца: график, кухня, бар, зал, менеджмент, уведомления, расходы.
 /// Визуал как у менеджмента/сотрудника — Card + ListTile, без цветных плиток.
@@ -13,57 +12,57 @@ class OwnerHomeContent extends StatelessWidget {
 
   final SpotlightController? tourController;
 
+  Widget _wrap(Widget child, String id) {
+    if (tourController == null) return child;
+    return SpotlightTarget(id: id, controller: tourController!, child: child);
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final screenPref = context.watch<ScreenLayoutPreferenceService>();
 
-    final firstTile = _Tile(icon: Icons.description_outlined, title: loc.t('documentation') ?? 'Документация', onTap: () => context.go('/documentation'));
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // Управление — сверху: сообщения и входящие
         _SectionTitle(title: loc.t('management')),
-        if (tourController != null)
-          SpotlightTarget(id: 'home-content', controller: tourController!, child: firstTile)
-        else
-          firstTile,
-        _Tile(icon: Icons.assignment, title: loc.t('haccp_journals') ?? 'Журналы и ХАССП', onTap: () => context.go('/haccp-journals')),
-        _Tile(icon: Icons.chat_bubble_outline, title: loc.t('inbox_tab_messages') ?? 'Сообщения', onTap: () => context.go('/notifications?tab=messages')),
-        _Tile(icon: Icons.inbox, title: loc.t('inbox'), onTap: () => context.go('/inbox')),
-        _Tile(icon: Icons.people, title: loc.t('employees'), onTap: () => context.go('/employees')),
-        _Tile(icon: Icons.calendar_month, title: loc.t('schedule'), onTap: () => context.go('/schedule/all')),
+        _wrap(_Tile(icon: Icons.description_outlined, title: loc.t('documentation') ?? 'Документация', onTap: () => context.go('/documentation')), 'home-doc'),
+        _wrap(_Tile(icon: Icons.assignment, title: loc.t('haccp_journals') ?? 'Журналы и ХАССП', onTap: () => context.go('/haccp-journals')), 'home-haccp'),
+        _wrap(_Tile(icon: Icons.chat_bubble_outline, title: loc.t('inbox_tab_messages') ?? 'Сообщения', onTap: () => context.go('/notifications?tab=messages')), 'home-messages'),
+        _wrap(_Tile(icon: Icons.inbox, title: loc.t('inbox'), onTap: () => context.go('/inbox')), 'home-inbox'),
+        _wrap(_Tile(icon: Icons.people, title: loc.t('employees'), onTap: () => context.go('/employees')), 'home-employees'),
+        _wrap(_Tile(icon: Icons.calendar_month, title: loc.t('schedule'), onTap: () => context.go('/schedule/all')), 'home-schedule-mgmt'),
 
         const SizedBox(height: 16),
         _SectionTitle(title: loc.t('kitchen')),
-        _Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.go('/schedule/kitchen')),
-        _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/kitchen')),
-        _Tile(icon: Icons.description, title: loc.t('ttk_kitchen'), onTap: () => context.go('/tech-cards/kitchen')),
-        _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature/kitchen')),
-        _Tile(icon: Icons.add_business, title: loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.push('/suppliers/kitchen')),
-        _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=kitchen')),
-        _Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')),
-        _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=kitchen')),
+        _wrap(_Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.go('/schedule/kitchen')), 'home-schedule-kitchen'),
+        _wrap(_Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/kitchen')), 'home-menu-kitchen'),
+        _wrap(_Tile(icon: Icons.description, title: loc.t('ttk_kitchen'), onTap: () => context.go('/tech-cards/kitchen')), 'home-ttk-kitchen'),
+        _wrap(_Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature/kitchen')), 'home-nomenclature-kitchen'),
+        _wrap(_Tile(icon: Icons.add_business, title: loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.push('/suppliers/kitchen')), 'home-suppliers-kitchen'),
+        _wrap(_Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=kitchen')), 'home-order-kitchen'),
+        _wrap(_Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')), 'home-writeoffs-kitchen'),
+        _wrap(_Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=kitchen')), 'home-checklists-kitchen'),
 
         const SizedBox(height: 16),
         _SectionTitle(title: loc.t('bar')),
-        _Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.go('/schedule/bar')),
-        _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/bar')),
-        _Tile(icon: Icons.description, title: loc.t('ttk_bar') ?? 'ТТК бара', onTap: () => context.go('/tech-cards/bar')),
-        _Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature/bar')),
-        _Tile(icon: Icons.add_business, title: loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.push('/suppliers/bar')),
-        _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=bar')),
-        _Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')),
-        _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=bar')),
+        _wrap(_Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.go('/schedule/bar')), 'home-schedule-bar'),
+        _wrap(_Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/bar')), 'home-menu-bar'),
+        _wrap(_Tile(icon: Icons.description, title: loc.t('ttk_bar') ?? 'ТТК бара', onTap: () => context.go('/tech-cards/bar')), 'home-ttk-bar'),
+        _wrap(_Tile(icon: Icons.assignment, title: loc.t('nomenclature'), onTap: () => context.go('/nomenclature/bar')), 'home-nomenclature-bar'),
+        _wrap(_Tile(icon: Icons.add_business, title: loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.push('/suppliers/bar')), 'home-suppliers-bar'),
+        _wrap(_Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=bar')), 'home-order-bar'),
+        _wrap(_Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')), 'home-writeoffs-bar'),
+        _wrap(_Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=bar')), 'home-checklists-bar'),
 
         const SizedBox(height: 16),
         _SectionTitle(title: loc.t('dining_room')),
-        _Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.go('/schedule/hall')),
-        _Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/hall')),
-        _Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=hall')),
-        _Tile(icon: Icons.add_business, title: loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.push('/suppliers/hall')),
-        _Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=hall')),
-        _Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')),
+        _wrap(_Tile(icon: Icons.schedule, title: loc.t('schedule'), onTap: () => context.go('/schedule/hall')), 'home-schedule-hall'),
+        _wrap(_Tile(icon: Icons.restaurant_menu, title: loc.t('menu'), onTap: () => context.go('/menu/hall')), 'home-menu-hall'),
+        _wrap(_Tile(icon: Icons.checklist, title: loc.t('checklists'), onTap: () => context.go('/checklists?department=hall')), 'home-checklists-hall'),
+        _wrap(_Tile(icon: Icons.add_business, title: loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики', onTap: () => context.push('/suppliers/hall')), 'home-suppliers-hall'),
+        _wrap(_Tile(icon: Icons.shopping_cart, title: loc.t('product_order'), onTap: () => context.go('/product-order?department=hall')), 'home-order-hall'),
+        _wrap(_Tile(icon: Icons.remove_circle_outline, title: loc.t('writeoffs') ?? 'Списания', onTap: () => context.push('/writeoffs')), 'home-writeoffs-hall'),
 
         if (screenPref.showBanquetCatering) ...[
           const SizedBox(height: 16),
@@ -71,8 +70,7 @@ class OwnerHomeContent extends StatelessWidget {
         ],
         const SizedBox(height: 16),
         _SectionTitle(title: '${loc.t('expenses')} (${loc.t('pro')})'),
-        _Tile(icon: Icons.payments, title: loc.t('expenses'), onTap: () => context.go('/expenses')),
-        // Аренда, Закупка, Свой вариант — временно скрыты
+        _wrap(_Tile(icon: Icons.payments, title: loc.t('expenses'), onTap: () => context.go('/expenses')), 'home-expenses'),
       ],
     );
   }

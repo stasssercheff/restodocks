@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../config/home_tour_config.dart';
 import 'home/owner_home_content.dart';
 import 'home/staff_home_content.dart';
 import 'home/management_home_content.dart';
@@ -65,8 +66,51 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!forceReplay && await tourService.isPageTourSeen(employeeId, PageTourKeys.home)) return;
     if (!mounted) return;
     final loc = context.read<LocalizationService>();
-    final controller = SpotlightController(
-      steps: [
+    final accountManager = context.read<AccountManagerSupabase>();
+    final emp = accountManager.currentEmployee;
+    final isOwnerView = emp != null && emp.hasRole('owner') &&
+        (emp.positionRole == null || context.read<OwnerViewPreferenceService>().viewAsOwner);
+
+    final List<SpotlightStep> steps;
+    if (isOwnerView) {
+      final ownerSteps = HomeTourConfig.ownerSteps(loc);
+      steps = [
+        for (var i = 0; i < ownerSteps.length; i++)
+          SpotlightStep(
+            id: ownerSteps[i].id,
+            text: ownerSteps[i].text(loc),
+            shape: SpotlightShape.rectangle,
+            padding: const EdgeInsets.all(4),
+            tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+              text: ownerSteps[i].text(loc),
+              onNext: onNext,
+              onPrevious: onPrev,
+              onSkip: onSkip,
+              isFirstStep: i == 0,
+              isLastStep: false,
+              nextLabel: PageTourService.getTourNext(loc),
+              skipLabel: PageTourService.getTourSkip(loc),
+            ),
+          ),
+        SpotlightStep(
+          id: 'home-bottom-nav',
+          text: PageTourService.getHomeTourNav(loc),
+          shape: SpotlightShape.rectangle,
+          padding: const EdgeInsets.all(4),
+          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            text: PageTourService.getHomeTourNav(loc),
+            onNext: onNext,
+            onPrevious: onPrev,
+            onSkip: onSkip,
+            isFirstStep: false,
+            isLastStep: true,
+            nextLabel: PageTourService.getTourDone(loc),
+            skipLabel: PageTourService.getTourSkip(loc),
+          ),
+        ),
+      ];
+    } else {
+      steps = [
         SpotlightStep(
           id: 'home-content',
           text: PageTourService.getHomeTourBody(loc),
@@ -99,7 +143,11 @@ class _HomeScreenState extends State<HomeScreen> {
             skipLabel: PageTourService.getTourSkip(loc),
           ),
         ),
-      ],
+      ];
+    }
+
+    final controller = SpotlightController(
+      steps: steps,
       onTourCompleted: () async {
         if (!forceReplay) await tourService.markPageTourSeen(employeeId, PageTourKeys.home);
         tourService.clearHomeTourController();

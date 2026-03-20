@@ -94,7 +94,7 @@ class PageTourService extends ChangeNotifier {
   static String getHomeTourBody(LocalizationService loc) =>
       loc.t('tour_home_body') ?? 'Здесь быстрый доступ ко всем разделам: меню, ТТК, чеклисты, заказы и др.';
   static String getHomeTourNav(LocalizationService loc) =>
-      loc.t('tour_home_nav') ?? 'Нижняя панель — переключение между рабочим столом, входящими и личным кабинетом.';
+      loc.t('tour_home_nav') ?? 'Нижняя панель — рабочий стол, средняя кнопка и личный кабинет. В личном кабинете находятся настройки приложения.';
   static String getPersonalCabinetTourTitle(LocalizationService loc) =>
       loc.t('tour_cabinet_title') ?? 'Личный кабинет';
   static String getPersonalCabinetTourProfile(LocalizationService loc) =>
