@@ -51,6 +51,9 @@ class SpotlightStep {
   /// is hidden (tooltip should include its own skip).
   final bool skipButtonOnTooltip;
 
+  /// When true, no dark overlay — only glow on the target button.
+  final bool useGlowOnly;
+
   /// Creates a [SpotlightStep].
   ///
   /// Either [text] or [tooltipBuilder] must be provided.
@@ -63,6 +66,7 @@ class SpotlightStep {
     this.padding = EdgeInsets.zero,
     this.fixedTooltipPosition = false,
     this.skipButtonOnTooltip = false,
+    this.useGlowOnly = false,
   }) : assert(text != null || tooltipBuilder != null,
             'Either text or tooltipBuilder must be provided.');
 }
@@ -188,9 +192,12 @@ class FeatureSpotlight extends StatefulWidget {
 class FeatureSpotlightState extends State<FeatureSpotlight> {
   SpotlightController? _activeController;
   OverlayEntry? _overlayEntry;
+  int _targetNotFoundRetries = 0;
+  static const int _maxTargetRetries = 25;
 
   /// Starts a tour using the provided [controller].
   void startTour(SpotlightController controller) {
+    _targetNotFoundRetries = 0;
     setState(() {
       _activeController = controller;
       _activeController?.addListener(_updateOverlay);
@@ -215,11 +222,29 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
         builder: (context) {
           final key = _activeController!.getKeyForCurrentStep();
           if (key == null || key.currentContext == null) {
-            // Wait for the target to be laid out.
-            WidgetsBinding.instance
-                .addPostFrameCallback((_) => _updateOverlay());
+            if (_targetNotFoundRetries >= _maxTargetRetries) {
+              // Target still not found — show tooltip only (fixed position)
+              final currentStep = _activeController!.currentStep!;
+              return _SpotlightOverlay(
+                targetRect: Rect.zero,
+                shape: currentStep.shape,
+                text: currentStep.text,
+                tooltipBuilder: currentStep.tooltipBuilder,
+                fixedTooltipPosition: true,
+                skipButtonOnTooltip: currentStep.skipButtonOnTooltip,
+                useGlowOnly: currentStep.useGlowOnly,
+                onNext: () => _activeController?.next(),
+                onPrevious: () => _activeController?.previous(),
+                onSkip: _stopTour,
+              );
+            }
+            _targetNotFoundRetries++;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _updateOverlay();
+            });
             return const SizedBox.shrink();
           }
+          _targetNotFoundRetries = 0;
 
           final renderBox = key.currentContext!.findRenderObject() as RenderBox;
           final targetSize = renderBox.size;
@@ -240,6 +265,7 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
             tooltipBuilder: currentStep.tooltipBuilder,
             fixedTooltipPosition: currentStep.fixedTooltipPosition,
             skipButtonOnTooltip: currentStep.skipButtonOnTooltip,
+            useGlowOnly: currentStep.useGlowOnly,
             onNext: () => _activeController?.next(),
             onPrevious: () => _activeController?.previous(),
             onSkip: _stopTour,
@@ -289,12 +315,56 @@ class _SpotlightTargetState extends State<SpotlightTarget> {
   void initState() {
     super.initState();
     widget.controller._registerTarget(widget.id, _key);
+    widget.controller.addListener(_onControllerChanged);
   }
 
   @override
+  void didUpdateWidget(SpotlightTarget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onControllerChanged);
+      widget.controller.addListener(_onControllerChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
+    super.dispose();
+  }
+
+  void _onControllerChanged() => setState(() {});
+
+  @override
   Widget build(BuildContext context) {
+    final isActive = widget.controller.isTourActive &&
+        widget.controller.currentStep?.id == widget.id;
+    final useGlow = isActive &&
+        (widget.controller.currentStep?.useGlowOnly ?? false);
+
     return Container(
       key: _key,
+      decoration: useGlow
+          ? BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.35),
+                  blurRadius: 16,
+                  spreadRadius: 2,
+                ),
+                BoxShadow(
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+                  blurRadius: 24,
+                  spreadRadius: 0,
+                ),
+              ],
+              border: Border.all(
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.7),
+                width: 2.5,
+              ),
+            )
+          : null,
       child: widget.child,
     );
   }
@@ -308,6 +378,7 @@ class _SpotlightOverlay extends StatelessWidget {
   final SpotlightTooltipBuilder? tooltipBuilder;
   final bool fixedTooltipPosition;
   final bool skipButtonOnTooltip;
+  final bool useGlowOnly;
   final VoidCallback onNext;
   final VoidCallback onPrevious;
   final VoidCallback onSkip;
@@ -319,6 +390,7 @@ class _SpotlightOverlay extends StatelessWidget {
     this.tooltipBuilder,
     this.fixedTooltipPosition = false,
     this.skipButtonOnTooltip = false,
+    this.useGlowOnly = false,
     required this.onNext,
     required this.onPrevious,
     required this.onSkip,
@@ -362,30 +434,33 @@ class _SpotlightOverlay extends StatelessWidget {
       color: Colors.transparent,
       child: Stack(
         children: [
-          // Background scrim
+          // Background: при useGlowOnly — полностью прозрачный барьер (тап = Далее), иначе тёмный с вырезом
           GestureDetector(
             onTap: onNext,
-            child: ColorFiltered(
-              colorFilter: const ColorFilter.mode(
-                Color.fromARGB(153, 0, 0, 0),
-                BlendMode.srcOut,
-              ),
-              child: Stack(
-                children: [
-                  Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      backgroundBlendMode: BlendMode.dstOut,
+            behavior: HitTestBehavior.opaque,
+            child: useGlowOnly
+                ? const SizedBox.expand()
+                : ColorFiltered(
+                    colorFilter: const ColorFilter.mode(
+                      Color.fromARGB(153, 0, 0, 0),
+                      BlendMode.srcOut,
+                    ),
+                    child: Stack(
+                      children: [
+                        Container(
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            backgroundBlendMode: BlendMode.dstOut,
+                          ),
+                        ),
+                        Positioned(
+                          top: targetRect.top,
+                          left: targetRect.left,
+                          child: _buildHighlight(targetRect.size),
+                        ),
+                      ],
                     ),
                   ),
-                  Positioned(
-                    top: targetRect.top,
-                    left: targetRect.left,
-                    child: _buildHighlight(targetRect.size),
-                  ),
-                ],
-              ),
-            ),
           ),
           tooltipContent,
           // Skip button (hidden when skipButtonOnTooltip is true)

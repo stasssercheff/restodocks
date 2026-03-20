@@ -83,6 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.all(4),
             fixedTooltipPosition: true,
             skipButtonOnTooltip: true,
+            useGlowOnly: true,
             tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
               text: ownerSteps[i].text(loc),
               onNext: onNext,
@@ -100,8 +101,9 @@ class _HomeScreenState extends State<HomeScreen> {
           shape: SpotlightShape.rectangle,
           padding: const EdgeInsets.all(4),
           fixedTooltipPosition: true,
-          skipButtonOnTooltip: true,
-          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            skipButtonOnTooltip: true,
+            useGlowOnly: true,
+            tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
             text: PageTourService.getTourNavHome(loc),
             onNext: onNext,
             onPrevious: onPrev,
@@ -118,8 +120,9 @@ class _HomeScreenState extends State<HomeScreen> {
           shape: SpotlightShape.rectangle,
           padding: const EdgeInsets.all(4),
           fixedTooltipPosition: true,
-          skipButtonOnTooltip: true,
-          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            skipButtonOnTooltip: true,
+            useGlowOnly: true,
+            tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
             text: PageTourService.getTourNavMiddle(loc),
             onNext: onNext,
             onPrevious: onPrev,
@@ -136,8 +139,9 @@ class _HomeScreenState extends State<HomeScreen> {
           shape: SpotlightShape.rectangle,
           padding: const EdgeInsets.all(4),
           fixedTooltipPosition: true,
-          skipButtonOnTooltip: true,
-          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            skipButtonOnTooltip: true,
+            useGlowOnly: true,
+            tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
             text: PageTourService.getTourNavCabinet(loc),
             onNext: onNext,
             onPrevious: onPrev,
@@ -157,8 +161,9 @@ class _HomeScreenState extends State<HomeScreen> {
           shape: SpotlightShape.rectangle,
           padding: const EdgeInsets.all(4),
           fixedTooltipPosition: true,
-          skipButtonOnTooltip: true,
-          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            skipButtonOnTooltip: true,
+            useGlowOnly: true,
+            tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
             text: PageTourService.getHomeTourBody(loc),
             onNext: onNext,
             onPrevious: onPrev,
@@ -175,8 +180,9 @@ class _HomeScreenState extends State<HomeScreen> {
           shape: SpotlightShape.rectangle,
           padding: const EdgeInsets.all(4),
           fixedTooltipPosition: true,
-          skipButtonOnTooltip: true,
-          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            skipButtonOnTooltip: true,
+            useGlowOnly: true,
+            tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
             text: PageTourService.getTourNavHome(loc),
             onNext: onNext,
             onPrevious: onPrev,
@@ -193,8 +199,9 @@ class _HomeScreenState extends State<HomeScreen> {
           shape: SpotlightShape.rectangle,
           padding: const EdgeInsets.all(4),
           fixedTooltipPosition: true,
-          skipButtonOnTooltip: true,
-          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            skipButtonOnTooltip: true,
+            useGlowOnly: true,
+            tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
             text: PageTourService.getTourNavMiddle(loc),
             onNext: onNext,
             onPrevious: onPrev,
@@ -211,8 +218,9 @@ class _HomeScreenState extends State<HomeScreen> {
           shape: SpotlightShape.rectangle,
           padding: const EdgeInsets.all(4),
           fixedTooltipPosition: true,
-          skipButtonOnTooltip: true,
-          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            skipButtonOnTooltip: true,
+            useGlowOnly: true,
+            tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
             text: PageTourService.getTourNavCabinet(loc),
             onNext: onNext,
             onPrevious: onPrev,
@@ -446,8 +454,9 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
           shape: SpotlightShape.rectangle,
           padding: const EdgeInsets.all(4),
           fixedTooltipPosition: true,
-          skipButtonOnTooltip: true,
-          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            skipButtonOnTooltip: true,
+            useGlowOnly: true,
+            tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
             text: PageTourService.getPersonalCabinetTourProfile(loc),
             onNext: onNext,
             onPrevious: onPrev,
@@ -464,8 +473,9 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
           shape: SpotlightShape.rectangle,
           padding: const EdgeInsets.all(4),
           fixedTooltipPosition: true,
-          skipButtonOnTooltip: true,
-          tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
+            skipButtonOnTooltip: true,
+            useGlowOnly: true,
+            tooltipBuilder: (onNext, onPrev, onSkip) => buildTourTooltip(
             text: PageTourService.getPersonalCabinetTourSettings(loc),
             onNext: onNext,
             onPrevious: onPrev,

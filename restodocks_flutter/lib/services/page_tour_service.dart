@@ -8,7 +8,9 @@ import 'supabase_service.dart';
 abstract final class PageTourKeys {
   static const home = 'home';
   static const personalCabinet = 'personal_cabinet';
-  // Расширяемо: inbox, schedule, techCards, checklists, ...
+  static const techCards = 'tech_cards';
+  static const writeoffs = 'writeoffs';
+  static const inventory = 'inventory';
 }
 
 /// Сервис для хранения и проверки «тур страницы показан» в Supabase.
@@ -110,4 +112,10 @@ class PageTourService extends ChangeNotifier {
   static String getTourNext(LocalizationService loc) => loc.t('tour_next') ?? 'Далее';
   static String getTourSkip(LocalizationService loc) => loc.t('tour_skip') ?? 'Пропустить';
   static String getTourDone(LocalizationService loc) => loc.t('tour_done') ?? 'Понятно';
+  static String getTourTechCards(LocalizationService loc) =>
+      loc.t('tour_tech_cards') ?? 'ТТК: создание из номенклатуры, цех, категория, тип (ПФ/блюдо). Поиск и фильтры.';
+  static String getTourWriteoffs(LocalizationService loc) =>
+      loc.t('tour_writeoffs') ?? 'Списания: персонал, порча, бракераж, проработка, отказ гостя. Отправка во Входящие.';
+  static String getTourInventory(LocalizationService loc) =>
+      loc.t('tour_inventory') ?? 'Бланк инвентаризации: продукты и полуфабрикаты. Завершение отправляет во Входящие.';
 }

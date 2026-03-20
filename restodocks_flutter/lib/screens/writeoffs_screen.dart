@@ -7,8 +7,10 @@ import 'package:intl/intl.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../models/models.dart';
 import '../services/inventory_download.dart';
+import '../services/page_tour_service.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/page_tour_wrapper.dart';
 
 String _unitDisplay(String? unit, String lang) {
   const ruToId = {
@@ -610,9 +612,12 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
         leading: appBarBackButton(context),
         title: Text(loc.t('writeoffs') ?? 'Списания'),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
+      body: PageTourWrapper(
+        pageKey: PageTourKeys.writeoffs,
+        tourText: PageTourService.getTourWriteoffs(loc),
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(
@@ -683,6 +688,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
                   ),
               ],
             ),
+      ),
     );
   }
 }

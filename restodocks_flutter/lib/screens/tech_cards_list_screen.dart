@@ -13,7 +13,9 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
+import '../services/page_tour_service.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/page_tour_wrapper.dart';
 import '../widgets/scroll_to_top_app_bar_title.dart';
 import '../services/ai_service.dart';
 import '../services/ai_service_supabase.dart';
@@ -2410,9 +2412,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               tooltip: loc.t('refresh')),
         ],
       ),
-      body: Stack(
-        children: [
-          _buildBody(loc, canEdit, showCost),
+      body: PageTourWrapper(
+        pageKey: PageTourKeys.techCards,
+        tourText: PageTourService.getTourTechCards(loc),
+        child: Stack(
+          children: [
+            _buildBody(loc, canEdit, showCost),
           if (_loadingExcel)
             ColoredBox(
               color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
@@ -2438,6 +2443,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               ),
             ),
         ],
+        ),
       ),
       floatingActionButton: null,
     );
