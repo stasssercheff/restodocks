@@ -47,18 +47,16 @@ Widget buildTourTooltip({
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (!isFirstStep) ...[
-                        OutlinedButton(
-                          onPressed: onPrevious,
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            minimumSize: const Size(0, 32),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Icon(Icons.arrow_back_ios_new, size: 14),
+                      OutlinedButton(
+                        onPressed: isFirstStep ? null : onPrevious,
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          minimumSize: const Size(0, 32),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        const SizedBox(width: 8),
-                      ],
+                        child: const Icon(Icons.arrow_back_ios_new, size: 14),
+                      ),
+                      const SizedBox(width: 8),
                       FilledButton(
                         onPressed: onNext,
                         style: FilledButton.styleFrom(

@@ -231,6 +231,23 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
     });
   }
 
+  /// Отложенный вызов next/previous — устраняет зависание при нажатии «Назад».
+  void _deferredNext() {
+    Future.delayed(const Duration(milliseconds: 80), () {
+      if (mounted && (_activeController?.isTourActive ?? false)) {
+        _activeController?.next();
+      }
+    });
+  }
+
+  void _deferredPrevious() {
+    Future.delayed(const Duration(milliseconds: 80), () {
+      if (mounted && (_activeController?.isTourActive ?? false)) {
+        _activeController?.previous();
+      }
+    });
+  }
+
   /// Stops the currently active tour.
   void _stopTour() {
     _activeController?.removeListener(_onControllerUpdate);
@@ -262,8 +279,8 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
                 fixedTooltipPosition: true,
                 skipButtonOnTooltip: currentStep.skipButtonOnTooltip,
                 useGlowOnly: currentStep.useGlowOnly,
-                onNext: () => Future.microtask(() => _activeController?.next()),
-                onPrevious: () => Future.microtask(() => _activeController?.previous()),
+                onNext: _deferredNext,
+                onPrevious: _deferredPrevious,
                 onSkip: _stopTour,
               );
             }
@@ -295,8 +312,8 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
             fixedTooltipPosition: currentStep.fixedTooltipPosition,
             skipButtonOnTooltip: currentStep.skipButtonOnTooltip,
             useGlowOnly: currentStep.useGlowOnly,
-            onNext: () => Future.microtask(() => _activeController?.next()),
-            onPrevious: () => Future.microtask(() => _activeController?.previous()),
+            onNext: _deferredNext,
+            onPrevious: _deferredPrevious,
             onSkip: _stopTour,
           );
         },
