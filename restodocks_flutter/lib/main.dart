@@ -1,4 +1,3 @@
-import 'package:feature_spotlight/feature_spotlight.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
@@ -124,9 +123,7 @@ class RestodocksApp extends StatelessWidget {
                 );
               }
               return WebLocationCorrection(
-                child: AppPrimaryScrollController(
-                  child: FeatureSpotlight(child: content),
-                ),
+                child: AppPrimaryScrollController(child: content),
               );
             },
             debugShowCheckedModeBanner: false,

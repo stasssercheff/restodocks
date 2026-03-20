@@ -1,3 +1,4 @@
+import 'package:feature_spotlight/feature_spotlight.dart';
 import 'package:flutter/foundation.dart';
 import '../../utils/dev_log.dart';
 import 'package:flutter/material.dart';
@@ -299,8 +300,10 @@ class AppRouter {
 
       // Shell — все рабочие экраны с нижней навигационной панелью
       ShellRoute(
-        builder: (context, state, child) => AppShell(
-          child: InboxNotificationListener(child: child),
+        builder: (context, state, child) => FeatureSpotlight(
+          child: AppShell(
+            child: InboxNotificationListener(child: child),
+          ),
         ),
         routes: [
           // Главный экран
