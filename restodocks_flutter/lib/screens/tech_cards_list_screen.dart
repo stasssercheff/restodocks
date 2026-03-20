@@ -192,15 +192,25 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     );
     if (!mounted) return;
     setState(() => _ttkTourController = controller);
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (!mounted) return;
-      try {
-        FeatureSpotlight.of(context).startTour(controller);
-      } catch (e) {
-        debugPrint('[Tour] TTK startTour error: $e');
-        if (mounted) setState(() => _ttkTourController = null);
-      }
-    });
+    // Ждём 2 кадра + 400мс — чтобы таргет ttk-actions успел отрендериться и подсветиться.
+    void startWhenReady() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          Future.delayed(const Duration(milliseconds: 400), () {
+            if (!mounted) return;
+            try {
+              FeatureSpotlight.of(context).startTour(controller);
+            } catch (e) {
+              debugPrint('[Tour] TTK startTour error: $e');
+              if (mounted) setState(() => _ttkTourController = null);
+            }
+          });
+        });
+      });
+    }
+    startWhenReady();
   }
 
   @override

@@ -47,16 +47,18 @@ Widget buildTourTooltip({
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (!isFirstStep)
-                        TextButton(
+                      if (!isFirstStep) ...[
+                        OutlinedButton(
                           onPressed: onPrevious,
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 6),
-                            minimumSize: Size.zero,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            minimumSize: const Size(0, 32),
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                           child: const Icon(Icons.arrow_back_ios_new, size: 14),
                         ),
+                        const SizedBox(width: 8),
+                      ],
                       FilledButton(
                         onPressed: onNext,
                         style: FilledButton.styleFrom(

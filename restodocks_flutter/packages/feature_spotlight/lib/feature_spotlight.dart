@@ -240,7 +240,7 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
               );
             }
             _targetNotFoundRetries++;
-            Future.delayed(const Duration(milliseconds: 150), () {
+            Future.delayed(const Duration(milliseconds: 200), () {
               if (mounted) _updateOverlay();
             });
             return const SizedBox.shrink();
@@ -413,12 +413,15 @@ class _SpotlightOverlay extends StatelessWidget {
     final screenSize = MediaQuery.of(context).size;
 
     // Tooltip position: fixed at bottom center, or near target
+    // При fixedTooltipPosition — выше нижней навигации (56px) и safe area
     Widget tooltipContent;
     if (fixedTooltipPosition) {
+      final bottomNavHeight = 56.0;
+      final bottomOffset = 24.0 + bottomNavHeight + MediaQuery.of(context).padding.bottom;
       tooltipContent = Positioned(
         left: 20,
         right: 20,
-        bottom: 24,
+        bottom: bottomOffset,
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 320),
