@@ -92,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
               isFirstStep: i == 0,
               isLastStep: false,
               nextLabel: PageTourService.getTourNext(loc),
-              skipLabel: PageTourService.getTourSkip(loc),
+              skipLabel: PageTourService.getTourFinish(loc),
             ),
           ),
         SpotlightStep(
@@ -111,7 +111,7 @@ class _HomeScreenState extends State<HomeScreen> {
             isFirstStep: false,
             isLastStep: false,
             nextLabel: PageTourService.getTourNext(loc),
-            skipLabel: PageTourService.getTourSkip(loc),
+            skipLabel: PageTourService.getTourFinish(loc),
           ),
         ),
         SpotlightStep(
@@ -130,7 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
             isFirstStep: false,
             isLastStep: false,
             nextLabel: PageTourService.getTourNext(loc),
-            skipLabel: PageTourService.getTourSkip(loc),
+            skipLabel: PageTourService.getTourFinish(loc),
           ),
         ),
         SpotlightStep(
@@ -149,7 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
             isFirstStep: false,
             isLastStep: true,
             nextLabel: PageTourService.getTourDone(loc),
-            skipLabel: PageTourService.getTourSkip(loc),
+            skipLabel: PageTourService.getTourFinish(loc),
           ),
         ),
       ];
@@ -171,7 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
             isFirstStep: true,
             isLastStep: false,
             nextLabel: PageTourService.getTourNext(loc),
-            skipLabel: PageTourService.getTourSkip(loc),
+            skipLabel: PageTourService.getTourFinish(loc),
           ),
         ),
         SpotlightStep(
@@ -190,7 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
             isFirstStep: false,
             isLastStep: false,
             nextLabel: PageTourService.getTourNext(loc),
-            skipLabel: PageTourService.getTourSkip(loc),
+            skipLabel: PageTourService.getTourFinish(loc),
           ),
         ),
         SpotlightStep(
@@ -209,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
             isFirstStep: false,
             isLastStep: false,
             nextLabel: PageTourService.getTourNext(loc),
-            skipLabel: PageTourService.getTourSkip(loc),
+            skipLabel: PageTourService.getTourFinish(loc),
           ),
         ),
         SpotlightStep(
@@ -228,7 +228,7 @@ class _HomeScreenState extends State<HomeScreen> {
             isFirstStep: false,
             isLastStep: true,
             nextLabel: PageTourService.getTourDone(loc),
-            skipLabel: PageTourService.getTourSkip(loc),
+            skipLabel: PageTourService.getTourFinish(loc),
           ),
         ),
       ];
@@ -464,7 +464,7 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
             isFirstStep: true,
             isLastStep: false,
             nextLabel: PageTourService.getTourNext(loc),
-            skipLabel: PageTourService.getTourSkip(loc),
+            skipLabel: PageTourService.getTourFinish(loc),
           ),
         ),
         SpotlightStep(
@@ -483,7 +483,7 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
             isFirstStep: false,
             isLastStep: true,
             nextLabel: PageTourService.getTourDone(loc),
-            skipLabel: PageTourService.getTourSkip(loc),
+            skipLabel: PageTourService.getTourFinish(loc),
           ),
         ),
       ],

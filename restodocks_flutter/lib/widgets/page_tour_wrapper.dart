@@ -64,7 +64,7 @@ class _PageTourWrapperState extends State<PageTourWrapper> {
             isFirstStep: true,
             isLastStep: true,
             nextLabel: PageTourService.getTourDone(loc),
-            skipLabel: PageTourService.getTourSkip(loc),
+            skipLabel: PageTourService.getTourFinish(loc),
           ),
         ),
       ],

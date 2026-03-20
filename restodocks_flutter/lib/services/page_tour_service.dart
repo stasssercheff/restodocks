@@ -111,6 +111,7 @@ class PageTourService extends ChangeNotifier {
       loc.t('tour_cabinet_settings') ?? 'Настройки приложения.';
   static String getTourNext(LocalizationService loc) => loc.t('tour_next') ?? 'Далее';
   static String getTourSkip(LocalizationService loc) => loc.t('tour_skip') ?? 'Пропустить';
+  static String getTourFinish(LocalizationService loc) => loc.t('tour_finish') ?? 'Закончить тур';
   static String getTourDone(LocalizationService loc) => loc.t('tour_done') ?? 'Понятно';
   static String getTourTechCards(LocalizationService loc) =>
       loc.t('tour_tech_cards') ?? 'ТТК: создание из номенклатуры, цех, категория, тип (ПФ/блюдо). Поиск и фильтры.';
@@ -118,4 +119,14 @@ class PageTourService extends ChangeNotifier {
       loc.t('tour_writeoffs') ?? 'Списания: персонал, порча, бракераж, проработка, отказ гостя. Отправка во Входящие.';
   static String getTourInventory(LocalizationService loc) =>
       loc.t('tour_inventory') ?? 'Бланк инвентаризации: продукты и полуфабрикаты. Завершение отправляет во Входящие.';
+
+  /// Тексты тура ТТК (многошаговый).
+  static String getTourTtkActions(LocalizationService loc) =>
+      loc.t('tour_ttk_actions') ?? 'Счётчик карточек, создание, импорт из Excel, экспорт, обновление списка.';
+  static String getTourTtkTabPf(LocalizationService loc) =>
+      loc.t('tour_ttk_tab_pf') ?? 'Полуфабрикаты — заготовки и основы. Стоимость за кг.';
+  static String getTourTtkTabDishes(LocalizationService loc) =>
+      loc.t('tour_ttk_tab_dishes') ?? 'Блюда — готовые позиции меню. Себестоимость за порцию.';
+  static String getTourTtkTabReview(LocalizationService loc) =>
+      loc.t('tour_ttk_tab_review') ?? 'На проверку: ТТК с проблемами (нет цен у ингредиентов, неоднозначные ПФ). Удобно для доработки себестоимости.';
 }
