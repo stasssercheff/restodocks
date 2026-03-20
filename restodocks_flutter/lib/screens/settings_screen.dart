@@ -1256,26 +1256,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   context.go('/tech-cards/kitchen');
                 },
               ),
-              ListTile(
-                leading: const Icon(Icons.remove_circle_outline),
-                title: Text(loc.t('tour_replay_writeoffs') ?? 'Пройти тур списаний'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  tourService.requestTourReplay(PageTourKeys.writeoffs);
-                  context.go('/writeoffs');
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.inventory_2_outlined),
-                title: Text(loc.t('tour_replay_inventory') ?? 'Пройти тур инвентаризации'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  tourService.requestTourReplay(PageTourKeys.inventory);
-                  context.go('/inventory');
-                },
-              ),
               const Divider(),
               // Секция: Видео
               Padding(

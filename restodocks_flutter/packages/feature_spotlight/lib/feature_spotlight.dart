@@ -205,14 +205,23 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
     _targetNotFoundRetries = 0;
     setState(() {
       _activeController = controller;
-      _activeController?.addListener(_updateOverlay);
+      _activeController?.addListener(_onControllerUpdate);
       _activeController?.start();
+    });
+  }
+
+  void _onControllerUpdate() {
+    if (!mounted) return;
+    // Откладываем на следующий кадр — даём SpotlightTarget обновиться до поиска таргета.
+    // Устраняет зависание при «назад», особенно в туре ТТК.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _updateOverlay();
     });
   }
 
   /// Stops the currently active tour.
   void _stopTour() {
-    _activeController?.removeListener(_updateOverlay);
+    _activeController?.removeListener(_onControllerUpdate);
     _activeController?.stop();
     _overlayEntry?.remove();
     _overlayEntry = null;

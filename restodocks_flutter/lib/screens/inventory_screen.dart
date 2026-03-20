@@ -23,14 +23,12 @@ import '../models/iiko_product.dart';
 import '../services/ai_service.dart';
 import '../services/image_service.dart';
 import '../services/inventory_download.dart';
-import '../services/page_tour_service.dart';
 import '../services/services.dart';
 import '../services/iiko_product_store.dart';
 import '../services/draft_storage_service.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
 import '../widgets/app_bar_home_button.dart';
-import '../widgets/page_tour_wrapper.dart';
 
 /// Единица для ПФ в бланке: вес (г) или штуки/порции.
 const String _pfUnitGrams = 'g';
@@ -1369,10 +1367,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       // Кнопка "Завершить" в bottomNavigationBar — Flutter поднимает её над клавиатурой автоматически.
       // Браузерный URL-бар (Safari/Chrome) остаётся ниже неё и не перекрывает таблицу.
       bottomNavigationBar: _buildFooter(loc, collapseLayout),
-      body: PageTourWrapper(
-        pageKey: PageTourKeys.inventory,
-        tourText: PageTourService.getTourInventory(loc),
-        child: Stack(
+      body: Stack(
           children: [
             Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1395,7 +1390,6 @@ class _InventoryScreenState extends State<InventoryScreen>
           if (!collapseLayout && !mobileKeyboardOpen) DataSafetyIndicator(isVisible: true),
         ],
         ),
-      ),
     );
   }
 
