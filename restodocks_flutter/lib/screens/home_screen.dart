@@ -89,9 +89,15 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
     tourService.setHomeTourController(controller);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    // Даём время на пересборку SpotlightTarget и layout перед запуском
+    Future.delayed(const Duration(milliseconds: 500), () {
       if (!mounted) return;
-      FeatureSpotlight.of(context).startTour(controller);
+      try {
+        FeatureSpotlight.of(context).startTour(controller);
+      } catch (e) {
+        debugPrint('[Tour] startTour error: $e');
+        tourService.clearHomeTourController();
+      }
     });
   }
 
@@ -317,9 +323,14 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
     );
     if (!mounted) return;
     setState(() => _tourController = controller);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    Future.delayed(const Duration(milliseconds: 500), () {
       if (!mounted) return;
-      FeatureSpotlight.of(context).startTour(controller);
+      try {
+        FeatureSpotlight.of(context).startTour(controller);
+      } catch (e) {
+        debugPrint('[Tour] cabinet startTour error: $e');
+        if (mounted) setState(() => _tourController = null);
+      }
     });
   }
 
