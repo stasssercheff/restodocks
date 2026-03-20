@@ -1237,16 +1237,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.person_outline),
-                title: Text(loc.t('tour_replay_cabinet') ?? 'Пройти тур личного кабинета'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.of(ctx).pop();
-                  tourService.requestTourReplay(PageTourKeys.personalCabinet);
-                  context.go('/personal-cabinet');
-                },
-              ),
-              ListTile(
                 leading: const Icon(Icons.menu_book_outlined),
                 title: Text(loc.t('tour_replay_ttk') ?? 'Пройти тур ТТК'),
                 trailing: const Icon(Icons.chevron_right),

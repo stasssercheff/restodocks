@@ -210,11 +210,23 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
     });
   }
 
+  bool _updateScheduled = false;
+  bool _updatePending = false;
+
   void _onControllerUpdate() {
     if (!mounted) return;
-    // Откладываем на следующий кадр — даём SpotlightTarget обновиться до поиска таргета.
-    // Устраняет зависание при «назад», особенно в туре ТТК.
+    if (_updateScheduled) {
+      _updatePending = true;
+      return;
+    }
+    _updateScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateScheduled = false;
+      if (_updatePending) {
+        _updatePending = false;
+        _onControllerUpdate();
+        return;
+      }
       if (mounted) _updateOverlay();
     });
   }
@@ -250,8 +262,8 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
                 fixedTooltipPosition: true,
                 skipButtonOnTooltip: currentStep.skipButtonOnTooltip,
                 useGlowOnly: currentStep.useGlowOnly,
-                onNext: () => _activeController?.next(),
-                onPrevious: () => _activeController?.previous(),
+                onNext: () => Future.microtask(() => _activeController?.next()),
+                onPrevious: () => Future.microtask(() => _activeController?.previous()),
                 onSkip: _stopTour,
               );
             }
@@ -283,8 +295,8 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
             fixedTooltipPosition: currentStep.fixedTooltipPosition,
             skipButtonOnTooltip: currentStep.skipButtonOnTooltip,
             useGlowOnly: currentStep.useGlowOnly,
-            onNext: () => _activeController?.next(),
-            onPrevious: () => _activeController?.previous(),
+            onNext: () => Future.microtask(() => _activeController?.next()),
+            onPrevious: () => Future.microtask(() => _activeController?.previous()),
             onSkip: _stopTour,
           );
         },

@@ -10,7 +10,6 @@ import 'home/management_home_content.dart';
 import '../services/services.dart';
 import '../models/models.dart';
 import '../widgets/app_bar_home_button.dart';
-import '../widgets/getting_started_document.dart';
 import '../widgets/tour_tooltip.dart';
 
 /// Главный экран — контент домашней вкладки по роли.
@@ -262,10 +261,18 @@ class _HomeScreenState extends State<HomeScreen> {
     final loc = context.read<LocalizationService>();
     await showDialog<void>(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _FirstEntryDialog(
-        employeeId: employeeId,
-        loc: loc,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('training') ?? 'Обучение'),
+        content: Text(
+          loc.t('first_entry_training_hint') ??
+              'В настройках в разделе «Обучение» можно посмотреть видео и прочитать инструкцию.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('start_work') ?? 'Начать работу'),
+          ),
+        ],
       ),
     );
   }
@@ -308,112 +315,6 @@ class _HomeScreenState extends State<HomeScreen> {
       return ManagementHomeContent(employee: employee);
     }
     return StaffHomeContent(employee: employee);
-  }
-}
-
-/// Диалог первого входа: документ «Начало работы» с раскрытием разделов и галочка о прочтении.
-class _FirstEntryDialog extends StatefulWidget {
-  const _FirstEntryDialog({required this.employeeId, required this.loc});
-
-  final String employeeId;
-  final LocalizationService loc;
-
-  @override
-  State<_FirstEntryDialog> createState() => _FirstEntryDialogState();
-}
-
-class _FirstEntryDialogState extends State<_FirstEntryDialog> {
-  bool _confirmed = false;
-  String? _selectedLanguageCode;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final screenHeight = MediaQuery.of(context).size.height;
-    final loc = context.watch<LocalizationService>();
-    final selectedLang = _selectedLanguageCode ?? loc.currentLanguageCode;
-    return Dialog(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 500, maxHeight: screenHeight * 0.9),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Text(
-                loc.t('getting_started') ?? 'Начало работы с Restodocks',
-                style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-            ),
-            const Divider(height: 1),
-            SizedBox(
-              height: 400,
-              child: GettingStartedDocument(showTitle: false, languageCodeOverride: selectedLang),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Выбор языка прямо в окне первого запуска.
-                  Row(
-                    children: [
-                      Text(loc.t('language') ?? 'Язык', style: theme.textTheme.labelLarge),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: selectedLang,
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          ),
-                          items: LocalizationService.supportedLocales
-                              .map((l) => DropdownMenuItem(
-                                    value: l.languageCode,
-                                    child: Text(loc.getLanguageName(l.languageCode)),
-                                  ))
-                              .toList(),
-                          onChanged: (code) async {
-                            if (code == null) return;
-                            setState(() => _selectedLanguageCode = code);
-                            await loc.setLocale(Locale(code));
-                            if (context.mounted) {
-                              await context.read<AccountManagerSupabase>().savePreferredLanguage(code);
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  CheckboxListTile(
-                    value: _confirmed,
-                    onChanged: (v) => setState(() => _confirmed = v ?? false),
-                    title: Text(
-                      loc.t('getting_started_confirmed') ?? 'Я прочитал(а) инструкцию',
-                      style: theme.textTheme.bodyMedium,
-                    ),
-                    controlAffinity: ListTileControlAffinity.leading,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                  const SizedBox(height: 8),
-                  FilledButton(
-                    onPressed: _confirmed
-                        ? () async {
-                            await GettingStartedReadService.setRead(widget.employeeId);
-                            if (context.mounted) Navigator.of(context).pop();
-                          }
-                        : null,
-                    child: Text(loc.t('start_work') ?? 'Начать работу'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
