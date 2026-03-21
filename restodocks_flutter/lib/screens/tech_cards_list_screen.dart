@@ -1957,10 +1957,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   static const _maxFilesSingleTtk = 10;
   static const _maxFilesMultiTtk = 10;
 
+  static const _allowedTtkExtensions = ['xlsx', 'xls', 'csv', 'pdf', 'docx', 'doc'];
+
   Future<void> _createFromExcel(
       BuildContext context, LocalizationService loc) async {
     _TtkImportMode dialogMode = _TtkImportMode.single;
-    final mode = await showDialog<_TtkImportMode>(
+    // Возвращаем (mode, files) — FilePicker вызывается внутри onPressed, без Navigator.pop перед ним,
+    // чтобы сохранить «user gesture» и сработать на мобильных (Safari/Chrome требуют прямой вызов из tap).
+    final result = await showDialog<({_TtkImportMode mode, List<PlatformFile> files})>(
       context: context,
       builder: (ctx) {
         final l = ctx.read<LocalizationService>();
@@ -2018,7 +2022,39 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   child: Text(l.t('cancel') ?? 'Отмена'),
                 ),
                 FilledButton(
-                  onPressed: () => Navigator.of(ctx).pop(dialogMode),
+                  onPressed: () async {
+                    // Вызов pickFiles напрямую из tap — без pop до него — сохраняет user gesture (мобильные).
+                    // На мобильных FileType.any избегает бага с allowedExtensions (каталоги не открываются).
+                    final pickResult = kIsWeb
+                        ? await FilePicker.platform.pickFiles(
+                            type: FileType.custom,
+                            allowedExtensions: _allowedTtkExtensions,
+                            withData: true,
+                            allowMultiple: true,
+                          )
+                        : await FilePicker.platform.pickFiles(
+                            type: FileType.any,
+                            withData: true,
+                            allowMultiple: true,
+                          );
+                    if (!ctx.mounted) return;
+                    if (pickResult == null || pickResult.files.isEmpty) return;
+                    final valid = pickResult.files.where((f) {
+                      final parts = f.name.split('.');
+                      final ext = (f.extension ?? (parts.length > 1 ? parts.last : '')).toLowerCase();
+                      return _allowedTtkExtensions.contains(ext) &&
+                          (f.bytes != null && f.bytes!.isNotEmpty);
+                    }).toList();
+                    if (valid.isEmpty) {
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(content: Text(l.t('file_read_failed') ?? 'Не удалось прочитать файл')),
+                        );
+                      }
+                      return;
+                    }
+                    Navigator.of(ctx).pop((mode: dialogMode, files: valid));
+                  },
                   child:
                       Text(l.t('ttk_import_select_files') ?? 'Выбрать файлы'),
                 ),
@@ -2028,23 +2064,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         );
       },
     );
-    if (!mounted || mode == null) return;
+    if (!mounted || result == null) return;
 
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['xlsx', 'xls', 'csv', 'pdf', 'docx', 'doc'],
-      withData: true,
-      allowMultiple: true,
-    );
-    if (!mounted) return;
-    if (result == null || result.files.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(loc.t('file_not_selected'))));
-      return;
-    }
-    final files = result.files
-        .where((f) => f.bytes != null && f.bytes!.isNotEmpty)
-        .toList();
+    final mode = result.mode;
+    final files = result.files;
     if (files.isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(loc.t('file_read_failed'))));
@@ -2594,10 +2617,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             tooltip: loc.t('ttk_import_file'),
             onSelected: (value) async {
               if (value == 'excel') await _createFromExcel(context, loc);
+              if (value == 'text') await _createFromText(context, loc);
             },
             itemBuilder: (_) => [
               PopupMenuItem(
                   value: 'excel', child: Text(loc.t('ttk_import_file'))),
+              PopupMenuItem(
+                  value: 'text',
+                  child: Text(loc.t('ttk_import_paste_text') ?? 'Вставить текст')),
             ],
           )
         : null;
