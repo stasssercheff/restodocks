@@ -247,18 +247,38 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
       _navScheduled = false;
       final a = _pendingNav;
       _pendingNav = null;
-      if (a == null || !mounted || !(_activeController?.isTourActive ?? false)) return;
-      if (a == 'next') {
-        _activeController?.next();
-      } else {
-        _activeController?.previous();
-      }
+      if (a == null || !mounted) return;
+      final c = _activeController;
+      if (c == null || !c.isTourActive) return;
+      _applyTourNav((ctrl) {
+        if (a == 'next') {
+          ctrl.next();
+        } else {
+          ctrl.previous();
+        }
+      });
+    });
+  }
+
+  /// Смена шага: listener не дублирует overlay; overlay — после кадра, где перестроились SpotlightTarget.
+  void _applyTourNav(void Function(SpotlightController c) nav) {
+    final c = _activeController;
+    if (c == null || !mounted) return;
+    c.removeListener(_onControllerUpdate);
+    try {
+      nav(c);
+    } finally {
+      c.addListener(_onControllerUpdate);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _updateOverlay();
     });
   }
 
   /// Stops the currently active tour.
   void _stopTour() {
     _pendingNav = null;
+    _navScheduled = false;
     _activeController?.removeListener(_onControllerUpdate);
     _activeController?.stop();
     _overlayEntry?.remove();
