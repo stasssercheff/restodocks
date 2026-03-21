@@ -268,19 +268,23 @@ Deno.serve(async (req: Request) => {
       );
       if (!m || !m[1]) {
         m = text.match(
-          /Технология\s+приготовления[\s\S]*?(?:\n|\r\n?)([\s\S]*?)(?=\n\s*Директор|\n\s*Шеф-повар|\n\s*Дата\s+печати|$)/i,
+          /Технология\s+приготовления[\s\S]*?(?:\n|\r\n?)([\s\S]*?)(?=\n\s*Директор|\n\s*Шеф-повар|\s+Директор\b|\s+Шеф-повар\b|Дата\s+печати|$)/i,
         );
       }
       if (!m || !m[1]) return "";
       let t = m[1].trim().replace(/\r\n/g, "\n");
       const lines = t.split(/\n/).map((l) => l.trim()).filter(Boolean);
       const skipHeader = /^условия\s+и\s+сроки|^изготовления|^оформления\s+и\s+подачи/i;
-      while (lines.length > 0 && (skipHeader.test(lines[0]) || lines[0].length < 20)) lines.shift();
-      t = lines.join(" ").replace(/\s+/g, " ");
+      const footerLine = /^директор$|^шеф-повар$|^калькулятор$|^дата\s+печати|^-1-$|^-\d+-$/i;
+      const filtered = lines.filter((l) => !skipHeader.test(l) && !footerLine.test(l) && l.length > 2);
+      while (filtered.length > 0 && (filtered[0].length < 20 || /^(директор|шеф|калькулятор|дата)/i.test(filtered[0]))) filtered.shift();
+      t = filtered.join(" ").replace(/\s+/g, " ");
       if (t.length < 30 || /^(кдж|ккал|белки|жиры|углеводы)/i.test(t)) return "";
       return t;
     })();
-    if (templateCards.length > 0) {
+    // Шаблон дал карточки с ингредиентами — возвращаем. Если все карточки без ингредиентов — пробуем AI.
+    const templateHasIngredients = templateCards.some((c) => (c.ingredients?.length ?? 0) > 0);
+    if (templateCards.length > 0 && templateHasIngredients) {
       // Обогащение технологии из обучения: даже когда шаблон сработал, подставляем выученную колонку (чтобы правки пользователя давали эффект)
       let learnedTechText = "";
       try {

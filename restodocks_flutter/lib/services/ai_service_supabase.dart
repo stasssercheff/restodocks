@@ -3094,7 +3094,9 @@ class AiServiceSupabase implements AiService {
         final row = rows[r];
         if (techCol >= row.length) continue;
         final cell = (row[techCol] is String ? row[techCol] as String : row[techCol].toString()).trim();
-        if (cell.length > 15 && !RegExp(r'^допустимые сроки\s|^информация о пищевой', caseSensitive: false).hasMatch(cell)) {
+        if (cell.length > 15 &&
+            !RegExp(r'^допустимые сроки\s|^информация о пищевой', caseSensitive: false).hasMatch(cell) &&
+            !RegExp(r'^директор$|^шеф-повар$|^калькулятор$|^дата\s+печати|^-1-$', caseSensitive: false).hasMatch(cell)) {
           parts.add(cell);
         }
       }
