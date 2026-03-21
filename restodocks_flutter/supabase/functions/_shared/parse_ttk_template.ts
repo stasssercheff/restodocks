@@ -18,8 +18,8 @@
  * 6. Числа: gross/net > 100000 г = мусор (КБЖУ, склейки).
  */
 
-/** Строка с маркером новой секции — конец таблицы ингредиентов (Shama, ГОСТ и др.) */
-const SECTION_BOUNDARY_REGEX = /технологическая\s+карта\s+№|выход\s+на\s+1\s+порцию|масса\s+полуфабриката|информация\s+о\s+пищевой|технологический\s+процесс|допустимые\s+сроки/i;
+/** Строка с маркером новой секции — конец таблицы ингредиентов (Shama, ГОСТ, Хмели-сумели и др.) */
+const SECTION_BOUNDARY_REGEX = /технологическая\s+карта\s+№|выход\s+на\s+1\s+порцию|масса\s+полуфабриката|информация\s+о\s+пищевой|технологический\s+процесс|технология\s+приготовления|допустимые\s+сроки/i;
 
 /** Заголовки колонок и названия секций — не продукты. Точное совпадение или начало фразы. */
 const STRUCTURAL_WORDS = new Set([
@@ -81,7 +81,7 @@ export function getTechnologyFromRowsUsingColumn(rows: string[][], technologyCol
 const NAME_KEYS = ["наименование", "название", "блюдо", "пф", "name", "dish"];
 const PRODUCT_KEYS = ["продукт", "сырьё", "сырья", "ингредиент", "product", "ingredient"];
 // iiko DOCX: "Вес брутто, кг" приоритетнее "Брутто в ед. изм."
-const GROSS_KEYS = ["вес брутто", "масса брутто", "брутто", "бр", "вес гр", "вес гр/шт", "расход сырья", "расход", "норма", "норма закладки", "масса", "gross"];
+const GROSS_KEYS = ["вес брутто", "масса брутто", "брутто", "бр", "вес гр", "вес гр/шт", "расход сырья", "расход", "норма", "норма закладки", "масса", "gross", "количество", "кол-во", "закладка"];
 const NET_KEYS = ["вес нетто", "масса нетто", "нетто", "нт", "net"];
 const WASTE_KEYS = ["отход", "отх", "waste", "процент отхода", "% отхода", "отх.", "отх %", "отход%"];
 // Сборник/ГОСТ: "Выход готовой продукции"
@@ -254,6 +254,15 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
     netCol = 3;
     if (outputCol < 0) outputCol = 4;
   }
+  // Хмели-сумели: заголовок разбит по пробелам (15+ ячеек), данные — по trailing-number (6 ячеек). Для строк с 4-7 ячейками и productCol вне границ — фиксируем маппинг.
+  const headerLen = headerRow.length;
+  const useCompactMapping = (cells: string[]) =>
+    cells.length >= 4 &&
+    cells.length <= 7 &&
+    headerLen >= cells.length + 4 &&
+    (grossCol >= cells.length || netCol >= cells.length) &&
+    /^[\d,.\-\s]+$/.test((cells[2] ?? "").trim()) &&
+    /^[\d,.\-\s]+$/.test((cells[3] ?? "").trim());
 
   // Единицы измерения и КБЖУ — не названия блюд (PDF даёт "г", "кДж)" и т.п.)
   const UNIT_PATTERNS = /^(г|кг|мл|л|шт|кдж\)?|ккал\)?)$/i;
@@ -363,11 +372,18 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
           nCol = 3;
         }
       }
+      if (useCompactMapping(cells)) {
+        pCol = 1;
+        gCol = 2;
+        nCol = 3;
+      }
     }
     const nameVal = nameCol < cells.length ? cells[nameCol] : "";
     let productVal = pCol < cells.length ? cells[pCol] : "";
     let weightStartCol = -1;
-    if (productVal && cells.length > pCol + 4) {
+    if (useCompactMapping(cells)) {
+      weightStartCol = 2;
+    } else if (productVal && cells.length > pCol + 4) {
       const parts: string[] = [productVal];
       for (let c = pCol + 1; c < cells.length - 2; c++) {
         const a = parseNum(cells[c] ?? "");
@@ -476,8 +492,32 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       if (grossColIsKg && gross != null && gross > 0 && gross < 100) gross = gross * 1000;
       if (netColIsKg && net != null && net > 0 && net < 100) net = net * 1000;
       if (outputColIsKg && outputG != null && outputG > 0 && outputG < 100) outputG = outputG * 1000;
+      const unitCell = unitCol >= 0 && unitCol < cells.length ? (cells[unitCol] ?? "").trim().toLowerCase() : "";
+      // Единица в колонке или в названии продукта (Хмели-сумели: "яйцо куриное шт", "тесто пф кг")
+      const unitFromProduct = (p: string) => {
+        const low = (p ?? "").trim().toLowerCase();
+        if (/\sшт\s*$/.test(low) || /\sшт\b/.test(low)) return "pcs";
+        if (/\sкг\s*$/.test(low) || /\sкг\b/.test(low)) return "kg";
+        if (/\sг\s*$/.test(low) || /\sг\b/.test(low) || /\sграмм/.test(low)) return "g";
+        if (/\sл\s*$/.test(low) || (/\sл\b/.test(low) && !low.includes("мл"))) return "l";
+        if (/\sмл\b/.test(low)) return "ml";
+        return "";
+      };
+      const productUnit = unitFromProduct(productVal);
+      const effectiveUnitCell = unitCell || (productUnit === "kg" ? "кг" : productUnit === "pcs" ? "шт" : productUnit === "l" ? "л" : productUnit === "ml" ? "мл" : "");
+      const rowUnitIsKgOrL = effectiveUnitCell.includes("кг") || effectiveUnitCell === "kg" || (effectiveUnitCell.includes("л") && !effectiveUnitCell.includes("мл"));
+      const rowUnitIsPcs = effectiveUnitCell.includes("шт") || effectiveUnitCell === "pcs";
+      const grossRawLooksLikeKg = /^\s*0[,.]\d{1,3}\s*$/.test(grossVal.trim());
+      const netRawLooksLikeKg = /^\s*0[,.]\d{1,3}\s*$/.test(netVal.trim());
+      // шт — не конвертируем (1,000 = 1 шт, не 1000 г). кг/л — в граммы
+      if (!rowUnitIsPcs) {
+        if (!grossColIsKg && rowUnitIsKgOrL && gross != null && gross > 0 && gross < 100) gross = gross * 1000;
+        else if (!grossColIsKg && grossRawLooksLikeKg && gross != null && gross > 0 && gross < 100) gross = gross * 1000;
+        if (!netColIsKg && rowUnitIsKgOrL && net != null && net > 0 && net < 100) net = net * 1000;
+        else if (!netColIsKg && netRawLooksLikeKg && net != null && net > 0 && net < 100) net = net * 1000;
+        if (!outputColIsKg && rowUnitIsKgOrL && outputG != null && outputG > 0 && outputG < 100) outputG = outputG * 1000;
+      }
       // Shama.Book: в таблице часто есть блок "на 1 порцию" и "на 10 порций".
-      // Иногда колонка "Выход" попадает из блока "на 10 порций" (в 10 раз больше). Нормализуем к "на 1 порцию".
       const baseOut = net ?? gross;
       if (outputG != null && baseOut != null && baseOut > 0 && outputG > 0) {
         const ratio = outputG / baseOut;
@@ -487,10 +527,9 @@ export function parseTtkByTemplate(rows: string[][]): TtkCard[] {
       if (gross != null && gross > 0 && net != null && net > 0 && net < gross && (waste == null || waste === 0)) {
         waste = (1 - net / gross) * 100;
       }
-      const unitCell = unitCol >= 0 && unitCol < cells.length ? (cells[unitCol] ?? "").trim().toLowerCase() : "";
       let unit = "g";
-      if (unitCell.includes("л") || unitCell === "l") unit = "ml";
-      else if (unitCell.includes("шт") || unitCell === "pcs") unit = "pcs";
+      if (effectiveUnitCell.includes("л") || effectiveUnitCell === "l") unit = "ml";
+      else if (effectiveUnitCell.includes("шт") || effectiveUnitCell === "pcs") unit = "pcs";
       const cleanName = productVal.replace(/^Т\.\s*/i, "").replace(/^П\/Ф\s*/i, "").trim() || productVal;
       const isPf = /^П\/Ф\s/i.test(productVal);
       if ((gross == null || gross <= 0) && (net == null || net <= 0)) continue;
@@ -734,18 +773,31 @@ export function parseTtkByStoredTemplate(
     // Sanity Check: вместо веса — текст
     let grossNum = parseNum(grossVal);
     let netNum = parseNum(netVal);
-    const unitCell = (productCol === 1 && cells.length > 2) ? (cells[2] ?? "").trim().toLowerCase() : "";
-    // кг/л → г/мл; шт не конвертируем. "0,150" (европ. формат) = кг
-    const rowUnitIsKgOrL = unitCell.includes("кг") || unitCell === "kg" || unitCell.includes("л") || unitCell === "l";
-    const grossRawLooksLikeKg = /^\s*0[,.]\d{1,3}\s*$/.test(grossVal.trim());
-    const netRawLooksLikeKg = /^\s*0[,.]\d{1,3}\s*$/.test(netVal.trim());
+    const unitCellStored = (productCol === 1 && cells.length > 2) ? (cells[2] ?? "").trim().toLowerCase() : "";
+    const unitFromProductStored = (p: string) => {
+      const low = (p ?? "").trim().toLowerCase();
+      if (/\sшт\s*$/.test(low) || /\sшт\b/.test(low)) return "pcs";
+      if (/\sкг\s*$/.test(low) || /\sкг\b/.test(low)) return "kg";
+      if (/\sг\s*$/.test(low) || /\sг\b/.test(low)) return "g";
+      if (/\sл\b/.test(low) && !low.includes("мл")) return "l";
+      if (/\sмл\b/.test(low)) return "ml";
+      return "";
+    };
+    const productUnitStored = unitFromProductStored(productVal);
+    const effectiveUnitStored = unitCellStored || (productUnitStored === "kg" ? "кг" : productUnitStored === "pcs" ? "шт" : productUnitStored === "l" ? "л" : productUnitStored === "ml" ? "мл" : "");
+    const rowUnitIsKgOrLStored = effectiveUnitStored.includes("кг") || effectiveUnitStored === "kg" || (effectiveUnitStored.includes("л") && !effectiveUnitStored.includes("мл"));
+    const rowUnitIsPcsStored = effectiveUnitStored.includes("шт") || effectiveUnitStored === "pcs";
+    const grossRawLooksLikeKgStored = /^\s*0[,.]\d{1,3}\s*$/.test(grossVal.trim());
+    const netRawLooksLikeKgStored = /^\s*0[,.]\d{1,3}\s*$/.test(netVal.trim());
     const shouldConvertKg = (v: number | null) => v != null && v > 0 && v < 100;
-    if (grossColIsKg && shouldConvertKg(grossNum)) grossNum = grossNum! * 1000;
-    else if (rowUnitIsKgOrL && shouldConvertKg(grossNum)) grossNum = grossNum! * 1000;
-    else if (grossRawLooksLikeKg && shouldConvertKg(grossNum)) grossNum = grossNum! * 1000;
-    if (netColIsKg && shouldConvertKg(netNum)) netNum = netNum! * 1000;
-    else if (rowUnitIsKgOrL && shouldConvertKg(netNum)) netNum = netNum! * 1000;
-    else if (netRawLooksLikeKg && shouldConvertKg(netNum)) netNum = netNum! * 1000;
+    if (!rowUnitIsPcsStored) {
+      if (grossColIsKg && shouldConvertKg(grossNum)) grossNum = grossNum! * 1000;
+      else if (rowUnitIsKgOrLStored && shouldConvertKg(grossNum)) grossNum = grossNum! * 1000;
+      else if (grossRawLooksLikeKgStored && shouldConvertKg(grossNum)) grossNum = grossNum! * 1000;
+      if (netColIsKg && shouldConvertKg(netNum)) netNum = netNum! * 1000;
+      else if (rowUnitIsKgOrLStored && shouldConvertKg(netNum)) netNum = netNum! * 1000;
+      else if (netRawLooksLikeKgStored && shouldConvertKg(netNum)) netNum = netNum! * 1000;
+    }
     if (productVal && (grossVal.trim() || netVal.trim())) {
       const grossIsText = grossVal.trim().length > 0 && grossNum == null;
       const netIsText = netVal.trim().length > 0 && netNum == null;
@@ -800,20 +852,23 @@ export function parseTtkByStoredTemplate(
       if (both100 && looksLikeDishName) continue;
       let outputG = parseNum(outputVal);
       const outputColIsKg = outputCol >= 0 && outputCol < headerRow.length && headerRow[outputCol]?.includes("кг");
-      if (outputColIsKg && outputG != null && outputG > 0 && outputG < 100) outputG = outputG * 1000;
+      if (!rowUnitIsPcsStored && outputColIsKg && outputG != null && outputG > 0 && outputG < 100) outputG = outputG * 1000;
       // Shama.Book: блок "на 10 порций" может попасть в outputCol. Если выход подозрительно в ~10 раз больше нормы — приводим к "на 1 порцию".
       const baseOut = netNum ?? grossNum;
       if (outputG != null && baseOut != null && baseOut > 0 && outputG > 0) {
         const ratio = outputG / baseOut;
         if (ratio >= 5 && ratio <= 25) outputG = baseOut;
       }
+      let unitStored = "g";
+      if (effectiveUnitStored.includes("л") || effectiveUnitStored === "l") unitStored = "ml";
+      else if (effectiveUnitStored.includes("шт") || effectiveUnitStored === "pcs") unitStored = "pcs";
       currentIngredients.push({
         productName: productVal,
         grossGrams: grossNum,
         netGrams: netNum,
         primaryWastePct: waste,
         outputGrams: outputG,
-        unit: "g",
+        unit: unitStored,
       });
     }
   }
@@ -861,6 +916,7 @@ export function pdfMergeContinuationLines(text: string): string {
 /**
  * Конвертирует текст из PDF в rows (массив строк с ячейками).
  * Пробует: табуляция, 2+ пробела, разбор по числам в конце строки.
+ * Снижен порог до 1 строки — короткие ТТК (Хачапури и др.) иначе не разбираются.
  */
 export function pdfTextToRows(text: string): string[][] {
   const lines = text
@@ -871,8 +927,8 @@ export function pdfTextToRows(text: string): string[][] {
 
   const tabCount = lines.filter((l) => l.split(/\t/).length >= 3).length;
   const spaceCount = lines.filter((l) => l.split(/\s{2,}/).length >= 3).length;
-  const useTab = tabCount >= Math.min(2, lines.length);
-  const useSpaces = !useTab && spaceCount >= Math.min(2, lines.length);
+  const useTab = tabCount >= 1;
+  const useSpaces = !useTab && spaceCount >= 1;
 
   const rows: string[][] = [];
   for (const line of lines) {

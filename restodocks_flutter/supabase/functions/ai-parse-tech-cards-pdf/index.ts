@@ -233,8 +233,10 @@ Deno.serve(async (req: Request) => {
     // ГОСТ / типовые ТТК: блюдо в канонических блоках — приоритет над парсером по таблице
     const dishMatch = text.match(/Проведено\s+контрольное\s+приготовление\s+блюда\s*:?\s*\n?\s*([^\n]+?)(?:\n|$)/i)
       ?? text.match(/Наименование\s+блюда[^:]*:\s*([^\n]+)/i)
+      ?? text.match(/Наименование[^:]*:\s*([^\n]{4,80})/i)
+      ?? text.match(/ТК\s+на\s+([^\n,_№]+?)(?:\s*[,№_]|$)/i)
       ?? null;
-    const techCardMatches = [...text.matchAll(/Технологическая\s+карта\s+№\s*\d+[^\n]*\n\s*([^\n]{5,80})/gi)];
+    const techCardMatches = [...text.matchAll(/Технологическая\s+карта\s+№\s*\d*[^\n]*\n\s*([^\n]{5,80})/gi)];
     const sourceMatches = [...text.matchAll(/Источник\s+рецептуры[^\n]*\n[^\n]*\n\s*([^\n]{5,80})/gi)];
     const extractedDishes: string[] = dishMatch ? [dishMatch[1].trim()] : techCardMatches.map((m) => m[1].trim());
     if (extractedDishes.length === 0 && sourceMatches.length > 0) extractedDishes.push(...sourceMatches.map((m) => m[1].trim()));
@@ -253,12 +255,22 @@ Deno.serve(async (req: Request) => {
     };
     templateCards = templateCards.filter((c) => !(c.ingredients.length === 0 && c.dishName && isFragmentDish(c.dishName)));
     const yieldMatch = text.match(/Выход\s+на\s+1\s+порцию\s*:\s*(\d+)\s*г/i);
-    const extractedYield = yieldMatch ? parseInt(yieldMatch[1], 10) : undefined;
-    /** Shama.Book: технология между «Технологический процесс» и «Допустимые сроки» — fallback если парсер не захватил */
+    const yieldMatchKg = text.match(/Выход\s+в\s+готовом\s+виде\s*:\s*([\d,.\s]+)\s*кг/i);
+    let extractedYield = yieldMatch ? parseInt(yieldMatch[1], 10) : undefined;
+    if (extractedYield == null && yieldMatchKg) {
+      const kgVal = parseFloat(yieldMatchKg[1].replace(/,/g, ".").replace(/\s/g, "").trim());
+      if (!Number.isNaN(kgVal) && kgVal > 0) extractedYield = Math.round(kgVal * 1000);
+    }
+    /** Shama.Book / Хмели-сумели: технология после «Технологический процесс» или «Технология приготовления» — fallback если парсер не захватил */
     const extractedTechFromText = (() => {
-      const m = text.match(
+      let m = text.match(
         /Технологический\s+процесс[\s\S]*?(?:\n|\r\n?)([\s\S]*?)(?=\n\s*Допустимые\s+сроки|\n\s*Информация\s+о\s+пищевой|$)/i,
       );
+      if (!m || !m[1]) {
+        m = text.match(
+          /Технология\s+приготовления[\s\S]*?(?:\n|\r\n?)([\s\S]*?)(?=\n\s*Директор|\n\s*Шеф-повар|\n\s*Дата\s+печати|$)/i,
+        );
+      }
       if (!m || !m[1]) return "";
       let t = m[1].trim().replace(/\r\n/g, "\n");
       const lines = t.split(/\n/).map((l) => l.trim()).filter(Boolean);
@@ -339,9 +351,10 @@ Deno.serve(async (req: Request) => {
       const { checkAndIncrementAiTtkUsage } = await import("../_shared/ai_ttk_limit.ts");
       const { allowed } = await checkAndIncrementAiTtkUsage(establishmentId);
       if (!allowed) {
-        return new Response(
-          JSON.stringify({ cards: [], reason: "ai_limit_exceeded", error: "limit_3_per_day" }),
-          { status: 200, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } },
+        const payload: Record<string, unknown> = { cards: [], reason: "ai_limit_exceeded", error: "limit_3_per_day" };
+        if (rows.length >= 2) payload.rows = rows;
+        return new Response(JSON.stringify(payload), {
+          status: 200, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } },
         );
       }
     }
@@ -415,12 +428,17 @@ Deno.serve(async (req: Request) => {
     const cards = parsed && Array.isArray(parsed.cards) ? parsed.cards : [];
     const reasonIfEmpty = cards.length === 0 ? "ai_no_cards" : undefined;
 
-    // Возвращаем rows для обучения шаблонов на клиенте (когда AI успешно распарсил)
-    const rowsForLearning = rows.length >= 2 && cards.length > 0 ? rows : undefined;
+    // Возвращаем rows всегда — чтобы клиент мог сохранить шаблон и выйти на «Проверку импорта» с placeholder для обучения
+    const rowsForLearning = rows.length >= 2 ? rows : undefined;
 
     // Выход на 1 порцию из текста (для AI-пути; для шаблона уже учтён выше)
     const yieldMatchAi = text.match(/Выход\s+на\s+1\s+порцию\s*:\s*(\d+)\s*г/i);
-    const extractedYieldAi = yieldMatchAi ? parseInt(yieldMatchAi[1], 10) : undefined;
+    const yieldMatchKgAi = text.match(/Выход\s+в\s+готовом\s+виде\s*:\s*([\d,.\s]+)\s*кг/i);
+    let extractedYieldAi = yieldMatchAi ? parseInt(yieldMatchAi[1], 10) : undefined;
+    if (extractedYieldAi == null && yieldMatchKgAi) {
+      const kgVal = parseFloat(yieldMatchKgAi[1].replace(/,/g, ".").replace(/\s/g, "").trim());
+      if (!Number.isNaN(kgVal) && kgVal > 0) extractedYieldAi = Math.round(kgVal * 1000);
+    }
 
     const normalized = cards.map((card) => {
       const c = card as Record<string, unknown>;

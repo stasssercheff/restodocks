@@ -689,57 +689,60 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         }
         if (mounted) setState(() => _saveProgress = productNamesToCreate.length + created);
       }
-      // Обучение постоянно: при любом сохранении (все карточки или одна) — обратный маппинг по скорректированным данным,
-      // сохраняем колонки в tt_parse_learned_dish_name; следующий импорт того же формата использует этот маппинг.
+      // Обучение: обратный маппинг по скорректированным данным. Таймаут 10 с — при плохой сети не блокируем.
       final sig = widget.headerSignature ?? AiServiceSupabase.lastParseHeaderSignature;
       final sourceRows = widget.sourceRows ?? AiServiceSupabase.lastParsedRows;
       debugPrint('[tt_parse] save: sig=${sig?.isEmpty ?? true ? "null/empty" : "ok"} sourceRows=${sourceRows?.length ?? 0}');
       if (sig != null && sig.isNotEmpty) {
-        if (sourceRows != null && sourceRows.isNotEmpty) {
-          final cardsForLearning = sorted
-              .where((item) {
-                final corr = (item.result.dishName ?? '').trim();
-                final hasIng = item.result.ingredients.any((i) => (i.productName ?? '').trim().isNotEmpty && (i.grossGrams ?? 0) > 0);
-                final hasTech = (item.result.technologyText ?? '').trim().length >= 20;
-                return corr.isNotEmpty || hasIng || hasTech;
-              })
-              .map((item) => (
-                    dishName: (item.result.dishName ?? '').trim(),
-                    originalDishName: item.originalDishName?.trim(),
-                    ingredients: item.result.ingredients
-                        .where((i) => (i.productName ?? '').trim().isNotEmpty && (i.grossGrams ?? 0) > 0)
-                        .map((i) => (
-                              productName: (i.productName ?? '').trim(),
-                              grossWeight: i.grossGrams ?? 0,
-                              netWeight: i.netGrams ?? i.grossGrams ?? 0,
-                            ))
-                        .toList(),
-                    technologyText: item.result.technologyText?.trim(),
-                  ))
-              .where((c) => c.dishName.isNotEmpty || c.ingredients.isNotEmpty || (c.technologyText != null && c.technologyText!.length >= 20))
-              .toList();
-          if (cardsForLearning.isNotEmpty) {
-            await AiServiceSupabase.learnColumnMappingFromCorrections(
-              Supabase.instance.client,
-              sourceRows,
-              sig,
-              cardsForLearning,
-            );
+        try {
+          if (sourceRows != null && sourceRows.isNotEmpty) {
+            final cardsForLearning = sorted
+                .where((item) {
+                  final corr = (item.result.dishName ?? '').trim();
+                  final hasIng = item.result.ingredients.any((i) => (i.productName ?? '').trim().isNotEmpty && (i.grossGrams ?? 0) > 0);
+                  final hasTech = (item.result.technologyText ?? '').trim().length >= 20;
+                  return corr.isNotEmpty || hasIng || hasTech;
+                })
+                .map((item) => (
+                      dishName: (item.result.dishName ?? '').trim(),
+                      originalDishName: item.originalDishName?.trim(),
+                      ingredients: item.result.ingredients
+                          .where((i) => (i.productName ?? '').trim().isNotEmpty && (i.grossGrams ?? 0) > 0)
+                          .map((i) => (
+                                productName: (i.productName ?? '').trim(),
+                                grossWeight: i.grossGrams ?? 0,
+                                netWeight: i.netGrams ?? i.grossGrams ?? 0,
+                              ))
+                          .toList(),
+                      technologyText: item.result.technologyText?.trim(),
+                    ))
+                .where((c) => c.dishName.isNotEmpty || c.ingredients.isNotEmpty || (c.technologyText != null && c.technologyText!.length >= 20))
+                .toList();
+            if (cardsForLearning.isNotEmpty) {
+              await AiServiceSupabase.learnColumnMappingFromCorrections(
+                Supabase.instance.client,
+                sourceRows,
+                sig,
+                cardsForLearning,
+              ).timeout(const Duration(seconds: 10), onTimeout: () {
+                AiServiceSupabase.lastLearningError = 'Таймаут (сеть)';
+              });
+            }
           }
-        }
-        for (final item in sorted) {
-          final orig = item.originalDishName?.trim() ?? '';
-          final corr = (item.result.dishName ?? '').trim();
-          if (orig.isNotEmpty && corr.isNotEmpty && orig != corr) {
-            await AiServiceSupabase.saveLearningCorrection(
-              headerSignature: sig,
-              field: 'dish_name',
-              originalValue: orig,
-              correctedValue: corr,
-              establishmentId: est.dataEstablishmentId,
-            );
+          for (final item in sorted) {
+            final orig = item.originalDishName?.trim() ?? '';
+            final corr = (item.result.dishName ?? '').trim();
+            if (orig.isNotEmpty && corr.isNotEmpty && orig != corr) {
+              await AiServiceSupabase.saveLearningCorrection(
+                headerSignature: sig,
+                field: 'dish_name',
+                originalValue: orig,
+                correctedValue: corr,
+                establishmentId: est.dataEstablishmentId,
+              ).timeout(const Duration(seconds: 6), onTimeout: () {});
+            }
           }
-        }
+        } catch (_) {}
       }
       devLog('[ttk_save] done: created=$created failed=${failed.length}');
       if (created > 0) {

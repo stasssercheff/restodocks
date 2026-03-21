@@ -2410,7 +2410,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 : null,
             originalDishName: orig,
             technologyText: _technologyController.text.trim(),
-          );
+          ).timeout(const Duration(seconds: 10), onTimeout: () {});
         }
         // Правка для подстановки (original → corrected) — если обучение не сработает
         if (sig != null &&
@@ -2424,7 +2424,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             originalValue: orig,
             correctedValue: name,
             establishmentId: est.dataEstablishmentId,
-          );
+          ).timeout(const Duration(seconds: 6), onTimeout: () {});
         }
         // Переводим название и технологию фоново. Используем updated (с фото и ингредиентами),
         // иначе перезапись через created удалит photoUrls и ingredients.

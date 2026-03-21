@@ -600,28 +600,34 @@ class AiServiceSupabase implements AiService {
           list.add(card);
         }
       }
-      // Обучение и метаданные для дообучения: rows приходят при template/stored/AI
-      if (list.isNotEmpty) {
-        lastParseTechCardPdfReason = null;
-        final rowsRaw = data['rows'];
-        String? sig;
-        if (rowsRaw is List && rowsRaw.isNotEmpty) {
-          final rows = rowsRaw.map((r) => (r is List ? r : <String>[]).map((c) => c?.toString() ?? '').toList()).toList();
-          if (rows.length >= 2) {
-            await _saveTemplateAfterAi(rows, list, 'pdf');
-            lastParsedRows = rows;
-            sig = _headerSignatureFromRows(rows);
-            if (sig != null && sig.isNotEmpty) lastParseHeaderSignature = sig;
+      // Обучение и метаданные: rows приходят всегда при rows.length >= 2 (даже при пустых cards)
+      final rowsRaw = data['rows'];
+      String? sig;
+      if (rowsRaw is List && rowsRaw.isNotEmpty) {
+        final rows = rowsRaw.map((r) => (r is List ? r : <String>[]).map((c) => c?.toString() ?? '').toList()).toList();
+        if (rows.length >= 2) {
+          lastParsedRows = rows;
+          sig = _headerSignatureFromRows(rows);
+          if (sig != null && sig.isNotEmpty) lastParseHeaderSignature = sig;
+          if (list.isNotEmpty) {
+            lastParseTechCardPdfReason = null;
+            await _saveTemplateAfterAi(rows, list, 'pdf')
+                .timeout(_learningTimeout, onTimeout: () {});
+          } else {
+            // Пустой parse — всё равно сохраняем шаблон по заголовку, чтобы каталог рос
+            await _saveTemplateFromKeywordParse(rows, 'pdf')
+                .timeout(_learningTimeout, onTimeout: () {});
           }
-        } else {
-          lastParsedRows = null;
-          lastParseHeaderSignature = null;
         }
-        final corrected = await _applyParseCorrections(list, sig ?? lastParseHeaderSignature, establishmentId);
+      }
+      if (list.isNotEmpty) {
+        final corrected = await _applyParseCorrections(list, sig ?? lastParseHeaderSignature ?? '', establishmentId);
         return _fillTechnologyFromStoredPf(corrected, establishmentId);
       }
-      lastParsedRows = null;
-      lastParseHeaderSignature = null;
+      if (rowsRaw is! List || rowsRaw.isEmpty) {
+        lastParsedRows = null;
+        lastParseHeaderSignature = null;
+      }
       if (list.isEmpty) lastParseTechCardErrors = null;
       return list;
     } catch (e) {
@@ -2782,15 +2788,26 @@ class AiServiceSupabase implements AiService {
     return null;
   }
 
-  /// Извлечь «Выход блюда (в граммах): 190» из rows (ГОСТ и др.) для подстановки в вес порции.
+  /// Извлечь «Выход блюда (в граммах): 190» или «Выход в готовом виде: 0,320кг» из rows.
   static double? _extractYieldFromRows(List<List<String>> rows) {
     final yieldNum = RegExp(r'(\d{2,4})\s*г');
     final anyNum = RegExp(r'\b(\d{2,4})\b');
+    final kgMatch = RegExp(r'выход\s+в\s+готовом\s+виде\s*:\s*([\d,.\s]+)\s*кг', caseSensitive: false);
+    final kgLabelMatch = RegExp(r'выход\s+в\s+готовом\s+виде', caseSensitive: false);
     for (var r = 0; r < rows.length && r < 80; r++) {
       final row = rows[r];
       for (var c = 0; c < row.length; c++) {
         final s = (row[c] is String ? row[c] as String : row[c].toString()).trim().toLowerCase();
         if (s.isEmpty) continue;
+        var kgM = kgMatch.firstMatch(s);
+        if (kgM == null && kgLabelMatch.hasMatch(s) && c + 1 < row.length) {
+          final next = (row[c + 1] is String ? row[c + 1] as String : row[c + 1].toString()).trim();
+          kgM = RegExp(r'([\d,.\s]+)\s*кг', caseSensitive: false).firstMatch(next);
+        }
+        if (kgM != null) {
+          final val = double.tryParse((kgM.group(1) ?? '').replaceAll(',', '.').replaceAll(' ', ''));
+          if (val != null && val > 0 && val <= 10) return val * 1000; // кг → г
+        }
         if (s.contains('выход') && (s.contains('грамм') || s.contains('г)'))) {
           final m = yieldNum.firstMatch(s);
           if (m != null) {
@@ -3060,7 +3077,7 @@ class AiServiceSupabase implements AiService {
       if (techCol == null || techCol < 0) return list;
       // Граница таблицы: первая строка с маркером (как в parse_ttk_template)
       final boundaryRegex = RegExp(
-        r'технологическая\s+карта\s+№|выход\s+на\s+1\s+порцию|масса\s+полуфабриката|информация\s+о\s+пищевой|технологический\s+процесс|допустимые\s+сроки',
+        r'технологическая\s+карта\s+№|выход\s+на\s+1\s+порцию|масса\s+полуфабриката|информация\s+о\s+пищевой|технологический\s+процесс|технология\s+приготовления|допустимые\s+сроки',
         caseSensitive: false,
       );
       int tableEndRow = rows.length;
@@ -3741,10 +3758,18 @@ class AiServiceSupabase implements AiService {
     return (cards: results, initialDish: currentDish);
   }
 
-  /// Сохранить обучение через Edge Function (service_role, обход RLS)
+  /// Таймаут для обучения — чтобы плохая сеть не блокировала основной поток.
+  static const _learningTimeout = Duration(seconds: 8);
+
+  /// Сохранить обучение через Edge Function (service_role, обход RLS).
+  /// С таймаутом — при плохой сети не блокируем парсинг/сохранение карточек.
   Future<void> _saveLearningViaEdgeFunction(Map<String, dynamic> payload) async {
     try {
-      final data = await invoke('tt-parse-save-learning', payload);
+      final data = await invoke('tt-parse-save-learning', payload)
+          .timeout(_learningTimeout, onTimeout: () {
+        lastLearningError = 'Таймаут (сеть)';
+        return null;
+      });
       if (data != null && data['ok'] == true) return;
       final err = data?['error']?.toString();
       final details = data?['details'];
@@ -3753,7 +3778,7 @@ class AiServiceSupabase implements AiService {
           : details?.toString()) ?? 'Unknown';
       debugPrint('[tt_parse] Edge Function save failed: $lastLearningError');
     } catch (e, st) {
-      lastLearningError = e.toString();
+      lastLearningError = e is TimeoutException ? 'Таймаут (сеть)' : e.toString();
       devLog('[tt_parse] Edge Function save error: $e\n$st');
       debugPrint('[tt_parse] Edge Function save error: $e');
     }
@@ -3803,13 +3828,22 @@ class AiServiceSupabase implements AiService {
         final hasWeights = grossCol >= 0 || netCol >= 0;
         if (hasNameOrProduct && (hasWeights || r >= 2)) break;
       }
-      if (headerIdx < 0 || (nameCol < 0 && productCol < 0)) return;
-      if (nameCol < 0) nameCol = 0;
-      // ГОСТ 2-row: наименование и продукт в одной колонке — иначе при парсинге пропускается первая колонка с весом.
-      if (productCol < 0) productCol = nameCol >= 0 ? nameCol : 1;
-      final sig = _headerSignature(rows[headerIdx].map((c) => c.trim()).toList());
-      if (sig.isEmpty) return;
-      lastParseHeaderSignature = sig;
+      String? sig;
+      if (headerIdx >= 0 && (nameCol >= 0 || productCol >= 0)) {
+        if (nameCol < 0) nameCol = 0;
+        if (productCol < 0) productCol = nameCol >= 0 ? nameCol : 1;
+        sig = _headerSignature(rows[headerIdx].map((c) => c.trim()).toList());
+      }
+      if (sig == null || sig.isEmpty) {
+        sig = _headerSignatureFromRows(rows);
+        if (sig == null || sig.isEmpty) return;
+        headerIdx = 0;
+        nameCol = 0;
+        productCol = 1;
+        grossCol = rows[0].length > 2 ? 2 : -1;
+        netCol = rows[0].length > 3 ? 3 : -1;
+      }
+      lastParseHeaderSignature = sig!;
       await _saveLearningViaEdgeFunction({
         'template': {
           'header_signature': sig,
