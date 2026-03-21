@@ -197,13 +197,9 @@ class FeatureSpotlight extends StatefulWidget {
 class FeatureSpotlightState extends State<FeatureSpotlight> {
   SpotlightController? _activeController;
   OverlayEntry? _overlayEntry;
-  int _targetNotFoundRetries = 0;
-  static const int _maxTargetRetries = 5;
-
   /// Starts a tour using the provided [controller].
   void startTour(SpotlightController controller) {
     _pendingNav = null;
-    _targetNotFoundRetries = 0;
     setState(() {
       _activeController = controller;
       _activeController?.addListener(_onControllerUpdate);
@@ -297,29 +293,22 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
         builder: (context) {
           final key = _activeController!.getKeyForCurrentStep();
           if (key == null || key.currentContext == null) {
-            if (_targetNotFoundRetries >= _maxTargetRetries) {
-              // Target still not found — show tooltip only (fixed position)
-              final currentStep = _activeController!.currentStep!;
-              return _SpotlightOverlay(
-                targetRect: Rect.zero,
-                shape: currentStep.shape,
-                text: currentStep.text,
-                tooltipBuilder: currentStep.tooltipBuilder,
-                fixedTooltipPosition: true,
-                skipButtonOnTooltip: currentStep.skipButtonOnTooltip,
-                useGlowOnly: currentStep.useGlowOnly,
-                onNext: _deferredNext,
-                onPrevious: _deferredPrevious,
-                onSkip: _stopTour,
-              );
-            }
-            _targetNotFoundRetries++;
-            Future.delayed(const Duration(milliseconds: 200), () {
-              if (mounted) _updateOverlay();
-            });
-            return const SizedBox.shrink();
+            // Таргет ещё не готов — сразу показываем tooltip, без retry с задержкой 200ms.
+            // Устраняет «большую задержку» первых 4–5 нажатий в туре ТТК.
+            final currentStep = _activeController!.currentStep!;
+            return _SpotlightOverlay(
+              targetRect: Rect.zero,
+              shape: currentStep.shape,
+              text: currentStep.text,
+              tooltipBuilder: currentStep.tooltipBuilder,
+              fixedTooltipPosition: true,
+              skipButtonOnTooltip: currentStep.skipButtonOnTooltip,
+              useGlowOnly: currentStep.useGlowOnly,
+              onNext: _deferredNext,
+              onPrevious: _deferredPrevious,
+              onSkip: _stopTour,
+            );
           }
-          _targetNotFoundRetries = 0;
 
           final renderBox = key.currentContext!.findRenderObject() as RenderBox;
           final targetSize = renderBox.size;
