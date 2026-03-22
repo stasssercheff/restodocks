@@ -41,5 +41,5 @@ export async function checkAndIncrementAiTtkUsage(
     console.error("[ai_ttk_limit] upsert error:", error);
     return { allowed: true, countToday: 0 };
   }
-  return { allowed: true, countToday };
+  return { allowed: true, countToday: currentCount + 1 };
 }
