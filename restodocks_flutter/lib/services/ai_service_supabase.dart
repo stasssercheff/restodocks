@@ -527,6 +527,16 @@ class AiServiceSupabase implements AiService {
     lastParsedRows = null;
     lastParseHeaderSignature = null;
     lastParseWasFirstTimeFormat = true;
+    // Свободный формат заметок: название, ингредиенты (продукт - вес ужарка - %), технология
+    final freeForm = AiServiceSupabase._tryParseFreeFormNotes(text);
+    if (freeForm.isNotEmpty) {
+      lastParsedRows = _freeFormToRowsForLearning(text);
+      lastParseHeaderSignature = lastParsedRows != null && lastParsedRows!.isNotEmpty
+          ? _headerSignatureFromRows(lastParsedRows!)
+          : null;
+      final corrected = await _applyParseCorrections(freeForm, lastParseHeaderSignature ?? '', establishmentId);
+      return _fillTechnologyFromStoredPf(corrected, establishmentId);
+    }
     final rows = _textToRows(text);
     if (rows.length < 2) return [];
     var expanded = _expandSingleCellRows(rows);
@@ -548,6 +558,12 @@ class AiServiceSupabase implements AiService {
       return _fillTechnologyFromStoredPf(corrected, establishmentId);
     }
     return list;
+  }
+
+  /// Строки для обучения при свободном формате (каждая строка — одна ячейка).
+  List<List<String>> _freeFormToRowsForLearning(String text) {
+    final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty);
+    return lines.map((line) => [line]).toList();
   }
 
   /// Текст → строки (split по \n, каждая строка по \t).
@@ -997,6 +1013,108 @@ class AiServiceSupabase implements AiService {
       if (r.length >= maxLen) return r;
       return [...r, ...List.filled(maxLen - r.length, '')];
     }).toList();
+  }
+
+  /// Свободный формат заметок: название, ингредиенты (продукт - вес [брутто/нетто] ужарка - %), технология.
+  /// Варианты: продукт - 180 / продукт 180 / продукт: 180 / ужарка - 30 / отход / брутто/нетто / технология:/рецепт:/способ приготовления:
+  static List<TechCardRecognitionResult> _tryParseFreeFormNotes(String text) {
+    final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    if (lines.length < 2) return [];
+    var dishIdx = 0;
+    var dishName = lines[0];
+    for (var i = 0; i < lines.length && i < 3; i++) {
+      final s = lines[i];
+      if (s.length < 2 || !RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(s)) continue;
+      if (RegExp(r'^\d+$|^№$|^выход$|^итого$|^состав$|^ингредиент', caseSensitive: false).hasMatch(s)) continue;
+      if (RegExp(r'наименование|брутто|нетто|продукт\s*$', caseSensitive: false).hasMatch(s.toLowerCase())) continue;
+      dishName = s;
+      dishIdx = i;
+      break;
+    }
+    if (dishName.length < 2) return [];
+    final techMarkers = ['технология', 'рецепт', 'приготовление', 'способ приготовления', 'способ', 'инструкция'];
+    final ingredients = <TechCardIngredientLine>[];
+    String? technologyText;
+    var inTechnology = false;
+    for (var i = dishIdx + 1; i < lines.length; i++) {
+      final line = lines[i];
+      final lower = line.toLowerCase();
+      final isTechStart = techMarkers.any((m) {
+        if (!lower.startsWith(m)) return false;
+        final rest = lower.length > m.length ? lower.substring(m.length, m.length + 1) : '';
+        return rest.isEmpty || rest == ' ' || rest == ':' || rest == '—' || rest == '-';
+      });
+      if (isTechStart) {
+        inTechnology = true;
+        final idx = techMarkers.indexWhere((m) => lower.startsWith(m));
+        var rest = idx >= 0 ? line.substring(techMarkers[idx].length).trim() : line;
+        if (rest.startsWith(':') || rest.startsWith('—') || rest.startsWith('-')) rest = rest.substring(1).trim();
+        if (rest.isNotEmpty) technologyText = rest;
+        continue;
+      }
+      if (inTechnology) {
+        technologyText = (technologyText != null ? '$technologyText\n' : '') + line;
+        continue;
+      }
+      if (!RegExp(r'\d').hasMatch(line)) continue;
+      final hasWeightMarker = RegExp(r'ужарка|усушка|брутто|нетто|боутто|отход|отх', caseSensitive: false).hasMatch(line);
+      final hasProductDashNum = RegExp(r'[а-яА-ЯёЁa-zA-Z][^—]*[\s:—\-]+\s*\d', caseSensitive: false).hasMatch(line);
+      final hasNumProduct = RegExp(r'\d+[\s,.]*[гкгмлшт]*\s+[а-яА-ЯёЁa-zA-Z]', caseSensitive: false).hasMatch(line);
+      if (!hasWeightMarker && !hasProductDashNum && !hasNumProduct) continue;
+      final nums = RegExp(r'\d+(?:[.,]\d+)?').allMatches(line).map((m) {
+        final s = m.group(0)!.replaceAll(',', '.');
+        return double.tryParse(s) ?? 0.0;
+      }).toList();
+      if (nums.isEmpty) continue;
+      double gross;
+      double net;
+      double cookingLoss;
+      if (nums.length >= 3) {
+        gross = nums[0];
+        net = nums[1];
+        cookingLoss = nums[2];
+      } else if (nums.length == 2 && (lower.contains('ужарка') || lower.contains('усушка'))) {
+        gross = net = nums[0];
+        cookingLoss = nums[1];
+      } else if (nums.length == 2) {
+        gross = net = nums[0];
+        cookingLoss = nums[1] <= 100 ? nums[1] : 0;
+      } else {
+        gross = net = nums[0];
+        cookingLoss = 0;
+      }
+      if (gross <= 0) continue;
+      String product;
+      final sepNumMatch = RegExp(r'[\s:—\-]\s*\d').firstMatch(line);
+      if (sepNumMatch != null && sepNumMatch.start > 1) {
+        product = line.substring(0, sepNumMatch.start).trim();
+      } else {
+        final numMatch = RegExp(r'\d+(?:[.,]\d+)?').firstMatch(line);
+        product = numMatch != null ? line.replaceFirst(numMatch.group(0)!, '').trim() : line;
+      }
+      product = product.replaceFirst(RegExp(r'[\s:—\-]+$'), '').trim();
+      if (product.length < 2) continue;
+      if (RegExp(r'^№$|^выход$|^итого$|^технология$|^состав$', caseSensitive: false).hasMatch(product.toLowerCase())) continue;
+      final wastePct = gross > 0 && gross != net ? (100 * (1 - net / gross)) : 0.0;
+      ingredients.add(TechCardIngredientLine(
+        productName: product.replaceFirst(RegExp(r'^П/Ф\s*|^п/ф\s*|^пф\s+', caseSensitive: false), '').trim(),
+        grossGrams: gross,
+        netGrams: net,
+        outputGrams: net > 0 ? (net * (1 - cookingLoss / 100)) : gross,
+        unit: 'g',
+        primaryWastePct: wastePct > 0 ? wastePct : null,
+        cookingLossPct: cookingLoss > 0 ? cookingLoss : null,
+        ingredientType: RegExp(r'пф|п/ф', caseSensitive: false).hasMatch(product) ? 'semi_finished' : 'product',
+      ));
+    }
+    if (ingredients.isEmpty) return [];
+    return [TechCardRecognitionResult(
+      dishName: dishName,
+      technologyText: technologyText?.trim().isNotEmpty == true ? technologyText!.trim() : null,
+      ingredients: ingredients,
+      isSemiFinished: dishName.toLowerCase().contains('пф'),
+      yieldGrams: ingredients.fold<double>(0, (s, i) => s + ((i.outputGrams ?? i.netGrams ?? i.grossGrams ?? 0))),
+    )];
   }
 
   /// КК (калькуляционная карта) из таблицы — когда есть колонки Цена, Сумма, Норма.
@@ -1494,6 +1612,13 @@ class AiServiceSupabase implements AiService {
         if (product.isEmpty) {
           if (hasTechCol && shiftedDr.length > techCol && shiftedDr[techCol].trim().length > 10) {
             technologyText = (technologyText != null ? '$technologyText\n' : '') + shiftedDr[techCol].trim();
+          } else {
+            // Технология в отдельной строке: одна ячейка с длинным текстом (формат: после ингредиента — рецепт)
+            final singleCell = shiftedDr.where((c) => c.trim().isNotEmpty).join(' ').trim();
+            if (singleCell.length > 50 && RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(singleCell) && _parseNum(singleCell) == null &&
+                RegExp(r'добавить|пробить|перемешать|довести|нашинкован|раздавить|переложить', caseSensitive: false).hasMatch(singleCell)) {
+              technologyText = (technologyText != null ? '$technologyText\n' : '') + singleCell;
+            }
           }
           dataR++; continue;
         }
@@ -1501,6 +1626,9 @@ class AiServiceSupabase implements AiService {
         if (norm == null && !RegExp(r'\d').hasMatch(normStr)) {
           if (hasTechCol && shiftedDr.length > techCol && shiftedDr[techCol].trim().length > 10) {
             technologyText = (technologyText != null ? '$technologyText\n' : '') + shiftedDr[techCol].trim();
+          } else if (product.length > 50 && RegExp(r'добавить|пробить|перемешать|довести|нашинкован|раздавить|переложить', caseSensitive: false).hasMatch(product)) {
+            // Строка с рецептом в колонке «продукт» (технология в отдельной строке)
+            technologyText = (technologyText != null ? '$technologyText\n' : '') + product;
           }
           dataR++; continue;
         }
@@ -2315,8 +2443,7 @@ class AiServiceSupabase implements AiService {
       }
       // Продолжение технологии: строка без ингредиента, но с длинным текстом (рецепт в отдельной строке)
       if (currentTechnologyText != null &&
-          productVal.isEmpty &&
-          nameVal.trim().isEmpty &&
+          (productVal.isEmpty || (productVal.length > 50 && RegExp(r'добавить|пробить|перемешать|довести|нашинкован|раздавить|переложить', caseSensitive: false).hasMatch(productVal))) &&
           (gCol < 0 || _parseNum(grossVal) == null) &&
           (nCol < 0 || _parseNum(netVal) == null)) {
         final textParts = cells.where((c) {

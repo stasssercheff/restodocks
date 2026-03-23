@@ -2359,16 +2359,33 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         );
         return;
       }
+      final sig = context.read<AiService>() is AiServiceSupabase
+          ? AiServiceSupabase.lastParseHeaderSignature
+          : null;
+      final sourceRows = context.read<AiService>() is AiServiceSupabase
+          ? AiServiceSupabase.lastParsedRows
+          : null;
+      final hasMeta = sig != null && sig.isNotEmpty;
       if (list.length == 1) {
         context.push(
             widget.department == 'bar'
                 ? '/tech-cards/new?department=bar'
                 : '/tech-cards/new',
-            extra: list.single);
+            extra: hasMeta || sourceRows != null
+                ? {
+                    'result': list.single,
+                    'headerSignature': sig,
+                    'sourceRows': sourceRows,
+                  }
+                : list.single);
       } else {
         context.push(
             '/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}',
-            extra: list);
+            extra: {
+              'cards': list,
+              'headerSignature': sig,
+              'sourceRows': sourceRows,
+            });
       }
     } finally {
       if (mounted) setState(() => _loadingExcel = false);
