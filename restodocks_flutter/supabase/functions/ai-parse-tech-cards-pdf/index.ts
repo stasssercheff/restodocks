@@ -24,7 +24,7 @@ function normForDishMatch(s: string): string {
   return (s ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-/** Убрать из списка ингредиентов те, у которых название совпадает с названием блюда карточки (Shama.Book и др.: название попадает в таблицу как строка) */
+/** Убрать из списка ингредиентов те, у которых название совпадает с названием блюда (Shama.Book: название в таблице как строка). */
 function dropIngredientsMatchingDishName<T extends { productName: string }>(
   ingredients: T[],
   dishName: string | null | undefined,
@@ -32,10 +32,14 @@ function dropIngredientsMatchingDishName<T extends { productName: string }>(
   if (!dishName || !dishName.trim()) return ingredients;
   const dishNorm = normForDishMatch(dishName);
   if (!dishNorm) return ingredients;
+  const ingredientPrefix = /^(сыр|тесто|мука|соус|масло|молоко|яйцо|вода|бульон|паста|крем|пюре|фарш|начинка)\s+/i;
   return ingredients.filter((i) => {
     const p = normForDishMatch(i.productName ?? "");
     if (p === dishNorm) return false;
-    if (p.length >= 10 && dishNorm.length >= 10 && (p.includes(dishNorm) || dishNorm.includes(p))) return false;
+    if (p.length >= 10 && dishNorm.length >= 10 && (p.includes(dishNorm) || dishNorm.includes(p))) {
+      if (ingredientPrefix.test(p)) return true;
+      return false;
+    }
     return true;
   });
 }
@@ -50,7 +54,8 @@ const PDF_SYSTEM_PROMPT = `Ты парсер технологических ка
 
 Структура бывает разной: название в заголовке или отдельной строке; таблица с колонками № / Наименование / Продукт / Сырьё / Брутто / Нетто / Выход / Расход / Норма / Цена / Сумма; числа в граммах или кг (запятая как десятичный разделитель). Для grossGrams/netGrams бери любые подходящие числа (брутто, нетто, норма в кг×1000). Если в таблице есть колонка «Выход» (г) — заполняй outputGrams для каждого ингредиента. Если в документе есть строка «Выход на 1 порцию: X г» или «Выход готовой продукции: X г» — заполняй yieldGrams в карточке (для блюда это вес порции).
 
-ВАЖНО: Если в таблице есть два блока колонок — «Расход на 1 порцию» и «Расход на 10 порций» (Брутто, Нетто, Выход в каждом) — для карточки используй ТОЛЬКО данные из блока «на 1 порцию»: grossGrams и netGrams из колонок Брутто/Нетто на 1 порцию, outputGrams из колонки Выход на 1 порцию. В итого (yieldGrams) должен быть суммарный выход на 1 порцию, а не на 10. ingredientType: "product" — сырьё (Т.); "semi_finished" — ПФ (П/Ф). isSemiFinished: true если в названии "ПФ".
+ВАЖНО: Если в таблице есть два блока колонок — «Расход на 1 порцию» и «Расход на 10 порций» — используй ТОЛЬКО «на 1 порцию». ingredientType: "product" — сырьё; "semi_finished" — ПФ. isSemiFinished: true если в названии "ПФ".
+Яйца: 1,000 шт = 1 piece → unit: "pcs", grossGrams: 1. «Сыр на X», «тесто для X» — ингредиенты, включать ВСЕГДА.
 
 Если есть КК (калькуляционная карта) с ценами — извлекай pricePerKg (цена за кг или за л, руб.) для каждого ингредиента. Это важно для расчёта себестоимости.
 
