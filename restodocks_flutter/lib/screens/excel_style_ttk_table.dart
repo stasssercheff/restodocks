@@ -428,9 +428,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                       ));
                     }, 'gross_$rowIndex'),
 
-                    // % отхода — редактируемо; при вводе пересчёт нетто и выхода
+                    // % отхода — редактируемо; при вводе пересчёт нетто и выхода. Пусто при 0 — не удалять перед вводом.
                     _buildNumericCell(
-                      ingredient.primaryWastePct.toStringAsFixed(0),
+                      ingredient.primaryWastePct == 0 ? '' : ingredient.primaryWastePct.toStringAsFixed(0),
                       (value) {
                         final wastePct = (double.tryParse(value?.replaceFirst(',', '.') ?? '') ?? 0).clamp(0.0, 99.9);
                         final gross = ingredient.grossWeight;
@@ -485,9 +485,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // Способ приготовления
                     _buildCookingMethodCell(ingredient, rowIndex),
 
-                    // % ужарки — всегда показываем, в т.ч. 0
+                    // % ужарки. Пусто при 0 — не удалять перед вводом.
                     _buildNumericCell(
-                      (ingredient.cookingLossPctOverride ?? 0).toStringAsFixed(0),
+                      (ingredient.cookingLossPctOverride ?? 0) == 0 ? '' : (ingredient.cookingLossPctOverride ?? 0).toStringAsFixed(0),
                       (value) {
                       final loss = double.tryParse(value.replaceFirst(',', '.')) ?? 0;
                       final clampedLoss = loss.clamp(0.0, 99.9);

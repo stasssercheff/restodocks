@@ -136,6 +136,41 @@ Deno.serve(async (req: Request) => {
         if (error) {
           console.error("[tt-parse-save-learning] learned_dish_name upsert error:", error);
           errors.push(`learned_dish_name: ${error.message}`);
+        } else {
+          // Критично для обучения: tryParseByStoredTemplates ищет шаблон по header_signature.
+          // Если шаблона нет (новый формат, парсинг был через AI) — следующий импорт снова шёл бы в AI.
+          // Создаём минимальный шаблон из выученных колонок, чтобы следующий импорт того же формата
+          // сразу парсился по шаблону с учётом правок пользователя.
+          const { data: existingTemplate } = await supabase
+            .from("tt_parse_templates")
+            .select("header_signature")
+            .eq("header_signature", sig)
+            .limit(1)
+            .maybeSingle();
+          if (!existingTemplate) {
+            const pCol = typeof l.product_col === "number" ? l.product_col : 1;
+            const gCol = typeof l.gross_col === "number" ? l.gross_col : -1;
+            const nCol = typeof l.net_col === "number" ? l.net_col : -1;
+            const tCol = typeof l.technology_col === "number" ? l.technology_col : -1;
+            const { error: tmplErr } = await supabase.from("tt_parse_templates").upsert({
+              header_signature: sig,
+              header_row_index: 0,
+              name_col: typeof l.dish_name_col === "number" ? l.dish_name_col : 0,
+              product_col: pCol >= 0 ? pCol : 1,
+              gross_col: gCol,
+              net_col: nCol,
+              waste_col: -1,
+              output_col: -1,
+              technology_col: tCol >= 0 ? tCol : -1,
+              source: "user_learning",
+            }, { onConflict: "header_signature" });
+            if (tmplErr) {
+              console.error("[tt-parse-save-learning] template ensure-from-learned error:", tmplErr);
+              errors.push(`template_ensure: ${tmplErr.message}`);
+            } else {
+              console.log("[tt-parse-save-learning] created template from learned_dish_name for", sig);
+            }
+          }
         }
       }
     }

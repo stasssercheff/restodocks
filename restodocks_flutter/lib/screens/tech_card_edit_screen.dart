@@ -860,6 +860,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   List<Uint8List> _pendingPhotoBytes = [];
   bool _saving = false;
 
+  Timer? _ingredientUpdateDebounce;
   Timer? _reconcileOpenCardTimer;
   TechCardsReconcileNotifier? _reconcileNotifier;
   int _lastReconcileNotifierVersion = 0;
@@ -1956,6 +1957,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (_reconcileNotifier != null) {
       _reconcileNotifier!.removeListener(_handleTechCardsReconcileSignal);
     }
+    _ingredientUpdateDebounce?.cancel();
     _cookTableSyncDebounce?.cancel();
     _reconcileDebounceTimer?.cancel();
     _nameController.dispose();
@@ -2373,7 +2375,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         }
         await svc.saveTechCard(updated,
             changedByEmployeeId: emp.id, changedByName: emp.fullName);
-        // Обучение: при изменении — ищем corrected в rows, сохраняем позиции (название + колонки)
+        // Обучение: только при карточке из импорта. Иначе сбрасываем, чтобы не показывать старый тост.
+        if (widget.initialFromAi == null || widget.initialHeaderSignature == null) {
+          AiServiceSupabase.lastLearningSuccess = null;
+        }
         final sig = widget.initialHeaderSignature;
         final orig = widget.initialFromAi?.dishName?.trim();
         final sourceRows = widget.initialSourceRows;
@@ -2480,7 +2485,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           setState(() => _saving = false);
           await clearDraft();
           final createdMsg = loc.t('tech_card_created');
-          if (AiServiceSupabase.lastLearningSuccess != null) {
+          final fromImport = widget.initialFromAi != null &&
+              widget.initialHeaderSignature != null;
+          if (fromImport && AiServiceSupabase.lastLearningSuccess != null) {
             AppToastService.show(
                 '$createdMsg ${AiServiceSupabase.lastLearningSuccess!}');
           } else {
@@ -4490,26 +4497,32 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                       },
                                       onAdd: _showAddIngredient,
                                       onUpdate: (i, ing) {
-                                        setState(() {
-                                          if (_ingredients.isEmpty && i == 0) {
-                                            _ingredients.add(ing);
-                                            if (ing.hasData) {
-                                              _ingredients[0] =
-                                                  ing.isPlaceholder
-                                                      ? ing.withRealId()
-                                                      : ing;
-                                            }
-                                            _ensurePlaceholderRowAtEnd();
-                                            return;
+                                        _lastUserInteractionAt = DateTime.now();
+                                        if (_ingredients.isEmpty && i == 0) {
+                                          _ingredients.add(ing);
+                                          if (ing.hasData) {
+                                            _ingredients[0] =
+                                                ing.isPlaceholder
+                                                    ? ing.withRealId()
+                                                    : ing;
                                           }
-                                          if (i >= _ingredients.length) return;
+                                          _ensurePlaceholderRowAtEnd();
+                                        } else if (i < _ingredients.length) {
                                           _ingredients[i] =
                                               ing.isPlaceholder && ing.hasData
                                                   ? ing.withRealId()
                                                   : ing;
                                           _ensurePlaceholderRowAtEnd();
-                                        });
-                                        _scheduleDraftSave();
+                                        }
+                                        _ingredientUpdateDebounce?.cancel();
+                                        _ingredientUpdateDebounce = Timer(
+                                          const Duration(milliseconds: 180),
+                                          () {
+                                            if (!mounted) return;
+                                            setState(() {});
+                                            _scheduleDraftSave();
+                                          },
+                                        );
                                       },
                                       onRemove: _removeIngredient,
                                       onSuggestWaste: _suggestWasteForRow,
