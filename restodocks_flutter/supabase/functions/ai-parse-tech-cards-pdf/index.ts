@@ -97,9 +97,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const body = (await req.json()) as { pdfBase64?: string; establishmentId?: string };
+    const body = (await req.json()) as { pdfBase64?: string; establishmentId?: string; nomenclatureProductNames?: string[] };
     const pdfBase64 = body.pdfBase64;
     const establishmentId = typeof body.establishmentId === "string" ? body.establishmentId.trim() : undefined;
+    const nomenclatureProductNames = Array.isArray(body.nomenclatureProductNames) ? body.nomenclatureProductNames.filter((n): n is string => typeof n === "string").slice(0, 500) : [];
     if (!pdfBase64 || typeof pdfBase64 !== "string") {
       return new Response(JSON.stringify({ error: "pdfBase64 required" }), {
         status: 400,
@@ -368,12 +369,15 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const nomenclatureHint = nomenclatureProductNames.length > 0
+      ? `\n\nНоменклатура заведения (подсказка при маппинге — предпочитать эти названия, если документ явно ссылается на тот же продукт; НЕ заменять произвольно): ${nomenclatureProductNames.slice(0, 200).join(", ")}`
+      : "";
     const textForAi = text.replace(/\s+/g, " ").trim();
     let content: string;
     try {
       content = await chatText({
         messages: [
-          { role: "system", content: shouldUseAiForKk ? KK_MULTI_SYSTEM_PROMPT : PDF_SYSTEM_PROMPT },
+          { role: "system", content: (shouldUseAiForKk ? KK_MULTI_SYSTEM_PROMPT : PDF_SYSTEM_PROMPT) + nomenclatureHint },
           { role: "user", content: `PDF extracted text:\n\n${textForAi}` },
         ],
         maxTokens: 16384,

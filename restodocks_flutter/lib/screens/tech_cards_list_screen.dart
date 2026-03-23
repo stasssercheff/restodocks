@@ -2094,7 +2094,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       final est = context.read<AccountManagerSupabase>().establishment;
       final establishmentId = est?.dataEstablishmentId;
       final ai = context.read<AiService>();
-      final allCards = <TechCardRecognitionResult>[];
+      final productStore = context.read<ProductStoreSupabase>();
+      // Подсказки из номенклатуры для AI (приоритет — данные карточки; номенклатура только подсказка)
+      List<String>? nomenclatureNames;
+      if (establishmentId != null) {
+        try {
+          await productStore.loadProducts();
+          await productStore.loadNomenclature(establishmentId);
+          final prods = productStore.getNomenclatureProducts(establishmentId);
+          nomenclatureNames = prods.expand((p) => [p.name, ...?p.names?.values.map((n) => n?.toString())]).whereType<String>().where((s) => s.trim().length > 1).toSet().take(300).toList();
+        } catch (_) {}
+      }
+      var allCards = <TechCardRecognitionResult>[];
       int failedCount = 0;
       for (final file in files) {
         final bytes = file.bytes!;
@@ -2103,7 +2114,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         List<TechCardRecognitionResult> list;
         if (isPdf) {
           list = await ai.parseTechCardsFromPdf(uBytes,
-              establishmentId: establishmentId);
+              establishmentId: establishmentId,
+              nomenclatureProductNames: nomenclatureNames);
         } else {
           int? sheetIndex;
           if (ai is AiServiceSupabase) {
@@ -2119,7 +2131,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             }
           }
           list = await ai.parseTechCardsFromExcel(uBytes,
-              establishmentId: establishmentId, sheetIndex: sheetIndex);
+              establishmentId: establishmentId,
+              sheetIndex: sheetIndex,
+              nomenclatureProductNames: nomenclatureNames);
           // Если парсер вернул пусто и «несколько листов» — показываем выбор листа и парсим выбранный
           if (list.isEmpty &&
               ai is AiServiceSupabase &&
@@ -2131,7 +2145,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             if (!mounted) return;
             if (sheetIndex != null) {
               list = await ai.parseTechCardsFromExcel(uBytes,
-                  establishmentId: establishmentId, sheetIndex: sheetIndex);
+                  establishmentId: establishmentId,
+                  sheetIndex: sheetIndex,
+                  nomenclatureProductNames: nomenclatureNames);
             }
           }
           if (list.isEmpty) list = _parseSimpleExcelNames(uBytes);
@@ -2171,44 +2187,67 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         }
         allCards.addAll(list);
       }
+      // При пустом parse но с rows — создаём placeholder и ведём на проверку для ручного ввода и обучения
       if (allCards.isEmpty) {
-        String msg;
-        if (context.read<AiService>() is AiServiceSupabase) {
-          final reason = AiServiceSupabase.lastParseTechCardExcelReason ??
-              AiServiceSupabase.lastParseTechCardPdfReason;
-          if (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day') {
-            msg = loc.t('ai_ttk_limit_3_per_day') ?? '';
-          } else if (reason == 'service_unavailable') {
-            msg = loc.t('ai_ttk_pdf_service_unavailable') ??
-                'Сервис распознавания временно недоступен. Экспортируйте PDF в Word или Excel и загрузите снова.';
-          } else if (reason == 'timeout_or_network') {
-            msg = loc.t('ai_ttk_pdf_timeout') ??
-                (loc.t('ai_tech_card_pdf_format_hint') ??
-                    'Таймаут загрузки PDF');
-          } else if (reason != null && reason.startsWith('extraction_failed')) {
-            msg = loc.t('ai_ttk_pdf_extraction_failed') ??
-                (loc.t('ai_tech_card_pdf_format_hint') ??
-                    'Не удалось извлечь текст из PDF');
-          } else if (reason == 'empty_text') {
-            msg = loc.t('ai_ttk_pdf_empty_text') ??
-                (loc.t('ai_tech_card_pdf_format_hint') ?? 'PDF без текста');
-          } else if (reason != null && reason.isNotEmpty) {
-            msg =
-                '${loc.t(failedCount == files.length && files.any((f) => (f.extension ?? '').toLowerCase().contains('pdf')) ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК'} ($reason)';
+        final hasRows = context.read<AiService>() is AiServiceSupabase &&
+            AiServiceSupabase.lastParsedRows != null &&
+            AiServiceSupabase.lastParsedRows!.length >= 2;
+        if (hasRows) {
+          allCards = [
+            TechCardRecognitionResult(
+              dishName: null,
+              ingredients: [],
+              technologyText: null,
+              isSemiFinished: null,
+              yieldGrams: null,
+            )
+          ];
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(loc.t('ttk_import_empty_parse_hint') ??
+                  'Не удалось распознать автоматически. Заполните карточку вручную — при следующем импорте похожего файла применится обучение.'),
+              duration: const Duration(seconds: 5),
+            ));
+          }
+        } else {
+          String msg;
+          if (context.read<AiService>() is AiServiceSupabase) {
+            final reason = AiServiceSupabase.lastParseTechCardExcelReason ??
+                AiServiceSupabase.lastParseTechCardPdfReason;
+            if (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day') {
+              msg = loc.t('ai_ttk_limit_3_per_day') ?? '';
+            } else if (reason == 'service_unavailable') {
+              msg = loc.t('ai_ttk_pdf_service_unavailable') ??
+                  'Сервис распознавания временно недоступен. Экспортируйте PDF в Word или Excel и загрузите снова.';
+            } else if (reason == 'timeout_or_network') {
+              msg = loc.t('ai_ttk_pdf_timeout') ??
+                  (loc.t('ai_tech_card_pdf_format_hint') ??
+                      'Таймаут загрузки PDF');
+            } else if (reason != null && reason.startsWith('extraction_failed')) {
+              msg = loc.t('ai_ttk_pdf_extraction_failed') ??
+                  (loc.t('ai_tech_card_pdf_format_hint') ??
+                      'Не удалось извлечь текст из PDF');
+            } else if (reason == 'empty_text') {
+              msg = loc.t('ai_ttk_pdf_empty_text') ??
+                  (loc.t('ai_tech_card_pdf_format_hint') ?? 'PDF без текста');
+            } else if (reason != null && reason.isNotEmpty) {
+              msg =
+                  '${loc.t(failedCount == files.length && files.any((f) => (f.extension ?? '').toLowerCase().contains('pdf')) ? 'ai_tech_card_pdf_format_hint' : 'ai_tech_card_excel_format_hint') ?? 'Не удалось распознать ТТК'} ($reason)';
+            } else {
+              msg = loc.t('ai_tech_card_excel_format_hint') ??
+                  'Не удалось распознать ТТК';
+            }
           } else {
             msg = loc.t('ai_tech_card_excel_format_hint') ??
                 'Не удалось распознать ТТК';
           }
-        } else {
-          msg = loc.t('ai_tech_card_excel_format_hint') ??
-              'Не удалось распознать ТТК';
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(msg),
+            duration: const Duration(seconds: 15),
+            action: SnackBarAction(label: 'OK', onPressed: () {}),
+          ));
+          return;
         }
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(msg),
-          duration: const Duration(seconds: 15),
-          action: SnackBarAction(label: 'OK', onPressed: () {}),
-        ));
-        return;
       }
       if (!mounted) return;
       if (failedCount > 0 && allCards.isNotEmpty) {

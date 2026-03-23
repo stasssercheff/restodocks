@@ -22,9 +22,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const body = (await req.json()) as { rows?: string[][]; establishmentId?: string };
+    const body = (await req.json()) as { rows?: string[][]; establishmentId?: string; nomenclatureProductNames?: string[] };
     const rows = body.rows;
     const establishmentId = typeof body.establishmentId === "string" ? body.establishmentId.trim() : undefined;
+    const nomenclatureProductNames = Array.isArray(body.nomenclatureProductNames) ? body.nomenclatureProductNames.filter((n): n is string => typeof n === "string").slice(0, 500) : [];
 
     // Лимит: 3 парсинга через AI в день на заведение
     if (establishmentId) {
@@ -104,9 +105,13 @@ If gross and net are given but primaryWastePct is not: calculate waste = (1 - ne
 
 Return ALL cards found (up to hundreds). If no cards, return { "cards": [] }.`;
 
+    const nomenclatureHint = nomenclatureProductNames.length > 0
+      ? `\n\nНоменклатура заведения (подсказка при маппинге ингредиентов — предпочитать эти названия, если документ явно ссылается на тот же продукт; НЕ заменять произвольно):\n${nomenclatureProductNames.slice(0, 200).join(", ")}`
+      : "";
+
     const content = await chatText({
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: systemPrompt + nomenclatureHint },
         { role: "user", content: `Document table rows:\n${JSON.stringify(rows)}` },
       ],
       maxTokens: 16384,

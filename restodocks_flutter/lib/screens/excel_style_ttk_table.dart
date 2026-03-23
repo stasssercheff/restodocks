@@ -878,6 +878,16 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             final idx = rowIndex;
             if (selectedItem.type == 'product') {
               final product = selectedItem.item as Product;
+              // Отказ: был другой продукт — не предлагать его снова
+              final origKey = normalizeProductAliasKey(ingredient.productName);
+              if (origKey.isNotEmpty && ingredient.productId != null && ingredient.productId != product.id) {
+                widget.productStore.saveProductAliasRejection(origKey, ingredient.productId!, establishmentId: widget.establishmentId);
+              }
+              // Обучение: сохраняем алиас «яйцо куричное» → «яйцо»
+              final prodKey = normalizeProductAliasKey(product.name);
+              if (origKey.isNotEmpty && origKey != prodKey) {
+                widget.productStore.saveProductAlias(origKey, product.id, establishmentId: widget.establishmentId);
+              }
               final establishmentPrice = widget.productStore.getEstablishmentPrice(product.id, widget.establishmentId);
               final pricePerKg = establishmentPrice?.$1 ?? 0.0;
               var gross = ingredient.grossWeight;
@@ -915,6 +925,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               if (name.isEmpty) return;
               final p = widget.productStore.findProductForIngredient(null, name);
               if (p != null) {
+                final origKey = normalizeProductAliasKey(ingredient.productName);
+                if (origKey.isNotEmpty && ingredient.productId != null && ingredient.productId != p.id) {
+                  widget.productStore.saveProductAliasRejection(origKey, ingredient.productId!, establishmentId: widget.establishmentId);
+                }
+                final prodKey = normalizeProductAliasKey(p.name);
+                if (origKey.isNotEmpty && origKey != prodKey) {
+                  widget.productStore.saveProductAlias(origKey, p.id, establishmentId: widget.establishmentId);
+                }
                 final establishmentPrice = widget.productStore.getEstablishmentPrice(p.id, widget.establishmentId);
                 final pricePerKg = establishmentPrice?.$1 ?? 0.0;
                 var gross = ingredient.grossWeight;

@@ -281,43 +281,114 @@ class ProductStoreSupabase {
   /// Публичный метод для запуска перевода извне (fire-and-forget)
   void triggerTranslation(String productId) => _translateProductInBackground(productId);
 
-  /// Загрузить алиасы (нормализованное_название → product_id) для разгрузки AI при импорте
-  Future<Map<String, String>> loadProductAliases() async {
+  /// Загрузить алиасы (нормализованное_название → product_id) для разгрузки AI при импорте.
+  /// [establishmentId] — заведение: алиасы заведения приоритетнее глобальных.
+  /// Исключаем отказы; при конфликтах — выше confidence.
+  Future<Map<String, String>> loadProductAliases({String? establishmentId}) async {
     try {
       final rows = await _supabase.client
           .from('product_aliases')
-          .select('input_name_normalized, product_id');
-      final map = <String, String>{};
+          .select('input_name_normalized, product_id, establishment_id, confidence');
+      final rejections = await _loadProductAliasRejections(establishmentId);
+      final map = <String, ({String id, int confidence, bool isEst})>{};
       for (final r in rows as List) {
         final row = r as Map<String, dynamic>;
         final key = row['input_name_normalized']?.toString().trim();
         final val = row['product_id']?.toString();
-        if (key != null && key.isNotEmpty && val != null) {
-          map[key] = val;
+        final conf = (row['confidence'] is num) ? (row['confidence'] as num).toInt() : 1;
+        final estId = row['establishment_id']?.toString();
+        if (key == null || key.isEmpty || val == null || conf <= 0) continue;
+        if (rejections[key]?.contains(val) ?? false) continue;
+        final isEst = establishmentId != null && estId == establishmentId;
+        final isGlobal = estId == null || estId.isEmpty;
+        if (!isEst && !isGlobal) continue;
+        final existing = map[key];
+        final take = existing == null ||
+            (isEst && !existing.isEst) ||
+            (isEst == existing.isEst && conf > existing.confidence);
+        if (take) map[key] = (id: val, confidence: conf, isEst: isEst);
+      }
+      return map.map((k, v) => MapEntry(k, v.id));
+    } catch (_) {
+      try {
+        final rows = await _supabase.client
+            .from('product_aliases')
+            .select('input_name_normalized, product_id');
+        final map = <String, String>{};
+        for (final r in rows as List) {
+          final row = r as Map<String, dynamic>;
+          final key = row['input_name_normalized']?.toString().trim();
+          final val = row['product_id']?.toString();
+          if (key != null && key.isNotEmpty && val != null) map[key] = val;
         }
+        return map;
+      } catch (__) {
+        return {};
+      }
+    }
+  }
+
+  Future<Map<String, Set<String>>> _loadProductAliasRejections(String? establishmentId) async {
+    try {
+      var query = _supabase.client.from('product_alias_rejections').select('input_name_normalized, product_id, establishment_id');
+      final rows = await query;
+      final map = <String, Set<String>>{};
+      for (final r in rows as List) {
+        final row = r as Map<String, dynamic>;
+        final key = row['input_name_normalized']?.toString().trim();
+        final val = row['product_id']?.toString();
+        final estId = row['establishment_id']?.toString();
+        if (key == null || val == null) continue;
+        final isEst = establishmentId != null && estId == establishmentId;
+        final isGlobal = estId == null || estId.isEmpty;
+        if (!isEst && !isGlobal) continue;
+        map.putIfAbsent(key, () => {}).add(val);
       }
       return map;
-    } catch (e) {
-      // Таблица может отсутствовать до миграции
+    } catch (_) {
       return {};
     }
   }
 
-  /// Сохранить алиас: при следующем импорте не вызывать AI, сразу мапить на product
-  Future<void> saveProductAlias(String inputNameNormalized, String productId) async {
+  /// Сохранить алиас. [establishmentId] — для алиасов по заведению.
+  Future<void> saveProductAlias(String inputNameNormalized, String productId, {String? establishmentId}) async {
     if (inputNameNormalized.trim().isEmpty || productId.isEmpty) return;
     try {
+      final payload = <String, dynamic>{
+        'input_name_normalized': inputNameNormalized.trim(),
+        'product_id': productId,
+        'confidence': 1,
+      };
+      if (establishmentId != null) payload['establishment_id'] = establishmentId;
       await _supabase.client.from('product_aliases').upsert(
+            payload,
+            onConflict: 'input_name_normalized,establishment_id',
+          );
+    } catch (_) {
+      try {
+        await _supabase.client.from('product_aliases').upsert(
+              {'input_name_normalized': inputNameNormalized.trim(), 'product_id': productId},
+              onConflict: 'input_name_normalized',
+            );
+      } catch (e) {
+        devLog('ProductStore: saveProductAlias failed: $e');
+      }
+    }
+  }
+
+  /// Отказ от маппинга: пользователь заменил продукт — не предлагать.
+  Future<void> saveProductAliasRejection(String inputNameNormalized, String productId, {String? establishmentId}) async {
+    if (inputNameNormalized.trim().isEmpty || productId.isEmpty) return;
+    try {
+      await _supabase.client.from('product_alias_rejections').upsert(
             {
               'input_name_normalized': inputNameNormalized.trim(),
               'product_id': productId,
+              'establishment_id': establishmentId,
             },
-            onConflict: 'input_name_normalized',
+            onConflict: 'input_name_normalized,product_id,establishment_id',
           );
-    } catch (e) {
-      // Не прерываем основной поток при ошибке сохранения алиаса
-      devLog('ProductStore: saveProductAlias failed: $e');
-    }
+    } catch (_) {}
   }
 
   /// Запустить перевод продукта фоново через Edge Function auto-translate-product

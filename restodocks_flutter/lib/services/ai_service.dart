@@ -256,11 +256,13 @@ abstract class AiService {
   /// Парсинг всех ТТК из одного документа Excel (несколько карточек в одном файле).
   /// [establishmentId] — для учёта лимита AI (3/день). Шаблонный парсинг без лимита.
   /// [sheetIndex] — для .xlsx с несколькими листами: парсить только этот лист (0-based). null = все листы или первый.
-  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId, int? sheetIndex});
+  /// [nomenclatureProductNames] — названия продуктов из номенклатуры: AI предпочитает их при совпадении (подсказка, не замена).
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId, int? sheetIndex, List<String>? nomenclatureProductNames});
 
   /// Парсинг ТТК из PDF (извлечение текста + ИИ).
   /// [establishmentId] — для учёта лимита AI (3/день). Шаблонный парсинг без лимита.
-  Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes, {String? establishmentId});
+  /// [nomenclatureProductNames] — подсказки из номенклатуры для маппинга продуктов.
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes, {String? establishmentId, List<String>? nomenclatureProductNames});
 
   /// Парсинг ТТК из вставленного текста (табуляции, как продукты).
   /// Формат: название блюда → заголовок (наименование, Ед.изм, Норма закладки…) → строки ингредиентов → Выход.
@@ -309,11 +311,11 @@ class AiServiceStub implements AiService {
       null;
 
   @override
-  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId, int? sheetIndex}) async =>
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId, int? sheetIndex, List<String>? nomenclatureProductNames}) async =>
       [];
 
   @override
-  Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes, {String? establishmentId}) async =>
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes, {String? establishmentId, List<String>? nomenclatureProductNames}) async =>
       [];
 
   @override

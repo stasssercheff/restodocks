@@ -621,6 +621,15 @@ class TechCardServiceSupabase {
     final products = productsForMapping ?? [];
     final techCardsPf = techCardsPfForMapping ?? [];
     final createdIdsByName = createdTechCardsByName ?? {};
+    final productIds = products.map((p) => p.id).toSet();
+
+    // Алиасы: сохранённые связи «яйцо куричное» → «яйцо» (из прошлых правок пользователя)
+    Map<String, String> aliases = {};
+    if (productStore != null) {
+      try {
+        aliases = await productStore.loadProductAliases(establishmentId: establishmentId);
+      } catch (_) {}
+    }
 
     final created = await createTechCard(
       dishName: name,
@@ -637,7 +646,15 @@ class TechCardServiceSupabase {
       String? productId;
       String? sourceTechCardId;
       if (products.isNotEmpty || techCardsPf.isNotEmpty || createdIdsByName.isNotEmpty) {
-        final found = _findProductId(
+        String? found;
+        final aliasKey = normalizeProductAliasKey(line.productName);
+        if (aliasKey.isNotEmpty && aliases.isNotEmpty) {
+          final aliasProductId = aliases[aliasKey];
+          if (aliasProductId != null && productIds.contains(aliasProductId)) {
+            found = aliasProductId;
+          }
+        }
+        found ??= _findProductId(
           line.productName,
           line.ingredientType,
           products,
@@ -650,6 +667,17 @@ class TechCardServiceSupabase {
             sourceTechCardId = found;
           } else {
             productId = found;
+            // Обучение: сохраняем алиас, если название из парсера отличается от продукта в номенклатуре.
+            // Так система учится и из успешных авто-совпадений, не только из ручного выбора.
+            if (productStore != null) {
+              final matched = products.where((p) => p.id == found).firstOrNull;
+              if (matched != null) {
+                final prodKey = normalizeProductAliasKey(matched.name);
+                if (aliasKey.isNotEmpty && aliasKey != prodKey) {
+                  productStore.saveProductAlias(aliasKey, found, establishmentId: establishmentId);
+                }
+              }
+            }
           }
         }
       }

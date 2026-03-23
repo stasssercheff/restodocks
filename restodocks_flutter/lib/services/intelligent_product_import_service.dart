@@ -50,7 +50,7 @@ class IntelligentProductImportService {
     final allProducts = _productStore.allProducts;
     final allTechCards = await _techCardService.getAllTechCards();
     // Алиасы: сохранённые маппинги — проверяем ДО вызова AI (разгрузка API)
-    final aliases = await _productStore.loadProductAliases();
+    final aliases = await _productStore.loadProductAliases(establishmentId: establishmentId);
 
     // Обрабатываем все листы
     for (final sheetName in excel.tables.keys) {
@@ -172,11 +172,11 @@ class IntelligentProductImportService {
         case MatchType.ambiguous:
           // Используем решение пользователя
           final resolution = resolutions[result.fileName];
-          if (resolution == 'replace' && result.matchResult.existingProductId != null) {
+            if (resolution == 'replace' && result.matchResult.existingProductId != null) {
             // Сохраняем алиас для следующих импортов (разгрузка AI)
-            final key = _normalizeText(result.fileName);
+            final key = normalizeProductAliasKey(result.fileName);
             if (key.isNotEmpty) {
-              await _productStore.saveProductAlias(key, result.matchResult.existingProductId!);
+              await _productStore.saveProductAlias(key, result.matchResult.existingProductId!, establishmentId: establishmentId);
             }
             // Связь продукт ↔ заведение — ТТК подтянет цену
             final ep = _productStore.getEstablishmentPrice(result.matchResult.existingProductId!, establishmentId);
@@ -274,7 +274,7 @@ ${sampleTexts.take(5).join('\n')}
     String establishmentId, {
     Map<String, String>? aliases,
   }) async {
-    final normalizedFileName = _normalizeText(fileName);
+    final normalizedFileName = normalizeProductAliasKey(fileName);
 
     // 1. Проверяем сохранённые алиасы (без вызова AI)
     if (aliases != null) {

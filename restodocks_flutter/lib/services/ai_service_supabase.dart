@@ -241,7 +241,7 @@ class AiServiceSupabase implements AiService {
   /// Цепочка: 1) сохранённые шаблоны; 2) пф гц (если не стандартный заголовок); 3) parseTtkByTemplate (keyword + колонки); 4) КК/multi-block/iiko; 5) AI при пусто.
   /// После любого слоя: _applyParseCorrections + _fillTechnologyFromStoredPf.
   @override
-  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId, int? sheetIndex}) async {
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromExcel(Uint8List xlsxBytes, {String? establishmentId, int? sheetIndex, List<String>? nomenclatureProductNames}) async {
     lastParseHeaderSignature = null;
     lastParsedRows = null;
     lastParseWasFirstTimeFormat = true; // сбросится в false, если сработает шаблон
@@ -408,8 +408,19 @@ class AiServiceSupabase implements AiService {
       // 3. Только если и там пусто — вызываем AI (лимит 3/день)
       if (list.isEmpty) {
         lastParseTechCardExcelReason = null;
+        // Всегда сохраняем rows и signature — чтобы при ручном вводе обучение сработало
+        if (rows.length >= 2) {
+          lastParsedRows = rows;
+          if (lastParseHeaderSignature == null || lastParseHeaderSignature!.isEmpty) {
+            lastParseHeaderSignature = _headerSignatureFromRows(rows) ??
+                (rows.isNotEmpty && rows[0].isNotEmpty ? _headerSignature(rows[0].map((c) => c.toString().trim()).toList()) : null);
+          }
+        }
         final body = <String, dynamic>{'rows': _rowsForJson(rows)};
         if (establishmentId != null && establishmentId.isNotEmpty) body['establishmentId'] = establishmentId;
+        if (nomenclatureProductNames != null && nomenclatureProductNames.isNotEmpty) {
+          body['nomenclatureProductNames'] = nomenclatureProductNames;
+        }
         final data = await invoke('ai-recognize-tech-cards-batch', body);
         if (data == null) return [];
         final err = data['error'] as String? ?? data['reason'] as String?;
@@ -427,6 +438,10 @@ class AiServiceSupabase implements AiService {
         // 4. Обучение: сохраняем шаблон для следующих загрузок того же формата
         if (list.isNotEmpty) {
           await _saveTemplateAfterAi(rows, list, source);
+        } else if (rows.length >= 2) {
+          // Пустой parse — всё равно сохраняем шаблон по заголовку для обучения
+          await _saveTemplateFromKeywordParse(rows, source)
+              .timeout(_learningTimeout, onTimeout: () {});
         }
       }
       if (list.isNotEmpty) {
@@ -553,11 +568,14 @@ class AiServiceSupabase implements AiService {
   void warmPdfParser() {}
 
   @override
-  Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes, {String? establishmentId}) async {
+  Future<List<TechCardRecognitionResult>> parseTechCardsFromPdf(Uint8List pdfBytes, {String? establishmentId, List<String>? nomenclatureProductNames}) async {
     lastParseTechCardPdfReason = null;
     try {
       final body = <String, dynamic>{'pdfBase64': base64Encode(pdfBytes)};
       if (establishmentId != null && establishmentId.isNotEmpty) body['establishmentId'] = establishmentId;
+      if (nomenclatureProductNames != null && nomenclatureProductNames.isNotEmpty) {
+        body['nomenclatureProductNames'] = nomenclatureProductNames;
+      }
       var data = await invoke('ai-parse-tech-cards-pdf', body)
           .timeout(_pdfParseTimeout, onTimeout: () => null);
       for (var retry = 0; data == null && retry < 2; retry++) {

@@ -42,6 +42,20 @@ String normalizeForPfMatching(String name) {
   return s;
 }
 
+/// Нормализация для ключа product_aliases (сохранение/поиск алиасов).
+/// Совпадает с логикой импорта номенклатуры, чтобы «яйцо куричное» → «яйцо» училось.
+String normalizeProductAliasKey(String text) {
+  var t = stripIikoPrefix(text);
+  return t
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^\w\s]'), '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .replaceAll(RegExp(r'\bкг\b|\bг\b|\bшт\b|\bл\b|\bмл\b|\bуп\b|\bпач\b'), '')
+      .replaceAll(RegExp(r'\bзаказ\b|\bпоставка\b|\bпартия\b'), '')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+}
+
 /// Убирает префиксы iiko из названия продукта для сопоставления с каталогом и поиска КБЖУ.
 /// "Т." — товар, "ТМЦ" — ТМЦ; часть наименования, но при поиске мешает.
 String stripIikoPrefix(String name) {
