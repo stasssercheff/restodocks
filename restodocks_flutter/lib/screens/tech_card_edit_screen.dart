@@ -4049,6 +4049,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     }
 
     return Scaffold(
+      clipBehavior: Clip.hardEdge,
       appBar: AppBar(
         leading: widget.initialFromAi != null
             ? IconButton(
@@ -4124,10 +4125,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           return Column(
             children: [
               Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(12, 24, 12, 12),
-                  keyboardDismissBehavior:
-                      ScrollViewKeyboardDismissBehavior.onDrag,
+                child: ClipRect(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(12, 24, 12, 12),
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -4452,10 +4454,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                               ?.copyWith(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
                       // Таблица ТТК на странице: без «окна», при росте числа продуктов страница скроллится, технология остаётся ниже
-                      Scrollbar(
-                        thumbVisibility: true,
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
+                      SizedBox(
+                        width: constraints.maxWidth,
+                        child: Scrollbar(
+                          thumbVisibility: true,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            clipBehavior: Clip.hardEdge,
                           child: SingleChildScrollView(
                             scrollDirection: Axis.vertical,
                             child: ConstrainedBox(
@@ -4516,7 +4521,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                         }
                                         _ingredientUpdateDebounce?.cancel();
                                         _ingredientUpdateDebounce = Timer(
-                                          const Duration(milliseconds: 180),
+                                          const Duration(milliseconds: 250),
                                           () {
                                             if (!mounted) return;
                                             setState(() {});
@@ -4573,6 +4578,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                           ),
                         ),
                       ),
+                    ),
                       // Кнопка «Подстроить % отхода под целевой выход» — отдельно под таблицей, не на панели, компактная
                       Builder(
                         builder: (context) {
@@ -4919,6 +4925,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   ),
                 ),
               ),
+            ),
             ],
           );
         },

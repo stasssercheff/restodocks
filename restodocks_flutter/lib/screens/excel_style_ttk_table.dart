@@ -1055,7 +1055,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               ),
               onChanged: (v) {
                 _debounceTimers[key]?.cancel();
-                _debounceTimers[key] = Timer(const Duration(milliseconds: 100), () {
+                _debounceTimers[key] = Timer(const Duration(milliseconds: 150), () {
                   if (!mounted) return;
                   onChanged(v);
                 });
