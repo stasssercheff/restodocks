@@ -1584,7 +1584,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                     : '';
             _ingredients
               ..clear()
-              ..addAll(tc.ingredients);
+              ..addAll(_ensureOutputWeights(tc.ingredients));
             _ensurePlaceholderRowAtEnd();
           }
           _contentPhase = 0; // подготовка, полная форма — в след. кадре
@@ -2861,6 +2861,34 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       _ensurePlaceholderRowAtEnd();
     }
     _autoFillBruttoFromNomenclature();
+  }
+
+  /// При загрузке/просмотре: пересчёт outputWeight если 0 (нетто × (1 − ужарка/100)).
+  List<TTIngredient> _ensureOutputWeights(List<TTIngredient> list) {
+    return list.map((i) {
+      if (i.productName.isNotEmpty && i.outputWeight == 0 && i.netWeight > 0) {
+        final loss = (i.cookingLossPctOverride ?? 0).clamp(0.0, 99.9) / 100.0;
+        return i.copyWith(outputWeight: i.netWeight * (1.0 - loss));
+      }
+      return i;
+    }).toList();
+  }
+
+  /// Масштабировать все ингредиенты под целевой выход — в реальном времени без подтверждения.
+  void _scaleIngredientsToTotalOutput(double newOutput) {
+    if (newOutput <= 0) return;
+    final currentTotal = _ingredients
+        .where((i) => i.productName.trim().isNotEmpty)
+        .fold<double>(0, (s, i) => s + i.outputWeight);
+    if (currentTotal <= 0) return;
+    final factor = newOutput / currentTotal;
+    if ((factor - 1.0).abs() < 0.0001) return;
+    setState(() {
+      _ingredients = _ingredients.map((i) => i.scaleBy(factor)).toList();
+      _ensurePlaceholderRowAtEnd();
+      if (!_isSemiFinished) _portionWeight = newOutput;
+    });
+    _scheduleDraftSave();
   }
 
   /// Подстроить % отхода у всех ингредиентов так, чтобы сумма выходов = [targetOutput] г.
@@ -4426,7 +4454,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                 minHeight: 220,
                               ),
                               child: effectiveCanEdit
-                                  ? ExcelStyleTtkTable(
+                                  ? RepaintBoundary(
+                                      child: ExcelStyleTtkTable(
                                       loc: loc,
                                       dishName: _nameController.text,
                                       isSemiFinished: _isSemiFinished,
@@ -4452,6 +4481,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                       onWeightPerPortionChanged: (v) {
                                         setState(() => _portionWeight = v);
                                         _scheduleDraftSave();
+                                      },
+                                      onTotalOutputChanged: (newOutput) {
+                                        _scaleIngredientsToTotalOutput(newOutput);
                                       },
                                       onAdd: _showAddIngredient,
                                       onUpdate: (i, ing) {
@@ -4481,6 +4513,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                       hideTechnologyBlock: true,
                                       onTapPfIngredient: (id) => context
                                           .push('/tech-cards/$id'),
+                                    ),
                                     )
                                   : ConstrainedBox(
                                       constraints: const BoxConstraints(
@@ -5842,10 +5875,21 @@ class _TtkCookTableState extends State<_TtkCookTable> {
   double _portionsCount =
       1; // количество порций в итого (ввод пользователя), допускаются дробные (0.3)
 
+  /// При просмотре: пересчёт outputWeight если 0 (нетто × (1 − ужарка/100)).
+  static List<TTIngredient> _recalcOutputWeights(List<TTIngredient> list) {
+    return list.map((i) {
+      if (i.productName.isNotEmpty && i.outputWeight == 0 && i.netWeight > 0) {
+        final loss = (i.cookingLossPctOverride ?? 0).clamp(0.0, 99.9) / 100.0;
+        return i.copyWith(outputWeight: i.netWeight * (1.0 - loss));
+      }
+      return i;
+    }).toList();
+  }
+
   @override
   void initState() {
     super.initState();
-    _ingredients = List.from(widget.ingredients);
+    _ingredients = _recalcOutputWeights(widget.ingredients);
     _totalOutput = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
   }
 
@@ -5853,7 +5897,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
   void didUpdateWidget(covariant _TtkCookTable oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.ingredients != widget.ingredients) {
-      _ingredients = List.from(widget.ingredients);
+      _ingredients = _recalcOutputWeights(widget.ingredients);
       _totalOutput = _ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
     }
   }

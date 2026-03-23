@@ -33,6 +33,8 @@ class ExcelStyleTtkTable extends StatefulWidget {
   /// Вес порции (г) — вносится в итого, столбец «вес прц». При изменении вызывается callback.
   final double weightPerPortion;
   final void Function(double)? onWeightPerPortionChanged;
+  /// При изменении выхода итого — масштабирование всех ингредиентов в реальном времени (без подтверждения).
+  final void Function(double)? onTotalOutputChanged;
   /// При клике на ПФ-ингредиент — переход к просмотру ТТК ПФ.
   final void Function(String techCardId)? onTapPfIngredient;
 
@@ -57,6 +59,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
     this.hideTechnologyBlock = false,
     this.weightPerPortion = 100,
     this.onWeightPerPortionChanged,
+    this.onTotalOutputChanged,
     this.onTapPfIngredient,
   });
 
@@ -546,7 +549,17 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // % отхода
                   const SizedBox.shrink(), // Нетто
                   const SizedBox.shrink(), // Способ
-                  _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'), // Выход г. итого: всегда сумма выходов по ингредиентам
+                  // Выход г. итого: редактируемый — при изменении масштабируются все ингредиенты в реальном времени
+                  widget.canEdit && widget.onTotalOutputChanged != null && totalOutput > 0
+                      ? _buildNumericCell(
+                          totalOutput.toStringAsFixed(0),
+                          (value) {
+                            final v = double.tryParse(value?.replaceFirst(',', '.') ?? '') ?? 0;
+                            if (v > 0) widget.onTotalOutputChanged?.call(v);
+                          },
+                          'total_output',
+                        )
+                      : _buildTotalCell('${totalOutput.toStringAsFixed(0)}г'),
                   // вес порции — редактируемый и для ПФ (по умолчанию 100), и для блюда (по умолчанию = вес выхода итого)
                   widget.canEdit && widget.onWeightPerPortionChanged != null
                       ? _buildNumericCell(
@@ -1042,7 +1055,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               ),
               onChanged: (v) {
                 _debounceTimers[key]?.cancel();
-                _debounceTimers[key] = Timer(const Duration(milliseconds: 40), () {
+                _debounceTimers[key] = Timer(const Duration(milliseconds: 100), () {
                   if (!mounted) return;
                   onChanged(v);
                 });
