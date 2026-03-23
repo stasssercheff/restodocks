@@ -2884,7 +2884,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     final factor = newOutput / currentTotal;
     if ((factor - 1.0).abs() < 0.0001) return;
     setState(() {
-      _ingredients = _ingredients.map((i) => i.scaleBy(factor)).toList();
+      final scaled = _ingredients.map((i) => i.scaleBy(factor)).toList();
+      _ingredients
+        ..clear()
+        ..addAll(scaled);
       _ensurePlaceholderRowAtEnd();
       if (!_isSemiFinished) _portionWeight = newOutput;
     });
