@@ -4,7 +4,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   enforceRateLimit,
+  getAuthenticatedUserId,
   hasValidApiKeyOrUser,
+  isServiceRoleRequest,
   resolveCorsHeaders,
 } from "../_shared/security.ts";
 
@@ -71,6 +73,21 @@ Deno.serve(async (req: Request) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    if (!isServiceRoleRequest(req)) {
+      const userId = await getAuthenticatedUserId(req);
+      if (!userId) {
+        return new Response(
+          JSON.stringify({ error: "Authenticated user required" }),
+          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (createdByEmployeeId !== userId) {
+        return new Response(
+          JSON.stringify({ error: "createdByEmployeeId must match authenticated user" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
     const { data: creator, error: creatorError } = await supabase
       .from("employees")
       .select("id")

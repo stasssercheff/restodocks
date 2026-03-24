@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../utils/dev_log.dart';
 import 'package:flutter/foundation.dart';
@@ -19,10 +20,14 @@ Future<({int status, Map<String, dynamic>? data})> postEdgeFunctionWithRetry(
   List<int> retryDelays = const [500, 1000],
 }) async {
   final url = '${supabase_url.getSupabaseBaseUrl()}/functions/v1/$functionPath';
+  final sessionToken = Supabase.instance.client.auth.currentSession?.accessToken;
+  final authBearer = (sessionToken != null && sessionToken.isNotEmpty)
+      ? sessionToken
+      : _supabaseAnonKey;
   final dio = Dio(BaseOptions(
     headers: {
       'apikey': _supabaseAnonKey,
-      'Authorization': 'Bearer $_supabaseAnonKey',
+      'Authorization': 'Bearer $authBearer',
       'Content-Type': 'application/json',
     },
     validateStatus: (_) => true,

@@ -41,10 +41,10 @@ serve(async (req) => {
 
     const { to, subject, html, attachments }: EmailRequest = await req.json()
 
-    console.log(`send-email: to=${to} subject="${subject}" attachments=${attachments?.length ?? 0}`)
+    console.log(`send-email: request received attachments=${attachments?.length ?? 0}`)
     if (attachments?.length) {
       attachments.forEach((a, i) => {
-        console.log(`  attachment[${i}]: filename=${a.filename} contentLen=${a.content?.length ?? 0}`)
+        console.log(`  attachment[${i}]: contentLen=${a.content?.length ?? 0}`)
       })
     }
 
@@ -75,9 +75,9 @@ serve(async (req) => {
     })
 
     const data = await res.json()
-    console.log(`send-email: Resend response status=${res.status} data=${JSON.stringify(data)}`)
+    console.log(`send-email: Resend response status=${res.status}`)
     if (!res.ok) {
-      console.error('Resend API error:', JSON.stringify(data), '— check RESEND_API_KEY, domain, and recipient (onboarding@resend.dev sends only to account email)')
+      console.error('Resend API error: failed to send email')
       return new Response(
         JSON.stringify({ error: data?.message ?? data?.error ?? String(data) }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },

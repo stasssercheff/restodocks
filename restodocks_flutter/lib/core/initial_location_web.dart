@@ -5,6 +5,19 @@ const String _localStorageKey   = 'restodocks_last_path_persist';
 
 bool _beforeUnloadRegistered = false;
 
+String _sanitizePersistedPath(String path) {
+  try {
+    final uri = Uri.parse(path);
+    final p = uri.path;
+    final isInviteFlow = p.startsWith('/accept-co-owner-invitation') || p.startsWith('/register-co-owner');
+    if (!isInviteFlow) return path;
+    // Do not persist invitation token in web storages.
+    return p;
+  } catch (_) {
+    return path;
+  }
+}
+
 void _registerBeforeUnload() {
   if (_beforeUnloadRegistered) return;
   _beforeUnloadRegistered = true;
@@ -25,8 +38,9 @@ void _registerBeforeUnload() {
         // Не сохранять промежуточные страницы — иначе restodocks.com/ перенаправит туда
         final skipSave = path.startsWith('/login') || path.startsWith('/confirm-email') || path.startsWith('/auth/confirm');
         if (!skipSave) {
-          html.window.sessionStorage[_sessionStorageKey] = path;
-          html.window.localStorage[_localStorageKey] = path;
+          final safePath = _sanitizePersistedPath(path);
+          html.window.sessionStorage[_sessionStorageKey] = safePath;
+          html.window.localStorage[_localStorageKey] = safePath;
         }
       }
     });
@@ -39,8 +53,9 @@ void savePathForRefresh(String path) {
     if (path.isEmpty || path == '/' || path == '/splash') return;
     final skip = path.startsWith('/login') || path.startsWith('/confirm-email') || path.startsWith('/auth/confirm');
     if (!skip) {
-      html.window.sessionStorage[_sessionStorageKey] = path;
-      html.window.localStorage[_localStorageKey] = path;
+      final safePath = _sanitizePersistedPath(path);
+      html.window.sessionStorage[_sessionStorageKey] = safePath;
+      html.window.localStorage[_localStorageKey] = safePath;
     }
   } catch (_) {}
 }
@@ -116,8 +131,9 @@ String getInitialLocation() {
       // Также сразу сохраняем в storage чтобы последующие вызовы тоже его видели.
       _cachedInitialPath = fromWindow;
       try {
-        html.window.localStorage[_localStorageKey] = fromWindow;
-        html.window.sessionStorage[_sessionStorageKey] = fromWindow;
+        final safePath = _sanitizePersistedPath(fromWindow);
+        html.window.localStorage[_localStorageKey] = safePath;
+        html.window.sessionStorage[_sessionStorageKey] = safePath;
       } catch (_) {}
     } else {
       // Pathname == '/'. Не восстанавливать промежуточные страницы: /login, /confirm-email, /auth/confirm.

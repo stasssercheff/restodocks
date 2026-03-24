@@ -103,6 +103,13 @@ export function hasValidApiKey(req: Request): boolean {
   return false;
 }
 
+export function isServiceRoleRequest(req: Request): boolean {
+  const apiKey = req.headers.get("apikey")?.trim();
+  if (!apiKey) return false;
+  const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+  return !!service && apiKey === service;
+}
+
 export async function hasValidApiKeyOrUser(req: Request): Promise<boolean> {
   if (hasValidApiKey(req)) return true;
 
@@ -123,5 +130,27 @@ export async function hasValidApiKeyOrUser(req: Request): Promise<boolean> {
     return !error && !!data.user;
   } catch {
     return false;
+  }
+}
+
+export async function getAuthenticatedUserId(req: Request): Promise<string | null> {
+  const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const token = authHeader.slice("Bearer ".length).trim();
+  if (!token) return null;
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
+  if (!supabaseUrl || !anonKey) return null;
+
+  try {
+    const authClient = createClient(supabaseUrl, anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await authClient.auth.getUser(token);
+    if (error || !data.user?.id) return null;
+    return data.user.id;
+  } catch {
+    return null;
   }
 }

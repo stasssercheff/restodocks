@@ -4,7 +4,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   enforceRateLimit,
+  getAuthenticatedUserId,
   hasValidApiKeyOrUser,
+  isServiceRoleRequest,
   resolveCorsHeaders,
 } from "../_shared/security.ts";
 
@@ -105,6 +107,27 @@ Deno.serve(async (req: Request) => {
       });
     }
     const checklistEstablishmentId = checklistRow.establishment_id as string;
+    if (!isServiceRoleRequest(req)) {
+      const userId = await getAuthenticatedUserId(req);
+      if (!userId) {
+        return new Response(JSON.stringify({ error: "Authenticated user required" }), {
+          status: 401,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+      const { data: callerEmployee } = await supabase
+        .from("employees")
+        .select("id")
+        .eq("id", userId)
+        .eq("establishment_id", checklistEstablishmentId)
+        .maybeSingle();
+      if (!callerEmployee?.id) {
+        return new Response(JSON.stringify({ error: "Forbidden for checklist establishment" }), {
+          status: 403,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+    }
     if (assigned_employee_id) {
       const { data: assignee, error: assigneeError } = await supabase
         .from("employees")

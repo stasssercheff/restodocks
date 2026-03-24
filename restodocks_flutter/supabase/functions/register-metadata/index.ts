@@ -3,7 +3,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   enforceRateLimit,
+  getAuthenticatedUserId,
   hasValidApiKeyOrUser,
+  isServiceRoleRequest,
   resolveCorsHeaders,
 } from "../_shared/security.ts";
 
@@ -82,6 +84,35 @@ Deno.serve(async (req: Request) => {
     const geo = await fetchGeo(ip);
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const userId = await getAuthenticatedUserId(req);
+    if (!isServiceRoleRequest(req)) {
+      if (!userId) {
+        return new Response(JSON.stringify({ error: "Authenticated user required" }), {
+          status: 401,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+      const { data: allowedEmployee } = await supabase
+        .from("employees")
+        .select("id")
+        .eq("id", userId)
+        .eq("establishment_id", establishmentId)
+        .maybeSingle();
+      if (!allowedEmployee?.id) {
+        const { data: allowedOwner } = await supabase
+          .from("establishments")
+          .select("id")
+          .eq("id", establishmentId)
+          .eq("owner_id", userId)
+          .maybeSingle();
+        if (!allowedOwner?.id) {
+          return new Response(JSON.stringify({ error: "Forbidden for establishment" }), {
+            status: 403,
+            headers: { ...cors, "Content-Type": "application/json" },
+          });
+        }
+      }
+    }
     const { error } = await supabase
       .from("establishments")
       .update({
