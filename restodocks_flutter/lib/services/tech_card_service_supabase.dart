@@ -190,6 +190,12 @@ class TechCardServiceSupabase {
     } catch (_) {}
   }
 
+  /// Принудительное обновление с сервера (используется фоновым realtime-sync).
+  Future<List<TechCard>> refreshTechCardsFromServer(
+      String establishmentId) async {
+    return _fetchTechCardsFromServer(establishmentId);
+  }
+
   Future<void> _saveTechCardsCache(
       String establishmentId, List<TechCard> list) async {
     final key = await _offlineCache.scopedKey(

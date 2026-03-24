@@ -41,6 +41,8 @@ export 'order_document_service.dart';
 export 'employee_message_service.dart';
 export 'group_chat_service.dart';
 export 'inventory_history_service.dart';
+export 'offline_cache_service.dart';
+export 'realtime_sync_service.dart';
 export 'email_service.dart';
 export 'app_toast_service.dart';
 export 'menu_stop_go_service.dart';

@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 import '../utils/dev_log.dart';
 import 'offline_cache_service.dart';
+import 'realtime_sync_service.dart';
 import 'secure_storage_service.dart';
 import 'supabase_service.dart';
 
@@ -38,6 +39,7 @@ class AccountManagerSupabase extends ChangeNotifier {
   final SupabaseService _supabase = SupabaseService();
   final SecureStorageService _secureStorage = SecureStorageService();
   final OfflineCacheService _offlineCache = OfflineCacheService();
+  final RealtimeSyncService _realtimeSync = RealtimeSyncService();
   Establishment? _establishment;
   Employee? _currentEmployee;
   bool _initialized = false;
@@ -92,6 +94,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
     await _tryRestoreSession();
     if (isLoggedInSync) {
+      await _bindRealtimeSync();
       _initialized = true;
       return;
     }
@@ -100,7 +103,10 @@ class AccountManagerSupabase extends ChangeNotifier {
     await Future.delayed(const Duration(milliseconds: 400));
     await _tryRestoreSession();
     _initialized = true;
-    if (isLoggedInSync) return;
+    if (isLoggedInSync) {
+      await _bindRealtimeSync();
+      return;
+    }
 
     devLog('🔐 AccountManager: No stored session and not authenticated');
   }
@@ -288,6 +294,7 @@ class AccountManagerSupabase extends ChangeNotifier {
   Future<void> switchEstablishment(Establishment establishment) async {
     _establishment = establishment;
     await _secureStorage.set(_keyEstablishmentId, establishment.id);
+    await _bindRealtimeSync();
     notifyListeners();
   }
 
@@ -1024,6 +1031,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     await _secureStorage.set(_keyEmployeeId, employee.id);
     await _secureStorage.set(_keyEstablishmentId, establishment.id);
     devLog('🔐 AccountManager: Data saved to secure storage');
+    await _bindRealtimeSync();
 
     if (rememberCredentials && email != null && password != null) {
       await _secureStorage.set(_keyRememberEmail, email);
@@ -1046,11 +1054,21 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Выход из системы
   Future<void> logout() async {
+    await _realtimeSync.stop();
     await _offlineCache.clearCurrentUserCache();
     await _supabase.signOut();
     await _clearStoredSession();
     _currentEmployee = null;
     _establishment = null;
+  }
+
+  Future<void> _bindRealtimeSync() async {
+    final est = _establishment;
+    if (est == null) return;
+    await _realtimeSync.startForEstablishment(
+      establishmentId: est.id,
+      dataEstablishmentId: est.dataEstablishmentId,
+    );
   }
 
   /// Проверка, авторизован ли пользователь
