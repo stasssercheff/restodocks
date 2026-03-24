@@ -67,14 +67,23 @@ class NomenclatureScreen extends StatefulWidget {
 }
 
 enum _CatalogSort { nameAz, nameZa, priceAsc, priceDesc }
+
 enum _NomenclatureFilter { all, products }
 
 /// Единица измерения для отображения в номенклатуре: кг, шт, г, л и т.д. (не сырой "pcs"/"kg" из БД).
 String _unitDisplay(String? unit, String lang) {
   const ruToId = {
-    'г': 'g', 'кг': 'kg', 'мг': 'mg', 'л': 'l', 'мл': 'ml',
-    'шт': 'pcs', 'штука': 'pcs', 'штуки': 'pcs', 'штук': 'pcs',
-    'грамм': 'g', 'килограмм': 'kg',
+    'г': 'g',
+    'кг': 'kg',
+    'мг': 'mg',
+    'л': 'l',
+    'мл': 'ml',
+    'шт': 'pcs',
+    'штука': 'pcs',
+    'штуки': 'pcs',
+    'штук': 'pcs',
+    'грамм': 'g',
+    'килограмм': 'kg',
   };
   final raw = (unit ?? 'g').trim().toLowerCase();
   final id = ruToId[raw] ?? raw;
@@ -116,7 +125,8 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
       supabase: context.read<SupabaseService>(),
     );
     final est = account.establishment;
-    final estId = est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
+    final estId =
+        est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
 
     if (estId == null) {
       if (mounted) {
@@ -154,10 +164,14 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
 
         // Используем проверенные ИИ данные или оригинальные
         final normalizedName = verification?.normalizedName ?? item.name;
-        var names = <String, String>{for (final c in allLangs) c: normalizedName};
+        var names = <String, String>{
+          for (final c in allLangs) c: normalizedName
+        };
 
         // Для больших списков переводим только если ИИ дал нормализованное имя
-        if (widget.items.length > 5 && verification?.normalizedName != null && verification!.normalizedName != item.name) {
+        if (widget.items.length > 5 &&
+            verification?.normalizedName != null &&
+            verification!.normalizedName != item.name) {
           // Переводим на все языки
           for (final lang in allLangs) {
             if (lang == sourceLang) continue;
@@ -178,16 +192,19 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
         final normalizedLower = normalizedName.trim().toLowerCase();
 
         // Проверяем, существует ли продукт с таким именем в базе (дедупликация)
-        final existingInStore = store.allProducts.where(
-          (p) => p.name.trim().toLowerCase() == normalizedLower,
-        ).toList();
+        final existingInStore = store.allProducts
+            .where(
+              (p) => p.name.trim().toLowerCase() == normalizedLower,
+            )
+            .toList();
 
         if (existingInStore.isNotEmpty) {
           // Продукт уже есть — просто добавляем в номенклатуру
           final existingId = existingInStore.first.id;
           try {
             final ep = store.getEstablishmentPrice(existingId, estId);
-            await store.addToNomenclature(estId, existingId, price: item.price ?? ep?.$1, currency: defCur);
+            await store.addToNomenclature(estId, existingId,
+                price: item.price ?? ep?.$1, currency: defCur);
           } catch (_) {}
           setState(() => _skipped++);
           continue;
@@ -203,7 +220,8 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
         final hasFullKbjuFromAi = (calories != null && calories > 0);
         if (!hasFullKbjuFromAi) {
           try {
-            final nutrition = await NutritionApiService.fetchNutrition(normalizedName);
+            final nutrition =
+                await NutritionApiService.fetchNutrition(normalizedName);
             if (nutrition != null && nutrition.hasData) {
               calories = calories ?? nutrition.calories;
               protein = nutrition.protein;
@@ -231,62 +249,66 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           currency: defCur,
         );
 
-          Product savedProduct;
-          try {
-            savedProduct = await store.addProduct(product);
-          } catch (e) {
-            if (e.toString().contains('duplicate key') ||
-                e.toString().contains('already exists') ||
-                e.toString().contains('unique constraint')) {
-              // Продукт уже существует в БД, ищем по имени
-              try {
-                final supabaseClient = Supabase.instance.client;
-                final existingProducts = await supabaseClient
-                    .from('products')
-                    .select('id')
-                    .eq('name', product.name)
-                    .limit(1);
-
-                if (existingProducts.isNotEmpty) {
-                  final existingId = existingProducts[0]['id'] as String;
-                  await store.addToNomenclature(estId, existingId, price: item.price);
-                  setState(() => _skipped++);
-                  continue;
-                }
-              } catch (findError) {
-                devLog('Failed to find existing product "${product.name}": $findError');
-              }
-            }
-            // Другая ошибка
-            devLog('Failed to add product "${product.name}": $e');
-            setState(() => _failed++);
-            continue;
-          }
-
-          try {
-            await store.addToNomenclature(estId, savedProduct.id, price: item.price ?? verification?.suggestedPrice, currency: defCur);
-          } catch (e) {
-            // Возможно продукт уже в номенклатуре - считаем это успехом
-            if (e.toString().contains('duplicate key') ||
-                e.toString().contains('already exists') ||
-                e.toString().contains('unique constraint')) {
-              setState(() => _skipped++);
-              continue;
-            }
-            // Другая ошибка
-            devLog('Failed to add to nomenclature "${product.name}": $e');
-            setState(() => _failed++);
-            continue;
-          }
-
-          setState(() => _added++);
-
-          // Небольшая задержка чтобы не перегружать сервер
-          await Future.delayed(const Duration(milliseconds: 50));
+        Product savedProduct;
+        try {
+          savedProduct = await store.addProduct(product);
         } catch (e) {
-          devLog('Unexpected error for "${item.name}": $e');
+          if (e.toString().contains('duplicate key') ||
+              e.toString().contains('already exists') ||
+              e.toString().contains('unique constraint')) {
+            // Продукт уже существует в БД, ищем по имени
+            try {
+              final supabaseClient = Supabase.instance.client;
+              final existingProducts = await supabaseClient
+                  .from('products')
+                  .select('id')
+                  .eq('name', product.name)
+                  .limit(1);
+
+              if (existingProducts.isNotEmpty) {
+                final existingId = existingProducts[0]['id'] as String;
+                await store.addToNomenclature(estId, existingId,
+                    price: item.price);
+                setState(() => _skipped++);
+                continue;
+              }
+            } catch (findError) {
+              devLog(
+                  'Failed to find existing product "${product.name}": $findError');
+            }
+          }
+          // Другая ошибка
+          devLog('Failed to add product "${product.name}": $e');
           setState(() => _failed++);
+          continue;
         }
+
+        try {
+          await store.addToNomenclature(estId, savedProduct.id,
+              price: item.price ?? verification?.suggestedPrice,
+              currency: defCur);
+        } catch (e) {
+          // Возможно продукт уже в номенклатуре - считаем это успехом
+          if (e.toString().contains('duplicate key') ||
+              e.toString().contains('already exists') ||
+              e.toString().contains('unique constraint')) {
+            setState(() => _skipped++);
+            continue;
+          }
+          // Другая ошибка
+          devLog('Failed to add to nomenclature "${product.name}": $e');
+          setState(() => _failed++);
+          continue;
+        }
+
+        setState(() => _added++);
+
+        // Небольшая задержка чтобы не перегружать сервер
+        await Future.delayed(const Duration(milliseconds: 50));
+      } catch (e) {
+        devLog('Unexpected error for "${item.name}": $e');
+        setState(() => _failed++);
+      }
     }
 
     setState(() => _isCompleted = true);
@@ -296,9 +318,11 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
     if (mounted) {
       Navigator.of(context).pop();
 
-        final msg = _failed == 0
-            ? widget.loc.t('upload_added').replaceAll('%s', '${_added + _skipped}')
-            : '${widget.loc.t('upload_added').replaceAll('%s', '${_added + _skipped}')}. ${widget.loc.t('upload_failed').replaceAll('%s', '$_failed')}';
+      final msg = _failed == 0
+          ? widget.loc
+              .t('upload_added')
+              .replaceAll('%s', '${_added + _skipped}')
+          : '${widget.loc.t('upload_added').replaceAll('%s', '${_added + _skipped}')}. ${widget.loc.t('upload_failed').replaceAll('%s', '$_failed')}';
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg), duration: const Duration(seconds: 5)),
@@ -308,7 +332,8 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final progress = widget.items.isEmpty ? 1.0 : _processed / widget.items.length;
+    final progress =
+        widget.items.isEmpty ? 1.0 : _processed / widget.items.length;
 
     final loc = widget.loc;
     return AlertDialog(
@@ -316,16 +341,28 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(loc.t('upload_products_progress').replaceFirst('%s', '$_processed').replaceFirst('%s', '${widget.items.length}')),
+          Text(loc
+              .t('upload_products_progress')
+              .replaceFirst('%s', '$_processed')
+              .replaceFirst('%s', '${widget.items.length}')),
           const SizedBox(height: 8),
-          Text(loc.t('upload_products_checking'), style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+          Text(loc.t('upload_products_checking'),
+              style: TextStyle(fontSize: 12, color: Colors.grey[600])),
           const SizedBox(height: 16),
           LinearProgressIndicator(value: progress),
           const SizedBox(height: 8),
           Text(
             loc.t('upload_products_added').replaceFirst('%s', '$_added') +
-            (_skipped > 0 ? loc.t('upload_products_skipped').replaceFirst('%s', '$_skipped') : '') +
-            (_failed > 0 ? loc.t('upload_products_failed').replaceFirst('%s', '$_failed') : ''),
+                (_skipped > 0
+                    ? loc
+                        .t('upload_products_skipped')
+                        .replaceFirst('%s', '$_skipped')
+                    : '') +
+                (_failed > 0
+                    ? loc
+                        .t('upload_products_failed')
+                        .replaceFirst('%s', '$_failed')
+                    : ''),
           ),
           if (_isCompleted) ...[
             const SizedBox(height: 16),
@@ -420,7 +457,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       if (mounted) {
         setState(() => _loadError = e);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка загрузки номенклатуры: $e'), duration: const Duration(seconds: 6)),
+          SnackBar(
+              content: Text('Ошибка загрузки номенклатуры: $e'),
+              duration: const Duration(seconds: 6)),
         );
       }
     }
@@ -454,11 +493,20 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   }
 
   /// Категории продуктов/ПФ для подразделений. general = без фильтра (все).
-  static const _barCategories = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks'};
+  static const _barCategories = {
+    'beverages',
+    'alcoholic_cocktails',
+    'non_alcoholic_drinks',
+    'hot_drinks',
+    'drinks_pure',
+    'snacks'
+  };
 
-  List<NomenclatureItem> _filterByDepartment(List<NomenclatureItem> items, String department) {
+  List<NomenclatureItem> _filterByDepartment(
+      List<NomenclatureItem> items, String department) {
     if (department == 'general') return items;
-    if (department == 'hall' || department == 'dining_room') return items; // Зал видит всё
+    if (department == 'hall' || department == 'dining_room')
+      return items; // Зал видит всё
     if (department == 'bar') {
       return items.where((i) => _barCategories.contains(i.category)).toList();
     }
@@ -474,12 +522,15 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       allowedExtensions: ['xlsx', 'xls'],
       withData: true,
     );
-    if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
+    if (result == null ||
+        result.files.isEmpty ||
+        result.files.single.bytes == null) return;
 
     final acc = context.read<AccountManagerSupabase>();
     final estId = acc.establishment?.id;
     if (estId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Не найдено заведение')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Не найдено заведение')));
       return;
     }
 
@@ -551,7 +602,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _iikoUploading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
       }
     }
   }
@@ -573,12 +625,12 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     int colCode,
     int colName,
     int colUnit,
-    int? colQty,    // null = не найдено, нужен диалог
+    int? colQty, // null = не найдено, нужен диалог
     int dataStart,
   }) _detectColumns(Sheet sheet, {int scanRows = 25}) {
     String cellStr(int col, int row) {
-      final v = sheet.cell(CellIndex.indexByColumnRow(
-              columnIndex: col, rowIndex: row))
+      final v = sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row))
           .value;
       return _iikoExcelCellToStr(v).trim();
     }
@@ -586,10 +638,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     // Defaults (формат стандартного бланка iiko):
     // A=группа, C=код, D=наименование, E=ед.изм., F=остаток
     int colGroup = 0;
-    int colCode  = 2;
-    int colName  = 3;
-    int colUnit  = 4;
-    int? colQty;        // будет null если не найдено по заголовкам
+    int colCode = 2;
+    int colName = 3;
+    int colUnit = 4;
+    int? colQty; // будет null если не найдено по заголовкам
     int dataStart = 8;
 
     final maxCols = sheet.maxColumns.clamp(0, 20);
@@ -597,22 +649,35 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     // Сканируем все строки заголовка — ищем строку с максимальным числом
     // совпадений ключевых слов (это надёжнее чем искать только "наименование")
     int bestScore = 0;
-    int bestRow   = -1;
+    int bestRow = -1;
 
     for (var r = 0; r < sheet.maxRows && r < scanRows; r++) {
       int score = 0;
       for (var c = 0; c < maxCols; c++) {
         final v = cellStr(c, r).toLowerCase();
         if (v.isEmpty) continue;
-        if (v.contains('наименование') || v.contains('товар') || v == 'name') score += 3;
-        if ((v.contains('код') && !v.contains('штрих') && !v.contains('баркод')) ||
-            v == 'code' || v == 'артикул' || v.contains('external id') ||
-            v == 'ext id' || v == 'external_id') score += 2;
-        if (v.contains('остаток') || v.contains('фактич') || v.contains('факт') ||
-            v.contains('количеств') || v.contains('кол-во') || v.contains('кол.') ||
-            v == 'qty' || v == 'fact') score += 2;
-        if ((v.contains('ед') && v.length < 12) || v.contains('мера') ||
-            v.contains('unit') || v.startsWith('mea')) score += 1;
+        if (v.contains('наименование') || v.contains('товар') || v == 'name')
+          score += 3;
+        if ((v.contains('код') &&
+                !v.contains('штрих') &&
+                !v.contains('баркод')) ||
+            v == 'code' ||
+            v == 'артикул' ||
+            v.contains('external id') ||
+            v == 'ext id' ||
+            v == 'external_id') score += 2;
+        if (v.contains('остаток') ||
+            v.contains('фактич') ||
+            v.contains('факт') ||
+            v.contains('количеств') ||
+            v.contains('кол-во') ||
+            v.contains('кол.') ||
+            v == 'qty' ||
+            v == 'fact') score += 2;
+        if ((v.contains('ед') && v.length < 12) ||
+            v.contains('мера') ||
+            v.contains('unit') ||
+            v.startsWith('mea')) score += 1;
         if (v.contains('групп') || v == 'group') score += 1;
       }
       if (score > bestScore) {
@@ -628,16 +693,30 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         for (var c = 0; c < maxCols; c++) {
           final v = cellStr(c, scanRow).toLowerCase();
           if (v.isEmpty) continue;
-          if ((v.contains('наименование') || v.contains('товар') || v == 'name') &&
+          if ((v.contains('наименование') ||
+                  v.contains('товар') ||
+                  v == 'name') &&
               c != colGroup) colName = c;
-          if ((v.contains('код') && !v.contains('штрих') && !v.contains('баркод')) ||
-              v == 'code' || v == 'артикул' || v.contains('external id') ||
-              v == 'ext id' || v == 'external_id') colCode = c;
-          if ((v.contains('ед') && v.length < 12) || v.contains('мера') ||
-              v.contains('unit') || v.startsWith('mea')) colUnit = c;
-          if (v.contains('остаток') || v.contains('фактич') || v.contains('факт') ||
-              v.contains('количеств') || v.contains('кол-во') || v.contains('кол.') ||
-              v == 'qty' || v == 'fact') colQty = c;
+          if ((v.contains('код') &&
+                  !v.contains('штрих') &&
+                  !v.contains('баркод')) ||
+              v == 'code' ||
+              v == 'артикул' ||
+              v.contains('external id') ||
+              v == 'ext id' ||
+              v == 'external_id') colCode = c;
+          if ((v.contains('ед') && v.length < 12) ||
+              v.contains('мера') ||
+              v.contains('unit') ||
+              v.startsWith('mea')) colUnit = c;
+          if (v.contains('остаток') ||
+              v.contains('фактич') ||
+              v.contains('факт') ||
+              v.contains('количеств') ||
+              v.contains('кол-во') ||
+              v.contains('кол.') ||
+              v == 'qty' ||
+              v == 'fact') colQty = c;
           if (v.contains('групп') || v == 'group') colGroup = c;
         }
       }
@@ -653,15 +732,16 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (colCode == colName) colCode = colName > 0 ? colName - 1 : colName + 1;
     // colUnit не должен совпадать с ключевыми столбцами
     if (colUnit == colCode || colUnit == colName || colUnit == colGroup) {
-      colUnit = [colCode, colName, colGroup].reduce((a, b) => a > b ? a : b) + 1;
+      colUnit =
+          [colCode, colName, colGroup].reduce((a, b) => a > b ? a : b) + 1;
     }
 
     return (
       colGroup: colGroup,
-      colCode:  colCode,
-      colName:  colName,
-      colUnit:  colUnit,
-      colQty:   colQty,
+      colCode: colCode,
+      colName: colName,
+      colUnit: colUnit,
+      colQty: colQty,
       dataStart: dataStart,
     );
   }
@@ -678,7 +758,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       final excel = Excel.decodeBytes(bytes.toList());
       if (excel.tables.isEmpty) return _emptyParsed;
 
-      final allProducts      = <IikoProduct>[];
+      final allProducts = <IikoProduct>[];
       final parsedSheetNames = <String>[];
       final parsedSheetQtyCols = <String, int>{};
       int? firstQtyCol;
@@ -689,17 +769,17 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         if (sheet == null) continue;
 
         String cellStr(int col, int row) {
-          final v = sheet.cell(CellIndex.indexByColumnRow(
-                  columnIndex: col, rowIndex: row))
+          final v = sheet
+              .cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row))
               .value;
           return _iikoExcelCellToStr(v).trim();
         }
 
         final detected = _detectColumns(sheet);
         final colGroup = detected.colGroup;
-        final colCode  = detected.colCode;
-        final colName  = detected.colName;
-        final colUnit  = detected.colUnit;
+        final colCode = detected.colCode;
+        final colName = detected.colName;
+        final colUnit = detected.colUnit;
         final dataStart = detected.dataStart;
 
         // Столбец остатка: сначала ручной (из диалога), потом авто, потом default=5
@@ -713,9 +793,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         final groupIsInNameCol = colGroup == colName;
 
         for (var r = dataStart; r < sheet.maxRows; r++) {
-          final codeVal  = cellStr(colCode, r);
-          final nameVal  = cellStr(colName, r);
-          final unitVal  = cellStr(colUnit, r);
+          final codeVal = cellStr(colCode, r);
+          final nameVal = cellStr(colName, r);
+          final unitVal = cellStr(colUnit, r);
           // Группу читаем из отдельного столбца только если он не совпадает с именем
           final groupVal = groupIsInNameCol ? '' : cellStr(colGroup, r);
 
@@ -763,10 +843,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       }
 
       return (
-        products:       allProducts,
-        quantityCol:    firstQtyCol,
-        dataStartRow:   0,
-        sheetNames:     parsedSheetNames,
+        products: allProducts,
+        quantityCol: firstQtyCol,
+        dataStartRow: 0,
+        sheetNames: parsedSheetNames,
         sheetQtyColumns: parsedSheetQtyCols,
       );
     } catch (e) {
@@ -785,8 +865,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final excel = Excel.decodeBytes(bytes.toList());
 
     String cellStr(Sheet sheet, int col, int row) {
-      final v = sheet.cell(CellIndex.indexByColumnRow(
-              columnIndex: col, rowIndex: row))
+      final v = sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row))
           .value;
       return _iikoExcelCellToStr(v).trim();
     }
@@ -809,7 +889,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       final maxCols = sheet.maxColumns.clamp(0, 12);
       final previewRows = <List<String>>[];
       final startPreview = (detected.dataStart - 2).clamp(0, sheet.maxRows - 1);
-      for (var r = startPreview; r < sheet.maxRows && r < startPreview + 6; r++) {
+      for (var r = startPreview;
+          r < sheet.maxRows && r < startPreview + 6;
+          r++) {
         final row = <String>[];
         for (var c = 0; c < maxCols; c++) {
           row.add(cellStr(sheet, c, r));
@@ -819,10 +901,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
       // Получаем заголовки столбцов из строки заголовка
       final headerRow = detected.dataStart > 0
-          ? List.generate(maxCols,
-              (c) => cellStr(sheet, c, detected.dataStart - 1))
-          : List.generate(maxCols,
-              (c) => String.fromCharCode(65 + c));
+          ? List.generate(
+              maxCols, (c) => cellStr(sheet, c, detected.dataStart - 1))
+          : List.generate(maxCols, (c) => String.fromCharCode(65 + c));
 
       final selectedCol = await showDialog<int>(
         context: context,
@@ -866,7 +947,18 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
   static bool _isIikoHeaderRow(String name) {
     final lower = name.toLowerCase();
-    const headers = ['наименование', 'код', 'ед. изм', 'остаток', 'бланк', 'организация', 'на дату', 'склад', 'группа', 'товар'];
+    const headers = [
+      'наименование',
+      'код',
+      'ед. изм',
+      'остаток',
+      'бланк',
+      'организация',
+      'на дату',
+      'склад',
+      'группа',
+      'товар'
+    ];
     return headers.any((h) => lower.contains(h));
   }
 
@@ -876,13 +968,16 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     if (productItems.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('duplicates_need_more') ?? 'Нужно минимум 2 продукта для поиска дубликатов')),
+        SnackBar(
+            content: Text(loc.t('duplicates_need_more') ??
+                'Нужно минимум 2 продукта для поиска дубликатов')),
       );
       return;
     }
 
     // Локальный поиск дублей по названию — без ИИ, мгновенно
-    String _norm(String s) => s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    String _norm(String s) =>
+        s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
 
     final Map<String, List<NomenclatureItem>> grouped = {};
     for (final item in productItems) {
@@ -906,11 +1001,13 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         })
         .where((g) => g.length >= 2)
         .toList()
-      ..sort((a, b) => b.length.compareTo(a.length)); // самые большие группы первыми
+      ..sort((a, b) =>
+          b.length.compareTo(a.length)); // самые большие группы первыми
 
     if (duplicateGroups.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('duplicates_none') ?? 'Дубликатов не найдено')),
+        SnackBar(
+            content: Text(loc.t('duplicates_none') ?? 'Дубликатов не найдено')),
       );
       return;
     }
@@ -926,7 +1023,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         onRemove: (idsToRemove) async {
           final store = context.read<ProductStoreSupabase>();
           final est = context.read<AccountManagerSupabase>().establishment;
-          final estId = est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
+          final estId =
+              est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
           if (estId == null) return;
           for (final id in idsToRemove) {
             final item = idToItem[id];
@@ -951,7 +1049,13 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     );
   }
 
-  void _showEditProductForNomenclature(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh, String estId) {
+  void _showEditProductForNomenclature(
+      BuildContext context,
+      Product p,
+      ProductStoreSupabase store,
+      LocalizationService loc,
+      VoidCallback onRefresh,
+      String estId) {
     showDialog<void>(
       context: context,
       builder: (ctx) => _ProductEditDialog(
@@ -967,9 +1071,11 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   void _showCreateProductDialog(LocalizationService loc) {
     final account = context.read<AccountManagerSupabase>();
     final est = account.establishment;
-    final estId = est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
+    final estId =
+        est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
     if (estId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('no_establishment'))));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(loc.t('no_establishment'))));
       return;
     }
     final store = context.read<ProductStoreSupabase>();
@@ -995,13 +1101,20 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         store: store,
         loc: loc,
         establishmentId: estId,
-        onSaved: () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})),
+        onSaved: () => _ensureLoaded(skipAutoTranslation: true)
+            .then((_) => setState(() {})),
         isCreate: true,
       ),
     );
   }
 
-  Future<void> _confirmRemoveForNomenclature(BuildContext context, Product p, ProductStoreSupabase store, LocalizationService loc, VoidCallback onRefresh, String estId) async {
+  Future<void> _confirmRemoveForNomenclature(
+      BuildContext context,
+      Product p,
+      ProductStoreSupabase store,
+      LocalizationService loc,
+      VoidCallback onRefresh,
+      String estId) async {
     // Проверяем, используется ли продукт в ТТК — блокируем удаление из номенклатуры
     try {
       final techCardService = context.read<TechCardServiceSupabase>();
@@ -1010,7 +1123,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         if (tc.ingredients.any((ing) => ing.productId == p.id)) {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Невозможно удалить: продукт используется в ТТК "${tc.dishName}"')),
+              SnackBar(
+                  content: Text(
+                      'Невозможно удалить: продукт используется в ТТК "${tc.dishName}"')),
             );
           }
           return;
@@ -1022,10 +1137,14 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       builder: (ctx) => AlertDialog(
         title: Text(loc.t('remove_from_nomenclature')),
         content: Text(
-          loc.t('remove_from_nomenclature_confirm').replaceAll('%s', p.getLocalizedName(loc.currentLanguageCode)),
+          loc
+              .t('remove_from_nomenclature_confirm')
+              .replaceAll('%s', p.getLocalizedName(loc.currentLanguageCode)),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(loc.t('cancel'))),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(loc.t('cancel'))),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -1040,18 +1159,24 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       if (context.mounted) onRefresh();
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                loc.t('error_with_message').replaceAll('%s', e.toString()))));
       }
     }
   }
 
-  String _buildProductSubtitle(BuildContext context, Product p, ProductStoreSupabase store, String estId, LocalizationService loc) {
+  String _buildProductSubtitle(BuildContext context, Product p,
+      ProductStoreSupabase store, String estId, LocalizationService loc) {
     final loc = context.read<LocalizationService>();
     final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
     final rawPrice = establishmentPrice?.$1;
     final accountManager = context.read<AccountManagerSupabase>();
     // Символ берём из валюты заведения, чтобы при смене валюты в настройках знак обновлялся
-    final displayCurrency = accountManager.establishment?.defaultCurrency ?? establishmentPrice?.$2 ?? p.currency ?? 'VND';
+    final displayCurrency = accountManager.establishment?.defaultCurrency ??
+        establishmentPrice?.$2 ??
+        p.currency ??
+        'VND';
     final currencySymbol = _currencySymbol(displayCurrency);
 
     // Цена в establishment_products и basePrice хранится за кг. Показываем как есть.
@@ -1059,19 +1184,26 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (rawPrice != null) {
       final unit = (p.unit ?? 'g').trim().toLowerCase();
       if (unit == 'g' || unit == 'грамм' || unit == 'kg' || unit == 'кг') {
-        priceText = loc.t('price_per_kg').replaceFirst('%s', NumberFormatUtils.formatInt(rawPrice)).replaceFirst('%s', currencySymbol);
+        priceText = loc
+            .t('price_per_kg')
+            .replaceFirst('%s', NumberFormatUtils.formatInt(rawPrice))
+            .replaceFirst('%s', currencySymbol);
       } else {
-        priceText = '${NumberFormatUtils.formatInt(rawPrice)} $currencySymbol/${_unitDisplay(p.unit, loc.currentLanguageCode)}';
+        priceText =
+            '${NumberFormatUtils.formatInt(rawPrice)} $currencySymbol/${_unitDisplay(p.unit, loc.currentLanguageCode)}';
       }
     } else {
       priceText = loc.t('price_not_set');
     }
 
-    final hideCategory = p.category == 'misc' || p.category == 'manual' || p.category == 'imported';
+    final hideCategory = p.category == 'misc' ||
+        p.category == 'manual' ||
+        p.category == 'imported';
 
     // «доп от филиала» — продукт добавлен только в номенклатуру филиала
     final branchOnly = store.isBranchOnlyProduct(p.id);
-    final base = hideCategory ? priceText : '${_categoryLabel(p.category)} · $priceText';
+    final base =
+        hideCategory ? priceText : '${_categoryLabel(p.category)} · $priceText';
     if (branchOnly) {
       final label = loc.t('branch_only_product_label') ?? 'доп от филиала';
       return '$base · $label';
@@ -1079,21 +1211,29 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     return base;
   }
 
-  String _currencySymbol(String currency) => Establishment.currencySymbolFor(currency);
+  String _currencySymbol(String currency) =>
+      Establishment.currencySymbolFor(currency);
 
   String _buildTechCardSubtitle(BuildContext context, TechCard tc) {
     final loc = context.read<LocalizationService>();
     // Рассчитываем стоимость за кг для ТТК
     if (tc.ingredients.isEmpty) {
-      return loc.t('pf_price_not_calculated').replaceFirst('%s', tc.yield.toStringAsFixed(0));
+      return loc
+          .t('pf_price_not_calculated')
+          .replaceFirst('%s', tc.yield.toStringAsFixed(0));
     }
 
-    final totalCost = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
-    final totalOutput = tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.outputWeight);
+    final totalCost =
+        tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
+    final totalOutput =
+        tc.ingredients.fold<double>(0, (sum, ing) => sum + ing.outputWeight);
     final costPerKg = totalOutput > 0 ? (totalCost / totalOutput) * 1000 : 0;
-    final sym = _currencySymbol(context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND');
+    final sym = _currencySymbol(
+        context.read<AccountManagerSupabase>().establishment?.defaultCurrency ??
+            'VND');
 
-    return loc.t('pf_price_per_kg')
+    return loc
+        .t('pf_price_per_kg')
         .replaceFirst('%s', NumberFormatUtils.formatInt(costPerKg))
         .replaceFirst('%s', sym)
         .replaceFirst('%s', tc.yield.toStringAsFixed(0));
@@ -1102,7 +1242,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   bool _needsKbju(NomenclatureItem item) {
     if (item.isTechCard) return false; // ТТК не нуждаются в КБЖУ
     final p = item.product!;
-    return (p.calories == null || p.calories == 0) && p.protein == null && p.fat == null && p.carbs == null;
+    return (p.calories == null || p.calories == 0) &&
+        p.protein == null &&
+        p.fat == null &&
+        p.carbs == null;
   }
 
   bool _canShowNutrition(BuildContext context) {
@@ -1120,7 +1263,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (allLangs.any((c) => (n[c] ?? '').trim().isEmpty)) return true;
     // Ручные продукты с одинаковым текстом во всех языках — не переведены
     if (p.category == 'manual') {
-      final vals = allLangs.map((c) => (n[c] ?? '').trim()).where((s) => s.isNotEmpty).toSet();
+      final vals = allLangs
+          .map((c) => (n[c] ?? '').trim())
+          .where((s) => s.isNotEmpty)
+          .toSet();
       if (vals.length <= 1) return true;
     }
     return false;
@@ -1141,20 +1287,26 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           Navigator.of(ctx).pop();
           _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
           if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('kbju_load_done'))));
+            ScaffoldMessenger.of(ctx)
+                .showSnackBar(SnackBar(content: Text(loc.t('kbju_load_done'))));
           }
         },
         onError: (e) {
           if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                content: Text(loc
+                    .t('error_with_message')
+                    .replaceAll('%s', e.toString()))));
           }
         },
       ),
     );
-    if (context.mounted) _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
+    if (context.mounted)
+      _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
   }
 
-  Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
+  Future<void> _loadTranslationsForAll(
+      BuildContext context, List<Product> list) async {
     if (!context.mounted) return;
     final store = context.read<ProductStoreSupabase>();
     final loc = context.read<LocalizationService>();
@@ -1169,20 +1321,26 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           Navigator.of(ctx).pop();
           _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
           if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('translate_done'))));
+            ScaffoldMessenger.of(ctx)
+                .showSnackBar(SnackBar(content: Text(loc.t('translate_done'))));
           }
         },
         onError: (e) {
           if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                content: Text(loc
+                    .t('error_with_message')
+                    .replaceAll('%s', e.toString()))));
           }
         },
       ),
     );
-    if (context.mounted) _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
+    if (context.mounted)
+      _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
   }
 
-  Future<void> _verifyWithAi(BuildContext context, List<Product> list, String estId) async {
+  Future<void> _verifyWithAi(
+      BuildContext context, List<Product> list, String estId) async {
     if (!context.mounted || list.isEmpty) return;
     final ai = context.read<AiService>();
     final store = context.read<ProductStoreSupabase>();
@@ -1203,7 +1361,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         },
         onError: (e) {
           if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                content: Text(loc
+                    .t('error_with_message')
+                    .replaceAll('%s', e.toString()))));
           }
         },
       ),
@@ -1211,7 +1372,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (!context.mounted) return;
     final withSuggestions = results.where((e) => e.hasAnySuggestion).toList();
     if (withSuggestions.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('verify_no_suggestions'))));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('verify_no_suggestions'))));
       _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
       return;
     }
@@ -1226,12 +1388,14 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           Navigator.of(ctx).pop();
           _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
           if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('verify_applied'))));
+            ScaffoldMessenger.of(ctx)
+                .showSnackBar(SnackBar(content: Text(loc.t('verify_applied'))));
           }
         },
       ),
     );
-    if (context.mounted) _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
+    if (context.mounted)
+      _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
   }
 
   Widget _tabChip(_NomTab tab, String label) {
@@ -1253,14 +1417,17 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final account = context.watch<AccountManagerSupabase>();
     final est = account.establishment;
     // Филиал: работа с номенклатурой и ценами по id филиала (головное — dataEstablishmentId).
-    final estId = est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
-    final canEdit = account.currentEmployee?.canEditChecklistsAndTechCards ?? false;
+    final estId =
+        est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
+    final canEdit =
+        account.currentEmployee?.canEditChecklistsAndTechCards ?? false;
     final isBranch = est?.isBranch ?? false;
 
     // Фильтруем элементы номенклатуры
     var nomItems = _nomenclatureItems.where((item) {
       // Фильтр по типу
-      if (_nomFilter == _NomenclatureFilter.products && item.isTechCard) return false;
+      if (_nomFilter == _NomenclatureFilter.products && item.isTechCard)
+        return false;
 
       // Фильтр «без цены»: только продукты/ПФ без указанной цены
       if (_filterNoPrice) {
@@ -1274,19 +1441,25 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       }
 
       // Фильтр по категории (только для продуктов)
-      if (_category != null && item.isProduct && item.product!.category != _category) return false;
+      if (_category != null &&
+          item.isProduct &&
+          item.product!.category != _category) return false;
 
       // Поисковый запрос
       if (_query.isNotEmpty) {
         final q = _query.toLowerCase();
         return item.name.toLowerCase().contains(q) ||
-            item.getLocalizedName(loc.currentLanguageCode).toLowerCase().contains(q);
+            item
+                .getLocalizedName(loc.currentLanguageCode)
+                .toLowerCase()
+                .contains(q);
       }
       return true;
     }).toList();
 
     // Сортируем
-    nomItems = _sortNomenclatureItems(nomItems, _nomSort, lang: loc.currentLanguageCode);
+    nomItems = _sortNomenclatureItems(nomItems, _nomSort,
+        lang: loc.currentLanguageCode);
 
     // «Новые» — продукты без цены (из загрузки ТТК и т.д.), для проверки и внесения цены/единицы
     final newItems = _nomenclatureItems.where((item) {
@@ -1299,16 +1472,21 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       if (_query.isNotEmpty) {
         final q = _query.toLowerCase();
         return item.name.toLowerCase().contains(q) ||
-            item.getLocalizedName(loc.currentLanguageCode).toLowerCase().contains(q);
+            item
+                .getLocalizedName(loc.currentLanguageCode)
+                .toLowerCase()
+                .contains(q);
       }
       return true;
     }).toList();
-    final newItemsSorted = _sortNomenclatureItems(newItems, _nomSort, lang: loc.currentLanguageCode);
+    final newItemsSorted = _sortNomenclatureItems(newItems, _nomSort,
+        lang: loc.currentLanguageCode);
 
     final iikoStore = context.watch<IikoProductStore>();
     final estId2 = account.dataEstablishmentId ?? '';
 
-    final canCreateProduct = (_selectedTab == _NomTab.nomenclature || _selectedTab == _NomTab.newProducts);
+    final canCreateProduct = (_selectedTab == _NomTab.nomenclature ||
+        _selectedTab == _NomTab.newProducts);
 
     return Scaffold(
       appBar: AppBar(
@@ -1320,16 +1498,22 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         ),
         actions: [
           // Счётчик: показываем для активной вкладки
-          if (_selectedTab == _NomTab.nomenclature || _selectedTab == _NomTab.newProducts)
+          if (_selectedTab == _NomTab.nomenclature ||
+              _selectedTab == _NomTab.newProducts)
             Center(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.8),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .surfaceContainerHighest
+                      .withOpacity(0.8),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  _selectedTab == _NomTab.newProducts ? '${newItemsSorted.length}' : '${nomItems.length}',
+                  _selectedTab == _NomTab.newProducts
+                      ? '${newItemsSorted.length}'
+                      : '${nomItems.length}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurface,
                         fontWeight: FontWeight.w600,
@@ -1337,7 +1521,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                 ),
               ),
             ),
-          if (_selectedTab == _NomTab.nomenclature || _selectedTab == _NomTab.newProducts) ...[
+          if (_selectedTab == _NomTab.nomenclature ||
+              _selectedTab == _NomTab.newProducts) ...[
             IconButton(
               icon: const Icon(Icons.warning),
               onPressed: () => _showDuplicates(),
@@ -1395,13 +1580,15 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
             ),
             IconButton(
               icon: const Icon(Icons.attach_money),
-              onPressed: account.establishment != null ? () => _showCurrencyDialog(context, loc, account, store) : null,
+              onPressed: account.establishment != null
+                  ? () => _showCurrencyDialog(context, loc, account, store)
+                  : null,
               tooltip: loc.t('default_currency'),
             ),
           ],
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () async {
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
               await _ensureLoaded(skipAutoTranslation: true);
               if (mounted) setState(() {});
             },
@@ -1413,191 +1600,317 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         controller: _scrollController,
         child: Column(
           children: [
-          // ── Переключатель вкладок (FilterChip, как в Входящих) ──────────────
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              border: Border(
-                bottom: BorderSide(color: Theme.of(context).dividerColor),
+            // ── Переключатель вкладок (FilterChip, как в Входящих) ──────────────
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                border: Border(
+                  bottom: BorderSide(color: Theme.of(context).dividerColor),
+                ),
+              ),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _tabChip(_NomTab.nomenclature, loc.t('nomenclature')),
+                    const SizedBox(width: 8),
+                    _tabChip(_NomTab.newProducts, loc.t('nomenclature_new')),
+                    if (widget.department != 'hall' &&
+                        widget.department != 'dining_room') ...[
+                      const SizedBox(width: 8),
+                      _tabChip(_NomTab.iiko, 'iiko'),
+                    ],
+                  ],
+                ),
               ),
             ),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
+
+            // ── Контент активной вкладки ─────────────────────────────────────────
+            Expanded(
+              child: IndexedStack(
+                index: _selectedTab.index,
                 children: [
-                  _tabChip(_NomTab.nomenclature, loc.t('nomenclature')),
-                  const SizedBox(width: 8),
-                  _tabChip(_NomTab.newProducts, loc.t('nomenclature_new')),
-                  if (widget.department != 'hall' && widget.department != 'dining_room') ...[
-                    const SizedBox(width: 8),
-                    _tabChip(_NomTab.iiko, 'iiko'),
-                  ],
+                  // Вкладка 0: стандартная номенклатура
+                  Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            TextField(
+                              decoration: InputDecoration(
+                                hintText: loc.t('search'),
+                                prefixIcon: const Icon(Icons.search),
+                                border: const OutlineInputBorder(),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
+                              ),
+                              onChanged: (v) => setState(() => _query = v),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                FilterChip(
+                                  avatar: Icon(Icons.money_off,
+                                      size: 18,
+                                      color: _filterNoPrice
+                                          ? Theme.of(context)
+                                              .colorScheme
+                                              .primary
+                                          : null),
+                                  label: Text(loc.t('filter_no_price')),
+                                  selected: _filterNoPrice,
+                                  onSelected: (v) =>
+                                      setState(() => _filterNoPrice = v),
+                                ),
+                                ChoiceChip(
+                                  label: const Text('А-Я'),
+                                  selected: _nomSort == _CatalogSort.nameAz,
+                                  onSelected: (_) => setState(
+                                      () => _nomSort = _CatalogSort.nameAz),
+                                ),
+                                ChoiceChip(
+                                  label: const Text('Я-А'),
+                                  selected: _nomSort == _CatalogSort.nameZa,
+                                  onSelected: (_) => setState(
+                                      () => _nomSort = _CatalogSort.nameZa),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: _isLoading
+                            ? _buildNomenclatureSkeletonLoading()
+                            : _NomenclatureTab(
+                                items: nomItems,
+                                store: store,
+                                estId: estId ?? '',
+                                canRemove: true,
+                                loc: loc,
+                                sort: _nomSort,
+                                filterType: _nomFilter,
+                                loadError: _loadError,
+                                onRetry: () =>
+                                    _ensureLoaded(skipAutoTranslation: true)
+                                        .then((_) => setState(() {})),
+                                onSortChanged: (s) =>
+                                    setState(() => _nomSort = s),
+                                onFilterTypeChanged: (f) =>
+                                    setState(() => _nomFilter = f),
+                                onRefresh: () =>
+                                    _ensureLoaded(skipAutoTranslation: true)
+                                        .then((_) => setState(() {})),
+                                onSwitchToCatalog: () =>
+                                    _showCreateProductDialog(loc),
+                                onEditProduct: (ctx, p) =>
+                                    _showEditProductForNomenclature(
+                                        ctx,
+                                        p,
+                                        store,
+                                        loc,
+                                        () => _ensureLoaded(
+                                                skipAutoTranslation: true)
+                                            .then((_) => setState(() {})),
+                                        estId ?? ''),
+                                onRemoveProduct: (ctx, p) =>
+                                    _confirmRemoveForNomenclature(
+                                        ctx,
+                                        p,
+                                        store,
+                                        loc,
+                                        () => _ensureLoaded(
+                                                skipAutoTranslation: true)
+                                            .then((_) => setState(() {})),
+                                        estId ?? ''),
+                                onLoadKbju: (ctx, list) =>
+                                    _loadKbjuForAll(ctx, list),
+                                onVerifyWithAi: (ctx, list) =>
+                                    _verifyWithAi(ctx, list, estId ?? ''),
+                                onNeedsKbju: (item) => _needsKbju(item),
+                                onNeedsTranslation: (item) =>
+                                    _needsTranslation(item),
+                                onCanShowNutrition: (context) =>
+                                    _canShowNutrition(context),
+                                onBuildProductSubtitle:
+                                    (context, p, store, estId, loc) =>
+                                        _buildProductSubtitle(
+                                            context, p, store, estId, loc),
+                                onBuildTechCardSubtitle: (tc) =>
+                                    _buildTechCardSubtitle(context, tc),
+                              ),
+                      ),
+                    ],
+                  ),
+
+                  // Вкладка 1: «Новые» — продукты без цены (из ТТК и т.д.)
+                  Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (newItemsSorted.isEmpty)
+                              Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                child: Text(
+                                  loc.t('nomenclature_new_empty') ??
+                                      'Нет продуктов без цены',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
+                                      ),
+                                ),
+                              )
+                            else
+                              Text(
+                                loc.t('nomenclature_new_hint') ??
+                                    'Укажите цену и единицу измерения',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                              ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              decoration: InputDecoration(
+                                hintText: loc.t('search'),
+                                prefixIcon: const Icon(Icons.search),
+                                border: const OutlineInputBorder(),
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
+                              ),
+                              onChanged: (v) => setState(() => _query = v),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                ChoiceChip(
+                                  label: const Text('А-Я'),
+                                  selected: _nomSort == _CatalogSort.nameAz,
+                                  onSelected: (_) => setState(
+                                      () => _nomSort = _CatalogSort.nameAz),
+                                ),
+                                ChoiceChip(
+                                  label: const Text('Я-А'),
+                                  selected: _nomSort == _CatalogSort.nameZa,
+                                  onSelected: (_) => setState(
+                                      () => _nomSort = _CatalogSort.nameZa),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: _isLoading
+                            ? _buildNomenclatureSkeletonLoading()
+                            : _NomenclatureTab(
+                                items: newItemsSorted,
+                                store: store,
+                                estId: estId ?? '',
+                                canRemove: true,
+                                loc: loc,
+                                sort: _nomSort,
+                                filterType: _nomFilter,
+                                loadError: _loadError,
+                                onRetry: () =>
+                                    _ensureLoaded(skipAutoTranslation: true)
+                                        .then((_) => setState(() {})),
+                                onSortChanged: (s) =>
+                                    setState(() => _nomSort = s),
+                                onFilterTypeChanged: (f) =>
+                                    setState(() => _nomFilter = f),
+                                onRefresh: () =>
+                                    _ensureLoaded(skipAutoTranslation: true)
+                                        .then((_) => setState(() {})),
+                                onSwitchToCatalog: () =>
+                                    _showCreateProductDialog(loc),
+                                onEditProduct: (ctx, p) =>
+                                    _showEditProductForNomenclature(
+                                        ctx,
+                                        p,
+                                        store,
+                                        loc,
+                                        () => _ensureLoaded(
+                                                skipAutoTranslation: true)
+                                            .then((_) => setState(() {})),
+                                        estId ?? ''),
+                                onRemoveProduct: (ctx, p) =>
+                                    _confirmRemoveForNomenclature(
+                                        ctx,
+                                        p,
+                                        store,
+                                        loc,
+                                        () => _ensureLoaded(
+                                                skipAutoTranslation: true)
+                                            .then((_) => setState(() {})),
+                                        estId ?? ''),
+                                onLoadKbju: (ctx, list) =>
+                                    _loadKbjuForAll(ctx, list),
+                                onVerifyWithAi: (ctx, list) =>
+                                    _verifyWithAi(ctx, list, estId ?? ''),
+                                onNeedsKbju: (item) => _needsKbju(item),
+                                onNeedsTranslation: (item) =>
+                                    _needsTranslation(item),
+                                onCanShowNutrition: (context) =>
+                                    _canShowNutrition(context),
+                                onBuildProductSubtitle:
+                                    (context, p, store, estId, loc) =>
+                                        _buildProductSubtitle(
+                                            context, p, store, estId, loc),
+                                onBuildTechCardSubtitle: (tc) =>
+                                    _buildTechCardSubtitle(context, tc),
+                              ),
+                      ),
+                    ],
+                  ),
+
+                  // Вкладка 2: iiko-продукты
+                  _IikoNomenclatureTab(
+                    store: iikoStore,
+                    establishmentId: estId2,
+                    onUpload: _uploadIikoBlank,
+                  ),
                 ],
               ),
             ),
-          ),
-
-          // ── Контент активной вкладки ─────────────────────────────────────────
-          Expanded(
-            child: IndexedStack(
-              index: _selectedTab.index,
-              children: [
-                // Вкладка 0: стандартная номенклатура
-                Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          TextField(
-                            decoration: InputDecoration(
-                              hintText: loc.t('search'),
-                              prefixIcon: const Icon(Icons.search),
-                              border: const OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                            onChanged: (v) => setState(() => _query = v),
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            children: [
-                              FilterChip(
-                                avatar: Icon(Icons.money_off, size: 18, color: _filterNoPrice ? Theme.of(context).colorScheme.primary : null),
-                                label: Text(loc.t('filter_no_price')),
-                                selected: _filterNoPrice,
-                                onSelected: (v) => setState(() => _filterNoPrice = v),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: _isLoading
-                          ? _buildNomenclatureSkeletonLoading()
-                          : _NomenclatureTab(
-                              items: nomItems,
-                              store: store,
-                              estId: estId ?? '',
-                              canRemove: true,
-                              loc: loc,
-                              sort: _nomSort,
-                              filterType: _nomFilter,
-                              loadError: _loadError,
-                              onRetry: () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})),
-                              onSortChanged: (s) => setState(() => _nomSort = s),
-                              onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
-                              onRefresh: () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})),
-                              onSwitchToCatalog: () => _showCreateProductDialog(loc),
-                              onEditProduct: (ctx, p) => _showEditProductForNomenclature(ctx, p, store, loc, () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})), estId ?? ''),
-                              onRemoveProduct: (ctx, p) => _confirmRemoveForNomenclature(ctx, p, store, loc, () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})), estId ?? ''),
-                              onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
-                              onVerifyWithAi: (ctx, list) => _verifyWithAi(ctx, list, estId ?? ''),
-                              onNeedsKbju: (item) => _needsKbju(item),
-                              onNeedsTranslation: (item) => _needsTranslation(item),
-                              onCanShowNutrition: (context) => _canShowNutrition(context),
-                              onBuildProductSubtitle: (context, p, store, estId, loc) => _buildProductSubtitle(context, p, store, estId, loc),
-                              onBuildTechCardSubtitle: (tc) => _buildTechCardSubtitle(context, tc),
-                            ),
-                    ),
-                  ],
-                ),
-
-                // Вкладка 1: «Новые» — продукты без цены (из ТТК и т.д.)
-                Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (newItemsSorted.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              child: Text(
-                                loc.t('nomenclature_new_empty') ?? 'Нет продуктов без цены',
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                    ),
-                              ),
-                            )
-                          else
-                            Text(
-                              loc.t('nomenclature_new_hint') ?? 'Укажите цену и единицу измерения',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
-                            ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            decoration: InputDecoration(
-                              hintText: loc.t('search'),
-                              prefixIcon: const Icon(Icons.search),
-                              border: const OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                            onChanged: (v) => setState(() => _query = v),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: _isLoading
-                          ? _buildNomenclatureSkeletonLoading()
-                          : _NomenclatureTab(
-                              items: newItemsSorted,
-                              store: store,
-                              estId: estId ?? '',
-                              canRemove: true,
-                              loc: loc,
-                              sort: _nomSort,
-                              filterType: _nomFilter,
-                              loadError: _loadError,
-                              onRetry: () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})),
-                              onSortChanged: (s) => setState(() => _nomSort = s),
-                              onFilterTypeChanged: (f) => setState(() => _nomFilter = f),
-                              onRefresh: () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})),
-                              onSwitchToCatalog: () => _showCreateProductDialog(loc),
-                              onEditProduct: (ctx, p) => _showEditProductForNomenclature(ctx, p, store, loc, () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})), estId ?? ''),
-                              onRemoveProduct: (ctx, p) => _confirmRemoveForNomenclature(ctx, p, store, loc, () => _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {})), estId ?? ''),
-                              onLoadKbju: (ctx, list) => _loadKbjuForAll(ctx, list),
-                              onVerifyWithAi: (ctx, list) => _verifyWithAi(ctx, list, estId ?? ''),
-                              onNeedsKbju: (item) => _needsKbju(item),
-                              onNeedsTranslation: (item) => _needsTranslation(item),
-                              onCanShowNutrition: (context) => _canShowNutrition(context),
-                              onBuildProductSubtitle: (context, p, store, estId, loc) => _buildProductSubtitle(context, p, store, estId, loc),
-                              onBuildTechCardSubtitle: (tc) => _buildTechCardSubtitle(context, tc),
-                            ),
-                    ),
-                  ],
-                ),
-
-                // Вкладка 2: iiko-продукты
-                _IikoNomenclatureTab(
-                  store: iikoStore,
-                  establishmentId: estId2,
-                  onUpload: _uploadIikoBlank,
-                ),
-              ],
-            ),
-          ),
           ],
         ),
       ),
     );
   }
 
-  List<Product> _sortProducts(List<Product> list, _CatalogSort sort, {String lang = 'ru'}) {
+  List<Product> _sortProducts(List<Product> list, _CatalogSort sort,
+      {String lang = 'ru'}) {
     final copy = List<Product>.from(list);
     switch (sort) {
       case _CatalogSort.nameAz:
-        copy.sort((a, b) => _sortKeyForName(a.getLocalizedName(lang)).compareTo(_sortKeyForName(b.getLocalizedName(lang))));
+        copy.sort((a, b) => _sortKeyForName(a.getLocalizedName(lang))
+            .compareTo(_sortKeyForName(b.getLocalizedName(lang))));
         break;
       case _CatalogSort.nameZa:
-        copy.sort((a, b) => _sortKeyForName(b.getLocalizedName(lang)).compareTo(_sortKeyForName(a.getLocalizedName(lang))));
+        copy.sort((a, b) => _sortKeyForName(b.getLocalizedName(lang))
+            .compareTo(_sortKeyForName(a.getLocalizedName(lang))));
         break;
       case _CatalogSort.priceAsc:
       case _CatalogSort.priceDesc:
@@ -1615,12 +1928,23 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     // Применяем русскую логику только если текст содержит кириллицу
     final hasCyrillic = lower.runes.any((r) => r >= 0x0400 && r <= 0x04FF);
     if (hasCyrillic) {
-      const words = ['соус', 'специя', 'смесь', 'приправа', 'маринад', 'подлива', 'паста', 'масло'];
+      const words = [
+        'соус',
+        'специя',
+        'смесь',
+        'приправа',
+        'маринад',
+        'подлива',
+        'паста',
+        'масло'
+      ];
       for (final w in words) {
         final idx = lower.indexOf(w);
         if (idx >= 0) {
           final before = idx > 0 ? lower.substring(0, idx).trim() : '';
-          final after = idx + w.length < lower.length ? lower.substring(idx + w.length).trim() : '';
+          final after = idx + w.length < lower.length
+              ? lower.substring(idx + w.length).trim()
+              : '';
           final rest = [before, after].where((s) => s.isNotEmpty).join(' ');
           return '$w ${rest.isEmpty ? '' : rest}'.trim();
         }
@@ -1629,17 +1953,21 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     return lower;
   }
 
-  List<NomenclatureItem> _sortNomenclatureItems(List<NomenclatureItem> list, _CatalogSort sort, {String lang = 'ru'}) {
+  List<NomenclatureItem> _sortNomenclatureItems(
+      List<NomenclatureItem> list, _CatalogSort sort,
+      {String lang = 'ru'}) {
     final products = list.where((item) => item.isProduct).toList();
     final techCards = list.where((item) => item.isTechCard).toList();
 
     void sortGroup(List<NomenclatureItem> group) {
       switch (sort) {
         case _CatalogSort.nameAz:
-          group.sort((a, b) => _sortKeyForName(a.getLocalizedName(lang)).compareTo(_sortKeyForName(b.getLocalizedName(lang))));
+          group.sort((a, b) => _sortKeyForName(a.getLocalizedName(lang))
+              .compareTo(_sortKeyForName(b.getLocalizedName(lang))));
           break;
         case _CatalogSort.nameZa:
-          group.sort((a, b) => _sortKeyForName(b.getLocalizedName(lang)).compareTo(_sortKeyForName(a.getLocalizedName(lang))));
+          group.sort((a, b) => _sortKeyForName(b.getLocalizedName(lang))
+              .compareTo(_sortKeyForName(a.getLocalizedName(lang))));
           break;
         case _CatalogSort.priceAsc:
           group.sort((a, b) => (a.price ?? 0).compareTo(b.price ?? 0));
@@ -1649,6 +1977,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           break;
       }
     }
+
     sortGroup(products);
     sortGroup(techCards);
     return [...products, ...techCards];
@@ -1656,10 +1985,22 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
   String _categoryLabel(String c) {
     const map = {
-      'vegetables': 'Овощи', 'fruits': 'Фрукты', 'meat': 'Мясо', 'seafood': 'Рыба',
-      'dairy': 'Молочное', 'grains': 'Крупы', 'bakery': 'Выпечка', 'pantry': 'Бакалея',
-      'spices': 'Специи', 'beverages': 'Напитки', 'eggs': 'Яйца', 'legumes': 'Бобовые',
-      'nuts': 'Орехи', 'misc': '', 'manual': '', 'imported': '',
+      'vegetables': 'Овощи',
+      'fruits': 'Фрукты',
+      'meat': 'Мясо',
+      'seafood': 'Рыба',
+      'dairy': 'Молочное',
+      'grains': 'Крупы',
+      'bakery': 'Выпечка',
+      'pantry': 'Бакалея',
+      'spices': 'Специи',
+      'beverages': 'Напитки',
+      'eggs': 'Яйца',
+      'legumes': 'Бобовые',
+      'nuts': 'Орехи',
+      'misc': '',
+      'manual': '',
+      'imported': '',
     };
     return map[c] ?? c;
   }
@@ -1705,18 +2046,36 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   // Теперь используется единый экран загрузки продуктов
   // Fix for Vercel build issue
 
-  static const _addProductCategories = ['manual', 'vegetables', 'fruits', 'meat', 'seafood', 'dairy', 'grains', 'bakery', 'pantry', 'spices', 'beverages', 'eggs', 'legumes', 'nuts', 'misc'];
+  static const _addProductCategories = [
+    'manual',
+    'vegetables',
+    'fruits',
+    'meat',
+    'seafood',
+    'dairy',
+    'grains',
+    'bakery',
+    'pantry',
+    'spices',
+    'beverages',
+    'eggs',
+    'legumes',
+    'nuts',
+    'misc'
+  ];
   static const _addProductUnits = ['g', 'kg', 'pcs', 'ml', 'L'];
 
   Future<void> _showAddProductDialog(LocalizationService loc) async {
     final account = context.read<AccountManagerSupabase>();
     final estId = account.dataEstablishmentId;
     if (estId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('no_establishment'))));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(loc.t('no_establishment'))));
       return;
     }
     final store = context.read<ProductStoreSupabase>();
-    final result = await showDialog<({String name, String category, String unit})>(
+    final result =
+        await showDialog<({String name, String category, String unit})>(
       context: context,
       builder: (ctx) => _AddProductDialog(
         loc: loc,
@@ -1768,9 +2127,13 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       final savedProduct = await store.addProduct(product);
       await store.addToNomenclature(estId, savedProduct.id);
       // Запускаем перевод фоново — не блокируем UI
-      translationManager.generateTranslationsForProduct(sourceName, sourceLang).then((translations) async {
+      translationManager
+          .generateTranslationsForProduct(sourceName, sourceLang)
+          .then((translations) async {
         if (translations.length > 1) {
-          final updatedNames = Map<String, String>.from(savedProduct.names ?? {})..addAll(translations);
+          final updatedNames =
+              Map<String, String>.from(savedProduct.names ?? {})
+                ..addAll(translations);
           final updatedProduct = savedProduct.copyWith(names: updatedNames);
           try {
             await store.updateProduct(updatedProduct);
@@ -1780,14 +2143,16 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       await store.loadProducts(force: true);
       await store.loadNomenclature(estId);
       if (mounted) setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('product_added'))));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(loc.t('product_added'))));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                loc.t('error_with_message').replaceAll('%s', e.toString()))));
       }
     }
   }
-
 
   /// Извлекает обычный текст из RTF файла
   String _extractTextFromRtf(String rtfContent) {
@@ -1813,13 +2178,15 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     return text;
   }
 
-  Future<void> _addProductsFromExcel(Uint8List bytes, LocalizationService loc) async {
+  Future<void> _addProductsFromExcel(
+      Uint8List bytes, LocalizationService loc) async {
     try {
       final excel = Excel.decodeBytes(bytes);
       final sheet = excel.tables[excel.tables.keys.first];
       if (sheet == null) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: не найдена таблица в файле')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Ошибка: не найдена таблица в файле')));
         return;
       }
 
@@ -1841,31 +2208,41 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       final text = lines.join('\n');
       if (text.trim().isEmpty) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('file_empty'))));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(loc.t('file_empty'))));
         return;
       }
       await _addProductsFromText(text, loc);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка обработки Excel файла: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Ошибка обработки Excel файла: $e')));
     }
   }
 
-  Future<void> _addProductsFromText(String text, LocalizationService loc) async {
-    final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty);
-    final items = lines.map(_parseLine).where((r) => r.name.isNotEmpty).toList();
+  Future<void> _addProductsFromText(
+      String text, LocalizationService loc) async {
+    final lines = text
+        .split(RegExp(r'\r?\n'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty);
+    final items =
+        lines.map(_parseLine).where((r) => r.name.isNotEmpty).toList();
 
     // Отладка
     if (!mounted) return;
     final sampleLines = lines.take(2).join('\n');
-    final sampleItems = items.take(2).map((item) => '${item.name}: ${item.price}').join(', ');
+    final sampleItems =
+        items.take(2).map((item) => '${item.name}: ${item.price}').join(', ');
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Найдено строк: ${lines.length}, валидных: ${items.length}\nСтроки: $sampleLines\nЭлементы: $sampleItems'),
+      content: Text(
+          'Найдено строк: ${lines.length}, валидных: ${items.length}\nСтроки: $sampleLines\nЭлементы: $sampleItems'),
       duration: const Duration(seconds: 8),
     ));
 
     if (items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('no_rows_to_add'))));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(loc.t('no_rows_to_add'))));
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -1880,18 +2257,28 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
             const SizedBox(height: 4),
             Text(
               loc.t('upload_add_to_nomenclature_hint'),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Colors.grey[600]),
             ),
             const SizedBox(height: 8),
             Text(
               loc.t('upload_txt_format'),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Colors.grey[600]),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(loc.t('cancel'))),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(loc.t('save'))),
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(loc.t('cancel'))),
+          FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(loc.t('save'))),
         ],
       ),
     );
@@ -1921,7 +2308,6 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     }
     if (mounted) setState(() {});
   }
-
 
   void _showCurrencyDialog(
     BuildContext context,
@@ -2003,7 +2389,8 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              widget.loc.t('duplicates_hint') ?? 'Найдены похожие названия. Выберите, какие удалить (останется один эталон).',
+              widget.loc.t('duplicates_hint') ??
+                  'Найдены похожие названия. Выберите, какие удалить (останется один эталон).',
               style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: 12),
@@ -2020,8 +2407,10 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.loc.t('duplicates_group') ?? 'Группа ${gi + 1}',
-                            style: theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.primary),
+                            widget.loc.t('duplicates_group') ??
+                                'Группа ${gi + 1}',
+                            style: theme.textTheme.labelMedium
+                                ?.copyWith(color: theme.colorScheme.primary),
                           ),
                           ...group.map((item) => CheckboxListTile(
                                 value: _selectedToRemove.contains(item.id),
@@ -2037,11 +2426,17 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
                                 title: Text(
                                   item.name,
                                   style: TextStyle(
-                                    fontWeight: group.indexOf(item) == 0 ? FontWeight.bold : FontWeight.normal,
+                                    fontWeight: group.indexOf(item) == 0
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
                                   ),
                                 ),
-                                subtitle: item.price != null ? Text('${item.price} ${Establishment.currencySymbolFor(item.currency ?? context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND')}') : null,
-                                controlAffinity: ListTileControlAffinity.leading,
+                                subtitle: item.price != null
+                                    ? Text(
+                                        '${item.price} ${Establishment.currencySymbolFor(item.currency ?? context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND')}')
+                                    : null,
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
                                 dense: true,
                               )),
                         ],
@@ -2061,11 +2456,18 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
         ),
         TextButton(
           onPressed: _saving ? null : _selectAllExceptFirst,
-          child: Text(widget.loc.t('duplicates_remove_all') ?? 'Удалить все кроме первого'),
+          child: Text(widget.loc.t('duplicates_remove_all') ??
+              'Удалить все кроме первого'),
         ),
         FilledButton(
-          onPressed: _saving || _selectedToRemove.isEmpty ? null : _applyRemoval,
-          child: _saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : Text(widget.loc.t('duplicates_apply') ?? 'Применить'),
+          onPressed:
+              _saving || _selectedToRemove.isEmpty ? null : _applyRemoval,
+          child: _saving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : Text(widget.loc.t('duplicates_apply') ?? 'Применить'),
         ),
       ],
     );
@@ -2116,10 +2518,12 @@ class _AddProductDialogState extends State<_AddProductDialog> {
       _recognizing = false;
       if (result != null) {
         _nameController?.text = result.normalizedName;
-        if (result.suggestedCategory != null && widget.categories.contains(result.suggestedCategory)) {
+        if (result.suggestedCategory != null &&
+            widget.categories.contains(result.suggestedCategory)) {
           _category = result.suggestedCategory!;
         }
-        if (result.suggestedUnit != null && widget.units.contains(result.suggestedUnit)) {
+        if (result.suggestedUnit != null &&
+            widget.units.contains(result.suggestedUnit)) {
           _unit = result.suggestedUnit!;
         }
       }
@@ -2141,16 +2545,19 @@ class _AddProductDialogState extends State<_AddProductDialog> {
                 if (query.isEmpty) return const Iterable<String>.empty();
                 final qStripped = stripIikoPrefix(query).toLowerCase();
                 return widget.store.allProducts
-                    .map((p) => p.getLocalizedName(widget.loc.currentLanguageCode))
+                    .map((p) =>
+                        p.getLocalizedName(widget.loc.currentLanguageCode))
                     .where((name) {
-                      final n = name.toLowerCase();
-                      final nStripped = stripIikoPrefix(name).toLowerCase();
-                      return n.contains(query) || n.contains(qStripped) ||
-                          nStripped.contains(query) || nStripped.contains(qStripped);
-                    })
-                    .take(15);
+                  final n = name.toLowerCase();
+                  final nStripped = stripIikoPrefix(name).toLowerCase();
+                  return n.contains(query) ||
+                      n.contains(qStripped) ||
+                      nStripped.contains(query) ||
+                      nStripped.contains(qStripped);
+                }).take(15);
               },
-              fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+              fieldViewBuilder:
+                  (context, controller, focusNode, onFieldSubmitted) {
                 _nameController = controller;
                 return TextField(
                   controller: controller,
@@ -2181,7 +2588,8 @@ class _AddProductDialogState extends State<_AddProductDialog> {
                           onTap: () => onSelected(opt),
                           child: ListTile(
                             dense: true,
-                            title: Text(opt, style: const TextStyle(fontSize: 14)),
+                            title:
+                                Text(opt, style: const TextStyle(fontSize: 14)),
                           ),
                         );
                       },
@@ -2193,33 +2601,52 @@ class _AddProductDialogState extends State<_AddProductDialog> {
             const SizedBox(height: 8),
             FilledButton.tonalIcon(
               onPressed: _recognizing ? null : _recognize,
-              icon: _recognizing ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome, size: 20),
+              icon: _recognizing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.auto_awesome, size: 20),
               label: Text(widget.loc.t('ai_product_recognize')),
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               value: _category,
-              decoration: InputDecoration(labelText: widget.loc.t('column_category'), border: const OutlineInputBorder()),
-              items: widget.categories.map((c) => DropdownMenuItem(value: c, child: Text(c == 'manual' ? widget.loc.t('category_manual') : c))).toList(),
+              decoration: InputDecoration(
+                  labelText: widget.loc.t('column_category'),
+                  border: const OutlineInputBorder()),
+              items: widget.categories
+                  .map((c) => DropdownMenuItem(
+                      value: c,
+                      child: Text(
+                          c == 'manual' ? widget.loc.t('category_manual') : c)))
+                  .toList(),
               onChanged: (v) => setState(() => _category = v ?? 'manual'),
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               value: _unit,
-              decoration: InputDecoration(labelText: widget.loc.t('unit'), border: const OutlineInputBorder()),
-              items: widget.units.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+              decoration: InputDecoration(
+                  labelText: widget.loc.t('unit'),
+                  border: const OutlineInputBorder()),
+              items: widget.units
+                  .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                  .toList(),
               onChanged: (v) => setState(() => _unit = v ?? 'g'),
             ),
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(null), child: Text(widget.loc.t('cancel'))),
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(null),
+            child: Text(widget.loc.t('cancel'))),
         FilledButton(
           onPressed: () {
             final name = _nameController?.text.trim() ?? '';
             if (name.isEmpty) return;
-            Navigator.of(context).pop((name: name, category: _category, unit: _unit));
+            Navigator.of(context)
+                .pop((name: name, category: _category, unit: _unit));
           },
           child: Text(widget.loc.t('save')),
         ),
@@ -2275,19 +2702,31 @@ class _NomenclatureTab extends StatefulWidget {
   final bool Function(NomenclatureItem) onNeedsKbju;
   final bool Function(NomenclatureItem) onNeedsTranslation;
   final bool Function(BuildContext) onCanShowNutrition;
-  final String Function(BuildContext, Product, ProductStoreSupabase, String, LocalizationService) onBuildProductSubtitle;
+  final String Function(BuildContext, Product, ProductStoreSupabase, String,
+      LocalizationService) onBuildProductSubtitle;
   final String Function(TechCard) onBuildTechCardSubtitle;
 
   static String _categoryLabel(String c) {
     const map = {
-      'vegetables': 'Овощи', 'fruits': 'Фрукты', 'meat': 'Мясо', 'seafood': 'Рыба',
-      'dairy': 'Молочное', 'grains': 'Крупы', 'bakery': 'Выпечка', 'pantry': 'Бакалея',
-      'spices': 'Специи', 'beverages': 'Напитки', 'eggs': 'Яйца', 'legumes': 'Бобовые',
-      'nuts': 'Орехи', 'misc': '', 'manual': '', 'imported': '',
+      'vegetables': 'Овощи',
+      'fruits': 'Фрукты',
+      'meat': 'Мясо',
+      'seafood': 'Рыба',
+      'dairy': 'Молочное',
+      'grains': 'Крупы',
+      'bakery': 'Выпечка',
+      'pantry': 'Бакалея',
+      'spices': 'Специи',
+      'beverages': 'Напитки',
+      'eggs': 'Яйца',
+      'legumes': 'Бобовые',
+      'nuts': 'Орехи',
+      'misc': '',
+      'manual': '',
+      'imported': '',
     };
     return map[c] ?? c;
   }
-
 
   @override
   State<_NomenclatureTab> createState() => _NomenclatureTabState();
@@ -2308,32 +2747,16 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
       );
     }
 
-    final needsKbju = widget.items.where((item) => item.isProduct && item.product!.category == 'manual' && widget.onNeedsKbju(item)).toList();
-    final needsTranslation = widget.items.where((item) => widget.onNeedsTranslation(item)).toList();
+    final needsKbju = widget.items
+        .where((item) =>
+            item.isProduct &&
+            item.product!.category == 'manual' &&
+            widget.onNeedsKbju(item))
+        .toList();
+    final needsTranslation =
+        widget.items.where((item) => widget.onNeedsTranslation(item)).toList();
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            alignment: WrapAlignment.start,
-            children: [
-              PopupMenuButton<_CatalogSort>(
-                icon: const Icon(Icons.sort),
-                tooltip: widget.loc.t('sort_name_az').split(' ').take(2).join(' '),
-                onSelected: widget.onSortChanged,
-                itemBuilder: (_) => [
-                  PopupMenuItem(value: _CatalogSort.nameAz, child: Text(widget.loc.t('sort_name_az'))),
-                  PopupMenuItem(value: _CatalogSort.nameZa, child: Text(widget.loc.t('sort_name_za'))),
-                  PopupMenuItem(value: _CatalogSort.priceAsc, child: Text(widget.loc.t('sort_price_asc'))),
-                  PopupMenuItem(value: _CatalogSort.priceDesc, child: Text(widget.loc.t('sort_price_desc'))),
-                ],
-              ),
-
-            ],
-          ),
-        ),
         Expanded(
           child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -2346,18 +2769,22 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                   margin: const EdgeInsets.only(bottom: 6),
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                      backgroundColor:
+                          Theme.of(context).colorScheme.primaryContainer,
                       child: Text(
                         (i + 1).toString(),
                         style: TextStyle(
                           fontSize: 12,
-                          color: Theme.of(context).colorScheme.onPrimaryContainer,
+                          color:
+                              Theme.of(context).colorScheme.onPrimaryContainer,
                         ),
                       ),
                     ),
-                    title: Text(p.getLocalizedName(widget.loc.currentLanguageCode)),
+                    title: Text(
+                        p.getLocalizedName(widget.loc.currentLanguageCode)),
                     subtitle: Text(
-                      widget.onBuildProductSubtitle(context, p, widget.store, widget.estId, widget.loc),
+                      widget.onBuildProductSubtitle(
+                          context, p, widget.store, widget.estId, widget.loc),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                     trailing: Row(
@@ -2370,14 +2797,16 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                         ),
                         if (widget.canRemove)
                           IconButton(
-                            icon: const Icon(Icons.remove_circle_outline, color: Colors.red),
+                            icon: const Icon(Icons.remove_circle_outline,
+                                color: Colors.red),
                             tooltip: widget.loc.t('remove_from_nomenclature'),
                             onPressed: () => widget.onRemoveProduct(context, p),
                           ),
                       ],
                     ),
                     onTap: () => widget.onEditProduct(context, p),
-                    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                    shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.zero),
                   ),
                 );
               }
@@ -2386,7 +2815,8 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                 child: ListTile(
                   onTap: null,
                   leading: CircleAvatar(
-                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+                    backgroundColor:
+                        Theme.of(context).colorScheme.primaryContainer,
                     child: Text(
                       (i + 1).toString(),
                       style: TextStyle(
@@ -2395,7 +2825,8 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
                       ),
                     ),
                   ),
-                  title: Text(item.getLocalizedName(widget.loc.currentLanguageCode)),
+                  title: Text(
+                      item.getLocalizedName(widget.loc.currentLanguageCode)),
                   subtitle: Text(
                     widget.onBuildTechCardSubtitle(item.techCard!),
                     style: Theme.of(context).textTheme.bodySmall,
@@ -2409,7 +2840,6 @@ class _NomenclatureTabState extends State<_NomenclatureTab> {
       ],
     );
   }
-
 }
 
 class _NomenclatureEmpty extends StatelessWidget {
@@ -2435,21 +2865,28 @@ class _NomenclatureEmpty extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              loadError != null ? Icons.cloud_off_outlined : Icons.inventory_2_outlined,
+              loadError != null
+                  ? Icons.cloud_off_outlined
+                  : Icons.inventory_2_outlined,
               size: 64,
-              color: loadError != null ? theme.colorScheme.error : Colors.grey[400],
+              color: loadError != null
+                  ? theme.colorScheme.error
+                  : Colors.grey[400],
             ),
             const SizedBox(height: 16),
             if (loadError != null) ...[
               Text(
-                loc.t('nomenclature_load_error') ?? 'Ошибка загрузки номенклатуры',
-                style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.error),
+                loc.t('nomenclature_load_error') ??
+                    'Ошибка загрузки номенклатуры',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(color: theme.colorScheme.error),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 loadError.toString(),
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 textAlign: TextAlign.center,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
@@ -2469,7 +2906,8 @@ class _NomenclatureEmpty extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 loc.t('add_from_catalog'),
-                style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: Colors.grey[600]),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -2548,7 +2986,8 @@ class _AddAllProgressDialogState extends State<_AddAllProgressDialog> {
     final total = widget.list.length;
     final progress = total > 0 ? (_done / total).clamp(0.0, 1.0) : 1.0;
     return AlertDialog(
-      title: Text(widget.loc.t('add_all_to_nomenclature').replaceAll('%s', '$total')),
+      title: Text(
+          widget.loc.t('add_all_to_nomenclature').replaceAll('%s', '$total')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2569,7 +3008,8 @@ class _AddAllProgressDialogState extends State<_AddAllProgressDialog> {
               padding: const EdgeInsets.only(top: 8),
               child: Text(
                 '${widget.loc.t('error')}: $_error',
-                style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
+                style: TextStyle(
+                    color: Theme.of(context).colorScheme.error, fontSize: 12),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -2596,7 +3036,8 @@ class _LoadKbjuProgressDialog extends StatefulWidget {
   final void Function(Object) onError;
 
   @override
-  State<_LoadKbjuProgressDialog> createState() => _LoadKbjuProgressDialogState();
+  State<_LoadKbjuProgressDialog> createState() =>
+      _LoadKbjuProgressDialogState();
 }
 
 class _LoadKbjuProgressDialogState extends State<_LoadKbjuProgressDialog> {
@@ -2613,7 +3054,8 @@ class _LoadKbjuProgressDialogState extends State<_LoadKbjuProgressDialog> {
   Future<void> _run() async {
     for (final p in widget.list) {
       try {
-        final result = await NutritionApiService.fetchNutrition(p.getLocalizedName(widget.loc.currentLanguageCode));
+        final result = await NutritionApiService.fetchNutrition(
+            p.getLocalizedName(widget.loc.currentLanguageCode));
         if (!mounted) return;
         if (result != null && result.hasData) {
           final updated = p.copyWith(
@@ -2651,10 +3093,15 @@ class _LoadKbjuProgressDialogState extends State<_LoadKbjuProgressDialog> {
             borderRadius: BorderRadius.circular(4),
           ),
           const SizedBox(height: 12),
-          Text('$_done / $total', style: Theme.of(context).textTheme.bodyMedium, textAlign: TextAlign.center),
+          Text('$_done / $total',
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center),
           Text(
             '${widget.loc.t('kbju_updated')}: $_updated',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: Colors.grey[600]),
             textAlign: TextAlign.center,
           ),
         ],
@@ -2699,10 +3146,12 @@ class _VerifyProductsProgressDialog extends StatefulWidget {
   final void Function(Object) onError;
 
   @override
-  State<_VerifyProductsProgressDialog> createState() => _VerifyProductsProgressDialogState();
+  State<_VerifyProductsProgressDialog> createState() =>
+      _VerifyProductsProgressDialogState();
 }
 
-class _VerifyProductsProgressDialogState extends State<_VerifyProductsProgressDialog> {
+class _VerifyProductsProgressDialogState
+    extends State<_VerifyProductsProgressDialog> {
   int _done = 0;
   final List<_VerifyProductItem> _results = [];
   bool _finished = false;
@@ -2717,7 +3166,10 @@ class _VerifyProductsProgressDialogState extends State<_VerifyProductsProgressDi
     for (final p in widget.list) {
       try {
         final ep = widget.store.getEstablishmentPrice(p.id, widget.estId);
-        final nutrition = (p.calories != null || p.protein != null || p.fat != null || p.carbs != null)
+        final nutrition = (p.calories != null ||
+                p.protein != null ||
+                p.fat != null ||
+                p.carbs != null)
             ? NutritionResult(
                 calories: p.calories,
                 protein: p.protein,
@@ -2797,7 +3249,10 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
     if (r.suggestedPrice != null) {
       await store.addToNomenclature(estId, p.id, price: r.suggestedPrice);
     }
-    if (r.suggestedCalories != null || r.suggestedProtein != null || r.suggestedFat != null || r.suggestedCarbs != null) {
+    if (r.suggestedCalories != null ||
+        r.suggestedProtein != null ||
+        r.suggestedFat != null ||
+        r.suggestedCarbs != null) {
       final saneCal = NutritionApiService.saneCaloriesForProduct(
         p.getLocalizedName(loc.currentLanguageCode),
         r.suggestedCalories,
@@ -2822,8 +3277,12 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
       if (r.normalizedName != null && r.normalizedName!.trim().isNotEmpty) {
         updated = updated.copyWith(name: r.normalizedName!.trim());
       }
-      if (r.suggestedPrice != null) await store.addToNomenclature(estId, p.id, price: r.suggestedPrice);
-      if (r.suggestedCalories != null || r.suggestedProtein != null || r.suggestedFat != null || r.suggestedCarbs != null) {
+      if (r.suggestedPrice != null)
+        await store.addToNomenclature(estId, p.id, price: r.suggestedPrice);
+      if (r.suggestedCalories != null ||
+          r.suggestedProtein != null ||
+          r.suggestedFat != null ||
+          r.suggestedCarbs != null) {
         final saneCal = NutritionApiService.saneCaloriesForProduct(
           p.getLocalizedName(loc.currentLanguageCode),
           r.suggestedCalories,
@@ -2852,7 +3311,10 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
           children: [
             Text(
               loc.t('verify_results_hint'),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: Colors.grey[600]),
             ),
             const SizedBox(height: 12),
             SizedBox(
@@ -2875,18 +3337,26 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
                             p.getLocalizedName(loc.currentLanguageCode),
                             style: Theme.of(context).textTheme.titleSmall,
                           ),
-                          if (r.normalizedName != null && r.normalizedName != p.name) ...[
+                          if (r.normalizedName != null &&
+                              r.normalizedName != p.name) ...[
                             const SizedBox(height: 4),
-                            Text('${loc.t('name')}: ${p.name} → ${r.normalizedName}', style: Theme.of(context).textTheme.bodySmall),
+                            Text(
+                                '${loc.t('name')}: ${p.name} → ${r.normalizedName}',
+                                style: Theme.of(context).textTheme.bodySmall),
                           ],
                           if (r.suggestedPrice != null) ...[
                             Builder(builder: (ctx) {
-                              final ep = store.getEstablishmentPrice(p.id, estId);
+                              final ep =
+                                  store.getEstablishmentPrice(p.id, estId);
                               final currentPrice = ep?.$1;
-                              if (r.suggestedPrice == currentPrice) return const SizedBox.shrink();
+                              if (r.suggestedPrice == currentPrice)
+                                return const SizedBox.shrink();
                               return Padding(
                                 padding: const EdgeInsets.only(top: 2),
-                                child: Text('${loc.t('price')}: ${currentPrice != null ? NumberFormatUtils.formatDecimal(currentPrice) : '—'} → ${NumberFormatUtils.formatDecimal(r.suggestedPrice!)}', style: Theme.of(context).textTheme.bodySmall),
+                                child: Text(
+                                    '${loc.t('price')}: ${currentPrice != null ? NumberFormatUtils.formatDecimal(currentPrice) : '—'} → ${NumberFormatUtils.formatDecimal(r.suggestedPrice!)}',
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall),
                               );
                             }),
                           ],
@@ -2909,7 +3379,9 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(loc.t('close'))),
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(loc.t('close'))),
         FilledButton(
           onPressed: () => _applyAll(context),
           child: Text(loc.t('apply_all')),
@@ -2935,10 +3407,12 @@ class _LoadTranslationsProgressDialog extends StatefulWidget {
   final void Function(Object) onError;
 
   @override
-  State<_LoadTranslationsProgressDialog> createState() => _LoadTranslationsProgressDialogState();
+  State<_LoadTranslationsProgressDialog> createState() =>
+      _LoadTranslationsProgressDialogState();
 }
 
-class _LoadTranslationsProgressDialogState extends State<_LoadTranslationsProgressDialog> {
+class _LoadTranslationsProgressDialogState
+    extends State<_LoadTranslationsProgressDialog> {
   int _done = 0;
   int _updated = 0;
   bool _finished = false;
@@ -2970,7 +3444,8 @@ class _LoadTranslationsProgressDialogState extends State<_LoadTranslationsProgre
     if (!mounted) return;
     setState(() => _finished = true);
     if (widget.list.isNotEmpty && _updated == 0) {
-      widget.onError(Exception('Ни один перевод не получен. Проверьте интернет или попробуйте позже.'));
+      widget.onError(Exception(
+          'Ни один перевод не получен. Проверьте интернет или попробуйте позже.'));
     }
     widget.onComplete();
   }
@@ -2980,7 +3455,8 @@ class _LoadTranslationsProgressDialogState extends State<_LoadTranslationsProgre
     final total = widget.list.length;
     final progress = total > 0 ? (_done / total).clamp(0.0, 1.0) : 1.0;
     return AlertDialog(
-      title: Text(widget.loc.t('translate_names_for_all').replaceAll('%s', '$total')),
+      title: Text(
+          widget.loc.t('translate_names_for_all').replaceAll('%s', '$total')),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2991,10 +3467,15 @@ class _LoadTranslationsProgressDialogState extends State<_LoadTranslationsProgre
             borderRadius: BorderRadius.circular(4),
           ),
           const SizedBox(height: 12),
-          Text('$_done / $total', style: Theme.of(context).textTheme.bodyMedium, textAlign: TextAlign.center),
+          Text('$_done / $total',
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center),
           Text(
             '${widget.loc.t('kbju_updated')}: $_updated',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: Colors.grey[600]),
             textAlign: TextAlign.center,
           ),
         ],
@@ -3042,10 +3523,22 @@ class _CatalogTab extends StatelessWidget {
 
   String _categoryLabel(String c) {
     const map = {
-      'vegetables': 'Овощи', 'fruits': 'Фрукты', 'meat': 'Мясо', 'seafood': 'Рыба',
-      'dairy': 'Молочное', 'grains': 'Крупы', 'bakery': 'Выпечка', 'pantry': 'Бакалея',
-      'spices': 'Специи', 'beverages': 'Напитки', 'eggs': 'Яйца', 'legumes': 'Бобовые',
-      'nuts': 'Орехи', 'misc': '', 'manual': '', 'imported': '',
+      'vegetables': 'Овощи',
+      'fruits': 'Фрукты',
+      'meat': 'Мясо',
+      'seafood': 'Рыба',
+      'dairy': 'Молочное',
+      'grains': 'Крупы',
+      'bakery': 'Выпечка',
+      'pantry': 'Бакалея',
+      'spices': 'Специи',
+      'beverages': 'Напитки',
+      'eggs': 'Яйца',
+      'legumes': 'Бобовые',
+      'nuts': 'Орехи',
+      'misc': '',
+      'manual': '',
+      'imported': '',
     };
     return map[c] ?? c;
   }
@@ -3063,12 +3556,16 @@ class _CatalogTab extends StatelessWidget {
           Navigator.of(ctx).pop();
           onRefresh();
           if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('kbju_load_done'))));
+            ScaffoldMessenger.of(ctx)
+                .showSnackBar(SnackBar(content: Text(loc.t('kbju_load_done'))));
           }
         },
         onError: (e) {
           if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                content: Text(loc
+                    .t('error_with_message')
+                    .replaceAll('%s', e.toString()))));
           }
         },
       ),
@@ -3076,7 +3573,8 @@ class _CatalogTab extends StatelessWidget {
     if (context.mounted) onRefresh();
   }
 
-  Future<void> _addAllToNomenclature(BuildContext context, List<Product> list) async {
+  Future<void> _addAllToNomenclature(
+      BuildContext context, List<Product> list) async {
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,
@@ -3091,14 +3589,20 @@ class _CatalogTab extends StatelessWidget {
           onRefresh();
           if (ctx.mounted) {
             ScaffoldMessenger.of(ctx).showSnackBar(
-              SnackBar(content: Text(loc.t('add_all_done').replaceAll('%s', '${list.length}'))),
+              SnackBar(
+                  content: Text(loc
+                      .t('add_all_done')
+                      .replaceAll('%s', '${list.length}'))),
             );
           }
         },
         onError: (e) {
           Navigator.of(ctx).pop();
           if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                content: Text(loc
+                    .t('error_with_message')
+                    .replaceAll('%s', e.toString()))));
           }
         },
       ),
@@ -3106,7 +3610,10 @@ class _CatalogTab extends StatelessWidget {
   }
 
   bool _needsKbju(Product p) =>
-      (p.calories == null || p.calories == 0) && p.protein == null && p.fat == null && p.carbs == null;
+      (p.calories == null || p.calories == 0) &&
+      p.protein == null &&
+      p.fat == null &&
+      p.carbs == null;
 
   bool _needsTranslation(Product p) {
     final allLangs = LocalizationService.productLanguageCodes;
@@ -3115,13 +3622,17 @@ class _CatalogTab extends StatelessWidget {
     if (allLangs.any((c) => (n[c] ?? '').trim().isEmpty)) return true;
     // Ручные продукты с одинаковым текстом во всех языках — не переведены
     if (p.category == 'manual') {
-      final vals = allLangs.map((c) => (n[c] ?? '').trim()).where((s) => s.isNotEmpty).toSet();
+      final vals = allLangs
+          .map((c) => (n[c] ?? '').trim())
+          .where((s) => s.isNotEmpty)
+          .toSet();
       if (vals.length <= 1) return true;
     }
     return false;
   }
 
-  Future<void> _loadTranslationsForAll(BuildContext context, List<Product> list) async {
+  Future<void> _loadTranslationsForAll(
+      BuildContext context, List<Product> list) async {
     if (!context.mounted) return;
     await showDialog<void>(
       context: context,
@@ -3134,12 +3645,16 @@ class _CatalogTab extends StatelessWidget {
           Navigator.of(ctx).pop();
           onRefresh();
           if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('translate_done'))));
+            ScaffoldMessenger.of(ctx)
+                .showSnackBar(SnackBar(content: Text(loc.t('translate_done'))));
           }
         },
         onError: (e) {
           if (ctx.mounted) {
-            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+            ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                content: Text(loc
+                    .t('error_with_message')
+                    .replaceAll('%s', e.toString()))));
           }
         },
       ),
@@ -3151,15 +3666,20 @@ class _CatalogTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final notInNom = products.where((p) => !store.isInNomenclature(p.id)).toList();
-    final needsKbju = store.allProducts.where((p) => p.category == 'manual' && _needsKbju(p)).toList();
-    final needsTranslation = store.allProducts.where(_needsTranslation).toList();
+    final notInNom =
+        products.where((p) => !store.isInNomenclature(p.id)).toList();
+    final needsKbju = store.allProducts
+        .where((p) => p.category == 'manual' && _needsKbju(p))
+        .toList();
+    final needsTranslation =
+        store.allProducts.where(_needsTranslation).toList();
     // Фоновый автоперевод — один раз на продукт за сессию
     if (needsTranslation.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         for (final p in needsTranslation) {
           if (p.name.trim().isEmpty) continue;
-          if (_triggeredTranslationIds.add(p.id)) store.triggerTranslation(p.id);
+          if (_triggeredTranslationIds.add(p.id))
+            store.triggerTranslation(p.id);
         }
       });
     }
@@ -3192,10 +3712,18 @@ class _CatalogTab extends StatelessWidget {
                 tooltip: 'Сортировка',
                 onSelected: onSortChanged,
                 itemBuilder: (_) => [
-                  PopupMenuItem(value: _CatalogSort.nameAz, child: Text(loc.t('sort_name_az'))),
-                  PopupMenuItem(value: _CatalogSort.nameZa, child: Text(loc.t('sort_name_za'))),
-                  PopupMenuItem(value: _CatalogSort.priceAsc, child: Text(loc.t('sort_price_asc'))),
-                  PopupMenuItem(value: _CatalogSort.priceDesc, child: Text(loc.t('sort_price_desc'))),
+                  PopupMenuItem(
+                      value: _CatalogSort.nameAz,
+                      child: Text(loc.t('sort_name_az'))),
+                  PopupMenuItem(
+                      value: _CatalogSort.nameZa,
+                      child: Text(loc.t('sort_name_za'))),
+                  PopupMenuItem(
+                      value: _CatalogSort.priceAsc,
+                      child: Text(loc.t('sort_price_asc'))),
+                  PopupMenuItem(
+                      value: _CatalogSort.priceDesc,
+                      child: Text(loc.t('sort_price_desc'))),
                 ],
               ),
             ],
@@ -3207,7 +3735,9 @@ class _CatalogTab extends StatelessWidget {
             child: FilledButton.tonalIcon(
               onPressed: () => _addAllToNomenclature(context, notInNom),
               icon: const Icon(Icons.add_circle, size: 20),
-              label: Text(loc.t('add_all_to_nomenclature').replaceAll('%s', '${notInNom.length}')),
+              label: Text(loc
+                  .t('add_all_to_nomenclature')
+                  .replaceAll('%s', '${notInNom.length}')),
             ),
           ),
         Expanded(
@@ -3218,7 +3748,8 @@ class _CatalogTab extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
+                        Icon(Icons.inventory_2_outlined,
+                            size: 64, color: Colors.grey[400]),
                         const SizedBox(height: 16),
                         Text(
                           'Справочник пуст',
@@ -3228,7 +3759,10 @@ class _CatalogTab extends StatelessWidget {
                         const SizedBox(height: 8),
                         Text(
                           'Загрузите список или вставьте текст (название + таб + цена).',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Colors.grey[600]),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
@@ -3245,7 +3779,10 @@ class _CatalogTab extends StatelessWidget {
                   ? Center(
                       child: Text(
                         'По запросу ничего не найдено',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey[600]),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(color: Colors.grey[600]),
                       ),
                     )
                   : ListView.builder(
@@ -3260,17 +3797,25 @@ class _CatalogTab extends StatelessWidget {
                             leading: CircleAvatar(
                               backgroundColor: inNom
                                   ? Colors.green.shade100
-                                  : Theme.of(context).colorScheme.primaryContainer,
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .primaryContainer,
                               child: Icon(
                                 inNom ? Icons.check : Icons.add,
-                                color: inNom ? Colors.green : Theme.of(context).colorScheme.onPrimaryContainer,
+                                color: inNom
+                                    ? Colors.green
+                                    : Theme.of(context)
+                                        .colorScheme
+                                        .onPrimaryContainer,
                               ),
                             ),
-                            title: Text(p.getLocalizedName(loc.currentLanguageCode)),
+                            title: Text(
+                                p.getLocalizedName(loc.currentLanguageCode)),
                             subtitle: Text(
                               () {
                                 final cat = _categoryLabel(p.category);
-                                final unit = _unitDisplay(p.unit, loc.currentLanguageCode);
+                                final unit = _unitDisplay(
+                                    p.unit, loc.currentLanguageCode);
                                 return cat.isEmpty ? unit : '$cat · $unit';
                               }(),
                               style: Theme.of(context).textTheme.bodySmall,
@@ -3285,11 +3830,13 @@ class _CatalogTab extends StatelessWidget {
                                 ),
                                 if (inNom)
                                   Chip(
-                                    label: Text(loc.t('nomenclature'), style: const TextStyle(fontSize: 11)),
+                                    label: Text(loc.t('nomenclature'),
+                                        style: const TextStyle(fontSize: 11)),
                                   )
                                 else
                                   FilledButton.tonal(
-                                    onPressed: () => _addToNomenclature(context, p),
+                                    onPressed: () =>
+                                        _addToNomenclature(context, p),
                                     child: Text(loc.t('add_to_nomenclature')),
                                   ),
                               ],
@@ -3320,17 +3867,22 @@ class _CatalogTab extends StatelessWidget {
     try {
       final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
       final price = establishmentPrice?.$1;
-      await store.addToNomenclature(estId, p.id, price: price, currency: establishmentPrice?.$2);
+      await store.addToNomenclature(estId, p.id,
+          price: price, currency: establishmentPrice?.$2);
       // Если продукт ещё не переведён — запускаем перевод фоново
       final names = p.names ?? {};
-      final hasAllLangs = names['ru'] != null && names['en'] != null && names['ru'] != names['en'];
+      final hasAllLangs = names['ru'] != null &&
+          names['en'] != null &&
+          names['ru'] != names['en'];
       if (!hasAllLangs) {
         store.triggerTranslation(p.id);
       }
       if (context.mounted) onRefresh();
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(
+                loc.t('error_with_message').replaceAll('%s', e.toString()))));
       }
     }
   }
@@ -3338,7 +3890,8 @@ class _CatalogTab extends StatelessWidget {
   Future<void> _fetchKbju(BuildContext context, Product p) async {
     final scaffold = ScaffoldMessenger.of(context);
     scaffold.showSnackBar(SnackBar(content: Text(loc.t('kbju_searching'))));
-    final result = await NutritionApiService.fetchNutrition(p.getLocalizedName(loc.currentLanguageCode));
+    final result = await NutritionApiService.fetchNutrition(
+        p.getLocalizedName(loc.currentLanguageCode));
     if (!context.mounted) return;
     if (result == null || !result.hasData) {
       scaffold.showSnackBar(SnackBar(content: Text(loc.t('kbju_not_found'))));
@@ -3363,13 +3916,16 @@ class _CatalogTab extends StatelessWidget {
       final msg = fmt;
       scaffold.showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
-      scaffold.showSnackBar(SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))));
+      scaffold.showSnackBar(SnackBar(
+          content: Text(
+              loc.t('error_with_message').replaceAll('%s', e.toString()))));
     }
   }
 }
 
 class _Chip extends StatelessWidget {
-  const _Chip({required this.label, required this.selected, required this.onTap});
+  const _Chip(
+      {required this.label, required this.selected, required this.onTap});
 
   final String label;
   final bool selected;
@@ -3406,7 +3962,16 @@ class _ProductEditDialog extends StatefulWidget {
   final bool isCreate;
   final VoidCallback onSaved;
 
-  static const _currencies = ['RUB', 'USD', 'EUR', 'VND', 'THB', 'KZT', 'GBP', 'UAH'];
+  static const _currencies = [
+    'RUB',
+    'USD',
+    'EUR',
+    'VND',
+    'THB',
+    'KZT',
+    'GBP',
+    'UAH'
+  ];
 
   @override
   State<_ProductEditDialog> createState() => _ProductEditDialogState();
@@ -3437,26 +4002,36 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   void initState() {
     super.initState();
     final p = widget.product;
-    _nameController = TextEditingController(text: p.getLocalizedName(widget.loc.currentLanguageCode));
+    _nameController = TextEditingController(
+        text: p.getLocalizedName(widget.loc.currentLanguageCode));
     double? initialPrice;
     if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
-      final ep = widget.store.getEstablishmentPrice(p.id, widget.establishmentId);
+      final ep =
+          widget.store.getEstablishmentPrice(p.id, widget.establishmentId);
       initialPrice = ep?.$1;
     }
-    _priceController = TextEditingController(text: initialPrice?.toString() ?? '');
+    _priceController =
+        TextEditingController(text: initialPrice?.toString() ?? '');
     // Инициализация полей упаковки
     _priceByPackage = p.packagePrice != null || p.packageWeightGrams != null;
-    _packagePriceController = TextEditingController(text: p.packagePrice?.toString() ?? '');
-    _packageWeightController = TextEditingController(text: p.packageWeightGrams?.toStringAsFixed(0) ?? '');
-    _gramsPerPieceController = TextEditingController(text: p.gramsPerPiece?.toStringAsFixed(0) ?? '');
+    _packagePriceController =
+        TextEditingController(text: p.packagePrice?.toString() ?? '');
+    _packageWeightController = TextEditingController(
+        text: p.packageWeightGrams?.toStringAsFixed(0) ?? '');
+    _gramsPerPieceController =
+        TextEditingController(text: p.gramsPerPiece?.toStringAsFixed(0) ?? '');
     // Подставить адекватные калории при открытии карточки
-    final saneCal = NutritionApiService.saneCaloriesForProduct(p.name, p.calories);
+    final saneCal =
+        NutritionApiService.saneCaloriesForProduct(p.name, p.calories);
     final initialCal = saneCal ?? p.calories;
-    _caloriesController = TextEditingController(text: initialCal?.toString() ?? '');
-    _proteinController = TextEditingController(text: p.protein?.toString() ?? '');
+    _caloriesController =
+        TextEditingController(text: initialCal?.toString() ?? '');
+    _proteinController =
+        TextEditingController(text: p.protein?.toString() ?? '');
     _fatController = TextEditingController(text: p.fat?.toString() ?? '');
     _carbsController = TextEditingController(text: p.carbs?.toString() ?? '');
-    _wastePctController = TextEditingController(text: p.primaryWastePct?.toStringAsFixed(1) ?? '0');
+    _wastePctController = TextEditingController(
+        text: p.primaryWastePct?.toStringAsFixed(1) ?? '0');
     final unitMap = {'кг': 'kg', 'г': 'g', 'шт': 'pcs', 'л': 'l', 'мл': 'ml'};
     _unit = unitMap[p.unit] ?? p.unit ?? 'g';
     if (!CulinaryUnits.all.any((e) => e.id == _unit)) _unit = 'g';
@@ -3465,10 +4040,11 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     _containsLactose = p.containsLactose ?? false;
     if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
       widget.store.getPriceHistory(p.id, widget.establishmentId!).then((list) {
-        if (mounted) setState(() {
-          _priceHistory = list;
-          _priceHistoryLoaded = true;
-        });
+        if (mounted)
+          setState(() {
+            _priceHistory = list;
+            _priceHistoryLoaded = true;
+          });
       });
     } else {
       _priceHistoryLoaded = true;
@@ -3519,25 +4095,33 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
         final ok = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: Text(widget.loc.t('ai_suggest_correction') ?? 'Предлагается исправление'),
+            title: Text(widget.loc.t('ai_suggest_correction') ??
+                'Предлагается исправление'),
             content: Text(
               '${widget.loc.t('ai_suggested_name') ?? 'Возможно, вы имели в виду'}: "${result.normalizedName}"',
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(widget.loc.t('cancel'))),
-              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(widget.loc.t('apply') ?? 'Применить')),
+              TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: Text(widget.loc.t('cancel'))),
+              FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  child: Text(widget.loc.t('apply') ?? 'Применить')),
             ],
           ),
         );
         if (ok == true && mounted) {
           _nameController.text = result.normalizedName;
-          if (result.suggestedUnit != null && CulinaryUnits.all.any((e) => e.id == result.suggestedUnit)) {
+          if (result.suggestedUnit != null &&
+              CulinaryUnits.all.any((e) => e.id == result.suggestedUnit)) {
             setState(() => _unit = result.suggestedUnit!);
           }
         }
       } else if (result != null && result.normalizedName == name && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(widget.loc.t('ai_name_ok') ?? 'Название в порядке')),
+          SnackBar(
+              content:
+                  Text(widget.loc.t('ai_name_ok') ?? 'Название в порядке')),
         );
       }
     } catch (_) {}
@@ -3547,7 +4131,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   Future<void> _save() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t('product_name_required'))));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(widget.loc.t('product_name_required'))));
       return;
     }
     double? calories = _parseNum(_caloriesController.text);
@@ -3566,11 +4151,17 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       merged.putIfAbsent(c, () => name);
     }
     // Цена за кг: если включён режим упаковки — рассчитываем из packagePrice/packageWeight
-    final double? pricePerKg = _priceByPackage ? _computedPricePerKg : _parseNum(_priceController.text);
-    final double? pkgPrice = _priceByPackage ? _parseNum(_packagePriceController.text) : null;
-    final double? pkgWeight = _priceByPackage ? _parseNum(_packageWeightController.text) : null;
+    final double? pricePerKg = _priceByPackage
+        ? _computedPricePerKg
+        : _parseNum(_priceController.text);
+    final double? pkgPrice =
+        _priceByPackage ? _parseNum(_packagePriceController.text) : null;
+    final double? pkgWeight =
+        _priceByPackage ? _parseNum(_packageWeightController.text) : null;
 
-    final gpp = CulinaryUnits.isCountable(_unit) ? _parseNum(_gramsPerPieceController.text) : null;
+    final gpp = CulinaryUnits.isCountable(_unit)
+        ? _parseNum(_gramsPerPieceController.text)
+        : null;
     final updated = widget.product.copyWith(
       name: name,
       names: merged,
@@ -3593,7 +4184,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     try {
       if (widget.isCreate) {
         final savedUpdated = await widget.store.addProduct(updated);
-        if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
+        if (widget.establishmentId != null &&
+            widget.establishmentId!.isNotEmpty) {
           await widget.store.addToNomenclature(
             widget.establishmentId!,
             savedUpdated.id,
@@ -3603,7 +4195,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
         }
       } else {
         await widget.store.updateProduct(updated);
-        if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
+        if (widget.establishmentId != null &&
+            widget.establishmentId!.isNotEmpty) {
           if (pricePerKg != null) {
             await widget.store.setEstablishmentPrice(
               widget.establishmentId!,
@@ -3617,10 +4210,15 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       if (!mounted) return;
       Navigator.of(context).pop();
       widget.onSaved();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t(widget.isCreate ? 'product_added' : 'product_saved'))));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(widget.loc
+              .t(widget.isCreate ? 'product_added' : 'product_saved'))));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t('error_with_message').replaceAll('%s', e.toString()))));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(widget.loc
+                .t('error_with_message')
+                .replaceAll('%s', e.toString()))));
       }
     }
   }
@@ -3629,7 +4227,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   Widget build(BuildContext context) {
     final lang = widget.loc.currentLanguageCode;
     return AlertDialog(
-      title: Text(widget.loc.t(widget.isCreate ? 'add_from_catalog' : 'edit_product')),
+      title: Text(
+          widget.loc.t(widget.isCreate ? 'add_from_catalog' : 'edit_product')),
       content: SingleChildScrollView(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 400),
@@ -3644,7 +4243,10 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                   border: const OutlineInputBorder(),
                   suffixIcon: IconButton(
                     icon: _checkingName
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.auto_awesome, size: 20),
                     tooltip: widget.loc.t('ai_product_recognize'),
                     onPressed: _checkingName ? null : _checkNameWithAi,
@@ -3659,10 +4261,12 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                   labelText: widget.loc.t('unit'),
                   border: const OutlineInputBorder(),
                 ),
-                items: CulinaryUnits.all.map((e) => DropdownMenuItem(
-                  value: e.id,
-                  child: Text(lang == 'ru' ? e.ru : e.en),
-                )).toList(),
+                items: CulinaryUnits.all
+                    .map((e) => DropdownMenuItem(
+                          value: e.id,
+                          child: Text(lang == 'ru' ? e.ru : e.en),
+                        ))
+                    .toList(),
                 onChanged: (v) => setState(() => _unit = v ?? _unit),
               ),
               if (CulinaryUnits.isCountable(_unit)) ...[
@@ -3670,10 +4274,12 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                 TextFormField(
                   controller: _gramsPerPieceController,
                   decoration: InputDecoration(
-                    labelText: widget.loc.t('grams_per_piece_label') ?? 'Вес 1 шт, г',
+                    labelText:
+                        widget.loc.t('grams_per_piece_label') ?? 'Вес 1 шт, г',
                     border: const OutlineInputBorder(),
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
                 ),
               ],
               const SizedBox(height: 16),
@@ -3686,7 +4292,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(widget.loc.t('kbju_per_100g') ?? 'КБЖУ на 100 г', style: Theme.of(context).textTheme.titleSmall),
+                        Text(widget.loc.t('kbju_per_100g') ?? 'КБЖУ на 100 г',
+                            style: Theme.of(context).textTheme.titleSmall),
                         const SizedBox(height: 8),
                         Row(
                           children: [
@@ -3694,11 +4301,14 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                               child: TextFormField(
                                 controller: _caloriesController,
                                 decoration: InputDecoration(
-                                  labelText: widget.loc.t('ttk_calories') ?? 'Калории',
+                                  labelText:
+                                      widget.loc.t('ttk_calories') ?? 'Калории',
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -3706,11 +4316,14 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                               child: TextFormField(
                                 controller: _proteinController,
                                 decoration: InputDecoration(
-                                  labelText: widget.loc.t('ttk_protein') ?? 'Белки',
+                                  labelText:
+                                      widget.loc.t('ttk_protein') ?? 'Белки',
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -3722,7 +4335,9 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -3730,11 +4345,14 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                               child: TextFormField(
                                 controller: _carbsController,
                                 decoration: InputDecoration(
-                                  labelText: widget.loc.t('ttk_carbs') ?? 'Углеводы',
+                                  labelText:
+                                      widget.loc.t('ttk_carbs') ?? 'Углеводы',
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
-                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                               ),
                             ),
                           ],
@@ -3753,18 +4371,23 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                       segments: [
                         ButtonSegment(
                           value: false,
-                          label: Text(widget.loc.t('price_per_unit_label') ?? 'За кг / ед'),
+                          label: Text(widget.loc.t('price_per_unit_label') ??
+                              'За кг / ед'),
                           icon: const Icon(Icons.scale_outlined, size: 16),
                         ),
                         ButtonSegment(
                           value: true,
-                          label: Text(widget.loc.t('price_per_package_label') ?? 'За упаковку'),
-                          icon: const Icon(Icons.inventory_2_outlined, size: 16),
+                          label: Text(widget.loc.t('price_per_package_label') ??
+                              'За упаковку'),
+                          icon:
+                              const Icon(Icons.inventory_2_outlined, size: 16),
                         ),
                       ],
                       selected: {_priceByPackage},
-                      onSelectionChanged: (s) => setState(() => _priceByPackage = s.first),
-                      style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                      onSelectionChanged: (s) =>
+                          setState(() => _priceByPackage = s.first),
+                      style: const ButtonStyle(
+                          visualDensity: VisualDensity.compact),
                     ),
                   ),
                 ],
@@ -3782,7 +4405,8 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                           labelText: widget.loc.t('price'),
                           border: const OutlineInputBorder(),
                         ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -3793,8 +4417,12 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                           labelText: widget.loc.t('currency'),
                           border: const OutlineInputBorder(),
                         ),
-                        items: _ProductEditDialog._currencies.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                        onChanged: (v) => setState(() => _currency = v ?? _currency),
+                        items: _ProductEditDialog._currencies
+                            .map((c) =>
+                                DropdownMenuItem(value: c, child: Text(c)))
+                            .toList(),
+                        onChanged: (v) =>
+                            setState(() => _currency = v ?? _currency),
                       ),
                     ),
                   ],
@@ -3808,10 +4436,12 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                       child: TextFormField(
                         controller: _packagePriceController,
                         decoration: InputDecoration(
-                          labelText: widget.loc.t('package_price_label') ?? 'Цена упаковки',
+                          labelText: widget.loc.t('package_price_label') ??
+                              'Цена упаковки',
                           border: const OutlineInputBorder(),
                         ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                         onChanged: (_) => setState(() {}),
                       ),
                     ),
@@ -3820,10 +4450,12 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                       child: TextFormField(
                         controller: _packageWeightController,
                         decoration: InputDecoration(
-                          labelText: widget.loc.t('package_weight_label') ?? 'Вес упаковки, г',
+                          labelText: widget.loc.t('package_weight_label') ??
+                              'Вес упаковки, г',
                           border: const OutlineInputBorder(),
                         ),
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
                         onChanged: (_) => setState(() {}),
                       ),
                     ),
@@ -3835,8 +4467,12 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                           labelText: widget.loc.t('currency'),
                           border: const OutlineInputBorder(),
                         ),
-                        items: _ProductEditDialog._currencies.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                        onChanged: (v) => setState(() => _currency = v ?? _currency),
+                        items: _ProductEditDialog._currencies
+                            .map((c) =>
+                                DropdownMenuItem(value: c, child: Text(c)))
+                            .toList(),
+                        onChanged: (v) =>
+                            setState(() => _currency = v ?? _currency),
                       ),
                     ),
                   ],
@@ -3848,27 +4484,37 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                     child: Text(
                       '${widget.loc.t('price_per_kg_computed') ?? 'Цена за кг'}: ${_computedPricePerKg!.toStringAsFixed(2)} $_currency',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
+                            color: Theme.of(context).colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
                   ),
               ],
-              if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) ...[
+              if (widget.establishmentId != null &&
+                  widget.establishmentId!.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                Text(widget.loc.t('price_history') ?? 'История изменений цены', style: Theme.of(context).textTheme.titleSmall),
+                Text(widget.loc.t('price_history') ?? 'История изменений цены',
+                    style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 8),
                 if (!_priceHistoryLoaded)
-                  const SizedBox(height: 24, child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
+                  const SizedBox(
+                      height: 24,
+                      child: Center(
+                          child: CircularProgressIndicator(strokeWidth: 2)))
                 else if (_priceHistory.isEmpty)
                   Text(
                     widget.loc.t('price_history_empty') ?? 'Нет записей',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
                   )
                 else
                   ..._priceHistory.take(10).map((e) {
-                    final oldStr = e.oldPrice != null ? e.oldPrice!.toStringAsFixed(0) : '—';
-                    final newStr = e.newPrice != null ? e.newPrice!.toStringAsFixed(0) : '—';
+                    final oldStr = e.oldPrice != null
+                        ? e.oldPrice!.toStringAsFixed(0)
+                        : '—';
+                    final newStr = e.newPrice != null
+                        ? e.newPrice!.toStringAsFixed(0)
+                        : '—';
                     final dateStr = e.changedAt != null
                         ? '${e.changedAt!.day.toString().padLeft(2, '0')}.${e.changedAt!.month.toString().padLeft(2, '0')}.${e.changedAt!.year}'
                         : '';
@@ -3886,7 +4532,9 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(widget.loc.t('cancel'))),
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(widget.loc.t('cancel'))),
         FilledButton(onPressed: _save, child: Text(widget.loc.t('save'))),
       ],
     );
@@ -3907,10 +4555,20 @@ class _CurrencySettingsDialog extends StatefulWidget {
   final LocalizationService loc;
   final Future<void> Function(Establishment) onSaved;
 
-  static const _presetCurrencies = ['RUB', 'USD', 'EUR', 'VND', 'THB', 'KZT', 'GBP', 'UAH'];
+  static const _presetCurrencies = [
+    'RUB',
+    'USD',
+    'EUR',
+    'VND',
+    'THB',
+    'KZT',
+    'GBP',
+    'UAH'
+  ];
 
   @override
-  State<_CurrencySettingsDialog> createState() => _CurrencySettingsDialogState();
+  State<_CurrencySettingsDialog> createState() =>
+      _CurrencySettingsDialogState();
 }
 
 class _CurrencySettingsDialogState extends State<_CurrencySettingsDialog> {
@@ -3933,7 +4591,9 @@ class _CurrencySettingsDialogState extends State<_CurrencySettingsDialog> {
   }
 
   String get _effectiveCurrency => _useCustom
-      ? _customController.text.trim().toUpperCase().isEmpty ? 'RUB' : _customController.text.trim().toUpperCase()
+      ? _customController.text.trim().toUpperCase().isEmpty
+          ? 'RUB'
+          : _customController.text.trim().toUpperCase()
       : _currency;
 
   Future<void> _saveAsDefault() async {
@@ -3946,7 +4606,8 @@ class _CurrencySettingsDialogState extends State<_CurrencySettingsDialog> {
       await widget.onSaved(updated);
       if (!mounted) return;
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(widget.loc.t('currency_saved'))));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(widget.loc.t('currency_saved'))));
     } catch (_) {
       // Ошибка уже показана в onSaved, диалог остаётся открытым
     }
@@ -3963,7 +4624,8 @@ class _CurrencySettingsDialogState extends State<_CurrencySettingsDialog> {
           CheckboxListTile(
             value: _useCustom,
             onChanged: (v) => setState(() => _useCustom = v ?? false),
-            title: Text(widget.loc.t('custom_currency'), style: const TextStyle(fontSize: 14)),
+            title: Text(widget.loc.t('custom_currency'),
+                style: const TextStyle(fontSize: 14)),
             contentPadding: EdgeInsets.zero,
             controlAffinity: ListTileControlAffinity.leading,
           ),
@@ -3983,8 +4645,13 @@ class _CurrencySettingsDialogState extends State<_CurrencySettingsDialog> {
             )
           else
             DropdownButtonFormField<String>(
-              value: _CurrencySettingsDialog._presetCurrencies.contains(_currency) ? _currency : _CurrencySettingsDialog._presetCurrencies.first,
-              decoration: InputDecoration(labelText: widget.loc.t('currency'), border: const OutlineInputBorder()),
+              value:
+                  _CurrencySettingsDialog._presetCurrencies.contains(_currency)
+                      ? _currency
+                      : _CurrencySettingsDialog._presetCurrencies.first,
+              decoration: InputDecoration(
+                  labelText: widget.loc.t('currency'),
+                  border: const OutlineInputBorder()),
               items: _CurrencySettingsDialog._presetCurrencies
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                   .toList(),
@@ -3993,8 +4660,11 @@ class _CurrencySettingsDialogState extends State<_CurrencySettingsDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(widget.loc.t('cancel'))),
-        FilledButton(onPressed: _saveAsDefault, child: Text(widget.loc.t('save'))),
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(widget.loc.t('cancel'))),
+        FilledButton(
+            onPressed: _saveAsDefault, child: Text(widget.loc.t('save'))),
       ],
     );
   }
@@ -4078,7 +4748,8 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
   }
 
   /// Подтверждение очистки всей номенклатуры
-  Future<void> _confirmClearAllNomenclature(BuildContext context, LocalizationService loc) async {
+  Future<void> _confirmClearAllNomenclature(
+      BuildContext context, LocalizationService loc) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -4120,7 +4791,8 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
           context: context,
           barrierDismissible: false,
           builder: (ctx) => LongOperationProgressDialog(
-            message: loc.t('clear_nomenclature_progress') ?? 'Очищаем номенклатуру',
+            message:
+                loc.t('clear_nomenclature_progress') ?? 'Очищаем номенклатуру',
             hint: null,
             productCount: count > 0 ? count : null,
           ),
@@ -4128,12 +4800,12 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
 
         // Очищаем номенклатуру (с таймаутом, чтобы не зависать навсегда)
         await store.clearAllNomenclature(estId).timeout(
-          const Duration(minutes: 2),
-          onTimeout: () => throw TimeoutException(
-            loc.t('clear_nomenclature_timeout') ??
-                'Операция заняла слишком много времени (2 мин). Обновите страницу — данные могли уже удалиться.',
-          ),
-        );
+              const Duration(minutes: 2),
+              onTimeout: () => throw TimeoutException(
+                loc.t('clear_nomenclature_timeout') ??
+                    'Операция заняла слишком много времени (2 мин). Обновите страницу — данные могли уже удалиться.',
+              ),
+            );
 
         if (context.mounted) {
           final nav = Navigator.of(context, rootNavigator: true);
@@ -4147,7 +4819,6 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
             backgroundColor: Colors.green,
           ),
         );
-
       } catch (e) {
         if (context.mounted) {
           final nav = Navigator.of(context, rootNavigator: true);
@@ -4194,8 +4865,18 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
   /// Проверяет, является ли строка заголовком таблицы (шапкой), а не товаром.
   static bool _isIikoHeaderRow(String name) {
     final lower = name.trim().toLowerCase();
-    const headers = ['наименование', 'код', 'ед. изм', 'остаток', 'бланк',
-        'организация', 'на дату', 'склад', 'группа', 'товар'];
+    const headers = [
+      'наименование',
+      'код',
+      'ед. изм',
+      'остаток',
+      'бланк',
+      'организация',
+      'на дату',
+      'склад',
+      'группа',
+      'товар'
+    ];
     return headers.any((h) => lower == h || lower.startsWith(h));
   }
 
@@ -4207,8 +4888,8 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
       if (widget.establishmentId.isNotEmpty) {
         widget.store.loadProducts(widget.establishmentId);
         // Восстанавливаем sheetNames из localStorage/сервера чтобы вкладки появились
-        widget.store.restoreBlankFromStorage(
-            establishmentId: widget.establishmentId);
+        widget.store
+            .restoreBlankFromStorage(establishmentId: widget.establishmentId);
       }
     });
   }
@@ -4232,7 +4913,9 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
           'Все загруженные iiko-продукты будут удалены из базы.\nЭто действие нельзя отменить.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Отмена')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
@@ -4300,12 +4983,14 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
     // Сортируем по sort_order чтобы порядок совпадал с оригинальным файлом
     // Исключаем строки-заголовки и пустые имена (могут попасть из шапки Excel)
     final sorted = [...products]
-      ..removeWhere((p) => p.name.trim().isEmpty || _IikoNomenclatureTabState._isIikoHeaderRow(p.name))
+      ..removeWhere((p) =>
+          p.name.trim().isEmpty ||
+          _IikoNomenclatureTabState._isIikoHeaderRow(p.name))
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
     // Листы бланка
     final sheetNames = widget.store.sheetNames;
-    final hasSheets  = sheetNames.length > 1;
+    final hasSheets = sheetNames.length > 1;
 
     // Если выбранный лист больше не существует — сбросим
     final activeSheet = (hasSheets && sheetNames.contains(_selectedSheet))
@@ -4317,7 +5002,8 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
     var bySheet = (hasSheets && activeSheet != null)
         ? sorted.where((p) {
             final sn = p.sheetName;
-            if (sn == null || sn.isEmpty) return activeSheet == sheetNames.first;
+            if (sn == null || sn.isEmpty)
+              return activeSheet == sheetNames.first;
             return sn == activeSheet;
           }).toList()
         : sorted;
@@ -4341,7 +5027,8 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
     // Считаем сколько товаров в каждой группе (для rowspan-эффекта)
     final groupCounts = <String, int>{};
     for (final p in filtered) {
-      groupCounts[p.groupName ?? ''] = (groupCounts[p.groupName ?? ''] ?? 0) + 1;
+      groupCounts[p.groupName ?? ''] =
+          (groupCounts[p.groupName ?? ''] ?? 0) + 1;
     }
 
     return Column(
@@ -4379,8 +5066,8 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
               IconButton(
                 icon: const Icon(Icons.refresh),
                 tooltip: 'Обновить',
-                onPressed: () =>
-                    widget.store.loadProducts(widget.establishmentId, force: true),
+                onPressed: () => widget.store
+                    .loadProducts(widget.establishmentId, force: true),
               ),
               IconButton(
                 icon: Icon(Icons.delete_sweep_outlined, color: Colors.red[400]),
@@ -4416,7 +5103,8 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
                       itemCount: rows.length,
                       itemBuilder: (ctx, i) {
                         final row = rows[i];
-                        final groupCount = groupCounts[row.product.groupName ?? ''] ?? 1;
+                        final groupCount =
+                            groupCounts[row.product.groupName ?? ''] ?? 1;
                         return _IikoBlankaRowWidget(
                           row: row,
                           groupCount: groupCount,
@@ -4464,16 +5152,20 @@ class _SheetTabBar extends StatelessWidget {
                 onTap: () => onSelect(name),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(
-                    color: isActive ? theme.colorScheme.primary : Colors.transparent,
+                    color: isActive
+                        ? theme.colorScheme.primary
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     name,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight:
+                          isActive ? FontWeight.w600 : FontWeight.normal,
                       color: isActive
                           ? theme.colorScheme.onPrimary
                           : theme.colorScheme.onSurface.withOpacity(0.7),
@@ -4500,23 +5192,24 @@ class _IikoBlankRow {
 // ── Константы ширин колонок (как в Excel бланке) ──────────────────────────────
 // Группа=110, Код=60, Наименование=300, Ед.изм.=52, Остаток=90
 // Итого минимальная ширина таблицы: 612px → горизонтальный скролл на узких экранах
-const double _colGroup    = 110;
-const double _colCode     = 60;
-const double _colName     = 300;
-const double _colUnit     = 52;
-const double _colQty      = 90;
-const double _tableWidth  = _colGroup + _colCode + _colName + _colUnit + _colQty;
+const double _colGroup = 110;
+const double _colCode = 60;
+const double _colName = 300;
+const double _colUnit = 52;
+const double _colQty = 90;
+const double _tableWidth = _colGroup + _colCode + _colName + _colUnit + _colQty;
 
 class _IikoBlankaHeader extends StatelessWidget {
   const _IikoBlankaHeader();
 
   @override
   Widget build(BuildContext context) {
-    final theme  = Theme.of(context);
-    final bg     = theme.colorScheme.surfaceContainerHighest;
+    final theme = Theme.of(context);
+    final bg = theme.colorScheme.surfaceContainerHighest;
     final border = BorderSide(color: theme.dividerColor);
-    final style  = TextStyle(
-        fontSize: 11, fontWeight: FontWeight.w700,
+    final style = TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
         color: theme.colorScheme.onSurface);
 
     Widget cell(String text, double width) => Container(
@@ -4537,10 +5230,10 @@ class _IikoBlankaHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          cell('Группа',               _colGroup),
-          cell('Код',                  _colCode),
-          cell('Наименование',         _colName),
-          cell('Ед.\nизм.',            _colUnit),
+          cell('Группа', _colGroup),
+          cell('Код', _colCode),
+          cell('Наименование', _colName),
+          cell('Ед.\nизм.', _colUnit),
           cell('Остаток\nфактический', _colQty),
         ],
       ),
@@ -4557,7 +5250,7 @@ class _IikoBlankaRowWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme  = Theme.of(context);
+    final theme = Theme.of(context);
     final border = BorderSide(color: theme.dividerColor);
 
     Widget cell(Widget child, double width, {Color? bg}) => Container(
@@ -4570,9 +5263,9 @@ class _IikoBlankaRowWidget extends StatelessWidget {
           child: child,
         );
 
-    final textColor    = theme.colorScheme.onSurface;
-    final subtleColor  = theme.colorScheme.onSurface.withOpacity(0.55);
-    final groupBg      = theme.colorScheme.primaryContainer.withOpacity(0.18);
+    final textColor = theme.colorScheme.onSurface;
+    final subtleColor = theme.colorScheme.onSurface.withOpacity(0.55);
+    final groupBg = theme.colorScheme.primaryContainer.withOpacity(0.18);
 
     return Container(
       width: _tableWidth,
@@ -4584,7 +5277,9 @@ class _IikoBlankaRowWidget extends StatelessWidget {
             cell(
               row.isFirstInGroup
                   ? Text(row.product.groupName ?? '',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
                           color: theme.colorScheme.primary))
                   : const SizedBox.shrink(),
               _colGroup,
@@ -4751,8 +5446,8 @@ class _QtyColumnPickerDialogState extends State<_QtyColumnPickerDialog> {
                         isHeader: true,
                       ),
                       // Строки данных
-                      ...widget.previewRows.map((row) =>
-                          _buildPreviewRow(context, row, cols)),
+                      ...widget.previewRows
+                          .map((row) => _buildPreviewRow(context, row, cols)),
                     ],
                   ),
                 ),
@@ -4821,8 +5516,7 @@ class _QtyColumnPickerDialogState extends State<_QtyColumnPickerDialog> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: isHeader ? 10 : 11,
-                  fontWeight:
-                      isHeader ? FontWeight.w600 : FontWeight.normal,
+                  fontWeight: isHeader ? FontWeight.w600 : FontWeight.normal,
                   color: isSelected
                       ? theme.colorScheme.primary
                       : theme.colorScheme.onSurface,

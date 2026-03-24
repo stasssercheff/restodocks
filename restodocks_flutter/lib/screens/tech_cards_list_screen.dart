@@ -44,6 +44,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   // Индексы/кэши для рекурсивного расчёта себестоимости (включая вложенные ПФ из импортированных ТТК).
   Map<String, TechCard> _techCardsById = {};
   Map<String, ({double cost, double output})> _resolvedCostMemo = {};
+
   /// Для расчёта ₽/кг в списке по ценам номенклатуры (ингредиенты в БД часто без cost/pricePerKg).
   ProductStoreSupabase? _priceProductStore;
   String? _priceEstablishmentId;
@@ -98,8 +99,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     if (employee == null) return;
     _ttkTourCheckDone = true;
     final tourService = context.read<PageTourService>();
-    final forceReplay = tourService.consumeReplayRequest(PageTourKeys.techCards);
-    if (!forceReplay && await tourService.isPageTourSeen(employee.id, PageTourKeys.techCards)) return;
+    final forceReplay =
+        tourService.consumeReplayRequest(PageTourKeys.techCards);
+    if (!forceReplay &&
+        await tourService.isPageTourSeen(employee.id, PageTourKeys.techCards))
+      return;
     if (!mounted) return;
     final loc = context.read<LocalizationService>();
     // Цвет подсветки для кнопок в красной AppBar
@@ -284,11 +288,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         ),
       ],
       onTourCompleted: () async {
-        if (!forceReplay) await tourService.markPageTourSeen(employee.id, PageTourKeys.techCards);
+        if (!forceReplay)
+          await tourService.markPageTourSeen(
+              employee.id, PageTourKeys.techCards);
         if (mounted) setState(() => _ttkTourController = null);
       },
       onTourSkipped: () async {
-        if (!forceReplay) await tourService.markPageTourSeen(employee.id, PageTourKeys.techCards);
+        if (!forceReplay)
+          await tourService.markPageTourSeen(
+              employee.id, PageTourKeys.techCards);
         if (mounted) setState(() => _ttkTourController = null);
       },
     );
@@ -312,6 +320,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         });
       });
     }
+
     startWhenReady();
   }
 
@@ -524,7 +533,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   /// Fallback: TechCardCostHydrator по гидратированным ингредиентам; выход — tc.yield если сумма по строкам 0.
   double _calculateCostPerKg(TechCard tc) {
     final resolved = _resolveTechCardCostOutput(tc.id, <String>{});
-    final effectiveOutput = resolved.output > 0 ? resolved.output : (tc.yield > 0 ? tc.yield : 0.0);
+    final effectiveOutput =
+        resolved.output > 0 ? resolved.output : (tc.yield > 0 ? tc.yield : 0.0);
     if (effectiveOutput > 0 && resolved.cost > 0) {
       return (resolved.cost / effectiveOutput) * 1000;
     }
@@ -584,17 +594,21 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     if ((pid == null || pid.isEmpty) && name.isEmpty) return 0.0;
 
     final product = store.findProductForIngredient(pid, name);
-    final resolvedId = product?.id ?? (pid != null && pid.isNotEmpty ? pid : null);
+    final resolvedId =
+        product?.id ?? (pid != null && pid.isNotEmpty ? pid : null);
     if (resolvedId == null || resolvedId.isEmpty) {
-      final byName =
-          _nomenclaturePriceByName[_normalizeForTechCardName(_stripPfPrefix(name))] ??
-              0.0;
+      final byName = _nomenclaturePriceByName[
+              _normalizeForTechCardName(_stripPfPrefix(name))] ??
+          0.0;
       return _costFromPricePerKgLine(byName, ing);
     }
 
     final ep = store.getEstablishmentPrice(resolvedId, estId);
     double unitPrice = ep?.$1 ?? 0.0;
-    if (unitPrice <= 0 && product != null && product.basePrice != null && product.basePrice! > 0) {
+    if (unitPrice <= 0 &&
+        product != null &&
+        product.basePrice != null &&
+        product.basePrice! > 0) {
       unitPrice = product.basePrice!;
     }
     return _costFromPricePerKgLine(unitPrice, ing);
@@ -609,7 +623,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     const chunkSize = 500;
     final client = Supabase.instance.client;
     for (var i = 0; i < ids.length; i += chunkSize) {
-      final chunk = ids.sublist(i, i + chunkSize > ids.length ? ids.length : i + chunkSize);
+      final chunk = ids.sublist(
+          i, i + chunkSize > ids.length ? ids.length : i + chunkSize);
       try {
         final data = await client
             .from('products')
@@ -719,7 +734,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       (_listVersion, _filterSection, _filterCategory, _searchController.text);
 
   /// Тяжёлые вычисления для вкладки «На проверку» — в след. кадре, чтобы не блокировать UI.
-  void _ensureReviewCache(LocalizationService loc, List<TechCard> reviewFiltered) {
+  void _ensureReviewCache(
+      LocalizationService loc, List<TechCard> reviewFiltered) {
     final key = _reviewCacheKey(reviewFiltered);
     if (_lastReviewCacheKey == key) return;
     if (_reviewCacheScheduled) return;
@@ -731,7 +747,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       final list = reviewFiltered
           .map((tc) {
             final issues = _reviewIssuesCount(tc, loc);
-            return (tc: tc, issues: issues, subtitle: _getReviewSubtitle(tc, loc));
+            return (
+              tc: tc,
+              issues: issues,
+              subtitle: _getReviewSubtitle(tc, loc)
+            );
           })
           .where((e) => e.issues > 0)
           .toList()
@@ -777,11 +797,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       if (ing.sourceTechCardId == null || ing.sourceTechCardId!.isEmpty) {
         if (ing.productName.trim().isNotEmpty) {
           // Есть продукт, но нет цены
-          if (ing.effectiveCost <= 0 && (ing.pricePerKg == null || ing.pricePerKg! <= 0)) {
+          if (ing.effectiveCost <= 0 &&
+              (ing.pricePerKg == null || ing.pricePerKg! <= 0)) {
             // Проверяем, есть ли цена в номенклатуре
-            final product = _priceProductStore?.findProductForIngredient(ing.productId, ing.productName);
+            final product = _priceProductStore?.findProductForIngredient(
+                ing.productId, ing.productName);
             if (product != null && _priceEstablishmentId != null) {
-              final priceInfo = _priceProductStore!.getEstablishmentPrice(product.id, _priceEstablishmentId!);
+              final priceInfo = _priceProductStore!
+                  .getEstablishmentPrice(product.id, _priceEstablishmentId!);
               final pricePerKg = priceInfo?.$1 ?? 0.0;
               final basePrice = product.basePrice ?? 0.0;
               if (pricePerKg <= 0 && basePrice <= 0) {
@@ -811,43 +834,43 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   /// Проверяет, есть ли проблемы с весом в ТТК
   int _missingWeightIssuesCount(TechCard tc) {
     var cnt = 0;
-    
+
     // Проверяем общий выход (вес готового продукта)
     if (tc.yield <= 0) {
       cnt++;
     }
-    
+
     // Проверяем вес порции для блюд
     if (!tc.isSemiFinished && tc.portionWeight <= 0) {
       cnt++;
     }
-    
+
     // Проверяем веса ингредиентов (нетто и брутто)
     for (final ing in tc.ingredients) {
       if (ing.netWeight <= 0 || ing.grossWeight <= 0) {
         cnt++;
       }
     }
-    
+
     return cnt;
   }
 
   /// Проверяет, есть ли проблемы с технологией в ТТК
   int _missingTechnologyIssuesCount(TechCard tc) {
     var cnt = 0;
-    
+
     // Проверяем технологию приготовления (многоязычная)
     if (tc.technologyLocalized == null || tc.technologyLocalized!.isEmpty) {
       cnt++;
     } else {
       // Проверяем, что есть хотя бы одна непустая технология
-      final hasNonEmptyTechnology = tc.technologyLocalized!.values
-          .any((tech) => tech.trim().isNotEmpty);
+      final hasNonEmptyTechnology =
+          tc.technologyLocalized!.values.any((tech) => tech.trim().isNotEmpty);
       if (!hasNonEmptyTechnology) {
         cnt++;
       }
     }
-    
+
     return cnt;
   }
 
@@ -857,7 +880,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final priceIssuesCount = _missingPriceIssuesCount(tc);
     final weightIssuesCount = _missingWeightIssuesCount(tc);
     final technologyIssuesCount = _missingTechnologyIssuesCount(tc);
-    return ambiguousCount + priceIssuesCount + weightIssuesCount + technologyIssuesCount;
+    return ambiguousCount +
+        priceIssuesCount +
+        weightIssuesCount +
+        technologyIssuesCount;
   }
 
   /// Генерирует подзаголовок для элемента в списке "На проверку"
@@ -866,7 +892,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final priceIssuesCount = _missingPriceIssuesCount(tc);
     final weightIssuesCount = _missingWeightIssuesCount(tc);
     final technologyIssuesCount = _missingTechnologyIssuesCount(tc);
-    
+
     final issues = <String>[];
     if (ambiguousCount > 0) {
       issues.add('Неоднозначных ПФ: $ambiguousCount');
@@ -880,7 +906,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     if (technologyIssuesCount > 0) {
       issues.add('Без технологии: $technologyIssuesCount');
     }
-    
+
     return issues.join(', ');
   }
 
@@ -932,7 +958,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final list = _cachedReviewList;
 
     if (list == null) {
-      return const Center(child: Padding(
+      return const Center(
+          child: Padding(
         padding: EdgeInsets.all(24),
         child: SizedBox(
           width: 32,
@@ -982,7 +1009,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }
 
   /// Собирает список неоднозначных ПФ ингредиентов
-  List<({TTIngredient ing, List<TechCard> candidates})> _getAmbiguousPfIngredients(TechCard tc) {
+  List<({TTIngredient ing, List<TechCard> candidates})>
+      _getAmbiguousPfIngredients(TechCard tc) {
     final matches = <({TTIngredient ing, List<TechCard> candidates})>[];
     for (final ing in tc.ingredients) {
       final sid = ing.sourceTechCardId;
@@ -1016,11 +1044,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       if (ing.sourceTechCardId == null || ing.sourceTechCardId!.isEmpty) {
         if (ing.productName.trim().isNotEmpty) {
           // Есть продукт, но нет цены
-          if (ing.effectiveCost <= 0 && (ing.pricePerKg == null || ing.pricePerKg! <= 0)) {
+          if (ing.effectiveCost <= 0 &&
+              (ing.pricePerKg == null || ing.pricePerKg! <= 0)) {
             // Проверяем, есть ли цена в номенклатуре
-            final product = _priceProductStore?.findProductForIngredient(ing.productId, ing.productName);
+            final product = _priceProductStore?.findProductForIngredient(
+                ing.productId, ing.productName);
             if (product != null && _priceEstablishmentId != null) {
-              final priceInfo = _priceProductStore!.getEstablishmentPrice(product.id, _priceEstablishmentId!);
+              final priceInfo = _priceProductStore!
+                  .getEstablishmentPrice(product.id, _priceEstablishmentId!);
               final pricePerKg = priceInfo?.$1 ?? 0.0;
               final basePrice = product.basePrice ?? 0.0;
               if (pricePerKg <= 0 && basePrice <= 0) {
@@ -1039,17 +1070,17 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   /// Собирает список проблем с весом
   List<String> _getMissingWeightIssues(TechCard tc) {
     final issues = <String>[];
-    
+
     // Проверяем общий выход (вес готового продукта)
     if (tc.yield <= 0) {
       issues.add('Отсутствует общий выход (вес готового продукта)');
     }
-    
+
     // Проверяем вес порции для блюд
     if (!tc.isSemiFinished && tc.portionWeight <= 0) {
       issues.add('Отсутствует вес порции');
     }
-    
+
     // Проверяем веса ингредиентов (нетто и брутто)
     for (final ing in tc.ingredients) {
       if (ing.netWeight <= 0 || ing.grossWeight <= 0) {
@@ -1059,26 +1090,26 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         issues.add('Нет веса (${issuesList.join(', ')}): ${ing.productName}');
       }
     }
-    
+
     return issues;
   }
 
   /// Собирает список проблем с технологией
   List<String> _getMissingTechnologyIssues(TechCard tc) {
     final issues = <String>[];
-    
+
     // Проверяем технологию приготовления (многоязычная)
     if (tc.technologyLocalized == null || tc.technologyLocalized!.isEmpty) {
       issues.add('Отсутствует технология приготовления');
     } else {
       // Проверяем, что есть хотя бы одна непустая технология
-      final hasNonEmptyTechnology = tc.technologyLocalized!.values
-          .any((tech) => tech.trim().isNotEmpty);
+      final hasNonEmptyTechnology =
+          tc.technologyLocalized!.values.any((tech) => tech.trim().isNotEmpty);
       if (!hasNonEmptyTechnology) {
         issues.add('Все технологии приготовления пустые');
       }
     }
-    
+
     return issues;
   }
 
@@ -1089,10 +1120,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final missingPriceIngredients = _getMissingPriceIngredients(tc);
     final missingWeightIssues = _getMissingWeightIssues(tc);
     final missingTechnologyIssues = _getMissingTechnologyIssues(tc);
-    
-    if (ambiguousMatches.isEmpty && 
-        missingPriceIngredients.isEmpty && 
-        missingWeightIssues.isEmpty && 
+
+    if (ambiguousMatches.isEmpty &&
+        missingPriceIngredients.isEmpty &&
+        missingWeightIssues.isEmpty &&
         missingTechnologyIssues.isEmpty) return;
 
     final selected = <String, String>{
@@ -1148,13 +1179,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                           if (ambiguousMatches.isNotEmpty) ...[
                             Text(
                               'Неоднозначные полуфабрикаты (${ambiguousMatches.length})',
-                              style: Theme.of(ctx2).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style:
+                                  Theme.of(ctx2).textTheme.titleSmall?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
                             ),
                             const SizedBox(height: 8),
                             ...ambiguousMatches.map((m) {
-                              final selId = selected[m.ing.id] ?? m.candidates.first.id;
+                              final selId =
+                                  selected[m.ing.id] ?? m.candidates.first.id;
                               final selPf = m.candidates.firstWhere(
                                   (c) => c.id == selId,
                                   orElse: () => m.candidates.first);
@@ -1172,7 +1205,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                                       .surfaceContainerLowest,
                                 ),
                                 child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
                                   children: [
                                     Text(m.ing.productName,
                                         style: Theme.of(ctx2)
@@ -1185,12 +1219,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                                       value: selId,
                                       isExpanded: true,
                                       decoration: const InputDecoration(
-                                          isDense: true, labelText: 'Кандидат ПФ'),
+                                          isDense: true,
+                                          labelText: 'Кандидат ПФ'),
                                       items: m.candidates
                                           .map((c) => DropdownMenuItem<String>(
                                                 value: c.id,
                                                 child: Text(
-                                                    c.getDisplayNameInLists(lang)),
+                                                    c.getDisplayNameInLists(
+                                                        lang)),
                                               ))
                                           .toList(),
                                       onChanged: saving
@@ -1218,12 +1254,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                           ],
                           // Секция ингредиентов без цен
                           if (missingPriceIngredients.isNotEmpty) ...[
-                            if (ambiguousMatches.isNotEmpty) const SizedBox(height: 16),
+                            if (ambiguousMatches.isNotEmpty)
+                              const SizedBox(height: 16),
                             Text(
                               'Ингредиенты без цен (${missingPriceIngredients.length})',
-                              style: Theme.of(ctx2).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style:
+                                  Theme.of(ctx2).textTheme.titleSmall?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
                             ),
                             const SizedBox(height: 8),
                             ...missingPriceIngredients.map((ing) {
@@ -1232,9 +1270,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   border: Border.all(
-                                      color: Theme.of(ctx2).colorScheme.outlineVariant),
+                                      color: Theme.of(ctx2)
+                                          .colorScheme
+                                          .outlineVariant),
                                   borderRadius: BorderRadius.circular(10),
-                                  color: Theme.of(ctx2).colorScheme.surfaceContainerLowest,
+                                  color: Theme.of(ctx2)
+                                      .colorScheme
+                                      .surfaceContainerLowest,
                                 ),
                                 child: Row(
                                   children: [
@@ -1243,7 +1285,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                                     Expanded(
                                       child: Text(
                                         ing.productName,
-                                        style: Theme.of(ctx2).textTheme.bodyMedium,
+                                        style:
+                                            Theme.of(ctx2).textTheme.bodyMedium,
                                       ),
                                     ),
                                   ],
@@ -1253,13 +1296,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                           ],
                           // Секция проблем с весом
                           if (missingWeightIssues.isNotEmpty) ...[
-                            if (ambiguousMatches.isNotEmpty || missingPriceIngredients.isNotEmpty) 
+                            if (ambiguousMatches.isNotEmpty ||
+                                missingPriceIngredients.isNotEmpty)
                               const SizedBox(height: 16),
                             Text(
                               'Проблемы с весом (${missingWeightIssues.length})',
-                              style: Theme.of(ctx2).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style:
+                                  Theme.of(ctx2).textTheme.titleSmall?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
                             ),
                             const SizedBox(height: 8),
                             ...missingWeightIssues.map((issue) {
@@ -1268,9 +1313,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   border: Border.all(
-                                      color: Theme.of(ctx2).colorScheme.outlineVariant),
+                                      color: Theme.of(ctx2)
+                                          .colorScheme
+                                          .outlineVariant),
                                   borderRadius: BorderRadius.circular(10),
-                                  color: Theme.of(ctx2).colorScheme.surfaceContainerLowest,
+                                  color: Theme.of(ctx2)
+                                      .colorScheme
+                                      .surfaceContainerLowest,
                                 ),
                                 child: Row(
                                   children: [
@@ -1279,7 +1328,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                                     Expanded(
                                       child: Text(
                                         issue,
-                                        style: Theme.of(ctx2).textTheme.bodyMedium,
+                                        style:
+                                            Theme.of(ctx2).textTheme.bodyMedium,
                                       ),
                                     ),
                                   ],
@@ -1289,15 +1339,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                           ],
                           // Секция проблем с технологией
                           if (missingTechnologyIssues.isNotEmpty) ...[
-                            if (ambiguousMatches.isNotEmpty || 
-                                missingPriceIngredients.isNotEmpty || 
-                                missingWeightIssues.isNotEmpty) 
+                            if (ambiguousMatches.isNotEmpty ||
+                                missingPriceIngredients.isNotEmpty ||
+                                missingWeightIssues.isNotEmpty)
                               const SizedBox(height: 16),
                             Text(
                               'Проблемы с технологией (${missingTechnologyIssues.length})',
-                              style: Theme.of(ctx2).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                              style:
+                                  Theme.of(ctx2).textTheme.titleSmall?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
                             ),
                             const SizedBox(height: 8),
                             ...missingTechnologyIssues.map((issue) {
@@ -1306,9 +1357,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   border: Border.all(
-                                      color: Theme.of(ctx2).colorScheme.outlineVariant),
+                                      color: Theme.of(ctx2)
+                                          .colorScheme
+                                          .outlineVariant),
                                   borderRadius: BorderRadius.circular(10),
-                                  color: Theme.of(ctx2).colorScheme.surfaceContainerLowest,
+                                  color: Theme.of(ctx2)
+                                      .colorScheme
+                                      .surfaceContainerLowest,
                                 ),
                                 child: Row(
                                   children: [
@@ -1317,7 +1372,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                                     Expanded(
                                       child: Text(
                                         issue,
-                                        style: Theme.of(ctx2).textTheme.bodyMedium,
+                                        style:
+                                            Theme.of(ctx2).textTheme.bodyMedium,
                                       ),
                                     ),
                                   ],
@@ -1337,8 +1393,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                                 ? null
                                 : () async {
                                     Navigator.of(ctx2).pop();
-                                    final needRefresh = await context.push<bool>('/tech-cards/${tc.id}');
-                                    if (mounted && needRefresh == true) _load(showLoading: false);
+                                    final needRefresh = await context
+                                        .push<bool>('/tech-cards/${tc.id}');
+                                    if (mounted && needRefresh == true)
+                                      _load(showLoading: false);
                                   },
                             child: const Text('Открыть карточку'),
                           ),
@@ -1350,60 +1408,60 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                               onPressed: saving
                                   ? null
                                   : () async {
-                                    setStateDlg(() => saving = true);
-                                    try {
-                                      final svc = context
-                                          .read<TechCardServiceSupabase>();
-                                      final updatedIngredients =
-                                          tc.ingredients.map((ing) {
-                                        final pickedId = selected[ing.id];
-                                        if (pickedId == null) return ing;
-                                        final pf = _list.firstWhere(
-                                          (x) => x.id == pickedId,
-                                          orElse: () =>
-                                              _pfCandidatesByNormalizedName
-                                                  .values
-                                                  .expand((e) => e)
-                                                  .firstWhere(
-                                                      (x) => x.id == pickedId),
-                                        );
-                                        final display =
-                                            pf.getDisplayNameInLists(lang);
-                                        return ing.copyWith(
-                                          sourceTechCardId: pf.id,
-                                          sourceTechCardName: display,
-                                          productName: display,
-                                        );
-                                      }).toList();
-                                      final updatedTc = tc.copyWith(
-                                          ingredients: updatedIngredients);
-                                      await svc.saveTechCard(updatedTc);
-                                      if (mounted) {
-                                        await _load();
+                                      setStateDlg(() => saving = true);
+                                      try {
+                                        final svc = context
+                                            .read<TechCardServiceSupabase>();
+                                        final updatedIngredients =
+                                            tc.ingredients.map((ing) {
+                                          final pickedId = selected[ing.id];
+                                          if (pickedId == null) return ing;
+                                          final pf = _list.firstWhere(
+                                            (x) => x.id == pickedId,
+                                            orElse: () =>
+                                                _pfCandidatesByNormalizedName
+                                                    .values
+                                                    .expand((e) => e)
+                                                    .firstWhere((x) =>
+                                                        x.id == pickedId),
+                                          );
+                                          final display =
+                                              pf.getDisplayNameInLists(lang);
+                                          return ing.copyWith(
+                                            sourceTechCardId: pf.id,
+                                            sourceTechCardName: display,
+                                            productName: display,
+                                          );
+                                        }).toList();
+                                        final updatedTc = tc.copyWith(
+                                            ingredients: updatedIngredients);
+                                        await svc.saveTechCard(updatedTc);
+                                        if (mounted) {
+                                          await _load();
+                                        }
+                                        if (ctx2.mounted)
+                                          Navigator.of(ctx2).pop();
+                                      } catch (e) {
+                                        if (ctx2.mounted) {
+                                          ScaffoldMessenger.of(ctx2)
+                                              .showSnackBar(SnackBar(
+                                                  content: Text(
+                                                      'Ошибка сохранения: $e')));
+                                        }
+                                      } finally {
+                                        if (ctx2.mounted)
+                                          setStateDlg(() => saving = false);
                                       }
-                                      if (ctx2.mounted)
-                                        Navigator.of(ctx2).pop();
-                                    } catch (e) {
-                                      if (ctx2.mounted) {
-                                        ScaffoldMessenger.of(ctx2).showSnackBar(
-                                            SnackBar(
-                                                content: Text(
-                                                    'Ошибка сохранения: $e')));
-                                      }
-                                    } finally {
-                                      if (ctx2.mounted)
-                                        setStateDlg(() => saving = false);
-                                    }
-                                  },
-                            child: saving
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2))
-                                : const Text('Применить'),
+                                    },
+                              child: saving
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2))
+                                  : const Text('Применить'),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ],
@@ -1504,34 +1562,71 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return resolved;
   }
 
-  List<TechCard> _filterListByDepartment(List<TechCard> processedAll, Set<String> customBarIds) {
+  List<TechCard> _filterListByDepartment(
+      List<TechCard> processedAll, Set<String> customBarIds) {
     if (widget.department == 'banquet-catering') {
-      return processedAll.where((tc) => tc.category == 'banquet' || tc.category == 'catering').toList();
+      return processedAll
+          .where((tc) => tc.category == 'banquet' || tc.category == 'catering')
+          .toList();
     }
     if (widget.department == 'banquet-catering-bar') {
-      const barCategories = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zakuska'};
-      return processedAll.where((tc) =>
-          (tc.category == 'banquet' || tc.category == 'catering') &&
-          (tc.sections.contains('bar') || tc.sections.contains('all') || barCategories.contains(tc.category))).toList();
+      const barCategories = {
+        'beverages',
+        'alcoholic_cocktails',
+        'non_alcoholic_drinks',
+        'hot_drinks',
+        'drinks_pure',
+        'snacks',
+        'zakuska'
+      };
+      return processedAll
+          .where((tc) =>
+              (tc.category == 'banquet' || tc.category == 'catering') &&
+              (tc.sections.contains('bar') ||
+                  tc.sections.contains('all') ||
+                  barCategories.contains(tc.category)))
+          .toList();
     }
     if (widget.department == 'bar') {
-      const barCats = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zakuska'};
+      const barCats = {
+        'beverages',
+        'alcoholic_cocktails',
+        'non_alcoholic_drinks',
+        'hot_drinks',
+        'drinks_pure',
+        'snacks',
+        'zakuska'
+      };
       final cat = (String c) => c.isEmpty ? 'misc' : c;
       return processedAll.where((tc) {
         final c = cat(tc.category);
         if (barCats.contains(c)) return true;
         if (tc.sections.contains('bar')) return true;
-        if (TechCardServiceSupabase.isCustomCategory(tc.category) && customBarIds.contains(TechCardServiceSupabase.customCategoryId(tc.category))) return true;
+        if (TechCardServiceSupabase.isCustomCategory(tc.category) &&
+            customBarIds.contains(
+                TechCardServiceSupabase.customCategoryId(tc.category)))
+          return true;
         return false;
       }).toList();
     }
     if (widget.department == 'hall') return [];
-    const barCats = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks', 'zakuska'};
+    const barCats = {
+      'beverages',
+      'alcoholic_cocktails',
+      'non_alcoholic_drinks',
+      'hot_drinks',
+      'drinks_pure',
+      'snacks',
+      'zakuska'
+    };
     final cat = (String c) => c.isEmpty ? 'misc' : c;
     return processedAll.where((tc) {
       final c = cat(tc.category);
       if (barCats.contains(c)) return false;
-      if (TechCardServiceSupabase.isCustomCategory(tc.category) && customBarIds.contains(TechCardServiceSupabase.customCategoryId(tc.category))) return false;
+      if (TechCardServiceSupabase.isCustomCategory(tc.category) &&
+          customBarIds
+              .contains(TechCardServiceSupabase.customCategoryId(tc.category)))
+        return false;
       return true;
     }).toList();
   }
@@ -1565,7 +1660,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           svc.getTechCardsForEstablishment(est.id),
         ]).then((results) => [...results[0], ...results[1]]);
       } else {
-        allCardsFuture = svc.getTechCardsForEstablishment(est.dataEstablishmentId);
+        allCardsFuture =
+            svc.getTechCardsForEstablishment(est.dataEstablishmentId);
       }
       final results = await Future.wait([
         allCardsFuture,
@@ -1576,7 +1672,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       ]);
       final all = results[0] as List<TechCard>;
       final customResults = results[1] as List;
-      final customKitchen = customResults[0] as List<({String id, String name})>;
+      final customKitchen =
+          customResults[0] as List<({String id, String name})>;
       final customBar = customResults[1] as List<({String id, String name})>;
       final customBarIds = customBar.map((c) => c.id).toSet();
 
@@ -1600,9 +1697,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         try {
           await productStore.loadProducts().catchError((_) {});
           if (est.isBranch) {
-            await productStore.loadNomenclatureForBranch(est.id, est.dataEstablishmentId!).catchError((_) {});
+            await productStore
+                .loadNomenclatureForBranch(est.id, est.dataEstablishmentId!)
+                .catchError((_) {});
           } else {
-            await productStore.loadNomenclature(est.dataEstablishmentId).catchError((_) {});
+            await productStore
+                .loadNomenclature(est.dataEstablishmentId)
+                .catchError((_) {});
           }
           if (!mounted) return;
           var withData = List<TechCard>.from(processedAll);
@@ -1610,11 +1711,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             withData = await svc.fillIngredientsForCardsBulk(withData);
             final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
             if (estPriceId != null && estPriceId.isNotEmpty) {
-              withData = TechCardCostHydrator.hydrate(withData, productStore, estPriceId);
+              withData = TechCardCostHydrator.hydrate(
+                  withData, productStore, estPriceId);
             }
           }
           if (!mounted) return;
-          await _buildNomenclatureNamePriceIndex(productStore, est.isBranch ? est.id : est.dataEstablishmentId);
+          await _buildNomenclatureNamePriceIndex(
+              productStore, est.isBranch ? est.id : est.dataEstablishmentId);
           if (!mounted) return;
           var filteredList = _filterListByDepartment(withData, customBarIds);
           final byId = {for (final tc in withData) tc.id: tc};
@@ -1622,7 +1725,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           for (final tc in withData) {
             for (final ing in tc.ingredients) {
               final id = ing.sourceTechCardId;
-              if (id != null && id.trim().isNotEmpty) referencedIds.add(id.trim());
+              if (id != null && id.trim().isNotEmpty)
+                referencedIds.add(id.trim());
             }
           }
           final existing = filteredList.map((e) => e.id).toSet();
@@ -1642,7 +1746,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             _lastReviewCacheKey = null;
             _techCardsById = {for (final t in withData) t.id: t};
             _priceProductStore = productStore;
-            _priceEstablishmentId = est.isBranch ? est.id : est.dataEstablishmentId;
+            _priceEstablishmentId =
+                est.isBranch ? est.id : est.dataEstablishmentId;
           });
           if (mounted) {
             _rebuildPfCandidatesIndex(context.read<LocalizationService>());
@@ -1910,7 +2015,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           final sid = ing.sourceTechCardId;
           if (sid != null && sid.isNotEmpty && sid == working.id) {
             changed = true;
-            return ing.copyWith(sourceTechCardId: null, sourceTechCardName: null);
+            return ing.copyWith(
+                sourceTechCardId: null, sourceTechCardName: null);
           }
           final hasSourceId = sid != null && sid.isNotEmpty;
           if (hasSourceId) return ing;
@@ -1957,14 +2063,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   static const _maxFilesSingleTtk = 10;
   static const _maxFilesMultiTtk = 10;
 
-  static const _allowedTtkExtensions = ['xlsx', 'xls', 'csv', 'pdf', 'docx', 'doc'];
+  static const _allowedTtkExtensions = [
+    'xlsx',
+    'xls',
+    'csv',
+    'pdf',
+    'docx',
+    'doc'
+  ];
 
   Future<void> _createFromExcel(
       BuildContext context, LocalizationService loc) async {
     _TtkImportMode dialogMode = _TtkImportMode.single;
     // Возвращаем (mode, files) — FilePicker вызывается внутри onPressed, без Navigator.pop перед ним,
     // чтобы сохранить «user gesture» и сработать на мобильных (Safari/Chrome требуют прямой вызов из tap).
-    final result = await showDialog<({_TtkImportMode mode, List<PlatformFile> files})>(
+    final result =
+        await showDialog<({_TtkImportMode mode, List<PlatformFile> files})>(
       context: context,
       builder: (ctx) {
         final l = ctx.read<LocalizationService>();
@@ -2041,14 +2155,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                     if (pickResult == null || pickResult.files.isEmpty) return;
                     final valid = pickResult.files.where((f) {
                       final parts = f.name.split('.');
-                      final ext = (f.extension ?? (parts.length > 1 ? parts.last : '')).toLowerCase();
+                      final ext =
+                          (f.extension ?? (parts.length > 1 ? parts.last : ''))
+                              .toLowerCase();
                       return _allowedTtkExtensions.contains(ext) &&
                           (f.bytes != null && f.bytes!.isNotEmpty);
                     }).toList();
                     if (valid.isEmpty) {
                       if (ctx.mounted) {
                         ScaffoldMessenger.of(ctx).showSnackBar(
-                          SnackBar(content: Text(l.t('file_read_failed') ?? 'Не удалось прочитать файл')),
+                          SnackBar(
+                              content: Text(l.t('file_read_failed') ??
+                                  'Не удалось прочитать файл')),
                         );
                       }
                       return;
@@ -2102,7 +2220,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           await productStore.loadProducts();
           await productStore.loadNomenclature(establishmentId);
           final prods = productStore.getNomenclatureProducts(establishmentId);
-          nomenclatureNames = prods.expand((p) => [p.name, ...?p.names?.values.map((n) => n?.toString())]).whereType<String>().where((s) => s.trim().length > 1).toSet().take(300).toList();
+          nomenclatureNames = prods
+              .expand((p) =>
+                  [p.name, ...?p.names?.values.map((n) => n?.toString())])
+              .whereType<String>()
+              .where((s) => s.trim().length > 1)
+              .toSet()
+              .take(300)
+              .toList();
         } catch (_) {}
       }
       var allCards = <TechCardRecognitionResult>[];
@@ -2223,7 +2348,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               msg = loc.t('ai_ttk_pdf_timeout') ??
                   (loc.t('ai_tech_card_pdf_format_hint') ??
                       'Таймаут загрузки PDF');
-            } else if (reason != null && reason.startsWith('extraction_failed')) {
+            } else if (reason != null &&
+                reason.startsWith('extraction_failed')) {
               msg = loc.t('ai_ttk_pdf_extraction_failed') ??
                   (loc.t('ai_tech_card_pdf_format_hint') ??
                       'Не удалось извлечь текст из PDF');
@@ -2593,8 +2719,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         actions: _buildAppBarActions(loc, canEdit),
       ),
       body: Stack(
-          children: [
-            _buildBody(loc, canEdit, showCost),
+        children: [
+          _buildBody(loc, canEdit, showCost),
           if (_loadingExcel)
             ColoredBox(
               color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
@@ -2663,7 +2789,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                         ? '/tech-cards/new?department=bar'
                         : '/tech-cards/new';
                     final needRefresh = await context.push<bool>(path);
-                    if (mounted && needRefresh == true) _load(showLoading: false);
+                    if (mounted && needRefresh == true)
+                      _load(showLoading: false);
                   },
           )
         : null;
@@ -2680,7 +2807,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   value: 'excel', child: Text(loc.t('ttk_import_file'))),
               PopupMenuItem(
                   value: 'text',
-                  child: Text(loc.t('ttk_import_paste_text') ?? 'Вставить текст')),
+                  child:
+                      Text(loc.t('ttk_import_paste_text') ?? 'Вставить текст')),
             ],
           )
         : null;
@@ -2704,8 +2832,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                       itemBuilder: (context, index) {
                         final techCard = _list[index];
                         return ListTile(
-                          title: Text(techCard.getDisplayNameInLists(
-                              l.currentLanguageCode)),
+                          title: Text(techCard
+                              .getDisplayNameInLists(l.currentLanguageCode)),
                           subtitle: Text(techCard.isSemiFinished
                               ? l.t('ttk_semi_finished')
                               : l.t('ttk_dish_label')),
@@ -2829,8 +2957,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 if (reviewCount > 0) ...[
                   const SizedBox(width: 8),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: Theme.of(context).colorScheme.primary,
                       borderRadius: BorderRadius.circular(999),
@@ -2909,6 +3037,19 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         .toSet()
         .toList();
     final filterCatOrder = [...catOrder, ...customCatsInList];
+    final validSectionFilter =
+        _filterSection == null || _sectionOrder.any((s) => s == _filterSection);
+    final validCategoryFilter = _filterCategory == null ||
+        filterCatOrder.any((c) => c == _filterCategory);
+    if (!validSectionFilter || !validCategoryFilter) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          if (!validSectionFilter) _filterSection = null;
+          if (!validCategoryFilter) _filterCategory = null;
+        });
+      });
+    }
     List<TechCard> filterBySearch(List<TechCard> list) {
       if (query.isEmpty) return list;
       final loc = context.read<LocalizationService>();
@@ -2951,8 +3092,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             emp?.hasRole('sous_chef') == true) &&
         acc.establishment?.isMain == true;
 
+    final initialTabIndex =
+        semiFinishedFiltered.isEmpty && dishFiltered.isNotEmpty ? 1 : 0;
     return DefaultTabController(
       length: 3,
+      initialIndex: initialTabIndex,
       child: Column(
         children: [
           if (showBranchFilter)
@@ -3000,18 +3144,25 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                     child: Row(
                       children: [
                         Icon(Icons.business,
-                            size: 20, color: Theme.of(context).colorScheme.primary),
+                            size: 20,
+                            color: Theme.of(context).colorScheme.primary),
                         const SizedBox(width: 8),
                         Text(
                           loc.t('ttk_section'),
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
                         ),
                         const SizedBox(width: 8),
                         Text(
                           _departmentHeaderLabel(loc),
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(
                                 fontWeight: FontWeight.w600,
                                 color: Theme.of(context).colorScheme.onSurface,
                               ),
@@ -3022,18 +3173,24 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 : Row(
                     children: [
                       Icon(Icons.business,
-                          size: 20, color: Theme.of(context).colorScheme.primary),
+                          size: 20,
+                          color: Theme.of(context).colorScheme.primary),
                       const SizedBox(width: 8),
                       Text(
                         loc.t('ttk_section'),
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         _departmentHeaderLabel(loc),
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleMedium
+                            ?.copyWith(
                               fontWeight: FontWeight.w600,
                               color: Theme.of(context).colorScheme.onSurface,
                             ),
@@ -3042,6 +3199,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   ),
           ),
           TabBar(
+            isScrollable: true,
             tabs: _buildTabBarTabs(loc, reviewCount),
           ),
           // Поиск и сортировка
@@ -3057,7 +3215,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                     hintText: loc.t('ttk_search_hint'),
                     isDense: true,
                     prefixIcon: const Icon(Icons.search, size: 20),
-                        suffixIcon: _searchController.text.isNotEmpty
+                    suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear, size: 20),
                             onPressed: () {
@@ -3156,6 +3314,35 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc,
       bool canEdit, bool showCost,
       {bool isDishesTab = false}) {
+    if (techCards.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(24),
+          children: [
+            const SizedBox(height: 48),
+            Icon(Icons.description_outlined,
+                size: 56, color: Theme.of(context).colorScheme.outline),
+            const SizedBox(height: 12),
+            Text(
+              isDishesTab
+                  ? (loc.t('ttk_dishes_tab') ?? 'Блюда')
+                  : (loc.t('ttk_pf_tab') ?? 'ПФ'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              loc.t('tech_cards_empty'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
+    }
     final lang = loc.currentLanguageCode;
     final isMobile = MediaQuery.of(context).size.width < 600;
     // На мобильном — уже столбцы, чтобы название получало больше места.
@@ -3321,7 +3508,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         },
         onLongPress: effectiveCanEdit && !_selectionMode
             ? () async {
-                final needRefresh = await context.push<bool>('/tech-cards/${tc.id}?view=1');
+                final needRefresh =
+                    await context.push<bool>('/tech-cards/${tc.id}?view=1');
                 if (mounted && needRefresh == true) _load(showLoading: false);
               }
             : null,

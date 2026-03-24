@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-
 import '../models/models.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/scroll_to_top_app_bar_title.dart';
+import '../widgets/supplier_contact_links.dart';
 
 /// Экран «Поставщики» — только карточки поставщиков со списком продуктов, без заказов.
 /// Для каждого подразделения (кухня, бар, зал) свои поставщики.
@@ -48,14 +47,14 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     return list;
   }
 
-  String get _departmentLabel {
+  String _departmentLabel(LocalizationService loc) {
     switch (widget.department) {
       case 'kitchen':
-        return 'Кухня';
+        return loc.t('dept_kitchen') ?? 'Кухня';
       case 'bar':
-        return 'Бар';
+        return loc.t('dept_bar') ?? 'Бар';
       case 'hall':
-        return 'Зал';
+        return loc.t('dept_hall') ?? 'Зал';
       default:
         return widget.department;
     }
@@ -114,9 +113,6 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     final nameCtrl = TextEditingController(text: s.supplierName);
     final emailCtrl = TextEditingController(text: s.email ?? '');
     final phoneCtrl = TextEditingController(text: s.phone ?? '');
-    final telegramCtrl = TextEditingController(text: s.telegram ?? '');
-    final zaloCtrl = TextEditingController(text: s.zalo ?? '');
-    final whatsappCtrl = TextEditingController(text: s.whatsapp ?? '');
 
     OrderList? result;
     await showModalBottomSheet<void>(
@@ -159,30 +155,6 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                 ),
                 keyboardType: TextInputType.phone,
               ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: telegramCtrl,
-                decoration: InputDecoration(
-                  labelText: loc.t('order_list_contact_telegram') ?? 'Telegram',
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: whatsappCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'WhatsApp',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: zaloCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Zalo',
-                  border: OutlineInputBorder(),
-                ),
-              ),
               const SizedBox(height: 14),
               Row(
                 children: [
@@ -203,9 +175,6 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                           supplierName: supplierName,
                           email: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
                           phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
-                          telegram: telegramCtrl.text.trim().isEmpty ? null : telegramCtrl.text.trim(),
-                          whatsapp: whatsappCtrl.text.trim().isEmpty ? null : whatsappCtrl.text.trim(),
-                          zalo: zaloCtrl.text.trim().isEmpty ? null : zaloCtrl.text.trim(),
                         );
                         Navigator.of(ctx).pop();
                       },
@@ -221,9 +190,6 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                   final draft = (supplierName.isEmpty ? s : s.copyWith(name: supplierName, supplierName: supplierName)).copyWith(
                     email: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
                     phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
-                    telegram: telegramCtrl.text.trim().isEmpty ? null : telegramCtrl.text.trim(),
-                    whatsapp: whatsappCtrl.text.trim().isEmpty ? null : whatsappCtrl.text.trim(),
-                    zalo: zaloCtrl.text.trim().isEmpty ? null : zaloCtrl.text.trim(),
                   );
                   result = draft;
                   Navigator.of(ctx).pop();
@@ -241,9 +207,6 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     nameCtrl.dispose();
     emailCtrl.dispose();
     phoneCtrl.dispose();
-    telegramCtrl.dispose();
-    zaloCtrl.dispose();
-    whatsappCtrl.dispose();
 
     if (result == null) return;
     final updated = result!;
@@ -277,7 +240,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: ScrollToTopAppBarTitle(
-          child: Text('${loc.t('order_tab_suppliers') ?? 'Поставщики'} — $_departmentLabel'),
+          child: Text('${loc.t('order_tab_suppliers') ?? 'Поставщики'} — ${_departmentLabel(loc)}'),
         ),
         actions: [
           IconButton(
@@ -423,9 +386,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         itemCount: filtered.length,
         itemBuilder: (_, i) {
           final s = filtered[i];
-          final contacts = [s.email, s.phone, s.telegram, s.whatsapp, s.zalo]
-              .where((v) => v != null && v.isNotEmpty)
-              .join(' · ');
+          final hasEmail = (s.email ?? '').trim().isNotEmpty;
+          final hasPhone = (s.phone ?? '').trim().isNotEmpty;
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ExpansionTile(
@@ -454,11 +416,15 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                     style: const TextStyle(fontWeight: FontWeight.w500),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (contacts.isNotEmpty)
-                    Text(
-                      contacts,
-                      style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                      overflow: TextOverflow.ellipsis,
+                  if (hasEmail || hasPhone)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: SupplierContactLinks(
+                        email: hasEmail ? s.email! : null,
+                        phone: hasPhone ? s.phone! : null,
+                        linkColor: Theme.of(context).colorScheme.primary,
+                        inline: true,
+                      ),
                     ),
                 ],
               ),
@@ -490,7 +456,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                                     ),
                                   ),
                                   Text(
-                                    '${CulinaryUnits.displayName(item.unit, loc.currentLanguageCode)}',
+                                    CulinaryUnits.displayName(item.unit, loc.currentLanguageCode),
                                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                                         ),
@@ -502,7 +468,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                           Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
-                              '... и ещё ${s.items.length - 20}',
+                              (loc.t('order_products_and_more') ?? '... и ещё {n}').replaceAll('{n}', '${s.items.length - 20}'),
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                                   ),

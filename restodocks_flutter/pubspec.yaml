@@ -100,10 +100,10 @@ flutter:
 
 flutter_launcher_icons:
   android: false
-  ios: false
-  image_path: "assets/images/logo.png"
+  ios: true
+  image_path: "assets/images/app_icon.png"
   web:
     generate: true
-    image_path: "assets/images/logo.png"
+    image_path: "assets/images/welcome_logo.png"
     background_color: "#AD292C"
     theme_color: "#AD292C"

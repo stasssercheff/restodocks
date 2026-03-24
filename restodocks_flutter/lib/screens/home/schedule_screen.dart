@@ -1,4 +1,5 @@
-import 'package:flutter/cupertino.dart' show CupertinoTimerPicker, CupertinoTimerPickerMode;
+import 'package:flutter/cupertino.dart'
+    show CupertinoTimerPicker, CupertinoTimerPickerMode;
 import 'package:flutter/material.dart';
 import '../../utils/dev_log.dart';
 import 'package:go_router/go_router.dart';
@@ -14,11 +15,17 @@ import '../../widgets/app_bar_home_button.dart';
 /// График: слоты (должности/имена) задаются вручную, можно выбрать сотрудника из списка или вписать имя.
 /// Один график на заведение, прокрутка по неделям (неделя влезает на экран, ограничений нет).
 class ScheduleScreen extends StatefulWidget {
-  const ScheduleScreen({super.key, this.department = 'all', this.personalOnly = false, this.embedded = false});
+  const ScheduleScreen(
+      {super.key,
+      this.department = 'all',
+      this.personalOnly = false,
+      this.embedded = false});
 
   final String department;
+
   /// Личный график — только строка текущего сотрудника.
   final bool personalOnly;
+
   /// Вложен в главный экран (вкладка «График») — без кнопки «назад».
   final bool embedded;
 
@@ -27,8 +34,10 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  static const int _defaultWeeks = 1040; // 20 лет — график не должен заканчиваться
+  static const int _defaultWeeks =
+      1040; // 20 лет — график не должен заканчиваться
   static const double _slotColumnWidth = 120;
+
   /// Ширина ячейки дня: 7 дней влезают на экран телефона (7 × 36 ≈ 252px).
   static const double _dayCellWidth = 36;
   static const double _rowHeight = 44;
@@ -39,7 +48,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   final ScrollController _horizontalScrollController = ScrollController();
 
   ScheduleModel _model = ScheduleModel(
-    startDate: DateTime(DateTime.now().year, 1, 1), // Начинаем с 1 января текущего года
+    startDate: DateTime(
+        DateTime.now().year, 1, 1), // Начинаем с 1 января текущего года
     numWeeks: _defaultWeeks,
   );
   bool _loading = true;
@@ -66,14 +76,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     int? todayIndex;
     for (var i = 0; i < dates.length; i++) {
       final d = dates[i];
-      if (d.year == todayDate.year && d.month == todayDate.month && d.day == todayDate.day) {
+      if (d.year == todayDate.year &&
+          d.month == todayDate.month &&
+          d.day == todayDate.day) {
         todayIndex = i;
         break;
       }
     }
     if (todayIndex == null) return;
-    final viewportWidth = _horizontalScrollController.position.viewportDimension;
-    final scrollOffset = (todayIndex * _dayCellWidth) - (viewportWidth / 2) + (_dayCellWidth / 2);
+    final viewportWidth =
+        _horizontalScrollController.position.viewportDimension;
+    final scrollOffset = (todayIndex * _dayCellWidth) -
+        (viewportWidth / 2) +
+        (_dayCellWidth / 2);
     final maxScroll = _horizontalScrollController.position.maxScrollExtent;
     _horizontalScrollController.jumpTo(scrollOffset.clamp(0.0, maxScroll));
   }
@@ -124,7 +139,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   /// Локализованное название должности. Использует ключ role_XXX из переводов.
-  String _positionDisplayName(String code, LocalizationService loc) => loc.roleDisplayName(code);
+  String _positionDisplayName(String code, LocalizationService loc) =>
+      loc.roleDisplayName(code);
 
   Employee? _employeeForSlot(ScheduleSlot slot) {
     if (slot.employeeId == null) return null;
@@ -132,32 +148,70 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   /// Секции кухни (цеха), без management/bar/hall.
-  static const _kitchenSectionIds = {'hot_kitchen', 'cold_kitchen', 'grill', 'pastry', 'prep', 'cleaning', 'pizza', 'sushi', 'bakery'};
+  static const _kitchenSectionIds = {
+    'hot_kitchen',
+    'cold_kitchen',
+    'grill',
+    'pastry',
+    'prep',
+    'cleaning',
+    'pizza',
+    'sushi',
+    'bakery'
+  };
 
   /// Блоки отображения при department='all': Кухня (управление + цеха), Бар (управление + сотрудники), Зал (управление + сотрудники).
-  List<({bool isDeptHeader, String deptLabel, String? sectionId, String sectionLabel, List<ScheduleSlot> slots})> _displayBlocks(LocalizationService loc) {
+  List<
+      ({
+        bool isDeptHeader,
+        String deptLabel,
+        String? sectionId,
+        String sectionLabel,
+        List<ScheduleSlot> slots
+      })> _displayBlocks(LocalizationService loc) {
     if (widget.department != 'all') {
       return _displaySections
           .map((s) => (
                 isDeptHeader: false,
                 deptLabel: '',
                 sectionId: s.id,
-                sectionLabel: loc.translate(s.nameKey) != s.nameKey ? loc.translate(s.nameKey) : s.id,
+                sectionLabel: loc.translate(s.nameKey) != s.nameKey
+                    ? loc.translate(s.nameKey)
+                    : s.id,
                 slots: _displaySlotsBySection[s.id] ?? [],
               ))
           .where((b) => b.slots.isNotEmpty)
           .toList();
     }
     final bySection = _displaySlotsBySection;
-    final blocks = <({bool isDeptHeader, String deptLabel, String? sectionId, String sectionLabel, List<ScheduleSlot> slots})>[];
+    final blocks = <({
+      bool isDeptHeader,
+      String deptLabel,
+      String? sectionId,
+      String sectionLabel,
+      List<ScheduleSlot> slots
+    })>[];
 
     void addDept(String deptKey, String deptLabel) {
-      blocks.add((isDeptHeader: true, deptLabel: deptLabel, sectionId: null, sectionLabel: '', slots: []));
+      blocks.add((
+        isDeptHeader: true,
+        deptLabel: deptLabel,
+        sectionId: null,
+        sectionLabel: '',
+        slots: []
+      ));
     }
 
-    void addSection(String sectionId, String sectionLabel, List<ScheduleSlot> slots) {
+    void addSection(
+        String sectionId, String sectionLabel, List<ScheduleSlot> slots) {
       if (slots.isEmpty) return;
-      blocks.add((isDeptHeader: false, deptLabel: '', sectionId: sectionId, sectionLabel: sectionLabel, slots: slots));
+      blocks.add((
+        isDeptHeader: false,
+        deptLabel: '',
+        sectionId: sectionId,
+        sectionLabel: sectionLabel,
+        slots: slots
+      ));
     }
 
     // Общее управление (department=='management')
@@ -181,7 +235,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     for (final section in _model.sections) {
       if (_kitchenSectionIds.contains(section.id)) {
         final slots = bySection[section.id] ?? [];
-        addSection(section.id, loc.translate(section.nameKey) != section.nameKey ? loc.translate(section.nameKey) : section.id, slots);
+        addSection(
+            section.id,
+            loc.translate(section.nameKey) != section.nameKey
+                ? loc.translate(section.nameKey)
+                : section.id,
+            slots);
       }
     }
 
@@ -199,7 +258,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     addDept('dept_hall', loc.t('dept_hall'));
     final hallMgmt = mgmtSlots.where((s) {
       final emp = _employeeForSlot(s);
-      return emp != null && (emp.department == 'hall' || emp.department == 'dining_room');
+      return emp != null &&
+          (emp.department == 'hall' || emp.department == 'dining_room');
     }).toList();
     addSection('management', loc.t('management'), hallMgmt);
     final hallSlots = bySection['hall'] ?? [];
@@ -212,24 +272,32 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Set<String> get _employeeIdsForDepartment {
     if (widget.department == 'all') return _employees.map((e) => e.id).toSet();
     final dept = widget.department;
-    return _employees.where((e) {
-      if (dept == 'kitchen') {
-        return e.department == 'kitchen' ||
-            (e.hasRole('executive_chef') || e.hasRole('sous_chef'));
-      }
-      if (dept == 'bar') return e.department == 'bar' || e.hasRole('bar_manager');
-      if (dept == 'hall' || dept == 'dining_room') {
-        return e.department == 'hall' || e.department == 'dining_room' || e.hasRole('floor_manager');
-      }
-      return true;
-    }).map((e) => e.id).toSet();
+    return _employees
+        .where((e) {
+          if (dept == 'kitchen') {
+            return e.department == 'kitchen' ||
+                (e.hasRole('executive_chef') || e.hasRole('sous_chef'));
+          }
+          if (dept == 'bar')
+            return e.department == 'bar' || e.hasRole('bar_manager');
+          if (dept == 'hall' || dept == 'dining_room') {
+            return e.department == 'hall' ||
+                e.department == 'dining_room' ||
+                e.hasRole('floor_manager');
+          }
+          return true;
+        })
+        .map((e) => e.id)
+        .toSet();
   }
 
   /// Слоты для отображения: при выборе подразделения — только сотрудники этого подразделения
   List<ScheduleSlot> get _displaySlots {
     if (widget.department == 'all') return _model.slots;
     final ids = _employeeIdsForDepartment;
-    return _model.slots.where((s) => s.employeeId != null && ids.contains(s.employeeId!)).toList();
+    return _model.slots
+        .where((s) => s.employeeId != null && ids.contains(s.employeeId!))
+        .toList();
   }
 
   /// Секции и слоты по секциям для отображения (с учётом фильтра по подразделению)
@@ -241,7 +309,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       if (list.isNotEmpty) map[section.id] = list;
     }
     // Слоты с sectionId, для которых нет секции (bar, hall) — добавляем секции
-    final orphanSectionIds = filtered.map((s) => s.sectionId).where((id) => id.isNotEmpty && !map.containsKey(id)).toSet();
+    final orphanSectionIds = filtered
+        .map((s) => s.sectionId)
+        .where((id) => id.isNotEmpty && !map.containsKey(id))
+        .toSet();
     for (final id in orphanSectionIds) {
       map[id] = filtered.where((s) => s.sectionId == id).toList();
     }
@@ -251,15 +322,20 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   List<ScheduleSection> get _displaySections {
     final bySection = _displaySlotsBySection;
     final ordered = ScheduleModel.sectionsInDisplayOrder(_model.sections);
-    final fromModel = ordered.where((s) => bySection.containsKey(s.id)).toList();
-    final orphanIds = bySection.keys.where((id) => !ordered.any((s) => s.id == id)).toList();
+    final fromModel =
+        ordered.where((s) => bySection.containsKey(s.id)).toList();
+    final orphanIds =
+        bySection.keys.where((id) => !ordered.any((s) => s.id == id)).toList();
     if (orphanIds.isEmpty) return fromModel;
     const nameKeys = {'bar': 'dept_bar', 'hall': 'dept_hall'};
-    final extra = orphanIds.map((id) => ScheduleSection(id: id, nameKey: nameKeys[id] ?? id)).toList();
+    final extra = orphanIds
+        .map((id) => ScheduleSection(id: id, nameKey: nameKeys[id] ?? id))
+        .toList();
     return [...fromModel, ...extra];
   }
 
-  String _getSectionIdForEmployee(Employee employee, List<ScheduleSection> sections) {
+  String _getSectionIdForEmployee(
+      Employee employee, List<ScheduleSection> sections) {
     if (sections.isEmpty) return '';
 
     String sectionKey;
@@ -291,10 +367,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     if (est == null) {
-      if (mounted) setState(() { _loading = false; });
+      if (mounted)
+        setState(() {
+          _loading = false;
+        });
       return;
     }
-    setState(() { _loading = true; _establishmentId = est.id; });
+    setState(() {
+      _loading = true;
+      _establishmentId = est.id;
+    });
     try {
       final employees = await acc.getEmployeesForEstablishment(est.id);
       final model = await loadSchedule(est.id);
@@ -313,33 +395,43 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           }
           // В графике только сотрудники с должностью. Собственник без должности не показывается.
           // В графике только сотрудники с должностью. Владелец без должности не показывается (positionRole==null при роли только owner).
-          final scheduleableEmployees = _employees.where((e) => e.positionRole != null).toList();
+          final scheduleableEmployees =
+              _employees.where((e) => e.positionRole != null).toList();
           final needsManagement = scheduleableEmployees.any((e) =>
               e.hasRole('executive_chef') ||
               e.hasRole('sous_chef') ||
               e.hasRole('bar_manager') ||
               e.hasRole('floor_manager') ||
               e.department == 'management');
-          if (needsManagement && !_model.sections.any((s) => s.id == 'management')) {
+          if (needsManagement &&
+              !_model.sections.any((s) => s.id == 'management')) {
             _model = _model.copyWith(sections: [
               const ScheduleSection(id: 'management', nameKey: 'management'),
               ..._model.sections,
             ]);
             saveSchedule(est.id, _model);
           }
-          if (_model.slots.isEmpty && _model.sections.isNotEmpty && scheduleableEmployees.isNotEmpty) {
+          if (_model.slots.isEmpty &&
+              _model.sections.isNotEmpty &&
+              scheduleableEmployees.isNotEmpty) {
             // Создаем слоты только для сотрудников с должностью (собственник без должности не в графике)
-            final slots = scheduleableEmployees.map((e) => ScheduleSlot(
-                  id: const Uuid().v4(),
-                  name: e.fullName.trim().isEmpty ? loc.t('employee_label') : e.fullName.trim(),
-                  sectionId: _getSectionIdForEmployee(e, _model.sections),
-                  employeeId: e.id,
-                )).toList();
+            final slots = scheduleableEmployees
+                .map((e) => ScheduleSlot(
+                      id: const Uuid().v4(),
+                      name: e.fullName.trim().isEmpty
+                          ? loc.t('employee_label')
+                          : e.fullName.trim(),
+                      sectionId: _getSectionIdForEmployee(e, _model.sections),
+                      employeeId: e.id,
+                    ))
+                .toList();
             _model = _model.copyWith(slots: slots);
             saveSchedule(est.id, _model);
-          } else if (_model.sections.isNotEmpty && (_model.slots.isNotEmpty || scheduleableEmployees.isNotEmpty)) {
+          } else if (_model.sections.isNotEmpty &&
+              (_model.slots.isNotEmpty || scheduleableEmployees.isNotEmpty)) {
             // Синхронизируем слоты: удаляем сотрудников без должности, добавляем новых с должностью
-            final currentEmployeeIds = scheduleableEmployees.map((e) => e.id).toSet();
+            final currentEmployeeIds =
+                scheduleableEmployees.map((e) => e.id).toSet();
 
             // Связываем слоты без employeeId с сотрудниками по имени (точное совпадение)
             final slotsWithEmployeeId = _model.slots.map((slot) {
@@ -374,7 +466,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 .where((e) => !existingEmployeeIds.contains(e.id))
                 .map((e) => ScheduleSlot(
                       id: const Uuid().v4(),
-                      name: e.fullName.trim().isEmpty ? loc.t('employee_label') : e.fullName.trim(),
+                      name: e.fullName.trim().isEmpty
+                          ? loc.t('employee_label')
+                          : e.fullName.trim(),
                       sectionId: _getSectionIdForEmployee(e, _model.sections),
                       employeeId: e.id,
                     ))
@@ -385,9 +479,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             // Обновляем секции для существующих слотов, если изменился отдел сотрудника
             final finalSlots = updatedSlots.map((slot) {
               if (slot.employeeId != null) {
-                final employee = scheduleableEmployees.where((e) => e.id == slot.employeeId).firstOrNull;
+                final employee = scheduleableEmployees
+                    .where((e) => e.id == slot.employeeId)
+                    .firstOrNull;
                 if (employee != null) {
-                  final correctSectionId = _getSectionIdForEmployee(employee, _model.sections);
+                  final correctSectionId =
+                      _getSectionIdForEmployee(employee, _model.sections);
                   if (slot.sectionId != correctSectionId) {
                     return slot.copyWith(sectionId: correctSectionId);
                   }
@@ -408,7 +505,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         });
       }
     } catch (_) {
-      if (mounted) setState(() { _loading = false; });
+      if (mounted)
+        setState(() {
+          _loading = false;
+        });
     }
   }
 
@@ -421,7 +521,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   String? _cellValue(String slotId, DateTime date) {
     final v = _model.getAssignment(slotId, date);
     if (v == '1' || v == '0') return v;
-    if (v != null && v.trim().isNotEmpty) return '1'; // раньше хранили имя — считаем сменой
+    if (v != null && v.trim().isNotEmpty)
+      return '1'; // раньше хранили имя — считаем сменой
     return null;
   }
 
@@ -449,8 +550,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         loc: loc,
         onSave: (value, start, end, showTime) async {
           setState(() {
-            _model = _model.setAssignment(slotId, date, value.isEmpty ? null : value);
-            if (value == '1' && showTime && start.isNotEmpty && end.isNotEmpty) {
+            _model = _model.setAssignment(
+                slotId, date, value.isEmpty ? null : value);
+            if (value == '1' &&
+                showTime &&
+                start.isNotEmpty &&
+                end.isNotEmpty) {
               _model = _model.setTimeRange(slotId, date, start, end);
             } else {
               _model = _model.setTimeRange(slotId, date, null, null);
@@ -462,7 +567,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
-  void _submitAssignment(BuildContext ctx, String slotId, DateTime date, String value) {
+  void _submitAssignment(
+      BuildContext ctx, String slotId, DateTime date, String value) {
     Navigator.of(ctx).pop();
     setState(() {
       _model = _model.setAssignment(slotId, date, value.isEmpty ? null : value);
@@ -484,7 +590,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         dates: _visibleDates,
         slots: _model.slots,
         loc: loc,
-        onCopy: (sourceStart, sourceEnd, targetStart, targetEnd, selectedSlots) async {
+        onCopy: (sourceStart, sourceEnd, targetStart, targetEnd,
+            selectedSlots) async {
           var updatedModel = _model;
           final sourceDates = _getDatesInRange(sourceStart, sourceEnd);
           final targetDates = _getDatesInRange(targetStart, targetEnd);
@@ -498,17 +605,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               final assignment = updatedModel.getAssignment(slotId, sourceDate);
               final timeRange = updatedModel.getTimeRange(slotId, sourceDate);
 
-              updatedModel = updatedModel.setAssignment(slotId, targetDate, assignment);
+              updatedModel =
+                  updatedModel.setAssignment(slotId, targetDate, assignment);
               if (timeRange != null) {
                 final parts = timeRange.split('|');
                 if (parts.length >= 2) {
-                  updatedModel = updatedModel.setTimeRange(slotId, targetDate, parts[0].trim(), parts[1].trim());
+                  updatedModel = updatedModel.setTimeRange(
+                      slotId, targetDate, parts[0].trim(), parts[1].trim());
                 }
               }
             }
           }
           if (establishmentId == null) {
-            scaffoldMessenger.showSnackBar(SnackBar(content: Text(loc.t('no_establishment') ?? 'Заведение не выбрано')));
+            scaffoldMessenger.showSnackBar(SnackBar(
+                content:
+                    Text(loc.t('no_establishment') ?? 'Заведение не выбрано')));
             return;
           }
           try {
@@ -516,15 +627,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             if (mounted) {
               if (ok) {
                 setState(() => _model = updatedModel);
-                scaffoldMessenger.showSnackBar(SnackBar(content: Text(loc.t('schedule_pasted'))));
+                scaffoldMessenger.showSnackBar(
+                    SnackBar(content: Text(loc.t('schedule_pasted'))));
               } else {
-                scaffoldMessenger.showSnackBar(SnackBar(content: Text(loc.t('schedule_save_error'))));
+                scaffoldMessenger.showSnackBar(
+                    SnackBar(content: Text(loc.t('schedule_save_error'))));
               }
             }
           } catch (e, st) {
             devLog('Schedule copy save error: $e\n$st');
             if (mounted) {
-              scaffoldMessenger.showSnackBar(SnackBar(content: Text(loc.t('save_error').replaceFirst('%s', e.toString()))));
+              scaffoldMessenger.showSnackBar(SnackBar(
+                  content: Text(
+                      loc.t('save_error').replaceFirst('%s', e.toString()))));
             }
           }
         },
@@ -548,7 +663,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final theme = Theme.of(context);
     final acc = context.watch<AccountManagerSupabase>();
     final canEdit = (acc.currentEmployee?.canEditSchedule ?? false) ||
-        (widget.personalOnly && (acc.currentEmployee?.canEditOwnSchedule ?? false));
+        (widget.personalOnly &&
+            (acc.currentEmployee?.canEditOwnSchedule ?? false));
     final locale = loc.currentLocale;
     final localeStr = '${locale.languageCode}_${locale.countryCode ?? ''}';
     final weekdays = List.generate(7, (i) {
@@ -564,8 +680,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
 
     final dates = _visibleDates;
-    final todayDate = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
-    final currentEmployeeId = widget.personalOnly ? acc.currentEmployee?.id : null;
+    final todayDate =
+        DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final currentEmployeeId =
+        widget.personalOnly ? acc.currentEmployee?.id : null;
 
     bool slotMatchesPersonal(ScheduleSlot slot) {
       if (currentEmployeeId == null) return true;
@@ -580,19 +698,25 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final borderColor = theme.dividerColor;
 
     bool isWeekend(DateTime d) => d.weekday == 6 || d.weekday == 7;
-    bool isToday(DateTime d) => d.year == todayDate.year && d.month == todayDate.month && d.day == todayDate.day;
+    bool isToday(DateTime d) =>
+        d.year == todayDate.year &&
+        d.month == todayDate.month &&
+        d.day == todayDate.day;
 
     // Строки таблицы: левая колонка (имена) и правая часть (даты) — чтобы при горизонтальной прокрутке левая колонка оставалась на месте
     final leftCells = <Widget>[];
 
     Border leftCellBorder({bool top = false}) => Border(
-      left: BorderSide(color: borderColor),
-      right: BorderSide(color: borderColor),
-      top: top ? BorderSide(color: borderColor) : BorderSide.none,
-      bottom: BorderSide(color: borderColor),
-    );
+          left: BorderSide(color: borderColor),
+          right: BorderSide(color: borderColor),
+          top: top ? BorderSide(color: borderColor) : BorderSide.none,
+          bottom: BorderSide(color: borderColor),
+        );
 
-    Widget leftCell(Widget child, {double? height, BoxDecoration? decoration, bool withTopBorder = false}) {
+    Widget leftCell(Widget child,
+        {double? height,
+        BoxDecoration? decoration,
+        bool withTopBorder = false}) {
       return Container(
         height: height ?? _rowHeight,
         decoration: (decoration ?? BoxDecoration()).copyWith(
@@ -612,7 +736,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         decoration: BoxDecoration(
           color: bg,
           border: Border(
-            right: mergeRight ? BorderSide.none : BorderSide(color: borderColor),
+            right:
+                mergeRight ? BorderSide.none : BorderSide(color: borderColor),
             bottom: BorderSide(color: borderColor),
           ),
         ),
@@ -623,7 +748,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     // Строка 1: заголовок «Дата»
     leftCells.add(leftCell(
-      Text(loc.t('schedule_date'), style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 12)),
+      Text(loc.t('schedule_date'),
+          style: TextStyle(
+              fontWeight: FontWeight.w600, color: headerFg, fontSize: 12)),
       height: _rowHeight,
       decoration: BoxDecoration(color: headerBg),
       withTopBorder: true,
@@ -631,9 +758,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     // Строка 2: «День»
     leftCells.add(leftCell(
-      Text(loc.t('schedule_day'), style: TextStyle(fontWeight: FontWeight.w600, color: headerFg, fontSize: 11)),
+      Text(loc.t('schedule_day'),
+          style: TextStyle(
+              fontWeight: FontWeight.w600, color: headerFg, fontSize: 11)),
       height: _rowHeight,
-      decoration: BoxDecoration(color: headerBg, border: Border(right: BorderSide(color: borderColor))),
+      decoration: BoxDecoration(
+          color: headerBg,
+          border: Border(right: BorderSide(color: borderColor))),
     ));
 
     final blocks = _displayBlocks(loc);
@@ -645,11 +776,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     for (final block in blocks) {
       if (block.isDeptHeader) {
         leftCells.add(leftCell(
-          Text(block.deptLabel, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: deptHeaderFg), overflow: TextOverflow.ellipsis),
+          Text(block.deptLabel,
+              style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: deptHeaderFg),
+              overflow: TextOverflow.ellipsis),
           height: _rowHeight,
           decoration: BoxDecoration(
             color: deptHeaderBg,
-            border: Border(right: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor)),
+            border: Border(
+                right: BorderSide(color: borderColor),
+                bottom: BorderSide(color: borderColor)),
           ),
         ));
         continue;
@@ -661,42 +799,51 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       if (sectionSlots.isEmpty) continue;
 
       leftCells.add(leftCell(
-        Text(block.sectionLabel, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: sectionFg), overflow: TextOverflow.ellipsis),
+        Text(block.sectionLabel,
+            style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w600, color: sectionFg),
+            overflow: TextOverflow.ellipsis),
         height: _rowHeight,
         decoration: BoxDecoration(
           color: sectionBg,
-          border: Border(right: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor)),
+          border: Border(
+              right: BorderSide(color: borderColor),
+              bottom: BorderSide(color: borderColor)),
         ),
       ));
 
       for (final slot in sectionSlots) {
-      final position = _slotPosition(slot, loc);
-      leftCells.add(leftCell(
-        Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _slotDisplayName(slot),
-              style: TextStyle(fontSize: isMobile ? 11 : 12),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-            ),
-            if (position != null && position.isNotEmpty)
+        final position = _slotPosition(slot, loc);
+        leftCells.add(leftCell(
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
               Text(
-                position,
-                style: TextStyle(fontSize: isMobile ? 8 : 9, color: theme.colorScheme.onSurfaceVariant),
+                _slotDisplayName(slot),
+                style: TextStyle(fontSize: isMobile ? 11 : 12),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
               ),
-          ],
-        ),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
-          border: Border(right: BorderSide(color: borderColor), bottom: BorderSide(color: borderColor)),
-        ),
-      ));
+              if (position != null && position.isNotEmpty)
+                Text(
+                  position,
+                  style: TextStyle(
+                      fontSize: isMobile ? 8 : 9,
+                      color: theme.colorScheme.onSurfaceVariant),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+            ],
+          ),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+            border: Border(
+                right: BorderSide(color: borderColor),
+                bottom: BorderSide(color: borderColor)),
+          ),
+        ));
       }
     }
 
@@ -708,21 +855,31 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
       final weekend = isWeekend(d);
       final dayIsToday = isToday(d);
-      final headerCellBg = dayIsToday ? todayHighlightBg : (weekend ? weekendHeaderBg : headerBg);
+      final headerCellBg = dayIsToday
+          ? todayHighlightBg
+          : (weekend ? weekendHeaderBg : headerBg);
       final headerCellFg = weekend ? weekendHeaderFg : headerFg;
 
       columnChildren.add(rightCell(
-        Text(DateFormat('dd.MM', localeStr).format(d), textAlign: TextAlign.center, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: headerCellFg)),
+        Text(DateFormat('dd.MM', localeStr).format(d),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: headerCellFg)),
         bg: headerCellBg,
       ));
       columnChildren.add(rightCell(
-        Text(weekdays[d.weekday - 1], textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: headerCellFg)),
+        Text(weekdays[d.weekday - 1],
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 10, color: headerCellFg)),
         bg: headerCellBg,
       ));
 
       for (final block in blocks) {
         if (block.isDeptHeader) {
-          columnChildren.add(rightCell(const SizedBox.shrink(), bg: deptHeaderBg, mergeRight: !isLastColumn));
+          columnChildren.add(rightCell(const SizedBox.shrink(),
+              bg: deptHeaderBg, mergeRight: !isLastColumn));
           continue;
         }
         var sectionSlots = block.slots;
@@ -732,7 +889,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         if (sectionSlots.isEmpty) continue;
 
         // Объединённая строка раздела: без правой границы между ячейками (mergeRight), чтобы визуально сливались
-        columnChildren.add(rightCell(const SizedBox.shrink(), bg: sectionBg, mergeRight: !isLastColumn));
+        columnChildren.add(rightCell(const SizedBox.shrink(),
+            bg: sectionBg, mergeRight: !isLastColumn));
 
         for (final slot in sectionSlots) {
           final val = _cellValue(slot.id, d);
@@ -744,8 +902,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             final parts = timeRange.split('|');
             if (parts.length >= 2) timeDisplay = '${parts[0]}–${parts[1]}';
           }
-          var bg = isShift ? Colors.green.shade100 : isDayOff ? Colors.amber.shade100 : null;
-          final emp = slot.employeeId != null ? _employees.where((e) => e.id == slot.employeeId).firstOrNull : null;
+          var bg = isShift
+              ? Colors.green.shade100
+              : isDayOff
+                  ? Colors.amber.shade100
+                  : null;
+          final emp = slot.employeeId != null
+              ? _employees.where((e) => e.id == slot.employeeId).firstOrNull
+              : null;
           final b = emp?.birthday;
           final isBirthday = b != null && b.month == d.month && b.day == d.day;
           if (isBirthday) {
@@ -756,13 +920,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           }
           final displayText = isDayOff
               ? '0'
-              : (isShift && timeDisplay.isNotEmpty ? timeDisplay : (val ?? '—'));
+              : (isShift && timeDisplay.isNotEmpty
+                  ? timeDisplay
+                  : (val ?? '—'));
           final content = Text(
             displayText,
             style: TextStyle(
               fontSize: timeDisplay.isNotEmpty && isShift ? 9 : 12,
               fontWeight: FontWeight.w600,
-              color: val != null ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant,
+              color: val != null
+                  ? theme.colorScheme.onSurface
+                  : theme.colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
             maxLines: 2,
@@ -793,8 +961,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: widget.embedded ? null : appBarBackButton(context),
-        title: Text(widget.personalOnly ? loc.t('personal_schedule') : loc.t('schedule')),
+        title: Text(widget.personalOnly
+            ? loc.t('personal_schedule')
+            : loc.t('schedule')),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.today),
+            onPressed: _scrollToCenterToday,
+            tooltip: loc.t('today'),
+          ),
           if (canEdit)
             IconButton(
               icon: const Icon(Icons.copy),
@@ -809,7 +984,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           if (!canEdit)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Text(loc.t('schedule_view_only_hint') ?? 'Редактирование графика доступно шеф-повару и су-шефу.', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              child: Text(
+                  loc.t('schedule_view_only_hint') ??
+                      'Редактирование графика доступно шеф-повару и су-шефу.',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             ),
           const SizedBox(height: 12),
           Expanded(
@@ -822,7 +1001,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   children: [
                     SizedBox(
                       width: _slotColumnWidth,
-                      child: Column(mainAxisSize: MainAxisSize.min, children: leftCells),
+                      child: Column(
+                          mainAxisSize: MainAxisSize.min, children: leftCells),
                     ),
                     Expanded(
                       child: ListView.builder(
@@ -892,13 +1072,15 @@ class _TimePickerField extends StatelessWidget {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
                       onPressed: () => Navigator.of(ctx).pop(),
-                      child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+                      child:
+                          Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
                     ),
                     const SizedBox(width: 8),
                     FilledButton(
@@ -917,7 +1099,8 @@ class _TimePickerField extends StatelessWidget {
       ),
     );
     if (result != null) {
-      final t = TimeOfDay(hour: result!.inHours % 24, minute: result!.inMinutes % 60);
+      final t =
+          TimeOfDay(hour: result!.inHours % 24, minute: result!.inMinutes % 60);
       onChanged(_format(t));
     }
   }
@@ -955,7 +1138,8 @@ class _ScheduleCellDialog extends StatefulWidget {
   final String initialStart;
   final String initialEnd;
   final LocalizationService loc;
-  final Future<void> Function(String value, String start, String end, bool showTime) onSave;
+  final Future<void> Function(
+      String value, String start, String end, bool showTime) onSave;
 
   @override
   State<_ScheduleCellDialog> createState() => _ScheduleCellDialogState();
@@ -1034,16 +1218,25 @@ class _ScheduleCellDialogState extends State<_ScheduleCellDialog> {
   List<Widget> _buildDialogContent(LocalizationService loc) {
     return [
       Text(
-        DateFormat('EEEE, d MMM', Localizations.localeOf(context).toString().replaceAll('_', '-')).format(widget.date),
+        DateFormat('EEEE, d MMM',
+                Localizations.localeOf(context).toString().replaceAll('_', '-'))
+            .format(widget.date),
         style: Theme.of(context).textTheme.bodyMedium,
       ),
       const SizedBox(height: 12),
-      Text(loc.t('schedule_shift_or_day_off'), style: Theme.of(context).textTheme.labelMedium),
+      Text(loc.t('schedule_shift_or_day_off'),
+          style: Theme.of(context).textTheme.labelMedium),
       const SizedBox(height: 4),
       SegmentedButton<String>(
         segments: [
-          ButtonSegment(value: '1', label: Text(loc.t('schedule_shift')), icon: const Icon(Icons.watch_later, size: 18)),
-          ButtonSegment(value: '0', label: Text(loc.t('schedule_day_off')), icon: const Icon(Icons.event_busy, size: 18)),
+          ButtonSegment(
+              value: '1',
+              label: Text(loc.t('schedule_shift')),
+              icon: const Icon(Icons.watch_later, size: 18)),
+          ButtonSegment(
+              value: '0',
+              label: Text(loc.t('schedule_day_off')),
+              icon: const Icon(Icons.event_busy, size: 18)),
         ],
         selected: {_selectedValue},
         onSelectionChanged: (s) => setState(() => _selectedValue = s.first),
@@ -1052,7 +1245,8 @@ class _ScheduleCellDialogState extends State<_ScheduleCellDialog> {
       Row(
         children: [
           Expanded(
-            child: Text(loc.t('schedule_time_range'), style: Theme.of(context).textTheme.labelMedium),
+            child: Text(loc.t('schedule_time_range'),
+                style: Theme.of(context).textTheme.labelMedium),
           ),
           Switch(
             value: _showTime,
@@ -1075,7 +1269,8 @@ class _ScheduleCellDialogState extends State<_ScheduleCellDialog> {
                 loc: loc,
               ),
             ),
-            const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('–')),
+            const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8), child: Text('–')),
             Expanded(
               child: _TimePickerField(
                 label: loc.t('schedule_time_end'),
@@ -1089,20 +1284,27 @@ class _ScheduleCellDialogState extends State<_ScheduleCellDialog> {
             ),
           ],
         )
-      ] else Text(
-        loc.t('schedule_show_time'),
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-        textAlign: TextAlign.center,
-      ),
+      ] else
+        Text(
+          loc.t('schedule_show_time'),
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+          textAlign: TextAlign.center,
+        ),
     ];
   }
 
   List<Widget> _buildDialogActions(LocalizationService loc) {
     return [
-      TextButton(onPressed: () => Navigator.of(context).pop(), child: Text(MaterialLocalizations.of(context).cancelButtonLabel)),
+      TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(MaterialLocalizations.of(context).cancelButtonLabel)),
       FilledButton(
         onPressed: () async {
-          await widget.onSave(_selectedValue, _startCtrl.text.trim(), _endCtrl.text.trim(), _showTime);
+          await widget.onSave(_selectedValue, _startCtrl.text.trim(),
+              _endCtrl.text.trim(), _showTime);
           if (!context.mounted) return;
           Navigator.of(context).pop();
         },
@@ -1123,7 +1325,12 @@ class _CopyRangeDialog extends StatefulWidget {
   final List<DateTime> dates;
   final List<ScheduleSlot> slots;
   final LocalizationService loc;
-  final Future<void> Function(DateTime sourceStart, DateTime sourceEnd, DateTime targetStart, DateTime targetEnd, List<String> selectedSlots) onCopy;
+  final Future<void> Function(
+      DateTime sourceStart,
+      DateTime sourceEnd,
+      DateTime targetStart,
+      DateTime targetEnd,
+      List<String> selectedSlots) onCopy;
 
   @override
   State<_CopyRangeDialog> createState() => _CopyRangeDialogState();
@@ -1158,7 +1365,8 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(loc.t('schedule_select_range_copy'), style: Theme.of(context).textTheme.titleSmall),
+            Text(loc.t('schedule_select_range_copy'),
+                style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -1184,7 +1392,8 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
               ],
             ),
             const SizedBox(height: 16),
-            Text(loc.t('schedule_select_range_paste'), style: Theme.of(context).textTheme.titleSmall),
+            Text(loc.t('schedule_select_range_paste'),
+                style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             Row(
               children: [
@@ -1210,23 +1419,26 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
               ],
             ),
             const SizedBox(height: 16),
-            Text(loc.t('schedule_select_employees'), style: Theme.of(context).textTheme.titleSmall),
+            Text(loc.t('schedule_select_employees'),
+                style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
-              children: widget.slots.map((slot) => FilterChip(
-                label: Text(slot.name),
-                selected: _selectedSlots.contains(slot.id),
-                onSelected: (selected) {
-                  setState(() {
-                    if (selected) {
-                      _selectedSlots.add(slot.id);
-                    } else {
-                      _selectedSlots.remove(slot.id);
-                    }
-                  });
-                },
-              )).toList(),
+              children: widget.slots
+                  .map((slot) => FilterChip(
+                        label: Text(slot.name),
+                        selected: _selectedSlots.contains(slot.id),
+                        onSelected: (selected) {
+                          setState(() {
+                            if (selected) {
+                              _selectedSlots.add(slot.id);
+                            } else {
+                              _selectedSlots.remove(slot.id);
+                            }
+                          });
+                        },
+                      ))
+                  .toList(),
             ),
           ],
         ),
@@ -1237,7 +1449,11 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
           child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
         ),
         FilledButton(
-          onPressed: _canCopy ? () async { await _copy(); } : null,
+          onPressed: _canCopy
+              ? () async {
+                  await _copy();
+                }
+              : null,
           child: Text(loc.t('copy_btn')),
         ),
       ],
@@ -1255,7 +1471,8 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
 
   Future<void> _copy() async {
     if (!_canCopy) return;
-    await widget.onCopy(_sourceStart!, _sourceEnd!, _targetStart!, _targetEnd!, _selectedSlots.toList());
+    await widget.onCopy(_sourceStart!, _sourceEnd!, _targetStart!, _targetEnd!,
+        _selectedSlots.toList());
     if (!mounted) return;
     Navigator.of(context).pop();
   }
@@ -1292,7 +1509,12 @@ class _DatePickerButton extends StatelessWidget {
         }
       },
       child: Text(selectedDate != null
-          ? DateFormat('d MMM', Localizations.localeOf(context).toString().replaceAll('_', '-')).format(selectedDate!)
+          ? DateFormat(
+                  'd MMM',
+                  Localizations.localeOf(context)
+                      .toString()
+                      .replaceAll('_', '-'))
+              .format(selectedDate!)
           : label),
     );
   }
@@ -1320,7 +1542,9 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
       final initial = widget.initialDate;
       if (initial != null) {
         final idx = widget.dates.indexWhere((d) =>
-            d.year == initial.year && d.month == initial.month && d.day == initial.day);
+            d.year == initial.year &&
+            d.month == initial.month &&
+            d.day == initial.day);
         if (idx >= 0) {
           final offset = (idx * _itemHeight) - 100;
           final maxExtent = _scrollController.position.maxScrollExtent;
@@ -1357,7 +1581,12 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
                 date.month == initialDate.month &&
                 date.day == initialDate.day;
             return ListTile(
-              title: Text(DateFormat('EEEE, d MMMM', Localizations.localeOf(context).toString().replaceAll('_', '-')).format(date)),
+              title: Text(DateFormat(
+                      'EEEE, d MMMM',
+                      Localizations.localeOf(context)
+                          .toString()
+                          .replaceAll('_', '-'))
+                  .format(date)),
               selected: isSelected,
               onTap: () => Navigator.of(context).pop(date),
             );

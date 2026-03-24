@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:js' as js;
 
+import '../core/flutter_nav_bridge_stub.dart'
+    if (dart.library.html) '../core/flutter_nav_bridge_web.dart' as flutter_nav;
 
 import 'package:archive/archive.dart';
 import '../utils/dev_log.dart';
@@ -2779,13 +2777,11 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   /// Регистрирует window._flutterNav(dir) — вызывается JS кнопками ▲▼.
   /// dir = 1 → следующая ячейка, dir = -1 → предыдущая.
   void _registerJsNavChannel() {
-    try {
-      js.context['_flutterNav'] = (dynamic dirArg) {
-        if (!mounted) return;
-        final dir = (dirArg is num) ? dirArg.toInt() : 1;
-        _navigateCell(dir);
-      };
-    } catch (_) {}
+    flutter_nav.registerFlutterNav((dynamic dirArg) {
+      if (!mounted) return;
+      final dir = (dirArg is num) ? dirArg.toInt() : 1;
+      _navigateCell(dir);
+    });
   }
 
   void _navigateCell(int dir) {
@@ -2823,7 +2819,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     _searchFocusNode.dispose();
     _serverSaveTimer?.cancel();
     _iikoCellFocusNodes.clear();
-    try { js.context.deleteProperty('_flutterNav'); } catch (_) {}
+    flutter_nav.unregisterFlutterNav();
     // Отписываемся от store чтобы не вызывать setState после unmount
     try {
       context.read<IikoProductStore>().removeListener(_onStoreUpdated);

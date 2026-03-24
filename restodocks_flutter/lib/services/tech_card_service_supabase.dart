@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/dev_log.dart';
 
@@ -9,17 +10,21 @@ import 'image_service.dart';
 import 'product_store_supabase.dart';
 import 'supabase_service.dart';
 import 'tech_card_history_service.dart';
+import 'offline_cache_service.dart';
 
 /// Bucket для фото ТТК (блюда и ПФ). Создать в Supabase Storage вручную, public.
 const String kTechCardPhotosBucket = 'tech_card_photos';
 
 /// Сервис управления технологическими картами с использованием Supabase
 class TechCardServiceSupabase {
-  static final TechCardServiceSupabase _instance = TechCardServiceSupabase._internal();
+  static final TechCardServiceSupabase _instance =
+      TechCardServiceSupabase._internal();
   factory TechCardServiceSupabase() => _instance;
   TechCardServiceSupabase._internal();
 
   final SupabaseService _supabase = SupabaseService();
+  final OfflineCacheService _offlineCache = OfflineCacheService();
+  static const _cacheDataset = 'tech_cards';
 
   /// Загрузить фото блюда/ПФ в Storage. Путь: {establishmentId}/{techCardId}/{index}.jpg
   /// Возвращает публичный URL или null при ошибке.
@@ -30,12 +35,16 @@ class TechCardServiceSupabase {
     required Uint8List bytes,
   }) async {
     try {
-      final compressed = await ImageService().compressToMaxBytes(bytes, maxBytes: 250 * 1024) ?? bytes;
+      final compressed = await ImageService()
+              .compressToMaxBytes(bytes, maxBytes: 250 * 1024) ??
+          bytes;
       final path = '$establishmentId/$techCardId/$index.jpg';
-      await _supabase.client.storage
+      await _supabase.client.storage.from(kTechCardPhotosBucket).uploadBinary(
+          path, compressed,
+          fileOptions: FileOptions(upsert: true));
+      final url = _supabase.client.storage
           .from(kTechCardPhotosBucket)
-          .uploadBinary(path, compressed, fileOptions: FileOptions(upsert: true));
-      final url = _supabase.client.storage.from(kTechCardPhotosBucket).getPublicUrl(path);
+          .getPublicUrl(path);
       return url;
     } catch (e) {
       devLog('TechCardServiceSupabase.uploadTechCardPhoto: $e');
@@ -46,11 +55,15 @@ class TechCardServiceSupabase {
   static bool _isColumnNotFoundError(Object e) {
     final msg = e.toString().toLowerCase();
     return msg.contains('pgrst204') ||
-        (msg.contains('column') && (msg.contains('find') || msg.contains('found') || msg.contains('exist')));
+        (msg.contains('column') &&
+            (msg.contains('find') ||
+                msg.contains('found') ||
+                msg.contains('exist')));
   }
 
   /// Payload для tech_cards. Убираем id, section. [includeHallFields] = false при retry после PGRST204.
-  static Map<String, dynamic> _techCardPayloadForDb(TechCard techCard, {bool includeHallFields = true}) {
+  static Map<String, dynamic> _techCardPayloadForDb(TechCard techCard,
+      {bool includeHallFields = true}) {
     final data = Map<String, dynamic>.from(techCard.toJson());
     data.remove('id');
     data.remove('section');
@@ -100,7 +113,8 @@ class TechCardServiceSupabase {
       response = await _supabase.insertData('tech_cards', techCardData);
     } catch (e) {
       if (_isColumnNotFoundError(e)) {
-        techCardData = _techCardPayloadForDb(techCard, includeHallFields: false);
+        techCardData =
+            _techCardPayloadForDb(techCard, includeHallFields: false);
         response = await _supabase.insertData('tech_cards', techCardData);
       } else {
         rethrow;
@@ -119,7 +133,23 @@ class TechCardServiceSupabase {
 
   /// Получение всех ТТК для заведения (один запрос с ингредиентами — без N+1).
   /// При 0 карточек или ошибке — fallback без tt_ingredients (ингредиенты подгрузятся при открытии).
-  Future<List<TechCard>> getTechCardsForEstablishment(String establishmentId) async {
+  Future<List<TechCard>> getTechCardsForEstablishment(
+      String establishmentId) async {
+    final cacheKey = await _offlineCache.scopedKey(
+      dataset: _cacheDataset,
+      establishmentId: establishmentId,
+    );
+    final cached = await _offlineCache.readJsonList(cacheKey);
+    if (cached != null && cached.isNotEmpty) {
+      final cachedCards = cached.map(TechCard.fromJson).toList();
+      unawaited(_refreshTechCardsCache(establishmentId));
+      return cachedCards;
+    }
+    return _fetchTechCardsFromServer(establishmentId);
+  }
+
+  Future<List<TechCard>> _fetchTechCardsFromServer(
+      String establishmentId) async {
     Future<List<TechCard>> _fetchWithoutEmbed() async {
       final data = await _supabase.client
           .from('tech_cards')
@@ -141,15 +171,35 @@ class TechCardServiceSupabase {
       if (list.isEmpty && rawCount > 0) {
         list = await _fetchWithoutEmbed();
       }
+      await _saveTechCardsCache(establishmentId, list);
       return list;
     } catch (e) {
       try {
         final list = await _fetchWithoutEmbed();
+        await _saveTechCardsCache(establishmentId, list);
         return list;
       } catch (e2) {
         return [];
       }
     }
+  }
+
+  Future<void> _refreshTechCardsCache(String establishmentId) async {
+    try {
+      await _fetchTechCardsFromServer(establishmentId);
+    } catch (_) {}
+  }
+
+  Future<void> _saveTechCardsCache(
+      String establishmentId, List<TechCard> list) async {
+    final key = await _offlineCache.scopedKey(
+      dataset: _cacheDataset,
+      establishmentId: establishmentId,
+    );
+    await _offlineCache.writeJsonList(
+      key,
+      list.map((e) => e.toJson()).toList(),
+    );
   }
 
   /// Парсинг списка ТТК из ответа с вложенными tt_ingredients.
@@ -206,14 +256,16 @@ class TechCardServiceSupabase {
             .maybeSingle();
         if (row == null) return null;
         final ingredients = await _fetchIngredientsForTechCard(techCardId);
-        return TechCard.fromJson(row as Map<String, dynamic>).copyWith(ingredients: ingredients);
+        return TechCard.fromJson(row as Map<String, dynamic>)
+            .copyWith(ingredients: ingredients);
       } catch (e2) {
         return null;
       }
     }
   }
 
-  Future<List<TTIngredient>> _fetchIngredientsForTechCard(String techCardId) async {
+  Future<List<TTIngredient>> _fetchIngredientsForTechCard(
+      String techCardId) async {
     try {
       final data = await _supabase.client
           .from('tt_ingredients')
@@ -234,7 +286,8 @@ class TechCardServiceSupabase {
 
   /// Догрузить ингредиенты одним bulk-запросом для набора карточек.
   /// Используется как быстрый fallback, когда embed tt_ingredients пришёл пустым.
-  Future<List<TechCard>> fillIngredientsForCardsBulk(List<TechCard> cards) async {
+  Future<List<TechCard>> fillIngredientsForCardsBulk(
+      List<TechCard> cards) async {
     if (cards.isEmpty) return cards;
     final ids = cards.map((c) => c.id).toSet().toList();
     if (ids.isEmpty) return cards;
@@ -254,7 +307,8 @@ class TechCardServiceSupabase {
         } catch (_) {}
       }
       return cards
-          .map((tc) => tc.copyWith(ingredients: grouped[tc.id] ?? tc.ingredients))
+          .map((tc) =>
+              tc.copyWith(ingredients: grouped[tc.id] ?? tc.ingredients))
           .toList();
     } catch (_) {
       return cards;
@@ -290,7 +344,8 @@ class TechCardServiceSupabase {
   }
 
   /// Поиск ТТК по названию блюда (один запрос)
-  Future<List<TechCard>> searchTechCards(String query, String establishmentId) async {
+  Future<List<TechCard>> searchTechCards(
+      String query, String establishmentId) async {
     try {
       final data = await _supabase.client
           .from('tech_cards')
@@ -333,7 +388,8 @@ class TechCardServiceSupabase {
       );
     } catch (e) {
       if (_isColumnNotFoundError(e)) {
-        payload = _techCardPayloadForDb(resolvedTechCard, includeHallFields: false);
+        payload =
+            _techCardPayloadForDb(resolvedTechCard, includeHallFields: false);
         await _supabase.updateData(
           'tech_cards',
           payload,
@@ -389,11 +445,13 @@ class TechCardServiceSupabase {
           updated.add(ing);
           continue;
         }
-        if ((ing.productId == null || ing.productId!.isEmpty) && ing.productName.trim().isEmpty) {
+        if ((ing.productId == null || ing.productId!.isEmpty) &&
+            ing.productName.trim().isEmpty) {
           updated.add(ing);
           continue;
         }
-        final best = store.findProductForIngredient(ing.productId, ing.productName);
+        final best =
+            store.findProductForIngredient(ing.productId, ing.productName);
         if (best != null && best.id != ing.productId) {
           changed = true;
           updated.add(ing.copyWith(productId: best.id));
@@ -543,10 +601,12 @@ class TechCardServiceSupabase {
   /// Нечёткое совпадение: продукт в каталоге содержит название ингредиента как префикс.
   /// Напр. «Кунжут жареный» → «Кунжут жареный белый».
   static bool _fuzzyPrefixMatch(String ingredientNorm, String catalogNorm) {
-    if (ingredientNorm.isEmpty || catalogNorm.length < ingredientNorm.length) return false;
+    if (ingredientNorm.isEmpty || catalogNorm.length < ingredientNorm.length)
+      return false;
     if (catalogNorm == ingredientNorm) return true;
     return catalogNorm.startsWith(ingredientNorm) &&
-        (ingredientNorm.length == catalogNorm.length || catalogNorm[ingredientNorm.length] == ' ');
+        (ingredientNorm.length == catalogNorm.length ||
+            catalogNorm[ingredientNorm.length] == ' ');
   }
 
   /// Поиск по названию: продукт или ПФ.
@@ -579,14 +639,18 @@ class TechCardServiceSupabase {
         for (final tc in techCardsPf) {
           if (normalizeForPfMatching(tc.name) == pfNorm) return tc.id;
         }
-        final found = createdByName[pfNorm] ?? createdByName[norm] ?? createdByName[productName.trim()];
+        final found = createdByName[pfNorm] ??
+            createdByName[norm] ??
+            createdByName[productName.trim()];
         if (found != null) return found;
       }
       // Fallback: иногда ingredientType не выставлен, но название совпадает полностью
       for (final tc in techCardsPf) {
         if (_normalizeName(tc.name) == norm) return tc.id;
       }
-      return createdByName[norm] ?? createdByName[pfNorm] ?? createdByName[productName.trim()];
+      return createdByName[norm] ??
+          createdByName[pfNorm] ??
+          createdByName[productName.trim()];
     }
 
     // ingredientType может быть ошибочно определён парсером, поэтому делаем fallback в обе стороны.
@@ -616,7 +680,9 @@ class TechCardServiceSupabase {
     Map<String, String>? createdTechCardsByName,
     ProductStoreSupabase? productStore,
   }) async {
-    final name = result.dishName?.trim().isNotEmpty == true ? result.dishName!.trim() : 'Без названия';
+    final name = result.dishName?.trim().isNotEmpty == true
+        ? result.dishName!.trim()
+        : 'Без названия';
     final isPf = isSemiFinishedOverride ?? result.isSemiFinished ?? true;
     final products = productsForMapping ?? [];
     final techCardsPf = techCardsPfForMapping ?? [];
@@ -627,7 +693,8 @@ class TechCardServiceSupabase {
     Map<String, String> aliases = {};
     if (productStore != null) {
       try {
-        aliases = await productStore.loadProductAliases(establishmentId: establishmentId);
+        aliases = await productStore.loadProductAliases(
+            establishmentId: establishmentId);
       } catch (_) {}
     }
 
@@ -645,7 +712,9 @@ class TechCardServiceSupabase {
       if (line.productName.trim().isEmpty) continue;
       String? productId;
       String? sourceTechCardId;
-      if (products.isNotEmpty || techCardsPf.isNotEmpty || createdIdsByName.isNotEmpty) {
+      if (products.isNotEmpty ||
+          techCardsPf.isNotEmpty ||
+          createdIdsByName.isNotEmpty) {
         String? found;
         final aliasKey = normalizeProductAliasKey(line.productName);
         if (aliasKey.isNotEmpty && aliases.isNotEmpty) {
@@ -662,7 +731,8 @@ class TechCardServiceSupabase {
           createdIdsByName,
         );
         if (found != null) {
-          final isPfId = techCardsPf.any((t) => t.id == found) || createdIdsByName.values.contains(found);
+          final isPfId = techCardsPf.any((t) => t.id == found) ||
+              createdIdsByName.values.contains(found);
           if (isPfId) {
             sourceTechCardId = found;
           } else {
@@ -674,7 +744,8 @@ class TechCardServiceSupabase {
               if (matched != null) {
                 final prodKey = normalizeProductAliasKey(matched.name);
                 if (aliasKey.isNotEmpty && aliasKey != prodKey) {
-                  productStore.saveProductAlias(aliasKey, found, establishmentId: establishmentId);
+                  productStore.saveProductAlias(aliasKey, found,
+                      establishmentId: establishmentId);
                 }
               }
             }
@@ -694,16 +765,26 @@ class TechCardServiceSupabase {
       }
       var wastePct = line.primaryWastePct;
       // Авторасчёт % отхода: нетто = брутто × (1 − отход/100) → отход = (1 − нетто/брутто)×100
-      if (gross > 0 && net > 0 && net < gross && (wastePct == null || wastePct == 0)) {
+      if (gross > 0 &&
+          net > 0 &&
+          net < gross &&
+          (wastePct == null || wastePct == 0)) {
         wastePct = (1.0 - net / gross) * 100.0;
       }
       wastePct = (wastePct ?? 0).clamp(0.0, 99.9);
-      var cookingLoss = line.cookingLossPct != null ? line.cookingLossPct!.clamp(0.0, 99.9) : null;
+      var cookingLoss = line.cookingLossPct != null
+          ? line.cookingLossPct!.clamp(0.0, 99.9)
+          : null;
       var output = line.outputGrams;
       // Нетто после отхода (для расчёта ужарки). Файл может дать нетто напрямую.
-      final netAfterWaste = net > 0 ? net : (gross > 0 ? gross * (1.0 - wastePct / 100.0) : 0.0);
+      final netAfterWaste =
+          net > 0 ? net : (gross > 0 ? gross * (1.0 - wastePct / 100.0) : 0.0);
       // Авторасчёт % ужарки: выход = нетто × (1 − ужарка/100) → ужарка = (1 − выход/нетто)×100
-      if (output != null && output > 0 && netAfterWaste > 0 && output < netAfterWaste && cookingLoss == null) {
+      if (output != null &&
+          output > 0 &&
+          netAfterWaste > 0 &&
+          output < netAfterWaste &&
+          cookingLoss == null) {
         cookingLoss = (1.0 - output / netAfterWaste) * 100.0;
         cookingLoss = cookingLoss.clamp(0.0, 99.9);
       } else if (output == null && cookingLoss != null && netAfterWaste > 0) {
@@ -714,7 +795,8 @@ class TechCardServiceSupabase {
       double cost = 0;
       double? pricePerKg;
       if (productId != null && productStore != null) {
-        final ep = productStore.getEstablishmentPrice(productId, establishmentId);
+        final ep =
+            productStore.getEstablishmentPrice(productId, establishmentId);
         final price = ep?.$1;
         if (price != null && price > 0) {
           pricePerKg = price;
@@ -748,28 +830,35 @@ class TechCardServiceSupabase {
         pricePerKg: pricePerKg,
       ));
     }
-    final yieldVal = result.yieldGrams ?? ingredients.fold<double>(0.0, (s, i) => s + i.netWeight);
-    final techMap = <String, String>{languageCode: result.technologyText?.trim() ?? ''};
+    final yieldVal = result.yieldGrams ??
+        ingredients.fold<double>(0.0, (s, i) => s + i.netWeight);
+    final techMap = <String, String>{
+      languageCode: result.technologyText?.trim() ?? ''
+    };
     final withIngredients = created.copyWith(
       ingredients: ingredients,
       technologyLocalized: techMap,
     );
-    var updated = TechCard.withYieldValue(withIngredients, yieldVal > 0 ? yieldVal : 100);
+    var updated =
+        TechCard.withYieldValue(withIngredients, yieldVal > 0 ? yieldVal : 100);
     // ТТК блюдо: вес порции = выход (вес итого из таблицы)
     if (!isPf && yieldVal > 0) {
       updated = updated.copyWith(portionWeight: yieldVal);
     }
-    await saveTechCard(updated, changedByEmployeeId: createdBy, changedByName: createdByName);
+    await saveTechCard(updated,
+        changedByEmployeeId: createdBy, changedByName: createdByName);
     if (createdTechCardsByName != null) {
       createdTechCardsByName[_normalizeName(name)] = updated.id;
       createdTechCardsByName[name] = updated.id;
-      if (isPf) createdTechCardsByName[normalizeForPfMatching(name)] = updated.id;
+      if (isPf)
+        createdTechCardsByName[normalizeForPfMatching(name)] = updated.id;
     }
     return updated;
   }
 
   /// Клонирование ТТК
-  Future<TechCard> cloneTechCard(TechCard originalTechCard, String newCreatorId) async {
+  Future<TechCard> cloneTechCard(
+      TechCard originalTechCard, String newCreatorId) async {
     final clonedTechCard = TechCard.create(
       dishName: '${originalTechCard.dishName} (копия)',
       dishNameLocalized: originalTechCard.dishNameLocalized,
@@ -790,9 +879,7 @@ class TechCardServiceSupabase {
 
   /// Получить все технологические карты
   Future<List<TechCard>> getAllTechCards() async {
-    final response = await _supabase.client
-        .from('tech_cards')
-        .select('''
+    final response = await _supabase.client.from('tech_cards').select('''
           *,
           tt_ingredients (
             *
@@ -814,7 +901,8 @@ class TechCardServiceSupabase {
 
   /// Перевести название ТТК на указанный язык через DeepL (translate-text edge function).
   /// Обновляет dishNameLocalized в БД и возвращает переведённое имя, либо null при ошибке.
-  Future<String?> translateTechCardName(String techCardId, String dishName, String targetLang) async {
+  Future<String?> translateTechCardName(
+      String techCardId, String dishName, String targetLang) async {
     if (targetLang == 'ru') return null;
     try {
       final res = await _supabase.client.functions.invoke(
@@ -823,7 +911,9 @@ class TechCardServiceSupabase {
       );
       final data = res.data as Map<String, dynamic>?;
       final translated = data?['translatedText'] as String?;
-      if (translated == null || translated.isEmpty || translated == dishName.trim()) return null;
+      if (translated == null ||
+          translated.isEmpty ||
+          translated == dishName.trim()) return null;
 
       // Загружаем текущие данные карты чтобы обновить только dishNameLocalized
       final rows = await _supabase.client
@@ -831,12 +921,17 @@ class TechCardServiceSupabase {
           .select('dish_name_localized')
           .eq('id', techCardId)
           .maybeSingle();
-      final existing = (rows?['dish_name_localized'] as Map<String, dynamic>?)?.cast<String, String>() ?? {};
-      final updated = {...existing, 'ru': dishName.trim(), targetLang: translated};
+      final existing = (rows?['dish_name_localized'] as Map<String, dynamic>?)
+              ?.cast<String, String>() ??
+          {};
+      final updated = {
+        ...existing,
+        'ru': dishName.trim(),
+        targetLang: translated
+      };
       await _supabase.client
           .from('tech_cards')
-          .update({'dish_name_localized': updated})
-          .eq('id', techCardId);
+          .update({'dish_name_localized': updated}).eq('id', techCardId);
       return translated;
     } catch (e) {
       devLog('TechCardServiceSupabase.translateTechCardName: $e');
@@ -848,14 +943,18 @@ class TechCardServiceSupabase {
 
   static const String _customPrefix = 'custom:';
 
-  static bool isCustomCategory(String category) => category.startsWith(_customPrefix);
+  static bool isCustomCategory(String category) =>
+      category.startsWith(_customPrefix);
 
   static String customCategoryId(String category) =>
-      category.startsWith(_customPrefix) ? category.substring(_customPrefix.length) : '';
+      category.startsWith(_customPrefix)
+          ? category.substring(_customPrefix.length)
+          : '';
 
   /// Загрузить пользовательские категории для заведения и отдела (kitchen | bar).
   /// Возвращает [] если таблица не существует (миграция не применена).
-  Future<List<({String id, String name})>> getCustomCategories(String establishmentId, String department) async {
+  Future<List<({String id, String name})>> getCustomCategories(
+      String establishmentId, String department) async {
     try {
       final data = await _supabase.client
           .from('tech_card_custom_categories')
@@ -863,7 +962,9 @@ class TechCardServiceSupabase {
           .eq('establishment_id', establishmentId)
           .eq('department', department)
           .order('name');
-      return (data as List).map((r) => (id: r['id'] as String, name: r['name'] as String)).toList();
+      return (data as List)
+          .map((r) => (id: r['id'] as String, name: r['name'] as String))
+          .toList();
     } catch (e) {
       // Таблица может не существовать — миграция не применена. Тогда работаем без своих категорий.
       devLog('TechCardServiceSupabase.getCustomCategories: $e');
@@ -873,7 +974,8 @@ class TechCardServiceSupabase {
 
   /// Добавить пользовательскую категорию. Возвращает category для tech_cards (custom:uuid).
   /// null если таблица не существует или ошибка.
-  Future<String?> addCustomCategory(String establishmentId, String department, String name) async {
+  Future<String?> addCustomCategory(
+      String establishmentId, String department, String name) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return null;
     try {
@@ -895,7 +997,8 @@ class TechCardServiceSupabase {
   }
 
   /// Количество ТТК, использующих эту пользовательскую категорию.
-  Future<int> countTechCardsUsingCustomCategory(String establishmentId, String customId) async {
+  Future<int> countTechCardsUsingCustomCategory(
+      String establishmentId, String customId) async {
     try {
       final category = '$_customPrefix$customId';
       final data = await _supabase.client
@@ -911,8 +1014,10 @@ class TechCardServiceSupabase {
   }
 
   /// Удалить пользовательскую категорию. Возвращает true при успехе. Нельзя удалить, если есть ТТК с этой категорией.
-  Future<bool> deleteCustomCategory(String establishmentId, String customId) async {
-    final count = await countTechCardsUsingCustomCategory(establishmentId, customId);
+  Future<bool> deleteCustomCategory(
+      String establishmentId, String customId) async {
+    final count =
+        await countTechCardsUsingCustomCategory(establishmentId, customId);
     if (count > 0 || count < 0) return false; // < 0 = ошибка, не удаляем
     try {
       await _supabase.client

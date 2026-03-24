@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/dev_log.dart';
 import '../utils/product_name_utils.dart';
@@ -5,21 +7,27 @@ import '../utils/product_name_utils.dart';
 import '../models/models.dart';
 import 'nutrition_backfill_service.dart';
 import '../models/nomenclature_item.dart';
+import 'offline_cache_service.dart';
 import 'supabase_service.dart';
 
 /// Сервис управления продуктами с использованием Supabase
 class ProductStoreSupabase {
-  static final ProductStoreSupabase _instance = ProductStoreSupabase._internal();
+  static final ProductStoreSupabase _instance =
+      ProductStoreSupabase._internal();
   factory ProductStoreSupabase() => _instance;
   ProductStoreSupabase._internal();
 
   final SupabaseService _supabase = SupabaseService();
+  final OfflineCacheService _offlineCache = OfflineCacheService();
   List<Product> _allProducts = [];
   List<String> _categories = [];
   bool _isLoading = false;
 
   // Кэш цен заведения: productId -> (price, currency)
   final Map<String, (double?, String?)?> _priceCache = {};
+
+  static const _productsCacheDataset = 'products_all';
+  static const _nomenclatureCacheDataset = 'nomenclature';
 
   // Геттеры
   List<Product> get allProducts => _allProducts;
@@ -28,13 +36,28 @@ class ProductStoreSupabase {
 
   /// Загрузка продуктов из Supabase
   Future<void> loadProducts({bool force = false}) async {
-    if (_isLoading && !force) return;
-    if (_isLoading && force) {
-      // Ждём окончания текущей загрузки перед новой
-      while (_isLoading) {
-        await Future.delayed(const Duration(milliseconds: 50));
+    if (!force) {
+      final cacheKey = await _offlineCache.scopedKey(
+        dataset: _productsCacheDataset,
+        establishmentId: 'global',
+      );
+      final cached = await _offlineCache.readJsonList(cacheKey);
+      if (cached != null && cached.isNotEmpty) {
+        _allProducts = cached.map(Product.fromJson).toList();
+        _categories = _allProducts
+            .map((product) => product.category)
+            .toSet()
+            .toList()
+          ..sort();
+        unawaited(_loadProductsFromServer());
+        return;
       }
     }
+    await _loadProductsFromServer();
+  }
+
+  Future<void> _loadProductsFromServer() async {
+    if (_isLoading) return;
 
     _isLoading = true;
 
@@ -42,54 +65,64 @@ class ProductStoreSupabase {
     const retryDelay = Duration(seconds: 1);
 
     try {
-    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        devLog('DEBUG ProductStore: Loading ALL products from database (paginated)... attempt $attempt/$maxAttempts');
-        // PostgREST ограничивает ответ 1000 строками по умолчанию.
-        // Грузим постранично пока не получим все записи.
-        const pageSize = 1000;
-        final allData = <Map<String, dynamic>>[];
-        var offset = 0;
+      for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          devLog(
+              'DEBUG ProductStore: Loading ALL products from database (paginated)... attempt $attempt/$maxAttempts');
+          // PostgREST ограничивает ответ 1000 строками по умолчанию.
+          // Грузим постранично пока не получим все записи.
+          const pageSize = 1000;
+          final allData = <Map<String, dynamic>>[];
+          var offset = 0;
 
-        while (true) {
-          final page = await _supabase.client
-              .from('products')
-              .select()
-              .order('name')
-              .range(offset, offset + pageSize - 1);
+          while (true) {
+            final page = await _supabase.client
+                .from('products')
+                .select()
+                .order('name')
+                .range(offset, offset + pageSize - 1);
 
-          final pageList = page as List;
-          for (final item in pageList) {
-            allData.add(item as Map<String, dynamic>);
+            final pageList = page as List;
+            for (final item in pageList) {
+              allData.add(item as Map<String, dynamic>);
+            }
+
+            devLog(
+                'DEBUG ProductStore: Page offset=$offset, got ${pageList.length} rows, total so far: ${allData.length}');
+
+            if (pageList.length < pageSize) break; // последняя страница
+            offset += pageSize;
+            if (offset > 50000) break; // защита от бесконечного цикла
           }
 
-          devLog('DEBUG ProductStore: Page offset=$offset, got ${pageList.length} rows, total so far: ${allData.length}');
+          devLog('DEBUG ProductStore: Loaded ${allData.length} products total');
+          _allProducts = allData.map((json) => Product.fromJson(json)).toList();
+          devLog(
+              'DEBUG ProductStore: Parsed ${_allProducts.length} products successfully');
 
-          if (pageList.length < pageSize) break; // последняя страница
-          offset += pageSize;
-          if (offset > 50000) break; // защита от бесконечного цикла
+          _categories = _allProducts
+              .map((product) => product.category)
+              .toSet()
+              .toList()
+            ..sort();
+
+          // Фоновая подгрузка КБЖУ для продуктов без калорий (в течение суток)
+          NutritionBackfillService().startBackgroundBackfill(this);
+          final cacheKey = await _offlineCache.scopedKey(
+            dataset: _productsCacheDataset,
+            establishmentId: 'global',
+          );
+          await _offlineCache.writeJsonList(
+              cacheKey, _allProducts.map((p) => p.toJson()).toList());
+
+          return;
+        } catch (e) {
+          devLog(
+              '❌ ProductStore: Error loading products (attempt $attempt/$maxAttempts): $e');
+          if (attempt == maxAttempts) rethrow;
+          await Future.delayed(retryDelay);
         }
-
-        devLog('DEBUG ProductStore: Loaded ${allData.length} products total');
-        _allProducts = allData.map((json) => Product.fromJson(json)).toList();
-        devLog('DEBUG ProductStore: Parsed ${_allProducts.length} products successfully');
-
-        _categories = _allProducts
-            .map((product) => product.category)
-            .toSet()
-            .toList()
-          ..sort();
-
-        // Фоновая подгрузка КБЖУ для продуктов без калорий (в течение суток)
-        NutritionBackfillService().startBackgroundBackfill(this);
-
-        return;
-      } catch (e) {
-        devLog('❌ ProductStore: Error loading products (attempt $attempt/$maxAttempts): $e');
-        if (attempt == maxAttempts) rethrow;
-        await Future.delayed(retryDelay);
       }
-    }
     } finally {
       _isLoading = false;
     }
@@ -107,16 +140,21 @@ class ProductStoreSupabase {
 
     // Фильтр по категории
     if (category != null && category.isNotEmpty) {
-      filtered = filtered.where((product) => product.category == category).toList();
+      filtered =
+          filtered.where((product) => product.category == category).toList();
     }
 
     // Фильтр по аллергенам: показываем продукты, не помеченные как содержащие (null не исключаем)
     if (glutenFree == true) {
-      filtered = filtered.where((product) => product.suitableForGlutenFreeFilter).toList();
+      filtered = filtered
+          .where((product) => product.suitableForGlutenFreeFilter)
+          .toList();
     }
 
     if (lactoseFree == true) {
-      filtered = filtered.where((product) => product.suitableForLactoseFreeFilter).toList();
+      filtered = filtered
+          .where((product) => product.suitableForLactoseFreeFilter)
+          .toList();
     }
 
     // Поиск по тексту
@@ -140,7 +178,9 @@ class ProductStoreSupabase {
 
   /// Получить продукты по категории
   List<Product> getProductsInCategory(String category) {
-    return _allProducts.where((product) => product.category == category).toList();
+    return _allProducts
+        .where((product) => product.category == category)
+        .toList();
   }
 
   /// Поиск продуктов по тексту
@@ -151,7 +191,9 @@ class ProductStoreSupabase {
   /// Найти продукт по ID
   Product? findProductById(String id) {
     final idLower = id.trim().toLowerCase();
-    return _allProducts.where((p) => p.id.trim().toLowerCase() == idLower).firstOrNull;
+    return _allProducts
+        .where((p) => p.id.trim().toLowerCase() == idLower)
+        .firstOrNull;
   }
 
   /// Найти продукт для ингредиента: по productId, при неудаче — по productName (для совместимости с UUID-миграцией).
@@ -163,24 +205,39 @@ class ProductStoreSupabase {
       final byId = findProductById(productId);
       if (byId != null) candidates.add(byId);
     }
-    final raw = productName.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-    final stripped = stripIikoPrefix(productName).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    final raw =
+        productName.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    final stripped = stripIikoPrefix(productName)
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), ' ');
     if (raw.isEmpty && stripped.isEmpty) return null;
     for (final p in _allProducts.where((p) {
       final n = (p.name.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' '));
-      final pStripped = stripIikoPrefix(p.name).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-      if (n == raw || n == stripped || pStripped == raw || pStripped == stripped) return true;
+      final pStripped = stripIikoPrefix(p.name)
+          .trim()
+          .toLowerCase()
+          .replaceAll(RegExp(r'\s+'), ' ');
+      if (n == raw ||
+          n == stripped ||
+          pStripped == raw ||
+          pStripped == stripped) return true;
       for (final v in p.names?.values ?? <String>[]) {
         final vn = v.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-        final vs = stripIikoPrefix(v).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-        if (vn == raw || vn == stripped || vs == raw || vs == stripped) return true;
+        final vs = stripIikoPrefix(v)
+            .trim()
+            .toLowerCase()
+            .replaceAll(RegExp(r'\s+'), ' ');
+        if (vn == raw || vn == stripped || vs == raw || vs == stripped)
+          return true;
       }
       return false;
     })) {
       if (!candidates.any((c) => c.id == p.id)) candidates.add(p);
     }
     if (candidates.isEmpty) return null;
-    candidates.sort((a, b) => _ingredientProductScore(b).compareTo(_ingredientProductScore(a)));
+    candidates.sort((a, b) =>
+        _ingredientProductScore(b).compareTo(_ingredientProductScore(a)));
     return candidates.first;
   }
 
@@ -199,16 +256,20 @@ class ProductStoreSupabase {
   Future<Product> addProduct(Product product) async {
     // Проверяем локальный кэш перед запросом к БД
     final nameLower = product.name.trim().toLowerCase();
-    final existingLocal = _allProducts.where(
-      (p) => p.name.trim().toLowerCase() == nameLower,
-    ).toList();
+    final existingLocal = _allProducts
+        .where(
+          (p) => p.name.trim().toLowerCase() == nameLower,
+        )
+        .toList();
     if (existingLocal.isNotEmpty) {
-      devLog('DEBUG ProductStore: Product "${product.name}" already exists locally, skipping insert');
+      devLog(
+          'DEBUG ProductStore: Product "${product.name}" already exists locally, skipping insert');
       return existingLocal.first;
     }
 
     try {
-      devLog('DEBUG ProductStore: Adding product "${product.name}" to database...');
+      devLog(
+          'DEBUG ProductStore: Adding product "${product.name}" to database...');
       // Убираем null-поля перед вставкой, чтобы БД использовала DEFAULT значения
       final json = Map<String, dynamic>.fromEntries(
         product.toJson().entries.where((e) => e.value != null),
@@ -218,7 +279,8 @@ class ProductStoreSupabase {
 
       final saved = Product.fromJson(response);
       _allProducts.add(saved);
-      devLog('DEBUG ProductStore: Product added successfully, total products: ${_allProducts.length}');
+      devLog(
+          'DEBUG ProductStore: Product added successfully, total products: ${_allProducts.length}');
       if (!_categories.contains(saved.category)) {
         _categories.add(saved.category);
         _categories.sort();
@@ -231,13 +293,18 @@ class ProductStoreSupabase {
     } catch (e) {
       // 409 / unique violation — продукт уже есть в БД, ищем его
       final errStr = e.toString().toLowerCase();
-      if (errStr.contains('409') || errStr.contains('23505') ||
-          errStr.contains('duplicate') || errStr.contains('unique') || errStr.contains('already exists')) {
-        devLog('DEBUG ProductStore: Duplicate detected for "${product.name}", fetching existing...');
+      if (errStr.contains('409') ||
+          errStr.contains('23505') ||
+          errStr.contains('duplicate') ||
+          errStr.contains('unique') ||
+          errStr.contains('already exists')) {
+        devLog(
+            'DEBUG ProductStore: Duplicate detected for "${product.name}", fetching existing...');
         Future<Product?> fetchProduct() async {
           try {
-            final res = await _supabase.client
-                .rpc('get_product_by_normalized_name', params: {'p_name': product.name.trim()});
+            final res = await _supabase.client.rpc(
+                'get_product_by_normalized_name',
+                params: {'p_name': product.name.trim()});
             final Map<String, dynamic>? row = res is Map<String, dynamic>
                 ? res
                 : (res is List && res.isNotEmpty && res[0] is Map)
@@ -270,7 +337,8 @@ class ProductStoreSupabase {
             return saved;
           }
         } catch (fetchErr) {
-          devLog('DEBUG ProductStore: Failed to fetch existing product: $fetchErr');
+          devLog(
+              'DEBUG ProductStore: Failed to fetch existing product: $fetchErr');
         }
       }
       devLog('DEBUG ProductStore: Error adding product: $e');
@@ -279,23 +347,25 @@ class ProductStoreSupabase {
   }
 
   /// Публичный метод для запуска перевода извне (fire-and-forget)
-  void triggerTranslation(String productId) => _translateProductInBackground(productId);
+  void triggerTranslation(String productId) =>
+      _translateProductInBackground(productId);
 
   /// Загрузить алиасы (нормализованное_название → product_id) для разгрузки AI при импорте.
   /// [establishmentId] — заведение: алиасы заведения приоритетнее глобальных.
   /// Исключаем отказы; при конфликтах — выше confidence.
-  Future<Map<String, String>> loadProductAliases({String? establishmentId}) async {
+  Future<Map<String, String>> loadProductAliases(
+      {String? establishmentId}) async {
     try {
-      final rows = await _supabase.client
-          .from('product_aliases')
-          .select('input_name_normalized, product_id, establishment_id, confidence');
+      final rows = await _supabase.client.from('product_aliases').select(
+          'input_name_normalized, product_id, establishment_id, confidence');
       final rejections = await _loadProductAliasRejections(establishmentId);
       final map = <String, ({String id, int confidence, bool isEst})>{};
       for (final r in rows as List) {
         final row = r as Map<String, dynamic>;
         final key = row['input_name_normalized']?.toString().trim();
         final val = row['product_id']?.toString();
-        final conf = (row['confidence'] is num) ? (row['confidence'] as num).toInt() : 1;
+        final conf =
+            (row['confidence'] is num) ? (row['confidence'] as num).toInt() : 1;
         final estId = row['establishment_id']?.toString();
         if (key == null || key.isEmpty || val == null || conf <= 0) continue;
         if (rejections[key]?.contains(val) ?? false) continue;
@@ -328,9 +398,12 @@ class ProductStoreSupabase {
     }
   }
 
-  Future<Map<String, Set<String>>> _loadProductAliasRejections(String? establishmentId) async {
+  Future<Map<String, Set<String>>> _loadProductAliasRejections(
+      String? establishmentId) async {
     try {
-      var query = _supabase.client.from('product_alias_rejections').select('input_name_normalized, product_id, establishment_id');
+      var query = _supabase.client
+          .from('product_alias_rejections')
+          .select('input_name_normalized, product_id, establishment_id');
       final rows = await query;
       final map = <String, Set<String>>{};
       for (final r in rows as List) {
@@ -351,7 +424,8 @@ class ProductStoreSupabase {
   }
 
   /// Сохранить алиас. [establishmentId] — для алиасов по заведению.
-  Future<void> saveProductAlias(String inputNameNormalized, String productId, {String? establishmentId}) async {
+  Future<void> saveProductAlias(String inputNameNormalized, String productId,
+      {String? establishmentId}) async {
     if (inputNameNormalized.trim().isEmpty || productId.isEmpty) return;
     try {
       final payload = <String, dynamic>{
@@ -359,7 +433,8 @@ class ProductStoreSupabase {
         'product_id': productId,
         'confidence': 1,
       };
-      if (establishmentId != null) payload['establishment_id'] = establishmentId;
+      if (establishmentId != null)
+        payload['establishment_id'] = establishmentId;
       await _supabase.client.from('product_aliases').upsert(
             payload,
             onConflict: 'input_name_normalized,establishment_id',
@@ -367,9 +442,12 @@ class ProductStoreSupabase {
     } catch (_) {
       try {
         await _supabase.client.from('product_aliases').upsert(
-              {'input_name_normalized': inputNameNormalized.trim(), 'product_id': productId},
-              onConflict: 'input_name_normalized',
-            );
+          {
+            'input_name_normalized': inputNameNormalized.trim(),
+            'product_id': productId
+          },
+          onConflict: 'input_name_normalized',
+        );
       } catch (e) {
         devLog('ProductStore: saveProductAlias failed: $e');
       }
@@ -377,25 +455,26 @@ class ProductStoreSupabase {
   }
 
   /// Отказ от маппинга: пользователь заменил продукт — не предлагать.
-  Future<void> saveProductAliasRejection(String inputNameNormalized, String productId, {String? establishmentId}) async {
+  Future<void> saveProductAliasRejection(
+      String inputNameNormalized, String productId,
+      {String? establishmentId}) async {
     if (inputNameNormalized.trim().isEmpty || productId.isEmpty) return;
     try {
       await _supabase.client.from('product_alias_rejections').upsert(
-            {
-              'input_name_normalized': inputNameNormalized.trim(),
-              'product_id': productId,
-              'establishment_id': establishmentId,
-            },
-            onConflict: 'input_name_normalized,product_id,establishment_id',
-          );
+        {
+          'input_name_normalized': inputNameNormalized.trim(),
+          'product_id': productId,
+          'establishment_id': establishmentId,
+        },
+        onConflict: 'input_name_normalized,product_id,establishment_id',
+      );
     } catch (_) {}
   }
 
   /// Запустить перевод продукта фоново через Edge Function auto-translate-product
   void _translateProductInBackground(String productId) {
-    Supabase.instance.client.functions
-        .invoke('auto-translate-product', body: {'product_id': productId})
-        .then((res) {
+    Supabase.instance.client.functions.invoke('auto-translate-product',
+        body: {'product_id': productId}).then((res) {
       if (res.status == 200 && res.data != null) {
         final data = res.data as Map<String, dynamic>?;
         if (data?['updated'] == true) {
@@ -411,7 +490,8 @@ class ProductStoreSupabase {
         }
       }
     }).catchError((e) {
-      devLog('DEBUG ProductStore: Background translation failed for $productId: $e');
+      devLog(
+          'DEBUG ProductStore: Background translation failed for $productId: $e');
     });
   }
 
@@ -434,7 +514,8 @@ class ProductStoreSupabase {
         }
       }
     } catch (e) {
-      devLog('DEBUG ProductStore: translateProductAwait failed for $productId: $e');
+      devLog(
+          'DEBUG ProductStore: translateProductAwait failed for $productId: $e');
     }
     return null;
   }
@@ -449,7 +530,8 @@ class ProductStoreSupabase {
         updatedProduct.id,
       );
 
-      final index = _allProducts.indexWhere((product) => product.id == updatedProduct.id);
+      final index =
+          _allProducts.indexWhere((product) => product.id == updatedProduct.id);
       if (index != -1) {
         _allProducts[index] = updatedProduct;
       }
@@ -484,22 +566,37 @@ class ProductStoreSupabase {
 
   /// ID продуктов, добавленных только филиалом (доп от филиала). Заполняется при loadNomenclatureForBranch.
   Set<String> _branchOnlyProductIds = {};
-  bool isBranchOnlyProduct(String productId) => _branchOnlyProductIds.contains(productId);
+  bool isBranchOnlyProduct(String productId) =>
+      _branchOnlyProductIds.contains(productId);
 
   /// Загрузить номенклатуру заведения (ID продуктов и цены)
   Future<void> loadNomenclature(String establishmentId) async {
+    final cacheKey = await _offlineCache.scopedKey(
+      dataset: _nomenclatureCacheDataset,
+      establishmentId: establishmentId,
+      suffix: 'main',
+    );
+    final cached = await _offlineCache.readJsonMap(cacheKey);
+    if (cached != null) {
+      _applyNomenclatureCache(establishmentId, cached);
+      unawaited(_reloadNomenclatureFromServer(establishmentId));
+      return;
+    }
+    await _reloadNomenclatureFromServer(establishmentId);
+  }
 
+  Future<void> _reloadNomenclatureFromServer(String establishmentId) async {
     _branchOnlyProductIds.clear();
     // Очищаем текущие данные
     _nomenclatureIds.clear();
     _priceCache.removeWhere((key, _) => key.startsWith('${establishmentId}_'));
 
-
     // Пробуем основной метод загрузки
     try {
       await _loadNomenclatureDirect(establishmentId);
     } catch (e) {
-      devLog('⚠️ ProductStore: Primary loading failed, trying fallback method: $e');
+      devLog(
+          '⚠️ ProductStore: Primary loading failed, trying fallback method: $e');
 
       // Пробуем альтернативный метод (RPC функция или упрощенный запрос)
       try {
@@ -509,21 +606,39 @@ class ProductStoreSupabase {
 
         // Очищаем данные при ошибке
         _nomenclatureIds.clear();
-        _priceCache.removeWhere((key, _) => key.startsWith('${establishmentId}_'));
+        _priceCache
+            .removeWhere((key, _) => key.startsWith('${establishmentId}_'));
 
         // Можно добавить дополнительную логику обработки ошибок
         rethrow; // Перебрасываем ошибку выше
       }
     }
+    await _saveNomenclatureCache(establishmentId, suffix: 'main');
   }
 
   /// Загрузить номенклатуру для филиала: объединение номенклатуры головного заведения и филиала.
   /// Цены филиала перекрывают цены головного. Продукты только филиала помечаются как «доп от филиала».
   Future<void> loadNomenclatureForBranch(String branchId, String mainId) async {
+    final cacheKey = await _offlineCache.scopedKey(
+      dataset: _nomenclatureCacheDataset,
+      establishmentId: mainId,
+      suffix: 'branch:$branchId',
+    );
+    final cached = await _offlineCache.readJsonMap(cacheKey);
+    if (cached != null) {
+      _applyNomenclatureCache(branchId, cached);
+      unawaited(_reloadNomenclatureForBranchFromServer(branchId, mainId));
+      return;
+    }
+    await _reloadNomenclatureForBranchFromServer(branchId, mainId);
+  }
 
+  Future<void> _reloadNomenclatureForBranchFromServer(
+      String branchId, String mainId) async {
     _branchOnlyProductIds.clear();
     _nomenclatureIds.clear();
-    _priceCache.removeWhere((key, _) => key.startsWith('${mainId}_') || key.startsWith('${branchId}_'));
+    _priceCache.removeWhere((key, _) =>
+        key.startsWith('${mainId}_') || key.startsWith('${branchId}_'));
 
     List<dynamic> mainList = [];
     List<dynamic> branchList = [];
@@ -551,7 +666,9 @@ class ProductStoreSupabase {
     final mainIds = <String>{};
     final mainPrices = <String, (double?, String?)>{};
     for (final item in mainList) {
-      final productId = item['product_id'] as String? ?? item['id'] as String? ?? item['productId'] as String?;
+      final productId = item['product_id'] as String? ??
+          item['id'] as String? ??
+          item['productId'] as String?;
       if (productId == null || productId.isEmpty) continue;
       mainIds.add(productId);
       final price = item['price'];
@@ -566,7 +683,9 @@ class ProductStoreSupabase {
     final branchIds = <String>{};
     final branchPrices = <String, (double?, String?)>{};
     for (final item in branchList) {
-      final productId = item['product_id'] as String? ?? item['id'] as String? ?? item['productId'] as String?;
+      final productId = item['product_id'] as String? ??
+          item['id'] as String? ??
+          item['productId'] as String?;
       if (productId == null || productId.isEmpty) continue;
       branchIds.add(productId);
       final price = item['price'];
@@ -595,12 +714,59 @@ class ProductStoreSupabase {
         _priceCache[cacheKey] = (null, null);
       }
     }
+    await _saveNomenclatureCache(mainId, suffix: 'branch:$branchId');
+  }
 
+  void _applyNomenclatureCache(
+      String establishmentId, Map<String, dynamic> cache) {
+    final ids = (cache['nomenclature_ids'] as List<dynamic>? ?? const [])
+        .map((e) => e.toString())
+        .toSet();
+    final branchOnly =
+        (cache['branch_only_product_ids'] as List<dynamic>? ?? const [])
+            .map((e) => e.toString())
+            .toSet();
+    _nomenclatureIds = ids;
+    _branchOnlyProductIds = branchOnly;
+    _priceCache.removeWhere((key, _) => key.startsWith('${establishmentId}_'));
+    final rawPrices = cache['price_cache'];
+    if (rawPrices is Map) {
+      for (final entry in rawPrices.entries) {
+        final key = entry.key.toString();
+        final value = entry.value;
+        if (value is Map) {
+          final price = value['price'];
+          final currency = value['currency']?.toString();
+          _priceCache[key] = (price is num ? price.toDouble() : null, currency);
+        } else {
+          _priceCache[key] = null;
+        }
+      }
+    }
+  }
+
+  Future<void> _saveNomenclatureCache(String establishmentId,
+      {required String suffix}) async {
+    final data = <String, dynamic>{
+      'nomenclature_ids': _nomenclatureIds.toList(),
+      'branch_only_product_ids': _branchOnlyProductIds.toList(),
+      'price_cache': _priceCache.map(
+        (k, v) => MapEntry(
+          k,
+          v == null ? null : {'price': v.$1, 'currency': v.$2},
+        ),
+      ),
+    };
+    final key = await _offlineCache.scopedKey(
+      dataset: _nomenclatureCacheDataset,
+      establishmentId: establishmentId,
+      suffix: suffix,
+    );
+    await _offlineCache.writeJsonMap(key, data);
   }
 
   /// Основной метод загрузки номенклатуры
   Future<void> _loadNomenclatureDirect(String establishmentId) async {
-
     dynamic response;
     try {
       response = await _supabase.client
@@ -609,7 +775,8 @@ class ProductStoreSupabase {
           .eq('establishment_id', establishmentId)
           .limit(10000);
     } catch (e) {
-      devLog('⚠️ ProductStore: Full select failed (price/currency columns may not exist), trying product_id only: $e');
+      devLog(
+          '⚠️ ProductStore: Full select failed (price/currency columns may not exist), trying product_id only: $e');
       response = await _supabase.client
           .from('establishment_products')
           .select('product_id')
@@ -620,7 +787,8 @@ class ProductStoreSupabase {
     final list = response is List ? response : <dynamic>[];
 
     if (list.isEmpty) {
-      devLog('ℹ️ ProductStore: No nomenclature data found for establishment $establishmentId');
+      devLog(
+          'ℹ️ ProductStore: No nomenclature data found for establishment $establishmentId');
       return;
     }
 
@@ -633,7 +801,8 @@ class ProductStoreSupabase {
 
     // Пробуем RPC функцию, если она существует
     try {
-      final response = await _supabase.client.rpc('get_establishment_products', params: {
+      final response =
+          await _supabase.client.rpc('get_establishment_products', params: {
         'est_id': establishmentId,
       });
 
@@ -662,15 +831,16 @@ class ProductStoreSupabase {
   }
 
   /// Обработка ответа с данными номенклатуры
-  Future<void> _processNomenclatureResponse(List<dynamic> response, String establishmentId) async {
+  Future<void> _processNomenclatureResponse(
+      List<dynamic> response, String establishmentId) async {
     int processedCount = 0;
 
     for (final item in response) {
       try {
         // Пробуем разные варианты названий полей
         final productId = item['product_id'] as String? ??
-                         item['id'] as String? ??
-                         item['productId'] as String?;
+            item['id'] as String? ??
+            item['productId'] as String?;
 
         if (productId == null || productId.isEmpty) continue;
 
@@ -701,12 +871,10 @@ class ProductStoreSupabase {
         continue;
       }
     }
-
   }
 
   /// Проверить и восстановить номенклатуру при ошибках
   Future<void> ensureNomenclatureLoaded(String establishmentId) async {
-
     try {
       // Пробуем загрузить, если еще не загружено
       if (_nomenclatureIds.isEmpty) {
@@ -715,9 +883,9 @@ class ProductStoreSupabase {
 
       // Если все еще пусто, возможно проблемы с данными
       if (_nomenclatureIds.isEmpty) {
-        devLog('⚠️ ProductStore: Nomenclature is empty, this might be normal for new establishments');
-      } else {
-      }
+        devLog(
+            '⚠️ ProductStore: Nomenclature is empty, this might be normal for new establishments');
+      } else {}
     } catch (e) {
       devLog('❌ ProductStore: Failed to ensure nomenclature loaded: $e');
       // Не выбрасываем ошибку, чтобы не ломать основной поток
@@ -725,8 +893,10 @@ class ProductStoreSupabase {
   }
 
   /// Добавить продукт в номенклатуру (опционально с ценой)
-  Future<void> addToNomenclature(String establishmentId, String productId, {double? price, String? currency}) async {
-    devLog('➕ ProductStore: Adding product $productId to nomenclature for establishment $establishmentId...');
+  Future<void> addToNomenclature(String establishmentId, String productId,
+      {double? price, String? currency}) async {
+    devLog(
+        '➕ ProductStore: Adding product $productId to nomenclature for establishment $establishmentId...');
 
     // Валидация входных данных
     if (establishmentId.isEmpty || productId.isEmpty) {
@@ -751,18 +921,20 @@ class ProductStoreSupabase {
           )
           .select();
 
-      devLog('✅ ProductStore: Nomenclature record upsert successful, response: $response');
+      devLog(
+          '✅ ProductStore: Nomenclature record upsert successful, response: $response');
 
       // Теперь всегда устанавливаем цену, если она указана (даже если запись уже существовала)
       if (price != null) {
-        await setEstablishmentPrice(establishmentId, productId, price, currency);
+        await setEstablishmentPrice(
+            establishmentId, productId, price, currency);
       }
 
       // Добавляем в локальный кэш
       _nomenclatureIds.add(productId);
 
-      devLog('✅ ProductStore: Product $productId added to nomenclature successfully');
-
+      devLog(
+          '✅ ProductStore: Product $productId added to nomenclature successfully');
     } catch (e, stackTrace) {
       devLog('❌ ProductStore: Error adding to nomenclature: $e');
       devLog('🔍 Stack trace: $stackTrace');
@@ -774,7 +946,8 @@ class ProductStoreSupabase {
   }
 
   /// Удалить продукт из номенклатуры
-  Future<void> removeFromNomenclature(String establishmentId, String productId) async {
+  Future<void> removeFromNomenclature(
+      String establishmentId, String productId) async {
     await _supabase.client
         .from('establishment_products')
         .delete()
@@ -794,10 +967,7 @@ class ProductStoreSupabase {
         .eq('product_id', productId);
 
     // Затем удаляем сам продукт
-    await _supabase.client
-        .from('products')
-        .delete()
-        .eq('id', productId);
+    await _supabase.client.from('products').delete().eq('id', productId);
 
     // Очистить кэш
     _priceCache.removeWhere((key, value) => key.contains(productId));
@@ -813,23 +983,21 @@ class ProductStoreSupabase {
   }
 
   /// Установить цену продукта в номенклатуре заведения
-  Future<void> setEstablishmentPrice(String establishmentId, String productId, double? price, String? currency) async {
-
+  Future<void> setEstablishmentPrice(String establishmentId, String productId,
+      double? price, String? currency) async {
     if (price != null) {
       final oldPrice = getEstablishmentPrice(productId, establishmentId)?.$1;
 
       // upsert — создаёт запись если нет, обновляет если есть
-      await _supabase.client
-          .from('establishment_products')
-          .upsert(
-            {
-              'establishment_id': establishmentId,
-              'product_id': productId,
-              'price': price,
-              'currency': currency,
-            },
-            onConflict: 'establishment_id,product_id',
-          );
+      await _supabase.client.from('establishment_products').upsert(
+        {
+          'establishment_id': establishmentId,
+          'product_id': productId,
+          'price': price,
+          'currency': currency,
+        },
+        onConflict: 'establishment_id,product_id',
+      );
 
       // Записываем в историю изменений (если цена изменилась)
       if (oldPrice == null || (oldPrice - price).abs() > 0.001) {
@@ -862,7 +1030,8 @@ class ProductStoreSupabase {
   /// Использует RPC для быстрого bulk delete (без возврата тысяч строк).
   /// Fallback на прямой DELETE если RPC ещё не применён.
   Future<void> clearAllNomenclature(String establishmentId) async {
-    devLog('🗑️ ProductStore: Clearing all nomenclature for establishment $establishmentId');
+    devLog(
+        '🗑️ ProductStore: Clearing all nomenclature for establishment $establishmentId');
 
     try {
       try {
@@ -884,10 +1053,10 @@ class ProductStoreSupabase {
 
       // Очищаем локальный кэш
       _nomenclatureIds.clear();
-      _priceCache.removeWhere((key, _) => key.startsWith('${establishmentId}_'));
+      _priceCache
+          .removeWhere((key, _) => key.startsWith('${establishmentId}_'));
 
       devLog('✅ ProductStore: All nomenclature cleared successfully');
-
     } catch (e, stackTrace) {
       devLog('❌ ProductStore: Error clearing nomenclature: $e');
       devLog('🔍 Stack trace: $stackTrace');
@@ -907,15 +1076,18 @@ class ProductStoreSupabase {
       }
 
       // ВНИМАНИЕ: Это опасная операция! Удаляем ВСЕ продукты
-      await _supabase.client.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+      await _supabase.client
+          .from('products')
+          .delete()
+          .neq('id', '00000000-0000-0000-0000-000000000000');
 
       // Очищаем локальный кэш
       _allProducts.clear();
       _nomenclatureIds.clear();
       _priceCache.clear();
 
-      devLog('✅ ProductStore: ALL products cleared successfully (DANGER: This removed all products!)');
-
+      devLog(
+          '✅ ProductStore: ALL products cleared successfully (DANGER: This removed all products!)');
     } catch (e, stackTrace) {
       devLog('❌ ProductStore: Error clearing all products: $e');
       devLog('🔍 Stack trace: $stackTrace');
@@ -975,7 +1147,8 @@ class ProductStoreSupabase {
   }
 
   /// Получить все элементы номенклатуры (продукты + ТТК ПФ)
-  Future<List<NomenclatureItem>> getAllNomenclatureItems(String establishmentId, dynamic techCardService) async {
+  Future<List<NomenclatureItem>> getAllNomenclatureItems(
+      String establishmentId, dynamic techCardService) async {
     final products = getNomenclatureProducts(establishmentId);
 
     final items = <NomenclatureItem>[];
@@ -988,7 +1161,8 @@ class ProductStoreSupabase {
   }
 
   /// В номенклатуре ли продукт
-  bool isInNomenclature(String productId) => _nomenclatureIds.contains(productId);
+  bool isInNomenclature(String productId) =>
+      _nomenclatureIds.contains(productId);
 
   /// Получить продукты для конкретного отдела
   Future<void> loadProductsForDepartment(String department) async {
@@ -999,13 +1173,38 @@ class ProductStoreSupabase {
       List<String> departmentCategories = [];
       switch (department) {
         case 'kitchen':
-          departmentCategories = ['meat', 'vegetables', 'dairy', 'grains', 'oils', 'spices'];
+          departmentCategories = [
+            'meat',
+            'vegetables',
+            'dairy',
+            'grains',
+            'oils',
+            'spices'
+          ];
           break;
         case 'bar':
-          departmentCategories = ['soft_drinks', 'juice', 'water', 'beer', 'wine', 'spirits', 'hot_drinks', 'coffee_drinks'];
+          departmentCategories = [
+            'soft_drinks',
+            'juice',
+            'water',
+            'beer',
+            'wine',
+            'spirits',
+            'hot_drinks',
+            'coffee_drinks'
+          ];
           break;
         case 'dining_room':
-          departmentCategories = ['hot_drinks', 'coffee_drinks', 'desserts', 'ice_cream', 'fresh_desserts', 'bread', 'oils', 'spices'];
+          departmentCategories = [
+            'hot_drinks',
+            'coffee_drinks',
+            'desserts',
+            'ice_cream',
+            'fresh_desserts',
+            'bread',
+            'oils',
+            'spices'
+          ];
           break;
       }
 
@@ -1020,16 +1219,14 @@ class ProductStoreSupabase {
           .inFilter('category', departmentCategories)
           .order('name');
 
-      _allProducts = (data as List)
-          .map((json) => Product.fromJson(json))
-          .toList();
+      _allProducts =
+          (data as List).map((json) => Product.fromJson(json)).toList();
 
       _categories = _allProducts
           .map((product) => product.category)
           .toSet()
           .toList()
         ..sort();
-
     } catch (e) {
       // Error loading products for department
     } finally {
@@ -1040,7 +1237,8 @@ class ProductStoreSupabase {
   /// Получить цену продукта для конкретного заведения
   /// Возвращает (price, currency) или null если цена не установлена
   /// Берёт из establishment_products (карточки заведения)
-  (double?, String?)? getEstablishmentPrice(String productId, String? establishmentId) {
+  (double?, String?)? getEstablishmentPrice(
+      String productId, String? establishmentId) {
     if (establishmentId == null) return null;
 
     final cacheKey = '${establishmentId}_$productId';
@@ -1053,7 +1251,8 @@ class ProductStoreSupabase {
   }
 
   /// История изменений цены продукта в номенклатуре заведения
-  Future<List<PriceHistoryEntry>> getPriceHistory(String productId, String establishmentId) async {
+  Future<List<PriceHistoryEntry>> getPriceHistory(
+      String productId, String establishmentId) async {
     try {
       final response = await _supabase.client
           .from('product_price_history')
@@ -1066,10 +1265,14 @@ class ProductStoreSupabase {
       return list.map((e) {
         final m = Map<String, dynamic>.from(e as Map);
         return PriceHistoryEntry(
-          oldPrice: m['old_price'] != null ? (m['old_price'] as num).toDouble() : null,
+          oldPrice: m['old_price'] != null
+              ? (m['old_price'] as num).toDouble()
+              : null,
           newPrice: (m['new_price'] as num?)?.toDouble(),
           currency: m['currency'] as String?,
-          changedAt: m['changed_at'] != null ? DateTime.parse(m['changed_at'] as String) : null,
+          changedAt: m['changed_at'] != null
+              ? DateTime.parse(m['changed_at'] as String)
+              : null,
         );
       }).toList();
     } catch (e) {

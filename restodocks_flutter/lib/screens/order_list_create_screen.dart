@@ -7,7 +7,7 @@ import '../models/models.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
-/// Создание поставщика: наименование поставщика, контакты (почта, телефон, TG, Zalo, WhatsApp).
+/// Создание поставщика: наименование поставщика, контакты (почта, телефон).
 /// Название списка не вводится — используется наименование поставщика.
 class OrderListCreateScreen extends StatefulWidget {
   const OrderListCreateScreen({super.key, this.department = 'kitchen'});
@@ -22,18 +22,12 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
   final _supplierCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
-  final _telegramCtrl = TextEditingController();
-  final _zaloCtrl = TextEditingController();
-  final _whatsappCtrl = TextEditingController();
 
   @override
   void dispose() {
     _supplierCtrl.dispose();
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
-    _telegramCtrl.dispose();
-    _zaloCtrl.dispose();
-    _whatsappCtrl.dispose();
     super.dispose();
   }
 
@@ -51,9 +45,6 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
       supplierName: supplier,
       email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
       phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
-      telegram: _telegramCtrl.text.trim().isEmpty ? null : _telegramCtrl.text.trim(),
-      zalo: _zaloCtrl.text.trim().isEmpty ? null : _zaloCtrl.text.trim(),
-      whatsapp: _whatsappCtrl.text.trim().isEmpty ? null : _whatsappCtrl.text.trim(),
       department: widget.department,
     );
     context.push('/product-order/new/products', extra: draft);
@@ -102,34 +93,6 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
               controller: _phoneCtrl,
               decoration: InputDecoration(
                 labelText: loc.t('order_list_contact_phone'),
-                border: const OutlineInputBorder(),
-                filled: true,
-              ),
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _telegramCtrl,
-              decoration: InputDecoration(
-                labelText: loc.t('order_list_contact_telegram'),
-                border: const OutlineInputBorder(),
-                filled: true,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _zaloCtrl,
-              decoration: InputDecoration(
-                labelText: loc.t('order_list_contact_zalo'),
-                border: const OutlineInputBorder(),
-                filled: true,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _whatsappCtrl,
-              decoration: InputDecoration(
-                labelText: loc.t('order_list_contact_whatsapp'),
                 border: const OutlineInputBorder(),
                 filled: true,
               ),

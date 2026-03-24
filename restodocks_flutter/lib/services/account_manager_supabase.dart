@@ -1,11 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:restodocks/core/supabase_url_resolver_stub.dart'
-    if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart' as supabase_url;
+    if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart'
+    as supabase_url;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import '../utils/dev_log.dart';
+import 'offline_cache_service.dart';
 import 'secure_storage_service.dart';
 import 'supabase_service.dart';
 
@@ -14,9 +16,11 @@ const _keyEstablishmentId = 'restodocks_establishment_id';
 
 const _supabaseAnonKey = String.fromEnvironment(
   'SUPABASE_ANON_KEY',
-  defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE',
+  defaultValue:
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE',
 );
-const _strictLegacyAuthSession = bool.fromEnvironment('AUTH_STRICT_SESSION', defaultValue: true);
+const _strictLegacyAuthSession =
+    bool.fromEnvironment('AUTH_STRICT_SESSION', defaultValue: true);
 const _keyRememberPin = 'restodocks_remember_pin';
 const _keyRememberEmail = 'restodocks_remember_email';
 const _keyRememberPassword = 'restodocks_remember_password';
@@ -26,15 +30,18 @@ String _dateOnly(DateTime d) =>
 
 /// Сервис управления аккаунтами с использованием Supabase
 class AccountManagerSupabase extends ChangeNotifier {
-  static final AccountManagerSupabase _instance = AccountManagerSupabase._internal();
+  static final AccountManagerSupabase _instance =
+      AccountManagerSupabase._internal();
   factory AccountManagerSupabase() => _instance;
   AccountManagerSupabase._internal();
 
   final SupabaseService _supabase = SupabaseService();
   final SecureStorageService _secureStorage = SecureStorageService();
+  final OfflineCacheService _offlineCache = OfflineCacheService();
   Establishment? _establishment;
   Employee? _currentEmployee;
   bool _initialized = false;
+
   /// Callback вызывается после загрузки профиля — применяет preferred_language к LocalizationService.
   void Function(String languageCode)? onPreferredLanguageLoaded;
 
@@ -59,7 +66,9 @@ class AccountManagerSupabase extends ChangeNotifier {
   String get preferredLanguage => _currentEmployee?.preferredLanguage ?? 'ru';
 
   /// Есть ли PRO подписка
-  bool get hasProSubscription => _establishment?.subscriptionType == 'pro' || _establishment?.subscriptionType == 'premium';
+  bool get hasProSubscription =>
+      _establishment?.subscriptionType == 'pro' ||
+      _establishment?.subscriptionType == 'premium';
 
   /// Co-owner с view_only: только просмотр (при >1 заведении у пригласившего)
   bool get isViewOnlyOwner => _currentEmployee?.isViewOnlyOwner ?? false;
@@ -82,7 +91,10 @@ class AccountManagerSupabase extends ChangeNotifier {
     await _secureStorage.initialize();
 
     await _tryRestoreSession();
-    if (isLoggedInSync) { _initialized = true; return; }
+    if (isLoggedInSync) {
+      _initialized = true;
+      return;
+    }
 
     // Retry: при hard refresh Supabase Auth может ещё не успеть прочитать localStorage.
     await Future.delayed(const Duration(milliseconds: 400));
@@ -96,14 +108,17 @@ class AccountManagerSupabase extends ChangeNotifier {
   Future<void> _tryRestoreSession() async {
     final employeeId = await _secureStorage.get(_keyEmployeeId);
     final establishmentId = await _secureStorage.get(_keyEstablishmentId);
-    devLog('🔐 AccountManager: Storage - employee: $employeeId, establishment: $establishmentId, auth: ${_supabase.isAuthenticated}');
+    devLog(
+        '🔐 AccountManager: Storage - employee: $employeeId, establishment: $establishmentId, auth: ${_supabase.isAuthenticated}');
 
     // 1. Сначала проверяем Supabase Auth — приоритет для пользователей с auth
     if (_supabase.isAuthenticated) {
-      devLog('🔐 AccountManager: Supabase Auth session found, loading user data...');
+      devLog(
+          '🔐 AccountManager: Supabase Auth session found, loading user data...');
       final ok = await _loadCurrentUserFromAuth();
       if (ok) {
-        devLog('🔐 AccountManager: User data loaded from Auth, logged in: $isLoggedInSync');
+        devLog(
+            '🔐 AccountManager: User data loaded from Auth, logged in: $isLoggedInSync');
         await _checkPromoAccess();
         return;
       }
@@ -128,7 +143,8 @@ class AccountManagerSupabase extends ChangeNotifier {
         params: {'p_establishment_id': estId},
       );
       if (result == 'expired') {
-        devLog('🔐 AccountManager: Promo code expired for establishment $estId — logging out');
+        devLog(
+            '🔐 AccountManager: Promo code expired for establishment $estId — logging out');
         await logout();
       }
     } catch (e) {
@@ -137,7 +153,8 @@ class AccountManagerSupabase extends ChangeNotifier {
     }
   }
 
-  Future<void> _restoreSession(String employeeId, String establishmentId) async {
+  Future<void> _restoreSession(
+      String employeeId, String establishmentId) async {
     try {
       devLog('🔐 AccountManager: Loading employee data for ID: $employeeId');
       final employeeDataRaw = await _supabase.client
@@ -154,7 +171,8 @@ class AccountManagerSupabase extends ChangeNotifier {
       _currentEmployee = Employee.fromJson(empData);
       onPreferredLanguageLoaded?.call(_currentEmployee!.preferredLanguage);
 
-      devLog('🔐 AccountManager: Loading establishment data for ID: $establishmentId');
+      devLog(
+          '🔐 AccountManager: Loading establishment data for ID: $establishmentId');
       final estData = await _supabase.client
           .from('establishments')
           .select()
@@ -204,7 +222,10 @@ class AccountManagerSupabase extends ChangeNotifier {
       final data = await _supabase.client.rpc('get_establishments_for_owner');
       if (data == null) return [];
       final list = data as List;
-      return list.map((e) => Establishment.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+      return list
+          .map((e) =>
+              Establishment.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
     } catch (e) {
       devLog('AccountManager: getEstablishmentsForOwner error: $e');
       return [];
@@ -237,13 +258,15 @@ class AccountManagerSupabase extends ChangeNotifier {
     );
     final response = Map<String, dynamic>.from(raw as Map);
     response['owner_id'] = response['owner_id']?.toString() ?? '';
-    response['parent_establishment_id'] = response['parent_establishment_id']?.toString();
+    response['parent_establishment_id'] =
+        response['parent_establishment_id']?.toString();
     final created = Establishment.fromJson(response);
     return created;
   }
 
   /// Филиалы заведения (для шефа — фильтр ТТК по филиалам)
-  Future<List<Establishment>> getBranchesForEstablishment(String establishmentId) async {
+  Future<List<Establishment>> getBranchesForEstablishment(
+      String establishmentId) async {
     try {
       final data = await _supabase.client.rpc(
         'get_branches_for_establishment',
@@ -251,7 +274,10 @@ class AccountManagerSupabase extends ChangeNotifier {
       );
       if (data == null) return [];
       final list = data as List;
-      return list.map((e) => Establishment.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+      return list
+          .map((e) =>
+              Establishment.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
     } catch (e) {
       devLog('AccountManager: getBranchesForEstablishment error: $e');
       return [];
@@ -316,7 +342,8 @@ class AccountManagerSupabase extends ChangeNotifier {
       },
     );
     final raw = res as Map<String, dynamic>?;
-    if (raw == null) throw Exception('register_company_with_promo returned null');
+    if (raw == null)
+      throw Exception('register_company_with_promo returned null');
     final m = Map<String, dynamic>.from(raw);
     m['owner_id'] = m['owner_id']?.toString() ?? '';
     final est = Establishment.fromJson(m);
@@ -360,7 +387,8 @@ class AccountManagerSupabase extends ChangeNotifier {
   }
 
   /// Проверка: занят ли email в данном заведении (чтобы исключить дубли)
-  Future<bool> isEmailTakenInEstablishment(String email, String establishmentId) async {
+  Future<bool> isEmailTakenInEstablishment(
+      String email, String establishmentId) async {
     try {
       final list = await _supabase.client
           .from('employees')
@@ -412,7 +440,8 @@ class AccountManagerSupabase extends ChangeNotifier {
     await _supabase.insertData('co_owner_invitations', invitationData);
 
     // Отправка email с ссылкой (здесь должна быть интеграция с email сервисом)
-    final invitationLink = 'https://yourapp.com/accept-co-owner-invitation?token=$token';
+    final invitationLink =
+        'https://yourapp.com/accept-co-owner-invitation?token=$token';
     devLog('Invitation link: $invitationLink'); // Временно выводим в консоль
 
     // TODO: Интегрировать с email сервисом для отправки приглашения
@@ -453,7 +482,8 @@ class AccountManagerSupabase extends ChangeNotifier {
     DateTime? birthday,
   }) async {
     if (authUserId == null || authUserId.isEmpty) {
-      throw Exception('employees.id = auth.users.id — требуется authUserId от signUp');
+      throw Exception(
+          'employees.id = auth.users.id — требуется authUserId от signUp');
     }
 
     // Владелец — через create_owner_employee (вызов без сессии после Confirm Email)
@@ -473,7 +503,8 @@ class AccountManagerSupabase extends ChangeNotifier {
     // Владелец добавляет другого человека → create_employee_for_company (caller = owner).
     // Саморегистрация (RegisterScreen с PIN): create_employee_self_register.
     // Признаки саморегистрации: auth.uid() == p_auth_user_id ИЛИ нет загруженного owner (isLoggedInSync).
-    final isSelfRegistration = _supabase.currentUser?.id == authUserId || !isLoggedInSync;
+    final isSelfRegistration =
+        _supabase.currentUser?.id == authUserId || !isLoggedInSync;
     final rpcName = (_supabase.isAuthenticated && !isSelfRegistration)
         ? 'create_employee_for_company'
         : 'create_employee_self_register';
@@ -499,7 +530,8 @@ class AccountManagerSupabase extends ChangeNotifier {
   }
 
   /// Регистрация в Supabase Auth (для сотрудников). Возвращает (userId, hasSession).
-  Future<({String? userId, bool hasSession})> signUpToSupabaseAuth(String email, String password) async {
+  Future<({String? userId, bool hasSession})> signUpToSupabaseAuth(
+      String email, String password) async {
     final emailTrim = email.trim();
     devLog('DEBUG: signUpToSupabaseAuth called with email: $emailTrim');
 
@@ -508,8 +540,12 @@ class AccountManagerSupabase extends ChangeNotifier {
       devLog('DEBUG: Attempting signIn first...');
       final signInRes = await _supabase.signInWithEmail(emailTrim, password);
       if (_supabase.currentUser != null) {
-        devLog('DEBUG: User already exists, signed in: ${_supabase.currentUser!.id}');
-        return (userId: _supabase.currentUser!.id, hasSession: signInRes.session != null);
+        devLog(
+            'DEBUG: User already exists, signed in: ${_supabase.currentUser!.id}');
+        return (
+          userId: _supabase.currentUser!.id,
+          hasSession: signInRes.session != null
+        );
       }
     } catch (signInError) {
       devLog('DEBUG: signIn failed: $signInError');
@@ -520,7 +556,8 @@ class AccountManagerSupabase extends ChangeNotifier {
     try {
       devLog('DEBUG: Attempting signUp...');
       final redirectUrl = _getEmailRedirectUrl();
-      final res = await _supabase.signUpWithEmail(emailTrim, password, emailRedirectTo: redirectUrl);
+      final res = await _supabase.signUpWithEmail(emailTrim, password,
+          emailRedirectTo: redirectUrl);
       final uid = res.user?.id ?? _supabase.currentUser?.id;
       final hasSession = res.session != null;
       devLog('DEBUG: signUp completed, userId: $uid, hasSession: $hasSession');
@@ -529,12 +566,18 @@ class AccountManagerSupabase extends ChangeNotifier {
       devLog('DEBUG: signUpWithEmail failed: $signUpError');
 
       // Если signUp тоже не удался из-за "user already exists", попробуем войти еще раз
-      if (signUpError.toString().contains('already') || signUpError.toString().contains('exists')) {
+      if (signUpError.toString().contains('already') ||
+          signUpError.toString().contains('exists')) {
         try {
-          devLog('DEBUG: signUp failed with "already exists", trying signIn again...');
-          final signInRes = await _supabase.signInWithEmail(emailTrim, password);
+          devLog(
+              'DEBUG: signUp failed with "already exists", trying signIn again...');
+          final signInRes =
+              await _supabase.signInWithEmail(emailTrim, password);
           if (_supabase.currentUser != null) {
-            return (userId: _supabase.currentUser!.id, hasSession: signInRes.session != null);
+            return (
+              userId: _supabase.currentUser!.id,
+              hasSession: signInRes.session != null
+            );
           }
         } catch (finalSignInError) {
           devLog('DEBUG: Final signIn also failed: $finalSignInError');
@@ -553,7 +596,8 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// Регистрация владельца в Supabase Auth (employees.id = auth.users.id — создаём auth первым)
   /// Возвращает (auth user id, есть ли сессия).
   /// При Confirm Email session = null — пользователь должен подтвердить почту.
-  Future<({String? userId, bool hasSession})> signUpWithEmailForOwner(String email, String password) async {
+  Future<({String? userId, bool hasSession})> signUpWithEmailForOwner(
+      String email, String password) async {
     final res = await _supabase.signUpWithEmail(
       email.trim(),
       password,
@@ -587,9 +631,11 @@ class AccountManagerSupabase extends ChangeNotifier {
   }
 
   /// Завершить регистрацию владельца (authenticated, после confirm). Возвращает null если pending нет.
-  Future<({Employee employee, Establishment establishment})?> completePendingOwnerRegistration() async {
+  Future<({Employee employee, Establishment establishment})?>
+      completePendingOwnerRegistration() async {
     if (!_supabase.isAuthenticated) return null;
-    final res = await _supabase.client.rpc('complete_pending_owner_registration');
+    final res =
+        await _supabase.client.rpc('complete_pending_owner_registration');
     if (res == null) return null;
     final m = Map<String, dynamic>.from(res as Map);
     final emp = m['employee'];
@@ -605,12 +651,14 @@ class AccountManagerSupabase extends ChangeNotifier {
   }
 
   /// Fallback: создать employee для auth user через fix_owner_without_employee (когда complete_pending не сработал).
-  Future<({Employee employee, Establishment establishment})?> _tryFixOwnerWithoutEmployee() async {
+  Future<({Employee employee, Establishment establishment})?>
+      _tryFixOwnerWithoutEmployee() async {
     if (!_supabase.isAuthenticated) return null;
     final email = _supabase.currentUser?.email?.trim();
     if (email == null || email.isEmpty) return null;
     try {
-      final res = await _supabase.client.rpc('fix_owner_without_employee', params: {'p_email': email});
+      final res = await _supabase.client
+          .rpc('fix_owner_without_employee', params: {'p_email': email});
       if (res == null) return null;
       final empData = Map<String, dynamic>.from(res as Map);
       empData['password'] = '';
@@ -650,8 +698,10 @@ class AccountManagerSupabase extends ChangeNotifier {
       'p_email': email,
       'p_roles': roles,
     };
-    if (ownerAccessLevel != null) params['p_owner_access_level'] = ownerAccessLevel;
-    final res = await _supabase.client.rpc('create_owner_employee', params: params);
+    if (ownerAccessLevel != null)
+      params['p_owner_access_level'] = ownerAccessLevel;
+    final res =
+        await _supabase.client.rpc('create_owner_employee', params: params);
     final data = Map<String, dynamic>.from(res as Map);
     data['password'] = '';
     data['password_hash'] = '';
@@ -660,7 +710,8 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Вход по email и паролю: сначала Supabase Auth, затем legacy fallback (Edge Function).
   /// Это убирает ложные 401 от legacy для аккаунтов, уже привязанных к auth.users.
-  Future<({Employee employee, Establishment establishment})?> findEmployeeByEmailAndPasswordGlobal({
+  Future<({Employee employee, Establishment establishment})?>
+      findEmployeeByEmailAndPasswordGlobal({
     required String email,
     required String password,
   }) async {
@@ -696,7 +747,9 @@ class AccountManagerSupabase extends ChangeNotifier {
         }
 
         try {
-          final fixRes = await _supabase.client.rpc('fix_owner_without_employee', params: {'p_email': emailTrim});
+          final fixRes = await _supabase.client.rpc(
+              'fix_owner_without_employee',
+              params: {'p_email': emailTrim});
           if (fixRes != null) {
             final empData = Map<String, dynamic>.from(fixRes as Map);
             empData['password'] = empData['password_hash'] ?? '';
@@ -718,36 +771,47 @@ class AccountManagerSupabase extends ChangeNotifier {
         throw Exception('employee_not_found');
       }
     } catch (authErr) {
-      if (authErr is Exception && authErr.toString().contains('employee_not_found')) {
+      if (authErr is Exception &&
+          authErr.toString().contains('employee_not_found')) {
         rethrow;
       }
       // Логируем всегда — иначе в prod (kDebugMode=false) не увидим причину
-      lastLoginError = 'Auth: ${authErr.toString().replaceAll(RegExp(r'\s+'), ' ')}';
+      lastLoginError =
+          'Auth: ${authErr.toString().replaceAll(RegExp(r'\s+'), ' ')}';
       devLog('🔐 Login: Supabase Auth failed: $authErr');
       if (authErr.toString().contains('Invalid login credentials')) {
-        devLog('🔐 Login: (Invalid credentials → пробуем legacy authenticate-employee)');
-      } else if (authErr.toString().toLowerCase().contains('cors') || authErr.toString().toLowerCase().contains('network')) {
-        devLog('🔐 Login: (CORS/сеть? Добавь restodocks.com в Supabase Auth Redirect URLs и API CORS)');
+        devLog(
+            '🔐 Login: (Invalid credentials → пробуем legacy authenticate-employee)');
+      } else if (authErr.toString().toLowerCase().contains('cors') ||
+          authErr.toString().toLowerCase().contains('network')) {
+        devLog(
+            '🔐 Login: (CORS/сеть? Добавь restodocks.com в Supabase Auth Redirect URLs и API CORS)');
       }
       try {
         await _supabase.signOut();
-      } catch (_) { /* ignore */ }
+      } catch (_) {/* ignore */}
     }
 
     // 2. Legacy: password_hash через Edge Function (employees без auth.users)
-    return _findEmployeeByPasswordHashViaEdgeFunction(emailTrim, passwordTrimmed);
+    return _findEmployeeByPasswordHashViaEdgeFunction(
+        emailTrim, passwordTrimmed);
   }
 
   /// Вызов Edge Function authenticate-employee через raw HTTP (обход Safari cross-origin
   /// POST body issues с supabase functions.invoke — body иногда не уходит).
   /// Retry при 401/5xx/сети — proxy/маршрутизация может обрывать первый запрос.
-  Future<({int status, Map<String, dynamic>? data})> _invokeAuthenticateEmployeeHttp(
+  Future<({int status, Map<String, dynamic>? data})>
+      _invokeAuthenticateEmployeeHttp(
     Map<String, dynamic> body,
   ) async {
     const maxRetries = 3;
-    const retryDelays = [600, 1200]; // ms, увеличенные задержки при proxy/маршрутизации
+    const retryDelays = [
+      600,
+      1200
+    ]; // ms, увеличенные задержки при proxy/маршрутизации
 
-    final url = '${supabase_url.getSupabaseBaseUrl()}/functions/v1/authenticate-employee';
+    final url =
+        '${supabase_url.getSupabaseBaseUrl()}/functions/v1/authenticate-employee';
     final dio = Dio(BaseOptions(
       headers: {
         'apikey': _supabaseAnonKey,
@@ -757,26 +821,34 @@ class AccountManagerSupabase extends ChangeNotifier {
       validateStatus: (_) => true, // не бросать на 4xx
     ));
 
-    ({int status, Map<String, dynamic>? data}) lastResult = (status: 0, data: null);
+    ({int status, Map<String, dynamic>? data}) lastResult =
+        (status: 0, data: null);
 
     for (var attempt = 0; attempt < maxRetries; attempt++) {
       if (attempt > 0) {
-        await Future<void>.delayed(Duration(milliseconds: retryDelays[attempt - 1]));
+        await Future<void>.delayed(
+            Duration(milliseconds: retryDelays[attempt - 1]));
         devLog('🔐 authenticate-employee retry $attempt/$maxRetries');
       }
       try {
         final resp = await dio.post(url, data: body);
         final data = resp.data is Map<String, dynamic>
             ? resp.data as Map<String, dynamic>
-            : (resp.data is Map ? Map<String, dynamic>.from(resp.data as Map) : null);
+            : (resp.data is Map
+                ? Map<String, dynamic>.from(resp.data as Map)
+                : null);
         lastResult = (status: resp.statusCode ?? 0, data: data);
 
         // 4xx — бизнес-ответ. Не retry, чтобы не маскировать неверные креды.
-        if (resp.statusCode != null && resp.statusCode! >= 400 && resp.statusCode! < 500) {
+        if (resp.statusCode != null &&
+            resp.statusCode! >= 400 &&
+            resp.statusCode! < 500) {
           return lastResult;
         }
         // 2xx — успех
-        if (resp.statusCode != null && resp.statusCode! >= 200 && resp.statusCode! < 300) {
+        if (resp.statusCode != null &&
+            resp.statusCode! >= 200 &&
+            resp.statusCode! < 300) {
           return lastResult;
         }
         // 5xx — retry
@@ -795,13 +867,15 @@ class AccountManagerSupabase extends ChangeNotifier {
     return lastResult;
   }
 
-  Future<bool> _ensureSupabaseSessionAfterLegacy(String email, String password) async {
+  Future<bool> _ensureSupabaseSessionAfterLegacy(
+      String email, String password) async {
     const maxAttempts = 3;
     const retryDelays = [350, 900];
 
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       if (attempt > 0) {
-        await Future<void>.delayed(Duration(milliseconds: retryDelays[attempt - 1]));
+        await Future<void>.delayed(
+            Duration(milliseconds: retryDelays[attempt - 1]));
         devLog('🔐 Legacy->Auth session retry $attempt/$maxAttempts');
       }
       try {
@@ -818,17 +892,21 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Legacy: BCrypt-проверка пароля через Edge Function authenticate-employee.
   /// password_hash никогда не покидает сервер — клиент получает только данные сотрудника.
-  Future<({Employee employee, Establishment establishment})?> _findEmployeeByPasswordHashViaEdgeFunction(
+  Future<({Employee employee, Establishment establishment})?>
+      _findEmployeeByPasswordHashViaEdgeFunction(
     String email,
     String password,
   ) async {
     try {
-      devLog('🔐 Login: Legacy fallback — calling authenticate-employee (HTTP)');
+      devLog(
+          '🔐 Login: Legacy fallback — calling authenticate-employee (HTTP)');
 
-      final res = await _invokeAuthenticateEmployeeHttp({'email': email, 'password': password});
+      final res = await _invokeAuthenticateEmployeeHttp(
+          {'email': email, 'password': password});
 
       if (res.status == 401) {
-        lastLoginError = (lastLoginError != null ? '$lastLoginError → ' : '') + 'Legacy: 401 invalid credentials';
+        lastLoginError = (lastLoginError != null ? '$lastLoginError → ' : '') +
+            'Legacy: 401 invalid credentials';
         devLog('🔐 Login: Legacy — invalid credentials (401)');
         return null;
       }
@@ -839,8 +917,10 @@ class AccountManagerSupabase extends ChangeNotifier {
           final d = res.data as Map;
           msg = (d['message'] ?? d['error'] ?? msg).toString();
         }
-        lastLoginError = (lastLoginError != null ? '$lastLoginError → ' : '') + msg;
-        devLog('🔐 Login: Legacy — Edge Function error: ${res.status}, data=${res.data}');
+        lastLoginError =
+            (lastLoginError != null ? '$lastLoginError → ' : '') + msg;
+        devLog(
+            '🔐 Login: Legacy — Edge Function error: ${res.status}, data=${res.data}');
         return null;
       }
 
@@ -860,17 +940,23 @@ class AccountManagerSupabase extends ChangeNotifier {
       empData['password'] = '';
       empData['password_hash'] = '';
       final employee = Employee.fromJson(empData);
-      final establishment = Establishment.fromJson(Map<String, dynamic>.from(estRaw as Map));
+      final establishment =
+          Establishment.fromJson(Map<String, dynamic>.from(estRaw as Map));
 
       // После legacy-входа всегда пытаемся поднять Supabase Auth session (JWT для RLS).
       final needsAuthSession = data['authUserCreated'] == true;
       if (needsAuthSession) {
-        final sessionReady = await _ensureSupabaseSessionAfterLegacy(email, password);
+        final sessionReady =
+            await _ensureSupabaseSessionAfterLegacy(email, password);
         if (sessionReady) {
-          devLog('🔐 Login: Legacy → Supabase Auth session established for ${employee.email}');
+          devLog(
+              '🔐 Login: Legacy → Supabase Auth session established for ${employee.email}');
         } else {
-          lastLoginError = (lastLoginError != null ? '$lastLoginError → ' : '') + 'Legacy: session_not_ready';
-          devLog('🔐 Login: Legacy authenticated, but Auth session was not established');
+          lastLoginError =
+              (lastLoginError != null ? '$lastLoginError → ' : '') +
+                  'Legacy: session_not_ready';
+          devLog(
+              '🔐 Login: Legacy authenticated, but Auth session was not established');
           if (_strictLegacyAuthSession) {
             return null;
           }
@@ -880,7 +966,8 @@ class AccountManagerSupabase extends ChangeNotifier {
       devLog('🔐 Login: Legacy — success for ${employee.email}');
       return (employee: employee, establishment: establishment);
     } catch (e, st) {
-      lastLoginError = (lastLoginError != null ? '$lastLoginError → ' : '') + 'Legacy exception: $e';
+      lastLoginError = (lastLoginError != null ? '$lastLoginError → ' : '') +
+          'Legacy exception: $e';
       devLog('🔐 Login: Legacy Edge Function threw: $e');
       rethrow;
     }
@@ -927,7 +1014,8 @@ class AccountManagerSupabase extends ChangeNotifier {
     String? email,
     String? password,
   }) async {
-    devLog('🔐 AccountManager: Setting current user - employee: ${employee.id}, establishment: ${establishment.id}');
+    devLog(
+        '🔐 AccountManager: Setting current user - employee: ${employee.id}, establishment: ${establishment.id}');
     _currentEmployee = employee;
     _establishment = establishment;
     onPreferredLanguageLoaded?.call(employee.preferredLanguage);
@@ -947,7 +1035,8 @@ class AccountManagerSupabase extends ChangeNotifier {
   }
 
   /// Загрузить сохранённые учётные данные (для автозаполнения формы входа)
-  Future<({String? pin, String? email, String? password})> loadRememberedCredentials() async {
+  Future<({String? pin, String? email, String? password})>
+      loadRememberedCredentials() async {
     await _secureStorage.initialize();
     final pin = await _secureStorage.get(_keyRememberPin);
     final email = await _secureStorage.get(_keyRememberEmail);
@@ -957,6 +1046,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Выход из системы
   Future<void> logout() async {
+    await _offlineCache.clearCurrentUserCache();
     await _supabase.signOut();
     await _clearStoredSession();
     _currentEmployee = null;
@@ -969,7 +1059,8 @@ class AccountManagerSupabase extends ChangeNotifier {
   }
 
   /// Получить всех сотрудников компании
-  Future<List<Employee>> getEmployeesForEstablishment(String establishmentId) async {
+  Future<List<Employee>> getEmployeesForEstablishment(
+      String establishmentId) async {
     try {
       final data = await _supabase.client
           .from('employees')
@@ -985,7 +1076,8 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Шеф-повара/су-шеф/владельцы заведения (для инвентаризации: кабинет + email).
   /// Приоритет: executive_chef, sous_chef, owner — чтобы хотя бы один получатель был.
-  Future<List<Employee>> getExecutiveChefsForEstablishment(String establishmentId) async {
+  Future<List<Employee>> getExecutiveChefsForEstablishment(
+      String establishmentId) async {
     try {
       final data = await _supabase.client
           .from('employees')
@@ -993,10 +1085,13 @@ class AccountManagerSupabase extends ChangeNotifier {
           .eq('establishment_id', establishmentId)
           .eq('is_active', true);
 
-      final all = (data as List).map((json) => Employee.fromJson(json)).toList();
-      final execChefs = all.where((e) => e.roles.contains('executive_chef')).toList();
+      final all =
+          (data as List).map((json) => Employee.fromJson(json)).toList();
+      final execChefs =
+          all.where((e) => e.roles.contains('executive_chef')).toList();
       if (execChefs.isNotEmpty) return execChefs;
-      final sousChefs = all.where((e) => e.roles.contains('sous_chef')).toList();
+      final sousChefs =
+          all.where((e) => e.roles.contains('sous_chef')).toList();
       if (sousChefs.isNotEmpty) return sousChefs;
       final owners = all.where((e) => e.roles.contains('owner')).toList();
       return owners;
@@ -1030,9 +1125,11 @@ class AccountManagerSupabase extends ChangeNotifier {
         } catch (e) {
           final before = employeeData.length;
           if (_isBirthdayColumnError(e)) {
-            employeeData = Map<String, dynamic>.from(employeeData)..remove('birthday');
+            employeeData = Map<String, dynamic>.from(employeeData)
+              ..remove('birthday');
           } else if (_isSchemaColumnError(e)) {
-            employeeData = Map<String, dynamic>.from(employeeData)..remove('can_edit_own_schedule');
+            employeeData = Map<String, dynamic>.from(employeeData)
+              ..remove('can_edit_own_schedule');
           } else if (_isPaymentColumnError(e)) {
             employeeData = Map<String, dynamic>.from(employeeData)
               ..remove('payment_type')
@@ -1068,10 +1165,7 @@ class AccountManagerSupabase extends ChangeNotifier {
   Future<void> deleteEmployee(String employeeId) async {
     try {
       devLog('🗑️ AccountManager: Deleting employee $employeeId...');
-      await _supabase.client
-          .from('employees')
-          .delete()
-          .eq('id', employeeId);
+      await _supabase.client.from('employees').delete().eq('id', employeeId);
       devLog('✅ AccountManager: Employee deleted successfully');
     } catch (e) {
       devLog('❌ AccountManager: Failed to delete employee: $e');
@@ -1106,7 +1200,10 @@ class AccountManagerSupabase extends ChangeNotifier {
         msg.contains('rate_per_shift') ||
         msg.contains('hourly_rate') ||
         msg.contains('pgrst204') ||
-        (msg.contains('column') && (msg.contains('exist') || msg.contains('found') || msg.contains('does not')));
+        (msg.contains('column') &&
+            (msg.contains('exist') ||
+                msg.contains('found') ||
+                msg.contains('does not')));
   }
 
   bool _isEmploymentColumnError(Object e) {
@@ -1192,8 +1289,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     try {
       await _supabase.client
           .from('employees')
-          .update({'preferred_language': languageCode})
-          .eq('id', emp.id);
+          .update({'preferred_language': languageCode}).eq('id', emp.id);
       _currentEmployee = emp.copyWith(preferredLanguage: languageCode);
     } catch (e) {
       devLog('AccountManager: savePreferredLanguage error: $e');

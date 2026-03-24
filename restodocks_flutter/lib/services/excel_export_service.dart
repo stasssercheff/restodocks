@@ -1,7 +1,8 @@
 import 'dart:typed_data';
-import 'dart:html' as html;
 import 'package:excel/excel.dart' hide Border;
 import '../models/models.dart';
+import 'excel_file_saver_stub.dart'
+    if (dart.library.html) 'excel_file_saver_web.dart' as file_saver;
 
 /// Сервис для экспорта технологических карт в Excel файлы
 class ExcelExportService {
@@ -245,13 +246,7 @@ class ExcelExportService {
   void _saveExcelFile(Excel excel, String fileName) {
     final bytes = excel.encode();
     if (bytes == null) return;
-
-    final blob = html.Blob([bytes]);
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.AnchorElement(href: url)
-      ..setAttribute('download', fileName)
-      ..click();
-    html.Url.revokeObjectUrl(url);
+    file_saver.saveExcelBytes(Uint8List.fromList(bytes), fileName);
   }
 
   /// Получение названия категории на русском

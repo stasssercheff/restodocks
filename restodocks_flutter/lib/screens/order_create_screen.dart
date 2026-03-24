@@ -8,6 +8,7 @@ import '../models/models.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/order_export_sheet.dart';
+import '../widgets/supplier_contact_links.dart';
 
 /// Экран создания заказа:
 /// 1. Название заказа
@@ -668,11 +669,8 @@ class _SupplierSelector extends StatelessWidget {
       );
     }
 
-    final contacts = [
-      selected!.email,
-      selected!.phone,
-      selected!.telegram,
-    ].where((v) => v != null && v.isNotEmpty).join(' · ');
+    final hasEmail = (selected!.email ?? '').trim().isNotEmpty;
+    final hasPhone = (selected!.phone ?? '').trim().isNotEmpty;
 
     return Card(
       child: ListTile(
@@ -683,7 +681,14 @@ class _SupplierSelector extends StatelessWidget {
         ),
         title: Text(selected!.supplierName,
             style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: contacts.isNotEmpty ? Text(contacts) : null,
+        subtitle: (hasEmail || hasPhone)
+            ? SupplierContactLinks(
+                email: hasEmail ? selected!.email : null,
+                phone: hasPhone ? selected!.phone : null,
+                linkColor: Theme.of(context).colorScheme.primary,
+                inline: true,
+              )
+            : null,
         trailing: TextButton(
           onPressed: () => _showPicker(context),
           child: Text(loc.t('change') ?? 'Изменить'),
