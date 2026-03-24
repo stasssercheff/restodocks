@@ -28,13 +28,10 @@ class _AcceptCoOwnerInvitationScreenState extends State<AcceptCoOwnerInvitationS
   Future<void> _loadInvitation() async {
     try {
       final accountManager = context.read<AccountManagerSupabase>();
-      final invitation = await accountManager.supabase.client
-          .from('co_owner_invitations')
-          .select('*, establishments(name)')
-          .eq('invitation_token', widget.token)
-          .eq('status', 'pending')
-          .gt('expires_at', DateTime.now().toIso8601String())
-          .single();
+      final invitation = await accountManager.supabase.client.rpc(
+        'get_co_owner_invitation_by_token',
+        params: {'p_token': widget.token},
+      );
 
       if (invitation == null) {
         setState(() {
@@ -64,11 +61,11 @@ class _AcceptCoOwnerInvitationScreenState extends State<AcceptCoOwnerInvitationS
     try {
       final accountManager = context.read<AccountManagerSupabase>();
 
-      // Обновляем статус приглашения (сотрудник создаётся на экране регистрации с id = auth.uid())
-      await accountManager.supabase.client
-          .from('co_owner_invitations')
-          .update({'status': 'accepted', 'updated_at': DateTime.now().toIso8601String()})
-          .eq('invitation_token', widget.token);
+      // Принимаем приглашение через защищенный RPC (без прямого UPDATE таблицы).
+      await accountManager.supabase.client.rpc(
+        'accept_co_owner_invitation',
+        params: {'p_token': widget.token},
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

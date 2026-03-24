@@ -1,3 +1,5 @@
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
 type RateLimitOptions = {
   windowMs: number;
   maxRequests: number;
@@ -33,7 +35,7 @@ export function resolveCorsHeaders(req: Request): Record<string, string> {
   if (!requestOrigin) {
     return {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
       "Access-Control-Allow-Headers":
         "authorization, x-client-info, apikey, content-type",
     };
@@ -42,7 +44,7 @@ export function resolveCorsHeaders(req: Request): Record<string, string> {
   const allowed = allowlist.some((rule) => matchesOriginRule(requestOrigin, rule));
   return {
     "Access-Control-Allow-Origin": allowed ? requestOrigin : "null",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers":
       "authorization, x-client-info, apikey, content-type",
   };
@@ -96,9 +98,30 @@ export function enforceRateLimit(
 export function hasValidApiKey(req: Request): boolean {
   const apiKey = req.headers.get("apikey")?.trim();
   if (!apiKey) return false;
-  const anon = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
   const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
-  if (anon && apiKey === anon) return true;
   if (service && apiKey === service) return true;
   return false;
+}
+
+export async function hasValidApiKeyOrUser(req: Request): Promise<boolean> {
+  if (hasValidApiKey(req)) return true;
+
+  const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return false;
+  const token = authHeader.slice("Bearer ".length).trim();
+  if (!token) return false;
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
+  if (!supabaseUrl || !anonKey) return false;
+
+  try {
+    const authClient = createClient(supabaseUrl, anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await authClient.auth.getUser(token);
+    return !error && !!data.user;
+  } catch {
+    return false;
+  }
 }

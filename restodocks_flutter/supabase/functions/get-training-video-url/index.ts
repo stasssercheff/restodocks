@@ -7,6 +7,7 @@
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { enforceRateLimit, hasValidApiKeyOrUser, resolveCorsHeaders } from "../_shared/security.ts";
 
 const BUCKET = "training_videos";
 const SIGNED_URL_EXPIRES_SEC = 3600; // 1 час
@@ -62,11 +63,19 @@ async function getCountryCode(ip: string): Promise<string | null> {
 }
 
 Deno.serve(async (req) => {
+  const cors = resolveCorsHeaders(req);
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" } });
+    return new Response(null, { headers: cors });
   }
-
-  const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type" };
+  if (req.method !== "GET") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: { ...cors, "Content-Type": "application/json" } });
+  }
+  if (!(await hasValidApiKeyOrUser(req))) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
+  }
+  if (!enforceRateLimit(req, "get-training-video-url", { windowMs: 60_000, maxRequests: 60 })) {
+    return new Response(JSON.stringify({ error: "Too many requests" }), { status: 429, headers: { ...cors, "Content-Type": "application/json" } });
+  }
 
   try {
     const url = new URL(req.url);

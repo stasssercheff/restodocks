@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { enforceRateLimit, hasValidApiKeyOrUser, resolveCorsHeaders } from "../_shared/security.ts";
 
 const DEEPL_URL = "https://api-free.deepl.com/v2/translate";
 const DEEPL_USAGE_URL = "https://api-free.deepl.com/v2/usage";
@@ -21,12 +22,28 @@ function jsonResponse(data: unknown, status = 200, origin: string | null = null)
 
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get("Origin");
+  const cors = resolveCorsHeaders(req);
 
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders(origin) });
+    return new Response(null, { headers: cors });
   }
   if (req.method !== "POST") {
-    return jsonResponse({ error: "Method not allowed" }, 405, origin);
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+  if (!(await hasValidApiKeyOrUser(req))) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+  if (!enforceRateLimit(req, "translate-text", { windowMs: 60_000, maxRequests: 60 })) {
+    return new Response(JSON.stringify({ error: "Too many requests" }), {
+      status: 429,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
   }
 
   const deeplKey = Deno.env.get("DEEPL_API_KEY")?.trim();

@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { enforceRateLimit, hasValidApiKeyOrUser, resolveCorsHeaders } from "../_shared/security.ts";
 
 const DEEPL_URL = "https://api-free.deepl.com/v2/translate";
 const SUPPORTED_LANGS = ["ru", "en", "es", "tr", "vi"];
@@ -101,9 +102,14 @@ async function translateWithMyMemory(text: string, src: string, tgt: string): Pr
 
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get("Origin");
+  const cors = resolveCorsHeaders(req);
 
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders(origin) });
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405, origin);
+  if (!(await hasValidApiKeyOrUser(req))) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
+  if (!enforceRateLimit(req, "auto-translate-product", { windowMs: 60_000, maxRequests: 40 })) {
+    return new Response(JSON.stringify({ error: "Too many requests" }), { status: 429, headers: { ...cors, "Content-Type": "application/json" } });
+  }
 
   const deeplKey = Deno.env.get("DEEPL_API_KEY")?.trim();
   if (!deeplKey) return jsonResponse({ error: "DEEPL_API_KEY not set" }, 500, origin);

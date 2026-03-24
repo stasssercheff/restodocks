@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { enforceRateLimit, hasValidApiKey, resolveCorsHeaders } from "../_shared/security.ts"
+import { enforceRateLimit, hasValidApiKeyOrUser, resolveCorsHeaders } from "../_shared/security.ts"
 
 interface EmailRequest {
   to: string
@@ -20,7 +20,7 @@ serve(async (req) => {
       { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }
-  if (!hasValidApiKey(req)) {
+  if (!(await hasValidApiKeyOrUser(req))) {
     return new Response(
       JSON.stringify({ error: 'Unauthorized' }),
       { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
