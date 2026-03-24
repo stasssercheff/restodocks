@@ -441,7 +441,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (mounted) setState(() => _loadError = null);
 
     try {
-      await store.loadProducts();
+      await store.loadProducts(force: !store.hasFullProductCatalog);
       if (est.isBranch) {
         await store.loadNomenclatureForBranch(est.id, est.dataEstablishmentId!);
       } else {

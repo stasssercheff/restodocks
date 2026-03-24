@@ -22,6 +22,7 @@ class ProductStoreSupabase {
   List<Product> _allProducts = [];
   List<String> _categories = [];
   bool _isLoading = false;
+  bool _hasFullProductCatalog = false;
 
   // Кэш цен заведения: productId -> (price, currency)
   final Map<String, (double?, String?)?> _priceCache = {};
@@ -33,6 +34,7 @@ class ProductStoreSupabase {
   List<Product> get allProducts => _allProducts;
   List<String> get categories => _categories;
   bool get isLoading => _isLoading;
+  bool get hasFullProductCatalog => _hasFullProductCatalog;
 
   /// Загрузка продуктов из Supabase
   Future<void> loadProducts({bool force = false}) async {
@@ -49,6 +51,7 @@ class ProductStoreSupabase {
             .toSet()
             .toList()
           ..sort();
+        _hasFullProductCatalog = true;
         unawaited(_loadProductsFromServer());
         return;
       }
@@ -105,6 +108,7 @@ class ProductStoreSupabase {
               .toSet()
               .toList()
             ..sort();
+          _hasFullProductCatalog = true;
 
           // Фоновая подгрузка КБЖУ для продуктов без калорий (в течение суток)
           NutritionBackfillService().startBackgroundBackfill(this);
@@ -1091,6 +1095,7 @@ class ProductStoreSupabase {
 
       // Очищаем локальный кэш
       _allProducts.clear();
+      _hasFullProductCatalog = false;
       _nomenclatureIds.clear();
       _priceCache.clear();
 
@@ -1229,6 +1234,7 @@ class ProductStoreSupabase {
 
       _allProducts =
           (data as List).map((json) => Product.fromJson(json)).toList();
+      _hasFullProductCatalog = false;
 
       _categories = _allProducts
           .map((product) => product.category)
