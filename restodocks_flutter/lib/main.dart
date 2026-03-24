@@ -94,10 +94,16 @@ class RestodocksApp extends StatelessWidget {
         child: Consumer2<LocalizationService, ThemeService>(
         builder: (context, localization, themeService, child) {
           final uiScale = context.watch<MobileUiScaleService>();
+          final useIosGlassTheme =
+              !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
           return MaterialApp.router(
             title: localization.t('app_name'),
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
+            theme: useIosGlassTheme
+                ? AppTheme.lightTheme
+                : AppTheme.classicLightTheme,
+            darkTheme: useIosGlassTheme
+                ? AppTheme.darkTheme
+                : AppTheme.classicDarkTheme,
             themeMode: themeService.themeMode,
             locale: localization.currentLocale,
             supportedLocales: LocalizationService.supportedLocales,
