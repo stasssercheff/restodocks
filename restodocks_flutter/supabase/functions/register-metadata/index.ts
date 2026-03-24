@@ -1,14 +1,11 @@
 // Edge Function: сохранение IP и геолокации при регистрации заведения
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-function corsHeaders(origin: string | null) {
-  return {
-    "Access-Control-Allow-Origin": origin || "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
-}
+import {
+  enforceRateLimit,
+  hasValidApiKey,
+  resolveCorsHeaders,
+} from "../_shared/security.ts";
 
 function getClientIp(req: Request): string {
   const cfIp = req.headers.get("cf-connecting-ip");
@@ -45,13 +42,26 @@ async function fetchGeo(ip: string): Promise<{ country?: string; city?: string }
 }
 
 Deno.serve(async (req: Request) => {
+  const cors = resolveCorsHeaders(req);
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders(req.headers.get("Origin")) });
+    return new Response(null, { headers: cors });
   }
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+  if (!hasValidApiKey(req)) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+  if (!enforceRateLimit(req, "register-metadata", { windowMs: 60_000, maxRequests: 20 })) {
+    return new Response(JSON.stringify({ error: "Too many requests" }), {
+      status: 429,
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   }
 
@@ -64,7 +74,7 @@ Deno.serve(async (req: Request) => {
     if (!establishmentId || typeof establishmentId !== "string") {
       return new Response(JSON.stringify({ error: "establishment_id required" }), {
         status: 400,
-        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        headers: { ...cors, "Content-Type": "application/json" },
       });
     }
 
@@ -84,17 +94,17 @@ Deno.serve(async (req: Request) => {
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), {
         status: 500,
-        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        headers: { ...cors, "Content-Type": "application/json" },
       });
     }
 
     return new Response(JSON.stringify({ ok: true, ip, country: geo.country, city: geo.city }), {
-      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {
       status: 500,
-      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   }
 });

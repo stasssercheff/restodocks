@@ -2,6 +2,11 @@
 // Если передан password — добавляем ссылку подтверждения email (через generateLink + Resend)
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  enforceRateLimit,
+  hasValidApiKey,
+  resolveCorsHeaders,
+} from "../_shared/security.ts";
 
 const REDIRECT_URL = "https://restodocks.com/auth/confirm";
 // Прокладка: prefetch почтового клиента не исчерпывает одноразовый токен Supabase.
@@ -18,22 +23,27 @@ function extractTokenHashFromActionLink(actionLink: string): { token_hash: strin
   return null;
 }
 
-function corsHeaders(origin: string | null) {
-  return {
-    "Access-Control-Allow-Origin": origin || "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
-}
-
 Deno.serve(async (req: Request) => {
+  const cors = resolveCorsHeaders(req);
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders(req.headers.get("Origin")) });
+    return new Response(null, { headers: cors });
   }
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+  if (!hasValidApiKey(req)) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+  if (!enforceRateLimit(req, "send-registration-email", { windowMs: 60_000, maxRequests: 12 })) {
+    return new Response(JSON.stringify({ error: "Too many requests" }), {
+      status: 429,
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   }
 
@@ -42,7 +52,7 @@ Deno.serve(async (req: Request) => {
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), {
       status: 500,
-      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        headers: { ...cors, "Content-Type": "application/json" },
     });
   }
 
@@ -67,7 +77,7 @@ Deno.serve(async (req: Request) => {
       if (!supabaseUrl || !serviceKey) {
         return new Response(JSON.stringify({ error: "Service not configured" }), {
           status: 500,
-          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+          headers: { ...cors, "Content-Type": "application/json" },
         });
       }
       try {
@@ -93,7 +103,7 @@ Deno.serve(async (req: Request) => {
         if (!link) {
           return new Response(JSON.stringify({ error: "Could not generate confirmation link" }), {
             status: 400,
-            headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+            headers: { ...cors, "Content-Type": "application/json" },
           });
         }
         const extracted = extractTokenHashFromActionLink(link);
@@ -123,16 +133,16 @@ Deno.serve(async (req: Request) => {
         if (!res.ok) {
           return new Response(JSON.stringify({ error: data?.message || res.statusText }), {
             status: res.status,
-            headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+            headers: { ...cors, "Content-Type": "application/json" },
           });
         }
         return new Response(JSON.stringify({ id: data?.id, ok: true }), {
-          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+          headers: { ...cors, "Content-Type": "application/json" },
         });
       } catch (e) {
         return new Response(JSON.stringify({ error: String(e) }), {
           status: 500,
-          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+          headers: { ...cors, "Content-Type": "application/json" },
         });
       }
     }
@@ -142,7 +152,7 @@ Deno.serve(async (req: Request) => {
       if (!to) {
         return new Response(JSON.stringify({ error: "to required" }), {
           status: 400,
-          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+          headers: { ...cors, "Content-Type": "application/json" },
         });
       }
       const subject = "Регистрация подтверждена — Restodocks";
@@ -167,18 +177,18 @@ Deno.serve(async (req: Request) => {
       if (!res.ok) {
         return new Response(JSON.stringify({ error: data?.message || res.statusText }), {
           status: res.status,
-          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+          headers: { ...cors, "Content-Type": "application/json" },
         });
       }
       return new Response(JSON.stringify({ id: data?.id, ok: true }), {
-        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        headers: { ...cors, "Content-Type": "application/json" },
       });
     }
 
     if (!type || !to || !companyName || !email) {
       return new Response(JSON.stringify({ error: "type, to, companyName, email required" }), {
         status: 400,
-        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        headers: { ...cors, "Content-Type": "application/json" },
       });
     }
 
@@ -238,17 +248,17 @@ Deno.serve(async (req: Request) => {
     if (!res.ok) {
       return new Response(JSON.stringify({ error: data?.message || res.statusText }), {
         status: res.status,
-        headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        headers: { ...cors, "Content-Type": "application/json" },
       });
     }
 
     return new Response(JSON.stringify({ id: data?.id, ok: true }), {
-      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {
       status: 500,
-      headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   }
 });

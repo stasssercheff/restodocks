@@ -2,12 +2,11 @@
 // Цены берутся только из establishment_products (номенклатура заведения).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import {
+  enforceRateLimit,
+  hasValidApiKey,
+  resolveCorsHeaders,
+} from "../_shared/security.ts";
 
 interface OrderItemInput {
   productId?: string | null;
@@ -26,12 +25,25 @@ interface OrderItemOutput {
 }
 
 Deno.serve(async (req: Request) => {
+  const corsHeaders = resolveCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  if (!hasValidApiKey(req)) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  if (!enforceRateLimit(req, "save-order-document", { windowMs: 60_000, maxRequests: 40 })) {
+    return new Response(JSON.stringify({ error: "Too many requests" }), {
+      status: 429,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -59,6 +71,18 @@ Deno.serve(async (req: Request) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const { data: creator, error: creatorError } = await supabase
+      .from("employees")
+      .select("id")
+      .eq("id", createdByEmployeeId)
+      .eq("establishment_id", establishmentId)
+      .maybeSingle();
+    if (creatorError || !creator?.id) {
+      return new Response(
+        JSON.stringify({ error: "Invalid employee for establishment" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const productIds = items
       .map((i) => i.productId)

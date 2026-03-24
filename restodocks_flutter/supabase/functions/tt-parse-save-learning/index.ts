@@ -2,23 +2,32 @@
 // Вызывается клиентом при успешном парсинге и при правках пользователя
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-function corsHeaders(origin: string | null): Record<string, string> {
-  return {
-    "Access-Control-Allow-Origin": origin || "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
-}
+import {
+  enforceRateLimit,
+  hasValidApiKey,
+  resolveCorsHeaders,
+} from "../_shared/security.ts";
 
 Deno.serve(async (req: Request) => {
-  const cors = corsHeaders(req.headers.get("Origin"));
+  const cors = resolveCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: cors });
   }
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+  if (!hasValidApiKey(req)) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+  if (!enforceRateLimit(req, "tt-parse-save-learning", { windowMs: 60_000, maxRequests: 25 })) {
+    return new Response(JSON.stringify({ error: "Too many requests" }), {
+      status: 429,
       headers: { ...cors, "Content-Type": "application/json" },
     });
   }

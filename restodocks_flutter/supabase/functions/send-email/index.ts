@@ -1,9 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { enforceRateLimit, hasValidApiKey, resolveCorsHeaders } from "../_shared/security.ts"
 
 interface EmailRequest {
   to: string
@@ -14,8 +10,27 @@ interface EmailRequest {
 }
 
 serve(async (req) => {
+  const corsHeaders = resolveCorsHeaders(req)
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }),
+      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
+  }
+  if (!hasValidApiKey(req)) {
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
+  }
+  if (!enforceRateLimit(req, "send-email", { windowMs: 60_000, maxRequests: 20 })) {
+    return new Response(
+      JSON.stringify({ error: 'Too many requests' }),
+      { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    )
   }
 
   // verify_jwt=false в config.toml. Проверка ключа убрана — Cloudflare build передаёт другой anon key.

@@ -2,14 +2,11 @@
 // Используется при legacy-логине (auth: false).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-function corsHeaders(origin: string | null): Record<string, string> {
-  return {
-    "Access-Control-Allow-Origin": origin || "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
-}
+import {
+  enforceRateLimit,
+  hasValidApiKey,
+  resolveCorsHeaders,
+} from "../_shared/security.ts";
 
 interface ChecklistItemInput {
   title?: string;
@@ -20,13 +17,25 @@ interface ChecklistItemInput {
 }
 
 Deno.serve(async (req: Request) => {
-  const cors = corsHeaders(req.headers.get("Origin"));
+  const cors = resolveCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: cors });
   }
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+  if (!hasValidApiKey(req)) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+  if (!enforceRateLimit(req, "save-checklist", { windowMs: 60_000, maxRequests: 60 })) {
+    return new Response(JSON.stringify({ error: "Too many requests" }), {
+      status: 429,
       headers: { ...cors, "Content-Type": "application/json" },
     });
   }
@@ -83,6 +92,46 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({ error: "checklist_id, name, updated_at required" }),
         { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
       );
+    }
+    const { data: checklistRow, error: checklistLookupError } = await supabase
+      .from("checklists")
+      .select("id, establishment_id")
+      .eq("id", checklist_id)
+      .maybeSingle();
+    if (checklistLookupError || !checklistRow?.id) {
+      return new Response(JSON.stringify({ error: "Checklist not found" }), {
+        status: 404,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+    const checklistEstablishmentId = checklistRow.establishment_id as string;
+    if (assigned_employee_id) {
+      const { data: assignee, error: assigneeError } = await supabase
+        .from("employees")
+        .select("id")
+        .eq("id", assigned_employee_id)
+        .eq("establishment_id", checklistEstablishmentId)
+        .maybeSingle();
+      if (assigneeError || !assignee?.id) {
+        return new Response(JSON.stringify({ error: "Invalid assigned employee" }), {
+          status: 400,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+    }
+    if (Array.isArray(assigned_employee_ids) && assigned_employee_ids.length > 0) {
+      const { data: assignees } = await supabase
+        .from("employees")
+        .select("id")
+        .in("id", assigned_employee_ids)
+        .eq("establishment_id", checklistEstablishmentId);
+      const allowed = new Set((assignees ?? []).map((r: { id: string }) => r.id));
+      if (assigned_employee_ids.some((id) => !allowed.has(id))) {
+        return new Response(JSON.stringify({ error: "Invalid assigned employee list" }), {
+          status: 400,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const { error: updateError } = await supabase

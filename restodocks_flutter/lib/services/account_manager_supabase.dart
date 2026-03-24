@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:restodocks/core/supabase_url_resolver_stub.dart'
     if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart'
@@ -31,6 +33,13 @@ String _dateOnly(DateTime d) =>
 
 /// Сервис управления аккаунтами с использованием Supabase
 class AccountManagerSupabase extends ChangeNotifier {
+  static final Random _secureRandom = Random.secure();
+
+  static String _generateSecureInvitationToken() {
+    final bytes = List<int>.generate(32, (_) => _secureRandom.nextInt(256));
+    return base64UrlEncode(bytes).replaceAll('=', '');
+  }
+
   static final AccountManagerSupabase _instance =
       AccountManagerSupabase._internal();
   factory AccountManagerSupabase() => _instance;
@@ -434,7 +443,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     final establishmentsCount = await getEstablishmentsForOwner();
     final isViewOnlyOwner = establishmentsCount.length > 1;
 
-    final token = DateTime.now().millisecondsSinceEpoch.toString();
+    final token = _generateSecureInvitationToken();
     final invitationData = {
       'establishment_id': establishmentId,
       'invited_email': email,
