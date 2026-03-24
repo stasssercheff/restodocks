@@ -4049,7 +4049,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     }
 
     return Scaffold(
-      clipBehavior: Clip.hardEdge,
       appBar: AppBar(
         leading: widget.initialFromAi != null
             ? IconButton(
