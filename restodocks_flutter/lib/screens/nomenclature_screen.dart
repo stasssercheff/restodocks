@@ -1403,6 +1403,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     return FilterChip(
       label: Text(label),
       selected: isSelected,
+      showCheckmark: false,
       onSelected: (_) => setState(() => _selectedTab = tab),
       backgroundColor: Theme.of(context).colorScheme.surface,
       selectedColor: Theme.of(context).colorScheme.primaryContainer,
@@ -1637,6 +1638,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                         ),
                         label: Text('Без $currencySymbol'),
                         selected: _filterNoPrice,
+                        showCheckmark: false,
                         onSelected: (v) => setState(() => _filterNoPrice = v),
                       ),
                     ],

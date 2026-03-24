@@ -78,6 +78,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     return FilterChip(
       label: Text(label),
       selected: isSelected,
+      showCheckmark: false,
       onSelected: (_) => setState(() => _selectedTab = tab),
       backgroundColor: Theme.of(context).colorScheme.surface,
       selectedColor: Theme.of(context).colorScheme.primaryContainer,

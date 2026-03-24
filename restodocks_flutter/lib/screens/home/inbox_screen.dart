@@ -570,6 +570,7 @@ class _InboxScreenState extends State<InboxScreen> {
         ],
       ),
       selected: isSelected,
+      showCheckmark: false,
       backgroundColor: allViewed && !isSelected ? Theme.of(context).colorScheme.surfaceContainerLow : Theme.of(context).colorScheme.surface,
       onSelected: (_) {
         setState(() {
@@ -634,6 +635,7 @@ class _InboxScreenState extends State<InboxScreen> {
         ],
       ),
       selected: isSelected,
+      showCheckmark: false,
       onSelected: (_) {
         setState(() => _selectedTypeTab = tab);
       },
@@ -698,6 +700,7 @@ class _InboxScreenState extends State<InboxScreen> {
           ],
         ),
         selected: isSelected,
+        showCheckmark: false,
         onSelected: (selected) {
           setState(() => _selectedTab = tab);
         },

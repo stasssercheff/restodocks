@@ -1588,12 +1588,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               ..addAll(_ensureOutputWeights(tc.ingredients));
             _ensurePlaceholderRowAtEnd();
           }
-          _contentPhase = 0; // подготовка, полная форма — в след. кадре
-        });
-        // Тяжёлый билд формы — в следующем кадре, без замирания
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          setState(() => _contentPhase = 1);
+          _contentPhase = 1; // показываем полную форму сразу после загрузки данных
         });
         // Если перевод технологии ещё не сохранён — запросить через DeepL
         if (tc != null) _translateTechnologyIfNeeded(tc);
@@ -4536,9 +4531,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                     ),
                                     )
                                   : ConstrainedBox(
-                                      constraints: const BoxConstraints(
+                                      constraints: BoxConstraints(
                                           minWidth:
-                                              1145), // как в режиме создания
+                                              constraints.maxWidth),
                                       child: _TtkCookTable(
                                         loc: loc,
                                         dishName: _nameController.text,
