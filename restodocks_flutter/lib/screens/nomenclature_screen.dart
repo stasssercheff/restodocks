@@ -441,7 +441,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (mounted) setState(() => _loadError = null);
 
     try {
-      await store.loadProducts(force: true);
+      await store.loadProducts();
       if (est.isBranch) {
         await store.loadNomenclatureForBranch(est.id, est.dataEstablishmentId!);
       } else {
@@ -1422,6 +1422,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final canEdit =
         account.currentEmployee?.canEditChecklistsAndTechCards ?? false;
     final isBranch = est?.isBranch ?? false;
+    final currencySymbol = account.establishment?.currencySymbol ??
+        Establishment.currencySymbolFor(
+            account.establishment?.defaultCurrency ?? 'VND');
 
     // Фильтруем элементы номенклатуры
     var nomItems = _nomenclatureItems.where((item) {
@@ -1621,6 +1624,22 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                       const SizedBox(width: 8),
                       _tabChip(_NomTab.iiko, 'iiko'),
                     ],
+                    if (_selectedTab == _NomTab.nomenclature ||
+                        _selectedTab == _NomTab.newProducts) ...[
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        avatar: Icon(
+                          Icons.money_off,
+                          size: 16,
+                          color: _filterNoPrice
+                              ? Theme.of(context).colorScheme.primary
+                              : null,
+                        ),
+                        label: Text('Без $currencySymbol'),
+                        selected: _filterNoPrice,
+                        onSelected: (v) => setState(() => _filterNoPrice = v),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -1639,46 +1658,47 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            TextField(
-                              decoration: InputDecoration(
-                                hintText: loc.t('search'),
-                                prefixIcon: const Icon(Icons.search),
-                                border: const OutlineInputBorder(),
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 10),
-                              ),
-                              onChanged: (v) => setState(() => _query = v),
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
+                            Row(
                               children: [
-                                FilterChip(
-                                  avatar: Icon(Icons.money_off,
-                                      size: 18,
-                                      color: _filterNoPrice
-                                          ? Theme.of(context)
-                                              .colorScheme
-                                              .primary
-                                          : null),
-                                  label: Text(loc.t('filter_no_price')),
-                                  selected: _filterNoPrice,
-                                  onSelected: (v) =>
-                                      setState(() => _filterNoPrice = v),
+                                Expanded(
+                                  child: TextField(
+                                    decoration: InputDecoration(
+                                      hintText: loc.t('search'),
+                                      prefixIcon: const Icon(Icons.search),
+                                      border: const OutlineInputBorder(),
+                                      isDense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 10),
+                                    ),
+                                    onChanged: (v) =>
+                                        setState(() => _query = v),
+                                  ),
                                 ),
-                                ChoiceChip(
-                                  label: const Text('А-Я'),
-                                  selected: _nomSort == _CatalogSort.nameAz,
-                                  onSelected: (_) => setState(
-                                      () => _nomSort = _CatalogSort.nameAz),
-                                ),
-                                ChoiceChip(
-                                  label: const Text('Я-А'),
-                                  selected: _nomSort == _CatalogSort.nameZa,
-                                  onSelected: (_) => setState(
-                                      () => _nomSort = _CatalogSort.nameZa),
+                                const SizedBox(width: 8),
+                                PopupMenuButton<_CatalogSort>(
+                                  icon: const Icon(Icons.sort),
+                                  tooltip: loc
+                                      .t('sort_name_az')
+                                      .split(' ')
+                                      .take(2)
+                                      .join(' '),
+                                  onSelected: (s) =>
+                                      setState(() => _nomSort = s),
+                                  itemBuilder: (_) => [
+                                    PopupMenuItem(
+                                        value: _CatalogSort.nameAz,
+                                        child: Text(loc.t('sort_name_az'))),
+                                    PopupMenuItem(
+                                        value: _CatalogSort.nameZa,
+                                        child: Text(loc.t('sort_name_za'))),
+                                    PopupMenuItem(
+                                        value: _CatalogSort.priceAsc,
+                                        child: Text(loc.t('sort_price_asc'))),
+                                    PopupMenuItem(
+                                        value: _CatalogSort.priceDesc,
+                                        child: Text(loc.t('sort_price_desc'))),
+                                  ],
                                 ),
                               ],
                             ),
@@ -1788,33 +1808,47 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                                     ),
                               ),
                             const SizedBox(height: 8),
-                            TextField(
-                              decoration: InputDecoration(
-                                hintText: loc.t('search'),
-                                prefixIcon: const Icon(Icons.search),
-                                border: const OutlineInputBorder(),
-                                isDense: true,
-                                contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 10),
-                              ),
-                              onChanged: (v) => setState(() => _query = v),
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
+                            Row(
                               children: [
-                                ChoiceChip(
-                                  label: const Text('А-Я'),
-                                  selected: _nomSort == _CatalogSort.nameAz,
-                                  onSelected: (_) => setState(
-                                      () => _nomSort = _CatalogSort.nameAz),
+                                Expanded(
+                                  child: TextField(
+                                    decoration: InputDecoration(
+                                      hintText: loc.t('search'),
+                                      prefixIcon: const Icon(Icons.search),
+                                      border: const OutlineInputBorder(),
+                                      isDense: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 10),
+                                    ),
+                                    onChanged: (v) =>
+                                        setState(() => _query = v),
+                                  ),
                                 ),
-                                ChoiceChip(
-                                  label: const Text('Я-А'),
-                                  selected: _nomSort == _CatalogSort.nameZa,
-                                  onSelected: (_) => setState(
-                                      () => _nomSort = _CatalogSort.nameZa),
+                                const SizedBox(width: 8),
+                                PopupMenuButton<_CatalogSort>(
+                                  icon: const Icon(Icons.sort),
+                                  tooltip: loc
+                                      .t('sort_name_az')
+                                      .split(' ')
+                                      .take(2)
+                                      .join(' '),
+                                  onSelected: (s) =>
+                                      setState(() => _nomSort = s),
+                                  itemBuilder: (_) => [
+                                    PopupMenuItem(
+                                        value: _CatalogSort.nameAz,
+                                        child: Text(loc.t('sort_name_az'))),
+                                    PopupMenuItem(
+                                        value: _CatalogSort.nameZa,
+                                        child: Text(loc.t('sort_name_za'))),
+                                    PopupMenuItem(
+                                        value: _CatalogSort.priceAsc,
+                                        child: Text(loc.t('sort_price_asc'))),
+                                    PopupMenuItem(
+                                        value: _CatalogSort.priceDesc,
+                                        child: Text(loc.t('sort_price_desc'))),
+                                  ],
                                 ),
                               ],
                             ),

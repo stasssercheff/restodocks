@@ -579,6 +579,10 @@ class ProductStoreSupabase {
     final cached = await _offlineCache.readJsonMap(cacheKey);
     if (cached != null) {
       _applyNomenclatureCache(establishmentId, cached);
+      if (_nomenclatureIds.isEmpty) {
+        await _reloadNomenclatureFromServer(establishmentId);
+        return;
+      }
       unawaited(_reloadNomenclatureFromServer(establishmentId));
       return;
     }
@@ -627,6 +631,10 @@ class ProductStoreSupabase {
     final cached = await _offlineCache.readJsonMap(cacheKey);
     if (cached != null) {
       _applyNomenclatureCache(branchId, cached);
+      if (_nomenclatureIds.isEmpty) {
+        await _reloadNomenclatureForBranchFromServer(branchId, mainId);
+        return;
+      }
       unawaited(_reloadNomenclatureForBranchFromServer(branchId, mainId));
       return;
     }
