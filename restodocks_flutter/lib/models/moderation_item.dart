@@ -43,7 +43,8 @@ class ModerationItem extends Equatable {
     this.approved = true,
   });
 
-  String get displayName => normalizedName ?? name;
+  /// Всегда исходное имя из файла. [normalizedName] не используется для сохранения (политика: не переименовывать автоматически).
+  String get displayName => name;
   double? get displayPrice => suggestedPrice ?? price;
 
   ModerationItem copyWith({

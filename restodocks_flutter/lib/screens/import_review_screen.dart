@@ -128,7 +128,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
           bool? containsGluten;
           bool? containsLactose;
           try {
-            final nutrition = await NutritionApiService.fetchNutrition(item.displayName);
+            final nutrition = await NutritionApiService.fetchNutrition(item.name);
             if (nutrition != null && nutrition.hasData) {
               calories = nutrition.calories;
               protein = nutrition.protein;

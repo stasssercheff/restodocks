@@ -1083,23 +1083,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         }
       }
 
-      // В режиме инвентаризации пропускаем нормализацию — названия сохраняем дословно из бланка
-      if (newNames.isNotEmpty && mode != 'inventory') {
-        final ai = context.read<AiService>();
-        final normalized = await ai.normalizeProductNames(newNames);
-        if (mounted && normalized.length == newNames.length) {
-          for (var j = 0; j < newIndices.length; j++) {
-            final idx = newIndices[j];
-            final norm = normalized[j];
-            if (norm != moderationItems[idx].name) {
-              moderationItems[idx] = moderationItems[idx].copyWith(
-                normalizedName: norm,
-                category: ModerationCategory.nameFix,
-              );
-            }
-          }
-        }
-      }
+      // Названия при импорте не нормализуем ИИ — только как ввёл пользователь.
 
       if (!mounted) return;
       _cancelLoadingTimeout();
@@ -2183,33 +2167,25 @@ ${text}
         }
         idx++;
         try {
-        // Используем ИИ для исправления опечаток и нормализации названия
+        // ИИ — КБЖУ, категория, единица; название не меняем (как в источнике).
         ProductVerificationResult? verification;
-        String normalizedName = item.name;
+        final storedName = item.name.trim();
         try {
           final aiService = context.read<AiServiceSupabase>();
           verification = await aiService.verifyProduct(
             item.name,
             currentPrice: item.price,
           );
-          _addDebugLog('AI verification successful for "${item.name}": normalized="${verification?.normalizedName}", calories=${verification?.suggestedCalories}');
-
-          // Используем нормализованное название от AI, если оно отличается
-          if (verification?.normalizedName != null && verification!.normalizedName!.isNotEmpty) {
-            normalizedName = verification!.normalizedName!;
-            _addDebugLog('Using AI-normalized name: "${item.name}" -> "${normalizedName}"');
-          }
+          _addDebugLog('AI verification for "${item.name}": calories=${verification?.suggestedCalories}');
         } catch (aiError) {
           _addDebugLog('AI verification failed for "${item.name}": $aiError');
           verification = null;
         }
 
-        // Дополнительная локальная нормализация названий
-        normalizedName = _normalizeProductName(normalizedName);
-        var names = <String, String>{for (final c in allLangs) c: normalizedName};
+        var names = <String, String>{for (final c in allLangs) c: storedName};
 
         // ПРОВЕРКА НА СУЩЕСТВОВАНИЕ ПОХОЖЕГО ПРОДУКТА
-        Product? existingProduct = await _findSimilarProduct(normalizedName, store);
+        Product? existingProduct = await _findSimilarProduct(storedName, store);
         if (existingProduct != null) {
           _addDebugLog('Found similar existing product: "${existingProduct.name}" (ID: ${existingProduct.id})');
 
@@ -2303,7 +2279,7 @@ ${text}
           // Fallback к Nutrition API только если AI не дал данные
           try {
             final nutritionService = context.read<NutritionApiService>();
-            final nutritionResult = await NutritionApiService.fetchNutrition(normalizedName);
+            final nutritionResult = await NutritionApiService.fetchNutrition(storedName);
 
             if (nutritionResult != null && nutritionResult.hasData) {
               calories = calories ?? nutritionResult.calories;
@@ -2312,18 +2288,18 @@ ${text}
               carbs = carbs ?? nutritionResult.carbs;
               containsGluten = nutritionResult.containsGluten ?? containsGluten;
               containsLactose = nutritionResult.containsLactose ?? containsLactose;
-              devLog('DEBUG: Used Nutrition API fallback for "${normalizedName}": calories=$calories');
+              devLog('DEBUG: Used Nutrition API fallback for "${storedName}": calories=$calories');
             }
           } catch (nutritionError) {
-            devLog('DEBUG: Nutrition API failed for "${normalizedName}": $nutritionError');
+            devLog('DEBUG: Nutrition API failed for "${storedName}": $nutritionError');
           }
         } else {
-          devLog('DEBUG: Using AI nutrition data for "${normalizedName}": ${calories}kcal, ${protein}g protein');
+          devLog('DEBUG: Using AI nutrition data for "${storedName}": ${calories}kcal, ${protein}g protein');
         }
 
           final product = Product(
             id: const Uuid().v4(),
-            name: normalizedName,
+            name: storedName,
             category: verification?.suggestedCategory ?? 'manual',
             names: names,
             calories: calories,
@@ -2360,7 +2336,7 @@ ${text}
               entityType: TranslationEntityType.product,
               entityId: savedProduct.id,
               textFields: {
-                'name': normalizedName,
+                'name': storedName,
                 if (savedProduct.names != null)
                   for (final entry in savedProduct.names!.entries)
                     'name_${entry.key}': entry.value,
@@ -2815,115 +2791,6 @@ ${allProducts.map((p) => p.name).join('\n')}
     final union = words1.union(words2).length;
 
     return union > 0 ? intersection / union : 0.0;
-  }
-
-  /// Локальная нормализация названий продуктов
-  String _normalizeProductName(String name) {
-    String normalized = name.trim();
-
-    // Исправить распространенные опечатки и стандартизировать
-    final corrections = {
-      // Фрукты и овощи
-      'авокадо': 'Авокадо',
-      'авокало': 'Авокадо',
-      'абокадо': 'Авокадо',
-      'картошка': 'Картофель',
-      'картофель': 'Картофель',
-      'картофель свежий': 'Картофель',
-      'морковка': 'Морковь',
-      'морковь': 'Морковь',
-      'морковь свежая': 'Морковь',
-      'лук': 'Лук репчатый',
-      'лук репка': 'Лук репчатый',
-      'лук репчатый': 'Лук репчатый',
-      'томат': 'Томаты',
-      'томаты': 'Томаты',
-      'помидоры': 'Томаты',
-      'огурец': 'Огурцы',
-      'огурцы': 'Огурцы',
-      'огурец свежий': 'Огурцы',
-      'перец': 'Перец болгарский',
-      'болгарский перец': 'Перец болгарский',
-      'перец болгарский': 'Перец болгарский',
-      'капуста': 'Капуста',
-      'брокколи': 'Капуста брокколи',
-      'капуста брокколи': 'Капуста брокколи',
-      'зелень': 'Зелень',
-      'укроп': 'Укроп',
-      'петрушка': 'Петрушка',
-      'кинза': 'Кинза',
-      'базилик': 'Базилик',
-      'розмарин': 'Розмарин',
-      'тимьян': 'Тимьян',
-      'чеснок': 'Чеснок',
-      'имбирь': 'Имбирь',
-
-      // Молочные продукты
-      'молоко': 'Молоко',
-      'молоко цельное': 'Молоко',
-      'сыр': 'Сыр',
-      'масло': 'Масло сливочное',
-      'сливочное масло': 'Масло сливочное',
-      'масло сливочное': 'Масло сливочное',
-      'йогурт': 'Йогурт',
-      'кефир': 'Кефир',
-      'творог': 'Творог',
-      'сметана': 'Сметана',
-      'сливки': 'Сливки',
-
-      // Мясо и рыба
-      'курица': 'Курица',
-      'курица грудка': 'Кура грудка филе',
-      'кура грудка': 'Кура грудка филе',
-      'говядина': 'Говядина',
-      'говядина вырезка': 'Говядина',
-      'свинина': 'Свинина',
-      'рыба': 'Рыба',
-      'лосось': 'Лосось',
-      'семга': 'Семга',
-      'форель': 'Форель',
-      'тунец': 'Тунец',
-      'креветки': 'Креветки',
-      'осьминог': 'Осьминог',
-      'кальмары': 'Кальмары',
-
-      // Крупы и зерновые
-      'рис': 'Рис',
-      'гречка': 'Крупа гречневая',
-      'овсянка': 'Каша овсянная',
-      'пшенка': 'Каша пшенная',
-      'перловка': 'Крупа перловая',
-      'манка': 'Крупа манная',
-
-      // Напитки и специи
-      'соль': 'Соль',
-      'перец черный': 'Перец черный молотый',
-      'сахар': 'Сахар',
-      'мед': 'Мед',
-      'уксус': 'Уксус',
-      'соус': 'Соус',
-
-      // Хлебобулочные
-      'хлеб': 'Хлеб',
-      'батон': 'Батон',
-      'багет': 'Багет',
-    };
-
-    // Применить исправления
-    for (final entry in corrections.entries) {
-      if (normalized.toLowerCase().contains(entry.key)) {
-        normalized = entry.value;
-        break;
-      }
-    }
-
-    // Убрать лишние пробелы и заглавные буквы
-    normalized = normalized.split(' ').map((word) {
-      if (word.isEmpty) return '';
-      return word[0].toUpperCase() + word.substring(1).toLowerCase();
-    }).join(' ');
-
-    return normalized;
   }
 
   ({String name, double? price}) _parseLine(String line) {

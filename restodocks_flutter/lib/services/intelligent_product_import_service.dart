@@ -140,8 +140,8 @@ class IntelligentProductImportService {
           break;
 
         case MatchType.create:
-          // Создаем новый продукт с переводами
-          final productName = result.matchResult.suggestedName ?? result.fileName;
+          // Создаем новый продукт с переводами (имя файла/строки — без ИИ)
+          final productName = result.fileName.trim();
           final product = Product.create(
             name: productName,
             category: 'imported',
@@ -302,9 +302,8 @@ ${sampleTexts.take(5).join('\n')}
       }
     }
 
-    // 2. AI-нормализация (только если алиас не найден)
-    final aiNormalizedName = await _aiNormalizeProductName(fileName);
-    final normalizedForMatch = _normalizeText(aiNormalizedName ?? fileName);
+    // 2. Сопоставление по локальной нормализации текста (без ИИ-переименования)
+    final normalizedForMatch = _normalizeText(fileName);
 
     // Ищем точные совпадения (по AI-нормализованному или исходному)
     final exactMatches = allProducts.where((product) {
@@ -367,12 +366,9 @@ ${sampleTexts.take(5).join('\n')}
       );
     }
 
-    // Новый продукт - генерируем нормализованное имя
-    final suggestedName = await _normalizeProductName(fileName, language);
-
     return ProductMatchResult(
       type: MatchType.create,
-      suggestedName: suggestedName,
+      suggestedName: fileName.trim(),
     );
   }
 
@@ -402,23 +398,6 @@ ${sampleTexts.take(5).join('\n')}
     return (longer.length - distance) / longer.length.toDouble();
   }
 
-  /// Нормализовать название продукта через AI
-  Future<String?> _aiNormalizeProductName(String productName) async {
-    try {
-      final result = await (_aiService as dynamic).invoke('ai-recognize-product', {
-        'userInput': productName,
-      });
-
-      if (result != null && result['normalizedName'] != null) {
-        return result['normalizedName'] as String;
-      }
-    } catch (e) {
-      // Если AI недоступен, возвращаем null
-      return null;
-    }
-    return null;
-  }
-
   /// Расстояние Левенштейна
   int _levenshteinDistance(String a, String b) {
     final matrix = List.generate(
@@ -446,29 +425,6 @@ ${sampleTexts.take(5).join('\n')}
     }
 
     return matrix[a.length][b.length];
-  }
-
-  /// Нормализовать название продукта
-  Future<String> _normalizeProductName(String name, String language) async {
-    try {
-      final prompt = '''
-Нормализуй название продукта для использования в базе данных.
-Убери лишние слова, исправь опечатки, приведи к стандартному виду.
-
-Оригинал: "$name"
-Язык: $language
-
-Верни только нормализованное название на английском языке.
-''';
-
-      final response = await _aiService.invoke('ai-generate-checklist', {
-        'prompt': prompt,
-      });
-
-      return response?['result']?.toString().trim() ?? name;
-    } catch (e) {
-      return name; // fallback
-    }
   }
 
   /// Сгенерировать переводы продукта (сохранение в БД)

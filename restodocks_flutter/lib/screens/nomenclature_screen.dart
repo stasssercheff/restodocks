@@ -162,24 +162,20 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           verification = null;
         }
 
-        // Используем проверенные ИИ данные или оригинальные
-        final normalizedName = verification?.normalizedName ?? item.name;
+        // Название не меняем — только как вставил пользователь. ИИ — КБЖУ и пр.
+        final storedName = item.name.trim();
         var names = <String, String>{
-          for (final c in allLangs) c: normalizedName
+          for (final c in allLangs) c: storedName
         };
 
-        // Для больших списков переводим только если ИИ дал нормализованное имя
-        if (widget.items.length > 5 &&
-            verification?.normalizedName != null &&
-            verification!.normalizedName != item.name) {
-          // Переводим на все языки
+        if (widget.items.length > 5) {
           for (final lang in allLangs) {
             if (lang == sourceLang) continue;
             final translated = await translationService.translate(
               entityType: TranslationEntityType.product,
               entityId: item.name,
               fieldName: 'name',
-              text: normalizedName,
+              text: storedName,
               from: sourceLang,
               to: lang,
             );
@@ -189,7 +185,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
           }
         }
 
-        final normalizedLower = normalizedName.trim().toLowerCase();
+        final normalizedLower = storedName.toLowerCase();
 
         // Проверяем, существует ли продукт с таким именем в базе (дедупликация)
         final existingInStore = store.allProducts
@@ -221,7 +217,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
         if (!hasFullKbjuFromAi) {
           try {
             final nutrition =
-                await NutritionApiService.fetchNutrition(normalizedName);
+                await NutritionApiService.fetchNutrition(storedName);
             if (nutrition != null && nutrition.hasData) {
               calories = calories ?? nutrition.calories;
               protein = nutrition.protein;
@@ -235,7 +231,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
 
         final product = Product(
           id: const Uuid().v4(),
-          name: normalizedName,
+          name: storedName,
           category: verification?.suggestedCategory ?? 'manual',
           names: names,
           calories: calories,
@@ -2553,7 +2549,6 @@ class _AddProductDialogState extends State<_AddProductDialog> {
     setState(() {
       _recognizing = false;
       if (result != null) {
-        _nameController?.text = result.normalizedName;
         if (result.suggestedCategory != null &&
             widget.categories.contains(result.suggestedCategory)) {
           _category = result.suggestedCategory!;
@@ -3154,8 +3149,7 @@ class _VerifyProductItem {
 
   bool get hasAnySuggestion =>
       result != null &&
-      (result!.normalizedName != null ||
-          result!.suggestedPrice != null ||
+      (result!.suggestedPrice != null ||
           result!.suggestedCalories != null ||
           result!.suggestedProtein != null ||
           result!.suggestedFat != null ||
@@ -3279,9 +3273,6 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
     final p = item.product;
     final r = item.result!;
     Product updated = p;
-    if (r.normalizedName != null && r.normalizedName!.trim().isNotEmpty) {
-      updated = updated.copyWith(name: r.normalizedName!.trim());
-    }
     if (r.suggestedPrice != null) {
       await store.addToNomenclature(estId, p.id, price: r.suggestedPrice);
     }
@@ -3310,9 +3301,6 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
       final p = item.product;
       final r = item.result!;
       Product updated = p;
-      if (r.normalizedName != null && r.normalizedName!.trim().isNotEmpty) {
-        updated = updated.copyWith(name: r.normalizedName!.trim());
-      }
       if (r.suggestedPrice != null)
         await store.addToNomenclature(estId, p.id, price: r.suggestedPrice);
       if (r.suggestedCalories != null ||
@@ -3373,13 +3361,6 @@ class _VerifyProductsResultsDialog extends StatelessWidget {
                             p.getLocalizedName(loc.currentLanguageCode),
                             style: Theme.of(context).textTheme.titleSmall,
                           ),
-                          if (r.normalizedName != null &&
-                              r.normalizedName != p.name) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                                '${loc.t('name')}: ${p.name} → ${r.normalizedName}',
-                                style: Theme.of(context).textTheme.bodySmall),
-                          ],
                           if (r.suggestedPrice != null) ...[
                             Builder(builder: (ctx) {
                               final ep =
@@ -4122,7 +4103,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     return double.tryParse(s);
   }
 
-  /// ИИ проверяет название на опечатки и предлагает исправление
+  /// ИИ проверяет название на опечатки — подсказка только в тексте, название не меняем автоматически.
   Future<void> _checkNameWithAi() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
@@ -4132,30 +4113,13 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       final result = await ai.recognizeProduct(name);
       if (!mounted) return;
       if (result != null && result.normalizedName != name) {
-        final ok = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: Text(widget.loc.t('ai_suggest_correction') ??
-                'Предлагается исправление'),
-            content: Text(
-              '${widget.loc.t('ai_suggested_name') ?? 'Возможно, вы имели в виду'}: "${result.normalizedName}"',
-            ),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(false),
-                  child: Text(widget.loc.t('cancel'))),
-              FilledButton(
-                  onPressed: () => Navigator.of(ctx).pop(true),
-                  child: Text(widget.loc.t('apply') ?? 'Применить')),
-            ],
-          ),
-        );
-        if (ok == true && mounted) {
-          _nameController.text = result.normalizedName;
-          if (result.suggestedUnit != null &&
-              CulinaryUnits.all.any((e) => e.id == result.suggestedUnit)) {
-            setState(() => _unit = result.suggestedUnit!);
-          }
+        final text = widget.loc
+            .t('ai_name_suggestion_only')
+            .replaceAll('%s', result.normalizedName);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+        if (result.suggestedUnit != null &&
+            CulinaryUnits.all.any((e) => e.id == result.suggestedUnit)) {
+          setState(() => _unit = result.suggestedUnit!);
         }
       } else if (result != null && result.normalizedName == name && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
