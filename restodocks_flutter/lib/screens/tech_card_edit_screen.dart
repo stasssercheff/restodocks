@@ -4838,6 +4838,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                       if (!_isSemiFinished && !tableOnlyView)
                         Builder(
                           builder: (ctx) {
+                            const eps = 1e-9;
                             final totalCal = _ingredients.fold<double>(
                                 0, (s, i) => s + i.finalCalories);
                             final totalProt = _ingredients.fold<double>(
@@ -4846,11 +4847,65 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                 0, (s, i) => s + i.finalFat);
                             final totalCarbVal = _ingredients.fold<double>(
                                 0, (s, i) => s + i.finalCarbs);
-                            if (totalCal == 0 &&
+                            final missingNutritionIngredients = <String>[];
+                            final seen = <String>{};
+                            for (final ing in _ingredients) {
+                              if (!ing.hasData) continue;
+                              final missing = ing.finalCalories.abs() < eps &&
+                                  ing.finalProtein.abs() < eps &&
+                                  ing.finalFat.abs() < eps &&
+                                  ing.finalCarbs.abs() < eps;
+                              if (!missing) continue;
+                              final name = ing.productName.trim();
+                              if (name.isEmpty) continue;
+                              if (seen.add(name)) missingNutritionIngredients.add(name);
+                            }
+
+                            final showKbjuBlock = !(totalCal == 0 &&
                                 totalProt == 0 &&
                                 totalFatVal == 0 &&
-                                totalCarbVal == 0)
-                              return const SizedBox.shrink();
+                                totalCarbVal == 0);
+
+                            final kbjuMarginTop = missingNutritionIngredients.isNotEmpty ? 8.0 : 12.0;
+
+                            String? warningText;
+                            if (missingNutritionIngredients.isNotEmpty) {
+                              const maxShown = 5;
+                              final shown = missingNutritionIngredients.take(maxShown).join(', ');
+                              final remaining =
+                                  missingNutritionIngredients.length - missingNutritionIngredients.take(maxShown).length;
+                              final listText = remaining > 0 ? '$shown (+$remaining)' : shown;
+                              warningText = loc
+                                  .t('kbju_incomplete_dish_nutrition_warning')
+                                  .replaceFirst('%s', listText);
+                            }
+
+                            if (!showKbjuBlock) {
+                              if (warningText == null) return const SizedBox.shrink();
+                              return Container(
+                                margin: const EdgeInsets.only(top: 12),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .errorContainer
+                                      .withOpacity(0.18),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .error
+                                        .withOpacity(0.35),
+                                  ),
+                                ),
+                                child: Text(
+                                  warningText,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              );
+                            }
+
                             final store = context.read<ProductStoreSupabase>();
                             final allergens = <String>[];
                             for (final ing in _ingredients
@@ -4858,47 +4913,79 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                               final p = store.findProductForIngredient(
                                   ing.productId, ing.productName);
                               if (p?.containsGluten == true &&
-                                  !allergens.contains('глютен'))
+                                  !allergens.contains('глютен')) {
                                 allergens.add('глютен');
+                              }
                               if (p?.containsLactose == true &&
-                                  !allergens.contains('лактоза'))
+                                  !allergens.contains('лактоза')) {
                                 allergens.add('лактоза');
+                              }
                             }
                             final allergenStr = allergens.isEmpty
                                 ? (loc.currentLanguageCode == 'ru'
                                     ? 'нет'
                                     : 'none')
                                 : allergens.join(', ');
-                            return Container(
-                              margin: const EdgeInsets.only(top: 12),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primaryContainer
-                                    .withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (warningText != null)
+                                  Container(
+                                    margin: const EdgeInsets.only(top: 12, bottom: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .errorContainer
+                                          .withOpacity(0.18),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .error
+                                            .withOpacity(0.35),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      warningText,
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
+                                  ),
+                                Container(
+                                  margin: EdgeInsets.only(top: kbjuMarginTop),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 10),
+                                  decoration: BoxDecoration(
                                     color: Theme.of(context)
                                         .colorScheme
-                                        .primary
-                                        .withOpacity(0.3)),
-                              ),
-                              child: Text(
-                                loc
-                                    .t('kbju_allergens_in_dish')
-                                    .replaceFirst(
-                                        '%s', totalCal.round().toString())
-                                    .replaceFirst(
-                                        '%s', totalProt.toStringAsFixed(1))
-                                    .replaceFirst(
-                                        '%s', totalFatVal.toStringAsFixed(1))
-                                    .replaceFirst(
-                                        '%s', totalCarbVal.toStringAsFixed(1))
-                                    .replaceFirst('%s', allergenStr),
-                                style: const TextStyle(fontSize: 13),
-                              ),
+                                        .primaryContainer
+                                        .withOpacity(0.3),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withOpacity(0.3),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    loc
+                                        .t('kbju_allergens_in_dish')
+                                        .replaceFirst(
+                                            '%s', totalCal.round().toString())
+                                        .replaceFirst(
+                                            '%s', totalProt.toStringAsFixed(1))
+                                        .replaceFirst(
+                                            '%s', totalFatVal.toStringAsFixed(1))
+                                        .replaceFirst(
+                                            '%s', totalCarbVal.toStringAsFixed(1))
+                                        .replaceFirst('%s', allergenStr),
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ),
+                              ],
                             );
                           },
                         ),
