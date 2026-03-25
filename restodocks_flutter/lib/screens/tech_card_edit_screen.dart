@@ -1526,7 +1526,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           setState(() {
             _loading = false;
           });
-          if (mounted) await restoreDraftNow();
+          if (mounted) {
+            if (kIsWeb) {
+              // На web jsonDecode/localStorage может блокировать UI на несколько секунд.
+              // Не ждём восстановление, чтобы форма/инпуты успевали отрисоваться.
+              unawaited(restoreDraftNow());
+            } else {
+              await restoreDraftNow();
+            }
+          }
         }
         return;
       }
@@ -1620,7 +1628,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         if (tc != null && est != null)
           _enrichPricesFromNomenclature(
               est.isBranch ? est.id : est.dataEstablishmentId!);
-        if (mounted) await restoreDraftNow();
+        if (mounted) {
+          if (kIsWeb) {
+            unawaited(restoreDraftNow());
+          } else {
+            await restoreDraftNow();
+          }
+        }
       });
     } catch (e) {
       if (mounted)
