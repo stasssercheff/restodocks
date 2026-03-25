@@ -4880,29 +4880,86 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                   .replaceFirst('%s', listText);
                             }
 
+                            void _showMissingNutritionDialog() {
+                              if (missingNutritionIngredients.isEmpty) return;
+                              showDialog<void>(
+                                context: ctx,
+                                builder: (dCtx) {
+                                  return AlertDialog(
+                                    title: Text(
+                                      loc.t('kbju_incomplete_dish_nutrition_title'),
+                                    ),
+                                    content: SizedBox(
+                                      width: 520,
+                                      height: 320,
+                                      child: ListView.builder(
+                                        itemCount:
+                                            missingNutritionIngredients.length,
+                                        itemBuilder: (c, idx) {
+                                          final name =
+                                              missingNutritionIngredients[idx];
+                                          return ListTile(
+                                            dense: true,
+                                            title: Text(
+                                              name,
+                                              maxLines: 2,
+                                              overflow:
+                                                  TextOverflow.ellipsis,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.of(dCtx).pop(),
+                                        child: Text(loc.t('cancel') ?? 'OK'),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              );
+                            }
+
                             if (!showKbjuBlock) {
                               if (warningText == null) return const SizedBox.shrink();
-                              return Container(
-                                margin: const EdgeInsets.only(top: 12),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .errorContainer
-                                      .withOpacity(0.18),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .error
-                                        .withOpacity(0.35),
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Container(
+                                    margin: const EdgeInsets.only(top: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .errorContainer
+                                          .withOpacity(0.18),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .error
+                                            .withOpacity(0.35),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      warningText,
+                                      style: const TextStyle(fontSize: 13),
+                                    ),
                                   ),
-                                ),
-                                child: Text(
-                                  warningText,
-                                  style: const TextStyle(fontSize: 13),
-                                ),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: TextButton(
+                                      onPressed: _showMissingNutritionDialog,
+                                      child: Text(
+                                        loc.t('kbju_incomplete_dish_nutrition_show_list') ??
+                                            'Показать список',
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               );
                             }
 
@@ -4948,9 +5005,27 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                             .withOpacity(0.35),
                                       ),
                                     ),
-                                    child: Text(
-                                      warningText,
-                                      style: const TextStyle(fontSize: 13),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          warningText,
+                                          style: const TextStyle(fontSize: 13),
+                                        ),
+                                        Align(
+                                          alignment:
+                                              Alignment.centerLeft,
+                                          child: TextButton(
+                                            onPressed:
+                                                _showMissingNutritionDialog,
+                                            child: Text(
+                                              loc.t('kbju_incomplete_dish_nutrition_show_list') ??
+                                                  'Показать список',
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 Container(
