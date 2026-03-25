@@ -7,6 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 class DraftStorageService {
   static const String _inventoryKey = 'draft_inventory';
   static const String _checklistKey = 'draft_checklist';
+  // Ограничиваем размер JSON черновика, чтобы web/iOS UI не зависал на jsonDecode
+  // при очень больших состояниях (особенно для tech_card_edit_*).
+  static const int _maxTechCardEditDraftChars = 250000;
 
   /// Сохранить черновик инвентаризации
   Future<void> saveInventoryDraft(Map<String, dynamic> data) async {
@@ -160,7 +163,15 @@ class DraftStorageService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final s = prefs.getString('$_techCardEditPrefix$techCardId');
-      return s != null ? jsonDecode(s) as Map<String, dynamic> : null;
+      if (s == null) return null;
+      if (s.length > _maxTechCardEditDraftChars) {
+        devLog(
+          'TechCardEdit draft too large (${s.length} chars) for "$techCardId". Clearing to avoid UI freeze.',
+        );
+        await prefs.remove('$_techCardEditPrefix$techCardId');
+        return null;
+      }
+      return jsonDecode(s) as Map<String, dynamic>;
     } catch (e) {
       devLog('Failed to load tech card draft: $e');
       return null;
