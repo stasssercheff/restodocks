@@ -243,8 +243,22 @@ class TechCardService {
       createdBy: newCreatorId,
     );
 
+    // Копируем поля, чтобы дубликат выглядел как оригинал.
+    var updatedTechCard = clonedTechCard.copyWith(
+      portionWeight: originalTechCard.portionWeight,
+      yield: originalTechCard.yield,
+      technologyLocalized: originalTechCard.technologyLocalized,
+      descriptionForHall: originalTechCard.descriptionForHall,
+      compositionForHall: originalTechCard.compositionForHall,
+      sellingPrice: originalTechCard.sellingPrice,
+      photoUrls: originalTechCard.photoUrls,
+      sections: originalTechCard.sections,
+      department: originalTechCard.department,
+      isSemiFinished: originalTechCard.isSemiFinished,
+      dishNameLocalized: originalTechCard.dishNameLocalized,
+    );
+
     // Копируем ингредиенты
-    var updatedTechCard = clonedTechCard;
     for (final ingredient in originalTechCard.ingredients) {
       updatedTechCard = updatedTechCard.addIngredient(ingredient);
     }

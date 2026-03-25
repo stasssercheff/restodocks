@@ -339,7 +339,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       child: SingleChildScrollView(
         scrollDirection: Axis.vertical,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 1145), // Минимальная ширина: 2 новых столбца (вес прц, порций)
+            constraints: const BoxConstraints(
+              minWidth: 1145,
+              maxWidth: 1145,
+            ), // фиксируем ширину, чтобы контейнер не раздувался под доступную ширину
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

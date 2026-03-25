@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:feature_spotlight/feature_spotlight.dart';
 import 'package:flutter/foundation.dart';
 import '../../utils/dev_log.dart';
@@ -47,6 +49,7 @@ import '../../services/ai_service.dart';
 import '../../services/services.dart';
 import '../../widgets/app_shell.dart';
 import '../../widgets/inbox_notification_listener.dart';
+import '../theme/app_theme.dart';
 
 /// Emails владельцев платформы — единственные кто видит /admin
 const _platformAdminEmails = <String>{
@@ -852,29 +855,39 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkAuthStatus() async {
-    final accountManager = context.read<AccountManagerSupabase>();
-    await accountManager.initialize();
-    if (!mounted) return;
+    try {
+      final accountManager = context.read<AccountManagerSupabase>();
+      await accountManager.initialize().timeout(
+            const Duration(seconds: 25),
+            onTimeout: () =>
+                throw TimeoutException('AccountManager.initialize'),
+          );
+      if (!mounted) return;
 
-    if (accountManager.isLoggedInSync) {
-      // Web: при F5 — восстанавливаем исходный путь из кэша или localStorage.
-      // _cachedInitialPath кэшируется в getInitialLocation() который вызывается
-      // в main() до любых redirect, поэтому всегда содержит реальный URL.
-      String? target;
-      if (kIsWeb) {
-        target = initial_loc.getCachedInitialPath();
-        // Дополнительный fallback: читаем из localStorage напрямую
-        if (target == null || target == '/' || target == '/splash') {
-          target = initial_loc.getLastSavedPath();
+      if (accountManager.isLoggedInSync) {
+        // Web: при F5 — восстанавливаем исходный путь из кэша или localStorage.
+        // _cachedInitialPath кэшируется в getInitialLocation() который вызывается
+        // в main() до любых redirect, поэтому всегда содержит реальный URL.
+        String? target;
+        if (kIsWeb) {
+          target = initial_loc.getCachedInitialPath();
+          // Дополнительный fallback: читаем из localStorage напрямую
+          if (target == null || target == '/' || target == '/splash') {
+            target = initial_loc.getLastSavedPath();
+          }
+          // Фильтруем служебные пути
+          if (target == '/' || target == '/splash' || target?.isEmpty == true) {
+            target = null;
+          }
         }
-        // Фильтруем служебные пути
-        if (target == '/' || target == '/splash' || target?.isEmpty == true) {
-          target = null;
-        }
+        devLog('[Splash] go → ${target ?? '/home'} (cached=${initial_loc.getCachedInitialPath()})');
+        context.go(target ?? '/home');
+      } else {
+        context.go('/login');
       }
-      devLog('[Splash] go → ${target ?? '/home'} (cached=${initial_loc.getCachedInitialPath()})');
-      context.go(target ?? '/home');
-    } else {
+    } catch (e, st) {
+      devLog('[Splash] _checkAuthStatus error: $e\n$st');
+      if (!mounted) return;
       context.go('/login');
     }
   }
@@ -882,12 +895,40 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SizedBox.expand(
-        child: Image.asset(
-          'assets/images/welcome_logo.png',
-          fit: BoxFit.cover,
-        ),
+      backgroundColor: AppTheme.primaryColor,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Image.asset(
+                'assets/images/welcome_logo.png',
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.restaurant_menu,
+                  size: 88,
+                  color: Colors.white70,
+                ),
+              ),
+            ),
+          ),
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 40,
+            child: Center(
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  color: Colors.white70,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

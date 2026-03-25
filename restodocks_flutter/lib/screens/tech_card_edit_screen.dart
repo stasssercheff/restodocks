@@ -860,6 +860,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// Фото, выбранные для новой ТТК до первого сохранения (загружаем после create)
   List<Uint8List> _pendingPhotoBytes = [];
   bool _saving = false;
+  bool _duplicating = false;
 
   Timer? _ingredientUpdateDebounce;
   Timer? _reconcileOpenCardTimer;
@@ -1283,6 +1284,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       var loadedTechCards = <TechCard>[];
       if (est != null) {
         final productStore = context.read<ProductStoreSupabase>();
+        final canEditNow =
+            context.read<AccountManagerSupabase>().currentEmployee?.canEditChecklistsAndTechCards ?? false;
+        final shouldLoadPickerData = canEditNow && !widget.forceViewMode;
         // Продукты и номенклатура — в фоне, не блокируем показ формы
         Future.microtask(() async {
           try {
@@ -1340,6 +1344,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           }
         } else {
           // Фоновая догрузка, чтобы дальше работали подбор ПФ/категорий без задержки при открытии.
+          if (!shouldLoadPickerData) {
+            // В режиме просмотра без редактирования не грузим все ТТК для справочников.
+            // Текущую карточку (и технологию) загрузим ниже как обычно.
+          } else {
           () async {
             try {
               final tcSvc = context.read<TechCardServiceSupabase>();
@@ -1425,6 +1433,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               _ensureTechCardTranslations(tcs);
             } catch (_) {}
           }();
+          }
         }
       }
       if (_isNew) {
@@ -2629,7 +2638,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           setState(() => _saving = false);
           await clearDraft();
           AppToastService.show(
-              context.read<LocalizationService>().t('save') + ' ✓');
+              context.read<LocalizationService>().t('saved'));
           context.pop(true); // Список обновит данные в фоне, без полного перезагруза
         }
       }
@@ -2810,6 +2819,33 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(
                 loc.t('error_with_message').replaceAll('%s', e.toString()))));
+    }
+  }
+
+  Future<void> _duplicateTechCard(LocalizationService loc) async {
+    if (_isNew) return;
+    final tc = _techCard;
+    if (tc == null) return;
+    if (_duplicating) return;
+
+    final emp = context.read<AccountManagerSupabase>().currentEmployee;
+    if (emp == null) return;
+
+    setState(() => _duplicating = true);
+    try {
+      final svc = context.read<TechCardServiceSupabase>();
+      final created = await svc.cloneTechCard(tc, emp.id);
+      if (!mounted) return;
+      AppToastService.show(loc.t('ttk_created_duplicate') ?? 'Дубликат создан');
+      context.pushReplacement('/tech-cards/${created.id}');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(loc.t('error_with_message').replaceAll('%s', e.toString())),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _duplicating = false);
     }
   }
 
@@ -4100,6 +4136,20 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 onPressed: () => _confirmDelete(context, loc),
                 tooltip: loc.t('delete_tech_card'),
                 style: IconButton.styleFrom(minimumSize: const Size(48, 48))),
+          // В режиме просмотра (view=1): разрешаем быстро создать дубликат, если есть право редактирования.
+          if (canEdit && !effectiveCanEdit && !_isNew && _techCard != null)
+            IconButton(
+              icon: _duplicating
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.copy),
+              onPressed: _duplicating ? null : () => _duplicateTechCard(loc),
+              tooltip: loc.t('ttk_create_duplicate') ?? 'Создать дубликат',
+              style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
+            ),
           // Кнопка экспорта текущей ТТК
           if (!_isNew && _techCard != null)
             IconButton(
@@ -4688,7 +4738,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                         },
                       ),
                       // Блок технологии сразу под таблицей, на странице (без ограничения по высоте «окном»)
-                      if (!tableOnlyView)
                       Align(
                         alignment: Alignment.centerLeft,
                         child: SizedBox(

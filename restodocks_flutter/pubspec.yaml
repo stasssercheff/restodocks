@@ -87,6 +87,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Иначе на физическом iPhone LLDB часто висит 60+ с — белый экран при flutter run.
+  config:
+    enable-lldb-debugging: false
 
   assets:
     - assets/config.json

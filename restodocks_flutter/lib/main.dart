@@ -16,7 +16,6 @@ import 'core/supabase_url_resolver_stub.dart'
     if (dart.library.html) 'core/supabase_url_resolver_web.dart' as supabase_url;
 import 'services/services.dart';
 import 'services/translation_manager.dart';
-import 'screens/screens.dart';
 import 'widgets/widgets.dart';
 
 const String _supabaseUrlEnv = String.fromEnvironment(
@@ -28,7 +27,7 @@ const String _supabaseAnonKey = String.fromEnvironment(
   defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE',
 );
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Критично: кэшировать путь+query до ВСЕГО остального — иначе теряются token_hash/type для auth/confirm-click
   if (kIsWeb) initial_loc.getInitialLocation();
@@ -37,7 +36,23 @@ void main() async {
     devLog('FlutterError: ${details.exception}');
     devLog('Stack: ${details.stack}');
   };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    devLog('Uncaught async: $error');
+    devLog('Stack: $stack');
+    return true;
+  };
 
+  try {
+    await _bootstrapApp();
+    runApp(const RestodocksApp());
+  } catch (e, st) {
+    devLog('Startup failed: $e');
+    devLog('Stack: $st');
+    runApp(_BootstrapFailureApp(message: '$e'));
+  }
+}
+
+Future<void> _bootstrapApp() async {
   final supabaseUrl = supabase_url.resolveSupabaseUrl(_supabaseUrlEnv);
   devLog('=== SUPABASE INIT: url=$supabaseUrl key=${_supabaseAnonKey.substring(0, 15)}... ===');
 
@@ -79,7 +94,48 @@ void main() async {
   await ScreenLayoutPreferenceService().initialize();
   await MobileUiScaleService().initialize();
   AppToastService.init(AppRouter.rootNavigatorKey);
-  runApp(const RestodocksApp());
+}
+
+/// Минимальный экран, если до runApp(RestodocksApp) не дошли (иначе на устройстве — вечный белый кадр).
+class _BootstrapFailureApp extends StatelessWidget {
+  const _BootstrapFailureApp({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.wifi_off, size: 48),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Не удалось запустить приложение. Проверьте сеть и откройте снова.',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                  if (kDebugMode) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class RestodocksApp extends StatelessWidget {

@@ -51,6 +51,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   String? _priceEstablishmentId;
   final Map<String, double> _nomenclaturePriceByName = {};
   bool _loading = true;
+  /// Фоновая догрузка продуктов/номенклатуры и гидрация цен/нутриентов после первого показа списка.
+  bool _listDetailsHydrating = false;
+  int _loadHydrateToken = 0;
+  int _loadRequestToken = 0;
   bool _loadingExcel = false;
   bool _loadingTtkIsPdf = false;
   String? _error;
@@ -1629,10 +1633,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     final emp = acc.currentEmployee;
+    final requestToken = ++_loadRequestToken;
     if (est == null) {
       setState(() {
         _loading = false;
         _error = 'no_establishment';
+        _listDetailsHydrating = false;
       });
       return;
     }
@@ -1640,36 +1646,39 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       setState(() {
         _loading = true;
         _error = null;
+        _listDetailsHydrating = false;
       });
     }
     try {
       final svc = context.read<TechCardServiceSupabase>();
       final productStore = context.read<ProductStoreSupabase>();
 
-      // Минимум для показа списка: только ТТК и категории (без products, nomenclature, fillIngredients).
+      // Минимум для показа списка: только ТТК и категории (без вложенных ingredients).
       late Future<List<TechCard>> allCardsFuture;
       if (est.isBranch) {
         allCardsFuture = Future.wait([
-          svc.getTechCardsForEstablishment(est.dataEstablishmentId),
-          svc.getTechCardsForEstablishment(est.id),
+          svc.getTechCardsForEstablishment(est.dataEstablishmentId, includeIngredients: false),
+          svc.getTechCardsForEstablishment(est.id, includeIngredients: false),
         ]).then((results) => [...results[0], ...results[1]]);
       } else {
         allCardsFuture =
-            svc.getTechCardsForEstablishment(est.dataEstablishmentId);
+            svc.getTechCardsForEstablishment(est.dataEstablishmentId, includeIngredients: false);
       }
-      final results = await Future.wait([
-        allCardsFuture,
-        Future.wait([
-          svc.getCustomCategories(est.dataEstablishmentId, 'kitchen'),
-          svc.getCustomCategories(est.dataEstablishmentId, 'bar'),
-        ]),
+      final customCategoriesFuture = Future.wait([
+        svc.getCustomCategories(est.dataEstablishmentId, 'kitchen'),
+        svc.getCustomCategories(est.dataEstablishmentId, 'bar'),
       ]);
-      final all = results[0] as List<TechCard>;
-      final customResults = results[1] as List;
-      final customKitchen =
-          customResults[0] as List<({String id, String name})>;
-      final customBar = customResults[1] as List<({String id, String name})>;
-      final customBarIds = customBar.map((c) => c.id).toSet();
+      final all = await allCardsFuture;
+      if (!mounted || requestToken != _loadRequestToken) return;
+      List<({String id, String name})> customKitchen = const [];
+      List<({String id, String name})> customBar = const [];
+      try {
+        final customResults = await customCategoriesFuture
+            .timeout(const Duration(milliseconds: 350));
+        customKitchen = customResults[0];
+        customBar = customResults[1];
+      } catch (_) {}
+      var customBarIds = customBar.map((c) => c.id).toSet();
 
       final toPersistSelfLink = <TechCard>[];
       final sanitizedAll = <TechCard>[];
@@ -1687,6 +1696,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           emp?.hasRole('general_manager') == true;
 
       // Тяжёлое (products, nomenclature, fillIngredients, hydrate, индекс цен) — в фоне
+      final hydrateToken = ++_loadHydrateToken;
       Future.microtask(() async {
         try {
           await productStore.loadProducts().catchError((_) {});
@@ -1699,10 +1709,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                 .loadNomenclature(est.dataEstablishmentId)
                 .catchError((_) {});
           }
-          if (!mounted) return;
+          if (!mounted || requestToken != _loadRequestToken) return;
           var withData = List<TechCard>.from(processedAll);
+          // В shallow-режиме в cards ингредиенты не вшиты — догружаем всегда,
+          // иначе вкладки/подсчёты (в т.ч. для без-цены ролей) будут работать некорректно.
+          withData = await svc.fillIngredientsForCardsBulk(withData);
           if (canSeeCosts) {
-            withData = await svc.fillIngredientsForCardsBulk(withData);
             final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
             if (estPriceId != null && estPriceId.isNotEmpty) {
               withData = TechCardCostHydrator.hydrate(
@@ -1711,10 +1723,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           }
           withData =
               TechCardNutritionHydrator.hydrate(withData, productStore);
-          if (!mounted) return;
+          if (!mounted || requestToken != _loadRequestToken) return;
           await _buildNomenclatureNamePriceIndex(
               productStore, est.isBranch ? est.id : est.dataEstablishmentId);
-          if (!mounted) return;
+          if (!mounted || requestToken != _loadRequestToken) return;
           var filteredList = _filterListByDepartment(withData, customBarIds);
           final byId = {for (final tc in withData) tc.id: tc};
           final referencedIds = <String>{};
@@ -1733,7 +1745,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               existing.add(id);
             }
           }
-          if (!mounted) return;
+          if (!mounted || requestToken != _loadRequestToken) return;
           setState(() {
             _list = filteredList;
             _listVersion++;
@@ -1745,7 +1757,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             _priceEstablishmentId =
                 est.isBranch ? est.id : est.dataEstablishmentId;
           });
-          if (mounted) {
+          if (mounted && requestToken == _loadRequestToken) {
             _rebuildPfCandidatesIndex(context.read<LocalizationService>());
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (!mounted || _list.isEmpty) return;
@@ -1753,7 +1765,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               _ensureReviewCache(loc, _getReviewFilteredList(loc));
             });
           }
-        } catch (_) {}
+        } catch (_) {
+        } finally {
+          if (mounted &&
+              requestToken == _loadRequestToken &&
+              hydrateToken == _loadHydrateToken) {
+            setState(() => _listDetailsHydrating = false);
+          }
+        }
       });
 
       _customCategoryNames.clear();
@@ -1791,6 +1810,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           _cachedReviewCount = null;
           _lastReviewCacheKey = null;
           _loading = false;
+          _listDetailsHydrating = list.isNotEmpty;
         });
         _techCardsById = {for (final tc in processedAll) tc.id: tc};
         _resolvedCostMemo.clear();
@@ -1803,6 +1823,30 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           _ensureReviewCache(loc, _getReviewFilteredList(loc));
         });
       }
+
+      // Если категории не успели к первому кадру — догружаем и обновляем фильтрацию/лейблы позднее.
+      unawaited(customCategoriesFuture.then((customResults) {
+        if (!mounted || requestToken != _loadRequestToken) return;
+        final kitchen = customResults[0];
+        final bar = customResults[1];
+        final newBarIds = bar.map((c) => c.id).toSet();
+        _customCategoryNames.clear();
+        for (final c in kitchen) {
+          _customCategoryNames[c.id] = c.name;
+        }
+        for (final c in bar) {
+          _customCategoryNames[c.id] = c.name;
+        }
+        customBarIds = newBarIds;
+        final relisted = _filterListByDepartment(processedAll, customBarIds);
+        setState(() {
+          _list = relisted;
+          _listVersion++;
+          _cachedReviewList = null;
+          _cachedReviewCount = null;
+          _lastReviewCacheKey = null;
+        });
+      }).catchError((_) {}));
 
       if (toPersistSelfLink.isNotEmpty && mounted) {
         Future.microtask(() async {
@@ -1820,6 +1864,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         setState(() {
           _error = e.toString();
           _loading = false;
+          _listDetailsHydrating = false;
         });
     }
   }
@@ -2805,11 +2850,26 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             },
             itemBuilder: (_) => [
               PopupMenuItem(
-                  value: 'excel', child: Text(loc.t('ttk_import_file'))),
+                value: 'excel',
+                child: Text(
+                  loc.t('ttk_import_file'),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
+              ),
               PopupMenuItem(
                   value: 'text',
-                  child:
-                      Text(loc.t('ttk_import_paste_text') ?? 'Вставить текст')),
+                  child: Text(
+                    loc.t('ttk_import_paste_text').trim().isEmpty
+                        ? 'Вставить текст'
+                        : loc.t('ttk_import_paste_text'),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontWeight: FontWeight.w500,
+                        ),
+                  )),
             ],
           )
         : null;
@@ -3200,11 +3260,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   ),
           ),
           TabBar(
-            isScrollable: true,
-            labelPadding:
-                const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            isScrollable: false,
+            tabAlignment: TabAlignment.center,
+            labelPadding: EdgeInsets.zero,
             indicatorSize: TabBarIndicatorSize.tab,
             dividerColor: Colors.transparent,
+            indicatorPadding: EdgeInsets.zero,
             indicator: BoxDecoration(
               color: Theme.of(context)
                   .colorScheme
@@ -3216,6 +3277,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             unselectedLabelColor: Theme.of(context).colorScheme.primary,
             tabs: _buildTabBarTabs(loc, reviewCount),
           ),
+          if (_listDetailsHydrating)
+            LinearProgressIndicator(
+              minHeight: 2,
+              backgroundColor:
+                  Theme.of(context).colorScheme.surfaceContainerHighest,
+            ),
           // Поиск и сортировка
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
@@ -3258,13 +3325,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
+                        isExpanded: true,
                         value: _filterSection,
                         decoration: InputDecoration(
                           labelText: loc.t('ttk_section_label'),
                           isDense: true,
                           border: const OutlineInputBorder(),
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                              horizontal: 10, vertical: 8),
                         ),
                         items: [
                           DropdownMenuItem(
@@ -3279,16 +3347,17 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                         onChanged: (v) => setState(() => _filterSection = v),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: DropdownButtonFormField<String>(
+                        isExpanded: true,
                         value: _filterCategory,
                         decoration: InputDecoration(
                           labelText: loc.t('column_category'),
                           isDense: true,
                           border: const OutlineInputBorder(),
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                              horizontal: 10, vertical: 8),
                         ),
                         items: [
                           DropdownMenuItem(
@@ -3310,10 +3379,25 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             child: TabBarView(
               children: [
                 _buildTechCardsTable(
-                    semiFinishedFiltered, loc, canEdit, showCost,
-                    isDishesTab: false),
-                _buildTechCardsTable(dishFiltered, loc, canEdit, showCost,
-                    isDishesTab: true),
+                  semiFinishedFiltered,
+                  loc,
+                  canEdit,
+                  showCost,
+                  isDishesTab: false,
+                  hasActiveFilters: _searchController.text.trim().isNotEmpty ||
+                      _filterSection != null ||
+                      _filterCategory != null,
+                ),
+                _buildTechCardsTable(
+                  dishFiltered,
+                  loc,
+                  canEdit,
+                  showCost,
+                  isDishesTab: true,
+                  hasActiveFilters: _searchController.text.trim().isNotEmpty ||
+                      _filterSection != null ||
+                      _filterCategory != null,
+                ),
                 _buildReviewList(loc, canEdit),
               ],
             ),
@@ -3327,7 +3411,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   /// isDishesTab: для блюд — себестоимость за порцию, для ПФ — стоимость за кг.
   Widget _buildTechCardsTable(List<TechCard> techCards, LocalizationService loc,
       bool canEdit, bool showCost,
-      {bool isDishesTab = false}) {
+      {bool isDishesTab = false, bool hasActiveFilters = false}) {
     if (techCards.isEmpty) {
       return RefreshIndicator(
         onRefresh: _load,
@@ -3341,14 +3425,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             const SizedBox(height: 12),
             Text(
               isDishesTab
-                  ? (loc.t('ttk_dishes_tab') ?? 'Блюда')
-                  : (loc.t('ttk_pf_tab') ?? 'ПФ'),
+                  ? (loc.t('ttk_tab_dishes') == 'ttk_tab_dishes'
+                      ? 'Блюда'
+                      : loc.t('ttk_tab_dishes'))
+                  : (loc.t('ttk_tab_pf') == 'ttk_tab_pf' ? 'ПФ' : loc.t('ttk_tab_pf')),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 6),
             Text(
-              loc.t('tech_cards_empty'),
+              hasActiveFilters ? loc.t('nothing_found') : loc.t('tech_cards_empty'),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant),

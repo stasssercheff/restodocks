@@ -138,7 +138,9 @@ class TechCardServiceSupabase {
   /// Получение всех ТТК для заведения (один запрос с ингредиентами — без N+1).
   /// При 0 карточек или ошибке — fallback без tt_ingredients (ингредиенты подгрузятся при открытии).
   Future<List<TechCard>> getTechCardsForEstablishment(
-      String establishmentId) async {
+    String establishmentId, {
+    bool includeIngredients = true,
+  }) async {
     final cacheKey = await _offlineCache.scopedKey(
       dataset: _cacheDataset,
       establishmentId: establishmentId,
@@ -146,10 +148,14 @@ class TechCardServiceSupabase {
     final cached = await _offlineCache.readJsonList(cacheKey);
     if (cached != null && cached.isNotEmpty) {
       final cachedCards = cached.map(TechCard.fromJson).toList();
-      unawaited(_refreshTechCardsCache(establishmentId));
+      // Обновим кэш в фоне полным вариантом (с tt_ingredients), чтобы прогреть detail-кэши.
+      unawaited(_refreshTechCardsCache(establishmentId, includeIngredients: true));
       return cachedCards;
     }
-    return _fetchTechCardsFromServer(establishmentId);
+    return _fetchTechCardsFromServer(
+      establishmentId,
+      includeIngredients: includeIngredients,
+    );
   }
 
   /// После полной загрузки списка с сервера — прогревает кэш открытия карточки (состав без лишнего round-trip).
@@ -169,7 +175,9 @@ class TechCardServiceSupabase {
   }
 
   Future<List<TechCard>> _fetchTechCardsFromServer(
-      String establishmentId) async {
+    String establishmentId, {
+    required bool includeIngredients,
+  }) async {
     Future<List<TechCard>> _fetchWithoutEmbed() async {
       final data = await _supabase.client
           .from('tech_cards')
@@ -182,9 +190,18 @@ class TechCardServiceSupabase {
     try {
       final data = await _supabase.client
           .from('tech_cards')
-          .select('*, tt_ingredients(*)')
+          .select(includeIngredients ? '*, tt_ingredients(*)' : '*')
           .eq('establishment_id', establishmentId)
           .order('created_at', ascending: false);
+
+      if (!includeIngredients) {
+        // В shallow-режиме ингредиенты не загружаем: они подгружаются при необходимости (открытие/расчёты).
+        final list = (data as List)
+            .map((row) => TechCard.fromJson(Map<String, dynamic>.from(row as Map)))
+            .toList();
+        await _saveTechCardsCache(establishmentId, list);
+        return list;
+      }
 
       var list = _parseTechCardsWithIngredients(data as List);
       final rawCount = (data as List).length;
@@ -206,16 +223,24 @@ class TechCardServiceSupabase {
     }
   }
 
-  Future<void> _refreshTechCardsCache(String establishmentId) async {
+  Future<void> _refreshTechCardsCache(String establishmentId,
+      {required bool includeIngredients}) async {
     try {
-      await _fetchTechCardsFromServer(establishmentId);
+      await _fetchTechCardsFromServer(
+        establishmentId,
+        includeIngredients: includeIngredients,
+      );
     } catch (_) {}
   }
 
   /// Принудительное обновление с сервера (используется фоновым realtime-sync).
   Future<List<TechCard>> refreshTechCardsFromServer(
-      String establishmentId) async {
-    return _fetchTechCardsFromServer(establishmentId);
+    String establishmentId,
+  ) async {
+    return _fetchTechCardsFromServer(
+      establishmentId,
+      includeIngredients: true,
+    );
   }
 
   Future<void> _saveTechCardsCache(
@@ -967,8 +992,19 @@ class TechCardServiceSupabase {
       createdBy: newCreatorId,
     );
 
+    // Копируем поля, чтобы дубликат выглядел как оригинал.
+    // (TechCard.create() выставляет часть полей дефолтами: yield=0, technologyLocalized=null.)
+    var updatedTechCard = clonedTechCard.copyWith(
+      portionWeight: originalTechCard.portionWeight,
+      yield: originalTechCard.yield,
+      technologyLocalized: originalTechCard.technologyLocalized,
+      descriptionForHall: originalTechCard.descriptionForHall,
+      compositionForHall: originalTechCard.compositionForHall,
+      sellingPrice: originalTechCard.sellingPrice,
+      photoUrls: originalTechCard.photoUrls,
+    );
+
     // Копируем ингредиенты
-    var updatedTechCard = clonedTechCard;
     for (final ingredient in originalTechCard.ingredients) {
       updatedTechCard = updatedTechCard.addIngredient(ingredient);
     }
