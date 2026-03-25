@@ -1696,10 +1696,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           emp?.hasRole('general_manager') == true;
 
       // Тяжёлое (products, nomenclature, fillIngredients, hydrate, индекс цен) — в фоне
-      // В фоне — только когда показан loading. Если showLoading=false (например,
-      // после сохранения и возврата на список), то тяжёлая гидратация всей
-      // выборки на web вызывает заметные зависания.
-      final bool doHeavyHydration = showLoading;
+      // На web тяжёлая гидратация в списке заметно фризит переходы
+      // (вход/выход из ТТК и обратно), поэтому отключаем её.
+      final bool doHeavyHydration = showLoading && !kIsWeb;
       int? hydrateToken;
       if (doHeavyHydration) {
         hydrateToken = ++_loadHydrateToken;
@@ -2978,6 +2977,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }) {
     final scheme = Theme.of(context).colorScheme;
     final p = scheme.primary;
+    final pageFill = Theme.of(context).scaffoldBackgroundColor;
+    final unselectedFill = pageFill;
+    final selectedFill = Color.alphaBlend(
+      const Color(0x33D32F2F),
+      pageFill,
+    );
     // Чуть увеличиваем расстояние между “кнопками-чипами” как в экране
     // номенклатуры: делаем зазор внешними паддингами, не трогая индикатор.
     return Padding(
@@ -2987,10 +2992,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: p, width: 1.2),
-          // Заливка внутри самого “чипа”, чтобы размер подсветки совпадал
-          // строго с размером кнопки/контейнера.
-          // Подбираем заметный, но "бледный" красный как в номенклатуре.
-          color: selected ? p.withValues(alpha: 0.18) : p.withValues(alpha: 0.12),
+          color: selected ? selectedFill : unselectedFill,
         ),
         child: FittedBox(
           fit: BoxFit.scaleDown,
@@ -3308,6 +3310,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                       tabAlignment: TabAlignment.center,
                       labelPadding: EdgeInsets.zero,
                       dividerColor: Colors.transparent,
+                      overlayColor:
+                          WidgetStateProperty.all(Colors.transparent),
+                      splashFactory: NoSplash.splashFactory,
                       indicator: const BoxDecoration(),
                       labelColor: Theme.of(context).colorScheme.primary,
                       unselectedLabelColor:
