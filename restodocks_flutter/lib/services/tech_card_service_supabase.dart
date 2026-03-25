@@ -996,13 +996,16 @@ class TechCardServiceSupabase {
     // (TechCard.create() выставляет часть полей дефолтами: yield=0, technologyLocalized=null.)
     var updatedTechCard = clonedTechCard.copyWith(
       portionWeight: originalTechCard.portionWeight,
-      yield: originalTechCard.yield,
       technologyLocalized: originalTechCard.technologyLocalized,
       descriptionForHall: originalTechCard.descriptionForHall,
       compositionForHall: originalTechCard.compositionForHall,
       sellingPrice: originalTechCard.sellingPrice,
       photoUrls: originalTechCard.photoUrls,
     );
+
+    // Внутри async-методов нельзя использовать named-аргумент `yield:` (это зарезервировано).
+    // Поэтому назначаем выход через безопасный хелпер.
+    updatedTechCard = TechCard.withYieldValue(updatedTechCard, originalTechCard.yield);
 
     // Копируем ингредиенты
     for (final ingredient in originalTechCard.ingredients) {

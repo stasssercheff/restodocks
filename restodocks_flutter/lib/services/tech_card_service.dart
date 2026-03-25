@@ -246,7 +246,6 @@ class TechCardService {
     // Копируем поля, чтобы дубликат выглядел как оригинал.
     var updatedTechCard = clonedTechCard.copyWith(
       portionWeight: originalTechCard.portionWeight,
-      yield: originalTechCard.yield,
       technologyLocalized: originalTechCard.technologyLocalized,
       descriptionForHall: originalTechCard.descriptionForHall,
       compositionForHall: originalTechCard.compositionForHall,
@@ -257,6 +256,10 @@ class TechCardService {
       isSemiFinished: originalTechCard.isSemiFinished,
       dishNameLocalized: originalTechCard.dishNameLocalized,
     );
+
+    // Внутри async-методов нельзя использовать named-аргумент `yield:` (это зарезервировано).
+    // Поэтому назначаем выход через безопасный хелпер.
+    updatedTechCard = TechCard.withYieldValue(updatedTechCard, originalTechCard.yield);
 
     // Копируем ингредиенты
     for (final ingredient in originalTechCard.ingredients) {
