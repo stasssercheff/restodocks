@@ -10,6 +10,8 @@ class TechCard extends Equatable {
   final String category;
   // Цеха: [] = Скрыто (только шеф/су-шеф), ['all'] = все, ['hot_kitchen', ...] = конкретные
   final List<String> sections;
+  /// Отдел заведения: kitchen | bar (колонка tech_cards.department в БД).
+  final String department;
   final bool isSemiFinished; // true = ПФ (полуфабрикат), false = блюдо
   final double portionWeight; // вес порции в граммах
   final double yield; // выход готового блюда в граммах
@@ -33,6 +35,7 @@ class TechCard extends Equatable {
     this.dishNameLocalized,
     required this.category,
     this.sections = const [],
+    this.department = 'kitchen',
     this.isSemiFinished = true,
     required this.portionWeight,
     required this.yield,
@@ -61,6 +64,9 @@ class TechCard extends Equatable {
               ?.map((e) => e.toString())
               .toList() ??
           [],
+      department: (json['department'] as String?)?.trim().isNotEmpty == true
+          ? (json['department'] as String).trim()
+          : 'kitchen',
       isSemiFinished: json['is_semi_finished'] as bool? ?? true,
       portionWeight: (json['portion_weight'] as num).toDouble(),
       yield: (json['yield'] as num).toDouble(),
@@ -87,6 +93,7 @@ class TechCard extends Equatable {
       'dish_name_localized': dishNameLocalized,
       'category': category,
       'sections': sections,
+      'department': department,
       'is_semi_finished': isSemiFinished,
       'portion_weight': portionWeight,
       'yield': yield,
@@ -112,6 +119,7 @@ class TechCard extends Equatable {
     Map<String, String>? dishNameLocalized,
     String? category,
     List<String>? sections,
+    String? department,
     bool? isSemiFinished,
     double? portionWeight,
     double? yield,
@@ -132,6 +140,7 @@ class TechCard extends Equatable {
       dishNameLocalized: dishNameLocalized ?? this.dishNameLocalized,
       category: category ?? this.category,
       sections: sections ?? this.sections,
+      department: department ?? this.department,
       isSemiFinished: isSemiFinished ?? this.isSemiFinished,
       portionWeight: portionWeight ?? this.portionWeight,
       yield: yield ?? this.yield,
@@ -290,6 +299,8 @@ class TechCard extends Equatable {
     dishName,
     dishNameLocalized,
     category,
+    sections,
+    department,
     isSemiFinished,
     portionWeight,
     yield,
@@ -325,6 +336,7 @@ class TechCard extends Equatable {
     Map<String, String>? dishNameLocalized,
     required String category,
     List<String> sections = const [],
+    String department = 'kitchen',
     bool isSemiFinished = true,
     required String establishmentId,
     required String createdBy,
@@ -336,6 +348,7 @@ class TechCard extends Equatable {
       dishNameLocalized: dishNameLocalized,
       category: category,
       sections: sections,
+      department: department,
       isSemiFinished: isSemiFinished,
       portionWeight: 100, // вес порции по умолчанию
       yield: 0,

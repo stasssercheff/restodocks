@@ -34,12 +34,12 @@ fi
 BACKUP_ARCHIVE="${1:-}"
 
 if [ -z "$BACKUP_ARCHIVE" ]; then
-    LATEST=$(ls -t *COMPLETE.tar.gz 2>/dev/null | head -1)
+    LATEST=$(ls -t backups/backup_*.tar.gz *COMPLETE.tar.gz 2>/dev/null | head -1)
     if [ -z "$LATEST" ]; then
-        echo "❌ Архивы бэкапа не найдены (*COMPLETE.tar.gz)"
+        echo "❌ Архивы бэкапа не найдены (backups/backup_*.tar.gz или *COMPLETE.tar.gz)"
         echo ""
         echo "💡 ИСПОЛЬЗОВАНИЕ:"
-        echo "   ./restore_all.sh backup_20260225_XXXXXX_COMPLETE.tar.gz"
+        echo "   ./restore_all.sh backups/backup_20260320_HHMMSS.tar.gz"
         echo "   ./restore_all.sh  # из последнего архива"
         echo "   ./restore_all.sh --checkpoint  # откат кода на checkpoint"
         exit 1

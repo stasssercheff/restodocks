@@ -101,38 +101,38 @@ else
     echo "   ⚠️ Python3 или storage_backup.py не найдены (storage пропущен)"
 fi
 
-# 4. Копируем временные архивы в папку бэкапа и создаём один архив внутри неё
+# 4. Копируем временные архивы в папку бэкапа
 echo ""
-echo "📦 ШАГ 4: Архив внутри папки бэкапа..."
+echo "📦 ШАГ 4: Создание архива..."
 find . -maxdepth 1 -name "storage_backup_*.tar.gz" -exec mv {} "$BACKUP_DIR/" \; 2>/dev/null || true
 find . -maxdepth 1 -name "database_backup.sql.gz" -exec mv {} "$BACKUP_DIR/" \; 2>/dev/null || true
 
-# Один .tar.gz со всем содержимым папки — внутри самой папки (удобно хранить/переносить)
-(cd "$BACKUP_DIR" && tar -czf archive.tar.gz --exclude='archive.tar.gz' . 2>/dev/null) && echo "   ✅ archive.tar.gz создан в папке" || true
-FINAL_ARCHIVE="$BACKUP_DIR/archive.tar.gz"
+# Один .tar.gz ФАЙЛ (не папка): backups/backup_YYYYMMDD_HHMMSS.tar.gz
+FINAL_ARCHIVE="$BACKUPS_ROOT/${BACKUP_NAME}.tar.gz"
+tar -czf "$FINAL_ARCHIVE" -C "$BACKUPS_ROOT" "$BACKUP_NAME" 2>/dev/null && echo "   ✅ Файл создан: $FINAL_ARCHIVE" || true
 FINAL_SIZE=""
 [ -f "$FINAL_ARCHIVE" ] && FINAL_SIZE=$(ls -lh "$FINAL_ARCHIVE" | awk '{print $5}')
 
-# 5. Очистка только временных файлов в корне проекта (папку бэкапа не трогаем)
+# 5. Удаляем временную папку — остаётся только файл
 echo ""
-echo "🧹 ШАГ 5: Очистка временных файлов в корне..."
+echo "🧹 ШАГ 5: Очистка..."
+rm -rf "$BACKUP_DIR"
 find . -maxdepth 1 -name "storage_backup_*.tar.gz" -delete 2>/dev/null || true
 find . -maxdepth 1 -name "database_backup.sql.gz" -delete 2>/dev/null || true
 
 echo ""
 echo "🎉 ПОЛНЫЙ БЭКАП ЗАВЕРШЕН!"
 echo "====================================="
-echo "📁 Папка бэкапа: $BACKUP_DIR"
-echo "   (удали папку целиком, если этот бэкап не нужен)"
-[ -n "$FINAL_SIZE" ] && echo "📦 Внутри: archive.tar.gz ($FINAL_SIZE)"
+echo "📄 Файл бэкапа: $FINAL_ARCHIVE"
+[ -n "$FINAL_SIZE" ] && echo "   Размер: $FINAL_SIZE"
 echo "📅 Дата: $(date)"
 echo ""
 echo "✅ Содержимое:"
-[ -f "$BACKUP_DIR/database.sql.gz" ] && echo "   • База данных PostgreSQL ✓" || echo "   ⚠️ БАЗА ДАННЫХ ОТСУТСТВУЕТ — проверьте supabase login"
+[ -f "$FINAL_ARCHIVE" ] && (tar -tzf "$FINAL_ARCHIVE" | grep -q "database.sql.gz" && echo "   • База данных PostgreSQL ✓" || echo "   ⚠️ БАЗА ДАННЫХ ОТСУТСТВУЕТ")
 echo "   • Код, миграции, env, Vercel, Auth-чеклист"
-[ -d "$BACKUP_DIR/storage_backup" ] && echo "   • Storage ✓" || echo "   ⚠️ Storage не сохранён — добавьте SUPABASE_SERVICE_ROLE_KEY в backup_config.env"
+[ -f "$FINAL_ARCHIVE" ] && (tar -tzf "$FINAL_ARCHIVE" | grep -q "storage_backup" && echo "   • Storage ✓" || echo "   ⚠️ Storage не сохранён")
 echo ""
-echo "💡 Восстановление: ./restore_all.sh $BACKUP_NAME  (или укажи путь к папке)"
+echo "💡 Восстановление: ./restore_all.sh $FINAL_ARCHIVE"
 echo ""
 echo "🚀 ГОТОВО!"
 # read -n 1 -s  # отключено для неинтерактивного запуска

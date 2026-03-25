@@ -320,7 +320,15 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                 const SizedBox(height: 16),
                 Text(loc.t('checklists_kitchen_only'), style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center),
                 const SizedBox(height: 24),
-                FilledButton.icon(onPressed: () => context.go('/home'), icon: const Icon(Icons.home), label: Text(loc.t('home'))),
+                FilledButton.icon(
+                  onPressed: () => context.go('/home'),
+                  icon: const Icon(Icons.home),
+                  label: Text(loc.t('home')),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                ),
               ],
             ),
           ),
@@ -345,7 +353,14 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
               children: [
                 Text(_error ?? 'Чеклист не найден', textAlign: TextAlign.center),
                 const SizedBox(height: 16),
-                FilledButton(onPressed: () => context.pop(), child: Text(loc.t('back'))),
+                FilledButton(
+                  onPressed: () => context.pop(),
+                  child: Text(loc.t('back')),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                  ),
+                ),
               ],
             ),
           ),
@@ -403,6 +418,12 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                   label: Text(loc.t('checklist_complete') ?? 'Завершить', style: const TextStyle(fontSize: 18)),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                    disabledBackgroundColor:
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
+                    disabledForegroundColor:
+                        Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -451,13 +472,27 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
 
   Widget _buildTableHeader(LocalizationService loc, ChecklistActionConfig cfg) {
     final children = <Widget>[
-      SizedBox(width: 40, child: Text(loc.t('checklist_number') ?? '№', style: Theme.of(context).textTheme.labelLarge)),
+      SizedBox(width: 28, child: Text(loc.t('checklist_number') ?? '№', style: Theme.of(context).textTheme.labelLarge)),
       Expanded(child: Text(loc.t('checklist_name') ?? 'Наименование', style: Theme.of(context).textTheme.labelLarge)),
     ];
-    if (cfg.hasNumeric) children.add(SizedBox(width: 80, child: Text(loc.t('checklist_action_numeric') ?? 'Цифра', style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
-    if (cfg.dropdownOptions != null && cfg.dropdownOptions!.isNotEmpty)
-      children.add(SizedBox(width: 120, child: Text(loc.t('checklist_action_choice') ?? 'Выбор', style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
-    if (cfg.hasToggle) children.add(SizedBox(width: 100, child: Text(loc.t('checklist_status') ?? 'Статус', style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
+    if (cfg.hasNumeric) {
+      children.add(SizedBox(
+          width: 64,
+          child: Text(loc.t('checklist_action_numeric') ?? 'Цифра',
+              style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
+    }
+    if (cfg.dropdownOptions != null && cfg.dropdownOptions!.isNotEmpty) {
+      children.add(SizedBox(
+          width: 96,
+          child: Text(loc.t('checklist_action_choice') ?? 'Выбор',
+              style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
+    }
+    if (cfg.hasToggle) {
+      children.add(Expanded(
+        child: Text(loc.t('checklist_status') ?? 'Статус',
+            style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center),
+      ));
+    }
     return Row(children: children);
   }
 
@@ -474,7 +509,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(width: 40, child: Text('${i + 1}', style: Theme.of(context).textTheme.bodyMedium)),
+            SizedBox(width: 28, child: Text('${i + 1}', style: Theme.of(context).textTheme.bodyMedium)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -515,7 +550,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
             ),
             if (cfg.hasNumeric)
               SizedBox(
-                width: 80,
+                width: 64,
                 child: Builder(
                   builder: (_) {
                     if (!_numericControllers.containsKey(i)) {
@@ -542,7 +577,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
               ),
             if (cfg.dropdownOptions != null && cfg.dropdownOptions!.isNotEmpty)
               SizedBox(
-                width: 120,
+                width: 96,
                 child: DropdownButtonFormField<String>(
                   value: ddVal != null && cfg.dropdownOptions!.contains(ddVal) ? ddVal : null,
                   decoration: const InputDecoration(isDense: true, border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 4)),
@@ -557,14 +592,14 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                 ),
               ),
             if (cfg.hasToggle)
-              SizedBox(
-                width: 100,
+              Expanded(
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Checkbox(
                       value: done,
                       tristate: false,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
                       onChanged: (v) {
                         setState(() {
                           if (i < _done.length) _done[i] = v ?? false;
@@ -572,7 +607,14 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                         });
                       },
                     ),
-                    Text(done ? (loc.t('done') ?? 'Сделано') : (loc.t('not_done') ?? 'Не сделано'), style: Theme.of(context).textTheme.bodySmall),
+                    Expanded(
+                      child: Text(
+                        done ? (loc.t('done') ?? 'Сделано') : (loc.t('not_done') ?? 'Не сделано'),
+                        style: Theme.of(context).textTheme.bodySmall,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 2,
+                      ),
+                    ),
                   ],
                 ),
               ),

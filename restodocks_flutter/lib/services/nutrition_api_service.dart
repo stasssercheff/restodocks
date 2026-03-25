@@ -38,6 +38,8 @@ class NutritionApiService {
   /// Макс. калории на 100 г для «обычных» продуктов (исключаем масло ~880, сухофрукты и т.п.).
   /// Авокадо ~160, масло авокадо ~880 — при совпадении по названию мог подтянуться не тот продукт.
   static const _maxSaneKcal = 320.0;
+  /// Чистый сахар / патока / карамель — обычно 380–400 ккал/100 г (выше общего потолка 320).
+  static const _maxSaneKcalSugar = 420.0;
   static const _minSaneKcal = 1.0;
 
   /// «Плохие» слова — пропускаем сухофрукты, чипсы, масло, порошки
@@ -46,6 +48,28 @@ class NutritionApiService {
     'oil', 'масло', 'powder', 'порошок', 'crisp', 'snack', 'дегидр',
     'dehydrat', 'roasted', 'жарен', 'toasted',
   ];
+
+  /// Сахар и чистые углеводные подсластители: у них ккал/100 г типично ~387, иначе отсекаются лимитом 320.
+  static bool _isSugarOrPureCarbSweetenerName(String lower) {
+    return lower.contains('сахар') ||
+        lower.contains('sugar') ||
+        lower.contains('sucrose') ||
+        lower.contains('saccharose') ||
+        lower.contains('пудра') && (lower.contains('сахар') || lower.contains('sugar')) ||
+        lower.contains('icing') ||
+        lower.contains('патока') ||
+        lower.contains('molasses') ||
+        lower.contains('treacle') ||
+        lower.contains('карамель') ||
+        lower.contains('caramel') ||
+        (lower.contains('глюкоз') || lower.contains('glucose')) ||
+        (lower.contains('фруктоз') || lower.contains('fructose')) ||
+        (lower.contains('сироп') &&
+            (lower.contains('глюкоз') ||
+                lower.contains('glucose') ||
+                lower.contains('кукуруз') ||
+                lower.contains('corn')));
+  }
 
   /// Ограничить/подставить калории от ИИ по названию: авокадо не 655, грудка не 0.
   static double? saneCaloriesForProduct(String productName, double? rawCalories) {
@@ -62,6 +86,10 @@ class NutritionApiService {
     }
     // Авокадо (фрукт): не 655, а ~160 ккал/100г
     if ((lower.contains('авокадо') || lower.contains('avocado')) && rawCalories > 220) return 160.0;
+    // Сахар ~387 ккал/100г — не режем до 320
+    if (_isSugarOrPureCarbSweetenerName(lower) && rawCalories <= _maxSaneKcalSugar) {
+      return rawCalories;
+    }
     // Обычные продукты: макс 320 ккал/100г
     if (rawCalories > _maxSaneKcal) return _maxSaneKcal;
     return rawCalories;
@@ -113,7 +141,9 @@ class NutritionApiService {
         final carbs = _parseNum(nutriments['carbohydrates_100g']);
         if (kcal == null && protein == null && fat == null && carbs == null) continue;
 
-        if (kcal != null && (kcal < _minSaneKcal || kcal > _maxSaneKcal)) continue;
+        final maxKcal =
+            _isSugarOrPureCarbSweetenerName(name) ? _maxSaneKcalSugar : _maxSaneKcal;
+        if (kcal != null && (kcal < _minSaneKcal || kcal > maxKcal)) continue;
 
         final tags = (map['allergens_tags'] as List<dynamic>?)?.cast<String>() ?? [];
         final containsGluten = tags.any((t) =>
@@ -141,7 +171,14 @@ class NutritionApiService {
   }
 
   static bool _shouldSkip(String name) {
-    return _skipWords.any((w) => name.contains(w));
+    final lower = name.toLowerCase();
+    // «Icing sugar powder» — не отбрасываем как «powder» (это сахар).
+    if (_isSugarOrPureCarbSweetenerName(lower)) {
+      return _skipWords
+          .where((w) => w != 'powder' && w != 'порошок')
+          .any((w) => lower.contains(w));
+    }
+    return _skipWords.any((w) => lower.contains(w));
   }
 
   static double _matchScore(String search, String productName, double kcal) {

@@ -340,10 +340,16 @@ class _InboxScreenState extends State<InboxScreen> {
           if (!widget.messagesOnly) ...[
             if (!_isNotificationsTab(isOwner) && _getUnviewedIdsForCurrentTab(isOwner).isNotEmpty)
               OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white, width: 1.2),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  visualDensity: VisualDensity.compact,
+                ),
                 onPressed: () async {
                   await _markAllInCurrentTabAsViewed();
                 },
-                icon: const Icon(Icons.done_all, size: 20),
+                icon: const Icon(Icons.done_all, size: 20, color: Colors.white),
                 label: Text(loc.t('inbox_mark_all_viewed') ?? 'Просмотреть все'),
               ),
             if (_isInventoryMergeTabSelected(isOwner) &&
@@ -946,13 +952,7 @@ class _InboxScreenState extends State<InboxScreen> {
 
   /// Списания с группировкой по датам
   Widget _buildWriteoffsGroupedList(LocalizationService loc) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildMarkAllViewedButton(loc),
-        Expanded(child: _buildWriteoffsGroupedListContent(loc)),
-      ],
-    );
+    return _buildWriteoffsGroupedListContent(loc);
   }
 
   Widget _buildWriteoffsGroupedListContent(LocalizationService loc) {
@@ -981,17 +981,6 @@ class _InboxScreenState extends State<InboxScreen> {
               ),
             ),
           ),
-          // Сводное списание за дату (для управления)
-          ListTile(
-            leading: const Icon(Icons.summarize),
-            title: Text(loc.t('writeoff_summary') ?? 'Сводное списание'),
-            subtitle: Text(loc.t('writeoff_summary_hint') ?? 'Итого по всем категориям'),
-            onTap: () => context.push('/inbox/writeoff-summary', extra: {
-              'documents': dateDocs,
-              'dateLabel': dateKey,
-            }),
-          ),
-          const Divider(height: 1),
           ...dateDocs.map((doc) => _DocumentTile(document: doc, onDownload: _downloadDocument)),
         ];
       }).toList(),
@@ -1000,13 +989,7 @@ class _InboxScreenState extends State<InboxScreen> {
 
   /// Чеклисты с группировкой: Просроченные, затем по цеху → дате → сотруднику
   Widget _buildChecklistsGroupedList(LocalizationService loc) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildMarkAllViewedButton(loc),
-        Expanded(child: _buildChecklistsGroupedListContent(loc)),
-      ],
-    );
+    return _buildChecklistsGroupedListContent(loc);
   }
 
   Widget _buildChecklistsGroupedListContent(LocalizationService loc) {
@@ -1118,25 +1101,6 @@ class _InboxScreenState extends State<InboxScreen> {
     );
   }
 
-  Widget _buildMarkAllViewedButton(LocalizationService loc) {
-    final isOwner = context.read<AccountManagerSupabase>().currentEmployee?.hasRole('owner') ?? false;
-    final ids = _getUnviewedIdsForCurrentTab(isOwner);
-    if (ids.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: OutlinedButton.icon(
-          onPressed: () async {
-            await _markAllInCurrentTabAsViewed();
-          },
-          icon: const Icon(Icons.done_all, size: 20),
-          label: Text(loc.t('inbox_mark_all_viewed') ?? 'Просмотреть все'),
-        ),
-      ),
-    );
-  }
-
   Widget _buildDocumentsList() {
     final loc = context.read<LocalizationService>();
     // Группируем документы по отделам
@@ -1146,12 +1110,7 @@ class _InboxScreenState extends State<InboxScreen> {
       groupedDocuments.putIfAbsent(department, () => []).add(doc);
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildMarkAllViewedButton(loc),
-        Expanded(
-          child: ListView.builder(
+    return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: groupedDocuments.length,
       itemBuilder: (context, index) {
@@ -1165,7 +1124,7 @@ class _InboxScreenState extends State<InboxScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Text(
-                docs.first.getDepartmentName(context.read<LocalizationService>()),
+                docs.first.getDepartmentName(loc),
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: Theme.of(context).colorScheme.primary,
@@ -1180,9 +1139,6 @@ class _InboxScreenState extends State<InboxScreen> {
           ],
         );
       },
-          ),
-        ),
-      ],
     );
   }
 

@@ -2351,6 +2351,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           dishName: name,
           category: category,
           sections: _selectedSections,
+          department: widget.department == 'bar' ||
+                  widget.department == 'banquet-catering-bar'
+              ? 'bar'
+              : 'kitchen',
           isSemiFinished: _isSemiFinished,
           establishmentId: est.isBranch ? est.id : est.dataEstablishmentId,
           createdBy: emp.id,
@@ -3888,6 +3892,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     final effectiveCanEdit = canEdit &&
         !widget.forceViewMode &&
         !forceViewBecauseBranch; // forceViewMode = режим «Просмотр ТТК»
+    /// В просмотре без редактирования — только таблица состава (без шапки полей, КБЖУ, цен, фото и т.д.).
+    final tableOnlyView = !effectiveCanEdit;
     final employee = context.watch<AccountManagerSupabase>().currentEmployee;
     final isCook = employee?.department == 'kitchen' &&
         !effectiveCanEdit; // Повар - кухня без прав редактирования
@@ -4143,6 +4149,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       // Шапка: название, категория, тип — на узком экране колонкой, на широком строкой
+                      if (!tableOnlyView)
                       if (narrow) ...[
                         TextField(
                           controller: _nameController,
@@ -4464,12 +4471,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                           ),
                         ),
                       const SizedBox(height: 16),
-                      Text(loc.t('ttk_composition'),
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
+                      if (!tableOnlyView) ...[
+                        Text(loc.t('ttk_composition'),
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                      ],
                       // Таблица ТТК на странице: без «окна», при росте числа продуктов страница скроллится, технология остаётся ниже
                       SizedBox(
                         width: constraints.maxWidth,
@@ -4553,50 +4562,61 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                           .push('/tech-cards/$id'),
                                     ),
                                     )
-                                  : ConstrainedBox(
-                                      constraints: BoxConstraints(
-                                          minWidth:
-                                              constraints.maxWidth),
-                                      child: _TtkCookTable(
-                                        loc: loc,
-                                        dishName: _nameController.text,
-                                        ingredients: _ingredients
-                                            .where((i) =>
-                                                !i.isPlaceholder || i.hasData)
-                                            .toList(),
-                                        technology: _technologyController.text,
-                                        weightPerPortion: _portionWeight,
-                                        hideTechnologyInTable: true,
-                                        productStore: context
-                                            .read<ProductStoreSupabase>(),
-                                        onTapPfIngredient: (id) => context
-                                            .push('/tech-cards/$id?view=1'),
-                                        onIngredientsChanged: (list) {
-                                          // Не делаем setState на каждом пересчёте внутри таблицы:
-                                          // `_TtkCookTable` пересчитывает и перерисовывает себя локально.
-                                          // Родителю синхронизируем и автосохраняем только после паузы ввода.
-                                          _cookTableSyncDebounce?.cancel();
-                                          final snapshot = List<TTIngredient>.from(list);
-                                          _cookTableSyncDebounce = Timer(
-                                            const Duration(milliseconds: 150),
-                                            () {
-                                              if (!mounted) return;
-                                              _ingredients
-                                                ..clear()
-                                                ..addAll(snapshot);
-                                              _ensurePlaceholderRowAtEnd();
-                                              _scheduleDraftSave();
+                                  : ListenableBuilder(
+                                      listenable: context
+                                          .read<ProductStoreSupabase>()
+                                          .catalogRevision,
+                                      builder: (context, _) {
+                                        return ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                              minWidth: constraints.maxWidth),
+                                          child: _TtkCookTable(
+                                            loc: loc,
+                                            dishName: _nameController.text,
+                                            ingredients: _ingredients
+                                                .where((i) =>
+                                                    !i.isPlaceholder ||
+                                                    i.hasData)
+                                                .toList(),
+                                            technology:
+                                                _technologyController.text,
+                                            weightPerPortion: _portionWeight,
+                                            hideTechnologyInTable: true,
+                                            productStore: context
+                                                .read<ProductStoreSupabase>(),
+                                            onTapPfIngredient: (id) => context
+                                                .push(
+                                                    '/tech-cards/$id?view=1'),
+                                            onIngredientsChanged: (list) {
+                                              _cookTableSyncDebounce?.cancel();
+                                              final snapshot =
+                                                  List<TTIngredient>.from(list);
+                                              _cookTableSyncDebounce = Timer(
+                                                const Duration(
+                                                    milliseconds: 150),
+                                                () {
+                                                  if (!mounted) return;
+                                                  setState(() {
+                                                    _ingredients
+                                                      ..clear()
+                                                      ..addAll(snapshot);
+                                                    _ensurePlaceholderRowAtEnd();
+                                                  });
+                                                  _scheduleDraftSave();
+                                                },
+                                              );
                                             },
-                                          );
-                                        },
-                                      ),
+                                          ),
+                                        );
+                                      },
                                     ),
                             ),
                           ),
                         ),
                       ),
-                    ),
+                      ),
                       // Кнопка «Подстроить % отхода под целевой выход» — отдельно под таблицей, не на панели, компактная
+                      if (!tableOnlyView)
                       Builder(
                         builder: (context) {
                           final totalOutput = _ingredients
@@ -4668,6 +4688,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                         },
                       ),
                       // Блок технологии сразу под таблицей, на странице (без ограничения по высоте «окном»)
+                      if (!tableOnlyView)
                       Align(
                         alignment: Alignment.centerLeft,
                         child: SizedBox(
@@ -4708,10 +4729,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                       if (_technologyTranslating) ...[
                                         const SizedBox(width: 8),
                                         const SizedBox(
-                                            width: 14,
-                                            height: 14,
-                                            child: CircularProgressIndicator(
-                                                strokeWidth: 2)),
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2)),
                                         const SizedBox(width: 6),
                                         Text(loc.t('loading'),
                                             style:
@@ -4749,7 +4770,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                         ),
                       ),
                       // КБЖУ и аллергены (только для блюда)
-                      if (!_isSemiFinished)
+                      if (!_isSemiFinished && !tableOnlyView)
                         Builder(
                           builder: (ctx) {
                             final totalCal = _ingredients.fold<double>(
@@ -4817,9 +4838,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                           },
                         ),
                       // Блок фото: ПФ — сетка до 10, блюдо — 1 фото
-                      _buildPhotoSection(loc, effectiveCanEdit),
+                      if (!tableOnlyView) _buildPhotoSection(loc, effectiveCanEdit),
                       // Описание и состав для зала (только для блюд)
-                      if (!_isSemiFinished)
+                      if (!_isSemiFinished && !tableOnlyView)
                         _buildHallFieldsSection(loc, effectiveCanEdit),
                       if (effectiveCanEdit)
                         SafeArea(
@@ -4910,31 +4931,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                   ),
                                 ],
                               ],
-                            ),
-                          ),
-                        ),
-                      if (!_isNew && !effectiveCanEdit)
-                        SafeArea(
-                          top: false,
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-                            child: TextButton.icon(
-                              icon: Icon(Icons.history,
-                                  size: 16,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurfaceVariant),
-                              label: Text(loc.t('ttk_history'),
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onSurfaceVariant)),
-                              onPressed: () => _showTechCardHistory(context),
-                              style: TextButton.styleFrom(
-                                  minimumSize: const Size(0, 36),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 0)),
                             ),
                           ),
                         ),
