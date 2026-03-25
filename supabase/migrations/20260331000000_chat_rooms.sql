@@ -42,6 +42,7 @@ ALTER TABLE chat_room_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_room_messages ENABLE ROW LEVEL SECURITY;
 
 -- Читать комнаты: только участники (через chat_room_members).
+DROP POLICY IF EXISTS chat_rooms_select ON chat_rooms;
 CREATE POLICY chat_rooms_select ON chat_rooms FOR SELECT TO authenticated
   USING (
     id IN (
@@ -50,6 +51,7 @@ CREATE POLICY chat_rooms_select ON chat_rooms FOR SELECT TO authenticated
   );
 
 -- Создавать комнаты: сотрудник своего заведения.
+DROP POLICY IF EXISTS chat_rooms_insert ON chat_rooms;
 CREATE POLICY chat_rooms_insert ON chat_rooms FOR INSERT TO authenticated
   WITH CHECK (
     created_by_employee_id = auth.uid()
@@ -59,6 +61,7 @@ CREATE POLICY chat_rooms_insert ON chat_rooms FOR INSERT TO authenticated
   );
 
 -- Обновлять (переименование): только участник комнаты.
+DROP POLICY IF EXISTS chat_rooms_update ON chat_rooms;
 CREATE POLICY chat_rooms_update ON chat_rooms FOR UPDATE TO authenticated
   USING (
     id IN (
@@ -71,6 +74,7 @@ CREATE POLICY chat_rooms_update ON chat_rooms FOR UPDATE TO authenticated
 -- Пока не добавляем DELETE policy — удаление только через каскад при удалении заведения.
 
 -- Участники: читать/добавлять/удалять только свои записи или в комнатах, где состоишь.
+DROP POLICY IF EXISTS chat_room_members_select ON chat_room_members;
 CREATE POLICY chat_room_members_select ON chat_room_members FOR SELECT TO authenticated
   USING (
     chat_room_id IN (
@@ -81,6 +85,7 @@ CREATE POLICY chat_room_members_select ON chat_room_members FOR SELECT TO authen
   );
 
 -- Вставка: добавлять себя в комнату или создатель комнаты добавляет других участников.
+DROP POLICY IF EXISTS chat_room_members_insert ON chat_room_members;
 CREATE POLICY chat_room_members_insert ON chat_room_members FOR INSERT TO authenticated
   WITH CHECK (
     employee_id = auth.uid()
@@ -90,10 +95,12 @@ CREATE POLICY chat_room_members_insert ON chat_room_members FOR INSERT TO authen
     )
   );
 
+DROP POLICY IF EXISTS chat_room_members_delete ON chat_room_members;
 CREATE POLICY chat_room_members_delete ON chat_room_members FOR DELETE TO authenticated
   USING (employee_id = auth.uid());
 
 -- Сообщения: читать только в комнатах, где участник; писать — только участник.
+DROP POLICY IF EXISTS chat_room_messages_select ON chat_room_messages;
 CREATE POLICY chat_room_messages_select ON chat_room_messages FOR SELECT TO authenticated
   USING (
     chat_room_id IN (
@@ -101,6 +108,7 @@ CREATE POLICY chat_room_messages_select ON chat_room_messages FOR SELECT TO auth
     )
   );
 
+DROP POLICY IF EXISTS chat_room_messages_insert ON chat_room_messages;
 CREATE POLICY chat_room_messages_insert ON chat_room_messages FOR INSERT TO authenticated
   WITH CHECK (
     sender_employee_id = auth.uid()
@@ -114,4 +122,11 @@ GRANT SELECT, INSERT, DELETE ON chat_room_members TO authenticated;
 GRANT SELECT, INSERT ON chat_room_messages TO authenticated;
 
 -- Realtime для групповых сообщений
-ALTER PUBLICATION supabase_realtime ADD TABLE chat_room_messages;
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE chat_room_messages;
+EXCEPTION
+  WHEN duplicate_object THEN
+    NULL;
+END
+$$;
