@@ -3951,6 +3951,10 @@ class _CatalogTab extends StatelessWidget {
       fmt = fmt.replaceFirst('%s', '${result.carbs?.round() ?? 0}');
       final msg = fmt;
       scaffold.showSnackBar(SnackBar(content: Text(msg)));
+    } on DuplicateProductNameException {
+      scaffold.showSnackBar(SnackBar(
+          content: Text(loc.t('product_name_duplicate') ??
+              'В номенклатуре не должно быть двух продуктов с одинаковым названием.')));
     } catch (e) {
       scaffold.showSnackBar(SnackBar(
           content: Text(
@@ -4249,6 +4253,12 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(widget.loc
               .t(widget.isCreate ? 'product_added' : 'product_saved'))));
+    } on DuplicateProductNameException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(widget.loc.t('product_name_duplicate') ??
+                'В номенклатуре не должно быть двух продуктов с одинаковым названием.')));
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(

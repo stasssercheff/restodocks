@@ -255,6 +255,40 @@ class ProductStoreSupabase {
     return score;
   }
 
+  /// Продукт с тем же `lower(trim(name))`, что и у [rawName] (логика БД и RPC).
+  Future<Product?> _fetchProductByNormalizedName(String rawName) async {
+    final norm = rawName.trim().toLowerCase();
+    for (final p in _allProducts) {
+      if (p.name.trim().toLowerCase() == norm) return p;
+    }
+    try {
+      final res = await _supabase.client.rpc(
+        'get_product_by_normalized_name',
+        params: {'p_name': rawName.trim()},
+      );
+      final Map<String, dynamic>? row = res is Map<String, dynamic>
+          ? res
+          : (res is List && res.isNotEmpty && res[0] is Map)
+              ? res[0] as Map<String, dynamic>
+              : null;
+      if (row != null) return Product.fromJson(row);
+    } catch (_) {}
+    try {
+      final fallback = await _supabase.client
+          .from('products')
+          .select()
+          .ilike('name', rawName.trim())
+          .limit(10);
+      for (final r in fallback as List) {
+        final m = r as Map<String, dynamic>;
+        if (norm == (m['name'] as String? ?? '').trim().toLowerCase()) {
+          return Product.fromJson(m);
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /// Добавить новый продукт. Возвращает сохранённый продукт с ID, подтверждённым сервером.
   /// Если продукт с таким именем уже существует — возвращает его без дублирования.
   Future<Product> addProduct(Product product) async {
@@ -304,36 +338,8 @@ class ProductStoreSupabase {
           errStr.contains('already exists')) {
         devLog(
             'DEBUG ProductStore: Duplicate detected for "${product.name}", fetching existing...');
-        Future<Product?> fetchProduct() async {
-          try {
-            final res = await _supabase.client.rpc(
-                'get_product_by_normalized_name',
-                params: {'p_name': product.name.trim()});
-            final Map<String, dynamic>? row = res is Map<String, dynamic>
-                ? res
-                : (res is List && res.isNotEmpty && res[0] is Map)
-                    ? res[0] as Map<String, dynamic>
-                    : null;
-            if (row != null) return Product.fromJson(row);
-          } catch (_) {}
-          // Fallback: RPC не применилась — ищем по ilike и фильтруем по lower(trim)
-          final fallback = await _supabase.client
-              .from('products')
-              .select()
-              .ilike('name', product.name.trim())
-              .limit(10);
-          final norm = product.name.trim().toLowerCase();
-          for (final r in fallback as List) {
-            final m = r as Map<String, dynamic>;
-            if (norm == (m['name'] as String? ?? '').trim().toLowerCase()) {
-              return Product.fromJson(m);
-            }
-          }
-          return null;
-        }
-
         try {
-          final saved = await fetchProduct();
+          final saved = await _fetchProductByNormalizedName(product.name);
           if (saved != null) {
             if (!_allProducts.any((p) => p.id == saved.id)) {
               _allProducts.add(saved);
@@ -526,6 +532,12 @@ class ProductStoreSupabase {
 
   /// Обновить продукт
   Future<void> updateProduct(Product updatedProduct) async {
+    final other =
+        await _fetchProductByNormalizedName(updatedProduct.name);
+    if (other != null &&
+        other.id.toLowerCase() != updatedProduct.id.toLowerCase()) {
+      throw const DuplicateProductNameException();
+    }
     try {
       await _supabase.updateData(
         'products',
@@ -540,7 +552,12 @@ class ProductStoreSupabase {
         _allProducts[index] = updatedProduct;
       }
     } catch (e) {
-      // Error updating product
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('23505') &&
+          (errStr.contains('products_name_unique_lower') ||
+              errStr.contains('duplicate key'))) {
+        throw const DuplicateProductNameException();
+      }
       rethrow;
     }
   }
@@ -573,6 +590,47 @@ class ProductStoreSupabase {
   bool isBranchOnlyProduct(String productId) =>
       _branchOnlyProductIds.contains(productId);
 
+  /// Догружает строки таблицы `products` для ID номенклатуры, которых ещё нет в [_allProducts].
+  /// Иначе [getNomenclatureProducts] даёт пустой список: ID есть в [establishment_products],
+  /// а карточки не попали в память (устаревший кэш каталога, фоновая подгрузка ещё не дошла).
+  Future<void> _ensureNomenclatureProductsInStore() async {
+    if (_nomenclatureIds.isEmpty) return;
+    final have = _allProducts.map((p) => p.id.toLowerCase()).toSet();
+    final missing = _nomenclatureIds
+        .where((id) => !have.contains(id.toLowerCase()))
+        .toList();
+    if (missing.isEmpty) return;
+
+    devLog(
+        'ℹ️ ProductStore: fetching ${missing.length} nomenclature product row(s) not in catalog cache');
+    const chunkSize = 500;
+    final client = _supabase.client;
+    for (var i = 0; i < missing.length; i += chunkSize) {
+      final end = i + chunkSize > missing.length ? missing.length : i + chunkSize;
+      final chunk = missing.sublist(i, end);
+      try {
+        final data = await client.from('products').select().inFilter('id', chunk);
+        final rows = data as List;
+        for (final row in rows) {
+          final m = Map<String, dynamic>.from(row as Map);
+          try {
+            final p = Product.fromJson(m);
+            final idx = _allProducts.indexWhere(
+                (e) => e.id.toLowerCase() == p.id.toLowerCase());
+            if (idx >= 0) {
+              _allProducts[idx] = p;
+            } else {
+              _allProducts.add(p);
+            }
+          } catch (_) {}
+        }
+      } catch (e) {
+        devLog(
+            '⚠️ ProductStore: _ensureNomenclatureProductsInStore chunk failed: $e');
+      }
+    }
+  }
+
   /// Загрузить номенклатуру заведения (ID продуктов и цены)
   Future<void> loadNomenclature(String establishmentId) async {
     final cacheKey = await _offlineCache.scopedKey(
@@ -583,6 +641,7 @@ class ProductStoreSupabase {
     final cached = await _offlineCache.readJsonMap(cacheKey);
     if (cached != null) {
       _applyNomenclatureCache(establishmentId, cached);
+      await _ensureNomenclatureProductsInStore();
       if (_nomenclatureIds.isEmpty) {
         await _reloadNomenclatureFromServer(establishmentId);
         return;
@@ -621,6 +680,7 @@ class ProductStoreSupabase {
         rethrow; // Перебрасываем ошибку выше
       }
     }
+    await _ensureNomenclatureProductsInStore();
     await _saveNomenclatureCache(establishmentId, suffix: 'main');
   }
 
@@ -635,6 +695,7 @@ class ProductStoreSupabase {
     final cached = await _offlineCache.readJsonMap(cacheKey);
     if (cached != null) {
       _applyNomenclatureCache(branchId, cached);
+      await _ensureNomenclatureProductsInStore();
       if (_nomenclatureIds.isEmpty) {
         await _reloadNomenclatureForBranchFromServer(branchId, mainId);
         return;
@@ -726,6 +787,7 @@ class ProductStoreSupabase {
         _priceCache[cacheKey] = (null, null);
       }
     }
+    await _ensureNomenclatureProductsInStore();
     await _saveNomenclatureCache(mainId, suffix: 'branch:$branchId');
   }
 
@@ -1162,6 +1224,7 @@ class ProductStoreSupabase {
   /// Получить все элементы номенклатуры (продукты + ТТК ПФ)
   Future<List<NomenclatureItem>> getAllNomenclatureItems(
       String establishmentId, dynamic techCardService) async {
+    await _ensureNomenclatureProductsInStore();
     final products = getNomenclatureProducts(establishmentId);
 
     final items = <NomenclatureItem>[];
@@ -1294,6 +1357,11 @@ class ProductStoreSupabase {
       return [];
     }
   }
+}
+
+/// Другое [Product.id] уже занимает то же нормализованное имя, что и в БД (`products_name_unique_lower`).
+class DuplicateProductNameException implements Exception {
+  const DuplicateProductNameException();
 }
 
 /// Запись истории изменения цены

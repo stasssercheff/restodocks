@@ -905,6 +905,7 @@
     "price": "Цена",
     "kbju_per_100g": "КБЖУ на 100 г",
     "product_saved": "Продукт сохранён",
+    "product_name_duplicate": "В номенклатуре не должно быть двух продуктов с одинаковым названием (без учёта регистра; пробелы по краям игнорируются).",
     "cancel": "Отмена",
     "default_currency": "Валюта заведения",
     "custom_currency": "Своя валюта",
@@ -2311,6 +2312,7 @@
     "price": "Price",
     "kbju_per_100g": "Nutrition per 100g",
     "product_saved": "Product saved",
+    "product_name_duplicate": "The catalog cannot list two products with the same name (case-insensitive; leading and trailing spaces are ignored).",
     "cancel": "Cancel",
     "default_currency": "Establishment currency",
     "custom_currency": "Custom currency",
@@ -3692,6 +3694,7 @@
     "unit": "Unidad",
     "price": "Precio",
     "product_saved": "Producto guardado",
+    "product_name_duplicate": "En la nomenclatura no puede haber dos productos con el mismo nombre (sin distinguir mayúsculas; se ignoran espacios al inicio y al final).",
     "cancel": "Cancelar",
     "default_currency": "Moneda del establecimiento",
     "custom_currency": "Moneda personalizada",
@@ -4367,7 +4370,8 @@
     "tour_ttk_import": "Karten aus Datei importieren.",
     "tour_ttk_export": "Karten auf Gerät herunterladen.",
     "tour_ttk_refresh": "Seite aktualisieren.",
-    "first_entry_training_hint": "In den Einstellungen, im Bereich Schulung, können Sie Videos ansehen und Anleitungen lesen."
+    "first_entry_training_hint": "In den Einstellungen, im Bereich Schulung, können Sie Videos ansehen und Anleitungen lesen.",
+    "product_name_duplicate": "In der Nomenklatur dürfen keine zwei Produkte mit demselben Namen existieren (Groß-/Kleinschreibung egal; führende und nachfolgende Leerzeichen werden ignoriert)."
   },
   "fr": {
     "app_name": "Restodocks",
@@ -4469,7 +4473,8 @@
     "tour_ttk_import": "Importer les fiches depuis un fichier.",
     "tour_ttk_export": "Télécharger les fiches sur l'appareil.",
     "tour_ttk_refresh": "Actualiser la page.",
-    "first_entry_training_hint": "Dans Paramètres, section Formation, vous pouvez regarder des vidéos et lire les instructions."
+    "first_entry_training_hint": "Dans Paramètres, section Formation, vous pouvez regarder des vidéos et lire les instructions.",
+    "product_name_duplicate": "La nomenclature ne peut pas contenir deux produits avec le même nom (sans tenir compte de la casse ; espaces en début et fin ignorés)."
   },
   "tr": {
     "app_name": "Yeniden stoklamalar",
@@ -5189,6 +5194,7 @@
     "price": "Fiyat",
     "kbju_per_100g": "100g başına beslenme",
     "product_saved": "Ürün kaydedildi",
+    "product_name_duplicate": "Nomenklaturda aynı ada sahip iki ürün olamaz (büyük/küçük harf önemsenmez; baştaki ve sondaki boşluklar yok sayılır).",
     "cancel": "İptal etmek",
     "default_currency": "Kuruluş para birimi",
     "custom_currency": "Özel para birimi",
@@ -6521,6 +6527,7 @@
     "price": "Giá",
     "kbju_per_100g": "Dinh dưỡng trên 100g",
     "product_saved": "Đã lưu sản phẩm",
+    "product_name_duplicate": "Danh mục không được có hai sản phẩm trùng tên (không phân biệt hoa thường; bỏ qua khoảng trắng đầu/cuối).",
     "cancel": "Hủy bỏ",
     "default_currency": "Đồng tiền thành lập",
     "custom_currency": "Tiền tệ tùy chỉnh",
