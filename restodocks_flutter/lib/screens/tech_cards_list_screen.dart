@@ -3263,7 +3263,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             isScrollable: false,
             tabAlignment: TabAlignment.center,
             labelPadding: EdgeInsets.zero,
-            indicatorSize: TabBarIndicatorSize.tab,
+            // Рисуем подсветку строго под содержимым Tab (label), а не под всей
+            // областью таба с внутренними padding — иначе подсветка визуально
+            // "вылезает" за границы чипа.
+            indicatorSize: TabBarIndicatorSize.label,
             dividerColor: Colors.transparent,
             indicatorPadding: EdgeInsets.zero,
             indicator: BoxDecoration(
