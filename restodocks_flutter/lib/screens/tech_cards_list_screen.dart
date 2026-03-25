@@ -3259,10 +3259,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                     ],
                   ),
           ),
-          TabBar(
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: TabBar(
             isScrollable: false,
             tabAlignment: TabAlignment.center,
-            labelPadding: EdgeInsets.zero,
+            // Добавляем небольшое расстояние между "чипами"
+            labelPadding: const EdgeInsets.symmetric(horizontal: 6),
             // Рисуем подсветку строго под содержимым Tab (label), а не под всей
             // областью таба с внутренними padding — иначе подсветка визуально
             // "вылезает" за границы чипа.
@@ -3279,6 +3282,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             labelColor: Theme.of(context).colorScheme.primary,
             unselectedLabelColor: Theme.of(context).colorScheme.primary,
             tabs: _buildTabBarTabs(loc, reviewCount),
+            ),
           ),
           if (_listDetailsHydrating)
             LinearProgressIndicator(
