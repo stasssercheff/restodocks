@@ -6739,12 +6739,40 @@ class _ProductDropdownInCell extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextButton.icon(
       onPressed: () async {
-        final products = await getProducts();
-        if (!context.mounted || products.isEmpty) return;
+        // Не ждём загрузку продуктов "до" открытия диалога: на слабых сетях/данных
+        // это блокирует UI на несколько секунд. Сначала показываем диалог-лоадер,
+        // а список подгружается внутри FutureBuilder.
+        final productsFuture = getProducts();
         final selected = await showDialog<Product>(
           context: context,
-          builder: (ctx) =>
-              _ProductSelectDialog(products: products, lang: lang),
+          builder: (ctx) => FutureBuilder<List<Product>>(
+            future: productsFuture,
+            builder: (ctx, snap) {
+              if (!snap.hasData) {
+                return const AlertDialog(
+                  content: SizedBox(
+                    width: 420,
+                    height: 140,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                );
+              }
+              final products = snap.data!;
+              if (products.isEmpty) {
+                return AlertDialog(
+                  title: const Text('Нет данных'),
+                  content: const Text('Список продуктов пуст'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('OK'),
+                    ),
+                  ],
+                );
+              }
+              return _ProductSelectDialog(products: products, lang: lang);
+            },
+          ),
         );
         if (selected != null && context.mounted) onSelected(index, selected);
       },

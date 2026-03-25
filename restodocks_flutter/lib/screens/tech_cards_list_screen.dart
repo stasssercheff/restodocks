@@ -3261,23 +3261,27 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           ),
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
+            clipBehavior: Clip.antiAlias,
             child: TabBar(
             isScrollable: false,
             tabAlignment: TabAlignment.center,
-            // Добавляем небольшое расстояние между "чипами"
-            labelPadding: const EdgeInsets.symmetric(horizontal: 6),
+            // Отключаем labelPadding, чтобы индикатор не "разъезжался" по ширине
+            // относительно чипа и не выходил за его границы.
+            labelPadding: EdgeInsets.zero,
             // Рисуем подсветку строго под содержимым Tab (label), а не под всей
             // областью таба с внутренними padding — иначе подсветка визуально
             // "вылезает" за границы чипа.
             indicatorSize: TabBarIndicatorSize.label,
             dividerColor: Colors.transparent,
             indicatorPadding: EdgeInsets.zero,
-            indicator: BoxDecoration(
+            indicator: ShapeDecoration(
               color: Theme.of(context)
                   .colorScheme
                   .primary
                   .withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(11),
+              ),
             ),
             labelColor: Theme.of(context).colorScheme.primary,
             unselectedLabelColor: Theme.of(context).colorScheme.primary,
