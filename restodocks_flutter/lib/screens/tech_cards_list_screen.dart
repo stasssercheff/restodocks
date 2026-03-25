@@ -1696,84 +1696,93 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           emp?.hasRole('general_manager') == true;
 
       // Тяжёлое (products, nomenclature, fillIngredients, hydrate, индекс цен) — в фоне
-      final hydrateToken = ++_loadHydrateToken;
-      Future.microtask(() async {
-        try {
-          await productStore.loadProducts().catchError((_) {});
-          if (est.isBranch) {
-            await productStore
-                .loadNomenclatureForBranch(est.id, est.dataEstablishmentId!)
-                .catchError((_) {});
-          } else {
-            await productStore
-                .loadNomenclature(est.dataEstablishmentId)
-                .catchError((_) {});
-          }
-          if (!mounted || requestToken != _loadRequestToken) return;
-          var withData = List<TechCard>.from(processedAll);
-          // В shallow-режиме в cards ингредиенты не вшиты — догружаем всегда,
-          // иначе вкладки/подсчёты (в т.ч. для без-цены ролей) будут работать некорректно.
-          withData = await svc.fillIngredientsForCardsBulk(withData);
-          if (canSeeCosts) {
-            final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
-            if (estPriceId != null && estPriceId.isNotEmpty) {
-              withData = TechCardCostHydrator.hydrate(
-                  withData, productStore, estPriceId);
+      // В фоне — только когда показан loading. Если showLoading=false (например,
+      // после сохранения и возврата на список), то тяжёлая гидратация всей
+      // выборки на web вызывает заметные зависания.
+      final bool doHeavyHydration = showLoading;
+      int? hydrateToken;
+      if (doHeavyHydration) {
+        hydrateToken = ++_loadHydrateToken;
+        Future.microtask(() async {
+          try {
+            await productStore.loadProducts().catchError((_) {});
+            if (est.isBranch) {
+              await productStore
+                  .loadNomenclatureForBranch(
+                      est.id, est.dataEstablishmentId!)
+                  .catchError((_) {});
+            } else {
+              await productStore
+                  .loadNomenclature(est.dataEstablishmentId)
+                  .catchError((_) {});
             }
-          }
-          withData =
-              TechCardNutritionHydrator.hydrate(withData, productStore);
-          if (!mounted || requestToken != _loadRequestToken) return;
-          await _buildNomenclatureNamePriceIndex(
-              productStore, est.isBranch ? est.id : est.dataEstablishmentId);
-          if (!mounted || requestToken != _loadRequestToken) return;
-          var filteredList = _filterListByDepartment(withData, customBarIds);
-          final byId = {for (final tc in withData) tc.id: tc};
-          final referencedIds = <String>{};
-          for (final tc in withData) {
-            for (final ing in tc.ingredients) {
-              final id = ing.sourceTechCardId;
-              if (id != null && id.trim().isNotEmpty)
-                referencedIds.add(id.trim());
+            if (!mounted || requestToken != _loadRequestToken) return;
+            var withData = List<TechCard>.from(processedAll);
+            withData = await svc.fillIngredientsForCardsBulk(withData);
+            if (canSeeCosts) {
+              final estPriceId =
+                  est.isBranch ? est.id : est.dataEstablishmentId;
+              if (estPriceId != null && estPriceId.isNotEmpty) {
+                withData = TechCardCostHydrator.hydrate(
+                    withData, productStore, estPriceId);
+              }
             }
-          }
-          final existing = filteredList.map((e) => e.id).toSet();
-          for (final id in referencedIds) {
-            final ref = byId[id];
-            if (ref != null && !existing.contains(id)) {
-              filteredList = [...filteredList, ref];
-              existing.add(id);
+            withData =
+                TechCardNutritionHydrator.hydrate(withData, productStore);
+            if (!mounted || requestToken != _loadRequestToken) return;
+            await _buildNomenclatureNamePriceIndex(
+                productStore,
+                est.isBranch ? est.id : est.dataEstablishmentId);
+            if (!mounted || requestToken != _loadRequestToken) return;
+            var filteredList =
+                _filterListByDepartment(withData, customBarIds);
+            final byId = {for (final tc in withData) tc.id: tc};
+            final referencedIds = <String>{};
+            for (final tc in withData) {
+              for (final ing in tc.ingredients) {
+                final id = ing.sourceTechCardId;
+                if (id != null && id.trim().isNotEmpty)
+                  referencedIds.add(id.trim());
+              }
             }
-          }
-          if (!mounted || requestToken != _loadRequestToken) return;
-          setState(() {
-            _list = filteredList;
-            _listVersion++;
-            _cachedReviewList = null;
-            _cachedReviewCount = null;
-            _lastReviewCacheKey = null;
-            _techCardsById = {for (final t in withData) t.id: t};
-            _priceProductStore = productStore;
-            _priceEstablishmentId =
-                est.isBranch ? est.id : est.dataEstablishmentId;
-          });
-          if (mounted && requestToken == _loadRequestToken) {
-            _rebuildPfCandidatesIndex(context.read<LocalizationService>());
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted || _list.isEmpty) return;
-              final loc = context.read<LocalizationService>();
-              _ensureReviewCache(loc, _getReviewFilteredList(loc));
+            final existing = filteredList.map((e) => e.id).toSet();
+            for (final id in referencedIds) {
+              final ref = byId[id];
+              if (ref != null && !existing.contains(id)) {
+                filteredList = [...filteredList, ref];
+                existing.add(id);
+              }
+            }
+            if (!mounted || requestToken != _loadRequestToken) return;
+            setState(() {
+              _list = filteredList;
+              _listVersion++;
+              _cachedReviewList = null;
+              _cachedReviewCount = null;
+              _lastReviewCacheKey = null;
+              _techCardsById = {for (final t in withData) t.id: t};
+              _priceProductStore = productStore;
+              _priceEstablishmentId =
+                  est.isBranch ? est.id : est.dataEstablishmentId;
             });
+            if (mounted && requestToken == _loadRequestToken) {
+              _rebuildPfCandidatesIndex(context.read<LocalizationService>());
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!mounted || _list.isEmpty) return;
+                final loc = context.read<LocalizationService>();
+                _ensureReviewCache(loc, _getReviewFilteredList(loc));
+              });
+            }
+          } catch (_) {
+          } finally {
+            if (mounted &&
+                requestToken == _loadRequestToken &&
+                hydrateToken == _loadHydrateToken) {
+              setState(() => _listDetailsHydrating = false);
+            }
           }
-        } catch (_) {
-        } finally {
-          if (mounted &&
-              requestToken == _loadRequestToken &&
-              hydrateToken == _loadHydrateToken) {
-            setState(() => _listDetailsHydrating = false);
-          }
-        }
-      });
+        });
+      }
 
       _customCategoryNames.clear();
       for (final c in customKitchen) _customCategoryNames[c.id] = c.name;
@@ -1810,7 +1819,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           _cachedReviewCount = null;
           _lastReviewCacheKey = null;
           _loading = false;
-          _listDetailsHydrating = list.isNotEmpty;
+          _listDetailsHydrating = doHeavyHydration && list.isNotEmpty;
         });
         _techCardsById = {for (final tc in processedAll) tc.id: tc};
         _resolvedCostMemo.clear();
@@ -2961,8 +2970,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return result;
   }
 
-  /// Вкладки ПФ / Блюда / На проверку: рамка и текст в цвете primary (как AppBar).
-  Widget _ttkTabChip(String label, {int? badgeCount}) {
+  /// Вкладки ПФ / Блюда / На проверку: рамка в primary, выбранная — с заливкой.
+  Widget _ttkTabChip(
+    String label, {
+    required bool selected,
+    int? badgeCount,
+  }) {
     final scheme = Theme.of(context).colorScheme;
     final p = scheme.primary;
     return Container(
@@ -2970,6 +2983,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: p, width: 1.2),
+        // Заливка внутри самого "чипа", чтобы размер подсветки совпадал
+        // строго с размером кнопки/контейнера.
+        color: selected ? p.withValues(alpha: 0.14) : Colors.transparent,
       ),
       child: FittedBox(
         fit: BoxFit.scaleDown,
@@ -3011,45 +3027,57 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     );
   }
 
-  List<Widget> _buildTabBarTabs(LocalizationService loc, int reviewCount) {
-    final tabPf = Tab(child: _ttkTabChip(loc.t('ttk_tab_pf')));
-    final tabDishes = Tab(child: _ttkTabChip(loc.t('ttk_tab_dishes')));
-    final tabReview = Tab(
-      child: _ttkTabChip(
-        loc.t('ttk_tab_review') ?? 'На проверку',
-        badgeCount: reviewCount,
-      ),
-    );
+  List<Widget> _buildTabBarTabs(
+    LocalizationService loc,
+    int reviewCount, {
+    required int selectedIndex,
+  }) {
     final ctrl = _ttkTourController;
+
+    Widget chipPf() => _ttkTabChip(
+          loc.t('ttk_tab_pf'),
+          selected: selectedIndex == 0,
+        );
+    Widget chipDishes() => _ttkTabChip(
+          loc.t('ttk_tab_dishes'),
+          selected: selectedIndex == 1,
+        );
+    Widget chipReview() => _ttkTabChip(
+          loc.t('ttk_tab_review') ?? 'На проверку',
+          selected: selectedIndex == 2,
+          badgeCount: reviewCount,
+        );
+
     if (ctrl != null) {
       return [
         Tab(
           child: SpotlightTarget(
             id: 'ttk-tab-pf',
             controller: ctrl,
-            child: _ttkTabChip(loc.t('ttk_tab_pf')),
+            child: chipPf(),
           ),
         ),
         Tab(
           child: SpotlightTarget(
             id: 'ttk-tab-dishes',
             controller: ctrl,
-            child: _ttkTabChip(loc.t('ttk_tab_dishes')),
+            child: chipDishes(),
           ),
         ),
         Tab(
           child: SpotlightTarget(
             id: 'ttk-tab-review',
             controller: ctrl,
-            child: _ttkTabChip(
-              loc.t('ttk_tab_review') ?? 'На проверку',
-              badgeCount: reviewCount,
-            ),
+            child: chipReview(),
           ),
         ),
       ];
     }
-    return [tabPf, tabDishes, tabReview];
+    return [
+      Tab(child: chipPf()),
+      Tab(child: chipDishes()),
+      Tab(child: chipReview()),
+    ];
   }
 
   Widget _buildBody(LocalizationService loc, bool canEdit, bool showCost) {
@@ -3262,30 +3290,25 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             clipBehavior: Clip.antiAlias,
-            child: TabBar(
-            isScrollable: false,
-            tabAlignment: TabAlignment.center,
-            // Отключаем labelPadding, чтобы индикатор не "разъезжался" по ширине
-            // относительно чипа и не выходил за его границы.
-            labelPadding: EdgeInsets.zero,
-            // Рисуем подсветку строго под содержимым Tab (label), а не под всей
-            // областью таба с внутренними padding — иначе подсветка визуально
-            // "вылезает" за границы чипа.
-            indicatorSize: TabBarIndicatorSize.label,
-            dividerColor: Colors.transparent,
-            indicatorPadding: EdgeInsets.zero,
-            indicator: ShapeDecoration(
-              color: Theme.of(context)
-                  .colorScheme
-                  .primary
-                  .withValues(alpha: 0.14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(11),
-              ),
-            ),
-            labelColor: Theme.of(context).colorScheme.primary,
-            unselectedLabelColor: Theme.of(context).colorScheme.primary,
-            tabs: _buildTabBarTabs(loc, reviewCount),
+            child: AnimatedBuilder(
+              animation: DefaultTabController.of(context),
+              builder: (ctx, _) {
+                final selectedIndex = DefaultTabController.of(ctx).index;
+                return TabBar(
+                  isScrollable: false,
+                  tabAlignment: TabAlignment.center,
+                  labelPadding: EdgeInsets.zero,
+                  dividerColor: Colors.transparent,
+                  indicator: const BoxDecoration(),
+                  labelColor: Theme.of(context).colorScheme.primary,
+                  unselectedLabelColor: Theme.of(context).colorScheme.primary,
+                  tabs: _buildTabBarTabs(
+                    loc,
+                    reviewCount,
+                    selectedIndex: selectedIndex,
+                  ),
+                );
+              },
             ),
           ),
           if (_listDetailsHydrating)
