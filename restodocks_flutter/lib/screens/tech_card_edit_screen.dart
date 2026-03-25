@@ -877,6 +877,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// Дебаунс на запуск reconcile после пользовательских правок.
   Timer? _reconcileDebounceTimer;
 
+  /// Для web автосохранение черновика (localStorage + jsonEncode) может быть тяжёлым,
+  /// поэтому откладываем сохранение до "паузы" после ввода, чтобы не фризить UI.
+  Timer? _draftSaveIdleDebounceTimer;
+
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
 
   @override
@@ -1680,6 +1684,17 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
   void _scheduleDraftSave() {
     _lastUserInteractionAt = DateTime.now();
+    // На web автосохранение в localStorage + jsonEncode может блокировать UI на
+    // заметные секунды, особенно при пересчёте ингредиентов.
+    // Поэтому сохраняем только после паузы в вводе.
+    if (kIsWeb) {
+      _draftSaveIdleDebounceTimer?.cancel();
+      _draftSaveIdleDebounceTimer = Timer(const Duration(seconds: 2), () {
+        if (!mounted) return;
+        scheduleSave();
+      });
+      return;
+    }
     scheduleSave();
   }
 
@@ -1975,6 +1990,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     _ingredientUpdateDebounce?.cancel();
     _cookTableSyncDebounce?.cancel();
     _reconcileDebounceTimer?.cancel();
+    _draftSaveIdleDebounceTimer?.cancel();
     _nameController.dispose();
     _technologyController.dispose();
     _descriptionForHallController.dispose();
