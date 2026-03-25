@@ -486,6 +486,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
   }
 
   Widget _buildTableHeader(LocalizationService loc, ChecklistActionConfig cfg) {
+    final statusWidth = MediaQuery.of(context).size.width < 600 ? 160.0 : 220.0;
     final children = <Widget>[
       SizedBox(width: 28, child: Text(loc.t('checklist_number') ?? '№', style: Theme.of(context).textTheme.labelLarge)),
       Expanded(child: Text(loc.t('checklist_name') ?? 'Наименование', style: Theme.of(context).textTheme.labelLarge)),
@@ -503,15 +504,22 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
               style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
     }
     if (cfg.hasToggle) {
-      children.add(Expanded(
-        child: Text(loc.t('checklist_status') ?? 'Статус',
-            style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center),
-      ));
+      children.add(
+        SizedBox(
+          width: statusWidth,
+          child: Text(
+            loc.t('checklist_status') ?? 'Статус',
+            style: Theme.of(context).textTheme.labelLarge,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
     }
     return Row(children: children);
   }
 
   Widget _buildRow(LocalizationService loc, Checklist checklist, ChecklistActionConfig cfg, int i) {
+    final statusWidth = MediaQuery.of(context).size.width < 600 ? 160.0 : 220.0;
     final it = checklist.items[i];
     final done = i < _done.length ? _done[i] : false;
     final numVal = i < _numericValues.length ? _numericValues[i] ?? '' : '';
@@ -618,31 +626,37 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                 ),
               ),
             if (cfg.hasToggle)
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Checkbox(
-                      value: done,
-                      tristate: false,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact,
-                      onChanged: (v) {
-                        setState(() {
-                          if (i < _done.length) _done[i] = v ?? false;
-                          saveNow();
-                        });
-                      },
-                    ),
-                    Expanded(
-                      child: Text(
-                        done ? (loc.t('done') ?? 'Сделано') : (loc.t('not_done') ?? 'Не сделано'),
-                        style: Theme.of(context).textTheme.bodySmall,
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
+              SizedBox(
+                width: statusWidth,
+                child: ClipRect(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Checkbox(
+                        value: done,
+                        tristate: false,
+                        materialTapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                        onChanged: (v) {
+                          setState(() {
+                            if (i < _done.length) _done[i] = v ?? false;
+                            saveNow();
+                          });
+                        },
                       ),
-                    ),
-                  ],
+                      Expanded(
+                        child: Text(
+                          done
+                              ? (loc.t('done') ?? 'Сделано')
+                              : (loc.t('not_done') ?? 'Не сделано'),
+                          style: Theme.of(context).textTheme.bodySmall,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
           ],
