@@ -1005,7 +1005,7 @@ class TechCardServiceSupabase {
 
     // Внутри async-методов нельзя использовать named-аргумент `yield:` (это зарезервировано).
     // Поэтому назначаем выход через безопасный хелпер.
-    updatedTechCard = TechCard.withYieldValue(updatedTechCard, originalTechCard.yield);
+    updatedTechCard = TechCard.withYieldValue(updatedTechCard, originalTechCard.yieldValue);
 
     // Копируем ингредиенты
     for (final ingredient in originalTechCard.ingredients) {

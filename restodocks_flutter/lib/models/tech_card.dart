@@ -112,6 +112,10 @@ class TechCard extends Equatable {
   /// Копия с новым значением выхода (обход зарезервированного слова yield в async).
   static TechCard withYieldValue(TechCard t, double y) => t.copyWith(yield: y);
 
+  /// Выход (в grams) отдельным геттером, чтобы в async-коде не использовать `.yield`
+  /// (у `yield` есть синтаксические ограничения в async/async*/sync* контекстах).
+  double get yieldValue => yield;
+
   /// Создание копии с изменениями
   TechCard copyWith({
     String? id,
