@@ -36,6 +36,12 @@ class ProductStoreSupabase {
   // Кэш цен заведения: productId -> (price, currency)
   final Map<String, (double?, String?)?> _priceCache = {};
 
+  // Чтобы на web/слабых устройствах не дёргать localStorage каждый раз при
+  // открытии пикакера: запоминаем, какие именно данные номенклатуры уже
+  // загружены в память.
+  String? _nomenclatureLoadedMainId;
+  String? _nomenclatureLoadedBranchKey; // format: mainId|branchId
+
   static const _productsCacheDataset = 'products_all';
   static const _nomenclatureCacheDataset = 'nomenclature';
 
@@ -47,6 +53,11 @@ class ProductStoreSupabase {
 
   /// Загрузка продуктов из Supabase
   Future<void> loadProducts({bool force = false}) async {
+    // На web чтение localStorage/jsonDecode заметно тормозит — если кэш уже
+    // распарсен в память, просто не грузим его заново.
+    if (!force && _hasFullProductCatalog && _allProducts.isNotEmpty) {
+      return;
+    }
     if (!force) {
       final cacheKey = await _offlineCache.scopedKey(
         dataset: _productsCacheDataset,
@@ -678,6 +689,11 @@ class ProductStoreSupabase {
 
   /// Загрузить номенклатуру заведения (ID продуктов и цены)
   Future<void> loadNomenclature(String establishmentId) async {
+    if (_nomenclatureIds.isNotEmpty &&
+        _nomenclatureLoadedMainId == establishmentId &&
+        _nomenclatureLoadedBranchKey == null) {
+      return;
+    }
     final cacheKey = await _offlineCache.scopedKey(
       dataset: _nomenclatureCacheDataset,
       establishmentId: establishmentId,
@@ -686,6 +702,8 @@ class ProductStoreSupabase {
     final cached = await _offlineCache.readJsonMap(cacheKey);
     if (cached != null) {
       _applyNomenclatureCache(establishmentId, cached);
+      _nomenclatureLoadedMainId = establishmentId;
+      _nomenclatureLoadedBranchKey = null;
       await _ensureNomenclatureProductsInStore();
       _bumpCatalogRevision();
       if (_nomenclatureIds.isEmpty) {
@@ -698,6 +716,8 @@ class ProductStoreSupabase {
       return;
     }
     await _reloadNomenclatureFromServer(establishmentId);
+    _nomenclatureLoadedMainId = establishmentId;
+    _nomenclatureLoadedBranchKey = null;
   }
 
   /// Сырой список строк establishment_products (без изменения кэша в памяти).
@@ -774,6 +794,11 @@ class ProductStoreSupabase {
   /// Загрузить номенклатуру для филиала: объединение номенклатуры головного заведения и филиала.
   /// Цены филиала перекрывают цены головного. Продукты только филиала помечаются как «доп от филиала».
   Future<void> loadNomenclatureForBranch(String branchId, String mainId) async {
+    final branchKey = '$mainId|$branchId';
+    if (_nomenclatureIds.isNotEmpty &&
+        _nomenclatureLoadedBranchKey == branchKey) {
+      return;
+    }
     final cacheKey = await _offlineCache.scopedKey(
       dataset: _nomenclatureCacheDataset,
       establishmentId: mainId,
@@ -782,6 +807,8 @@ class ProductStoreSupabase {
     final cached = await _offlineCache.readJsonMap(cacheKey);
     if (cached != null) {
       _applyNomenclatureCache(branchId, cached);
+      _nomenclatureLoadedMainId = null;
+      _nomenclatureLoadedBranchKey = branchKey;
       await _ensureNomenclatureProductsInStore();
       _bumpCatalogRevision();
       if (_nomenclatureIds.isEmpty) {
@@ -792,6 +819,8 @@ class ProductStoreSupabase {
       return;
     }
     await _reloadNomenclatureForBranchFromServer(branchId, mainId);
+    _nomenclatureLoadedMainId = null;
+    _nomenclatureLoadedBranchKey = branchKey;
   }
 
   Future<void> _reloadNomenclatureForBranchFromServer(

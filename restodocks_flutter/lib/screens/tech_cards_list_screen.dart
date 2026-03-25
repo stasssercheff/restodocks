@@ -2978,50 +2978,56 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   }) {
     final scheme = Theme.of(context).colorScheme;
     final p = scheme.primary;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: p, width: 1.2),
-        // Заливка внутри самого "чипа", чтобы размер подсветки совпадал
-        // строго с размером кнопки/контейнера.
-        color: selected ? p.withValues(alpha: 0.14) : Colors.transparent,
-      ),
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.center,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: p,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
-            if (badgeCount != null && badgeCount > 0) ...[
-              const SizedBox(width: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
+    // Чуть увеличиваем расстояние между “кнопками-чипами” как в экране
+    // номенклатуры: делаем зазор внешними паддингами, не трогая индикатор.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: p, width: 1.2),
+          // Заливка внутри самого “чипа”, чтобы размер подсветки совпадал
+          // строго с размером кнопки/контейнера.
+          // Подбираем заметный, но "бледный" красный как в номенклатуре.
+          color: selected ? p.withValues(alpha: 0.18) : p.withValues(alpha: 0.12),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
                   color: p,
-                  borderRadius: BorderRadius.circular(999),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
                 ),
-                child: Text(
-                  '$badgeCount',
-                  style: TextStyle(
-                    color: scheme.onPrimary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
+              ),
+              if (badgeCount != null && badgeCount > 0) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: p,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '$badgeCount',
+                    style: TextStyle(
+                      color: scheme.onPrimary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
