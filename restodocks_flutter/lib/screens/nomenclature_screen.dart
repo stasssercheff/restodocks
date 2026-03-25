@@ -445,9 +445,17 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       }
 
       // Загружаем элементы номенклатуры (продукты + ТТК ПФ)
-      var items = await store.getAllNomenclatureItems(estId, techCardService);
-      // Фильтр по подразделению: каждый видит только свою номенклатуру
-      _nomenclatureItems = _filterByDepartment(items, widget.department);
+      var items = await store.getAllNomenclatureItems(
+        estId,
+        techCardService,
+        screenDepartment: widget.department,
+      );
+      // kitchen: отдел из БД уже учтён в ProductStore; bar/зал — по категории как раньше.
+      if (widget.department == 'kitchen') {
+        _nomenclatureItems = items;
+      } else {
+        _nomenclatureItems = _filterByDepartment(items, widget.department);
+      }
     } catch (e) {
       devLog('❌ NomenclatureScreen: _ensureLoaded error: $e');
       if (mounted) {
@@ -1396,14 +1404,14 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
   Widget _tabChip(_NomTab tab, String label) {
     final isSelected = _selectedTab == tab;
+    final scheme = Theme.of(context).colorScheme;
     return FilterChip(
       label: Text(label),
       selected: isSelected,
       showCheckmark: false,
       onSelected: (_) => setState(() => _selectedTab = tab),
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      selectedColor: Theme.of(context).colorScheme.primaryContainer,
-      checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
+      backgroundColor: scheme.surface,
+      selectedColor: scheme.primaryContainer,
     );
   }
 
@@ -1628,14 +1636,15 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                         avatar: Icon(
                           Icons.money_off,
                           size: 16,
-                          color: _filterNoPrice
-                              ? Theme.of(context).colorScheme.primary
-                              : null,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                         label: Text('Без $currencySymbol'),
                         selected: _filterNoPrice,
                         showCheckmark: false,
                         onSelected: (v) => setState(() => _filterNoPrice = v),
+                        selectedColor:
+                            Theme.of(context).colorScheme.primaryContainer,
+                        backgroundColor: Theme.of(context).colorScheme.surface,
                       ),
                     ],
                   ],

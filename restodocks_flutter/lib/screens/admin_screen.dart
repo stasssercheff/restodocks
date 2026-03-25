@@ -1055,8 +1055,8 @@ class _FilterChip extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 11,
-            color: isActive ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface,
-            fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+            color: isActive ? theme.colorScheme.onPrimary : theme.colorScheme.primary,
+            fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
           ),
         ),
       ),

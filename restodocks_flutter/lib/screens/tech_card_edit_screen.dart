@@ -18,6 +18,7 @@ import '../services/ai_service_supabase.dart';
 import '../services/app_toast_service.dart';
 import '../services/services.dart';
 import '../services/tech_card_cost_hydrator.dart';
+import '../services/tech_card_nutrition_hydrator.dart';
 import '../utils/number_format_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 import 'excel_style_ttk_table.dart';
@@ -1322,6 +1323,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           if (estPriceId != null && estPriceId.isNotEmpty) {
             tcs = TechCardCostHydrator.hydrate(tcs, productStore, estPriceId);
           }
+          tcs = TechCardNutritionHydrator.hydrate(tcs, productStore);
           loadedTechCards = tcs;
           final customKitchen = await tcSvc.getCustomCategories(
               est.isBranch ? est.id : est.dataEstablishmentId!, 'kitchen');
@@ -1385,6 +1387,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   tcs = TechCardCostHydrator.hydrate(tcs, productStore, estPriceId);
                 }
               }
+              tcs = TechCardNutritionHydrator.hydrate(tcs, productStore);
               if (!mounted) return;
               setState(() {
                 _pickerTechCards = _isNew
@@ -1401,9 +1404,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 final fixed =
                     _attachMissingPfSourceTechCardId(_techCard!, pfCards);
                 final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
-                final hydrated = (estPriceId != null && estPriceId.isNotEmpty)
-                    ? TechCardCostHydrator.hydrate([fixed, ...tcs], productStore, estPriceId)
-                    : [fixed, ...tcs];
+                var hydratedList = [fixed, ...tcs];
+                if (estPriceId != null && estPriceId.isNotEmpty) {
+                  hydratedList =
+                      TechCardCostHydrator.hydrate(hydratedList, productStore, estPriceId);
+                }
+                final hydrated =
+                    TechCardNutritionHydrator.hydrate(hydratedList, productStore);
                 final hydratedTc = hydrated.firstWhere(
                     (item) => item.id == fixed.id,
                     orElse: () => fixed);
@@ -1535,9 +1542,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           final productStore = context.read<ProductStoreSupabase>();
           final est = context.read<AccountManagerSupabase>().establishment;
           final estPriceId = est != null && est.isBranch ? est.id : est?.dataEstablishmentId;
-          final hydrated = (estPriceId != null && estPriceId.isNotEmpty)
-              ? TechCardCostHydrator.hydrate([working, ...loadedTechCards], productStore, estPriceId)
-              : [working, ...loadedTechCards];
+          var hydratedList = [working, ...loadedTechCards];
+          if (estPriceId != null && estPriceId.isNotEmpty) {
+            hydratedList = TechCardCostHydrator.hydrate(
+                hydratedList, productStore, estPriceId);
+          }
+          final hydrated = TechCardNutritionHydrator.hydrate(
+              hydratedList, productStore);
           working = hydrated.firstWhere((item) => item.id == currentTechCardId,
               orElse: () => working);
         }
@@ -2031,9 +2042,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
       final productStore = context.read<ProductStoreSupabase>();
       final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
-      final hydrated = (estPriceId != null && estPriceId.isNotEmpty)
-          ? TechCardCostHydrator.hydrate([fixed, ...all], productStore, estPriceId)
-          : [fixed, ...all];
+      var hydratedList = [fixed, ...all];
+      if (estPriceId != null && estPriceId.isNotEmpty) {
+        hydratedList =
+            TechCardCostHydrator.hydrate(hydratedList, productStore, estPriceId);
+      }
+      final hydrated =
+          TechCardNutritionHydrator.hydrate(hydratedList, productStore);
       final hydratedTc = hydrated.firstWhere((item) => item.id == fixed.id,
           orElse: () => fixed);
       final hydratedPfs = hydrated.where((t) => t.isSemiFinished).toList();
@@ -4333,6 +4348,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                             message: loc.t('tt_type_hint'),
                                             child: SegmentedButton<bool>(
                                               style: SegmentedButton.styleFrom(
+                                                foregroundColor:
+                                                    Theme.of(context)
+                                                        .colorScheme
+                                                        .primary,
+                                                selectedForegroundColor:
+                                                    Theme.of(context)
+                                                        .colorScheme
+                                                        .primary,
                                                 visualDensity:
                                                     VisualDensity.compact,
                                                 padding:

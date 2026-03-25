@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/dev_log.dart';
 import '../utils/product_name_utils.dart';
+import '../utils/product_ingredient_family_match.dart';
 
 import '../models/models.dart';
 import 'nutrition_backfill_service.dart';
@@ -239,10 +240,41 @@ class ProductStoreSupabase {
     })) {
       if (!candidates.any((c) => c.id == p.id)) candidates.add(p);
     }
+    // Семейное совпадение: «тростниковый песок» / «пудра» без точного равенства карточке.
+    if (candidates.isEmpty) {
+      final q = stripped.isNotEmpty ? stripped : raw;
+      if (isSugarFamilySearchString(q)) {
+        final sugarHits = <Product>[];
+        for (final p in _allProducts) {
+          final nameL = p.name.trim().toLowerCase();
+          final extras = (p.names?.values ?? const <String>[])
+              .map((v) => v.trim().toLowerCase())
+              .toList();
+          if (!isSugarFamilyProductNameBlob(nameL, extras)) continue;
+          sugarHits.add(p);
+        }
+        if (sugarHits.isNotEmpty) {
+          sugarHits.sort((a, b) {
+            final oa = sugarQueryOverlapScore(q, _productNameBlobLower(a));
+            final ob = sugarQueryOverlapScore(q, _productNameBlobLower(b));
+            if (oa != ob) return ob.compareTo(oa);
+            return _ingredientProductScore(b).compareTo(_ingredientProductScore(a));
+          });
+          candidates.add(sugarHits.first);
+        }
+      }
+    }
     if (candidates.isEmpty) return null;
     candidates.sort((a, b) =>
         _ingredientProductScore(b).compareTo(_ingredientProductScore(a)));
     return candidates.first;
+  }
+
+  String _productNameBlobLower(Product p) {
+    final parts = <String>[p.name, ...(p.names?.values ?? const <String>[])];
+    return parts
+        .map((e) => e.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' '))
+        .join(' ');
   }
 
   int _ingredientProductScore(Product p) {
@@ -585,6 +617,9 @@ class ProductStoreSupabase {
   Set<String> _nomenclatureIds = {};
   Set<String> get nomenclatureProductIds => Set.from(_nomenclatureIds);
 
+  /// Для строк `establishment_products` с колонкой [department]: product_id → отделы (kitchen, bar).
+  final Map<String, Set<String>> _nomenclatureDeptByProduct = {};
+
   /// ID продуктов, добавленных только филиалом (доп от филиала). Заполняется при loadNomenclatureForBranch.
   Set<String> _branchOnlyProductIds = {};
   bool isBranchOnlyProduct(String productId) =>
@@ -656,6 +691,7 @@ class ProductStoreSupabase {
     _branchOnlyProductIds.clear();
     // Очищаем текущие данные
     _nomenclatureIds.clear();
+    _nomenclatureDeptByProduct.clear();
     _priceCache.removeWhere((key, _) => key.startsWith('${establishmentId}_'));
 
     // Пробуем основной метод загрузки
@@ -673,6 +709,7 @@ class ProductStoreSupabase {
 
         // Очищаем данные при ошибке
         _nomenclatureIds.clear();
+        _nomenclatureDeptByProduct.clear();
         _priceCache
             .removeWhere((key, _) => key.startsWith('${establishmentId}_'));
 
@@ -710,6 +747,7 @@ class ProductStoreSupabase {
       String branchId, String mainId) async {
     _branchOnlyProductIds.clear();
     _nomenclatureIds.clear();
+    _nomenclatureDeptByProduct.clear();
     _priceCache.removeWhere((key, _) =>
         key.startsWith('${mainId}_') || key.startsWith('${branchId}_'));
 
@@ -718,22 +756,43 @@ class ProductStoreSupabase {
     try {
       final mainResp = await _supabase.client
           .from('establishment_products')
-          .select('product_id, price, currency')
+          .select('product_id, price, currency, department')
           .eq('establishment_id', mainId)
           .limit(10000);
       mainList = mainResp is List ? mainResp : [];
     } catch (e) {
-      devLog('⚠️ ProductStore: Failed to load main nomenclature: $e');
+      devLog('⚠️ ProductStore: Failed to load main nomenclature (with department): $e');
+      try {
+        final mainResp = await _supabase.client
+            .from('establishment_products')
+            .select('product_id, price, currency')
+            .eq('establishment_id', mainId)
+            .limit(10000);
+        mainList = mainResp is List ? mainResp : [];
+      } catch (e2) {
+        devLog('⚠️ ProductStore: Failed to load main nomenclature: $e2');
+      }
     }
     try {
       final branchResp = await _supabase.client
           .from('establishment_products')
-          .select('product_id, price, currency')
+          .select('product_id, price, currency, department')
           .eq('establishment_id', branchId)
           .limit(10000);
       branchList = branchResp is List ? branchResp : [];
     } catch (e) {
-      devLog('⚠️ ProductStore: Failed to load branch nomenclature: $e');
+      devLog(
+          '⚠️ ProductStore: Failed to load branch nomenclature (with department): $e');
+      try {
+        final branchResp = await _supabase.client
+            .from('establishment_products')
+            .select('product_id, price, currency')
+            .eq('establishment_id', branchId)
+            .limit(10000);
+        branchList = branchResp is List ? branchResp : [];
+      } catch (e2) {
+        devLog('⚠️ ProductStore: Failed to load branch nomenclature: $e2');
+      }
     }
 
     final mainIds = <String>{};
@@ -744,6 +803,7 @@ class ProductStoreSupabase {
           item['productId'] as String?;
       if (productId == null || productId.isEmpty) continue;
       mainIds.add(productId);
+      _rememberNomenclatureDepartment(productId, item['department']);
       final price = item['price'];
       final currency = item['currency'] as String?;
       if (price != null && price is num) {
@@ -761,6 +821,7 @@ class ProductStoreSupabase {
           item['productId'] as String?;
       if (productId == null || productId.isEmpty) continue;
       branchIds.add(productId);
+      _rememberNomenclatureDepartment(productId, item['department']);
       final price = item['price'];
       final currency = item['currency'] as String?;
       if (price != null && price is num) {
@@ -802,6 +863,18 @@ class ProductStoreSupabase {
             .toSet();
     _nomenclatureIds = ids;
     _branchOnlyProductIds = branchOnly;
+    _nomenclatureDeptByProduct.clear();
+    final rawDept = cache['nomenclature_departments'];
+    if (rawDept is Map) {
+      for (final e in rawDept.entries) {
+        final pid = e.key.toString();
+        final list = e.value;
+        if (list is List) {
+          _nomenclatureDeptByProduct[pid] =
+              list.map((x) => x.toString()).toSet();
+        }
+      }
+    }
     _priceCache.removeWhere((key, _) => key.startsWith('${establishmentId}_'));
     final rawPrices = cache['price_cache'];
     if (rawPrices is Map) {
@@ -824,6 +897,9 @@ class ProductStoreSupabase {
     final data = <String, dynamic>{
       'nomenclature_ids': _nomenclatureIds.toList(),
       'branch_only_product_ids': _branchOnlyProductIds.toList(),
+      'nomenclature_departments': _nomenclatureDeptByProduct.map(
+        (k, v) => MapEntry(k, v.toList()),
+      ),
       'price_cache': _priceCache.map(
         (k, v) => MapEntry(
           k,
@@ -845,17 +921,26 @@ class ProductStoreSupabase {
     try {
       response = await _supabase.client
           .from('establishment_products')
-          .select('product_id, price, currency')
+          .select('product_id, price, currency, department')
           .eq('establishment_id', establishmentId)
           .limit(10000);
     } catch (e) {
       devLog(
           '⚠️ ProductStore: Full select failed (price/currency columns may not exist), trying product_id only: $e');
-      response = await _supabase.client
-          .from('establishment_products')
-          .select('product_id')
-          .eq('establishment_id', establishmentId)
-          .limit(10000);
+      try {
+        response = await _supabase.client
+            .from('establishment_products')
+            .select('product_id, price, currency')
+            .eq('establishment_id', establishmentId)
+            .limit(10000);
+      } catch (e2) {
+        devLog('⚠️ ProductStore: select without department failed: $e2');
+        response = await _supabase.client
+            .from('establishment_products')
+            .select('product_id')
+            .eq('establishment_id', establishmentId)
+            .limit(10000);
+      }
     }
 
     final list = response is List ? response : <dynamic>[];
@@ -904,6 +989,27 @@ class ProductStoreSupabase {
     }
   }
 
+  void _rememberNomenclatureDepartment(String productId, dynamic rawDept) {
+    final s = rawDept?.toString().trim();
+    final dept = (s == null || s.isEmpty) ? 'kitchen' : s;
+    _nomenclatureDeptByProduct.putIfAbsent(productId, () => {}).add(dept);
+  }
+
+  /// Какие product_id отдаём на экран номенклатуры до клиентских фильтров.
+  /// Для [kitchen] учитываем [establishment_products.department], иначе старый кейс
+  /// «все позиции с department=kitchen, но категория как у бара» давал пустой список.
+  /// Для bar и прочих маршрутов — все id; узкий отбор по категории остаётся в UI.
+  Set<String> _nomenclatureIdsForScreen(String screenDepartment) {
+    if (screenDepartment != 'kitchen') {
+      return Set<String>.from(_nomenclatureIds);
+    }
+    return _nomenclatureIds.where((id) {
+      final d = _nomenclatureDeptByProduct[id];
+      if (d == null || d.isEmpty) return true;
+      return d.contains('kitchen');
+    }).toSet();
+  }
+
   /// Обработка ответа с данными номенклатуры
   Future<void> _processNomenclatureResponse(
       List<dynamic> response, String establishmentId) async {
@@ -917,6 +1023,8 @@ class ProductStoreSupabase {
             item['productId'] as String?;
 
         if (productId == null || productId.isEmpty) continue;
+
+        _rememberNomenclatureDepartment(productId, item['department']);
 
         // Добавляем в номенклатуру
         _nomenclatureIds.add(productId);
@@ -1223,9 +1331,14 @@ class ProductStoreSupabase {
 
   /// Получить все элементы номенклатуры (продукты + ТТК ПФ)
   Future<List<NomenclatureItem>> getAllNomenclatureItems(
-      String establishmentId, dynamic techCardService) async {
+    String establishmentId,
+    dynamic techCardService, {
+    String screenDepartment = 'general',
+  }) async {
     await _ensureNomenclatureProductsInStore();
-    final products = getNomenclatureProducts(establishmentId);
+    final allowed = _nomenclatureIdsForScreen(screenDepartment);
+    final products = getNomenclatureProducts(establishmentId)
+        .where((p) => allowed.contains(p.id));
 
     final items = <NomenclatureItem>[];
     for (final product in products) {

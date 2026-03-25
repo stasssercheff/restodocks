@@ -61,6 +61,7 @@ class AppTheme {
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
+        foregroundColor: primaryColor,
         minimumSize: const Size(48, 48),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -68,6 +69,7 @@ class AppTheme {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
+        foregroundColor: primaryColor,
         minimumSize: const Size(48, 48),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         side: BorderSide(color: primaryColor.withValues(alpha: 0.35), width: 1),
@@ -92,12 +94,27 @@ class AppTheme {
     ),
     chipTheme: ChipThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      side: BorderSide(color: primaryColor.withValues(alpha: 0.2)),
+      side: BorderSide(color: primaryColor.withValues(alpha: 0.35)),
       backgroundColor: Colors.white.withValues(alpha: 0.62),
       selectedColor: primaryColor.withValues(alpha: 0.16),
       checkmarkColor: primaryColor,
       showCheckmark: false,
-      labelStyle: const TextStyle(fontWeight: FontWeight.w500),
+      labelStyle: TextStyle(
+        color: primaryColor,
+        fontWeight: FontWeight.w500,
+      ),
+      secondaryLabelStyle: TextStyle(
+        color: primaryColor,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: SegmentedButton.styleFrom(
+        foregroundColor: primaryColor,
+        selectedForegroundColor: primaryColor,
+        selectedBackgroundColor: primaryColor.withValues(alpha: 0.2),
+        backgroundColor: primaryColor.withValues(alpha: 0.06),
+      ),
     ),
     tabBarTheme: TabBarThemeData(
       indicator: BoxDecoration(
@@ -107,7 +124,7 @@ class AppTheme {
       ),
       dividerColor: Colors.transparent,
       labelColor: primaryColor,
-      unselectedLabelColor: Colors.black87,
+      unselectedLabelColor: primaryColor,
       labelStyle: const TextStyle(fontWeight: FontWeight.w600),
       unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
     ),
@@ -129,6 +146,18 @@ class AppTheme {
       shadowColor: Colors.black12,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (states) => TextStyle(
+          fontSize: 12,
+          fontWeight: states.contains(WidgetState.selected)
+              ? FontWeight.w600
+              : FontWeight.w500,
+          color: primaryColor,
+        ),
+      ),
+      iconTheme: WidgetStateProperty.all(
+        const IconThemeData(size: 24, color: primaryColor),
+      ),
     ),
     cardTheme: CardThemeData(
       color: Colors.white.withValues(alpha: 0.72),
@@ -181,6 +210,7 @@ class AppTheme {
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
+        foregroundColor: primaryColor,
         minimumSize: const Size(48, 48),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -188,9 +218,10 @@ class AppTheme {
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
+        foregroundColor: primaryColor,
         minimumSize: const Size(48, 48),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.24), width: 1),
+        side: BorderSide(color: primaryColor.withValues(alpha: 0.45), width: 1),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     ),
@@ -212,12 +243,27 @@ class AppTheme {
     ),
     chipTheme: ChipThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+      side: BorderSide(color: primaryColor.withValues(alpha: 0.4)),
       backgroundColor: const Color(0xFF2A2A2A).withValues(alpha: 0.55),
       selectedColor: primaryColor.withValues(alpha: 0.24),
-      checkmarkColor: Colors.white,
+      checkmarkColor: primaryColor,
       showCheckmark: false,
-      labelStyle: const TextStyle(fontWeight: FontWeight.w500),
+      labelStyle: TextStyle(
+        color: primaryColor,
+        fontWeight: FontWeight.w500,
+      ),
+      secondaryLabelStyle: TextStyle(
+        color: primaryColor,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: SegmentedButton.styleFrom(
+        foregroundColor: primaryColor,
+        selectedForegroundColor: primaryColor,
+        selectedBackgroundColor: primaryColor.withValues(alpha: 0.28),
+        backgroundColor: primaryColor.withValues(alpha: 0.08),
+      ),
     ),
     tabBarTheme: TabBarThemeData(
       indicator: BoxDecoration(
@@ -226,8 +272,8 @@ class AppTheme {
         border: Border.all(color: Colors.white24),
       ),
       dividerColor: Colors.transparent,
-      labelColor: Colors.white,
-      unselectedLabelColor: Colors.white70,
+      labelColor: primaryColor,
+      unselectedLabelColor: primaryColor,
       labelStyle: const TextStyle(fontWeight: FontWeight.w600),
       unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500),
     ),
@@ -248,6 +294,18 @@ class AppTheme {
       shadowColor: Colors.black45,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (states) => TextStyle(
+          fontSize: 12,
+          fontWeight: states.contains(WidgetState.selected)
+              ? FontWeight.w600
+              : FontWeight.w500,
+          color: primaryColor,
+        ),
+      ),
+      iconTheme: WidgetStateProperty.all(
+        const IconThemeData(size: 24, color: primaryColor),
+      ),
     ),
     cardTheme: CardThemeData(
       elevation: 0,
@@ -295,8 +353,51 @@ class AppTheme {
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-          minimumSize: const Size(48, 48),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
+        foregroundColor: primaryColor,
+        minimumSize: const Size(48, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: primaryColor,
+        side: BorderSide(color: primaryColor.withValues(alpha: 0.35)),
+      ),
+    ),
+    chipTheme: ChipThemeData(
+      side: BorderSide(color: primaryColor.withValues(alpha: 0.35)),
+      labelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w500),
+      secondaryLabelStyle:
+          TextStyle(color: primaryColor, fontWeight: FontWeight.w600),
+      selectedColor: primaryColor.withValues(alpha: 0.16),
+      checkmarkColor: primaryColor,
+      showCheckmark: false,
+    ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: SegmentedButton.styleFrom(
+        foregroundColor: primaryColor,
+        selectedForegroundColor: primaryColor,
+        selectedBackgroundColor: primaryColor.withValues(alpha: 0.2),
+        backgroundColor: primaryColor.withValues(alpha: 0.06),
+      ),
+    ),
+    tabBarTheme: TabBarThemeData(
+      labelColor: primaryColor,
+      unselectedLabelColor: primaryColor,
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (states) => TextStyle(
+          fontSize: 12,
+          fontWeight: states.contains(WidgetState.selected)
+              ? FontWeight.w600
+              : FontWeight.w500,
+          color: primaryColor,
+        ),
+      ),
+      iconTheme: WidgetStateProperty.all(
+        const IconThemeData(size: 24, color: primaryColor),
+      ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       border: OutlineInputBorder(
@@ -350,8 +451,51 @@ class AppTheme {
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-          minimumSize: const Size(48, 48),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
+        foregroundColor: primaryColor,
+        minimumSize: const Size(48, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: primaryColor,
+        side: BorderSide(color: primaryColor.withValues(alpha: 0.45)),
+      ),
+    ),
+    chipTheme: ChipThemeData(
+      side: BorderSide(color: primaryColor.withValues(alpha: 0.4)),
+      labelStyle: TextStyle(color: primaryColor, fontWeight: FontWeight.w500),
+      secondaryLabelStyle:
+          TextStyle(color: primaryColor, fontWeight: FontWeight.w600),
+      selectedColor: primaryColor.withValues(alpha: 0.24),
+      checkmarkColor: primaryColor,
+      showCheckmark: false,
+    ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: SegmentedButton.styleFrom(
+        foregroundColor: primaryColor,
+        selectedForegroundColor: primaryColor,
+        selectedBackgroundColor: primaryColor.withValues(alpha: 0.28),
+        backgroundColor: primaryColor.withValues(alpha: 0.08),
+      ),
+    ),
+    tabBarTheme: TabBarThemeData(
+      labelColor: primaryColor,
+      unselectedLabelColor: primaryColor,
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      labelTextStyle: WidgetStateProperty.resolveWith(
+        (states) => TextStyle(
+          fontSize: 12,
+          fontWeight: states.contains(WidgetState.selected)
+              ? FontWeight.w600
+              : FontWeight.w500,
+          color: primaryColor,
+        ),
+      ),
+      iconTheme: WidgetStateProperty.all(
+        const IconThemeData(size: 24, color: primaryColor),
+      ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       border: OutlineInputBorder(

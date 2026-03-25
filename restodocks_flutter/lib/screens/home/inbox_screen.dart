@@ -557,6 +557,18 @@ class _InboxScreenState extends State<InboxScreen> {
     );
   }
 
+  /// Подписи вкладок входящих: брендовый красный; выбранная — onPrimaryContainer; «всё просмотрено» — приглушённый primary.
+  Color _inboxChipLabelColor(
+    BuildContext context, {
+    required bool isSelected,
+    required bool allViewed,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    if (isSelected) return scheme.onPrimaryContainer;
+    if (allViewed) return scheme.primary.withValues(alpha: 0.5);
+    return scheme.primary;
+  }
+
   Widget _buildDeptChip(_InboxDeptTab tab, String label, LocalizationService loc) {
     final isSelected = _selectedDeptTab == tab;
     final count = _getCountForDeptTab(tab);
@@ -565,7 +577,13 @@ class _InboxScreenState extends State<InboxScreen> {
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: TextStyle(color: allViewed && !isSelected ? Theme.of(context).colorScheme.onSurfaceVariant : null)),
+          Text(
+            label,
+            style: TextStyle(
+              color: _inboxChipLabelColor(context,
+                  isSelected: isSelected, allViewed: allViewed),
+            ),
+          ),
           _buildCountBadge(count),
         ],
       ),
@@ -630,7 +648,13 @@ class _InboxScreenState extends State<InboxScreen> {
       label: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: TextStyle(color: allViewed && !isSelected ? Theme.of(context).colorScheme.onSurfaceVariant : null)),
+          Text(
+            label,
+            style: TextStyle(
+              color: _inboxChipLabelColor(context,
+                  isSelected: isSelected, allViewed: allViewed),
+            ),
+          ),
           _buildCountBadge(count),
         ],
       ),
@@ -695,7 +719,13 @@ class _InboxScreenState extends State<InboxScreen> {
         label: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(_tabLabel(tab, loc), style: TextStyle(color: allViewed && !isSelected ? Theme.of(context).colorScheme.onSurfaceVariant : null)),
+            Text(
+              _tabLabel(tab, loc),
+              style: TextStyle(
+                color: _inboxChipLabelColor(context,
+                    isSelected: isSelected, allViewed: allViewed),
+              ),
+            ),
             _buildCountBadge(count),
           ],
         ),
