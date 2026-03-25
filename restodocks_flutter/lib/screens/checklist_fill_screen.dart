@@ -117,7 +117,22 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
       setState(() {
         _checklist = c;
         if (_done.length != n) _done = List.filled(n, false);
-        if (_numericValues.length != n) _numericValues = List.filled(n, null);
+
+        // Инициализируем "Цифру" из targetQuantity, если пользователь еще не вводил
+        // значения (или после восстановления черновика значения отсутствуют).
+        if (_numericValues.length != n) {
+          _numericValues = List.filled(n, null);
+        }
+
+        final hasNumeric = c?.actionConfig.hasNumeric == true;
+        if (hasNumeric) {
+          final allNull = _numericValues.isEmpty || _numericValues.every((e) => e == null || (e?.trim().isEmpty ?? true));
+          if (allNull && c != null) {
+            _numericValues = c.items
+                .map((it) => it.targetQuantity?.toString())
+                .toList(growable: false);
+          }
+        }
         if (_dropdownValues.length != n) _dropdownValues = List.filled(n, null);
         _loading = false;
       });
@@ -471,13 +486,14 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
   }
 
   Widget _buildTableHeader(LocalizationService loc, ChecklistActionConfig cfg) {
+    final statusWidth = MediaQuery.of(context).size.width < 600 ? 160.0 : 220.0;
     final children = <Widget>[
       SizedBox(width: 28, child: Text(loc.t('checklist_number') ?? '№', style: Theme.of(context).textTheme.labelLarge)),
       Expanded(child: Text(loc.t('checklist_name') ?? 'Наименование', style: Theme.of(context).textTheme.labelLarge)),
     ];
     if (cfg.hasNumeric) {
       children.add(SizedBox(
-          width: 64,
+          width: 86,
           child: Text(loc.t('checklist_action_numeric') ?? 'Цифра',
               style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
     }
@@ -488,15 +504,22 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
               style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
     }
     if (cfg.hasToggle) {
-      children.add(Expanded(
-        child: Text(loc.t('checklist_status') ?? 'Статус',
-            style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center),
-      ));
+      children.add(
+        SizedBox(
+          width: statusWidth,
+          child: Text(
+            loc.t('checklist_status') ?? 'Статус',
+            style: Theme.of(context).textTheme.labelLarge,
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
     }
     return Row(children: children);
   }
 
   Widget _buildRow(LocalizationService loc, Checklist checklist, ChecklistActionConfig cfg, int i) {
+    final statusWidth = MediaQuery.of(context).size.width < 600 ? 160.0 : 220.0;
     final it = checklist.items[i];
     final done = i < _done.length ? _done[i] : false;
     final numVal = i < _numericValues.length ? _numericValues[i] ?? '' : '';
@@ -507,9 +530,12 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            SizedBox(width: 28, child: Text('${i + 1}', style: Theme.of(context).textTheme.bodyMedium)),
+            SizedBox(
+              width: 28,
+              child: Text('${i + 1}', style: Theme.of(context).textTheme.bodyMedium),
+            ),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -528,7 +554,8 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                     )
                   else
                     Text(_getTitle(it), style: Theme.of(context).textTheme.bodyMedium),
-                  if (it.quantityLabel != null) ...[
+                  // Если есть колонка "Цифра", количество показываем в ней, а не "под" названием.
+                  if (!cfg.hasNumeric && it.quantityLabel != null) ...[
                     const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -550,7 +577,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
             ),
             if (cfg.hasNumeric)
               SizedBox(
-                width: 64,
+                width: 86,
                 child: Builder(
                   builder: (_) {
                     if (!_numericControllers.containsKey(i)) {
@@ -562,7 +589,14 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                       key: ValueKey('num_$i'),
                       keyboardType: TextInputType.number,
                       controller: _numericControllers[i],
-                      decoration: const InputDecoration(isDense: true, border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
+                      textAlign: TextAlign.center,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        // Показываем единицу измерения "рядом" с числом в той же колонке.
+                        suffixText: it.targetUnit?.isNotEmpty == true ? ' ${it.targetUnit!}' : null,
+                      ),
                       style: const TextStyle(fontSize: 12),
                       onChanged: (v) {
                         setState(() {
@@ -592,30 +626,37 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                 ),
               ),
             if (cfg.hasToggle)
-              Expanded(
-                child: Row(
-                  children: [
-                    Checkbox(
-                      value: done,
-                      tristate: false,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact,
-                      onChanged: (v) {
-                        setState(() {
-                          if (i < _done.length) _done[i] = v ?? false;
-                          saveNow();
-                        });
-                      },
-                    ),
-                    Expanded(
-                      child: Text(
-                        done ? (loc.t('done') ?? 'Сделано') : (loc.t('not_done') ?? 'Не сделано'),
-                        style: Theme.of(context).textTheme.bodySmall,
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 2,
+              SizedBox(
+                width: statusWidth,
+                child: ClipRect(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Checkbox(
+                        value: done,
+                        tristate: false,
+                        materialTapTargetSize:
+                            MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                        onChanged: (v) {
+                          setState(() {
+                            if (i < _done.length) _done[i] = v ?? false;
+                            saveNow();
+                          });
+                        },
                       ),
-                    ),
-                  ],
+                      Expanded(
+                        child: Text(
+                          done
+                              ? (loc.t('done') ?? 'Сделано')
+                              : (loc.t('not_done') ?? 'Не сделано'),
+                          style: Theme.of(context).textTheme.bodySmall,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
           ],

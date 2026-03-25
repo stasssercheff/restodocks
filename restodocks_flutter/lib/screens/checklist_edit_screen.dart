@@ -383,7 +383,13 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         userId: emp?.id,
       );
       if (mounted) {
-        AppToastService.show(loc.t('save') + ' ✓');
+        // Для нового чеклиста показываем явное подтверждение создания.
+        final toastText = _isNew
+            ? (loc.currentLanguageCode == 'ru'
+                ? 'Чеклист создан'
+                : (loc.t('checklist_created') ?? 'Checklist created'))
+            : (loc.t('saved') ?? 'Сохранено');
+        AppToastService.show(toastText, duration: const Duration(seconds: 4));
         clearDraft();
         context.go('/checklists?department=$dept&refresh=1');
       }

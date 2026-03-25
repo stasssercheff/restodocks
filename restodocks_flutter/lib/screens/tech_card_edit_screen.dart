@@ -1363,11 +1363,22 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               late Future<List<TechCard>> allCardsFuture;
               if (est.isBranch) {
                 allCardsFuture = Future.wait([
-                  tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId!),
-                  tcSvc.getTechCardsForEstablishment(est.id),
+                  // В справочнике/пикере не нужно грузить ingredients и сразу
+                  // считать КБЖУ/стоимость для ВСЕХ ТТК — это блокирует UI.
+                  tcSvc.getTechCardsForEstablishment(
+                    est.dataEstablishmentId!,
+                    includeIngredients: false,
+                  ),
+                  tcSvc.getTechCardsForEstablishment(
+                    est.id,
+                    includeIngredients: false,
+                  ),
                 ]).then((results) => [...results[0], ...results[1]]);
               } else {
-                allCardsFuture = tcSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
+                allCardsFuture = tcSvc.getTechCardsForEstablishment(
+                  est.dataEstablishmentId,
+                  includeIngredients: false,
+                );
               }
               futures.add(allCardsFuture);
               
@@ -1385,21 +1396,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               final customBar = customResults[1] as List<({String id, String name})>;
               
               tcs = tcs.map(stripInvalidNestedPfSelfLinks).toList();
-              // Гидратация цен только если нужно для расчётов вложенных ПФ
-              final emp = context.read<AccountManagerSupabase>().currentEmployee;
-              final needsCostCalculation = emp?.hasRole('owner') == true || 
-                                          emp?.hasRole('executive_chef') == true || 
-                                          emp?.hasRole('sous_chef') == true ||
-                                          emp?.hasRole('manager') == true ||
-                                          emp?.hasRole('general_manager') == true;
-              if (needsCostCalculation) {
-                tcs = await tcSvc.fillIngredientsForCardsBulk(tcs);
-                final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
-                if (estPriceId != null && estPriceId.isNotEmpty) {
-                  tcs = TechCardCostHydrator.hydrate(tcs, productStore, estPriceId);
-                }
-              }
-              tcs = TechCardNutritionHydrator.hydrate(tcs, productStore);
               if (!mounted) return;
               setState(() {
                 _pickerTechCards = _isNew
@@ -1410,30 +1406,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 _customCategoriesKitchen = customKitchen;
                 _customCategoriesBar = customBar;
               });
-              // Если мы уже загрузили текущую ТТК — досвязываем вложенные ПФ и пересчитываем цену.
-              if (_techCard != null) {
-                final pfCards = tcs.where((t) => t.isSemiFinished).toList();
-                final fixed =
-                    _attachMissingPfSourceTechCardId(_techCard!, pfCards);
-                final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
-                var hydratedList = [fixed, ...tcs];
-                if (estPriceId != null && estPriceId.isNotEmpty) {
-                  hydratedList =
-                      TechCardCostHydrator.hydrate(hydratedList, productStore, estPriceId);
-                }
-                final hydrated =
-                    TechCardNutritionHydrator.hydrate(hydratedList, productStore);
-                final hydratedTc = hydrated.firstWhere(
-                    (item) => item.id == fixed.id,
-                    orElse: () => fixed);
-                setState(() {
-                  _techCard = hydratedTc;
-                  _ingredients
-                    ..clear()
-                    ..addAll(hydratedTc.ingredients);
-                  _ensurePlaceholderRowAtEnd();
-                });
-              }
               _ensureTechCardTranslations(tcs);
             } catch (_) {}
           }();
@@ -1650,39 +1622,65 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   void _enrichPricesFromNomenclature(String establishmentId) {
     final store = context.read<ProductStoreSupabase>();
     final products = store.getNomenclatureProducts(establishmentId);
+    final invalidChars = RegExp(r'[^a-zA-Zа-яёЁ0-9\s]');
+    final multiSpaces = RegExp(r'\s+');
     final norm = (String s) => s
-        .replaceAll(RegExp(r'[^a-zA-Zа-яёЁ0-9\s]'), '')
+        .replaceAll(invalidChars, '')
         .toLowerCase()
-        .replaceAll(RegExp(r'\s+'), ' ')
+        .replaceAll(multiSpaces, ' ')
         .trim();
+    // Lookup: нормализованное имя -> (productId, pricePerKg)
+    final priceByNormName =
+        <String, ({String productId, double pricePerKg})>{};
+    for (final p in products) {
+      final pricePerKg =
+          store.getEstablishmentPrice(p.id, establishmentId)?.$1;
+      if (pricePerKg == null || pricePerKg <= 0) continue;
+
+      void addKey(String? raw) {
+        if (raw == null) return;
+        final k = norm(raw);
+        if (k.isEmpty) return;
+        priceByNormName.putIfAbsent(
+          k,
+          () => (productId: p.id, pricePerKg: pricePerKg),
+        );
+      }
+
+      addKey(p.name);
+      for (final alias in p.names?.values ?? const Iterable<String>.empty()) {
+        addKey(alias);
+      }
+    }
+
     var changed = false;
     final updated = <int, TTIngredient>{};
     for (var i = 0; i < _ingredients.length; i++) {
       final ing = _ingredients[i];
       if (ing.cost > 0) continue;
+
+      final productName = ing.productName.trim();
+      if (productName.isEmpty) continue;
+
       String? pid = ing.productId;
-      double? price;
+      double? pricePerKg;
       if (pid != null) {
-        final ep = store.getEstablishmentPrice(pid, establishmentId);
-        price = ep?.$1;
+        pricePerKg =
+            store.getEstablishmentPrice(pid, establishmentId)?.$1;
       }
-      if ((price == null || price <= 0) && ing.productName.trim().isNotEmpty) {
-        final nameNorm = norm(ing.productName);
-        for (final p in products) {
-          if (norm(p.name) == nameNorm ||
-              p.names?.values.any((n) => norm(n) == nameNorm) == true) {
-            pid = p.id;
-            price = store.getEstablishmentPrice(p.id, establishmentId)?.$1;
-            break;
-          }
-        }
+
+      if (pricePerKg == null || pricePerKg <= 0) {
+        final hit = priceByNormName[norm(productName)];
+        pid = hit?.productId;
+        pricePerKg = hit?.pricePerKg;
       }
-      if (price == null || price <= 0) continue;
-      final newCost = (price / 1000) * ing.grossWeight;
+
+      if (pricePerKg == null || pricePerKg <= 0) continue;
+      final newCost = (pricePerKg / 1000) * ing.grossWeight;
       updated[i] = ing.copyWith(
         productId: pid ?? ing.productId,
         cost: newCost,
-        pricePerKg: price,
+        pricePerKg: pricePerKg,
       );
       changed = true;
     }
@@ -3049,6 +3047,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   Future<void> _showAddIngredient([int? replaceIndex]) async {
     final loc = context.read<LocalizationService>();
     final productStore = context.read<ProductStoreSupabase>();
+    final tcSvc = context.read<TechCardServiceSupabase>();
     final est = context.read<AccountManagerSupabase>().establishment;
     if (est == null) return;
     await productStore.loadProducts();
@@ -3058,6 +3057,27 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     final nomenclatureProducts =
         productStore.getNomenclatureProducts(est.dataEstablishmentId);
     final allProducts = productStore.allProducts;
+    final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId!;
+    Future<TechCard> ensureHydratedTechCard(TechCard tc) async {
+      var working = tc;
+      if (working.ingredients.isEmpty) {
+        final filled = await tcSvc.fillIngredientsForCardsBulk([working]);
+        if (filled.isNotEmpty) working = filled.first;
+      }
+      var hydratedList = [working];
+      if (estPriceId.isNotEmpty) {
+        hydratedList = TechCardCostHydrator.hydrate(
+          hydratedList,
+          productStore,
+          estPriceId,
+        );
+      }
+      hydratedList = TechCardNutritionHydrator.hydrate(
+        hydratedList,
+        productStore,
+      );
+      return hydratedList.isNotEmpty ? hydratedList.first : working;
+    }
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -3100,10 +3120,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                           cookingLossPctOverride: cookingLossPctOverride),
                 ),
                 _TechCardPicker(
-                    techCards: _pickerTechCards,
-                    onPick: (t, w, unit, gpp) => _addTechCardIngredient(
-                        t, w, unit, gpp,
-                        replaceIndex: replaceIndex)),
+                  techCards: _pickerTechCards,
+                  onPick: (t, w, unit, gpp) => _addTechCardIngredient(
+                    t,
+                    w,
+                    unit,
+                    gpp,
+                    replaceIndex: replaceIndex,
+                  ),
+                  ensureHydrated: ensureHydratedTechCard,
+                ),
               ],
             ),
           ),
@@ -6739,12 +6765,40 @@ class _ProductDropdownInCell extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextButton.icon(
       onPressed: () async {
-        final products = await getProducts();
-        if (!context.mounted || products.isEmpty) return;
+        // Не ждём загрузку продуктов "до" открытия диалога: на слабых сетях/данных
+        // это блокирует UI на несколько секунд. Сначала показываем диалог-лоадер,
+        // а список подгружается внутри FutureBuilder.
+        final productsFuture = getProducts();
         final selected = await showDialog<Product>(
           context: context,
-          builder: (ctx) =>
-              _ProductSelectDialog(products: products, lang: lang),
+          builder: (ctx) => FutureBuilder<List<Product>>(
+            future: productsFuture,
+            builder: (ctx, snap) {
+              if (!snap.hasData) {
+                return const AlertDialog(
+                  content: SizedBox(
+                    width: 420,
+                    height: 140,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                );
+              }
+              final products = snap.data!;
+              if (products.isEmpty) {
+                return AlertDialog(
+                  title: const Text('Нет данных'),
+                  content: const Text('Список продуктов пуст'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('OK'),
+                    ),
+                  ],
+                );
+              }
+              return _ProductSelectDialog(products: products, lang: lang);
+            },
+          ),
         );
         if (selected != null && context.mounted) onSelected(index, selected);
       },
@@ -7033,11 +7087,16 @@ class _ProductPickerState extends State<_ProductPicker> {
 }
 
 class _TechCardPicker extends StatelessWidget {
-  const _TechCardPicker({required this.techCards, required this.onPick});
+  const _TechCardPicker({
+    required this.techCards,
+    required this.onPick,
+    required this.ensureHydrated,
+  });
 
   final List<TechCard> techCards;
   final void Function(
       TechCard t, double value, String unit, double? gramsPerPiece) onPick;
+  final Future<TechCard> Function(TechCard t) ensureHydrated;
 
   @override
   Widget build(BuildContext context) {
@@ -7058,15 +7117,24 @@ class _TechCardPicker extends StatelessWidget {
           onTap: () => _askWeight(context, t),
           child: ListTile(
             title: Text(t.getDisplayNameInLists(lang)),
-            subtitle: Text(
-                '${t.ingredients.length} ${loc.t('ingredients_short')} · ${t.totalCalories.round()} ${loc.t('kcal')}'),
+            // В шалоу-загрузке ингредиенты/КБЖУ могут быть пустыми,
+            // поэтому не показываем цифры, чтобы не зависеть от гидратации.
+            subtitle: t.category.isNotEmpty ? Text(t.category) : null,
           ),
         );
       },
     );
   }
 
-  void _askWeight(BuildContext context, TechCard t) {
+  Future<void> _askWeight(BuildContext context, TechCard t) async {
+    // Гидратируем только выбранную ТТК (а не весь справочник), чтобы
+    // убрать долгие подвисания при открытии/переходах.
+    TechCard hydrated;
+    try {
+      hydrated = await ensureHydrated(t);
+    } catch (_) {
+      return;
+    }
     final c = TextEditingController(text: '100');
     final gppController = TextEditingController(text: '50');
     final loc = context.read<LocalizationService>();
@@ -7076,7 +7144,7 @@ class _TechCardPicker extends StatelessWidget {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setStateDlg) => AlertDialog(
-          title: Text(t.getDisplayNameInLists(lang)),
+          title: Text(hydrated.getDisplayNameInLists(lang)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -7140,7 +7208,7 @@ class _TechCardPicker extends StatelessWidget {
                     gpp = double.tryParse(gppController.text) ?? 50;
                     if (gpp <= 0) gpp = 50;
                   }
-                  onPick(t, v, selectedUnit, gpp);
+                  onPick(hydrated, v, selectedUnit, gpp);
                 }
               },
               child: Text(loc.t('save')),
