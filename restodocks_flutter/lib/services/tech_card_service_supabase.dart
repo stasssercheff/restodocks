@@ -25,6 +25,8 @@ class TechCardServiceSupabase {
   final SupabaseService _supabase = SupabaseService();
   final OfflineCacheService _offlineCache = OfflineCacheService();
   static const _cacheDataset = 'tech_cards';
+  /// Кэш одной карточки с ингредиентами (мгновенное открытие из приложения / web).
+  static const _detailDataset = 'tech_card_detail';
 
   /// Загрузить фото блюда/ПФ в Storage. Путь: {establishmentId}/{techCardId}/{index}.jpg
   /// Возвращает публичный URL или null при ошибке.
@@ -93,6 +95,7 @@ class TechCardServiceSupabase {
     Map<String, String>? dishNameLocalized,
     required String category,
     List<String> sections = const [],
+    String department = 'kitchen',
     bool isSemiFinished = true,
     required String establishmentId,
     required String createdBy,
@@ -102,6 +105,7 @@ class TechCardServiceSupabase {
       dishNameLocalized: dishNameLocalized,
       category: category,
       sections: sections,
+      department: department,
       isSemiFinished: isSemiFinished,
       establishmentId: establishmentId,
       createdBy: createdBy,
@@ -148,6 +152,22 @@ class TechCardServiceSupabase {
     return _fetchTechCardsFromServer(establishmentId);
   }
 
+  /// После полной загрузки списка с сервера — прогревает кэш открытия карточки (состав без лишнего round-trip).
+  void _scheduleWarmDetailCaches(List<TechCard> cards) {
+    if (cards.isEmpty) return;
+    unawaited(Future(() async {
+      final slice = cards.length > 150 ? cards.sublist(0, 150) : cards;
+      var i = 0;
+      for (final tc in slice) {
+        try {
+          await _writeTechCardDetailCache(tc);
+        } catch (_) {}
+        i++;
+        if (i % 12 == 0) await Future<void>.delayed(Duration.zero);
+      }
+    }));
+  }
+
   Future<List<TechCard>> _fetchTechCardsFromServer(
       String establishmentId) async {
     Future<List<TechCard>> _fetchWithoutEmbed() async {
@@ -172,11 +192,13 @@ class TechCardServiceSupabase {
         list = await _fetchWithoutEmbed();
       }
       await _saveTechCardsCache(establishmentId, list);
+      _scheduleWarmDetailCaches(list);
       return list;
     } catch (e) {
       try {
         final list = await _fetchWithoutEmbed();
         await _saveTechCardsCache(establishmentId, list);
+        _scheduleWarmDetailCaches(list);
         return list;
       } catch (e2) {
         return [];
@@ -232,8 +254,71 @@ class TechCardServiceSupabase {
     return techCards;
   }
 
-  /// Поиск ТТК по ID. При ошибке embed — fallback: загрузка карточки и ингредиентов отдельно.
-  Future<TechCard?> getTechCardById(String techCardId) async {
+  Future<void> _writeTechCardDetailCache(TechCard tc) async {
+    try {
+      final key = await _offlineCache.scopedKey(
+        dataset: _detailDataset,
+        establishmentId: tc.id,
+      );
+      await _offlineCache.writeJsonMap(key, {
+        'card': tc.toJson(),
+        'ingredients': tc.ingredients.map((e) => e.toJson()).toList(),
+      });
+    } catch (_) {}
+  }
+
+  Future<TechCard?> _readTechCardDetailCache(String techCardId) async {
+    try {
+      final key = await _offlineCache.scopedKey(
+        dataset: _detailDataset,
+        establishmentId: techCardId,
+      );
+      final map = await _offlineCache.readJsonMap(key);
+      if (map == null) return null;
+      final cardRaw = map['card'];
+      if (cardRaw is! Map) return null;
+      final tc =
+          TechCard.fromJson(Map<String, dynamic>.from(cardRaw as Map));
+      final ingRaw = map['ingredients'] as List<dynamic>? ?? [];
+      final ings = <TTIngredient>[];
+      for (final j in ingRaw) {
+        try {
+          ings.add(
+              TTIngredient.fromJson(Map<String, dynamic>.from(j as Map)));
+        } catch (_) {}
+      }
+      return tc.copyWith(ingredients: ings);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _removeTechCardDetailCache(String techCardId) async {
+    try {
+      final key = await _offlineCache.scopedKey(
+        dataset: _detailDataset,
+        establishmentId: techCardId,
+      );
+      await _offlineCache.removeKey(key);
+    } catch (_) {}
+  }
+
+  /// Поиск ТТК по ID. [preferCache]: сначала локальный снимок, затем фоновое обновление с сервера.
+  /// Для истории изменений при сохранении передавайте [preferCache]: false.
+  Future<TechCard?> getTechCardById(String techCardId,
+      {bool preferCache = true}) async {
+    if (preferCache) {
+      final cached = await _readTechCardDetailCache(techCardId);
+      if (cached != null) {
+        unawaited(_fetchTechCardByIdFromServer(techCardId));
+        return cached;
+      }
+    }
+    return _fetchTechCardByIdFromServer(techCardId);
+  }
+
+  /// Загрузка с сервера и запись в кэш детальной карточки.
+  Future<TechCard?> _fetchTechCardByIdFromServer(String techCardId) async {
     try {
       final data = await _supabase.client
           .from('tech_cards')
@@ -252,7 +337,9 @@ class TechCardServiceSupabase {
       } catch (_) {
         ingredients = await _fetchIngredientsForTechCard(techCardId);
       }
-      return TechCard.fromJson(m).copyWith(ingredients: ingredients);
+      final tc = TechCard.fromJson(m).copyWith(ingredients: ingredients);
+      await _writeTechCardDetailCache(tc);
+      return tc;
     } catch (e) {
       try {
         final row = await _supabase.client
@@ -262,8 +349,10 @@ class TechCardServiceSupabase {
             .maybeSingle();
         if (row == null) return null;
         final ingredients = await _fetchIngredientsForTechCard(techCardId);
-        return TechCard.fromJson(row as Map<String, dynamic>)
+        final tc = TechCard.fromJson(row as Map<String, dynamic>)
             .copyWith(ingredients: ingredients);
+        await _writeTechCardDetailCache(tc);
+        return tc;
       } catch (e2) {
         return null;
       }
@@ -380,7 +469,7 @@ class TechCardServiceSupabase {
     TechCard? oldCard;
     if (!skipHistory) {
       try {
-        oldCard = await getTechCardById(techCard.id);
+        oldCard = await getTechCardById(techCard.id, preferCache: false);
       } catch (_) {}
     }
 
@@ -430,6 +519,7 @@ class TechCardServiceSupabase {
         changedByName: changedByName,
       );
     }
+    await _writeTechCardDetailCache(resolvedTechCard);
   }
 
   /// При сохранении ТТК перепривязывает ингредиенты к "лучшему" продукту в каталоге:
@@ -481,6 +571,7 @@ class TechCardServiceSupabase {
     try {
       // Удаление ингредиентов произойдет автоматически из-за CASCADE
       await _supabase.deleteData('tech_cards', 'id', techCardId);
+      await _removeTechCardDetailCache(techCardId);
     } catch (e) {
       devLog('Ошибка удаления ТТК: $e');
       rethrow;
@@ -869,6 +960,9 @@ class TechCardServiceSupabase {
       dishName: '${originalTechCard.dishName} (копия)',
       dishNameLocalized: originalTechCard.dishNameLocalized,
       category: originalTechCard.category,
+      sections: originalTechCard.sections,
+      department: originalTechCard.department,
+      isSemiFinished: originalTechCard.isSemiFinished,
       establishmentId: originalTechCard.establishmentId,
       createdBy: newCreatorId,
     );

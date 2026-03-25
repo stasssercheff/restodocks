@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/dev_log.dart';
 import '../utils/product_name_utils.dart';
@@ -17,6 +18,13 @@ class ProductStoreSupabase {
       ProductStoreSupabase._internal();
   factory ProductStoreSupabase() => _instance;
   ProductStoreSupabase._internal();
+
+  /// Счётчик обновлений каталога и номенклатуры (для перерисовки ТТК в просмотре без подтверждения).
+  final ValueNotifier<int> catalogRevision = ValueNotifier<int>(0);
+
+  void _bumpCatalogRevision() {
+    catalogRevision.value++;
+  }
 
   final SupabaseService _supabase = SupabaseService();
   final OfflineCacheService _offlineCache = OfflineCacheService();
@@ -53,6 +61,7 @@ class ProductStoreSupabase {
             .toList()
           ..sort();
         _hasFullProductCatalog = true;
+        _bumpCatalogRevision();
         unawaited(_loadProductsFromServer());
         return;
       }
@@ -130,6 +139,7 @@ class ProductStoreSupabase {
       }
     } finally {
       _isLoading = false;
+      _bumpCatalogRevision();
     }
   }
 
@@ -677,48 +687,88 @@ class ProductStoreSupabase {
     if (cached != null) {
       _applyNomenclatureCache(establishmentId, cached);
       await _ensureNomenclatureProductsInStore();
+      _bumpCatalogRevision();
       if (_nomenclatureIds.isEmpty) {
         await _reloadNomenclatureFromServer(establishmentId);
         return;
       }
-      unawaited(_reloadNomenclatureFromServer(establishmentId));
+      // Ждём фоновое обновление: иначе после return номенклатура оказывается пустой
+      // (reload сначала очищает данные) и UI теряет список до конца запроса.
+      await _reloadNomenclatureFromServer(establishmentId);
       return;
     }
     await _reloadNomenclatureFromServer(establishmentId);
   }
 
-  Future<void> _reloadNomenclatureFromServer(String establishmentId) async {
-    _branchOnlyProductIds.clear();
-    // Очищаем текущие данные
-    _nomenclatureIds.clear();
-    _nomenclatureDeptByProduct.clear();
-    _priceCache.removeWhere((key, _) => key.startsWith('${establishmentId}_'));
-
-    // Пробуем основной метод загрузки
+  /// Сырой список строк establishment_products (без изменения кэша в памяти).
+  Future<List<dynamic>> _fetchNomenclatureRowsRaw(String establishmentId) async {
+    dynamic response;
     try {
-      await _loadNomenclatureDirect(establishmentId);
+      response = await _supabase.client
+          .from('establishment_products')
+          .select('product_id, price, currency, department')
+          .eq('establishment_id', establishmentId)
+          .limit(10000);
+    } catch (e) {
+      devLog(
+          '⚠️ ProductStore: Full select failed (price/currency columns may not exist), trying product_id only: $e');
+      try {
+        response = await _supabase.client
+            .from('establishment_products')
+            .select('product_id, price, currency')
+            .eq('establishment_id', establishmentId)
+            .limit(10000);
+      } catch (e2) {
+        devLog('⚠️ ProductStore: select without department failed: $e2');
+        response = await _supabase.client
+            .from('establishment_products')
+            .select('product_id')
+            .eq('establishment_id', establishmentId)
+            .limit(10000);
+      }
+    }
+    return response is List ? response : <dynamic>[];
+  }
+
+  Future<void> _reloadNomenclatureFromServer(String establishmentId) async {
+    try {
+      final list = await _fetchNomenclatureRowsRaw(establishmentId);
+      // Сбрасываем после получения ответа — пока идёт сеть, старая номенклатура остаётся в памяти.
+      _branchOnlyProductIds.clear();
+      _nomenclatureIds.clear();
+      _nomenclatureDeptByProduct.clear();
+      _priceCache
+          .removeWhere((key, _) => key.startsWith('${establishmentId}_'));
+
+      if (list.isEmpty) {
+        devLog(
+            'ℹ️ ProductStore: No nomenclature data found for establishment $establishmentId');
+      } else {
+        await _processNomenclatureResponse(list, establishmentId);
+      }
     } catch (e) {
       devLog(
           '⚠️ ProductStore: Primary loading failed, trying fallback method: $e');
-
-      // Пробуем альтернативный метод (RPC функция или упрощенный запрос)
+      _branchOnlyProductIds.clear();
+      _nomenclatureIds.clear();
+      _nomenclatureDeptByProduct.clear();
+      _priceCache
+          .removeWhere((key, _) => key.startsWith('${establishmentId}_'));
       try {
         await _loadNomenclatureFallback(establishmentId);
       } catch (fallbackError) {
-        devLog('❌ ProductStore: Fallback loading also failed: $fallbackError');
-
-        // Очищаем данные при ошибке
+        devLog(
+            '❌ ProductStore: Fallback loading also failed: $fallbackError');
         _nomenclatureIds.clear();
         _nomenclatureDeptByProduct.clear();
         _priceCache
             .removeWhere((key, _) => key.startsWith('${establishmentId}_'));
-
-        // Можно добавить дополнительную логику обработки ошибок
-        rethrow; // Перебрасываем ошибку выше
+        rethrow;
       }
     }
     await _ensureNomenclatureProductsInStore();
     await _saveNomenclatureCache(establishmentId, suffix: 'main');
+    _bumpCatalogRevision();
   }
 
   /// Загрузить номенклатуру для филиала: объединение номенклатуры головного заведения и филиала.
@@ -733,11 +783,12 @@ class ProductStoreSupabase {
     if (cached != null) {
       _applyNomenclatureCache(branchId, cached);
       await _ensureNomenclatureProductsInStore();
+      _bumpCatalogRevision();
       if (_nomenclatureIds.isEmpty) {
         await _reloadNomenclatureForBranchFromServer(branchId, mainId);
         return;
       }
-      unawaited(_reloadNomenclatureForBranchFromServer(branchId, mainId));
+      await _reloadNomenclatureForBranchFromServer(branchId, mainId);
       return;
     }
     await _reloadNomenclatureForBranchFromServer(branchId, mainId);
@@ -745,12 +796,6 @@ class ProductStoreSupabase {
 
   Future<void> _reloadNomenclatureForBranchFromServer(
       String branchId, String mainId) async {
-    _branchOnlyProductIds.clear();
-    _nomenclatureIds.clear();
-    _nomenclatureDeptByProduct.clear();
-    _priceCache.removeWhere((key, _) =>
-        key.startsWith('${mainId}_') || key.startsWith('${branchId}_'));
-
     List<dynamic> mainList = [];
     List<dynamic> branchList = [];
     try {
@@ -794,6 +839,13 @@ class ProductStoreSupabase {
         devLog('⚠️ ProductStore: Failed to load branch nomenclature: $e2');
       }
     }
+
+    // После ответов сети — подменяем кэш (до этого UI может опираться на старую номенклатуру).
+    _branchOnlyProductIds.clear();
+    _nomenclatureIds.clear();
+    _nomenclatureDeptByProduct.clear();
+    _priceCache.removeWhere((key, _) =>
+        key.startsWith('${mainId}_') || key.startsWith('${branchId}_'));
 
     final mainIds = <String>{};
     final mainPrices = <String, (double?, String?)>{};
@@ -850,6 +902,7 @@ class ProductStoreSupabase {
     }
     await _ensureNomenclatureProductsInStore();
     await _saveNomenclatureCache(mainId, suffix: 'branch:$branchId');
+    _bumpCatalogRevision();
   }
 
   void _applyNomenclatureCache(
@@ -913,45 +966,6 @@ class ProductStoreSupabase {
       suffix: suffix,
     );
     await _offlineCache.writeJsonMap(key, data);
-  }
-
-  /// Основной метод загрузки номенклатуры
-  Future<void> _loadNomenclatureDirect(String establishmentId) async {
-    dynamic response;
-    try {
-      response = await _supabase.client
-          .from('establishment_products')
-          .select('product_id, price, currency, department')
-          .eq('establishment_id', establishmentId)
-          .limit(10000);
-    } catch (e) {
-      devLog(
-          '⚠️ ProductStore: Full select failed (price/currency columns may not exist), trying product_id only: $e');
-      try {
-        response = await _supabase.client
-            .from('establishment_products')
-            .select('product_id, price, currency')
-            .eq('establishment_id', establishmentId)
-            .limit(10000);
-      } catch (e2) {
-        devLog('⚠️ ProductStore: select without department failed: $e2');
-        response = await _supabase.client
-            .from('establishment_products')
-            .select('product_id')
-            .eq('establishment_id', establishmentId)
-            .limit(10000);
-      }
-    }
-
-    final list = response is List ? response : <dynamic>[];
-
-    if (list.isEmpty) {
-      devLog(
-          'ℹ️ ProductStore: No nomenclature data found for establishment $establishmentId');
-      return;
-    }
-
-    await _processNomenclatureResponse(list, establishmentId);
   }
 
   /// Альтернативный метод загрузки (если основной не работает)

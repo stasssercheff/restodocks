@@ -93,14 +93,15 @@ class RealtimeSyncService {
 
     _syncInProgress = true;
     try {
-      await _products.loadProducts(force: true);
+      // Сначала кэш/локальные данные (быстрый старт), обновление с сервера у ТТК — в фоне.
+      await _products.loadProducts(force: false);
       if (dataEstablishmentId == establishmentId) {
         await _products.loadNomenclature(establishmentId);
       } else {
         await _products.loadNomenclatureForBranch(
             establishmentId, dataEstablishmentId);
       }
-      await _techCards.refreshTechCardsFromServer(dataEstablishmentId);
+      unawaited(_techCards.refreshTechCardsFromServer(dataEstablishmentId));
     } catch (e) {
       // Не валим приложение при плохой сети: продолжаем работать с локальным кэшем.
       devLog('RealtimeSyncService.syncNow($reason) failed: $e');

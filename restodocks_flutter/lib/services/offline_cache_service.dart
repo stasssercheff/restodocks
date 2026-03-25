@@ -74,6 +74,12 @@ class OfflineCacheService {
     return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
+  Future<void> removeKey(String key) async {
+    final prefs = await _sp();
+    await prefs.remove(key);
+    await prefs.remove('$key:ts');
+  }
+
   Future<void> clearCurrentUserCache() async {
     final token = await _scopeToken();
     final prefs = await _sp();

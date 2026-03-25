@@ -24,6 +24,7 @@ import '../services/ai_service_supabase.dart';
 import '../services/services.dart';
 import '../services/excel_export_service.dart';
 import '../services/tech_card_cost_hydrator.dart';
+import '../services/tech_card_nutrition_hydrator.dart';
 
 enum _TtkImportMode { single, multi }
 
@@ -1562,6 +1563,27 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return resolved;
   }
 
+  bool _legacyBarCardMatch(TechCard tc, Set<String> customBarIds) {
+    const barCats = {
+      'beverages',
+      'alcoholic_cocktails',
+      'non_alcoholic_drinks',
+      'hot_drinks',
+      'drinks_pure',
+      'snacks',
+      'zakuska'
+    };
+    final cat = (String c) => c.isEmpty ? 'misc' : c;
+    final c = cat(tc.category);
+    if (barCats.contains(c)) return true;
+    if (tc.sections.contains('bar')) return true;
+    if (TechCardServiceSupabase.isCustomCategory(tc.category) &&
+        customBarIds
+            .contains(TechCardServiceSupabase.customCategoryId(tc.category)))
+      return true;
+    return false;
+  }
+
   List<TechCard> _filterListByDepartment(
       List<TechCard> processedAll, Set<String> customBarIds) {
     if (widget.department == 'banquet-catering') {
@@ -1588,47 +1610,19 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           .toList();
     }
     if (widget.department == 'bar') {
-      const barCats = {
-        'beverages',
-        'alcoholic_cocktails',
-        'non_alcoholic_drinks',
-        'hot_drinks',
-        'drinks_pure',
-        'snacks',
-        'zakuska'
-      };
-      final cat = (String c) => c.isEmpty ? 'misc' : c;
       return processedAll.where((tc) {
-        final c = cat(tc.category);
-        if (barCats.contains(c)) return true;
-        if (tc.sections.contains('bar')) return true;
-        if (TechCardServiceSupabase.isCustomCategory(tc.category) &&
-            customBarIds.contains(
-                TechCardServiceSupabase.customCategoryId(tc.category)))
-          return true;
-        return false;
+        final dep = tc.department.trim().toLowerCase();
+        if (dep == 'bar') return true;
+        // Старые карточки без department=bar — по категории и цеху.
+        if (dep.isNotEmpty && dep != 'kitchen') return false;
+        return _legacyBarCardMatch(tc, customBarIds);
       }).toList();
     }
     if (widget.department == 'hall') return [];
-    const barCats = {
-      'beverages',
-      'alcoholic_cocktails',
-      'non_alcoholic_drinks',
-      'hot_drinks',
-      'drinks_pure',
-      'snacks',
-      'zakuska'
-    };
-    final cat = (String c) => c.isEmpty ? 'misc' : c;
-    return processedAll.where((tc) {
-      final c = cat(tc.category);
-      if (barCats.contains(c)) return false;
-      if (TechCardServiceSupabase.isCustomCategory(tc.category) &&
-          customBarIds
-              .contains(TechCardServiceSupabase.customCategoryId(tc.category)))
-        return false;
-      return true;
-    }).toList();
+    // Кухня: не отсекаем по «барным» категориям — в БД tech_cards.department = kitchen.
+    return processedAll
+        .where((tc) => tc.department.trim().toLowerCase() != 'bar')
+        .toList();
   }
 
   Future<void> _load({bool showLoading = true}) async {
@@ -1715,6 +1709,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   withData, productStore, estPriceId);
             }
           }
+          withData =
+              TechCardNutritionHydrator.hydrate(withData, productStore);
           if (!mounted) return;
           await _buildNomenclatureNamePriceIndex(
               productStore, est.isBranch ? est.id : est.dataEstablishmentId);
@@ -1843,8 +1839,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               (tc.dishNameLocalized![lang]?.trim().isNotEmpty ?? false)),
         )
         .toList();
+    var i = 0;
     for (final tc in missing) {
       if (!mounted) break;
+      if (i > 0 && i % 2 == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
+      i++;
       try {
         final translated = await svc
             .translateTechCardName(tc.id, tc.dishName, lang)
@@ -2900,33 +2901,63 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     return result;
   }
 
-  List<Widget> _buildTabBarTabs(LocalizationService loc, int reviewCount) {
-    final tabPf = Tab(text: loc.t('ttk_tab_pf'));
-    final tabDishes = Tab(text: loc.t('ttk_tab_dishes'));
-    final tabReview = Tab(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(loc.t('ttk_tab_review') ?? 'На проверку'),
-          if (reviewCount > 0) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                '$reviewCount',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onPrimary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
+  /// Вкладки ПФ / Блюда / На проверку: рамка и текст в цвете primary (как AppBar).
+  Widget _ttkTabChip(String label, {int? badgeCount}) {
+    final scheme = Theme.of(context).colorScheme;
+    final p = scheme.primary;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: p, width: 1.2),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.center,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: p,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
               ),
             ),
+            if (badgeCount != null && badgeCount > 0) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: p,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '$badgeCount',
+                  style: TextStyle(
+                    color: scheme.onPrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildTabBarTabs(LocalizationService loc, int reviewCount) {
+    final tabPf = Tab(child: _ttkTabChip(loc.t('ttk_tab_pf')));
+    final tabDishes = Tab(child: _ttkTabChip(loc.t('ttk_tab_dishes')));
+    final tabReview = Tab(
+      child: _ttkTabChip(
+        loc.t('ttk_tab_review') ?? 'На проверку',
+        badgeCount: reviewCount,
       ),
     );
     final ctrl = _ttkTourController;
@@ -2936,44 +2967,23 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           child: SpotlightTarget(
             id: 'ttk-tab-pf',
             controller: ctrl,
-            child: Text(loc.t('ttk_tab_pf')),
+            child: _ttkTabChip(loc.t('ttk_tab_pf')),
           ),
         ),
         Tab(
           child: SpotlightTarget(
             id: 'ttk-tab-dishes',
             controller: ctrl,
-            child: Text(loc.t('ttk_tab_dishes')),
+            child: _ttkTabChip(loc.t('ttk_tab_dishes')),
           ),
         ),
         Tab(
           child: SpotlightTarget(
             id: 'ttk-tab-review',
             controller: ctrl,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(loc.t('ttk_tab_review') ?? 'На проверку'),
-                if (reviewCount > 0) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '$reviewCount',
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onPrimary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
+            child: _ttkTabChip(
+              loc.t('ttk_tab_review') ?? 'На проверку',
+              badgeCount: reviewCount,
             ),
           ),
         ),
@@ -3147,25 +3157,21 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                             size: 20,
                             color: Theme.of(context).colorScheme.primary),
                         const SizedBox(width: 8),
-                        Text(
-                          loc.t('ttk_section'),
-                          style:
-                              Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _departmentHeaderLabel(loc),
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
+                        Expanded(
+                          child: Text(
+                            '${loc.t('ttk_section')}: ${_departmentHeaderLabel(loc)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurface,
+                                ),
+                          ),
                         ),
                       ],
                     ),
@@ -3176,30 +3182,38 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                           size: 20,
                           color: Theme.of(context).colorScheme.primary),
                       const SizedBox(width: 8),
-                      Text(
-                        loc.t('ttk_section'),
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _departmentHeaderLabel(loc),
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
+                      Expanded(
+                        child: Text(
+                          '${loc.t('ttk_section')}: ${_departmentHeaderLabel(loc)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleSmall
+                              ?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                        ),
                       ),
                     ],
                   ),
           ),
           TabBar(
             isScrollable: true,
+            labelPadding:
+                const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            indicatorSize: TabBarIndicatorSize.tab,
+            dividerColor: Colors.transparent,
+            indicator: BoxDecoration(
+              color: Theme.of(context)
+                  .colorScheme
+                  .primary
+                  .withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            labelColor: Theme.of(context).colorScheme.primary,
+            unselectedLabelColor: Theme.of(context).colorScheme.primary,
             tabs: _buildTabBarTabs(loc, reviewCount),
           ),
           // Поиск и сортировка
