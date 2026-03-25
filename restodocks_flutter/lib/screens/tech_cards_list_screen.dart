@@ -3290,23 +3290,29 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             clipBehavior: Clip.antiAlias,
-            child: AnimatedBuilder(
-              animation: DefaultTabController.of(context),
-              builder: (ctx, _) {
-                final selectedIndex = DefaultTabController.of(ctx).index;
-                return TabBar(
-                  isScrollable: false,
-                  tabAlignment: TabAlignment.center,
-                  labelPadding: EdgeInsets.zero,
-                  dividerColor: Colors.transparent,
-                  indicator: const BoxDecoration(),
-                  labelColor: Theme.of(context).colorScheme.primary,
-                  unselectedLabelColor: Theme.of(context).colorScheme.primary,
-                  tabs: _buildTabBarTabs(
-                    loc,
-                    reviewCount,
-                    selectedIndex: selectedIndex,
-                  ),
+            child: Builder(
+              builder: (innerCtx) {
+                final tabState = DefaultTabController.of(innerCtx);
+                return AnimatedBuilder(
+                  animation: tabState,
+                  builder: (ctx, _) {
+                    final selectedIndex = tabState.index;
+                    return TabBar(
+                      isScrollable: false,
+                      tabAlignment: TabAlignment.center,
+                      labelPadding: EdgeInsets.zero,
+                      dividerColor: Colors.transparent,
+                      indicator: const BoxDecoration(),
+                      labelColor: Theme.of(context).colorScheme.primary,
+                      unselectedLabelColor:
+                          Theme.of(context).colorScheme.primary,
+                      tabs: _buildTabBarTabs(
+                        loc,
+                        reviewCount,
+                        selectedIndex: selectedIndex,
+                      ),
+                    );
+                  },
                 );
               },
             ),
