@@ -1556,6 +1556,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       }
       if (tc != null) {
         var working = stripInvalidNestedPfSelfLinks(tc);
+        // Нужные ПФ для расчёта цен/стоимости в таблице:
+        // в режиме просмотра раньше могли не подгружаться "справочники" (loadedTechCards пустой),
+        // из-за чего sourceTechCardId не прикреплялся и стоимость вложенных ПФ становилась 0.
+        var semiFinishedForCost = <TechCard>[];
         if (!identical(working, tc)) {
           try {
             await svc.saveTechCard(working, skipHistory: true);
@@ -1577,6 +1581,60 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               hydratedList, productStore);
           working = hydrated.firstWhere((item) => item.id == currentTechCardId,
               orElse: () => working);
+          semiFinishedForCost = hydrated.where((t) => t.isSemiFinished).toList();
+        } else {
+          // loadedTechCards пустой (часто в forceViewMode / без прав редактирования).
+          // Подгружаем полуфабрикаты точечно для корректного расчёта себестоимости.
+          final est = context.read<AccountManagerSupabase>().establishment;
+          if (est != null) {
+            final productStore = context.read<ProductStoreSupabase>();
+            final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
+
+            List<TechCard> shallow;
+            if (est.isBranch) {
+              final main = await svc.getTechCardsForEstablishment(
+                est.dataEstablishmentId!,
+                includeIngredients: false,
+              );
+              final branch = await svc.getTechCardsForEstablishment(
+                est.id,
+                includeIngredients: false,
+              );
+              shallow = [...main, ...branch];
+            } else {
+              shallow = await svc.getTechCardsForEstablishment(
+                est.dataEstablishmentId,
+                includeIngredients: false,
+              );
+            }
+
+            final pfCardsShallow = shallow.where((t) => t.isSemiFinished).toList();
+            if (pfCardsShallow.isNotEmpty) {
+              // Догружаем ингредиенты ПФ (тогда recursion по рецепту сможет взять цены листовых продуктов).
+              final pfCardsFilled = await svc.fillIngredientsForCardsBulk(pfCardsShallow);
+
+              // В ПФ мог быть не заполнен sourceTechCardId для вложенных ПФ — прикрепим по имени.
+              final attachedPfs = pfCardsFilled
+                  .map((pf) => _attachMissingPfSourceTechCardId(pf, pfCardsFilled))
+                  .toList();
+
+              // Прикрепим sourceTechCardId и к самой текущей карте.
+              working = _attachMissingPfSourceTechCardId(working, attachedPfs);
+
+              var hydratedList = [working, ...attachedPfs];
+              if (estPriceId.isNotEmpty) {
+                hydratedList = TechCardCostHydrator.hydrate(
+                  hydratedList,
+                  productStore,
+                  estPriceId,
+                );
+              }
+              hydratedList = TechCardNutritionHydrator.hydrate(hydratedList, productStore);
+              working = hydratedList.firstWhere((item) => item.id == working.id, orElse: () => working);
+
+              semiFinishedForCost = attachedPfs;
+            }
+          }
         }
         tc = working;
       }
@@ -1588,6 +1646,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           _techCard = tc;
           _loading = false;
           if (tc != null) {
+            if (tc.isSemiFinished) {
+              // для ПФ самой по себе достаточно своих ингредиентов, но пусть не пусто для рекурсии
+              _semiFinishedProducts = semiFinishedForCost.isNotEmpty ? semiFinishedForCost : (tc != null ? [tc] : []);
+            } else {
+              if (semiFinishedForCost.isNotEmpty) {
+                _semiFinishedProducts = semiFinishedForCost;
+              }
+            }
             final sumOutput =
                 tc.ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
             if (tc.isSemiFinished) {
