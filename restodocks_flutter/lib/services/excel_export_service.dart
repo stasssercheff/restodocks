@@ -11,6 +11,21 @@ import 'inventory_download.dart';
 
 enum TechCardExportFormat { pdf, xlsx }
 enum TechCardExportKind { withPrice, withoutPrice, actDevelopment }
+enum OrganolepticMode { template, custom }
+
+class OrganolepticProperties {
+  const OrganolepticProperties({
+    required this.appearance,
+    required this.consistency,
+    required this.color,
+    required this.tasteAndSmell,
+  });
+
+  final String appearance;
+  final String consistency;
+  final String color;
+  final String tasteAndSmell;
+}
 
 class TechCardExportOptions {
   const TechCardExportOptions({
@@ -21,6 +36,8 @@ class TechCardExportOptions {
     required this.chefName,
     required this.chefPosition,
     required this.documentDate,
+    required this.organolepticMode,
+    required this.organoleptic,
   });
 
   final TechCardExportFormat format;
@@ -30,6 +47,8 @@ class TechCardExportOptions {
   final String chefName;
   final String chefPosition;
   final DateTime documentDate;
+  final OrganolepticMode organolepticMode;
+  final OrganolepticProperties organoleptic;
 
   bool get includePrice => kind == TechCardExportKind.withPrice;
   bool get isAct => kind == TechCardExportKind.actDevelopment;
@@ -114,8 +133,36 @@ class ExcelExportService {
       'total': 'Total',
       'semi': 'Semi-finished',
       'dish': 'Dish',
+      'organoleptic': 'Organoleptic Properties',
+      'appearance': 'Appearance',
+      'consistency': 'Consistency',
+      'color_label': 'Color',
+      'taste_smell': 'Taste and smell',
     };
     return (ru ? ruMap : enMap)[key] ?? key;
+  }
+
+  OrganolepticProperties defaultOrganolepticTemplate(String lang) {
+    if (lang == 'ru') {
+      return const OrganolepticProperties(
+        appearance:
+            'Ингредиенты приготовлены и выложены согласно технологии приготовления.',
+        consistency: 'Характерная для данного вида продукта',
+        color:
+            'Естественный, свойственный входящим в состав ингредиентам. Без признаков заветривания или порчи.',
+        tasteAndSmell:
+            'Чистые, без посторонних привкусов и запахов. Вкус сбалансированный.',
+      );
+    }
+    return const OrganolepticProperties(
+      appearance:
+          'Ingredients are prepared and plated according to the cooking technology.',
+      consistency: 'Characteristic for this type of product.',
+      color:
+          'Natural, typical for ingredients included in the composition. No signs of drying or spoilage.',
+      tasteAndSmell:
+          'Clean, without off-flavors or off-odors. Taste is balanced.',
+    );
   }
 
   Future<void> exportSingleTechCardAdvanced(
@@ -141,6 +188,8 @@ class ExcelExportService {
         chefName: '',
         chefPosition: '',
         documentDate: techCard.createdAt,
+        organolepticMode: OrganolepticMode.template,
+        organoleptic: defaultOrganolepticTemplate('ru'),
       ),
     );
   }
@@ -227,6 +276,20 @@ class ExcelExportService {
       sheet.cell(CellIndex.indexByString('H$totalRow')).value = DoubleCellValue(totalCost);
       sheet.cell(CellIndex.indexByString('I$totalRow')).value =
           DoubleCellValue(totalNet > 0 ? totalCost * 1000 / totalNet : 0);
+    }
+
+    if (options.isAct) {
+      final start = totalRow + 2;
+      sheet.cell(CellIndex.indexByString('A$start')).value =
+          TextCellValue(_tr('organoleptic', lang));
+      sheet.cell(CellIndex.indexByString('A${start + 1}')).value =
+          TextCellValue('${_tr('appearance', lang)}: ${options.organoleptic.appearance}');
+      sheet.cell(CellIndex.indexByString('A${start + 2}')).value = TextCellValue(
+          '${_tr('consistency', lang)}: ${options.organoleptic.consistency}');
+      sheet.cell(CellIndex.indexByString('A${start + 3}')).value =
+          TextCellValue('${_tr('color_label', lang)}: ${options.organoleptic.color}');
+      sheet.cell(CellIndex.indexByString('A${start + 4}')).value = TextCellValue(
+          '${_tr('taste_smell', lang)}: ${options.organoleptic.tasteAndSmell}');
     }
 
     final safeName = techCard.dishName.replaceAll(RegExp(r'[^\w\s-]'), '_');
@@ -355,6 +418,33 @@ class ExcelExportService {
               ),
             ],
           ),
+          if (options.isAct) ...[
+            pw.SizedBox(height: 12),
+            pw.Text(
+              _tr('organoleptic', lang),
+              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 4),
+            pw.Text(
+              '${_tr('appearance', lang)}: ${_pdfSafe(options.organoleptic.appearance)}',
+              style: const pw.TextStyle(fontSize: 9),
+            ),
+            pw.SizedBox(height: 2),
+            pw.Text(
+              '${_tr('consistency', lang)}: ${_pdfSafe(options.organoleptic.consistency)}',
+              style: const pw.TextStyle(fontSize: 9),
+            ),
+            pw.SizedBox(height: 2),
+            pw.Text(
+              '${_tr('color_label', lang)}: ${_pdfSafe(options.organoleptic.color)}',
+              style: const pw.TextStyle(fontSize: 9),
+            ),
+            pw.SizedBox(height: 2),
+            pw.Text(
+              '${_tr('taste_smell', lang)}: ${_pdfSafe(options.organoleptic.tasteAndSmell)}',
+              style: const pw.TextStyle(fontSize: 9),
+            ),
+          ],
         ],
       ),
     );
