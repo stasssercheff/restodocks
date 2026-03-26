@@ -12,6 +12,8 @@ import '../utils/dev_log.dart';
 import '../utils/product_name_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 
+enum _ImportDuplicateAction { createDuplicate, editExisting, deleteExisting }
+
 /// Экран просмотра и правки распознанных ТТК перед созданием (пакетный импорт из Excel).
 class TechCardsImportReviewScreen extends StatefulWidget {
   const TechCardsImportReviewScreen({super.key, required this.cards, this.headerSignature, this.sourceRows, this.department = 'kitchen'});
@@ -466,6 +468,12 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   static String _norm(String s) =>
       stripIikoPrefix(s).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
 
+  /// Убирает суффикс вида `-1`, `-2`... если он стоит в конце названия.
+  static String _stripDuplicateSuffix(String s) {
+    final v = s.trim();
+    return v.replaceFirst(RegExp(r'-\d+$'), '');
+  }
+
   /// Топологическая сортировка: сначала листовые ТТК (без ПФ), потом с ПФ. При цикле — fallback.
   static List<_ReviewItem> _topologicalSortOrFallback(
     List<_ReviewItem> items,
@@ -563,6 +571,27 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           .where((tc) => tc.isSemiFinished)
           .map((tc) => (id: tc.id, name: tc.dishName))
           .toList();
+
+      // Индексы для детекта «такой ТТК уже есть» (по названию).
+      final existingDishByKey = <String, TechCard>{};
+      final existingPfByKey = <String, TechCard>{};
+      final existingDishKeys = <String>{};
+      final existingPfKeys = <String>{};
+      for (final tc in allTc) {
+        final name = (tc.dishName).trim();
+        if (name.isEmpty) continue;
+        if (tc.isSemiFinished) {
+          final k = normalizeForPfMatching(name);
+          if (k.isEmpty) continue;
+          existingPfByKey.putIfAbsent(k, () => tc);
+          existingPfKeys.add(k);
+        } else {
+          final k = _norm(name);
+          if (k.isEmpty) continue;
+          existingDishByKey.putIfAbsent(k, () => tc);
+          existingDishKeys.add(k);
+        }
+      }
       var productsForMapping = <({String id, String name})>[];
       for (final p in products) {
         productsForMapping.add((id: p.id, name: p.name));
@@ -656,6 +685,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       int created = 0;
       final failed = <({String name, String error})>[];
       final failedItems = <_ReviewItem>[];
+      var abortAfterDuplicateAction = false;
       for (final item in sorted) {
         if (item.alreadySaved) continue; // уже сохранена в систему через «Сохранить» в редакторе
         try {
@@ -666,21 +696,134 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
               resultToSave = item.result.copyWith(dishName: ensurePfPrefix(raw));
             }
           }
-          await svc.createTechCardFromRecognitionResult(
-            establishmentId: est.dataEstablishmentId,
-            createdBy: emp.id,
-            createdByName: emp.fullName,
-            result: resultToSave,
-            category: item.category,
-            sections: _normalizeSections(item.sections),
-            isSemiFinishedOverride: item.isSemiFinished,
-            languageCode: lang,
-            productsForMapping: productsForMapping,
-            techCardsPfForMapping: techCardsPf,
-            createdTechCardsByName: createdByName,
-            productStore: productStore,
-          );
-          created++;
+          final proposedName = (resultToSave.dishName ?? '').trim();
+
+          Future<TechCard> createOne(TechCardRecognitionResult r) async {
+            return svc.createTechCardFromRecognitionResult(
+              establishmentId: est.dataEstablishmentId,
+              createdBy: emp.id,
+              createdByName: emp.fullName,
+              result: r,
+              category: item.category,
+              sections: _normalizeSections(item.sections),
+              isSemiFinishedOverride: item.isSemiFinished,
+              languageCode: lang,
+              productsForMapping: productsForMapping,
+              techCardsPfForMapping: techCardsPf,
+              createdTechCardsByName: createdByName,
+              productStore: productStore,
+            );
+          }
+
+          final duplicateKey = item.isSemiFinished
+              ? normalizeForPfMatching(proposedName)
+              : _norm(proposedName);
+          final existingTc = item.isSemiFinished
+              ? existingPfByKey[duplicateKey]
+              : existingDishByKey[duplicateKey];
+
+          if (existingTc != null && existingTc.dishName.trim().isNotEmpty) {
+            final action = await showDialog<_ImportDuplicateAction>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Такая ТТК уже есть в системе'),
+                content: Text('"${existingTc.dishName.trim()}"'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(null),
+                    child: Text(loc.t('cancel') ?? 'Отмена'),
+                  ),
+                  FilledButton(
+                    onPressed: () =>
+                        Navigator.of(ctx).pop(_ImportDuplicateAction.createDuplicate),
+                    child: const Text('Создать дубликат'),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(ctx).pop(_ImportDuplicateAction.editExisting),
+                    child: const Text('Внести правки'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(_ImportDuplicateAction.deleteExisting),
+                    child: const Text('Удалить', style: TextStyle(color: Colors.red)),
+                  ),
+                ],
+              ),
+            );
+
+            if (action == null) {
+              // Пользователь отменил действие — не создаём/не правим.
+              continue;
+            }
+
+            if (action == _ImportDuplicateAction.createDuplicate) {
+              final base = _stripDuplicateSuffix(proposedName);
+              int n = 1;
+              while (true) {
+                final candidate = '$base-$n';
+                final k = item.isSemiFinished
+                    ? normalizeForPfMatching(candidate)
+                    : _norm(candidate);
+                final exists = item.isSemiFinished
+                    ? existingPfKeys.contains(k)
+                    : existingDishKeys.contains(k);
+                if (!exists) {
+                  var dup = resultToSave.copyWith(dishName: candidate);
+                  if (_ensurePfPrefix && item.isSemiFinished) {
+                    dup = dup.copyWith(dishName: ensurePfPrefix(candidate));
+                  }
+
+                  final createdTc = await createOne(dup);
+                  final createdNameNorm = createdTc.dishName.trim();
+                  if (createdTc.isSemiFinished) {
+                    final k2 = normalizeForPfMatching(createdNameNorm);
+                    if (k2.isNotEmpty) {
+                      existingPfByKey[k2] = createdTc;
+                      existingPfKeys.add(k2);
+                    }
+                  } else {
+                    final k2 = _norm(createdNameNorm);
+                    if (k2.isNotEmpty) {
+                      existingDishByKey[k2] = createdTc;
+                      existingDishKeys.add(k2);
+                    }
+                  }
+                  created++;
+                  break;
+                }
+                n++;
+              }
+            } else if (action == _ImportDuplicateAction.editExisting) {
+              if (mounted) setState(() => _saving = false);
+              await context.push('/tech-cards/${existingTc.id}');
+              abortAfterDuplicateAction = true;
+              break;
+            } else if (action == _ImportDuplicateAction.deleteExisting) {
+              if (mounted) setState(() => _saving = false);
+              await svc.deleteTechCard(existingTc.id);
+              if (mounted) {
+                context.go('/tech-cards/${widget.department}?refresh=1');
+              }
+              abortAfterDuplicateAction = true;
+              break;
+            }
+          } else {
+            final createdTc = await createOne(resultToSave);
+            final createdNameNorm = createdTc.dishName.trim();
+            if (createdTc.isSemiFinished) {
+              final k2 = normalizeForPfMatching(createdNameNorm);
+              if (k2.isNotEmpty) {
+                existingPfByKey[k2] = createdTc;
+                existingPfKeys.add(k2);
+              }
+            } else {
+              final k2 = _norm(createdNameNorm);
+              if (k2.isNotEmpty) {
+                existingDishByKey[k2] = createdTc;
+                existingDishKeys.add(k2);
+              }
+            }
+            created++;
+          }
         } catch (e) {
           final name = (item.result.dishName ?? '').trim().isEmpty ? (loc.t('tech_cards_import_unnamed') ?? 'Без названия') : (item.result.dishName ?? '').trim();
           failed.add((name: name, error: e.toString()));
@@ -688,7 +831,10 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           devLog('[ttk_import] Ошибка сохранения "$name": $e');
         }
         if (mounted) setState(() => _saveProgress = productNamesToCreate.length + created);
+
+        if (abortAfterDuplicateAction) break;
       }
+      if (abortAfterDuplicateAction) return;
       // Обучение: обратный маппинг по скорректированным данным. Таймаут 10 с — при плохой сети не блокируем.
       final sig = widget.headerSignature ?? AiServiceSupabase.lastParseHeaderSignature;
       final sourceRows = widget.sourceRows ?? AiServiceSupabase.lastParsedRows;

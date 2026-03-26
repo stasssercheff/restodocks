@@ -40,11 +40,21 @@ class TechCardsListScreen extends StatefulWidget {
   State<TechCardsListScreen> createState() => _TechCardsListScreenState();
 }
 
-class _TechCardsListScreenState extends State<TechCardsListScreen> {
+class _TechCardsListScreenState extends State<TechCardsListScreen>
+    with SingleTickerProviderStateMixin {
   List<TechCard> _list = [];
   // Индексы/кэши для рекурсивного расчёта себестоимости (включая вложенные ПФ из импортированных ТТК).
   Map<String, TechCard> _techCardsById = {};
   Map<String, ({double cost, double output})> _resolvedCostMemo = {};
+
+  /// Ленивое наполнение `tc.ingredients` для отображения цен.
+  /// Идея: при построении видимой строки запрашиваем ингредиенты только для нужных ТТК,
+  /// а не для всего списка.
+  final Set<String> _ingredientsHydratedIds = {};
+  final Set<String> _ingredientsHydrationInFlight = {};
+  final Set<String> _ingredientsHydrationPending = {};
+  Timer? _ingredientsHydrationDebounce;
+  bool _reviewIngredientsWarmUpInFlight = false;
 
   /// Для расчёта ₽/кг в списке по ценам номенклатуры (ингредиенты в БД часто без cost/pricePerKg).
   ProductStoreSupabase? _priceProductStore;
@@ -79,9 +89,37 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   bool _ttkTourCheckDone = false;
   SpotlightController? _ttkTourController;
 
+  late final TabController _tabController;
+  int _tabIndex = 0;
+  bool _tabWasTouched = false;
+  bool _tabAutoSelectedOnce = false;
+  int? _tabIndexFromUrl;
+
   @override
   void initState() {
     super.initState();
+    _tabIndexFromUrl = _readTabIndexFromUrl();
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: _tabIndexFromUrl ?? 0,
+    );
+    _tabIndex = _tabController.index;
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) return;
+      final idx = _tabController.index;
+      if (idx == _tabIndex) return;
+      _tabIndex = idx;
+      if (mounted) {
+        if (idx == 2) {
+          _cachedReviewList = null;
+          _cachedReviewCount = null;
+          _lastReviewCacheKey = null;
+          unawaited(_warmUpReviewIngredients());
+        }
+        setState(() {});
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowTtkTour());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _load();
@@ -332,13 +370,29 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   @override
   void dispose() {
     _searchDebounceTimer?.cancel();
+    _ingredientsHydrationDebounce?.cancel();
     _reconcileTimer?.cancel();
+    _tabController.dispose();
     if (_reconcileNotifier != null) {
       _reconcileNotifier!.removeListener(_handleTechCardsReconcileSignal);
     }
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  int? _readTabIndexFromUrl() {
+    final state = GoRouterState.of(context);
+    final tab = state.queryParameters['tab'];
+    if (tab == null) return null;
+    final v = tab.trim().toLowerCase();
+    if (v == 'pf') return 0;
+    if (v == 'dishes') return 1;
+    if (v == 'review') return 2;
+    final i = int.tryParse(v);
+    if (i == null) return null;
+    if (i < 0 || i > 2) return null;
+    return i;
   }
 
   /// Порядок категорий: кухня (без напитков) и бар (только напитки/снеки)
@@ -553,7 +607,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
   /// Себестоимость за порцию (для блюд): totalCost * portionWeight / yield.
   double _calculateCostPerPortion(TechCard tc) {
-    if (tc.ingredients.isEmpty || tc.portionWeight <= 0) return 0.0;
+    if (tc.ingredients.isEmpty) {
+      _queueIngredientsHydrationForCost(tc.id);
+      return 0.0;
+    }
+    if (tc.portionWeight <= 0) return 0.0;
     final resolved = _resolveTechCardCostOutput(tc.id, <String>{});
     if (resolved.cost <= 0 || resolved.output <= 0) return 0.0;
     final yieldG = tc.yield > 0 ? tc.yield : resolved.output;
@@ -1536,6 +1594,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       return (cost: 0.0, output: 0.0);
     }
 
+    if (tc.ingredients.isEmpty) {
+      _queueIngredientsHydrationForCost(techCardId);
+      resolving.remove(techCardId);
+      return (cost: 0.0, output: 0.0);
+    }
+
     double totalCost = 0.0;
     double totalOutput = 0.0;
 
@@ -1565,6 +1629,166 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
     _resolvedCostMemo[techCardId] = resolved;
     resolving.remove(techCardId);
     return resolved;
+  }
+
+  void _queueIngredientsHydrationForCost(String techCardId) {
+    if (techCardId.isEmpty) return;
+    if (_ingredientsHydratedIds.contains(techCardId)) return;
+
+    final tc = _techCardsById[techCardId];
+    if (tc != null && tc.ingredients.isNotEmpty) {
+      _ingredientsHydratedIds.add(techCardId);
+      return;
+    }
+
+    if (_ingredientsHydrationInFlight.contains(techCardId)) return;
+    _ingredientsHydrationPending.add(techCardId);
+
+    _ingredientsHydrationDebounce?.cancel();
+    _ingredientsHydrationDebounce =
+        Timer(const Duration(milliseconds: 180), () async {
+      unawaited(_flushIngredientsHydrationQueue());
+    });
+  }
+
+  Future<void> _flushIngredientsHydrationQueue() async {
+    if (!mounted) return;
+
+    final ids = Set<String>.from(_ingredientsHydrationPending);
+    _ingredientsHydrationPending.clear();
+    if (ids.isEmpty) return;
+
+    final idsToFetch = <String>{};
+    for (final id in ids) {
+      if (_ingredientsHydratedIds.contains(id)) continue;
+      if (_ingredientsHydrationInFlight.contains(id)) continue;
+      final tc = _techCardsById[id];
+      if (tc != null && tc.ingredients.isNotEmpty) {
+        _ingredientsHydratedIds.add(id);
+        continue;
+      }
+      idsToFetch.add(id);
+    }
+    if (idsToFetch.isEmpty) return;
+
+    for (final id in idsToFetch) {
+      _ingredientsHydrationInFlight.add(id);
+    }
+
+    try {
+      final svc = context.read<TechCardServiceSupabase>();
+      final cards = idsToFetch
+          .map((id) => _techCardsById[id])
+          .whereType<TechCard>()
+          .toList(growable: false);
+
+      final updated = await svc.fillIngredientsForCardsBulk(cards);
+      final updatedById = {for (final tc in updated) tc.id: tc};
+
+      if (!mounted) return;
+
+      setState(() {
+        for (final id in idsToFetch) {
+          final u = updatedById[id];
+          if (u == null) continue;
+          _techCardsById[id] = u;
+          _ingredientsHydratedIds.add(id);
+        }
+
+        if (_list.isNotEmpty) {
+          final map = updatedById;
+          _list = _list.map((tc) => map[tc.id] ?? tc).toList(growable: false);
+        }
+
+        // Себестоимость зависит от ингредиентов, поэтому очищаем кеш.
+        _resolvedCostMemo.clear();
+
+        // Подсчёт «На проверку» зависит от цен/весов/ПФ, поэтому
+        // пересчитаем только если пользователь прямо смотрит этот таб.
+        if (_tabController.index == 2) {
+          _cachedReviewList = null;
+          _cachedReviewCount = null;
+          _lastReviewCacheKey = null;
+        }
+      });
+    } catch (_) {
+      // Ошибки догрузки ингредиентов не должны ломать список.
+    } finally {
+      for (final id in idsToFetch) {
+        _ingredientsHydrationInFlight.remove(id);
+      }
+    }
+  }
+
+  /// Прогрев ингредиентов для вкладки «На проверку», чтобы подсчёт проблем
+  /// (особенно цен) был корректным. Запускается лениво при переходе на таб.
+  Future<void> _warmUpReviewIngredients() async {
+    if (!mounted) return;
+    if (_reviewIngredientsWarmUpInFlight) return;
+
+    final loc = context.read<LocalizationService>();
+    final reviewFiltered = _getReviewFilteredList(loc);
+    final toHydrate = reviewFiltered.where((tc) => tc.ingredients.isEmpty).toList();
+    if (toHydrate.isEmpty) return;
+
+    _reviewIngredientsWarmUpInFlight = true;
+    try {
+      final acc = context.read<AccountManagerSupabase>();
+      final est = acc.establishment;
+      final productStore = context.read<ProductStoreSupabase>();
+      final svc = context.read<TechCardServiceSupabase>();
+
+      // Гарантируем наличие цен в номенклатуре для проверки «Без цен».
+      if (est != null) {
+        await productStore.loadProducts().catchError((_) {});
+        if (est.isBranch) {
+          await productStore
+              .loadNomenclatureForBranch(est.id, est.dataEstablishmentId!)
+              .catchError((_) {});
+        } else {
+          await productStore
+              .loadNomenclature(est.dataEstablishmentId)
+              .catchError((_) {});
+        }
+
+        if (!mounted) return;
+        await _buildNomenclatureNamePriceIndex(
+          productStore,
+          est.isBranch ? est.id : est.dataEstablishmentId,
+        );
+      }
+
+      const chunkSize = 60;
+      final hydratedById = <String, TechCard>{};
+      for (var i = 0; i < toHydrate.length; i += chunkSize) {
+        if (!mounted) break;
+        final end = (i + chunkSize < toHydrate.length) ? (i + chunkSize) : toHydrate.length;
+        final chunk = toHydrate.sublist(i, end);
+        final updated = await svc.fillIngredientsForCardsBulk(chunk);
+        for (final tc in updated) {
+          hydratedById[tc.id] = tc;
+          _ingredientsHydratedIds.add(tc.id);
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        hydratedById.forEach((id, tc) => _techCardsById[id] = tc);
+        if (_list.isNotEmpty) {
+          _list = _list
+              .map((tc) => hydratedById[tc.id] ?? tc)
+              .toList(growable: false);
+        }
+        _resolvedCostMemo.clear();
+        _cachedReviewList = null;
+        _cachedReviewCount = null;
+        _lastReviewCacheKey = null;
+      });
+    } catch (_) {
+      // Прогрев не должен блокировать UI.
+    } finally {
+      _reviewIngredientsWarmUpInFlight = false;
+    }
   }
 
   bool _legacyBarCardMatch(TechCard tc, Set<String> customBarIds) {
@@ -1695,10 +1919,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           emp?.hasRole('manager') == true ||
           emp?.hasRole('general_manager') == true;
 
-      // Тяжёлое (products, nomenclature, fillIngredients, hydrate, индекс цен) — в фоне
-      // На web тяжёлая гидратация в списке заметно фризит переходы
-      // (вход/выход из ТТК и обратно), поэтому отключаем её.
-      final bool doHeavyHydration = showLoading && !kIsWeb;
+      // Тяжёлое (products, nomenclature, fillIngredients, индекс цен) — в фоне.
+      // Чтобы не тормозить список, убираем лишние гидраторы (cost/nutrition)
+      // и полагаемся на рекурсивный расчёт себестоимости по ингредиентам + ценам номенклатуры.
+      final bool doHeavyHydration = (showLoading || canSeeCosts);
       int? hydrateToken;
       if (doHeavyHydration) {
         hydrateToken = ++_loadHydrateToken;
@@ -1716,62 +1940,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
                   .catchError((_) {});
             }
             if (!mounted || requestToken != _loadRequestToken) return;
-            var withData = List<TechCard>.from(processedAll);
-            withData = await svc.fillIngredientsForCardsBulk(withData);
-            if (canSeeCosts) {
-              final estPriceId =
-                  est.isBranch ? est.id : est.dataEstablishmentId;
-              if (estPriceId != null && estPriceId.isNotEmpty) {
-                withData = TechCardCostHydrator.hydrate(
-                    withData, productStore, estPriceId);
-              }
-            }
-            withData =
-                TechCardNutritionHydrator.hydrate(withData, productStore);
-            if (!mounted || requestToken != _loadRequestToken) return;
             await _buildNomenclatureNamePriceIndex(
-                productStore,
-                est.isBranch ? est.id : est.dataEstablishmentId);
+              productStore,
+              est.isBranch ? est.id : est.dataEstablishmentId,
+            );
             if (!mounted || requestToken != _loadRequestToken) return;
-            var filteredList =
-                _filterListByDepartment(withData, customBarIds);
-            final byId = {for (final tc in withData) tc.id: tc};
-            final referencedIds = <String>{};
-            for (final tc in withData) {
-              for (final ing in tc.ingredients) {
-                final id = ing.sourceTechCardId;
-                if (id != null && id.trim().isNotEmpty)
-                  referencedIds.add(id.trim());
-              }
-            }
-            final existing = filteredList.map((e) => e.id).toSet();
-            for (final id in referencedIds) {
-              final ref = byId[id];
-              if (ref != null && !existing.contains(id)) {
-                filteredList = [...filteredList, ref];
-                existing.add(id);
-              }
-            }
-            if (!mounted || requestToken != _loadRequestToken) return;
+            // После догрузки номенклатуры: пересчитаем стоимость для тех строк,
+            // которые уже успели быть отрендерены и посчитаны.
             setState(() {
-              _list = filteredList;
-              _listVersion++;
-              _cachedReviewList = null;
-              _cachedReviewCount = null;
-              _lastReviewCacheKey = null;
-              _techCardsById = {for (final t in withData) t.id: t};
-              _priceProductStore = productStore;
-              _priceEstablishmentId =
-                  est.isBranch ? est.id : est.dataEstablishmentId;
+              _resolvedCostMemo.clear();
             });
-            if (mounted && requestToken == _loadRequestToken) {
-              _rebuildPfCandidatesIndex(context.read<LocalizationService>());
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (!mounted || _list.isEmpty) return;
-                final loc = context.read<LocalizationService>();
-                _ensureReviewCache(loc, _getReviewFilteredList(loc));
-              });
-            }
           } catch (_) {
           } finally {
             if (mounted &&
@@ -1822,6 +2000,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
         });
         _techCardsById = {for (final tc in processedAll) tc.id: tc};
         _resolvedCostMemo.clear();
+        _rebuildPfCandidatesIndex(context.read<LocalizationService>());
         _ensureTechCardTranslations(svc, list);
         _warmPdfParser();
         // Предзагрузка кэша «На проверку» — чтобы при переключении вкладки данные были готовы
@@ -3200,11 +3379,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
     final initialTabIndex =
         semiFinishedFiltered.isEmpty && dishFiltered.isNotEmpty ? 1 : 0;
-    return DefaultTabController(
-      length: 3,
-      initialIndex: initialTabIndex,
-      child: Column(
-        children: [
+    // Автоматический выбор первой вкладки (как раньше), но только один раз
+    // и только если пользователь явно не трогал вкладки.
+    if (!_tabAutoSelectedOnce &&
+        !_tabWasTouched &&
+        _tabIndexFromUrl == null &&
+        _list.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_tabWasTouched || _tabAutoSelectedOnce) return;
+        _tabController.index = initialTabIndex;
+        _tabAutoSelectedOnce = true;
+      });
+    }
+
+    return Column(
+      children: [
           if (showBranchFilter)
             FutureBuilder<List<Establishment>>(
               future: acc.getBranchesForEstablishment(acc.establishment!.id),
@@ -3298,34 +3488,23 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             clipBehavior: Clip.antiAlias,
-            child: Builder(
-              builder: (innerCtx) {
-                final tabState = DefaultTabController.of(innerCtx);
-                return AnimatedBuilder(
-                  animation: tabState,
-                  builder: (ctx, _) {
-                    final selectedIndex = tabState.index;
-                    return TabBar(
-                      isScrollable: false,
-                      tabAlignment: TabAlignment.center,
-                      labelPadding: EdgeInsets.zero,
-                      dividerColor: Colors.transparent,
-                      overlayColor:
-                          WidgetStateProperty.all(Colors.transparent),
-                      splashFactory: NoSplash.splashFactory,
-                      indicator: const BoxDecoration(),
-                      labelColor: Theme.of(context).colorScheme.primary,
-                      unselectedLabelColor:
-                          Theme.of(context).colorScheme.primary,
-                      tabs: _buildTabBarTabs(
-                        loc,
-                        reviewCount,
-                        selectedIndex: selectedIndex,
-                      ),
-                    );
-                  },
-                );
-              },
+            child: TabBar(
+              controller: _tabController,
+              isScrollable: false,
+              tabAlignment: TabAlignment.center,
+              labelPadding: EdgeInsets.zero,
+              dividerColor: Colors.transparent,
+              overlayColor: WidgetStateProperty.all(Colors.transparent),
+              splashFactory: NoSplash.splashFactory,
+              indicator: const BoxDecoration(),
+              labelColor: Theme.of(context).colorScheme.primary,
+              unselectedLabelColor: Theme.of(context).colorScheme.primary,
+              onTap: (_) => _tabWasTouched = true,
+              tabs: _buildTabBarTabs(
+                loc,
+                reviewCount,
+                selectedIndex: _tabController.index,
+              ),
             ),
           ),
           if (_listDetailsHydrating)
@@ -3428,6 +3607,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           ),
           Expanded(
             child: TabBarView(
+              controller: _tabController,
               children: [
                 _buildTechCardsTable(
                   semiFinishedFiltered,
@@ -3453,8 +3633,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               ],
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -3705,16 +3884,31 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               if (showCost)
                 SizedBox(
                   width: colCostWidth,
-                  child: Text(
-                    isDishesTab
-                        ? '${NumberFormatUtils.formatDecimal(_calculateCostPerPortion(tc))} $costSym'
-                        : NumberFormatUtils.formatInt(_calculateCostPerKg(tc)),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
+                  child: Builder(builder: (ctx) {
+                    final hasIngredients = tc.ingredients.isNotEmpty;
+                    if (!hasIngredients) {
+                      _queueIngredientsHydrationForCost(tc.id);
+                      return Text(
+                        '—',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
+                      );
+                    }
+
+                    return Text(
+                      isDishesTab
+                          ? '${NumberFormatUtils.formatDecimal(_calculateCostPerPortion(tc))} $costSym'
+                          : NumberFormatUtils.formatInt(_calculateCostPerKg(tc)),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      textAlign: TextAlign.center,
+                    );
+                  }),
                 ),
               SizedBox(
                 width: colActionsWidth,
