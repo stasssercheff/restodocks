@@ -3735,8 +3735,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
     final lang = loc.currentLanguageCode;
     final isMobile = MediaQuery.of(context).size.width < 600;
-    // На мобильном — уже столбцы, чтобы название получало больше места.
-    final colSectionWidth = isMobile ? 72.0 : 118.0;
+    // Показываем все цеха целиком; на мобильном расширяем колонку "Цех".
+    final colSectionWidth = isMobile ? 140.0 : 180.0;
     final colCatWidth = isMobile ? 52.0 : 84.0;
     final colCostWidth = isMobile ? 48.0 : 56.0;
     final colActionsWidth = isMobile ? 48.0 : 62.0;
@@ -3923,6 +3923,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                   softWrap: true,
+                  maxLines: null,
+                  overflow: TextOverflow.visible,
                   textAlign: TextAlign.center,
                 ),
               ),

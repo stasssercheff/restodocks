@@ -5741,10 +5741,12 @@ class _TtkTableState extends State<_TtkTable> {
 
     final hasDeleteCol = widget.effectiveCanEdit;
     // Порядок колонок как в образце. Ширины подобраны так, чтобы вся строка с полями ввода помещалась на экране без горизонтальной прокрутки.
-    final isWideDesktop = MediaQuery.of(context).size.width >= 1200;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isWideDesktop = screenWidth >= 1200;
+    final isMobile = screenWidth < 600;
     const colType = 64.0; // Тип ТТК
     const colName = 100.0; // Наименование
-    final colProduct = isWideDesktop ? 220.0 : 140.0;
+    final colProduct = isWideDesktop ? 240.0 : (isMobile ? 210.0 : 160.0);
     const colGross = 70.0; // Брутто г. (как столбец Цена)
     const colWaste = 64.0; // Отход %
     const colNet = 70.0; // Нетто г.
@@ -6547,7 +6549,7 @@ class _TtkCookTable extends StatefulWidget {
   static const _cellPad = EdgeInsets.symmetric(horizontal: 6, vertical: 6);
   // Ширины как в _TtkTable (таблица создания)
   static const _colDish = 100.0;
-  static const _colProduct = 120.0;
+  static const _colProduct = 190.0;
   static const _colGross = 70.0; // как столбец Цена
   static const _colNet = 70.0;
   static const _colMethod = 100.0;
@@ -6747,13 +6749,21 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                                               ' (${ing.outputWeight.toStringAsFixed(0)} ${widget.loc.t('gram')})'),
                                     ],
                                   ),
-                                  overflow: TextOverflow.ellipsis,
-                                  maxLines: 2,
+                                  softWrap: true,
                                 ),
                               ),
                             ),
                           )
-                        : _cell(cookDisplayName),
+                        : TableCell(
+                            child: Padding(
+                              padding: _TtkCookTable._cellPad,
+                              child: Text(
+                                cookDisplayName,
+                                style: const TextStyle(fontSize: 12),
+                                softWrap: true,
+                              ),
+                            ),
+                          ),
                     TableCell(
                       child: Padding(
                         padding: _TtkCookTable._cellPad,
