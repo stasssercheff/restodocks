@@ -1963,18 +1963,17 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
   void _scheduleDraftSave() {
     _lastUserInteractionAt = DateTime.now();
-    // На web автосохранение в localStorage + jsonEncode может блокировать UI на
-    // заметные секунды, особенно при пересчёте ингредиентов.
-    // Поэтому сохраняем только после паузы в вводе.
-    if (kIsWeb) {
-      _draftSaveIdleDebounceTimer?.cancel();
-      _draftSaveIdleDebounceTimer = Timer(const Duration(seconds: 2), () {
+    // Автосохранение черновика с полным состоянием (включая ингредиенты) может
+    // заметно блокировать UI, особенно сразу после импорта больших ТТК.
+    // Сохраняем только после короткой паузы на всех платформах.
+    _draftSaveIdleDebounceTimer?.cancel();
+    _draftSaveIdleDebounceTimer = Timer(
+      kIsWeb ? const Duration(seconds: 2) : const Duration(milliseconds: 700),
+      () {
         if (!mounted) return;
         scheduleSave();
-      });
-      return;
-    }
-    scheduleSave();
+      },
+    );
   }
 
   String _normalizeForTechCardName(String s) {
