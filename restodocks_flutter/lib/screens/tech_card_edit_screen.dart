@@ -930,26 +930,23 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         }
       }
 
-      // Берём все ПФ заведения, даже если текущий экран открыт в view-режиме.
-      List<TechCard> shallow;
-      if (est.isBranch) {
-        final main = await tcSvc.getTechCardsForEstablishment(
-          est.dataEstablishmentId ?? estPriceId,
-          includeIngredients: false,
-        );
-        final branch = await tcSvc.getTechCardsForEstablishment(
-          est.id,
-          includeIngredients: false,
-        );
-        shallow = [...main, ...branch];
-      } else {
-        shallow = await tcSvc.getTechCardsForEstablishment(
-          est.dataEstablishmentId ?? estPriceId,
-          includeIngredients: false,
-        );
+      final neededPfIds = <String>{};
+      for (final ing in currentTc.ingredients) {
+        if (ing.sourceTechCardId != null &&
+            ing.sourceTechCardId!.trim().isNotEmpty) {
+          neededPfIds.add(ing.sourceTechCardId!.trim());
+        }
       }
+      if (neededPfIds.isEmpty) return;
 
-      final pfCards = shallow.where((t) => t.isSemiFinished).toList();
+      // Точечная загрузка только связанных ПФ — без полного списка ТТК заведения.
+      final fetched = await Future.wait(
+        neededPfIds.map((id) => tcSvc.getTechCardById(id)),
+      );
+      final pfCards = fetched
+          .whereType<TechCard>()
+          .where((t) => t.isSemiFinished)
+          .toList();
       if (pfCards.isEmpty) return;
 
       // Догружаем ингредиенты ПФ и гидратим их стоимость/pricePerKg.
@@ -1743,52 +1740,27 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           semiFinishedForCost = hydrated.where((t) => t.isSemiFinished).toList();
         } else {
           // loadedTechCards пустой (часто в forceViewMode / без прав редактирования).
-          // Подгружаем полуфабрикаты точечно для корректного расчёта себестоимости.
+          // Подгружаем полуфабрикаты только по sourceTechCardId текущей карточки.
           final est = context.read<AccountManagerSupabase>().establishment;
           if (est != null) {
             final productStore = context.read<ProductStoreSupabase>();
             final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId;
-
-            List<TechCard> shallow;
-            if (est.isBranch) {
-              final main = await svc.getTechCardsForEstablishment(
-                est.dataEstablishmentId!,
-                includeIngredients: false,
-              );
-              final branch = await svc.getTechCardsForEstablishment(
-                est.id,
-                includeIngredients: false,
-              );
-              shallow = [...main, ...branch];
-            } else {
-              shallow = await svc.getTechCardsForEstablishment(
-                est.dataEstablishmentId,
-                includeIngredients: false,
-              );
+            final neededPfIds = <String>{};
+            for (final ing in working.ingredients) {
+              final id = ing.sourceTechCardId?.trim();
+              if (id != null && id.isNotEmpty) neededPfIds.add(id);
             }
-
-            final pfCardsShallow = shallow.where((t) => t.isSemiFinished).toList();
-            if (pfCardsShallow.isNotEmpty) {
-              final neededPfIds = <String>{};
-              final neededPfNames = <String>{};
-              for (final ing in working.ingredients) {
-                if (ing.sourceTechCardId != null &&
-                    ing.sourceTechCardId!.trim().isNotEmpty) {
-                  neededPfIds.add(ing.sourceTechCardId!.trim());
-                }
-                final n = normalizeForPfMatching(ing.productName);
-                if (n.isNotEmpty) neededPfNames.add(n);
-              }
-              final neededPfCards = pfCardsShallow.where((pf) {
-                if (neededPfIds.contains(pf.id)) return true;
-                final n = normalizeForPfMatching(pf.dishName);
-                return n.isNotEmpty && neededPfNames.contains(n);
-              }).toList();
+            if (neededPfIds.isNotEmpty) {
+              final fetched = await Future.wait(
+                neededPfIds.map((id) => svc.getTechCardById(id)),
+              );
+              final neededPfCards = fetched
+                  .whereType<TechCard>()
+                  .where((t) => t.isSemiFinished)
+                  .toList();
               if (neededPfCards.isNotEmpty) {
-                // Догружаем только реально нужные ПФ для текущей карточки.
-                final pfCardsFilled = await svc.fillIngredientsForCardsBulk(
-                  neededPfCards,
-                );
+                final pfCardsFilled =
+                    await svc.fillIngredientsForCardsBulk(neededPfCards);
 
                 // В ПФ мог быть не заполнен sourceTechCardId для вложенных ПФ — прикрепим по имени.
                 final attachedPfs = pfCardsFilled
@@ -1877,7 +1849,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         // Защитный fallback: если по какой-то причине semiFinishedProducts не
         // успели заполниться (например, view-режим без loadedTechCards),
         // подгружаем/гидратим их, чтобы ExcelStyleTtkTable успел посчитать цены.
-        if (tc != null && _semiFinishedProducts.isEmpty) {
+        if (tc != null &&
+            _semiFinishedProducts.isEmpty &&
+            tc.ingredients.any((ing) =>
+                (ing.sourceTechCardId?.trim().isNotEmpty ?? false) ||
+                (ing.productId == null && ing.productName.trim().isNotEmpty))) {
           unawaited(_ensureSemiFinishedProductsForCost(tc));
         }
         // Если перевод технологии ещё не сохранён — запросить через DeepL
@@ -1887,10 +1863,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           _enrichPricesFromNomenclature(
               est.isBranch ? est.id : est.dataEstablishmentId!);
         if (mounted) {
-          if (kIsWeb) {
-            unawaited(restoreDraftNow());
-          } else {
-            await restoreDraftNow();
+          // Для существующих ТТК не восстанавливаем черновик автоматически:
+          // старый draft может перетирать серверные поля (название/категория/цех/тип/технология).
+          final shouldRestoreDraft = _isNew || widget.initialFromAi != null;
+          if (shouldRestoreDraft) {
+            if (kIsWeb) {
+              unawaited(restoreDraftNow());
+            } else {
+              await restoreDraftNow();
+            }
           }
         }
       });
