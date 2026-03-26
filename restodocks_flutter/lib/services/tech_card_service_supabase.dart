@@ -280,15 +280,20 @@ class TechCardServiceSupabase {
       try {
         final m = row as Map<String, dynamic>;
         final ingredientsData = m['tt_ingredients'] as List<dynamic>? ?? [];
+        final sortedMaps = _sortIngredientMapsStable(
+          ingredientsData
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList(),
+        );
         final ingredients = <TTIngredient>[];
-        for (final j in ingredientsData) {
+        for (final j in sortedMaps) {
           try {
-            ingredients.add(TTIngredient.fromJson(j as Map<String, dynamic>));
+            ingredients.add(TTIngredient.fromJson(j));
           } catch (_) {}
         }
-        final sortedIngredients = _sortIngredientsStableByIdSuffix(ingredients);
         final tc = TechCard.fromJson(m);
-        techCards.add(tc.copyWith(ingredients: sortedIngredients));
+        techCards.add(tc.copyWith(ingredients: ingredients));
       } catch (e) {
         skipCards++;
       }
@@ -323,6 +328,50 @@ class TechCardServiceSupabase {
       final ka = orderKey(a.value);
       final kb = orderKey(b.value);
       if (ka != kb) return ka.compareTo(kb);
+      return a.key.compareTo(b.key);
+    });
+    return indexed.map((e) => e.value).toList();
+  }
+
+  /// Стабильная сортировка строк ингредиентов из БД:
+  /// 1) по created_at (если доступно), 2) по id-suffix, 3) по исходному индексу.
+  static List<Map<String, dynamic>> _sortIngredientMapsStable(
+    List<Map<String, dynamic>> rows,
+  ) {
+    if (rows.length <= 1) return rows;
+
+    int idSuffixKey(Map<String, dynamic> row) {
+      final id = (row['id'] ?? '').toString();
+      final idx = id.lastIndexOf('_');
+      if (idx >= 0 && idx + 1 < id.length) {
+        final suffix = id.substring(idx + 1);
+        final parsed = int.tryParse(suffix);
+        if (parsed != null) return parsed;
+      }
+      return int.tryParse(id) ?? 0;
+    }
+
+    DateTime? createdAt(Map<String, dynamic> row) {
+      final raw = row['created_at']?.toString();
+      if (raw == null || raw.isEmpty) return null;
+      return DateTime.tryParse(raw);
+    }
+
+    final indexed = rows.asMap().entries.toList();
+    indexed.sort((a, b) {
+      final ca = createdAt(a.value);
+      final cb = createdAt(b.value);
+      if (ca != null && cb != null) {
+        final cmp = ca.compareTo(cb);
+        if (cmp != 0) return cmp;
+      } else if (ca != null && cb == null) {
+        return -1;
+      } else if (ca == null && cb != null) {
+        return 1;
+      }
+      final ia = idSuffixKey(a.value);
+      final ib = idSuffixKey(b.value);
+      if (ia != ib) return ia.compareTo(ib);
       return a.key.compareTo(b.key);
     });
     return indexed.map((e) => e.value).toList();
@@ -440,10 +489,15 @@ class TechCardServiceSupabase {
       final data = await _supabase.client
           .from('tt_ingredients')
           .select()
-          .eq('tech_card_id', techCardId)
-          .order('id');
-      return (data as List)
-          .map((j) => TTIngredient.fromJson(j as Map<String, dynamic>))
+          .eq('tech_card_id', techCardId);
+      final rows = _sortIngredientMapsStable(
+        (data as List)
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList(),
+      );
+      return rows
+          .map((j) => TTIngredient.fromJson(j))
           .toList();
     } catch (_) {
       return [];
@@ -465,24 +519,22 @@ class TechCardServiceSupabase {
       final data = await _supabase.client
           .from('tt_ingredients')
           .select('*')
-          .inFilter('tech_card_id', ids)
-          .order('id');
-      final grouped = <String, List<TTIngredient>>{};
+          .inFilter('tech_card_id', ids);
+      final groupedRaw = <String, List<Map<String, dynamic>>>{};
       for (final row in (data as List)) {
         try {
           final m = row as Map<String, dynamic>;
           final tcId = (m['tech_card_id'] ?? '').toString();
           if (tcId.isEmpty) continue;
-          final ing = TTIngredient.fromJson(m);
-          (grouped[tcId] ??= <TTIngredient>[]).add(ing);
+          (groupedRaw[tcId] ??= <Map<String, dynamic>>[])
+              .add(Map<String, dynamic>.from(m));
         } catch (_) {}
       }
-      // Нормализуем порядок ингредиентов так, чтобы UI всегда показывал
-      // “как создавали/как импортировали”, а не embedded/bulk произвольный.
-      for (final entry in grouped.entries) {
-        entry.value
-          ..clear()
-          ..addAll(_sortIngredientsStableByIdSuffix(entry.value));
+      final grouped = <String, List<TTIngredient>>{};
+      for (final entry in groupedRaw.entries) {
+        grouped[entry.key] = _sortIngredientMapsStable(entry.value)
+            .map(TTIngredient.fromJson)
+            .toList();
       }
       return cards
           .map((tc) =>
