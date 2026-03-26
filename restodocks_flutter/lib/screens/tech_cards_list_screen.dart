@@ -1923,16 +1923,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       final svc = context.read<TechCardServiceSupabase>();
       final productStore = context.read<ProductStoreSupabase>();
 
-      // Минимум для показа списка: только ТТК и категории (без вложенных ingredients).
+      // Приоритет надёжности: всегда грузим список с ingredients.
+      // Ранее shallow-режим (includeIngredients:false) давал «пустые» ТТК
+      // при любых сбоях кэша/ленивой гидрации.
       late Future<List<TechCard>> allCardsFuture;
       if (est.isBranch) {
         allCardsFuture = Future.wait([
-          svc.getTechCardsForEstablishment(est.dataEstablishmentId, includeIngredients: false),
-          svc.getTechCardsForEstablishment(est.id, includeIngredients: false),
+          svc.getTechCardsForEstablishment(est.dataEstablishmentId),
+          svc.getTechCardsForEstablishment(est.id),
         ]).then((results) => [...results[0], ...results[1]]);
       } else {
         allCardsFuture =
-            svc.getTechCardsForEstablishment(est.dataEstablishmentId, includeIngredients: false);
+            svc.getTechCardsForEstablishment(est.dataEstablishmentId);
       }
       final customCategoriesFuture = Future.wait([
         svc.getCustomCategories(est.dataEstablishmentId, 'kitchen'),
@@ -2091,6 +2093,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           final saveSvc = context.read<TechCardServiceSupabase>();
           for (final tc in toPersistSelfLink.take(25)) {
             if (!mounted) break;
+            if (tc.ingredients.isEmpty) continue;
             try {
               await saveSvc.saveTechCard(tc, skipHistory: true);
             } catch (_) {}
@@ -2331,6 +2334,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       // Ограничиваем нагрузку: максимум 20 карточек за тик.
       final toSave = updated.take(20).toList();
       for (final tc in toSave) {
+        if (tc.ingredients.isEmpty) continue;
         await svc.saveTechCard(tc, skipHistory: true);
       }
 
