@@ -311,43 +311,32 @@ class _MenuScreenState extends State<MenuScreen> {
         currencySym: currencySym,
       );
     }
-
-    // Кухня/бар: если есть права — полный просмотр ТТК.
-    if (_canSeeFullTtkView(emp, tc)) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.download, size: 18),
-              label: Text(loc.t('download_dish')),
-              onPressed: () => _downloadDish(tc),
-            ),
-          ),
-          _MenuDishTable(
-            loc: loc,
-            dishName: tc.dishName,
-            techCard: tc,
-            ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
-            technology: tc.getLocalizedTechnology(lang),
-            currencySym: currencySym,
-            showCost: true,
-            productStore: context.read<ProductStoreSupabase>(),
-          ),
-        ],
-      );
-    }
-    // Кухня/бар: повары и сотрудники — полная ТТК (состав, технология) без цен
-    return _MenuDishTable(
+    final showCost = _canSeeFullTtkView(emp, tc);
+    final table = _MenuDishTable(
       loc: loc,
       dishName: tc.dishName,
       techCard: tc,
       ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
       technology: tc.getLocalizedTechnology(lang),
       currencySym: currencySym,
-      showCost: false,
+      showCost: showCost,
       productStore: context.read<ProductStoreSupabase>(),
+    );
+    // Кухня/бар: всегда показываем таблицу и технологию.
+    if (!showCost) return table;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.download, size: 18),
+            label: Text(loc.t('download_dish')),
+            onPressed: () => _downloadDish(tc),
+          ),
+        ),
+        table,
+      ],
     );
   }
 
