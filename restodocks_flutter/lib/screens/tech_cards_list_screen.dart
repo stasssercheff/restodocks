@@ -42,6 +42,9 @@ class TechCardsListScreen extends StatefulWidget {
 
 class _TechCardsListScreenState extends State<TechCardsListScreen>
     with SingleTickerProviderStateMixin {
+  // Временное бизнес-решение: скрываем колонку себестоимости в списке ТТК,
+  // не удаляя логику расчёта.
+  static const bool _hideCostColumnsInList = true;
   List<TechCard> _list = [];
   // Индексы/кэши для рекурсивного расчёта себестоимости (включая вложенные ПФ из импортированных ТТК).
   Map<String, TechCard> _techCardsById = {};
@@ -2986,7 +2989,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final accountManager = context.watch<AccountManagerSupabase>();
     final canEdit =
         accountManager.currentEmployee?.canEditChecklistsAndTechCards ?? false;
-    final showCost = _canSeeCost(accountManager);
+    final showCost = _canSeeCost(accountManager) && !_hideCostColumnsInList;
 
     return Scaffold(
       appBar: AppBar(
@@ -3919,8 +3922,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
                   textAlign: TextAlign.center,
                 ),
               ),
