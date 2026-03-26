@@ -86,6 +86,21 @@ class TechCardServiceSupabase {
     data.remove('cost_currency');
     data.remove('gramsPerPiece'); // toJson выдаёт grams_per_piece (JsonKey)
     data.removeWhere((key, value) => value == null);
+
+    // Некоторые поля в БД могут иметь тип `uuid`, а мы в приложении храним
+    // процесс/enum как строковые id (например, cooking_process_id).
+    // Чтобы не падать при импорте, если значение не похоже на uuid —
+    // выкидываем поле из payload (оставив cooking_process_name, если оно есть).
+    final cookingProcessId = data['cooking_process_id'];
+    if (cookingProcessId is String && cookingProcessId.trim().isNotEmpty) {
+      final s = cookingProcessId.trim();
+      final looksLikeUuid = RegExp(
+        r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+      ).hasMatch(s);
+      if (!looksLikeUuid) {
+        data.remove('cooking_process_id');
+      }
+    }
     return data;
   }
 

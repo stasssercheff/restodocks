@@ -1670,12 +1670,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           if (filled.isNotEmpty) tc = filled.first;
         }
       }
+      List<TechCard> semiFinishedForCost = <TechCard>[];
       if (tc != null) {
         var working = stripInvalidNestedPfSelfLinks(tc);
         // Нужные ПФ для расчёта цен/стоимости в таблице:
         // в режиме просмотра раньше могли не подгружаться "справочники" (loadedTechCards пустой),
         // из-за чего sourceTechCardId не прикреплялся и стоимость вложенных ПФ становилась 0.
-        var semiFinishedForCost = <TechCard>[];
         if (!identical(working, tc)) {
           try {
             await svc.saveTechCard(working, skipHistory: true);
