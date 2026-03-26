@@ -97,15 +97,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   bool _tabWasTouched = false;
   bool _tabAutoSelectedOnce = false;
   int? _tabIndexFromUrl;
+  bool _tabIndexResolvedFromUrl = false;
 
   @override
   void initState() {
     super.initState();
-    _tabIndexFromUrl = _readTabIndexFromUrl();
     _tabController = TabController(
       length: 3,
       vsync: this,
-      initialIndex: _tabIndexFromUrl ?? 0,
+      initialIndex: 0,
     );
     _tabIndex = _tabController.index;
     _tabController.addListener(() {
@@ -136,6 +136,19 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       });
       _tryReconcileTechCards(force: false);
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_tabIndexResolvedFromUrl) return;
+    _tabIndexResolvedFromUrl = true;
+    _tabIndexFromUrl = _readTabIndexFromUrl();
+    final idx = _tabIndexFromUrl;
+    if (idx != null && idx >= 0 && idx <= 2 && _tabController.index != idx) {
+      _tabController.index = idx;
+      _tabIndex = idx;
+    }
   }
 
   Future<void> _maybeShowTtkTour() async {
