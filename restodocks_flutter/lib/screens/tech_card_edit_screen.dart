@@ -1406,6 +1406,39 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 _customCategoriesKitchen = customKitchen;
                 _customCategoriesBar = customBar;
               });
+
+              // Для расчёта цены ПФ в ExcelStyleTtkTable нужны ingredients + cost внутри самих ПФ.
+              // В режиме deferTcLoad мы грузим карточки без ingredients, поэтому догружаем только ПФ.
+              unawaited(() async {
+                try {
+                  if (!mounted) return;
+                  await productStore.loadProducts().catchError((_) {});
+                  if (est.isBranch) {
+                    await productStore
+                        .loadNomenclatureForBranch(
+                            est.id, est.dataEstablishmentId!)
+                        .catchError((_) {});
+                  } else {
+                    await productStore
+                        .loadNomenclature(est.dataEstablishmentId)
+                        .catchError((_) {});
+                  }
+
+                  final pfs = tcs.where((t) => t.isSemiFinished).toList();
+                  var hydratedPfs = await tcSvc.fillIngredientsForCardsBulk(pfs);
+
+                  final estPriceId = est.isBranch
+                      ? est.id
+                      : (est.dataEstablishmentId ?? '');
+                  if (estPriceId.isNotEmpty) {
+                    hydratedPfs = TechCardCostHydrator.hydrate(
+                        hydratedPfs, productStore, estPriceId);
+                  }
+
+                  if (!mounted) return;
+                  setState(() => _semiFinishedProducts = hydratedPfs);
+                } catch (_) {}
+              }());
               _ensureTechCardTranslations(tcs);
             } catch (_) {}
           }();

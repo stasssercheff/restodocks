@@ -415,7 +415,8 @@ class TechCardServiceSupabase {
       final data = await _supabase.client
           .from('tt_ingredients')
           .select('*')
-          .inFilter('tech_card_id', ids);
+          .inFilter('tech_card_id', ids)
+          .order('id');
       final grouped = <String, List<TTIngredient>>{};
       for (final row in (data as List)) {
         try {

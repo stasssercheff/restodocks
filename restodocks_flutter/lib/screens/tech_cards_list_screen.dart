@@ -1698,7 +1698,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
       // Тяжёлое (products, nomenclature, fillIngredients, hydrate, индекс цен) — в фоне
       // На web тяжёлая гидратация в списке заметно фризит переходы
       // (вход/выход из ТТК и обратно), поэтому отключаем её.
-      final bool doHeavyHydration = showLoading && !kIsWeb;
+      // Если роль позволяет видеть себестоимость — нужна гидратация даже когда
+      // экран перерисовывается без “загрузки” (showLoading=false).
+      final bool doHeavyHydration = (showLoading || canSeeCosts) && !kIsWeb;
       int? hydrateToken;
       if (doHeavyHydration) {
         hydrateToken = ++_loadHydrateToken;
