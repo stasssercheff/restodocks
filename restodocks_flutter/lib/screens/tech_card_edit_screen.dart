@@ -1065,6 +1065,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       final looksEmpty = name.isEmpty && tech.isEmpty && !hasAnyIngredientName;
       if (looksEmpty) return;
     }
+    // Web: после загрузки с сервера вызывается restoreDraftNow(). Если в localStorage
+    // лежит старый черновик только с пустыми строками таблицы, он перетирает реальный состав.
+    // Для обычных ТТК (не импорт) не подменяем серверные ингредиенты «пустым» черновиком.
+    final skipIngredientsFromDraft = widget.techCardId.isNotEmpty &&
+        widget.techCardId != 'new' &&
+        widget.initialFromAi == null &&
+        _namedIngredientCountLoaded() > 0 &&
+        _namedIngredientCountInDraft(data['ingredients'] as List<dynamic>?) ==
+            0;
     if (!mounted) return;
     setState(() {
       _nameController.text = data['name'] as String? ?? '';
@@ -1129,15 +1138,40 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           data['compositionForHall'] as String? ?? '';
       _sellingPriceController.text = data['sellingPrice'] as String? ?? '';
       _photoUrls = List<String>.from(data['photoUrls'] as List<dynamic>? ?? []);
-      _ingredients.clear();
-      for (final item in data['ingredients'] as List<dynamic>? ?? []) {
-        try {
-          _ingredients.add(
-              TTIngredient.fromJson(Map<String, dynamic>.from(item as Map)));
-        } catch (_) {}
+      if (!skipIngredientsFromDraft) {
+        _ingredients.clear();
+        for (final item in data['ingredients'] as List<dynamic>? ?? []) {
+          try {
+            _ingredients.add(
+                TTIngredient.fromJson(Map<String, dynamic>.from(item as Map)));
+          } catch (_) {}
+        }
       }
       _ensurePlaceholderRowAtEnd();
     });
+  }
+
+  /// Сколько строк черновика реально похожи на ингредиенты (не placeholder и с названием).
+  int _namedIngredientCountInDraft(List<dynamic>? raw) {
+    if (raw == null) return 0;
+    var n = 0;
+    for (final item in raw) {
+      if (item is! Map) continue;
+      try {
+        final ing =
+            TTIngredient.fromJson(Map<String, dynamic>.from(item));
+        if (ing.isPlaceholder) continue;
+        if (ing.productName.trim().isEmpty) continue;
+        n++;
+      } catch (_) {}
+    }
+    return n;
+  }
+
+  int _namedIngredientCountLoaded() {
+    return _ingredients
+        .where((i) => !i.isPlaceholder && i.productName.trim().isNotEmpty)
+        .length;
   }
 
   /// Всегда держать хотя бы одну пустую строку для ввода в конце таблицы ингредиентов.
