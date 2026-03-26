@@ -1720,6 +1720,52 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
   }
 
+  /// Догрузка ингредиентов для всех карточек после списка с `includeIngredients: false`.
+  /// Без этого роли без колонки «Себестоимость» никогда не вызывали ленивую гидрацию — состав и цены оставались пустыми.
+  Future<void> _hydrateEmptyIngredientsForLoadedCards(
+    TechCardServiceSupabase svc, {
+    required int requestToken,
+  }) async {
+    if (!mounted || requestToken != _loadRequestToken) return;
+    final toHydrate = _techCardsById.values
+        .where((tc) => tc.ingredients.isEmpty)
+        .toList(growable: false);
+    if (toHydrate.isEmpty) return;
+
+    const chunkSize = 60;
+    for (var i = 0; i < toHydrate.length; i += chunkSize) {
+      if (!mounted || requestToken != _loadRequestToken) return;
+      final end = (i + chunkSize < toHydrate.length)
+          ? (i + chunkSize)
+          : toHydrate.length;
+      final chunk = toHydrate.sublist(i, end);
+      try {
+        final updated = await svc.fillIngredientsForCardsBulk(chunk);
+        if (!mounted || requestToken != _loadRequestToken) return;
+        final updatedById = {for (final tc in updated) tc.id: tc};
+        setState(() {
+          for (final tc in updated) {
+            _techCardsById[tc.id] = tc;
+            _ingredientsHydratedIds.add(tc.id);
+          }
+          if (_list.isNotEmpty) {
+            _list = _list
+                .map((tc) => updatedById[tc.id] ?? tc)
+                .toList(growable: false);
+          }
+          _resolvedCostMemo.clear();
+          if (_tabController.index == 2) {
+            _cachedReviewList = null;
+            _cachedReviewCount = null;
+            _lastReviewCacheKey = null;
+          }
+        });
+      } catch (_) {
+        // как при ленивой догрузке — не ломаем список
+      }
+    }
+  }
+
   /// Прогрев ингредиентов для вкладки «На проверку», чтобы подсчёт проблем
   /// (особенно цен) был корректным. Запускается лениво при переходе на таб.
   Future<void> _warmUpReviewIngredients() async {
@@ -1916,6 +1962,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       final canSeeCosts = emp?.hasRole('owner') == true ||
           emp?.hasRole('executive_chef') == true ||
           emp?.hasRole('sous_chef') == true ||
+          emp?.hasRole('bar_manager') == true ||
           emp?.hasRole('manager') == true ||
           emp?.hasRole('general_manager') == true;
 
@@ -1945,8 +1992,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               est.isBranch ? est.id : est.dataEstablishmentId,
             );
             if (!mounted || requestToken != _loadRequestToken) return;
-            // После догрузки номенклатуры: пересчитаем стоимость для тех строк,
-            // которые уже успели быть отрендерены и посчитаны.
+            await _hydrateEmptyIngredientsForLoadedCards(
+              svc,
+              requestToken: requestToken,
+            );
+            if (!mounted || requestToken != _loadRequestToken) return;
+            // После догрузки ингредиентов и номенклатуры — сброс кэша себестоимости.
             setState(() {
               _resolvedCostMemo.clear();
             });
