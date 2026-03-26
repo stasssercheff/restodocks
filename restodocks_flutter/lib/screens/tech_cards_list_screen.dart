@@ -42,6 +42,9 @@ class TechCardsListScreen extends StatefulWidget {
 
 class _TechCardsListScreenState extends State<TechCardsListScreen>
     with SingleTickerProviderStateMixin {
+  // Временное бизнес-решение: скрываем колонку себестоимости в списке ТТК,
+  // не удаляя логику расчёта.
+  static const bool _hideCostColumnsInList = true;
   List<TechCard> _list = [];
   // Индексы/кэши для рекурсивного расчёта себестоимости (включая вложенные ПФ из импортированных ТТК).
   Map<String, TechCard> _techCardsById = {};
@@ -1061,7 +1064,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 borderRadius: BorderRadius.circular(10),
                 side: BorderSide(
                     color: Theme.of(ctx).colorScheme.outlineVariant)),
-            title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+            title: Text(name),
             subtitle: Text(item.subtitle),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showReviewBottomSheet(tc, loc),
@@ -2968,14 +2971,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     );
   }
 
-  /// Себестоимость видят только руководство: собственник, шеф, су-шеф, барменеджер.
+  /// Себестоимость видят руководство и управляющие.
   bool _canSeeCost(AccountManagerSupabase acc) {
     final emp = acc.currentEmployee;
     if (emp == null) return false;
     return emp.hasRole('owner') ||
         emp.hasRole('executive_chef') ||
         emp.hasRole('sous_chef') ||
-        emp.hasRole('bar_manager');
+        emp.hasRole('bar_manager') ||
+        emp.hasRole('manager') ||
+        emp.hasRole('general_manager');
   }
 
   @override
@@ -2984,7 +2989,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final accountManager = context.watch<AccountManagerSupabase>();
     final canEdit =
         accountManager.currentEmployee?.canEditChecklistsAndTechCards ?? false;
-    final showCost = _canSeeCost(accountManager);
+    final showCost = _canSeeCost(accountManager) && !_hideCostColumnsInList;
 
     return Scaffold(
       appBar: AppBar(
@@ -3906,8 +3911,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 child: Text(
                   name,
                   style: const TextStyle(fontSize: 14),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
                 ),
               ),
               SizedBox(
@@ -3918,8 +3922,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
                   textAlign: TextAlign.center,
                 ),
               ),
