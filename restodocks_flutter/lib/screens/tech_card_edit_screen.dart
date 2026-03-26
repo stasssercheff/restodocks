@@ -930,7 +930,19 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         }
       }
 
-      // Берём все ПФ заведения, даже если текущий экран открыт в view-режиме.
+      final neededPfIds = <String>{};
+      final neededPfNames = <String>{};
+      for (final ing in currentTc.ingredients) {
+        if (ing.sourceTechCardId != null &&
+            ing.sourceTechCardId!.trim().isNotEmpty) {
+          neededPfIds.add(ing.sourceTechCardId!.trim());
+        }
+        final n = normalizeForPfMatching(ing.productName);
+        if (n.isNotEmpty) neededPfNames.add(n);
+      }
+      if (neededPfIds.isEmpty && neededPfNames.isEmpty) return;
+
+      // Берём ПФ заведения и фильтруем только те, что реально нужны текущей ТТК.
       List<TechCard> shallow;
       if (est.isBranch) {
         final main = await tcSvc.getTechCardsForEstablishment(
@@ -949,7 +961,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         );
       }
 
-      final pfCards = shallow.where((t) => t.isSemiFinished).toList();
+      final pfCards = shallow.where((t) {
+        if (!t.isSemiFinished) return false;
+        if (neededPfIds.contains(t.id)) return true;
+        final n = normalizeForPfMatching(t.dishName);
+        return n.isNotEmpty && neededPfNames.contains(n);
+      }).toList();
       if (pfCards.isEmpty) return;
 
       // Догружаем ингредиенты ПФ и гидратим их стоимость/pricePerKg.
@@ -1877,7 +1894,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         // Защитный fallback: если по какой-то причине semiFinishedProducts не
         // успели заполниться (например, view-режим без loadedTechCards),
         // подгружаем/гидратим их, чтобы ExcelStyleTtkTable успел посчитать цены.
-        if (tc != null && _semiFinishedProducts.isEmpty) {
+        if (tc != null &&
+            _semiFinishedProducts.isEmpty &&
+            tc.ingredients.any((ing) =>
+                (ing.sourceTechCardId?.trim().isNotEmpty ?? false) ||
+                (ing.productId == null && ing.productName.trim().isNotEmpty))) {
           unawaited(_ensureSemiFinishedProductsForCost(tc));
         }
         // Если перевод технологии ещё не сохранён — запросить через DeepL
@@ -1887,10 +1908,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           _enrichPricesFromNomenclature(
               est.isBranch ? est.id : est.dataEstablishmentId!);
         if (mounted) {
-          if (kIsWeb) {
-            unawaited(restoreDraftNow());
-          } else {
-            await restoreDraftNow();
+          // Для существующих ТТК не восстанавливаем черновик автоматически:
+          // старый draft может перетирать серверные поля (название/категория/цех/тип/технология).
+          final shouldRestoreDraft = _isNew || widget.initialFromAi != null;
+          if (shouldRestoreDraft) {
+            if (kIsWeb) {
+              unawaited(restoreDraftNow());
+            } else {
+              await restoreDraftNow();
+            }
           }
         }
       });
