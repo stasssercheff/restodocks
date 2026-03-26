@@ -142,6 +142,82 @@ class ExcelExportService {
     return (ru ? ruMap : enMap)[key] ?? key;
   }
 
+  String _transliterateRuToLatin(String input) {
+    const map = {
+      'а': 'a',
+      'б': 'b',
+      'в': 'v',
+      'г': 'g',
+      'д': 'd',
+      'е': 'e',
+      'ё': 'e',
+      'ж': 'zh',
+      'з': 'z',
+      'и': 'i',
+      'й': 'y',
+      'к': 'k',
+      'л': 'l',
+      'м': 'm',
+      'н': 'n',
+      'о': 'o',
+      'п': 'p',
+      'р': 'r',
+      'с': 's',
+      'т': 't',
+      'у': 'u',
+      'ф': 'f',
+      'х': 'h',
+      'ц': 'ts',
+      'ч': 'ch',
+      'ш': 'sh',
+      'щ': 'sch',
+      'ъ': '',
+      'ы': 'y',
+      'ь': '',
+      'э': 'e',
+      'ю': 'yu',
+      'я': 'ya',
+    };
+    final b = StringBuffer();
+    for (final rune in input.runes) {
+      final ch = String.fromCharCode(rune);
+      final lower = ch.toLowerCase();
+      final repl = map[lower];
+      if (repl == null) {
+        b.write(ch);
+      } else if (ch == lower) {
+        b.write(repl);
+      } else if (repl.isNotEmpty) {
+        b.write('${repl[0].toUpperCase()}${repl.substring(1)}');
+      }
+    }
+    return b.toString();
+  }
+
+  String _safeFilePart(String input) {
+    return input
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  String _buildExportFileName(
+    TechCard techCard,
+    TechCardExportOptions options, {
+    required String ext,
+  }) {
+    final lang = options.languageCode;
+    final title = options.isAct ? _tr('title_act', lang) : _tr('title_ttk', lang);
+    final raw = '$title ${techCard.dishName}'.trim();
+    final safe = _safeFilePart(raw);
+    if (safe.isNotEmpty) return '$safe.$ext';
+
+    final fallbackRaw = '${_transliterateRuToLatin(title)} ${_transliterateRuToLatin(techCard.dishName)}'.trim();
+    final fallbackSafe = _safeFilePart(fallbackRaw);
+    if (fallbackSafe.isNotEmpty) return '$fallbackSafe.$ext';
+    return '${options.isAct ? 'Act' : 'TTK'}.$ext';
+  }
+
   OrganolepticProperties defaultOrganolepticTemplate(String lang) {
     if (lang == 'ru') {
       return const OrganolepticProperties(
@@ -292,10 +368,10 @@ class ExcelExportService {
           '${_tr('taste_smell', lang)}: ${options.organoleptic.tasteAndSmell}');
     }
 
-    final safeName = techCard.dishName.replaceAll(RegExp(r'[^\w\s-]'), '_');
-    final prefix = options.isAct ? 'Act' : 'TTK';
-    final fileName = '${prefix}_$safeName.xlsx';
-    _saveExcelFile(excel, fileName);
+    _saveExcelFile(
+      excel,
+      _buildExportFileName(techCard, options, ext: 'xlsx'),
+    );
   }
 
   Future<void> _exportSingleTechCardPdf(
@@ -449,9 +525,10 @@ class ExcelExportService {
       ),
     );
 
-    final safeName = techCard.dishName.replaceAll(RegExp(r'[^\w\s-]'), '_');
-    final prefix = options.isAct ? 'Act' : 'TTK';
-    await saveFileBytes('${prefix}_$safeName.pdf', await doc.save());
+    await saveFileBytes(
+      _buildExportFileName(techCard, options, ext: 'pdf'),
+      await doc.save(),
+    );
   }
 
   /// Экспорт выбранных технологических карт
