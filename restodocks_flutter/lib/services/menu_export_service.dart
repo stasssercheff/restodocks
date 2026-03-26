@@ -32,6 +32,84 @@ class MenuExportService {
     return _pdfTheme!;
   }
 
+  /// PDF карточки для зала: название + фото + описание/состав для гостей.
+  static Future<Uint8List> buildHallDishPdfBytes({
+    required TechCard dish,
+    required String Function(String) t,
+    required String lang,
+  }) async {
+    final theme = await _getPdfTheme();
+    final doc = pw.Document(theme: theme);
+
+    final hallDescription = (dish.descriptionForHall ?? '').trim();
+    final hallComposition = (dish.compositionForHall ?? '').trim();
+
+    pw.MemoryImage? photo;
+    final photoUrl = (dish.photoUrls != null && dish.photoUrls!.isNotEmpty)
+        ? dish.photoUrls!.first
+        : null;
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      try {
+        final data = await NetworkAssetBundle(Uri.parse(photoUrl)).load(photoUrl);
+        photo = pw.MemoryImage(data.buffer.asUint8List());
+      } catch (_) {}
+    }
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        build: (_) => [
+          pw.Header(
+            level: 0,
+            child: pw.Text(
+              lang == 'ru' ? 'Карточка для зала' : 'Hall Card',
+              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
+            ),
+          ),
+          pw.SizedBox(height: 8),
+          pw.Text(
+            dish.dishName,
+            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+          ),
+          if (photo != null) ...[
+            pw.SizedBox(height: 12),
+            pw.Container(
+              height: 180,
+              width: 180,
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.grey300),
+              ),
+              child: pw.Image(photo, fit: pw.BoxFit.cover),
+            ),
+          ],
+          pw.SizedBox(height: 12),
+          pw.Text(
+            t('description_for_hall'),
+            style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            hallDescription.isNotEmpty ? hallDescription : t('dash'),
+            style: const pw.TextStyle(fontSize: 10),
+          ),
+          pw.SizedBox(height: 10),
+          pw.Text(
+            t('composition_for_hall'),
+            style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            hallComposition.isNotEmpty ? hallComposition : t('dash'),
+            style: const pw.TextStyle(fontSize: 10),
+          ),
+        ],
+      ),
+    );
+
+    return doc.save();
+  }
+
   static pw.Widget _cell(String text, {bool bold = false}) {
     return pw.Padding(
       padding: pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -409,6 +487,25 @@ class MenuExportService {
     );
     final safeName = dish.dishName.replaceAll(RegExp(r'[^\w\s\-\.]'), '_').replaceAll(RegExp(r'\s+'), '_');
     final fileName = 'dish_${safeName}_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.pdf';
+    await saveFileBytes(fileName, bytes);
+    return fileName;
+  }
+
+  /// Сохранить карточку блюда для зала (без кухонных таблиц/цен) на устройство.
+  static Future<String> saveHallDishPdf({
+    required TechCard dish,
+    required String Function(String) t,
+    required String lang,
+  }) async {
+    final bytes = await buildHallDishPdfBytes(
+      dish: dish,
+      t: t,
+      lang: lang,
+    );
+    final safeName =
+        dish.dishName.replaceAll(RegExp(r'[^\w\s\-\.]'), '_').replaceAll(RegExp(r'\s+'), '_');
+    final fileName =
+        'hall_card_${safeName}_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.pdf';
     await saveFileBytes(fileName, bytes);
     return fileName;
   }

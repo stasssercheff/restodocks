@@ -207,6 +207,21 @@ class _MenuScreenState extends State<MenuScreen> {
     return false;
   }
 
+  /// Скачать карточку блюда могут только руководители подразделения.
+  bool _canDownloadDishCard(Employee? emp, TechCard tc) {
+    if (emp == null) return false;
+    if (emp.hasRole('owner')) return true;
+    if (tc.sections.contains('bar') || _isBarDish(tc)) {
+      return emp.hasRole('bar_manager') ||
+          emp.hasRole('manager') ||
+          emp.hasRole('general_manager');
+    }
+    return emp.hasRole('executive_chef') ||
+        emp.hasRole('sous_chef') ||
+        emp.hasRole('manager') ||
+        emp.hasRole('general_manager');
+  }
+
   bool _hasHallContent(TechCard tc) {
     final d = tc.descriptionForHall?.trim() ?? '';
     final c = tc.compositionForHall?.trim() ?? '';
@@ -283,14 +298,10 @@ class _MenuScreenState extends State<MenuScreen> {
   Future<void> _downloadDish(TechCard tc) async {
     final loc = context.read<LocalizationService>();
     try {
-      final sym = context.read<AccountManagerSupabase>().establishment?.currencySymbol ?? '₽';
-      final fileName = await MenuExportService.saveDishPdf(
+      final fileName = await MenuExportService.saveHallDishPdf(
         dish: tc,
-        techCardService: context.read<TechCardServiceSupabase>(),
-        productStore: context.read<ProductStoreSupabase>(),
         t: loc.t,
         lang: loc.currentLanguageCode,
-        currencySym: sym,
       );
       if (mounted) AppToastService.show(loc.t('download_dish') + ' ✓ $fileName');
     } catch (e) {
@@ -311,12 +322,24 @@ class _MenuScreenState extends State<MenuScreen> {
         currencySym: currencySym,
       );
     }
-
-    // Кухня/бар: если есть права — полный просмотр ТТК.
-    if (_canSeeFullTtkView(emp, tc)) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    final showCost = _canSeeFullTtkView(emp, tc);
+    final canDownloadDishCard = _canDownloadDishCard(emp, tc);
+    final table = _MenuDishTable(
+      loc: loc,
+      dishName: tc.dishName,
+      techCard: tc,
+      ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
+      technology: tc.getLocalizedTechnology(lang),
+      currencySym: currencySym,
+      showCost: showCost,
+      productStore: context.read<ProductStoreSupabase>(),
+    );
+    // Кухня/бар: всегда показываем таблицу и технологию.
+    if (!showCost) return table;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (canDownloadDishCard)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: OutlinedButton.icon(
@@ -325,29 +348,8 @@ class _MenuScreenState extends State<MenuScreen> {
               onPressed: () => _downloadDish(tc),
             ),
           ),
-          _MenuDishTable(
-            loc: loc,
-            dishName: tc.dishName,
-            techCard: tc,
-            ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
-            technology: tc.getLocalizedTechnology(lang),
-            currencySym: currencySym,
-            showCost: true,
-            productStore: context.read<ProductStoreSupabase>(),
-          ),
-        ],
-      );
-    }
-    // Кухня/бар: повары и сотрудники — полная ТТК (состав, технология) без цен
-    return _MenuDishTable(
-      loc: loc,
-      dishName: tc.dishName,
-      techCard: tc,
-      ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
-      technology: tc.getLocalizedTechnology(lang),
-      currencySym: currencySym,
-      showCost: false,
-      productStore: context.read<ProductStoreSupabase>(),
+        table,
+      ],
     );
   }
 
