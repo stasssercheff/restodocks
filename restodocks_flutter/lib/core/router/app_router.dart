@@ -967,6 +967,13 @@ class _DeferredTechCardEditState extends State<_DeferredTechCardEdit> {
       final svc = context.read<TechCardServiceSupabase>();
       var tc = await svc.getTechCardById(widget.techCardId);
       if (tc != null && tc.ingredients.isEmpty) {
+        try {
+          final server =
+              await svc.getTechCardById(widget.techCardId, preferCache: false);
+          if (server != null) tc = server;
+        } catch (_) {}
+      }
+      if (tc != null && tc.ingredients.isEmpty) {
         final filled = await svc.fillIngredientsForCardsBulk([tc]);
         if (filled.isNotEmpty) tc = filled.first;
       }

@@ -1699,10 +1699,19 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         tc = widget.initialTechCard;
       } else {
         tc = await svc.getTechCardById(widget.techCardId);
-        if (tc != null && tc.ingredients.isEmpty) {
-          final filled = await svc.fillIngredientsForCardsBulk([tc]);
-          if (filled.isNotEmpty) tc = filled.first;
-        }
+      }
+      if (tc != null && tc.ingredients.isEmpty) {
+        try {
+          final server = await svc.getTechCardById(
+            widget.techCardId,
+            preferCache: false,
+          );
+          if (server != null) tc = server;
+        } catch (_) {}
+      }
+      if (tc != null && tc.ingredients.isEmpty) {
+        final filled = await svc.fillIngredientsForCardsBulk([tc]);
+        if (filled.isNotEmpty) tc = filled.first;
       }
       List<TechCard> semiFinishedForCost = <TechCard>[];
       if (tc != null) {
