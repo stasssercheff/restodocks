@@ -23,6 +23,8 @@ import '../utils/number_format_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 import 'excel_style_ttk_table.dart';
 
+enum _DuplicateNameAction { createDuplicate, edit, delete }
+
 /// Создание или редактирование ТТК. Ингредиенты — из номенклатуры или из других ТТК (ПФ).
 ///
 /// Составление/редактирование карточек остаётся как реализовано (таблица, ингредиенты, технология).
@@ -2601,6 +2603,66 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     );
   }
 
+  String _normalizeDishName(String input) =>
+      input.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+
+  Future<String?> _buildDuplicateNameIfNeeded({
+    required String establishmentId,
+    required String originalName,
+  }) async {
+    final normalized = _normalizeDishName(originalName);
+    final rows = await Supabase.instance.client
+        .from('tech_cards')
+        .select('dish_name')
+        .eq('establishment_id', establishmentId);
+    final existingNames = <String>{};
+    for (final row in (rows as List)) {
+      final name = (row as Map)['dish_name']?.toString() ?? '';
+      if (name.trim().isEmpty) continue;
+      existingNames.add(_normalizeDishName(name));
+    }
+    if (!existingNames.contains(normalized)) return null;
+    var i = 1;
+    while (true) {
+      final candidate = '$originalName-$i';
+      if (!existingNames.contains(_normalizeDishName(candidate))) {
+        return candidate;
+      }
+      i++;
+    }
+  }
+
+  Future<_DuplicateNameAction?> _showDuplicateNameDialog({
+    required String originalName,
+    required String duplicateName,
+  }) {
+    return showDialog<_DuplicateNameAction>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Такая ТТК уже есть в системе'),
+        content: Text(
+          'Название "$originalName" уже используется.\n'
+          'Создать дубликат с именем "$duplicateName"?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(_DuplicateNameAction.edit),
+            child: const Text('Внести правки'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(_DuplicateNameAction.delete),
+            child: const Text('Удалить'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(ctx).pop(_DuplicateNameAction.createDuplicate),
+            child: const Text('Создать дубликат'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _save() async {
     final loc = context.read<LocalizationService>();
     final acc = context.read<AccountManagerSupabase>();
@@ -2643,9 +2705,39 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     final translationManager = context.read<TranslationManager>();
     try {
       if (_isNew || tc == null) {
+        final targetEstablishmentId =
+            est.isBranch ? est.id : est.dataEstablishmentId;
+        final duplicateName = await _buildDuplicateNameIfNeeded(
+          establishmentId: targetEstablishmentId,
+          originalName: name,
+        );
+        if (duplicateName != null) {
+          final action = await _showDuplicateNameDialog(
+            originalName: name,
+            duplicateName: duplicateName,
+          );
+          if (!mounted) return;
+          if (action != _DuplicateNameAction.createDuplicate &&
+              action != _DuplicateNameAction.edit &&
+              action != _DuplicateNameAction.delete) {
+            setState(() => _saving = false);
+            return;
+          }
+          if (action == _DuplicateNameAction.edit) {
+            setState(() => _saving = false);
+            return;
+          }
+          if (action == _DuplicateNameAction.delete) {
+            setState(() => _saving = false);
+            await clearDraft();
+            context.pop(false);
+            return;
+          }
+        }
+        final saveName = duplicateName ?? name;
         // Филиал создаёт ТТК в своём заведении (доп от филиала); головное — в своём.
         final created = await svc.createTechCard(
-          dishName: name,
+          dishName: saveName,
           category: category,
           sections: _selectedSections,
           department: widget.department == 'bar' ||
@@ -2653,7 +2745,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               ? 'bar'
               : 'kitchen',
           isSemiFinished: _isSemiFinished,
-          establishmentId: est.isBranch ? est.id : est.dataEstablishmentId,
+          establishmentId: targetEstablishmentId,
           createdBy: emp.id,
         );
         final sellingPrice = _parseSellingPrice();
@@ -2746,7 +2838,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         // иначе перезапись через created удалит photoUrls и ingredients.
         final savedForTranslation = updated;
         final techText = _technologyController.text.trim();
-        final fieldsToTranslate = <String, String>{'dish_name': name};
+        final fieldsToTranslate = <String, String>{'dish_name': saveName};
         if (techText.isNotEmpty) fieldsToTranslate['technology'] = techText;
         translationManager
             .handleEntitySave(
@@ -2762,14 +2854,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             entityType: TranslationEntityType.techCard,
             entityId: created.id,
             fieldName: 'dish_name',
-            sourceText: name,
+            sourceText: saveName,
             sourceLanguage: curLang,
             targetLanguage: otherLang,
           );
           final nameMap = Map<String, String>.from(
               savedForTranslation.dishNameLocalized ?? {});
-          nameMap[curLang] = name;
-          if (translatedName != name) nameMap[otherLang] = translatedName;
+          nameMap[curLang] = saveName;
+          if (translatedName != saveName) nameMap[otherLang] = translatedName;
           final newTechMap = Map<String, String>.from(techMap);
           if (techText.isNotEmpty) {
             final translatedTech = await translationManager.getLocalizedText(
@@ -2821,7 +2913,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                     ))
                 .toList();
             final result = TechCardRecognitionResult(
-              dishName: name,
+              dishName: saveName,
               technologyText: _technologyController.text.trim().isEmpty
                   ? null
                   : _technologyController.text.trim(),

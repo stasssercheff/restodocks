@@ -139,13 +139,14 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     _parseErrors = AiServiceSupabase.lastParseTechCardErrors;
     if (_parseErrors != null) AiServiceSupabase.lastParseTechCardErrors = null;
     final defaultSections = _isBar ? const ['bar'] : const ['all'];
-    _items = widget.cards.map((c) => _ReviewItem(
+    final rawItems = widget.cards.map((c) => _ReviewItem(
       result: c,
       originalDishName: c.dishName,
       category: _inferCategory(c.dishName ?? ''),
       sections: defaultSections,
       isSemiFinished: c.isSemiFinished ?? true,
     )).toList();
+    _items = _groupDuplicatesForReview(rawItems);
     // Не включать «ПФ» по умолчанию, если у всех ПФ уже есть префикс в названии.
     final pfItems = _items.where((i) => i.isSemiFinished).toList();
     if (pfItems.isNotEmpty) {
@@ -467,6 +468,34 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
 
   static String _norm(String s) =>
       stripIikoPrefix(s).trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+
+  /// Группирует дубликаты рядом во вкладке "На проверку":
+  /// одинаковые названия (с учётом суффикса -1/-2) идут подряд, чтобы было удобно сравнивать.
+  static List<_ReviewItem> _groupDuplicatesForReview(List<_ReviewItem> items) {
+    if (items.length < 2) return items;
+    String groupKey(_ReviewItem item) {
+      final raw = (item.result.dishName ?? '').trim();
+      if (raw.isEmpty) return '';
+      final noSuffix = _stripDuplicateSuffix(raw);
+      return item.isSemiFinished ? normalizeForPfMatching(noSuffix) : _norm(noSuffix);
+    }
+
+    final byKey = <String, List<_ReviewItem>>{};
+    final order = <String>[];
+    for (final item in items) {
+      final key = groupKey(item);
+      if (!byKey.containsKey(key)) {
+        byKey[key] = <_ReviewItem>[];
+        order.add(key);
+      }
+      byKey[key]!.add(item);
+    }
+    final grouped = <_ReviewItem>[];
+    for (final key in order) {
+      grouped.addAll(byKey[key] ?? const []);
+    }
+    return grouped;
+  }
 
   /// Убирает суффикс вида `-1`, `-2`... если он стоит в конце названия.
   static String _stripDuplicateSuffix(String s) {
