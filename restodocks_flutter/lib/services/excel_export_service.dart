@@ -57,6 +57,16 @@ class ExcelExportService {
     return _pdfTheme!;
   }
 
+  // Удаляем "битые" управляющие символы, которые в PDF дают квадраты/иероглифы.
+  String _pdfSafe(String input) {
+    return input
+        .replaceAll('\uFFFD', ' ')
+        .replaceAll(RegExp(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]'), ' ')
+        .replaceAll(RegExp(r'[ \t]{2,}'), ' ')
+        .replaceAll(RegExp(r' *\n *'), '\n')
+        .trim();
+  }
+
   String _tr(String key, String lang) {
     final ru = lang == 'ru';
     const ruMap = {
@@ -186,7 +196,7 @@ class ExcelExportService {
       final ingredient = techCard.ingredients[i];
       final currentRow = rowIndex + i + 1;
       sheet.cell(CellIndex.indexByString('A$currentRow')).value =
-          TextCellValue(ingredient.productName);
+          TextCellValue(_pdfSafe(ingredient.productName));
       sheet.cell(CellIndex.indexByString('B$currentRow')).value =
           DoubleCellValue(ingredient.grossWeight);
       sheet.cell(CellIndex.indexByString('C$currentRow')).value =
@@ -194,7 +204,7 @@ class ExcelExportService {
       sheet.cell(CellIndex.indexByString('D$currentRow')).value =
           DoubleCellValue(ingredient.effectiveGrossWeight);
       sheet.cell(CellIndex.indexByString('E$currentRow')).value =
-          TextCellValue(ingredient.cookingProcessName ?? '');
+          TextCellValue(_pdfSafe(ingredient.cookingProcessName ?? ''));
       sheet.cell(CellIndex.indexByString('F$currentRow')).value = DoubleCellValue(
           ingredient.cookingLossPctOverride ?? ingredient.weightLossPercentage);
       sheet.cell(CellIndex.indexByString('G$currentRow')).value =
@@ -233,15 +243,16 @@ class ExcelExportService {
     final doc = pw.Document(theme: theme);
     final lang = options.languageCode;
     final title = options.isAct ? _tr('title_act', lang) : _tr('title_ttk', lang);
-    final technology = techCard.getLocalizedTechnology(lang);
+    final technology = _pdfSafe(techCard.getLocalizedTechnology(lang));
     final totalNet = techCard.ingredients.fold<double>(0, (sum, ing) => sum + ing.netWeight);
     final totalCost = techCard.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
 
     pw.Widget cell(String text, {bool bold = false, pw.TextAlign align = pw.TextAlign.left}) {
+      final safeText = _pdfSafe(text);
       return pw.Padding(
         padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
         child: pw.Text(
-          text,
+          safeText,
           textAlign: align,
           style: pw.TextStyle(fontSize: 9, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal),
         ),
@@ -264,7 +275,7 @@ class ExcelExportService {
           ),
           pw.Text('${_tr('date', lang)}: ${DateFormat('dd.MM.yyyy').format(options.documentDate)}', style: const pw.TextStyle(fontSize: 10)),
           pw.SizedBox(height: 8),
-          pw.Text('${_tr('name', lang)}: ${techCard.dishName}', style: const pw.TextStyle(fontSize: 10)),
+          pw.Text('${_tr('name', lang)}: ${_pdfSafe(techCard.dishName)}', style: const pw.TextStyle(fontSize: 10)),
           pw.Text(
             '${_tr('type', lang)}: ${techCard.isSemiFinished ? _tr('semi', lang) : _tr('dish', lang)}',
             style: const pw.TextStyle(fontSize: 10),
@@ -274,7 +285,7 @@ class ExcelExportService {
             pw.SizedBox(height: 8),
             pw.Text('${_tr('technology', lang)}:', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 4),
-            pw.Text(technology, style: const pw.TextStyle(fontSize: 9)),
+            pw.Text(_pdfSafe(technology), style: const pw.TextStyle(fontSize: 9)),
           ],
           pw.SizedBox(height: 10),
           pw.Table(
