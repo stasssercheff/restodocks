@@ -3147,6 +3147,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     var kind = TechCardExportKind.withPrice;
     var format = TechCardExportFormat.xlsx;
     var lang = loc.currentLanguageCode;
+    var organolepticMode = OrganolepticMode.template;
+    OrganolepticProperties tpl =
+        ExcelExportService().defaultOrganolepticTemplate(lang);
+    final appearanceCtrl = TextEditingController(text: tpl.appearance);
+    final consistencyCtrl = TextEditingController(text: tpl.consistency);
+    final colorCtrl = TextEditingController(text: tpl.color);
+    final tasteCtrl = TextEditingController(text: tpl.tasteAndSmell);
 
     await showDialog(
       context: context,
@@ -3222,9 +3229,103 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                           ))
                       .toList(),
                   onChanged: (v) {
-                    if (v != null) setLocalState(() => lang = v);
+                    if (v != null) {
+                      setLocalState(() {
+                        lang = v;
+                        if (organolepticMode == OrganolepticMode.template) {
+                          tpl =
+                              ExcelExportService().defaultOrganolepticTemplate(
+                            lang,
+                          );
+                          appearanceCtrl.text = tpl.appearance;
+                          consistencyCtrl.text = tpl.consistency;
+                          colorCtrl.text = tpl.color;
+                          tasteCtrl.text = tpl.tasteAndSmell;
+                        }
+                      });
+                    }
                   },
                 ),
+                if (kind == TechCardExportKind.actDevelopment) ...[
+                  const SizedBox(height: 12),
+                  const Divider(height: 1),
+                  const SizedBox(height: 10),
+                  const Text('Органолептические свойства'),
+                  RadioListTile<OrganolepticMode>(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: const Text('По шаблону'),
+                    value: OrganolepticMode.template,
+                    groupValue: organolepticMode,
+                    onChanged: (v) {
+                      if (v != null) {
+                        setLocalState(() {
+                          organolepticMode = v;
+                          tpl =
+                              ExcelExportService().defaultOrganolepticTemplate(
+                            lang,
+                          );
+                          appearanceCtrl.text = tpl.appearance;
+                          consistencyCtrl.text = tpl.consistency;
+                          colorCtrl.text = tpl.color;
+                          tasteCtrl.text = tpl.tasteAndSmell;
+                        });
+                      }
+                    },
+                  ),
+                  RadioListTile<OrganolepticMode>(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: const Text('Изменить шаблон'),
+                    value: OrganolepticMode.custom,
+                    groupValue: organolepticMode,
+                    onChanged: (v) {
+                      if (v != null) {
+                        setLocalState(() => organolepticMode = v);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 6),
+                  TextFormField(
+                    controller: appearanceCtrl,
+                    enabled: organolepticMode == OrganolepticMode.custom,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      labelText: 'Внешний вид',
+                    ),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: consistencyCtrl,
+                    enabled: organolepticMode == OrganolepticMode.custom,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      labelText: 'Консистенция',
+                    ),
+                    maxLines: 2,
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: colorCtrl,
+                    enabled: organolepticMode == OrganolepticMode.custom,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      labelText: 'Цвет',
+                    ),
+                    maxLines: 3,
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: tasteCtrl,
+                    enabled: organolepticMode == OrganolepticMode.custom,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      labelText: 'Вкус и запах',
+                    ),
+                    maxLines: 3,
+                  ),
+                ],
               ],
             ),
           ),
@@ -3248,6 +3349,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                       chefPosition:
                           emp?.positionRole ?? est?.directorPosition ?? '',
                       documentDate: tc.createdAt,
+                      organolepticMode: organolepticMode,
+                      organoleptic: OrganolepticProperties(
+                        appearance: appearanceCtrl.text.trim(),
+                        consistency: consistencyCtrl.text.trim(),
+                        color: colorCtrl.text.trim(),
+                        tasteAndSmell: tasteCtrl.text.trim(),
+                      ),
                     ),
                   );
                   if (!mounted) return;
@@ -3275,6 +3383,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         ),
       ),
     );
+    appearanceCtrl.dispose();
+    consistencyCtrl.dispose();
+    colorCtrl.dispose();
+    tasteCtrl.dispose();
   }
 
   /// Применить результат распознавания ИИ к форме (название, технология, ингредиенты).
