@@ -868,6 +868,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   int _lastReconcileNotifierVersion = 0;
   bool _reconciling = false;
   DateTime _lastReconcileAt = DateTime.fromMillisecondsSinceEpoch(0);
+  Timer? _portionWeightUpdateDebounce;
 
   /// Время последнего пользовательского взаимодействия (ввод/тап в таблице).
   /// Используется, чтобы не запускать тяжёлый reconcile в момент, когда пользователь
@@ -889,7 +890,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
   Future<void> _ensureSemiFinishedProductsForCost(TechCard currentTc) async {
     if (_semiFinishedCostHydrationRunning) return;
-    if (_semiFinishedProducts.isNotEmpty) return; // уже есть — не трогаем
+    // Если список ПФ уже заполнен и в нём уже есть цены/стоимости —
+    // повторно не гидратим.
+    if (_semiFinishedProducts.isNotEmpty) {
+      final hasIngredients = _semiFinishedProducts.any((pf) => pf.ingredients.isNotEmpty);
+      final hasAnyPrices = _semiFinishedProducts.any((pf) => pf.ingredients.any((ing) =>
+          (ing.pricePerKg != null && ing.pricePerKg! > 0) ||
+          ing.cost > 0 ||
+          ing.effectiveCost > 0));
+      if (hasIngredients && hasAnyPrices) return;
+    }
 
     _semiFinishedCostHydrationRunning = true;
     try {
@@ -2176,11 +2186,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     super.initState();
     setOnInputChanged(_scheduleDraftSave);
     _nameController.addListener(() {
-      setState(() {});
       _scheduleDraftSave();
     });
     _technologyController.addListener(() {
-      setState(() {});
       _scheduleDraftSave();
     });
     _descriptionForHallController.addListener(_scheduleDraftSave);
@@ -2207,6 +2215,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   @override
   void dispose() {
     _reconcileOpenCardTimer?.cancel();
+    _portionWeightUpdateDebounce?.cancel();
     if (_reconcileNotifier != null) {
       _reconcileNotifier!.removeListener(_handleTechCardsReconcileSignal);
     }
@@ -4837,8 +4846,17 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                       isCook: isCook,
                                       weightPerPortion: _portionWeight,
                                       onWeightPerPortionChanged: (v) {
-                                        setState(() => _portionWeight = v);
-                                        _scheduleDraftSave();
+                                        _portionWeightUpdateDebounce
+                                            ?.cancel();
+                                        // Не дергаем тяжёлый setState на каждый символ:
+                                        // сам TextField показывает значение мгновенно через controller в ExcelStyleTtkTable.
+                                        _portionWeight = v;
+                                        _portionWeightUpdateDebounce =
+                                            Timer(const Duration(milliseconds: 200), () {
+                                          if (!mounted) return;
+                                          setState(() {});
+                                          _scheduleDraftSave();
+                                        });
                                       },
                                       onTotalOutputChanged: (newOutput) {
                                         _scaleIngredientsToTotalOutput(newOutput);
