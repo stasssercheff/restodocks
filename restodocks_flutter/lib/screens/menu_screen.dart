@@ -300,6 +300,19 @@ class _MenuScreenState extends State<MenuScreen> {
 
   /// Контент раскрытой карточки: полная ТТК с ценой / полная ТТК без цены / описание для зала.
   Widget _buildExpandedContent(Employee? emp, LocalizationService loc, TechCard tc, String lang, String currencySym) {
+    if (_isHallMenu) {
+      return _HallDishContent(
+        loc: loc,
+        techCard: tc,
+        description: tc.descriptionForHall ?? '',
+        composition: tc.compositionForHall ?? '',
+        // Для зала показываем только блок "для меню зала": описание/состав и фото (слева).
+        sellingPrice: null,
+        currencySym: currencySym,
+      );
+    }
+
+    // Кухня/бар: если есть права — полный просмотр ТТК.
     if (_canSeeFullTtkView(emp, tc)) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,27 +326,16 @@ class _MenuScreenState extends State<MenuScreen> {
             ),
           ),
           _MenuDishTable(
-        loc: loc,
-        dishName: tc.dishName,
-        techCard: tc,
-        ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
-        technology: tc.getLocalizedTechnology(lang),
-        currencySym: currencySym,
-        showCost: true,
-        productStore: context.read<ProductStoreSupabase>(),
-      ),
+            loc: loc,
+            dishName: tc.dishName,
+            techCard: tc,
+            ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
+            technology: tc.getLocalizedTechnology(lang),
+            currencySym: currencySym,
+            showCost: true,
+            productStore: context.read<ProductStoreSupabase>(),
+          ),
         ],
-      );
-    }
-    // Меню зала: только описание для зала.
-    if (_isHallMenu) {
-      return _HallDishContent(
-        loc: loc,
-        techCard: tc,
-        description: tc.descriptionForHall ?? '',
-        composition: tc.compositionForHall ?? '',
-        sellingPrice: tc.sellingPrice,
-        currencySym: currencySym,
       );
     }
     // Кухня/бар: повары и сотрудники — полная ТТК (состав, технология) без цен
@@ -722,7 +724,10 @@ class _HallDishContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hallDescription = description.trim();
-    if (hallDescription.isEmpty) {
+    final hallComposition = composition.trim();
+
+    final hasAny = hallDescription.isNotEmpty || hallComposition.isNotEmpty;
+    if (!hasAny) {
       return Text(
         loc.t('dash'),
         style: const TextStyle(fontSize: 13, height: 1.4),
@@ -732,18 +737,35 @@ class _HallDishContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          loc.t('description_for_hall'),
-          style: Theme.of(context)
-              .textTheme
-              .titleSmall
-              ?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          hallDescription,
-          style: const TextStyle(fontSize: 13, height: 1.4),
-        ),
+        if (hallDescription.isNotEmpty) ...[
+          Text(
+            loc.t('description_for_hall'),
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            hallDescription,
+            style: const TextStyle(fontSize: 13, height: 1.4),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (hallComposition.isNotEmpty) ...[
+          Text(
+            loc.t('composition_for_hall'),
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            hallComposition,
+            style: const TextStyle(fontSize: 13, height: 1.4),
+          ),
+        ],
       ],
     );
   }
