@@ -26,8 +26,8 @@ class TechCardServiceSupabase {
   final OfflineCacheService _offlineCache = OfflineCacheService();
   /// v2: раньше shallow-лист перезаписывал этот кэш без ингредиентов — меняем префикс, чтобы сбросить битые снимки.
   static const _cacheDataset = 'tech_cards_v2';
-  /// Кэш одной карточки с ингредиентами (мгновенное открытие из приложения / web).
-  static const _detailDataset = 'tech_card_detail';
+  /// Кэш одной карточки; v2 — сброс после багов с «пустыми» снимками в offline/web.
+  static const _detailDataset = 'tech_card_detail_v2';
 
   /// Загрузить фото блюда/ПФ в Storage. Путь: {establishmentId}/{techCardId}/{index}.jpg
   /// Возвращает публичный URL или null при ошибке.
