@@ -3137,6 +3137,146 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     }
   }
 
+  Future<void> _showExportOptionsDialog(LocalizationService loc) async {
+    final tc = _techCard;
+    if (tc == null) return;
+    final acc = context.read<AccountManagerSupabase>();
+    final est = acc.establishment;
+    final emp = acc.currentEmployee;
+
+    var kind = TechCardExportKind.withPrice;
+    var format = TechCardExportFormat.xlsx;
+    var lang = loc.currentLanguageCode;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocalState) => AlertDialog(
+          title: const Text('Экспорт документа'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Что сохранить:'),
+                RadioListTile<TechCardExportKind>(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('1) Сохранить с ценой'),
+                  value: TechCardExportKind.withPrice,
+                  groupValue: kind,
+                  onChanged: (v) {
+                    if (v != null) setLocalState(() => kind = v);
+                  },
+                ),
+                RadioListTile<TechCardExportKind>(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('2) Сохранить без цены'),
+                  value: TechCardExportKind.withoutPrice,
+                  groupValue: kind,
+                  onChanged: (v) {
+                    if (v != null) setLocalState(() => kind = v);
+                  },
+                ),
+                RadioListTile<TechCardExportKind>(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('3) Сохранить как акт проработки'),
+                  value: TechCardExportKind.actDevelopment,
+                  groupValue: kind,
+                  onChanged: (v) {
+                    if (v != null) setLocalState(() => kind = v);
+                  },
+                ),
+                const SizedBox(height: 8),
+                const Text('Формат файла:'),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<TechCardExportFormat>(
+                  value: format,
+                  isExpanded: true,
+                  items: const [
+                    DropdownMenuItem(
+                      value: TechCardExportFormat.pdf,
+                      child: Text('PDF'),
+                    ),
+                    DropdownMenuItem(
+                      value: TechCardExportFormat.xlsx,
+                      child: Text('XLSX'),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v != null) setLocalState(() => format = v);
+                  },
+                ),
+                const SizedBox(height: 10),
+                const Text('Язык документа:'),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  value: lang,
+                  isExpanded: true,
+                  items: loc.availableLanguages
+                      .map((e) => DropdownMenuItem<String>(
+                            value: e['code']!,
+                            child: Text('${e['flag']} ${e['name']}'),
+                          ))
+                      .toList(),
+                  onChanged: (v) {
+                    if (v != null) setLocalState(() => lang = v);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(loc.t('cancel')),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.of(ctx).pop();
+                try {
+                  await ExcelExportService().exportSingleTechCardAdvanced(
+                    tc,
+                    TechCardExportOptions(
+                      format: format,
+                      kind: kind,
+                      languageCode: lang,
+                      establishmentName: est?.name ?? '',
+                      chefName: emp?.fullName ?? '',
+                      chefPosition:
+                          emp?.positionRole ?? est?.directorPosition ?? '',
+                      documentDate: tc.createdAt,
+                    ),
+                  );
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        (loc.t('ttk_exported')).replaceFirst('%s', tc.dishName),
+                      ),
+                    ),
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        loc.t('ttk_export_error').replaceFirst('%s', '$e'),
+                      ),
+                    ),
+                  );
+                }
+              },
+              child: const Text('Сохранить'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Применить результат распознавания ИИ к форме (название, технология, ингредиенты).
   void _applyAiResult(TechCardRecognitionResult ai) {
     if (ai.dishName != null && ai.dishName!.trim().isNotEmpty) {
@@ -4470,32 +4610,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           if (!_isNew && _techCard != null)
             IconButton(
               icon: const Icon(Icons.download),
-              onPressed: () async {
-                try {
-                  await ExcelExportService().exportSingleTechCard(_techCard!);
-                  if (mounted) {
-                    final loc = context.read<LocalizationService>();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                          content: Text(loc
-                              .t('ttk_exported')
-                              .replaceFirst('%s', _techCard!.dishName))),
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    final loc = context.read<LocalizationService>();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                          content: Text(loc
-                              .t('ttk_export_error')
-                              .replaceFirst('%s', '$e'))),
-                    );
-                  }
-                }
-              },
-              tooltip:
-                  context.read<LocalizationService>().t('ttk_export_excel'),
+              onPressed: () => _showExportOptionsDialog(loc),
+              tooltip: 'Экспорт PDF/XLSX',
               style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
             ),
         ],
