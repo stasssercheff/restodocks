@@ -2205,8 +2205,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                           : ing.netWeight;
                       return ListTile(
                         dense: true,
-                        title: Text(name,
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        title: Text(name),
                         subtitle: Text('Выход: ${w.toStringAsFixed(0)} г'),
                       );
                     },
@@ -5626,9 +5625,10 @@ class _TtkTableState extends State<_TtkTable> {
 
     final hasDeleteCol = widget.effectiveCanEdit;
     // Порядок колонок как в образце. Ширины подобраны так, чтобы вся строка с полями ввода помещалась на экране без горизонтальной прокрутки.
+    final isWideDesktop = MediaQuery.of(context).size.width >= 1200;
     const colType = 64.0; // Тип ТТК
     const colName = 100.0; // Наименование
-    const colProduct = 120.0;
+    final colProduct = isWideDesktop ? 220.0 : 140.0;
     const colGross = 70.0; // Брутто г. (как столбец Цена)
     const colWaste = 64.0; // Отход %
     const colNet = 70.0; // Нетто г.
@@ -5642,7 +5642,7 @@ class _TtkTableState extends State<_TtkTable> {
     final columnWidths = <int, TableColumnWidth>{
       0: const FixedColumnWidth(colType),
       1: const FixedColumnWidth(colName),
-      2: const FixedColumnWidth(colProduct),
+      2: FixedColumnWidth(colProduct),
       3: const FixedColumnWidth(colGross),
       4: const FixedColumnWidth(colWaste),
       5: const FixedColumnWidth(colNet),
@@ -5843,12 +5843,12 @@ class _TtkTableState extends State<_TtkTable> {
                                             message: _getIngredientDisplayName(
                                                 ing, lang),
                                             child: Text(
-                                                _getIngredientDisplayName(
-                                                    ing, lang),
-                                                style: const TextStyle(
-                                                    fontSize: 12),
-                                                overflow:
-                                                    TextOverflow.ellipsis),
+                                              _getIngredientDisplayName(
+                                                  ing, lang),
+                                              style:
+                                                  const TextStyle(fontSize: 12),
+                                              softWrap: true,
+                                            ),
                                           ),
                                         ),
                                         if (widget.getProductsForDropdown !=
@@ -5885,12 +5885,12 @@ class _TtkTableState extends State<_TtkTable> {
                                             message: _getIngredientDisplayName(
                                                 ing, lang),
                                             child: Text(
-                                                _getIngredientDisplayName(
-                                                    ing, lang),
-                                                style: const TextStyle(
-                                                    fontSize: 12),
-                                                overflow:
-                                                    TextOverflow.ellipsis))),
+                                              _getIngredientDisplayName(
+                                                  ing, lang),
+                                              style:
+                                                  const TextStyle(fontSize: 12),
+                                              softWrap: true,
+                                            ))),
                                     fillColor: firstColsBg,
                                     dataCell: true)),
                     widget.effectiveCanEdit
