@@ -219,12 +219,11 @@ class _MenuScreenState extends State<MenuScreen> {
     if (_canSeeFullTtkView(emp, tc)) {
       return '${cat} • ${loc.t('cost_price')}: ${totalCost.toStringAsFixed(2)} $currencySym';
     }
-    // Меню зала: показываем продажную цену, если есть
+    // Меню зала: только описание для зала (без просмотра ТТК/состава/цен).
     if (_isHallMenu) {
-      final sp = tc.sellingPrice;
-      if (sp != null && sp > 0) {
-        return '$cat • ${loc.t('selling_price')}: ${sp.toStringAsFixed(2)} $currencySym';
-      }
+      final d = tc.descriptionForHall?.trim() ?? '';
+      if (d.isNotEmpty) return d;
+      return cat;
     }
     // Кухня/бар: повары и сотрудники — без цен
     return cat;
@@ -326,7 +325,7 @@ class _MenuScreenState extends State<MenuScreen> {
         ],
       );
     }
-    // Меню зала: описание, состав, КБЖУ, аллергены, продажная цена
+    // Меню зала: только описание для зала.
     if (_isHallMenu) {
       return _HallDishContent(
         loc: loc,
@@ -486,6 +485,32 @@ class _MenuScreenState extends State<MenuScreen> {
                     : Colors.green.shade700)
                 : null,
           );
+          final statusBadge = _isHallMenu && status != null
+              ? Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: status == 'stop'
+                          ? Colors.red.shade700
+                          : Colors.green.shade700,
+                      width: 1.8,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    status == 'stop' ? 'x' : '!',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: status == 'stop'
+                          ? Colors.red.shade700
+                          : Colors.green.shade700,
+                      fontSize: 12,
+                    ),
+                  ),
+                )
+              : null;
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
             child: ExpansionTile(
@@ -504,30 +529,54 @@ class _MenuScreenState extends State<MenuScreen> {
                       : fallbackIcon,
                 ),
               ),
-              title: InkWell(
-                onTap: () {
-                  final emp = context.read<AccountManagerSupabase>().currentEmployee;
-                  final useHallView = _isHallMenu && !_canSeeFullTtkView(emp, tc);
-                  context.push('/tech-cards/${tc.id}?view=1${useHallView ? '&hall=1' : ''}');
-                },
-                child: Text(
-                  tc.getDisplayNameInLists(lang),
-                  style: titleStyle,
-                ),
+              title: Row(
+                children: [
+                  if (statusBadge != null) ...[
+                    statusBadge,
+                    const SizedBox(width: 8),
+                  ],
+                  Expanded(
+                    child: InkWell(
+                      onTap: _isHallMenu
+                          ? null
+                          : () {
+                              final emp = context
+                                  .read<AccountManagerSupabase>()
+                                  .currentEmployee;
+                              final useHallView =
+                                  _isHallMenu && !_canSeeFullTtkView(emp, tc);
+                              context.push(
+                                  '/tech-cards/${tc.id}?view=1${useHallView ? '&hall=1' : ''}');
+                            },
+                      child: Text(
+                        tc.getDisplayNameInLists(lang),
+                        style: titleStyle,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   InkWell(
-                    onTap: () {
-                      final emp = context.read<AccountManagerSupabase>().currentEmployee;
-                      final useHallView = _isHallMenu && !_canSeeFullTtkView(emp, tc);
-                      context.push('/tech-cards/${tc.id}?view=1${useHallView ? '&hall=1' : ''}');
-                    },
+                    onTap: _isHallMenu
+                        ? null
+                        : () {
+                            final emp = context
+                                .read<AccountManagerSupabase>()
+                                .currentEmployee;
+                            final useHallView =
+                                _isHallMenu && !_canSeeFullTtkView(emp, tc);
+                            context.push(
+                                '/tech-cards/${tc.id}?view=1${useHallView ? '&hall=1' : ''}');
+                          },
                     child: Text(
                       _buildSubtitleText(loc, tc, lang, totalCost, currencySym),
                       style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      maxLines: _isHallMenu ? 3 : 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   if (_canEditStopGo) ...[
@@ -672,54 +721,29 @@ class _HallDishContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalCal = techCard.totalCalories;
-    final totalProt = techCard.totalProtein;
-    final totalFat = techCard.totalFat;
-    final totalCarb = techCard.totalCarbs;
-    final store = context.read<ProductStoreSupabase>();
-    final allergens = <String>[];
-    for (final ing in techCard.ingredients.where((i) => i.productId != null)) {
-      final p = store.findProductForIngredient(ing.productId, ing.productName);
-      if (p?.containsGluten == true && !allergens.contains('глютен')) allergens.add('глютен');
-      if (p?.containsLactose == true && !allergens.contains('лактоза')) allergens.add('лактоза');
+    final hallDescription = description.trim();
+    if (hallDescription.isEmpty) {
+      return Text(
+        loc.t('dash'),
+        style: const TextStyle(fontSize: 13, height: 1.4),
+      );
     }
-    final allergenStr = allergens.isEmpty ? (loc.currentLanguageCode == 'ru' ? 'нет' : 'none') : allergens.join(', ');
-    final hasNutrition = totalCal > 0 || totalProt > 0 || totalFat > 0 || totalCarb > 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (description.isNotEmpty) ...[
-          Text(loc.t('description_for_hall'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text(description, style: const TextStyle(fontSize: 13, height: 1.4)),
-          const SizedBox(height: 12),
-        ],
-        if (composition.isNotEmpty) ...[
-          Text(loc.t('composition_for_hall'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text(composition, style: const TextStyle(fontSize: 13, height: 1.4)),
-          const SizedBox(height: 12),
-        ],
-        if (hasNutrition) ...[
-          Text(loc.t('ttk_nutrition_dish'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text(
-            loc.t('kbju_allergens_in_dish')
-                .replaceFirst('%s', totalCal.round().toString())
-                .replaceFirst('%s', totalProt.toStringAsFixed(1))
-                .replaceFirst('%s', totalFat.toStringAsFixed(1))
-                .replaceFirst('%s', totalCarb.toStringAsFixed(1))
-                .replaceFirst('%s', allergenStr),
-            style: const TextStyle(fontSize: 13, height: 1.4),
-          ),
-          const SizedBox(height: 12),
-        ],
-        if (sellingPrice != null && sellingPrice! > 0) ...[
-          Text(loc.t('selling_price'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text('${sellingPrice!.toStringAsFixed(2)} $currencySym', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
-        ],
+        Text(
+          loc.t('description_for_hall'),
+          style: Theme.of(context)
+              .textTheme
+              .titleSmall
+              ?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          hallDescription,
+          style: const TextStyle(fontSize: 13, height: 1.4),
+        ),
       ],
     );
   }
