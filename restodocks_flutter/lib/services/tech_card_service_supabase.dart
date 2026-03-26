@@ -24,7 +24,8 @@ class TechCardServiceSupabase {
 
   final SupabaseService _supabase = SupabaseService();
   final OfflineCacheService _offlineCache = OfflineCacheService();
-  static const _cacheDataset = 'tech_cards';
+  /// v2: раньше shallow-лист перезаписывал этот кэш без ингредиентов — меняем префикс, чтобы сбросить битые снимки.
+  static const _cacheDataset = 'tech_cards_v2';
   /// Кэш одной карточки с ингредиентами (мгновенное открытие из приложения / web).
   static const _detailDataset = 'tech_card_detail';
 
@@ -210,11 +211,11 @@ class TechCardServiceSupabase {
           .order('created_at', ascending: false);
 
       if (!includeIngredients) {
-        // В shallow-режиме ингредиенты не загружаем: они подгружаются при необходимости (открытие/расчёты).
+        // В shallow-режиме ингредиенты не загружаем: догрузка в UI / bulk.
+        // Не пишем в общий офлайн-кэш — иначе перетираем полный снимок «пустыми» строками.
         final list = (data as List)
             .map((row) => TechCard.fromJson(Map<String, dynamic>.from(row as Map)))
             .toList();
-        await _saveTechCardsCache(establishmentId, list);
         return list;
       }
 
