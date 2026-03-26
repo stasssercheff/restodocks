@@ -895,25 +895,26 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.primaryColor,
+      backgroundColor: kIsWeb ? Colors.white : AppTheme.primaryColor,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Image.asset(
-                'assets/images/welcome_logo.png',
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Icon(
-                  Icons.restaurant_menu,
-                  size: 88,
-                  color: Colors.white70,
+          if (!kIsWeb)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Image.asset(
+                  'assets/images/welcome_logo.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.restaurant_menu,
+                    size: 88,
+                    color: Colors.white70,
+                  ),
                 ),
               ),
             ),
-          ),
-          const Positioned(
+          Positioned(
             left: 0,
             right: 0,
             bottom: 40,
@@ -923,7 +924,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 height: 28,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
-                  color: Colors.white70,
+                  color: kIsWeb ? Colors.black38 : Colors.white70,
                 ),
               ),
             ),
