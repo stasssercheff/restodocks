@@ -883,6 +883,112 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
 
+  /// Защита от повторного запуска тяжёлой гидратации ПФ, если пользователь быстро
+  /// переключает режимы/окна (view/edit) или карточка догружается асинхронно.
+  bool _semiFinishedCostHydrationRunning = false;
+
+  Future<void> _ensureSemiFinishedProductsForCost(TechCard currentTc) async {
+    if (_semiFinishedCostHydrationRunning) return;
+    if (_semiFinishedProducts.isNotEmpty) return; // уже есть — не трогаем
+
+    _semiFinishedCostHydrationRunning = true;
+    try {
+      final acc = context.read<AccountManagerSupabase>();
+      final est = acc.establishment;
+      if (est == null) return;
+
+      final tcSvc = context.read<TechCardServiceSupabase>();
+      final productStore = context.read<ProductStoreSupabase>();
+
+      final estPriceId =
+          est.isBranch ? est.id : (est.dataEstablishmentId ?? '');
+      if (estPriceId.isEmpty) return;
+
+      // Цены листовых ингредиентов берём из номенклатуры заведения.
+      await productStore.loadProducts().catchError((_) {});
+      if (est.isBranch) {
+        await productStore
+            .loadNomenclatureForBranch(
+                est.id, est.dataEstablishmentId ?? estPriceId)
+            .catchError((_) {});
+      } else {
+        final mainId = est.dataEstablishmentId ?? estPriceId;
+        if (mainId.isNotEmpty) {
+          await productStore.loadNomenclature(mainId).catchError((_) {});
+        }
+      }
+
+      // Берём все ПФ заведения, даже если текущий экран открыт в view-режиме.
+      List<TechCard> shallow;
+      if (est.isBranch) {
+        final main = await tcSvc.getTechCardsForEstablishment(
+          est.dataEstablishmentId ?? estPriceId,
+          includeIngredients: false,
+        );
+        final branch = await tcSvc.getTechCardsForEstablishment(
+          est.id,
+          includeIngredients: false,
+        );
+        shallow = [...main, ...branch];
+      } else {
+        shallow = await tcSvc.getTechCardsForEstablishment(
+          est.dataEstablishmentId ?? estPriceId,
+          includeIngredients: false,
+        );
+      }
+
+      final pfCards = shallow.where((t) => t.isSemiFinished).toList();
+      if (pfCards.isEmpty) return;
+
+      // Догружаем ингредиенты ПФ и гидратим их стоимость/pricePerKg.
+      final pfFilled = await tcSvc.fillIngredientsForCardsBulk(pfCards);
+      final attachedPfs = pfFilled
+          .map((pf) => _attachMissingPfSourceTechCardId(pf, pfFilled))
+          .toList();
+
+      final hydratedPfs = TechCardCostHydrator.hydrate(
+        attachedPfs,
+        productStore,
+        estPriceId,
+      );
+
+      // Важно: прикрепить sourceTechCardId текущей ТТК к нужным ПФ, иначе
+      // ExcelStyleTtkTable не сможет рекурсивно достать цены ПФ.
+      final updatedCurrent =
+          _attachMissingPfSourceTechCardId(currentTc, hydratedPfs);
+
+      final hydratedList = TechCardCostHydrator.hydrate(
+        [updatedCurrent, ...hydratedPfs],
+        productStore,
+        estPriceId,
+      );
+      final hydratedCurrent = hydratedList.firstWhere(
+        (item) => item.id == updatedCurrent.id,
+        orElse: () => updatedCurrent,
+      );
+      final hydratedNutrition =
+          TechCardNutritionHydrator.hydrate(hydratedList, productStore);
+      final hydratedCurrent2 = hydratedNutrition.firstWhere(
+        (item) => item.id == hydratedCurrent.id,
+        orElse: () => hydratedCurrent,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _semiFinishedProducts = hydratedNutrition
+            .where((t) => t.isSemiFinished)
+            .toList(growable: false);
+        _techCard = hydratedCurrent2;
+        _ingredients
+          ..clear()
+          ..addAll(hydratedCurrent2.ingredients);
+        _ensurePlaceholderRowAtEnd();
+      });
+    } finally {
+      _semiFinishedCostHydrationRunning = false;
+    }
+  }
+
   @override
   String get draftKey {
     if (widget.techCardId.isNotEmpty && widget.techCardId != 'new') {
@@ -1693,6 +1799,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           }
           _contentPhase = 1; // показываем полную форму сразу после загрузки данных
         });
+        // Защитный fallback: если по какой-то причине semiFinishedProducts не
+        // успели заполниться (например, view-режим без loadedTechCards),
+        // подгружаем/гидратим их, чтобы ExcelStyleTtkTable успел посчитать цены.
+        if (tc != null && _semiFinishedProducts.isEmpty) {
+          unawaited(_ensureSemiFinishedProductsForCost(tc));
+        }
         // Если перевод технологии ещё не сохранён — запросить через DeepL
         if (tc != null) _translateTechnologyIfNeeded(tc);
         // Дополнить цены из номенклатуры (если productId есть, cost=0)

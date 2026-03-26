@@ -270,13 +270,46 @@ class TechCardServiceSupabase {
             ingredients.add(TTIngredient.fromJson(j as Map<String, dynamic>));
           } catch (_) {}
         }
+        final sortedIngredients = _sortIngredientsStableByIdSuffix(ingredients);
         final tc = TechCard.fromJson(m);
-        techCards.add(tc.copyWith(ingredients: ingredients));
+        techCards.add(tc.copyWith(ingredients: sortedIngredients));
       } catch (e) {
         skipCards++;
       }
     }
     return techCards;
+  }
+
+  /// Стабильно восстанавливает порядок ингредиентов при загрузке из БД.
+  ///
+  /// Важно: `tt_ingredients.id` создаётся как `${timestamp}_${index}` при импорте,
+  /// но при разных сценариях сортировка по id в БД/embedded может быть недетерминированной.
+  /// Поэтому сортируем по числовому suffix после последнего `_` (если есть),
+  /// а при отсутствии — пробуем распарсить весь id как число.
+  static List<TTIngredient> _sortIngredientsStableByIdSuffix(
+    List<TTIngredient> ingredients,
+  ) {
+    if (ingredients.length <= 1) return ingredients;
+
+    int orderKey(TTIngredient ing) {
+      final id = ing.id;
+      final idx = id.lastIndexOf('_');
+      if (idx >= 0 && idx + 1 < id.length) {
+        final suffix = id.substring(idx + 1);
+        final parsed = int.tryParse(suffix);
+        if (parsed != null) return parsed;
+      }
+      return int.tryParse(id) ?? 0;
+    }
+
+    final indexed = ingredients.asMap().entries.toList(); // стабильность
+    indexed.sort((a, b) {
+      final ka = orderKey(a.value);
+      final kb = orderKey(b.value);
+      if (ka != kb) return ka.compareTo(kb);
+      return a.key.compareTo(b.key);
+    });
+    return indexed.map((e) => e.value).toList();
   }
 
   Future<void> _writeTechCardDetailCache(TechCard tc) async {
@@ -312,7 +345,7 @@ class TechCardServiceSupabase {
               TTIngredient.fromJson(Map<String, dynamic>.from(j as Map)));
         } catch (_) {}
       }
-      return tc.copyWith(ingredients: ings);
+      return tc.copyWith(ingredients: _sortIngredientsStableByIdSuffix(ings));
     } catch (_) {
       return null;
     }
@@ -362,6 +395,7 @@ class TechCardServiceSupabase {
       } catch (_) {
         ingredients = await _fetchIngredientsForTechCard(techCardId);
       }
+      ingredients = _sortIngredientsStableByIdSuffix(ingredients);
       final tc = TechCard.fromJson(m).copyWith(ingredients: ingredients);
       await _writeTechCardDetailCache(tc);
       return tc;
@@ -375,7 +409,7 @@ class TechCardServiceSupabase {
         if (row == null) return null;
         final ingredients = await _fetchIngredientsForTechCard(techCardId);
         final tc = TechCard.fromJson(row as Map<String, dynamic>)
-            .copyWith(ingredients: ingredients);
+            .copyWith(ingredients: _sortIngredientsStableByIdSuffix(ingredients));
         await _writeTechCardDetailCache(tc);
         return tc;
       } catch (e2) {
@@ -426,6 +460,13 @@ class TechCardServiceSupabase {
           final ing = TTIngredient.fromJson(m);
           (grouped[tcId] ??= <TTIngredient>[]).add(ing);
         } catch (_) {}
+      }
+      // Нормализуем порядок ингредиентов так, чтобы UI всегда показывал
+      // “как создавали/как импортировали”, а не embedded/bulk произвольный.
+      for (final entry in grouped.entries) {
+        entry.value
+          ..clear()
+          ..addAll(_sortIngredientsStableByIdSuffix(entry.value));
       }
       return cards
           .map((tc) =>
