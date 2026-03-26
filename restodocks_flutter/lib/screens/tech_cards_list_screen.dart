@@ -40,7 +40,8 @@ class TechCardsListScreen extends StatefulWidget {
   State<TechCardsListScreen> createState() => _TechCardsListScreenState();
 }
 
-class _TechCardsListScreenState extends State<TechCardsListScreen> {
+class _TechCardsListScreenState extends State<TechCardsListScreen>
+    with SingleTickerProviderStateMixin {
   List<TechCard> _list = [];
   // Индексы/кэши для рекурсивного расчёта себестоимости (включая вложенные ПФ из импортированных ТТК).
   Map<String, TechCard> _techCardsById = {};
@@ -79,9 +80,29 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   bool _ttkTourCheckDone = false;
   SpotlightController? _ttkTourController;
 
+  late final TabController _tabController;
+  int _tabIndex = 0;
+  bool _tabWasTouched = false;
+  bool _tabAutoSelectedOnce = false;
+  int? _tabIndexFromUrl;
+
   @override
   void initState() {
     super.initState();
+    _tabIndexFromUrl = _readTabIndexFromUrl();
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: _tabIndexFromUrl ?? 0,
+    );
+    _tabIndex = _tabController.index;
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) return;
+      final idx = _tabController.index;
+      if (idx == _tabIndex) return;
+      _tabIndex = idx;
+      if (mounted) setState(() {});
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowTtkTour());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _load();
@@ -333,12 +354,27 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
   void dispose() {
     _searchDebounceTimer?.cancel();
     _reconcileTimer?.cancel();
+    _tabController.dispose();
     if (_reconcileNotifier != null) {
       _reconcileNotifier!.removeListener(_handleTechCardsReconcileSignal);
     }
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
+  }
+
+  int? _readTabIndexFromUrl() {
+    final state = GoRouterState.of(context);
+    final tab = state.queryParameters['tab'];
+    if (tab == null) return null;
+    final v = tab.trim().toLowerCase();
+    if (v == 'pf') return 0;
+    if (v == 'dishes') return 1;
+    if (v == 'review') return 2;
+    final i = int.tryParse(v);
+    if (i == null) return null;
+    if (i < 0 || i > 2) return null;
+    return i;
   }
 
   /// Порядок категорий: кухня (без напитков) и бар (только напитки/снеки)
@@ -1695,12 +1731,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           emp?.hasRole('manager') == true ||
           emp?.hasRole('general_manager') == true;
 
-      // Тяжёлое (products, nomenclature, fillIngredients, hydrate, индекс цен) — в фоне
-      // На web тяжёлая гидратация в списке заметно фризит переходы
-      // (вход/выход из ТТК и обратно), поэтому отключаем её.
-      // Если роль позволяет видеть себестоимость — нужна гидратация даже когда
-      // экран перерисовывается без “загрузки” (showLoading=false).
-      final bool doHeavyHydration = (showLoading || canSeeCosts) && !kIsWeb;
+      // Тяжёлое (products, nomenclature, fillIngredients, индекс цен) — в фоне.
+      // Чтобы не тормозить список, убираем лишние гидраторы (cost/nutrition)
+      // и полагаемся на рекурсивный расчёт себестоимости по ингредиентам + ценам номенклатуры.
+      final bool doHeavyHydration = (showLoading || canSeeCosts);
       int? hydrateToken;
       if (doHeavyHydration) {
         hydrateToken = ++_loadHydrateToken;
@@ -1720,20 +1754,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
             if (!mounted || requestToken != _loadRequestToken) return;
             var withData = List<TechCard>.from(processedAll);
             withData = await svc.fillIngredientsForCardsBulk(withData);
-            if (canSeeCosts) {
-              final estPriceId =
-                  est.isBranch ? est.id : est.dataEstablishmentId;
-              if (estPriceId != null && estPriceId.isNotEmpty) {
-                withData = TechCardCostHydrator.hydrate(
-                    withData, productStore, estPriceId);
-              }
-            }
-            withData =
-                TechCardNutritionHydrator.hydrate(withData, productStore);
             if (!mounted || requestToken != _loadRequestToken) return;
             await _buildNomenclatureNamePriceIndex(
-                productStore,
-                est.isBranch ? est.id : est.dataEstablishmentId);
+              productStore,
+              est.isBranch ? est.id : est.dataEstablishmentId,
+            );
             if (!mounted || requestToken != _loadRequestToken) return;
             var filteredList =
                 _filterListByDepartment(withData, customBarIds);
@@ -3202,11 +3227,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
 
     final initialTabIndex =
         semiFinishedFiltered.isEmpty && dishFiltered.isNotEmpty ? 1 : 0;
-    return DefaultTabController(
-      length: 3,
-      initialIndex: initialTabIndex,
-      child: Column(
-        children: [
+    // Автоматический выбор первой вкладки (как раньше), но только один раз
+    // и только если пользователь явно не трогал вкладки.
+    if (!_tabAutoSelectedOnce &&
+        !_tabWasTouched &&
+        _tabIndexFromUrl == null &&
+        _list.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_tabWasTouched || _tabAutoSelectedOnce) return;
+        _tabController.index = initialTabIndex;
+        _tabAutoSelectedOnce = true;
+      });
+    }
+
+    return Column(
+      children: [
           if (showBranchFilter)
             FutureBuilder<List<Establishment>>(
               future: acc.getBranchesForEstablishment(acc.establishment!.id),
@@ -3300,34 +3336,23 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
             clipBehavior: Clip.antiAlias,
-            child: Builder(
-              builder: (innerCtx) {
-                final tabState = DefaultTabController.of(innerCtx);
-                return AnimatedBuilder(
-                  animation: tabState,
-                  builder: (ctx, _) {
-                    final selectedIndex = tabState.index;
-                    return TabBar(
-                      isScrollable: false,
-                      tabAlignment: TabAlignment.center,
-                      labelPadding: EdgeInsets.zero,
-                      dividerColor: Colors.transparent,
-                      overlayColor:
-                          WidgetStateProperty.all(Colors.transparent),
-                      splashFactory: NoSplash.splashFactory,
-                      indicator: const BoxDecoration(),
-                      labelColor: Theme.of(context).colorScheme.primary,
-                      unselectedLabelColor:
-                          Theme.of(context).colorScheme.primary,
-                      tabs: _buildTabBarTabs(
-                        loc,
-                        reviewCount,
-                        selectedIndex: selectedIndex,
-                      ),
-                    );
-                  },
-                );
-              },
+            child: TabBar(
+              controller: _tabController,
+              isScrollable: false,
+              tabAlignment: TabAlignment.center,
+              labelPadding: EdgeInsets.zero,
+              dividerColor: Colors.transparent,
+              overlayColor: WidgetStateProperty.all(Colors.transparent),
+              splashFactory: NoSplash.splashFactory,
+              indicator: const BoxDecoration(),
+              labelColor: Theme.of(context).colorScheme.primary,
+              unselectedLabelColor: Theme.of(context).colorScheme.primary,
+              onTap: (_) => _tabWasTouched = true,
+              tabs: _buildTabBarTabs(
+                loc,
+                reviewCount,
+                selectedIndex: _tabController.index,
+              ),
             ),
           ),
           if (_listDetailsHydrating)
@@ -3430,6 +3455,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
           ),
           Expanded(
             child: TabBarView(
+              controller: _tabController,
               children: [
                 _buildTechCardsTable(
                   semiFinishedFiltered,
@@ -3455,8 +3481,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen> {
               ],
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 
