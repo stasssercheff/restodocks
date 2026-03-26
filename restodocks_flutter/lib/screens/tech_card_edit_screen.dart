@@ -1769,29 +1769,51 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
             final pfCardsShallow = shallow.where((t) => t.isSemiFinished).toList();
             if (pfCardsShallow.isNotEmpty) {
-              // Догружаем ингредиенты ПФ (тогда recursion по рецепту сможет взять цены листовых продуктов).
-              final pfCardsFilled = await svc.fillIngredientsForCardsBulk(pfCardsShallow);
-
-              // В ПФ мог быть не заполнен sourceTechCardId для вложенных ПФ — прикрепим по имени.
-              final attachedPfs = pfCardsFilled
-                  .map((pf) => _attachMissingPfSourceTechCardId(pf, pfCardsFilled))
-                  .toList();
-
-              // Прикрепим sourceTechCardId и к самой текущей карте.
-              working = _attachMissingPfSourceTechCardId(working, attachedPfs);
-
-              var hydratedList = [working, ...attachedPfs];
-              if (estPriceId.isNotEmpty) {
-                hydratedList = TechCardCostHydrator.hydrate(
-                  hydratedList,
-                  productStore,
-                  estPriceId,
-                );
+              final neededPfIds = <String>{};
+              final neededPfNames = <String>{};
+              for (final ing in working.ingredients) {
+                if (ing.sourceTechCardId != null &&
+                    ing.sourceTechCardId!.trim().isNotEmpty) {
+                  neededPfIds.add(ing.sourceTechCardId!.trim());
+                }
+                final n = normalizeForPfMatching(ing.productName);
+                if (n.isNotEmpty) neededPfNames.add(n);
               }
-              hydratedList = TechCardNutritionHydrator.hydrate(hydratedList, productStore);
-              working = hydratedList.firstWhere((item) => item.id == working.id, orElse: () => working);
+              final neededPfCards = pfCardsShallow.where((pf) {
+                if (neededPfIds.contains(pf.id)) return true;
+                final n = normalizeForPfMatching(pf.dishName);
+                return n.isNotEmpty && neededPfNames.contains(n);
+              }).toList();
+              if (neededPfCards.isNotEmpty) {
+                // Догружаем только реально нужные ПФ для текущей карточки.
+                final pfCardsFilled = await svc.fillIngredientsForCardsBulk(
+                  neededPfCards,
+                );
 
-              semiFinishedForCost = attachedPfs;
+                // В ПФ мог быть не заполнен sourceTechCardId для вложенных ПФ — прикрепим по имени.
+                final attachedPfs = pfCardsFilled
+                    .map((pf) =>
+                        _attachMissingPfSourceTechCardId(pf, pfCardsFilled))
+                    .toList();
+
+                // Прикрепим sourceTechCardId и к самой текущей карте.
+                working = _attachMissingPfSourceTechCardId(working, attachedPfs);
+
+                var hydratedList = [working, ...attachedPfs];
+                if (estPriceId.isNotEmpty) {
+                  hydratedList = TechCardCostHydrator.hydrate(
+                    hydratedList,
+                    productStore,
+                    estPriceId,
+                  );
+                }
+                hydratedList =
+                    TechCardNutritionHydrator.hydrate(hydratedList, productStore);
+                working = hydratedList.firstWhere((item) => item.id == working.id,
+                    orElse: () => working);
+
+                semiFinishedForCost = attachedPfs;
+              }
             }
           }
         }
