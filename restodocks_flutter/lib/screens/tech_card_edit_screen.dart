@@ -1719,11 +1719,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         // Нужные ПФ для расчёта цен/стоимости в таблице:
         // в режиме просмотра раньше могли не подгружаться "справочники" (loadedTechCards пустой),
         // из-за чего sourceTechCardId не прикреплялся и стоимость вложенных ПФ становилась 0.
-        if (!identical(working, tc)) {
-          try {
-            await svc.saveTechCard(working, skipHistory: true);
-          } catch (_) {}
-        }
+        // Никогда не автосохраняем при открытии экрана:
+        // если карточка прилетела с пустым составом из кэша, такое сохранение
+        // удалит строки ingredients в БД (saveTechCard делает delete+insert).
         if (loadedTechCards.isNotEmpty) {
           final pfCards = loadedTechCards.where((t) => t.isSemiFinished).toList();
           working = _attachMissingPfSourceTechCardId(working, pfCards);
