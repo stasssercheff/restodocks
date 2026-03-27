@@ -35,6 +35,8 @@ class LocalizationService extends ChangeNotifier {
   Locale _currentLocale = const Locale('ru', 'RU');
   Map<String, Map<String, String>> _translations = {};
   TranslationManager? _translationManager;
+  final Map<String, Map<String, String>> _autoUiTranslations = {};
+  final Set<String> _autoUiInFlight = {};
 
   void setTranslationManager(TranslationManager manager) {
     _translationManager = manager;
@@ -103,12 +105,19 @@ class LocalizationService extends ChangeNotifier {
 
   /// Получение перевода для текущей локали (fallback: en → ru → key)
   String translate(String key, {Map<String, String>? args}) {
-    var translation = _translations[currentLanguageCode]?[key] ??
+    var translation = _autoUiTranslations[currentLanguageCode]?[key] ??
+        _translations[currentLanguageCode]?[key] ??
         _translations['en']?[key] ??
         _translations['ru']?[key] ??
         _translations['tr']?[key] ??
         _translations['vi']?[key] ??
         key;
+
+    if (translation == key &&
+        _shouldAutoTranslateUiString(key, currentLanguageCode)) {
+      _scheduleAutoUiTranslation(
+          sourceText: key, targetLanguage: currentLanguageCode);
+    }
 
     // Замена аргументов в переводе
     if (args != null) {
@@ -167,12 +176,17 @@ class LocalizationService extends ChangeNotifier {
   /// Получение перевода для указанного языка (для экспорта списка заказа на выбранном языке)
   String tForLanguage(String languageCode, String key,
       {Map<String, String>? args}) {
-    var translation = _translations[languageCode]?[key] ??
+    var translation = _autoUiTranslations[languageCode]?[key] ??
+        _translations[languageCode]?[key] ??
         _translations['en']?[key] ??
         _translations['ru']?[key] ??
         _translations['tr']?[key] ??
         _translations['vi']?[key] ??
         key;
+
+    if (translation == key && _shouldAutoTranslateUiString(key, languageCode)) {
+      _scheduleAutoUiTranslation(sourceText: key, targetLanguage: languageCode);
+    }
 
     if (args != null) {
       args.forEach((argKey, argValue) {
@@ -284,5 +298,45 @@ class LocalizationService extends ChangeNotifier {
         userId: userId,
       );
     } catch (_) {}
+  }
+
+  bool _shouldAutoTranslateUiString(String value, String targetLanguage) {
+    if (targetLanguage == 'ru') return false;
+    if (_translationManager == null) return false;
+    final text = value.trim();
+    if (text.isEmpty) return false;
+    // Вероятно это ключ локализации, а не текст интерфейса.
+    if (RegExp(r'^[a-z0-9_]+$').hasMatch(text)) return false;
+    return true;
+  }
+
+  void _scheduleAutoUiTranslation({
+    required String sourceText,
+    required String targetLanguage,
+  }) {
+    final inFlightKey = '$targetLanguage|$sourceText';
+    if (_autoUiInFlight.contains(inFlightKey)) return;
+    _autoUiInFlight.add(inFlightKey);
+    Future<void>(() async {
+      try {
+        final translated = await _translationManager!.getLocalizedText(
+          entityType: TranslationEntityType.ui,
+          entityId: 'runtime_ui',
+          fieldName: 'text',
+          sourceText: sourceText,
+          sourceLanguage: 'auto',
+          targetLanguage: targetLanguage,
+        );
+        final normalized = translated.trim();
+        if (normalized.isNotEmpty && normalized != sourceText) {
+          _autoUiTranslations.putIfAbsent(targetLanguage, () => {});
+          _autoUiTranslations[targetLanguage]![sourceText] = normalized;
+          notifyListeners();
+        }
+      } catch (_) {
+      } finally {
+        _autoUiInFlight.remove(inFlightKey);
+      }
+    });
   }
 }

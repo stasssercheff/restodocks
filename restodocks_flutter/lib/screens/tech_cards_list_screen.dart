@@ -64,6 +64,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   String? _priceEstablishmentId;
   final Map<String, double> _nomenclaturePriceByName = {};
   bool _loading = true;
+
   /// Фоновая догрузка продуктов/номенклатуры и гидрация цен/нутриентов после первого показа списка.
   bool _listDetailsHydrating = false;
   int _loadHydrateToken = 0;
@@ -1777,7 +1778,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
     final loc = context.read<LocalizationService>();
     final reviewFiltered = _getReviewFilteredList(loc);
-    final toHydrate = reviewFiltered.where((tc) => tc.ingredients.isEmpty).toList();
+    final toHydrate =
+        reviewFiltered.where((tc) => tc.ingredients.isEmpty).toList();
     if (toHydrate.isEmpty) return;
 
     _reviewIngredientsWarmUpInFlight = true;
@@ -1811,7 +1813,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       final hydratedById = <String, TechCard>{};
       for (var i = 0; i < toHydrate.length; i += chunkSize) {
         if (!mounted) break;
-        final end = (i + chunkSize < toHydrate.length) ? (i + chunkSize) : toHydrate.length;
+        final end = (i + chunkSize < toHydrate.length)
+            ? (i + chunkSize)
+            : toHydrate.length;
         final chunk = toHydrate.sublist(i, end);
         final updated = await svc.fillIngredientsForCardsBulk(chunk);
         for (final tc in updated) {
@@ -1855,9 +1859,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     if (barCats.contains(c)) return true;
     if (tc.sections.contains('bar')) return true;
     if (TechCardServiceSupabase.isCustomCategory(tc.category) &&
-        customBarIds
-            .contains(TechCardServiceSupabase.customCategoryId(tc.category)))
-      return true;
+        customBarIds.contains(
+            TechCardServiceSupabase.customCategoryId(tc.category))) return true;
     return false;
   }
 
@@ -1983,8 +1986,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             await productStore.loadProducts().catchError((_) {});
             if (est.isBranch) {
               await productStore
-                  .loadNomenclatureForBranch(
-                      est.id, est.dataEstablishmentId!)
+                  .loadNomenclatureForBranch(est.id, est.dataEstablishmentId!)
                   .catchError((_) {});
             } else {
               await productStore
@@ -2120,38 +2122,41 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   Future<void> _ensureTechCardTranslations(
       TechCardServiceSupabase svc, List<TechCard> cards) async {
-    final lang = context.read<LocalizationService>().currentLanguageCode;
-    if (lang == 'ru') return;
-    final missing = cards
-        .where(
-          (tc) => !(tc.dishNameLocalized?.containsKey(lang) == true &&
-              (tc.dishNameLocalized![lang]?.trim().isNotEmpty ?? false)),
-        )
-        .toList();
+    final currentLang = context.read<LocalizationService>().currentLanguageCode;
+    final targetLanguages = LocalizationService.productLanguageCodes
+        .where((lang) => lang != currentLang)
+        .toList(growable: false);
+    if (targetLanguages.isEmpty) return;
     var i = 0;
-    for (final tc in missing) {
+    for (final tc in cards) {
       if (!mounted) break;
       if (i > 0 && i % 2 == 0) {
         await Future<void>.delayed(Duration.zero);
       }
       i++;
-      try {
-        final translated = await svc
-            .translateTechCardName(tc.id, tc.dishName, lang)
-            .timeout(const Duration(seconds: 5), onTimeout: () => null);
-        if (translated != null && mounted) {
-          final idx = _list.indexWhere((c) => c.id == tc.id);
-          if (idx >= 0) {
-            final updated = _list[idx].copyWith(
-              dishNameLocalized: {
-                ...(_list[idx].dishNameLocalized ?? {}),
-                lang: translated
-              },
-            );
-            setState(() => _list[idx] = updated);
+      for (final lang in targetLanguages) {
+        final hasTranslation =
+            tc.dishNameLocalized?.containsKey(lang) == true &&
+                (tc.dishNameLocalized![lang]?.trim().isNotEmpty ?? false);
+        if (hasTranslation) continue;
+        try {
+          final translated = await svc
+              .translateTechCardName(tc.id, tc.dishName, lang)
+              .timeout(const Duration(seconds: 5), onTimeout: () => null);
+          if (translated != null && mounted) {
+            final idx = _list.indexWhere((c) => c.id == tc.id);
+            if (idx >= 0) {
+              final updated = _list[idx].copyWith(
+                dishNameLocalized: {
+                  ...(_list[idx].dishNameLocalized ?? {}),
+                  lang: translated
+                },
+              );
+              setState(() => _list[idx] = updated);
+            }
           }
-        }
-      } catch (_) {}
+        } catch (_) {}
+      }
     }
   }
 
@@ -3252,7 +3257,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               if (badgeCount != null && badgeCount > 0) ...[
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: p,
                     borderRadius: BorderRadius.circular(999),
@@ -3455,74 +3461,49 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
     return Column(
       children: [
-          if (showBranchFilter)
-            FutureBuilder<List<Establishment>>(
-              future: acc.getBranchesForEstablishment(acc.establishment!.id),
-              builder: (ctx, snap) {
-                if (!snap.hasData || snap.data!.isEmpty)
-                  return const SizedBox.shrink();
-                final branches = snap.data!;
-                return Consumer<TtkBranchFilterService>(
-                  builder: (_, branchFilter, __) {
-                    final selId = branchFilter.selectedBranchId;
-                    final label = selId == null
-                        ? loc.t('main_establishment_short')
-                        : branches
-                                .where((b) => b.id == selId)
-                                .map((b) => b.name)
-                                .firstOrNull ??
-                            selId;
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                      child: Row(
-                        children: [
-                          FilterChip(
-                            avatar: const Icon(Icons.account_tree, size: 18),
-                            label: Text(label),
-                            selected: selId != null,
-                            onSelected: (_) => _showTtkBranchFilterPicker(
-                                context, loc, acc, branches),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          // Шапка: цех (подразделение) над вкладками ТТК/ПФ
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: _ttkTourController != null
-                ? SpotlightTarget(
-                    id: 'ttk-subdivision',
-                    controller: _ttkTourController!,
+        if (showBranchFilter)
+          FutureBuilder<List<Establishment>>(
+            future: acc.getBranchesForEstablishment(acc.establishment!.id),
+            builder: (ctx, snap) {
+              if (!snap.hasData || snap.data!.isEmpty)
+                return const SizedBox.shrink();
+              final branches = snap.data!;
+              return Consumer<TtkBranchFilterService>(
+                builder: (_, branchFilter, __) {
+                  final selId = branchFilter.selectedBranchId;
+                  final label = selId == null
+                      ? loc.t('main_establishment_short')
+                      : branches
+                              .where((b) => b.id == selId)
+                              .map((b) => b.name)
+                              .firstOrNull ??
+                          selId;
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                     child: Row(
                       children: [
-                        Icon(Icons.business,
-                            size: 20,
-                            color: Theme.of(context).colorScheme.primary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '${loc.t('ttk_section')}: ${_departmentHeaderLabel(loc)}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleSmall
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                  color: Theme.of(context)
-                                      .colorScheme
-                                      .onSurface,
-                                ),
-                          ),
+                        FilterChip(
+                          avatar: const Icon(Icons.account_tree, size: 18),
+                          label: Text(label),
+                          selected: selId != null,
+                          onSelected: (_) => _showTtkBranchFilterPicker(
+                              context, loc, acc, branches),
                         ),
                       ],
                     ),
-                  )
-                : Row(
+                  );
+                },
+              );
+            },
+          ),
+        // Шапка: цех (подразделение) над вкладками ТТК/ПФ
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: _ttkTourController != null
+              ? SpotlightTarget(
+                  id: 'ttk-subdivision',
+                  controller: _ttkTourController!,
+                  child: Row(
                     children: [
                       Icon(Icons.business,
                           size: 20,
@@ -3544,155 +3525,174 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       ),
                     ],
                   ),
-          ),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            clipBehavior: Clip.antiAlias,
-            child: TabBar(
-              controller: _tabController,
-              isScrollable: false,
-              tabAlignment: TabAlignment.center,
-              labelPadding: EdgeInsets.zero,
-              dividerColor: Colors.transparent,
-              overlayColor: WidgetStateProperty.all(Colors.transparent),
-              splashFactory: NoSplash.splashFactory,
-              indicator: const BoxDecoration(),
-              labelColor: Theme.of(context).colorScheme.primary,
-              unselectedLabelColor: Theme.of(context).colorScheme.primary,
-              onTap: (_) => _tabWasTouched = true,
-              tabs: _buildTabBarTabs(
-                loc,
-                reviewCount,
-                selectedIndex: _tabController.index,
-              ),
-            ),
-          ),
-          if (_listDetailsHydrating)
-            LinearProgressIndicator(
-              minHeight: 2,
-              backgroundColor:
-                  Theme.of(context).colorScheme.surfaceContainerHighest,
-            ),
-          // Поиск и сортировка
-          Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode,
-                  decoration: InputDecoration(
-                    hintText: loc.t('ttk_search_hint'),
-                    isDense: true,
-                    prefixIcon: const Icon(Icons.search, size: 20),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear, size: 20),
-                            onPressed: () {
-                              _searchController.clear();
-                              _searchDebounceTimer?.cancel();
-                              setState(() {});
-                            },
-                          )
-                        : null,
-                    border: const OutlineInputBorder(),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                  ),
-                  onChanged: (_) {
-                    _searchDebounceTimer?.cancel();
-                    _searchDebounceTimer = Timer(
-                      const Duration(milliseconds: 150),
-                      () {
-                        if (mounted) setState(() {});
-                      },
-                    );
-                  },
-                ),
-                const SizedBox(height: 8),
-                Row(
+                )
+              : Row(
                   children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        value: _filterSection,
-                        decoration: InputDecoration(
-                          labelText: loc.t('ttk_section_label'),
-                          isDense: true,
-                          border: const OutlineInputBorder(),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 8),
-                        ),
-                        items: [
-                          DropdownMenuItem(
-                              value: null, child: Text(loc.t('all') ?? 'Все')),
-                          ..._sectionOrder
-                              .where((s) => s != 'hidden' && s != 'all')
-                              .map((s) => DropdownMenuItem(
-                                    value: s,
-                                    child: Text(_sectionCodeToLabel(s, loc)),
-                                  )),
-                        ],
-                        onChanged: (v) => setState(() => _filterSection = v),
-                      ),
-                    ),
+                    Icon(Icons.business,
+                        size: 20, color: Theme.of(context).colorScheme.primary),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: DropdownButtonFormField<String>(
-                        isExpanded: true,
-                        value: _filterCategory,
-                        decoration: InputDecoration(
-                          labelText: loc.t('column_category'),
-                          isDense: true,
-                          border: const OutlineInputBorder(),
-                          contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 8),
-                        ),
-                        items: [
-                          DropdownMenuItem(
-                              value: null, child: Text(loc.t('all') ?? 'Все')),
-                          ...filterCatOrder.map((c) => DropdownMenuItem(
-                                value: c,
-                                child: Text(_categoryLabel(c, loc)),
-                              )),
-                        ],
-                        onChanged: (v) => setState(() => _filterCategory = v),
+                      child: Text(
+                        '${loc.t('ttk_section')}: ${_departmentHeaderLabel(loc)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
                       ),
                     ),
                   ],
                 ),
-              ],
+        ),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: TabBar(
+            controller: _tabController,
+            isScrollable: false,
+            tabAlignment: TabAlignment.center,
+            labelPadding: EdgeInsets.zero,
+            dividerColor: Colors.transparent,
+            overlayColor: WidgetStateProperty.all(Colors.transparent),
+            splashFactory: NoSplash.splashFactory,
+            indicator: const BoxDecoration(),
+            labelColor: Theme.of(context).colorScheme.primary,
+            unselectedLabelColor: Theme.of(context).colorScheme.primary,
+            onTap: (_) => _tabWasTouched = true,
+            tabs: _buildTabBarTabs(
+              loc,
+              reviewCount,
+              selectedIndex: _tabController.index,
             ),
           ),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildTechCardsTable(
-                  semiFinishedFiltered,
-                  loc,
-                  canEdit,
-                  showCost,
-                  isDishesTab: false,
-                  hasActiveFilters: _searchController.text.trim().isNotEmpty ||
-                      _filterSection != null ||
-                      _filterCategory != null,
-                ),
-                _buildTechCardsTable(
-                  dishFiltered,
-                  loc,
-                  canEdit,
-                  showCost,
-                  isDishesTab: true,
-                  hasActiveFilters: _searchController.text.trim().isNotEmpty ||
-                      _filterSection != null ||
-                      _filterCategory != null,
-                ),
-                _buildReviewList(loc, canEdit),
-              ],
-            ),
+        ),
+        if (_listDetailsHydrating)
+          LinearProgressIndicator(
+            minHeight: 2,
+            backgroundColor:
+                Theme.of(context).colorScheme.surfaceContainerHighest,
           ),
+        // Поиск и сортировка
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _searchController,
+                focusNode: _searchFocusNode,
+                decoration: InputDecoration(
+                  hintText: loc.t('ttk_search_hint'),
+                  isDense: true,
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 20),
+                          onPressed: () {
+                            _searchController.clear();
+                            _searchDebounceTimer?.cancel();
+                            setState(() {});
+                          },
+                        )
+                      : null,
+                  border: const OutlineInputBorder(),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                onChanged: (_) {
+                  _searchDebounceTimer?.cancel();
+                  _searchDebounceTimer = Timer(
+                    const Duration(milliseconds: 150),
+                    () {
+                      if (mounted) setState(() {});
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      value: _filterSection,
+                      decoration: InputDecoration(
+                        labelText: loc.t('ttk_section_label'),
+                        isDense: true,
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                            value: null, child: Text(loc.t('all') ?? 'Все')),
+                        ..._sectionOrder
+                            .where((s) => s != 'hidden' && s != 'all')
+                            .map((s) => DropdownMenuItem(
+                                  value: s,
+                                  child: Text(_sectionCodeToLabel(s, loc)),
+                                )),
+                      ],
+                      onChanged: (v) => setState(() => _filterSection = v),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      value: _filterCategory,
+                      decoration: InputDecoration(
+                        labelText: loc.t('column_category'),
+                        isDense: true,
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 8),
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                            value: null, child: Text(loc.t('all') ?? 'Все')),
+                        ...filterCatOrder.map((c) => DropdownMenuItem(
+                              value: c,
+                              child: Text(_categoryLabel(c, loc)),
+                            )),
+                      ],
+                      onChanged: (v) => setState(() => _filterCategory = v),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildTechCardsTable(
+                semiFinishedFiltered,
+                loc,
+                canEdit,
+                showCost,
+                isDishesTab: false,
+                hasActiveFilters: _searchController.text.trim().isNotEmpty ||
+                    _filterSection != null ||
+                    _filterCategory != null,
+              ),
+              _buildTechCardsTable(
+                dishFiltered,
+                loc,
+                canEdit,
+                showCost,
+                isDishesTab: true,
+                hasActiveFilters: _searchController.text.trim().isNotEmpty ||
+                    _filterSection != null ||
+                    _filterCategory != null,
+              ),
+              _buildReviewList(loc, canEdit),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -3718,13 +3718,17 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                   ? (loc.t('ttk_tab_dishes') == 'ttk_tab_dishes'
                       ? 'Блюда'
                       : loc.t('ttk_tab_dishes'))
-                  : (loc.t('ttk_tab_pf') == 'ttk_tab_pf' ? 'ПФ' : loc.t('ttk_tab_pf')),
+                  : (loc.t('ttk_tab_pf') == 'ttk_tab_pf'
+                      ? 'ПФ'
+                      : loc.t('ttk_tab_pf')),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 6),
             Text(
-              hasActiveFilters ? loc.t('nothing_found') : loc.t('tech_cards_empty'),
+              hasActiveFilters
+                  ? loc.t('nothing_found')
+                  : loc.t('tech_cards_empty'),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant),
@@ -3961,7 +3965,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     return Text(
                       isDishesTab
                           ? '${NumberFormatUtils.formatDecimal(_calculateCostPerPortion(tc))} $costSym'
-                          : NumberFormatUtils.formatInt(_calculateCostPerKg(tc)),
+                          : NumberFormatUtils.formatInt(
+                              _calculateCostPerKg(tc)),
                       style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(context).colorScheme.onSurfaceVariant,

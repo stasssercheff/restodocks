@@ -2879,31 +2879,38 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           userId: emp.id,
         )
             .then((_) async {
-          final otherLang = curLang == 'ru' ? 'en' : 'ru';
-          final translatedName = await translationManager.getLocalizedText(
-            entityType: TranslationEntityType.techCard,
-            entityId: created.id,
-            fieldName: 'dish_name',
-            sourceText: saveName,
-            sourceLanguage: curLang,
-            targetLanguage: otherLang,
-          );
           final nameMap = Map<String, String>.from(
               savedForTranslation.dishNameLocalized ?? {});
           nameMap[curLang] = saveName;
-          if (translatedName != saveName) nameMap[otherLang] = translatedName;
           final newTechMap = Map<String, String>.from(techMap);
-          if (techText.isNotEmpty) {
-            final translatedTech = await translationManager.getLocalizedText(
+          for (final targetLang in LocalizationService.productLanguageCodes) {
+            if (targetLang == curLang) continue;
+            final translatedName = await translationManager.getLocalizedText(
               entityType: TranslationEntityType.techCard,
               entityId: created.id,
-              fieldName: 'technology',
-              sourceText: techText,
+              fieldName: 'dish_name',
+              sourceText: saveName,
               sourceLanguage: curLang,
-              targetLanguage: otherLang,
+              targetLanguage: targetLang,
             );
-            if (translatedTech != techText)
-              newTechMap[otherLang] = translatedTech;
+            if (translatedName.trim().isNotEmpty &&
+                translatedName != saveName) {
+              nameMap[targetLang] = translatedName;
+            }
+            if (techText.isNotEmpty) {
+              final translatedTech = await translationManager.getLocalizedText(
+                entityType: TranslationEntityType.techCard,
+                entityId: created.id,
+                fieldName: 'technology',
+                sourceText: techText,
+                sourceLanguage: curLang,
+                targetLanguage: targetLang,
+              );
+              if (translatedTech.trim().isNotEmpty &&
+                  translatedTech != techText) {
+                newTechMap[targetLang] = translatedTech;
+              }
+            }
           }
           try {
             await svc.saveTechCard(
@@ -3008,33 +3015,39 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           userId: emp.id,
         )
             .then((_) async {
-          final otherLang = curLang == 'ru' ? 'en' : 'ru';
-          final translatedName = await translationManager.getLocalizedText(
-            entityType: TranslationEntityType.techCard,
-            entityId: tc.id,
-            fieldName: 'dish_name',
-            sourceText: name,
-            sourceLanguage: curLang,
-            targetLanguage: otherLang,
-          );
           final nameMap =
               Map<String, String>.from(updated.dishNameLocalized ?? {});
           nameMap[curLang] = name;
-          if (translatedName != name) nameMap[otherLang] = translatedName;
           // Обновляем technologyLocalized
           final newTechMap =
               Map<String, String>.from(updated.technologyLocalized ?? techMap);
-          if (techText.isNotEmpty) {
-            final translatedTech = await translationManager.getLocalizedText(
+          for (final targetLang in LocalizationService.productLanguageCodes) {
+            if (targetLang == curLang) continue;
+            final translatedName = await translationManager.getLocalizedText(
               entityType: TranslationEntityType.techCard,
               entityId: tc.id,
-              fieldName: 'technology',
-              sourceText: techText,
+              fieldName: 'dish_name',
+              sourceText: name,
               sourceLanguage: curLang,
-              targetLanguage: otherLang,
+              targetLanguage: targetLang,
             );
-            if (translatedTech != techText)
-              newTechMap[otherLang] = translatedTech;
+            if (translatedName.trim().isNotEmpty && translatedName != name) {
+              nameMap[targetLang] = translatedName;
+            }
+            if (techText.isNotEmpty) {
+              final translatedTech = await translationManager.getLocalizedText(
+                entityType: TranslationEntityType.techCard,
+                entityId: tc.id,
+                fieldName: 'technology',
+                sourceText: techText,
+                sourceLanguage: curLang,
+                targetLanguage: targetLang,
+              );
+              if (translatedTech.trim().isNotEmpty &&
+                  translatedTech != techText) {
+                newTechMap[targetLang] = translatedTech;
+              }
+            }
           }
           try {
             await svc.saveTechCard(
