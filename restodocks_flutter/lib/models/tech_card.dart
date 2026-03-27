@@ -221,6 +221,8 @@ class TechCard extends Equatable {
         return 'Prep';
       case 'es':
         return 'SF';
+      case 'it':
+        return 'PF';
       case 'fr':
         return 'SF';
       case 'de':

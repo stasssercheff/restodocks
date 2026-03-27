@@ -12,7 +12,8 @@ import '../widgets/order_export_sheet.dart';
 
 /// Просмотр/редактирование списка заказа: наименование, единица (редактируемая), количество. Комментарий. Сохранить список / Отправить (сохранить на устройство).
 class OrderListDetailScreen extends StatefulWidget {
-  const OrderListDetailScreen({super.key, required this.listId, this.department = 'kitchen'});
+  const OrderListDetailScreen(
+      {super.key, required this.listId, this.department = 'kitchen'});
 
   final String listId;
   final String department;
@@ -28,14 +29,28 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
   final _commentCtrl = TextEditingController();
   List<TextEditingController> _qtyControllers = [];
 
-  static String _unitLabel(String unitId, String lang) =>
-      unitId == 'pkg' ? (lang == 'ru' ? 'упак.' : 'pkg') : CulinaryUnits.displayName(unitId, lang);
+  static String _unitLabel(String unitId, String lang) => unitId == 'pkg'
+      ? (lang == 'ru' ? 'упак.' : 'pkg')
+      : CulinaryUnits.displayName(unitId, lang);
 
   static List<String> _allowedUnitsForProduct(Product? p) {
     const base = [
-      'g', 'kg', 'ml', 'l',
-      'pcs', 'pack', 'can', 'box', 'bunch', 'slice', 'clove',
-      'tbsp', 'tsp', 'cup', 'oz', 'lb',
+      'g',
+      'kg',
+      'ml',
+      'l',
+      'pcs',
+      'pack',
+      'can',
+      'box',
+      'bunch',
+      'slice',
+      'clove',
+      'tbsp',
+      'tsp',
+      'cup',
+      'oz',
+      'lb',
     ];
     final options = List<String>.from(base);
     if (p?.packageWeightGrams != null && p!.packageWeightGrams! > 0) {
@@ -68,16 +83,20 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     for (final c in _qtyControllers) {
       c.dispose();
     }
-    _qtyControllers = found?.items.map((e) => TextEditingController(
-      text: e.quantity > 0 ? e.quantity.toString() : '',
-    )).toList() ?? [];
+    _qtyControllers = found?.items
+            .map((e) => TextEditingController(
+                  text: e.quantity > 0 ? e.quantity.toString() : '',
+                ))
+            .toList() ??
+        [];
     setState(() {
       _list = found;
       _loading = false;
       // Загружаем комментарий только из шаблона (savedAt == null).
       // Сохранённые заказы (savedAt != null) — это архив, комментарий для
       // новой отправки всегда начинается пустым, чтобы не тянуть старый текст.
-      _commentCtrl.text = (found != null && found.savedAt == null) ? found.comment : '';
+      _commentCtrl.text =
+          (found != null && found.savedAt == null) ? found.comment : '';
     });
   }
 
@@ -116,17 +135,26 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     final employee = account.currentEmployee;
     final establishment = account.establishment;
     if (employee == null || establishment == null) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.t('error_short') ?? 'Ошибка')));
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.t('error_short') ?? 'Ошибка')));
       return;
     }
     final now = DateTime.now();
     final dateStr = DateFormat('dd.MM.yyyy').format(now);
-    final itemsWithQty = _list!.items.asMap().entries.map((e) {
-      final q = e.key < _qtyControllers.length
-          ? (double.tryParse(_qtyControllers[e.key].text.replaceFirst(',', '.')) ?? 0)
-          : e.value.quantity;
-      return e.value.copyWith(quantity: q);
-    }).where((item) => item.quantity > 0).toList();
+    final itemsWithQty = _list!.items
+        .asMap()
+        .entries
+        .map((e) {
+          final q = e.key < _qtyControllers.length
+              ? (double.tryParse(
+                      _qtyControllers[e.key].text.replaceFirst(',', '.')) ??
+                  0)
+              : e.value.quantity;
+          return e.value.copyWith(quantity: q);
+        })
+        .where((item) => item.quantity > 0)
+        .toList();
     final dept = _list!.department;
     final saved = _list!.copyWith(
       id: const Uuid().v4(),
@@ -136,10 +164,13 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       items: itemsWithQty,
     );
     final lists = await loadOrderLists(_establishmentId!, department: dept);
-    await saveOrderLists(_establishmentId!, [...lists, saved], department: dept);
+    await saveOrderLists(_establishmentId!, [...lists, saved],
+        department: dept);
 
     // Сохранить во входящие (шефу и собственнику) — цены подставляются на сервере через Edge Function
-    final orderForDateStr = saved.orderForDate != null ? DateFormat('yyyy-MM-dd').format(saved.orderForDate!) : null;
+    final orderForDateStr = saved.orderForDate != null
+        ? DateFormat('yyyy-MM-dd').format(saved.orderForDate!)
+        : null;
     final header = {
       'supplierName': saved.supplierName,
       'employeeName': employee.fullName,
@@ -148,12 +179,14 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       'orderForDate': orderForDateStr,
       'department': saved.department,
     };
-    final itemsPayload = itemsWithQty.map((item) => {
-      'productId': item.productId,
-      'productName': item.productName,
-      'unit': item.unit,
-      'quantity': item.quantity,
-    }).toList();
+    final itemsPayload = itemsWithQty
+        .map((item) => {
+              'productId': item.productId,
+              'productName': item.productName,
+              'unit': item.unit,
+              'quantity': item.quantity,
+            })
+        .toList();
     final orderDoc = await OrderDocumentService().saveWithServerPrices(
       establishmentId: establishment.id,
       createdByEmployeeId: employee.id,
@@ -167,7 +200,8 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       if (orderDoc == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${loc.t('error_short')}: ${loc.t('order_save_inbox_error')}'),
+            content: Text(
+                '${loc.t('error_short')}: ${loc.t('order_save_inbox_error')}'),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -182,22 +216,34 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
 
   List<OrderListItem> _getItemsWithQuantities() {
     if (_list == null) return [];
-    return _list!.items.asMap().entries.map((e) {
-      final q = e.key < _qtyControllers.length
-          ? (double.tryParse(_qtyControllers[e.key].text.replaceFirst(',', '.')) ?? 0)
-          : e.value.quantity;
-      return e.value.copyWith(quantity: q);
-    }).where((item) => item.quantity > 0).toList();
+    return _list!.items
+        .asMap()
+        .entries
+        .map((e) {
+          final q = e.key < _qtyControllers.length
+              ? (double.tryParse(
+                      _qtyControllers[e.key].text.replaceFirst(',', '.')) ??
+                  0)
+              : e.value.quantity;
+          return e.value.copyWith(quantity: q);
+        })
+        .where((item) => item.quantity > 0)
+        .toList();
   }
 
   Future<List<OrderListItem>> _getItemsWithLocalizedNames(String lang) async {
     final store = context.read<ProductStoreSupabase>();
     final estId = _establishmentId;
     if (estId != null) await store.loadNomenclature(estId);
-    final nomProducts = estId != null ? store.getNomenclatureProducts(estId) : <Product>[];
+    final nomProducts =
+        estId != null ? store.getNomenclatureProducts(estId) : <Product>[];
     return _getItemsWithQuantities().map((item) {
       final name = item.productId != null
-          ? (nomProducts.where((p) => p.id == item.productId).firstOrNull?.getLocalizedName(lang) ?? item.productName)
+          ? (nomProducts
+                  .where((p) => p.id == item.productId)
+                  .firstOrNull
+                  ?.getLocalizedName(lang) ??
+              item.productName)
           : item.productName;
       return item.copyWith(productName: name);
     }).toList();
@@ -213,7 +259,9 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     if (employee == null || establishment == null) return false;
     final itemsWithQty = _getItemsWithQuantities();
     final now = DateTime.now();
-    final orderForDateStr = _list!.orderForDate != null ? DateFormat('yyyy-MM-dd').format(_list!.orderForDate!) : null;
+    final orderForDateStr = _list!.orderForDate != null
+        ? DateFormat('yyyy-MM-dd').format(_list!.orderForDate!)
+        : null;
     final header = {
       'supplierName': _list!.supplierName,
       'employeeName': employee.fullName,
@@ -221,12 +269,14 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       'createdAt': now.toIso8601String(),
       'orderForDate': orderForDateStr,
     };
-    final itemsPayload = itemsWithQty.map((item) => {
-      'productId': item.productId,
-      'productName': item.productName,
-      'unit': item.unit,
-      'quantity': item.quantity,
-    }).toList();
+    final itemsPayload = itemsWithQty
+        .map((item) => {
+              'productId': item.productId,
+              'productName': item.productName,
+              'unit': item.unit,
+              'quantity': item.quantity,
+            })
+        .toList();
     final orderDoc = await OrderDocumentService().saveWithServerPrices(
       establishmentId: establishment.id,
       createdByEmployeeId: employee.id,
@@ -260,10 +310,26 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _LangButton(flag: '🇷🇺', label: loc.t('order_export_language_ru'), onTap: () => Navigator.of(ctx).pop('ru')),
-                _LangButton(flag: '🇺🇸', label: loc.t('order_export_language_en'), onTap: () => Navigator.of(ctx).pop('en')),
-                _LangButton(flag: '🇪🇸', label: loc.t('order_export_language_es'), onTap: () => Navigator.of(ctx).pop('es')),
-                _LangButton(flag: '🇹🇷', label: loc.t('order_export_language_tr') ?? 'Türkçe', onTap: () => Navigator.of(ctx).pop('tr')),
+                _LangButton(
+                    flag: '🇷🇺',
+                    label: loc.t('order_export_language_ru'),
+                    onTap: () => Navigator.of(ctx).pop('ru')),
+                _LangButton(
+                    flag: '🇺🇸',
+                    label: loc.t('order_export_language_en'),
+                    onTap: () => Navigator.of(ctx).pop('en')),
+                _LangButton(
+                    flag: '🇪🇸',
+                    label: loc.t('order_export_language_es'),
+                    onTap: () => Navigator.of(ctx).pop('es')),
+                _LangButton(
+                    flag: '🇮🇹',
+                    label: loc.t('order_export_language_it') ?? 'Italiano',
+                    onTap: () => Navigator.of(ctx).pop('it')),
+                _LangButton(
+                    flag: '🇹🇷',
+                    label: loc.t('order_export_language_tr') ?? 'Türkçe',
+                    onTap: () => Navigator.of(ctx).pop('tr')),
               ],
             ),
           ],
@@ -285,13 +351,15 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
         exportLang: exportLang,
         commentSourceLang: loc.currentLanguageCode,
         itemsSourceLang: loc.currentLanguageCode,
-        onSaved: (msg) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg))),
+        onSaved: (msg) => ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(msg))),
         onExportToInbox: () async {
           final ok = await _saveOrderToInbox();
           if (mounted && !ok) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('${loc.t('error_short')}: ${loc.t('order_save_inbox_error')}'),
+                content: Text(
+                    '${loc.t('error_short')}: ${loc.t('order_save_inbox_error')}'),
                 backgroundColor: Theme.of(context).colorScheme.error,
               ),
             );
@@ -345,22 +413,27 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Text('${loc.t('order_export_order_for')}: ', style: Theme.of(context).textTheme.bodyMedium),
+                      Text('${loc.t('order_export_order_for')}: ',
+                          style: Theme.of(context).textTheme.bodyMedium),
                       TextButton(
                         onPressed: () async {
                           final picked = await showDatePicker(
                             context: context,
-                            initialDate: list.orderForDate ?? DateTime.now().add(const Duration(days: 1)),
+                            initialDate: list.orderForDate ??
+                                DateTime.now().add(const Duration(days: 1)),
                             firstDate: DateTime.now(),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                            lastDate:
+                                DateTime.now().add(const Duration(days: 365)),
                           );
                           if (picked != null) {
-                            setState(() => _list = _list!.copyWith(orderForDate: picked));
+                            setState(() =>
+                                _list = _list!.copyWith(orderForDate: picked));
                           }
                         },
                         child: Text(
                           list.orderForDate != null
-                              ? DateFormat('dd.MM.yyyy').format(list.orderForDate!)
+                              ? DateFormat('dd.MM.yyyy')
+                                  .format(list.orderForDate!)
                               : '${loc.t('order_export_order_for')}...',
                         ),
                       ),
@@ -368,7 +441,8 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                   ),
                   const SizedBox(height: 16),
                   Table(
-                    border: TableBorder.all(color: Theme.of(context).dividerColor),
+                    border:
+                        TableBorder.all(color: Theme.of(context).dividerColor),
                     columnWidths: const {
                       0: FlexColumnWidth(2),
                       1: FixedColumnWidth(100),
@@ -376,19 +450,31 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                     },
                     children: [
                       TableRow(
-                        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest),
+                        decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest),
                         children: [
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                            child: Text(loc.t('inventory_item_name'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 8),
+                            child: Text(loc.t('inventory_item_name'),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold)),
                           ),
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                            child: Text(loc.t('order_list_unit'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 8),
+                            child: Text(loc.t('order_list_unit'),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold)),
                           ),
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                            child: Text(loc.t('order_list_quantity'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 8),
+                            child: Text(loc.t('order_list_quantity'),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold)),
                           ),
                         ],
                       ),
@@ -397,40 +483,56 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                         final item = e.value;
                         final store = context.read<ProductStoreSupabase>();
                         final product = item.productId != null
-                            ? store.allProducts.where((p) => p.id == item.productId).firstOrNull
+                            ? store.allProducts
+                                .where((p) => p.id == item.productId)
+                                .firstOrNull
                             : null;
                         final allowedUnits = _allowedUnitsForProduct(product);
-                        final currentUnit = allowedUnits.contains(item.unit) ? item.unit : allowedUnits.first;
+                        final currentUnit = allowedUnits.contains(item.unit)
+                            ? item.unit
+                            : allowedUnits.first;
                         return TableRow(
                           children: [
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              child: Text(item.productName, overflow: TextOverflow.ellipsis),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              child: Text(item.productName,
+                                  overflow: TextOverflow.ellipsis),
                             ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 4),
                               child: DropdownButton<String>(
                                 value: currentUnit,
                                 isDense: true,
                                 isExpanded: true,
-                                items: allowedUnits.map((id) => DropdownMenuItem(
-                                  value: id,
-                                  child: Text(_unitLabel(id, lang), style: const TextStyle(fontSize: 12)),
-                                )).toList(),
+                                items: allowedUnits
+                                    .map((id) => DropdownMenuItem(
+                                          value: id,
+                                          child: Text(_unitLabel(id, lang),
+                                              style: const TextStyle(
+                                                  fontSize: 12)),
+                                        ))
+                                    .toList(),
                                 onChanged: (v) {
-                                  if (v != null) _updateItem(i, item.copyWith(unit: v));
+                                  if (v != null)
+                                    _updateItem(i, item.copyWith(unit: v));
                                 },
                               ),
                             ),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 4),
                               child: i < _qtyControllers.length
                                   ? TextField(
-                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      keyboardType:
+                                          const TextInputType.numberWithOptions(
+                                              decimal: true),
                                       decoration: const InputDecoration(
                                         isDense: true,
                                         border: OutlineInputBorder(),
-                                        contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                        contentPadding: EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 8),
                                       ),
                                       style: const TextStyle(fontSize: 12),
                                       controller: _qtyControllers[i],
@@ -443,7 +545,8 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  Text(loc.t('order_list_comment'), style: Theme.of(context).textTheme.labelLarge),
+                  Text(loc.t('order_list_comment'),
+                      style: Theme.of(context).textTheme.labelLarge),
                   const SizedBox(height: 4),
                   TextField(
                     controller: _commentCtrl,
