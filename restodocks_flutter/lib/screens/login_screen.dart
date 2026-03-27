@@ -1,14 +1,11 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'legal_document_screen.dart';
-import '../services/services.dart';
-import '../models/models.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../services/services.dart';
 
 /// Экран входа в систему
 class LoginScreen extends StatefulWidget {
@@ -301,46 +298,49 @@ class _LoginScreenState extends State<LoginScreen> {
       builder: (ctx) {
         return AlertDialog(
           title: Text(loc.t('before_registration')),
-          content: RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              style: Theme.of(ctx).textTheme.bodyMedium,
-              children: [
-                TextSpan(
-                  text: loc.t('registration_accepts_prefix'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                loc.t('registration_accepts_prefix'),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              InkWell(
+                onTap: () => _openLegalFromRegistrationDialog(
+                  ctx,
+                  LegalDocumentType.publicOffer,
                 ),
-                TextSpan(
-                  text: loc.t('offer_short'),
+                child: Text(
+                  loc.t('offer_read'),
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                     decoration: TextDecoration.underline,
                     color: Colors.blue,
                   ),
-                  recognizer: TapGestureRecognizer()
-                    ..onTap = () {
-                      _openLegalFromRegistrationDialog(
-                        ctx,
-                        LegalDocumentType.publicOffer,
-                      );
-                    },
                 ),
-                TextSpan(text: '\n${loc.t('and_short')}\n'),
-                TextSpan(
-                  text: loc.t('privacy_policy_accusative'),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                loc.t('and_short'),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 2),
+              InkWell(
+                onTap: () => _openLegalFromRegistrationDialog(
+                  ctx,
+                  LegalDocumentType.privacyPolicy,
+                ),
+                child: Text(
+                  loc.t('privacy_policy_read'),
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                     decoration: TextDecoration.underline,
                     color: Colors.blue,
                   ),
-                  recognizer: TapGestureRecognizer()
-                    ..onTap = () {
-                      _openLegalFromRegistrationDialog(
-                        ctx,
-                        LegalDocumentType.privacyPolicy,
-                      );
-                    },
                 ),
-                const TextSpan(text: '.'),
-              ],
-            ),
+              ),
+            ],
           ),
           actions: [
             TextButton(

@@ -174,24 +174,6 @@ class AppRouter {
             : null;
         return redirect != null ? '/login?redirect=$redirect' : '/login';
       }
-      final consentService = context.read<PrivacyPolicyConsentService>();
-      final onConsentScreen = loc.startsWith('/privacy-consent');
-      bool hasConsent = true;
-      try {
-        hasConsent = await consentService.hasAcceptedCurrentVersion();
-      } catch (_) {
-        // Никогда не блокируем вход из-за сбоя проверки consent.
-        hasConsent = true;
-      }
-      if (!hasConsent && !onConsentScreen) {
-        final next = Uri.encodeComponent(state.location);
-        return '/privacy-consent?next=$next';
-      }
-      if (hasConsent && onConsentScreen) {
-        final next = state.queryParameters['next'];
-        if (next != null && next.isNotEmpty) return Uri.decodeComponent(next);
-        return '/home';
-      }
       // Web: сохраняем путь для F5 fallback
       if (kIsWeb && loc.isNotEmpty && loc != '/' && loc != '/splash') {
         initial_loc.savePathForRefresh(loc);
