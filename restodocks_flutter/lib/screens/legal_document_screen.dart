@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../legal/legal_texts.dart';
+import '../services/services.dart';
 
 enum LegalDocumentType { privacyPolicy, publicOffer }
 
@@ -10,11 +12,12 @@ class LegalDocumentScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     final isPrivacy = type == LegalDocumentType.privacyPolicy;
     return Scaffold(
       appBar: AppBar(
-        title:
-            Text(isPrivacy ? 'Политика конфиденциальности' : 'Договор оферты'),
+        title: Text(
+            isPrivacy ? loc.t('privacy_policy') : loc.t('public_offer')),
       ),
       body: SafeArea(
         child: Padding(

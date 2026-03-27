@@ -1071,7 +1071,6 @@
     "no_checklists_hint": "Создайте шаблон — вы сможете править его и создавать новые по аналогии.",
     "checklists_kitchen_only": "Чеклисты доступны только сотрудникам кухни.",
     "save": "Сохранить",
-    "saved": "Сохранено",
     "delete": "Удалить",
     "upload_list": "Загрузить список",
     "upload_list_tooltip": "Добавить продукты из файла или вставить текст",
@@ -1538,7 +1537,19 @@
     "order_sort_az": "А–Я",
     "order_sort_za": "Я–А",
     "order_no_results": "Ничего не найдено",
-    "no_results": "Ничего не найдено"
+    "no_results": "Ничего не найдено",
+    "legal_offer_and_privacy_button": "Оферта и Политика конфиденциальности",
+    "legal_documents": "Юридические документы",
+    "public_offer": "Договор оферты",
+    "privacy_policy": "Политика конфиденциальности",
+    "before_registration": "Перед регистрацией",
+    "registration_accepts_prefix": "Регистрируясь, вы принимаете условия ",
+    "offer_short": "Оферты",
+    "and_short": "и",
+    "privacy_policy_accusative": "Политику конфиденциальности",
+    "continue_action": "Продолжить",
+    "privacy_consent_required": "Перед началом работы нужно принять Политику конфиденциальности.",
+    "accept_and_continue": "Принять и продолжить"
   },
   "en": {
     "app_name": "Restodocks",
@@ -2968,7 +2979,19 @@
     "haccp_add_row": "+ Add row",
     "haccp_add_employee_row": "Add employee",
     "haccp_all_employees_added": "All employees are already added",
-    "haccp_add_at_least_one": "Add at least one employee"
+    "haccp_add_at_least_one": "Add at least one employee",
+    "legal_offer_and_privacy_button": "Offer and Privacy Policy",
+    "legal_documents": "Legal documents",
+    "public_offer": "Public Offer Agreement",
+    "privacy_policy": "Privacy Policy",
+    "before_registration": "Before registration",
+    "registration_accepts_prefix": "By registering, you accept the terms of ",
+    "offer_short": "the Offer",
+    "and_short": "and",
+    "privacy_policy_accusative": "the Privacy Policy",
+    "continue_action": "Continue",
+    "privacy_consent_required": "To start using the service, you must accept the Privacy Policy.",
+    "accept_and_continue": "Accept and continue"
   },
   "es": {
     "app_name": "Restodocks",
@@ -4288,7 +4311,19 @@
     "order_select_supplier": "Seleccionar proveedor",
     "order_no_suppliers_hint": "Primero crea un proveedor en la pestaña «Proveedores»",
     "order_suppliers_empty": "Sin proveedores",
-    "order_suppliers_empty_hint": "Cree un proveedor: ingrese el nombre, los contactos y la lista de productos de la nomenclatura"
+    "order_suppliers_empty_hint": "Cree un proveedor: ingrese el nombre, los contactos y la lista de productos de la nomenclatura",
+    "legal_offer_and_privacy_button": "Oferta y Política de privacidad",
+    "legal_documents": "Documentos legales",
+    "public_offer": "Contrato de oferta pública",
+    "privacy_policy": "Política de privacidad",
+    "before_registration": "Antes del registro",
+    "registration_accepts_prefix": "Al registrarte, aceptas los términos de ",
+    "offer_short": "la Oferta",
+    "and_short": "y",
+    "privacy_policy_accusative": "la Política de privacidad",
+    "continue_action": "Continuar",
+    "privacy_consent_required": "Antes de comenzar a usar el servicio, debes aceptar la Política de privacidad.",
+    "accept_and_continue": "Aceptar y continuar"
   },
   "de": {
     "app_name": "Restodocks",
@@ -5814,7 +5849,19 @@
     "order_products_count": "ürünler",
     "order_products_and_more": "... ve {n} tane daha",
     "order_delete_supplier_confirm": "Tedarikçiyi sil",
-    "order_delete_order_confirm": "Sipariş listesini sil"
+    "order_delete_order_confirm": "Sipariş listesini sil",
+    "legal_offer_and_privacy_button": "Teklif ve Gizlilik Politikası",
+    "legal_documents": "Yasal belgeler",
+    "public_offer": "Kamu Teklif Sözleşmesi",
+    "privacy_policy": "Gizlilik Politikası",
+    "before_registration": "Kaydolmadan önce",
+    "registration_accepts_prefix": "Kaydolarak ",
+    "offer_short": "Teklif",
+    "and_short": "ve",
+    "privacy_policy_accusative": "Gizlilik Politikası şartlarını kabul etmiş olursunuz",
+    "continue_action": "Devam et",
+    "privacy_consent_required": "Hizmeti kullanmaya başlamak için Gizlilik Politikası'nı kabul etmelisiniz.",
+    "accept_and_continue": "Kabul et ve devam et"
   },
   "vi": {
     "app_name": "Khôi phục lại",
@@ -7165,6 +7212,18 @@
     "requisites": "Thông tin công ty",
     "requisites_hint": "Cho mẫu thỏa thuận với nhân viên",
     "notification_settings": "Thông báo",
-    "notification_settings_hint": "Loại thông báo và những gì được bật"
+    "notification_settings_hint": "Loại thông báo và những gì được bật",
+    "legal_offer_and_privacy_button": "Điều khoản chào dịch vụ và Chính sách bảo mật",
+    "legal_documents": "Tài liệu pháp lý",
+    "public_offer": "Thỏa thuận chào dịch vụ công khai",
+    "privacy_policy": "Chính sách bảo mật",
+    "before_registration": "Trước khi đăng ký",
+    "registration_accepts_prefix": "Khi đăng ký, bạn chấp nhận các điều khoản của ",
+    "offer_short": "Điều khoản chào dịch vụ",
+    "and_short": "và",
+    "privacy_policy_accusative": "Chính sách bảo mật",
+    "continue_action": "Tiếp tục",
+    "privacy_consent_required": "Để bắt đầu sử dụng dịch vụ, bạn cần chấp nhận Chính sách bảo mật.",
+    "accept_and_continue": "Chấp nhận và tiếp tục"
   }
 }

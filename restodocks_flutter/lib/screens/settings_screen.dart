@@ -2185,13 +2185,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               ListTile(
                 leading: const Icon(Icons.gavel_outlined),
-                title: const Text('Договор оферты'),
+                title: Text(localization.t('public_offer')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/legal/offer'),
               ),
               ListTile(
                 leading: const Icon(Icons.privacy_tip_outlined),
-                title: const Text('Политика конфиденциальности'),
+                title: Text(localization.t('privacy_policy')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/legal/privacy'),
               ),

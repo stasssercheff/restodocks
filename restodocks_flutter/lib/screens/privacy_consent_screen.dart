@@ -50,11 +50,12 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const Text('Privacy Policy'),
+        title: Text(loc.t('privacy_policy')),
       ),
       body: SafeArea(
         child: Padding(
@@ -63,7 +64,7 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Перед началом работы нужно принять Политику конфиденциальности.',
+                loc.t('privacy_consent_required'),
                 style: textTheme.titleMedium,
               ),
               const SizedBox(height: 12),
@@ -95,12 +96,12 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Принять и продолжить'),
+                    : Text(loc.t('accept_and_continue')),
               ),
               const SizedBox(height: 8),
               OutlinedButton(
                 onPressed: _loading ? null : _logout,
-                child: const Text('Выйти'),
+                child: Text(loc.t('logout')),
               ),
             ],
           ),

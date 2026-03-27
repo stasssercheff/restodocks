@@ -255,17 +255,18 @@ class _LoginScreenState extends State<LoginScreen> {
         icon: const Icon(Icons.gavel_outlined),
         style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 14)),
-        label: const Text('Оферта и Политика конфиденциальности'),
+        label: Text(loc.t('legal_offer_and_privacy_button')),
       ),
     ];
   }
 
   Future<void> _showPublicLegalLinksDialog() async {
+    final loc = context.read<LocalizationService>();
     await showDialog<void>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Юридические документы'),
+          title: Text(loc.t('legal_documents')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -275,14 +276,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   Navigator.of(ctx).pop();
                   context.push('/legal/offer');
                 },
-                child: const Text('Договор оферты'),
+                child: Text(loc.t('public_offer')),
               ),
               TextButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
                   context.push('/legal/privacy');
                 },
-                child: const Text('Политика конфиденциальности'),
+                child: Text(loc.t('privacy_policy')),
               ),
             ],
           ),
@@ -294,20 +295,21 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _showRegistrationLegalDialog({
     required VoidCallback onContinue,
   }) async {
+    final loc = context.read<LocalizationService>();
     final accepted = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Перед регистрацией'),
+          title: Text(loc.t('before_registration')),
           content: RichText(
             text: TextSpan(
               style: Theme.of(ctx).textTheme.bodyMedium,
               children: [
-                const TextSpan(
-                  text: 'Регистрируясь, вы принимаете условия ',
+                TextSpan(
+                  text: loc.t('registration_accepts_prefix'),
                 ),
                 TextSpan(
-                  text: 'Оферты',
+                  text: loc.t('offer_short'),
                   style: const TextStyle(
                     decoration: TextDecoration.underline,
                     color: Colors.blue,
@@ -320,9 +322,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       );
                     },
                 ),
-                const TextSpan(text: ' и '),
+                TextSpan(text: '\n${loc.t('and_short')}\n'),
                 TextSpan(
-                  text: 'Политику конфиденциальности',
+                  text: loc.t('privacy_policy_accusative'),
                   style: const TextStyle(
                     decoration: TextDecoration.underline,
                     color: Colors.blue,
@@ -342,11 +344,11 @@ class _LoginScreenState extends State<LoginScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Отмена'),
+              child: Text(loc.t('cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('Продолжить'),
+              child: Text(loc.t('continue_action')),
             ),
           ],
         );
