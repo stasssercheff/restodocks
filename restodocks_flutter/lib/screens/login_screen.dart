@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import 'legal_document_screen.dart';
 import '../services/services.dart';
 import '../models/models.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -313,8 +314,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   recognizer: TapGestureRecognizer()
                     ..onTap = () {
-                      Navigator.of(ctx).pop(false);
-                      context.push('/legal/offer');
+                      _openLegalFromRegistrationDialog(
+                        ctx,
+                        LegalDocumentType.publicOffer,
+                      );
                     },
                 ),
                 const TextSpan(text: ' и '),
@@ -326,8 +329,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   recognizer: TapGestureRecognizer()
                     ..onTap = () {
-                      Navigator.of(ctx).pop(false);
-                      context.push('/legal/privacy');
+                      _openLegalFromRegistrationDialog(
+                        ctx,
+                        LegalDocumentType.privacyPolicy,
+                      );
                     },
                 ),
                 const TextSpan(text: '.'),
@@ -348,6 +353,18 @@ class _LoginScreenState extends State<LoginScreen> {
       },
     );
     if (accepted == true && mounted) onContinue();
+  }
+
+  Future<void> _openLegalFromRegistrationDialog(
+    BuildContext dialogContext,
+    LegalDocumentType type,
+  ) async {
+    await Navigator.of(dialogContext).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => LegalDocumentScreen(type: type),
+      ),
+    );
   }
 
   Future<void> _login() async {
