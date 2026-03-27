@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../legal/legal_texts.dart';
 import '../services/services.dart';
 
 class PrivacyConsentScreen extends StatefulWidget {
@@ -74,7 +75,7 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const SingleChildScrollView(
-                    child: SelectableText(_privacyPolicyTextRu),
+                    child: SelectableText(privacyPolicyFullTextRu),
                   ),
                 ),
               ),
@@ -108,31 +109,3 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
     );
   }
 }
-
-const String _privacyPolicyTextRu = '''
-PRIVACY POLICY (Политика конфиденциальности)
-Версия 1.0
-
-Оператор: Ребриков Станислав Александрович.
-Контакт по вопросам данных: info@restodocks.com.
-
-Мы обрабатываем данные, которые вы предоставляете при регистрации и работе в сервисе:
-- данные аккаунта (email, имя, роль, идентификатор пользователя);
-- данные заведения и рабочие данные (номенклатура, ТТК, инвентаризация, заказы, документы);
-- служебные технические данные (логи, ошибки, кэш, черновики).
-
-Цели обработки:
-- предоставление доступа к функционалу сервиса;
-- хранение и синхронизация рабочих данных заведения;
-- обеспечение безопасности и предотвращение злоупотреблений;
-- улучшение качества и стабильности сервиса.
-
-Данные могут обрабатываться инфраструктурными провайдерами, необходимыми для работы сервиса
-(база данных, хостинг, хранилище файлов, email и AI-сервисы по запросу пользователя).
-
-Мы не продаем персональные данные третьим лицам.
-
-Пользователь вправе запросить доступ, исправление или удаление данных в пределах применимого законодательства.
-
-Нажимая «Принять и продолжить», вы подтверждаете согласие с Политикой конфиденциальности.
-''';
