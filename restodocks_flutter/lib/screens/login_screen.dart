@@ -1,12 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../services/services.dart';
-import '../models/models.dart';
+import 'legal_document_screen.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../services/services.dart';
 
 /// Экран входа в систему
 class LoginScreen extends StatefulWidget {
@@ -27,7 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool _isLoading = false;
   String? _errorMessage;
-  bool _rememberCredentials = true;
   bool _isUnconfirmedEmail = false;
   bool _isSendingLink = false;
   DateTime? _passwordFieldFocusedAt;
@@ -76,7 +74,8 @@ class _LoginScreenState extends State<LoginScreen> {
     final loc = context.watch<LocalizationService>();
     return Scaffold(
       appBar: AppBar(
-        leading: GoRouter.of(context).canPop() ? appBarBackButton(context) : null,
+        leading:
+            GoRouter.of(context).canPop() ? appBarBackButton(context) : null,
         title: Text(loc.t('login')),
         actions: [
           IconButton(
@@ -153,7 +152,8 @@ class _LoginScreenState extends State<LoginScreen> {
           if (_isLoading) return;
           // Вход только если пользователь сам нажал Enter: не сразу после фокуса (автозаполнение браузера вызывает submit без Enter).
           final focusedAt = _passwordFieldFocusedAt;
-          if (focusedAt == null) return; // поле не получало фокус — скорее всего submit от автозаполнения
+          if (focusedAt == null)
+            return; // поле не получало фокус — скорее всего submit от автозаполнения
           if (DateTime.now().difference(focusedAt).inMilliseconds < 500) return;
           _login();
         },
@@ -171,22 +171,19 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Text(loc.t('forgot_password') ?? 'Забыли пароль?'),
         ),
       ),
-      const SizedBox(height: 8),
-      CheckboxListTile(
-        value: _rememberCredentials,
-        onChanged: (v) => setState(() => _rememberCredentials = v ?? true),
-        title: Text(loc.t('remember_credentials'), style: Theme.of(context).textTheme.bodyMedium),
-        contentPadding: EdgeInsets.zero,
-        controlAffinity: ListTileControlAffinity.leading,
-      ),
       const SizedBox(height: 16),
       if (_errorMessage != null)
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: _isUnconfirmedEmail ? Colors.orange.shade50 : Colors.red.shade50,
+            color: _isUnconfirmedEmail
+                ? Colors.orange.shade50
+                : Colors.red.shade50,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: _isUnconfirmedEmail ? Colors.orange.shade200 : Colors.red.shade200),
+            border: Border.all(
+                color: _isUnconfirmedEmail
+                    ? Colors.orange.shade200
+                    : Colors.red.shade200),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -195,7 +192,9 @@ class _LoginScreenState extends State<LoginScreen> {
               SelectableText(
                 _errorMessage!,
                 style: TextStyle(
-                  color: _isUnconfirmedEmail ? Colors.orange.shade900 : Colors.red.shade700,
+                  color: _isUnconfirmedEmail
+                      ? Colors.orange.shade900
+                      : Colors.red.shade700,
                   fontSize: 13,
                 ),
                 maxLines: 8,
@@ -220,24 +219,155 @@ class _LoginScreenState extends State<LoginScreen> {
       const SizedBox(height: 24),
       ElevatedButton(
         onPressed: _isLoading ? null : _login,
-        style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+        style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16)),
         child: _isLoading
-            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2))
             : Text(loc.t('login')),
       ),
       const SizedBox(height: 16),
       OutlinedButton(
-        onPressed: () => context.push('/register-company'),
-        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+        onPressed: () => _showRegistrationLegalDialog(
+          onContinue: () => context.push('/register-company'),
+        ),
+        style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14)),
         child: Text(loc.t('register_company')),
       ),
       const SizedBox(height: 12),
       OutlinedButton(
-        onPressed: () => context.push('/register'),
-        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
+        onPressed: () => _showRegistrationLegalDialog(
+          onContinue: () => context.push('/register'),
+        ),
+        style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14)),
         child: Text(loc.t('register_employee')),
       ),
+      const SizedBox(height: 12),
+      OutlinedButton.icon(
+        onPressed: _showPublicLegalLinksDialog,
+        icon: const Icon(Icons.gavel_outlined),
+        style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 14)),
+        label: Text(loc.t('legal_offer_and_privacy_button')),
+      ),
     ];
+  }
+
+  Future<void> _showPublicLegalLinksDialog() async {
+    final loc = context.read<LocalizationService>();
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(loc.t('legal_documents')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  context.push('/legal/offer');
+                },
+                child: Text(loc.t('public_offer')),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  context.push('/legal/privacy');
+                },
+                child: Text(loc.t('privacy_policy')),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showRegistrationLegalDialog({
+    required VoidCallback onContinue,
+  }) async {
+    final loc = context.read<LocalizationService>();
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(loc.t('before_registration')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                loc.t('registration_accepts_prefix'),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 4),
+              InkWell(
+                onTap: () => _openLegalFromRegistrationDialog(
+                  ctx,
+                  LegalDocumentType.publicOffer,
+                ),
+                child: Text(
+                  loc.t('offer_read'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    decoration: TextDecoration.underline,
+                    color: Colors.blue,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                loc.t('and_short'),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 2),
+              InkWell(
+                onTap: () => _openLegalFromRegistrationDialog(
+                  ctx,
+                  LegalDocumentType.privacyPolicy,
+                ),
+                child: Text(
+                  loc.t('privacy_policy_read'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    decoration: TextDecoration.underline,
+                    color: Colors.blue,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(loc.t('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(loc.t('continue_action')),
+            ),
+          ],
+        );
+      },
+    );
+    if (accepted == true && mounted) onContinue();
+  }
+
+  Future<void> _openLegalFromRegistrationDialog(
+    BuildContext dialogContext,
+    LegalDocumentType type,
+  ) async {
+    await Navigator.of(dialogContext).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => LegalDocumentScreen(type: type),
+      ),
+    );
   }
 
   Future<void> _login() async {
@@ -288,7 +418,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await accountManager.login(
         result.employee,
         result.establishment,
-        rememberCredentials: _rememberCredentials,
+        rememberCredentials: false,
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
@@ -328,7 +458,9 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       setState(() {
         _isUnconfirmedEmail = false;
-        _errorMessage = (msg == fallback) ? msg : loc.t('login_error', args: {'error': msg});
+        _errorMessage = (msg == fallback)
+            ? msg
+            : loc.t('login_error', args: {'error': msg});
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -368,8 +500,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   Flexible(
                     child: ListView(
                       shrinkWrap: true,
-                      children: LocalizationService.supportedLocales.map((locale) {
-                        final selected = loc.currentLocale.languageCode == locale.languageCode;
+                      children:
+                          LocalizationService.supportedLocales.map((locale) {
+                        final selected = loc.currentLocale.languageCode ==
+                            locale.languageCode;
                         return ListTile(
                           leading: Text(
                             _flag(locale.languageCode),
@@ -434,7 +568,8 @@ class _LoginScreenState extends State<LoginScreen> {
   /// Безопасное преобразование ошибки в строку (избегаем JSNull на Web)
   /// Для ошибок Auth (400, invalid_grant) — [authErrorFallback]
   /// Для "Email not confirmed" — [confirmEmailMsg]
-  String _safeErrorString(Object? e, String authErrorFallback, {String? confirmEmailMsg}) {
+  String _safeErrorString(Object? e, String authErrorFallback,
+      {String? confirmEmailMsg}) {
     if (e == null) return authErrorFallback;
     try {
       final s = e.toString().toLowerCase();
@@ -463,12 +598,18 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String _flag(String code) {
     switch (code) {
-      case 'ru': return '🇷🇺';
-      case 'en': return '🇺🇸';
-      case 'es': return '🇪🇸';
-      case 'de': return '🇩🇪';
-      case 'fr': return '🇫🇷';
-      default: return '🏳️';
+      case 'ru':
+        return '🇷🇺';
+      case 'en':
+        return '🇺🇸';
+      case 'es':
+        return '🇪🇸';
+      case 'de':
+        return '🇩🇪';
+      case 'fr':
+        return '🇫🇷';
+      default:
+        return '🏳️';
     }
   }
 }

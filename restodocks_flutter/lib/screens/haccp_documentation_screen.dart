@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../models/employee.dart';
@@ -13,18 +14,22 @@ class HaccpDocumentationScreen extends StatefulWidget {
   const HaccpDocumentationScreen({super.key});
 
   @override
-  State<HaccpDocumentationScreen> createState() => _HaccpDocumentationScreenState();
+  State<HaccpDocumentationScreen> createState() =>
+      _HaccpDocumentationScreenState();
 }
 
 class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
-  Future<void> _downloadHaccpAgreement(BuildContext context, LocalizationService loc) async {
+  Future<void> _downloadHaccpAgreement(
+      BuildContext context, LocalizationService loc) async {
     final account = context.read<AccountManagerSupabase>();
     final est = account.establishment;
     final emp = account.currentEmployee;
     if (est == null || emp == null) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('establishment_not_found') ?? 'Заведение не выбрано')),
+          SnackBar(
+              content: Text(
+                  loc.t('establishment_not_found') ?? 'Заведение не выбрано')),
         );
       }
       return;
@@ -37,7 +42,9 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
         context: context,
         builder: (ctx) => StatefulBuilder(
           builder: (ctx2, setState) => AlertDialog(
-            title: Text(loc.t('haccp_agreement_lang_title') ?? loc.t('language') ?? 'Language'),
+            title: Text(loc.t('haccp_agreement_lang_title') ??
+                loc.t('language') ??
+                'Language'),
             content: Wrap(
               spacing: 8,
               children: LocalizationService.productLanguageCodes.map((code) {
@@ -63,8 +70,11 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
       );
       if (pickedLang == null || !context.mounted) return;
 
-      final roleCode = emp.positionRole ?? (emp.roles.contains('owner') ? 'owner' : null);
-      final employerPosition = roleCode != null ? (loc.tForLanguage(pickedLang, 'role_$roleCode')) : null;
+      final roleCode =
+          emp.positionRole ?? (emp.roles.contains('owner') ? 'owner' : null);
+      final employerPosition = roleCode != null
+          ? (loc.tForLanguage(pickedLang, 'role_$roleCode'))
+          : null;
 
       final bytes = await HaccpAgreementPdfService.buildAgreementPdfBytes(
         establishment: est,
@@ -72,24 +82,33 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
         organizationLabel: loc.tForLanguage(pickedLang, 'haccp_agreement_org'),
         innBinLabel: loc.tForLanguage(pickedLang, 'haccp_agreement_inn_bin'),
         addressLabel: loc.tForLanguage(pickedLang, 'haccp_agreement_address'),
-        documentTitle: loc.tForLanguage(pickedLang, 'haccp_agreement_doc_title'),
-        documentSubtitle: loc.tForLanguage(pickedLang, 'haccp_agreement_doc_subtitle'),
-        agreementHeading: loc.tForLanguage(pickedLang, 'haccp_agreement_heading'),
+        documentTitle:
+            loc.tForLanguage(pickedLang, 'haccp_agreement_doc_title'),
+        documentSubtitle:
+            loc.tForLanguage(pickedLang, 'haccp_agreement_doc_subtitle'),
+        agreementHeading:
+            loc.tForLanguage(pickedLang, 'haccp_agreement_heading'),
         workerLabel: loc.tForLanguage(pickedLang, 'haccp_agreement_worker'),
-        workerFioHint: loc.tForLanguage(pickedLang, 'haccp_agreement_worker_fio_hint'),
+        workerFioHint:
+            loc.tForLanguage(pickedLang, 'haccp_agreement_worker_fio_hint'),
         positionLabel: loc.tForLanguage(pickedLang, 'haccp_agreement_position'),
         dateLine: loc.tForLanguage(pickedLang, 'haccp_agreement_date_line'),
         employerLabel: loc.tForLanguage(pickedLang, 'haccp_agreement_employer'),
         stampHint: loc.tForLanguage(pickedLang, 'haccp_agreement_stamp_hint'),
-        workerSignLabel: loc.tForLanguage(pickedLang, 'haccp_agreement_worker_sign'),
+        workerSignLabel:
+            loc.tForLanguage(pickedLang, 'haccp_agreement_worker_sign'),
         agreementBody: loc.tForLanguage(pickedLang, 'haccp_agreement_body'),
-        employerPositionLabel: (employerPosition != null && employerPosition != 'role_$roleCode') ? employerPosition : null,
+        employerPositionLabel:
+            (employerPosition != null && employerPosition != 'role_$roleCode')
+                ? employerPosition
+                : null,
       );
 
       await saveFileBytes('haccp_agreement_employee.pdf', bytes);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('haccp_agreement_saved') ?? 'PDF saved')),
+          SnackBar(
+              content: Text(loc.t('haccp_agreement_saved') ?? 'PDF saved')),
         );
       }
     } catch (e) {
@@ -101,7 +120,8 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
     }
   }
 
-  Future<void> _downloadHaccpOrder(BuildContext context, LocalizationService loc) async {
+  Future<void> _downloadHaccpOrder(
+      BuildContext context, LocalizationService loc) async {
     final account = context.read<AccountManagerSupabase>();
     final est = account.establishment;
     if (est == null) return;
@@ -128,13 +148,16 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                       value: HaccpOrderThirdPageMode.empty,
                       groupValue: mode,
                       title: const Text('Пустой бланк (заполнение вручную)'),
-                      onChanged: (v) => setState(() => mode = v ?? HaccpOrderThirdPageMode.empty),
+                      onChanged: (v) => setState(
+                          () => mode = v ?? HaccpOrderThirdPageMode.empty),
                     ),
                     RadioListTile<HaccpOrderThirdPageMode>(
                       value: HaccpOrderThirdPageMode.filled,
                       groupValue: mode,
-                      title: const Text('Заполненный бланк (ФИО/должности автоматически)'),
-                      onChanged: (v) => setState(() => mode = v ?? HaccpOrderThirdPageMode.filled),
+                      title: const Text(
+                          'Заполненный бланк (ФИО/должности автоматически)'),
+                      onChanged: (v) => setState(
+                          () => mode = v ?? HaccpOrderThirdPageMode.filled),
                     ),
                     if (filled) ...[
                       const SizedBox(height: 10),
@@ -154,13 +177,23 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                             return CheckboxListTile(
                               dense: true,
                               contentPadding: EdgeInsets.zero,
-                              title: Text(e.fullName.trim().isNotEmpty ? '${e.fullName}${e.surname != null && e.surname!.trim().isNotEmpty ? ' ${e.surname}' : ''}' : e.id),
-                              subtitle: Text(e.positionRole ?? (e.hasRole('owner') ? (est.directorPosition ?? '') : ''), maxLines: 1, overflow: TextOverflow.ellipsis),
+                              title: Text(e.fullName.trim().isNotEmpty
+                                  ? '${e.fullName}${e.surname != null && e.surname!.trim().isNotEmpty ? ' ${e.surname}' : ''}'
+                                  : e.id),
+                              subtitle: Text(
+                                  e.positionRole ??
+                                      (e.hasRole('owner')
+                                          ? (est.directorPosition ?? '')
+                                          : ''),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis),
                               value: checked,
                               onChanged: (v) {
                                 setState(() {
-                                  if (v == true) selectedIds.add(e.id);
-                                  else selectedIds.remove(e.id);
+                                  if (v == true)
+                                    selectedIds.add(e.id);
+                                  else
+                                    selectedIds.remove(e.id);
                                 });
                               },
                             );
@@ -179,7 +212,8 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                             child: const Text('Выбрать всех'),
                           ),
                           TextButton(
-                            onPressed: () => setState(() => selectedIds.clear()),
+                            onPressed: () =>
+                                setState(() => selectedIds.clear()),
                             child: const Text('Очистить'),
                           ),
                         ],
@@ -195,9 +229,12 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                 ),
                 FilledButton(
                   onPressed: () async {
-                    final selected = employees.where((e) => selectedIds.contains(e.id)).toList();
+                    final selected = employees
+                        .where((e) => selectedIds.contains(e.id))
+                        .toList();
                     Navigator.of(ctx2).pop(
-                      HaccpOrderThirdPageModeAndSelection(mode: mode, selectedEmployees: selected),
+                      HaccpOrderThirdPageModeAndSelection(
+                          mode: mode, selectedEmployees: selected),
                     );
                   },
                   child: Text(loc.t('download') ?? 'Скачать'),
@@ -219,12 +256,14 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
       await saveFileBytes('haccp_order.pdf', bytes);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('haccp_agreement_saved') ?? 'PDF saved')),
+          SnackBar(
+              content: Text(loc.t('haccp_agreement_saved') ?? 'PDF saved')),
         );
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('error')}: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('${loc.t('error')}: $e')));
       }
     }
   }
@@ -245,10 +284,13 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
     final account = context.watch<AccountManagerSupabase>();
     final emp = account.currentEmployee;
 
-    if (emp == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (emp == null)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (!_canSeeLegalDocs(emp)) {
       return Scaffold(
-        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('documentation') ?? 'Документация')),
+        appBar: AppBar(
+            leading: appBarBackButton(context),
+            title: Text(loc.t('documentation') ?? 'Документация')),
         body: Center(child: Text(loc.t('access_denied') ?? 'Доступ запрещен')),
       );
     }
@@ -276,7 +318,9 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                   _RequisitesForm(
                     establishment: account.establishment!,
                     onSave: (e) async {
-                      await context.read<AccountManagerSupabase>().updateEstablishment(e);
+                      await context
+                          .read<AccountManagerSupabase>()
+                          .updateEstablishment(e);
                       if (mounted) setState(() {});
                     },
                     loc: loc,
@@ -286,7 +330,8 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
             ExpansionTile(
               initiallyExpanded: true,
               leading: const Icon(Icons.rule_outlined),
-              title: Text(loc.t('haccp_legal_legitimacy') ?? 'Юридическая легитимность'),
+              title: Text(loc.t('haccp_legal_legitimacy') ??
+                  'Юридическая легитимность'),
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -301,7 +346,8 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
             ExpansionTile(
               initiallyExpanded: false,
               leading: const Icon(Icons.document_scanner_outlined),
-              title: Text(loc.t('haccp_legal_sp_extract') ?? 'Извлечение из СП'),
+              title:
+                  Text(loc.t('haccp_legal_sp_extract') ?? 'Извлечение из СП'),
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -312,18 +358,31 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                 ),
               ],
             ),
-
             const SizedBox(height: 16),
-
+            ListTile(
+              leading: const Icon(Icons.description_outlined),
+              title: Text(loc.t('public_offer')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/legal/offer'),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.privacy_tip_outlined),
+              title: Text(loc.t('privacy_policy')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/legal/privacy'),
+            ),
+            const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: () => _downloadHaccpAgreement(context, loc),
               icon: const Icon(Icons.download),
-              label: Text(loc.t('haccp_download_agreement') ?? 'Скачать Соглашение с сотрудником (PDF)'),
+              label: Text(loc.t('haccp_download_agreement') ??
+                  'Скачать Соглашение с сотрудником'),
             ),
             const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: () => _downloadHaccpOrder(context, loc),
-              icon: const Icon(Icons.print),
+              icon: const Icon(Icons.download),
               label: const Text('Скачать приказ (3 страницы)'),
             ),
             const SizedBox(height: 8),
@@ -379,16 +438,26 @@ class _RequisitesFormState extends State<_RequisitesForm> {
   @override
   void initState() {
     super.initState();
-    _legalNameController = TextEditingController(text: widget.establishment.legalName ?? widget.establishment.name);
-    _innBinController = TextEditingController(text: widget.establishment.innBin ?? '');
-    _addressController = TextEditingController(text: widget.establishment.address ?? '');
-    _ogrnOgrnipController = TextEditingController(text: widget.establishment.ogrnOgrnip ?? '');
-    _kppController = TextEditingController(text: widget.establishment.kpp ?? '');
-    _bankRsController = TextEditingController(text: widget.establishment.bankRs ?? '');
-    _bankBikController = TextEditingController(text: widget.establishment.bankBik ?? '');
-    _bankNameController = TextEditingController(text: widget.establishment.bankName ?? '');
-    _directorFioController = TextEditingController(text: widget.establishment.directorFio ?? '');
-    _directorPositionController = TextEditingController(text: widget.establishment.directorPosition ?? '');
+    _legalNameController = TextEditingController(
+        text: widget.establishment.legalName ?? widget.establishment.name);
+    _innBinController =
+        TextEditingController(text: widget.establishment.innBin ?? '');
+    _addressController =
+        TextEditingController(text: widget.establishment.address ?? '');
+    _ogrnOgrnipController =
+        TextEditingController(text: widget.establishment.ogrnOgrnip ?? '');
+    _kppController =
+        TextEditingController(text: widget.establishment.kpp ?? '');
+    _bankRsController =
+        TextEditingController(text: widget.establishment.bankRs ?? '');
+    _bankBikController =
+        TextEditingController(text: widget.establishment.bankBik ?? '');
+    _bankNameController =
+        TextEditingController(text: widget.establishment.bankName ?? '');
+    _directorFioController =
+        TextEditingController(text: widget.establishment.directorFio ?? '');
+    _directorPositionController = TextEditingController(
+        text: widget.establishment.directorPosition ?? '');
   }
 
   @override
@@ -416,7 +485,8 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _legalNameController,
             decoration: InputDecoration(
-              labelText: widget.loc.t('requisites_organization') ?? 'Юр. название',
+              labelText:
+                  widget.loc.t('requisites_organization') ?? 'Юр. название',
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -513,32 +583,54 @@ class _RequisitesFormState extends State<_RequisitesForm> {
                       final legalName = _legalNameController.text.trim();
                       final updated = widget.establishment.copyWith(
                         legalName: legalName.isEmpty ? null : legalName,
-                        innBin: _innBinController.text.trim().isEmpty ? null : _innBinController.text.trim(),
-                        address: _addressController.text.trim().isEmpty ? null : _addressController.text.trim(),
-                        ogrnOgrnip: _ogrnOgrnipController.text.trim().isEmpty ? null : _ogrnOgrnipController.text.trim(),
-                        kpp: _kppController.text.trim().isEmpty ? null : _kppController.text.trim(),
-                        bankRs: _bankRsController.text.trim().isEmpty ? null : _bankRsController.text.trim(),
-                        bankBik: _bankBikController.text.trim().isEmpty ? null : _bankBikController.text.trim(),
-                        bankName: _bankNameController.text.trim().isEmpty ? null : _bankNameController.text.trim(),
-                        directorFio: _directorFioController.text.trim().isEmpty ? null : _directorFioController.text.trim(),
-                        directorPosition: _directorPositionController.text.trim().isEmpty ? null : _directorPositionController.text.trim(),
+                        innBin: _innBinController.text.trim().isEmpty
+                            ? null
+                            : _innBinController.text.trim(),
+                        address: _addressController.text.trim().isEmpty
+                            ? null
+                            : _addressController.text.trim(),
+                        ogrnOgrnip: _ogrnOgrnipController.text.trim().isEmpty
+                            ? null
+                            : _ogrnOgrnipController.text.trim(),
+                        kpp: _kppController.text.trim().isEmpty
+                            ? null
+                            : _kppController.text.trim(),
+                        bankRs: _bankRsController.text.trim().isEmpty
+                            ? null
+                            : _bankRsController.text.trim(),
+                        bankBik: _bankBikController.text.trim().isEmpty
+                            ? null
+                            : _bankBikController.text.trim(),
+                        bankName: _bankNameController.text.trim().isEmpty
+                            ? null
+                            : _bankNameController.text.trim(),
+                        directorFio: _directorFioController.text.trim().isEmpty
+                            ? null
+                            : _directorFioController.text.trim(),
+                        directorPosition:
+                            _directorPositionController.text.trim().isEmpty
+                                ? null
+                                : _directorPositionController.text.trim(),
                         updatedAt: DateTime.now(),
                       );
                       await widget.onSave(updated);
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(widget.loc.t('saved') ?? 'Сохранено')),
+                          SnackBar(
+                              content:
+                                  Text(widget.loc.t('saved') ?? 'Сохранено')),
                         );
                       }
                     } finally {
                       if (mounted) setState(() => _saving = false);
                     }
                   },
-            child: Text(_saving ? (widget.loc.t('saving') ?? 'Сохранение...') : (widget.loc.t('save') ?? 'Сохранить')),
+            child: Text(_saving
+                ? (widget.loc.t('saving') ?? 'Сохранение...')
+                : (widget.loc.t('save') ?? 'Сохранить')),
           ),
         ],
       ),
     );
   }
 }
-

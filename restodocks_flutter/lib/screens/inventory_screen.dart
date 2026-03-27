@@ -36,15 +36,19 @@ const String _pfUnitPcs = 'pcs';
 class _InventoryRow {
   final Product? product;
   final TechCard? techCard;
+
   /// ID для восстановления из черновика (до загрузки номенклатуры).
   final String? productId;
   final String? techCardId;
+
   /// Свободная строка (распознанный чек): когда product и techCard оба null.
   final String? freeName;
   final String? freeUnit;
   final List<double> quantities;
+
   /// Для ПФ: единица в бланке — 'g' (граммы) или 'pcs' (порции/штуки). По умолчанию 'pcs'.
   final String? pfUnit;
+
   /// Переопределение единицы для продукта (null = использовать product.unit).
   final String? unitOverride;
 
@@ -58,7 +62,11 @@ class _InventoryRow {
     required this.quantities,
     this.pfUnit,
     this.unitOverride,
-  })  : assert(product != null || techCard != null || (freeName != null && freeName.isNotEmpty) || productId != null || techCardId != null),
+  })  : assert(product != null ||
+            techCard != null ||
+            (freeName != null && freeName.isNotEmpty) ||
+            productId != null ||
+            techCardId != null),
         assert(product == null || techCard == null);
 
   bool get isPf => techCard != null || techCardId != null;
@@ -78,7 +86,8 @@ class _InventoryRow {
   }
 
   /// Продукт заведён по упаковке: есть вес упаковки.
-  bool get hasPackage => product?.packageWeightGrams != null && product!.packageWeightGrams! > 0;
+  bool get hasPackage =>
+      product?.packageWeightGrams != null && product!.packageWeightGrams! > 0;
 
   /// Текущая единица — упаковка или бутылка (пересчёт: кол-во × грамм/мл в упаковке).
   bool get isCountedByPackage => unitOverride == 'pkg' || unitOverride == 'btl';
@@ -90,7 +99,9 @@ class _InventoryRow {
   String unitDisplay(String lang) {
     if (isPf) {
       final u = pfUnit ?? _pfUnitPcs;
-      return u == _pfUnitGrams ? (lang == 'ru' ? 'гр' : 'g') : (lang == 'ru' ? 'порц.' : 'pcs');
+      return u == _pfUnitGrams
+          ? (lang == 'ru' ? 'гр' : 'g')
+          : (lang == 'ru' ? 'порц.' : 'pcs');
     }
     if (unitOverride == 'btl') return lang == 'ru' ? 'бутылка' : 'bottle';
     if (isCountedByPackage) return lang == 'ru' ? 'упак.' : 'pkg';
@@ -99,7 +110,9 @@ class _InventoryRow {
 
   /// В бланке инвентаризации вес показываем в граммах, не в кг.
   bool get isWeightInKg =>
-      !isPf && !isCountedByPackage && (unit.toLowerCase() == 'kg' || unit == 'кг');
+      !isPf &&
+      !isCountedByPackage &&
+      (unit.toLowerCase() == 'kg' || unit == 'кг');
 
   String unitDisplayForBlank(String lang) {
     if (unitOverride == 'btl') return lang == 'ru' ? 'мл' : 'ml';
@@ -124,7 +137,12 @@ class _InventoryRow {
     return quantities.fold(0.0, (a, b) => a + b);
   }
 
-  _InventoryRow copyWith({Product? product, TechCard? techCard, String? pfUnit, String? unitOverride}) => _InventoryRow(
+  _InventoryRow copyWith(
+          {Product? product,
+          TechCard? techCard,
+          String? pfUnit,
+          String? unitOverride}) =>
+      _InventoryRow(
         product: product ?? this.product,
         techCard: techCard ?? this.techCard,
         productId: product != null ? null : productId,
@@ -152,9 +170,13 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen>
-    with AutoSaveMixin<InventoryScreen>, InputChangeListenerMixin<InventoryScreen> {
-  Timer? _serverAutoSaveTimer; // Таймер для автоматической отправки на сервер каждые 30 секунд
+    with
+        AutoSaveMixin<InventoryScreen>,
+        InputChangeListenerMixin<InventoryScreen> {
+  Timer?
+      _serverAutoSaveTimer; // Таймер для автоматической отправки на сервер каждые 30 секунд
   final List<_InventoryRow> _rows = [];
+
   /// Продукты, перерасчитанные из ПФ (третья секция); заполняется при загрузке файла.
   List<Map<String, dynamic>>? _aggregatedFromFile;
   DateTime _date = DateTime.now();
@@ -162,15 +184,16 @@ class _InventoryScreenState extends State<InventoryScreen>
   TimeOfDay? _endTime;
   bool _completed = false;
   bool _isInputMode = false; // Режим ввода количества (клавиатура открыта)
-  bool _hasInputFocus = false; // Фокус в ячейке/фильтре — для скрытия шапки на мобильном
+  bool _hasInputFocus =
+      false; // Фокус в ячейке/фильтре — для скрытия шапки на мобильном
   _InventorySort _sortMode = _InventorySort.alphabetAsc;
   _InventoryBlockFilter _blockFilter = _InventoryBlockFilter.all;
   final TextEditingController _nameFilterCtrl = TextEditingController();
   final FocusNode _nameFilterFocusNode = FocusNode();
   String _nameFilter = '';
   bool _stateRestored = false; // Флаг: предотвращает двойное восстановление
-  bool _isLoadingProducts = true; // Показывать "Загрузка продуктов..." пока не завершился initScreen
-
+  bool _isLoadingProducts =
+      true; // Показывать "Загрузка продуктов..." пока не завершился initScreen
 
   /// Сохранить данные немедленно в локальное хранилище (SharedPreferences/localStorage)
   void saveNow() {
@@ -182,7 +205,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     super.initState();
     _startTime = TimeOfDay.now();
     WidgetsBinding.instance.addPostFrameCallback((_) => _initScreen());
-    _nameFilterCtrl.addListener(() => setState(() => _nameFilter = _nameFilterCtrl.text));
+    _nameFilterCtrl
+        .addListener(() => setState(() => _nameFilter = _nameFilterCtrl.text));
     _nameFilterFocusNode.addListener(() {
       setState(() => _hasInputFocus = _nameFilterFocusNode.hasFocus);
     });
@@ -199,7 +223,6 @@ class _InventoryScreenState extends State<InventoryScreen>
         _autoSaveToServer();
       }
     });
-
   }
 
   @override
@@ -215,15 +238,17 @@ class _InventoryScreenState extends State<InventoryScreen>
       'sortMode': _sortMode.name,
       'blockFilter': _blockFilter.name,
       'nameFilter': _nameFilter,
-      'rows': _rows.map((row) => {
-        'productId': row.product?.id,
-        'techCardId': row.techCard?.id,
-        'freeName': row.freeName,
-        'freeUnit': row.freeUnit,
-        'quantities': row.quantities,
-        'pfUnit': row.pfUnit,
-        'unitOverride': row.unitOverride,
-      }).toList(),
+      'rows': _rows
+          .map((row) => {
+                'productId': row.product?.id,
+                'techCardId': row.techCard?.id,
+                'freeName': row.freeName,
+                'freeUnit': row.freeUnit,
+                'quantities': row.quantities,
+                'pfUnit': row.pfUnit,
+                'unitOverride': row.unitOverride,
+              })
+          .toList(),
       'aggregatedFromFile': _aggregatedFromFile,
     };
   }
@@ -235,19 +260,24 @@ class _InventoryScreenState extends State<InventoryScreen>
     setState(() {
       _date = DateTime.parse(data['date'] ?? DateTime.now().toIso8601String());
       _startTime = data['startTime'] != null && data['startTime'].isNotEmpty
-          ? TimeOfDay.fromDateTime(DateTime.parse('2023-01-01 ${data['startTime']}'))
+          ? TimeOfDay.fromDateTime(
+              DateTime.parse('2023-01-01 ${data['startTime']}'))
           : null;
       _endTime = data['endTime'] != null && data['endTime'].isNotEmpty
-          ? TimeOfDay.fromDateTime(DateTime.parse('2023-01-01 ${data['endTime']}'))
+          ? TimeOfDay.fromDateTime(
+              DateTime.parse('2023-01-01 ${data['endTime']}'))
           : null;
       _completed = data['completed'] ?? false;
 
       final sortModeName = data['sortMode'] ?? 'alphabetAsc';
       _sortMode = _InventorySort.values.firstWhere(
-        (e) => e.name == sortModeName || (sortModeName == 'alphabet' && e == _InventorySort.alphabetAsc),
+        (e) =>
+            e.name == sortModeName ||
+            (sortModeName == 'alphabet' && e == _InventorySort.alphabetAsc),
         orElse: () => _InventorySort.alphabetAsc,
       );
-      if (_sortMode == _InventorySort.lastAdded) _sortMode = _InventorySort.alphabetAsc;
+      if (_sortMode == _InventorySort.lastAdded)
+        _sortMode = _InventorySort.alphabetAsc;
 
       final blockFilterName = data['blockFilter'] ?? 'all';
       _blockFilter = _InventoryBlockFilter.values.firstWhere(
@@ -263,7 +293,10 @@ class _InventoryScreenState extends State<InventoryScreen>
       _rows.clear();
       for (final rowData in rowsData) {
         final Map<String, dynamic> rowMap = rowData as Map<String, dynamic>;
-        final quantities = (rowMap['quantities'] as List<dynamic>?)?.map((e) => (e as num).toDouble()).toList() ?? [0.0, 0.0];
+        final quantities = (rowMap['quantities'] as List<dynamic>?)
+                ?.map((e) => (e as num).toDouble())
+                .toList() ??
+            [0.0, 0.0];
         final productId = rowMap['productId'] as String?;
         final techCardId = rowMap['techCardId'] as String?;
 
@@ -274,11 +307,15 @@ class _InventoryScreenState extends State<InventoryScreen>
         } else if (rowMap['freeName'] != null && qty.isEmpty) {
           qty.addAll([0.0, 0.0]);
         }
-        if (!rowMap.containsKey('freeName') && productId == null && techCardId == null) {
+        if (!rowMap.containsKey('freeName') &&
+            productId == null &&
+            techCardId == null) {
           // Пустая строка продукта/ПФ — оставляем как есть
         } else if (productId != null || techCardId != null) {
-          if (qty.isEmpty) qty.addAll([0.0, 0.0]);
-          else while (qty.length < 2) qty.add(0.0);
+          if (qty.isEmpty)
+            qty.addAll([0.0, 0.0]);
+          else
+            while (qty.length < 2) qty.add(0.0);
         }
 
         _rows.add(_InventoryRow(
@@ -310,12 +347,19 @@ class _InventoryScreenState extends State<InventoryScreen>
   List<int> get _productIndices {
     final lang = context.read<LocalizationService>().currentLanguageCode;
     var indices = List.generate(_rows.length, (i) => i)
-        .where((i) => !_rows[i].isPf && _matchesNameFilter(_rows[i].productName(lang)))
+        .where((i) =>
+            !_rows[i].isPf && _matchesNameFilter(_rows[i].productName(lang)))
         .toList();
     if (_sortMode == _InventorySort.alphabetAsc) {
-      indices.sort((a, b) => _rows[a].productName(lang).toLowerCase().compareTo(_rows[b].productName(lang).toLowerCase()));
+      indices.sort((a, b) => _rows[a]
+          .productName(lang)
+          .toLowerCase()
+          .compareTo(_rows[b].productName(lang).toLowerCase()));
     } else {
-      indices.sort((a, b) => _rows[b].productName(lang).toLowerCase().compareTo(_rows[a].productName(lang).toLowerCase()));
+      indices.sort((a, b) => _rows[b]
+          .productName(lang)
+          .toLowerCase()
+          .compareTo(_rows[a].productName(lang).toLowerCase()));
     }
     return indices;
   }
@@ -324,12 +368,19 @@ class _InventoryScreenState extends State<InventoryScreen>
   List<int> get _pfIndices {
     final lang = context.read<LocalizationService>().currentLanguageCode;
     var indices = List.generate(_rows.length, (i) => i)
-        .where((i) => _rows[i].isPf && _matchesNameFilter(_rows[i].productName(lang)))
+        .where((i) =>
+            _rows[i].isPf && _matchesNameFilter(_rows[i].productName(lang)))
         .toList();
     if (_sortMode == _InventorySort.alphabetAsc) {
-      indices.sort((a, b) => _rows[a].productName(lang).toLowerCase().compareTo(_rows[b].productName(lang).toLowerCase()));
+      indices.sort((a, b) => _rows[a]
+          .productName(lang)
+          .toLowerCase()
+          .compareTo(_rows[b].productName(lang).toLowerCase()));
     } else {
-      indices.sort((a, b) => _rows[b].productName(lang).toLowerCase().compareTo(_rows[a].productName(lang).toLowerCase()));
+      indices.sort((a, b) => _rows[b]
+          .productName(lang)
+          .toLowerCase()
+          .compareTo(_rows[a].productName(lang).toLowerCase()));
     }
     return indices;
   }
@@ -345,8 +396,8 @@ class _InventoryScreenState extends State<InventoryScreen>
 
     // Загружаем iiko-продукты и оба типа черновиков одновременно
     final iikoStore = context.read<IikoProductStore>();
-    final account  = context.read<AccountManagerSupabase>();
-    final estId    = account.establishment?.id;
+    final account = context.read<AccountManagerSupabase>();
+    final estId = account.establishment?.id;
 
     final futures = await Future.wait([
       draftStorage.loadInventoryDraft(),
@@ -356,17 +407,18 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (!mounted) return;
     if (_isLoadingProducts) setState(() => _isLoadingProducts = false);
 
-    final stdDraft  = futures[0] as Map<String, dynamic>?;
+    final stdDraft = futures[0] as Map<String, dynamic>?;
     final iikoDraft = futures[1] as Map<String, dynamic>?;
 
     final hasIikoProducts = iikoStore.hasProducts;
-    final hasIikoDraft    = iikoDraft != null && iikoDraft.isNotEmpty;
-    final hasStdDraft     = stdDraft  != null && stdDraft.isNotEmpty;
+    final hasIikoDraft = iikoDraft != null && iikoDraft.isNotEmpty;
+    final hasStdDraft = stdDraft != null && stdDraft.isNotEmpty;
 
     // Если есть iiko-продукты или iiko-черновик — показываем диалог выбора ВСЕГДА
     // (пользователь должен сам выбрать куда вернуться)
     if (hasIikoProducts || hasIikoDraft) {
-      await _showModeDialog(hasIikoDraft: hasIikoDraft, hasStdDraft: hasStdDraft);
+      await _showModeDialog(
+          hasIikoDraft: hasIikoDraft, hasStdDraft: hasStdDraft);
       return;
     }
 
@@ -440,12 +492,14 @@ class _InventoryScreenState extends State<InventoryScreen>
   /// Диалог выбора режима инвентаризации при открытии экрана.
   /// [hasIikoDraft] — незавершённая iiko-инвентаризация сохранена.
   /// [hasStdDraft]  — незавершённая стандартная инвентаризация сохранена.
-  Future<void> _showModeDialog({bool hasIikoDraft = false, bool hasStdDraft = false}) async {
+  Future<void> _showModeDialog(
+      {bool hasIikoDraft = false, bool hasStdDraft = false}) async {
     if (!mounted) return;
     final iikoStore = context.read<IikoProductStore>();
     final hasIiko = iikoStore.hasProducts || hasIikoDraft;
     final employee = context.read<AccountManagerSupabase>().currentEmployee;
-    final isHall = employee?.department == 'hall' || employee?.department == 'dining_room';
+    final isHall =
+        employee?.department == 'hall' || employee?.department == 'dining_room';
 
     Widget _continueBadge(BuildContext ctx) {
       final theme = Theme.of(ctx);
@@ -486,7 +540,8 @@ class _InventoryScreenState extends State<InventoryScreen>
                 subtitle: Text(hasStdDraft
                     ? 'Незавершённая инвентаризация сохранена'
                     : 'Продукты из номенклатуры'),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
                 tileColor: Colors.blue.withOpacity(0.05),
                 onTap: () => Navigator.of(ctx).pop('standard'),
               ),
@@ -506,7 +561,8 @@ class _InventoryScreenState extends State<InventoryScreen>
                             ? 'Продукты из iiko-бланка · ${iikoStore.products.length} позиций'
                             : 'Сначала загрузите бланк iiko в «Загрузка продуктов»',
                   ),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
                   tileColor: hasIiko
                       ? theme.colorScheme.primaryContainer.withOpacity(0.3)
                       : Colors.grey.withOpacity(0.03),
@@ -584,12 +640,21 @@ class _InventoryScreenState extends State<InventoryScreen>
 
       // Добавляем недостающие продукты и ПФ
       for (final p in products) {
-        if (_rows.any((r) => r.product?.id == p.id || r.productId == p.id)) continue;
-        _rows.add(_InventoryRow(product: p, techCard: null, quantities: List<double>.generate(minQtyCount, (_) => 0.0)));
+        if (_rows.any((r) => r.product?.id == p.id || r.productId == p.id))
+          continue;
+        _rows.add(_InventoryRow(
+            product: p,
+            techCard: null,
+            quantities: List<double>.generate(minQtyCount, (_) => 0.0)));
       }
       for (final tc in pfOnly) {
-        if (_rows.any((r) => r.techCard?.id == tc.id || r.techCardId == tc.id)) continue;
-        _rows.add(_InventoryRow(product: null, techCard: tc, quantities: List<double>.generate(minQtyCount, (_) => 0.0), pfUnit: _pfUnitPcs));
+        if (_rows.any((r) => r.techCard?.id == tc.id || r.techCardId == tc.id))
+          continue;
+        _rows.add(_InventoryRow(
+            product: null,
+            techCard: tc,
+            quantities: List<double>.generate(minQtyCount, (_) => 0.0),
+            pfUnit: _pfUnitPcs));
       }
 
       for (var i = 0; i < _rows.length; i++) {
@@ -607,7 +672,8 @@ class _InventoryScreenState extends State<InventoryScreen>
       for (final line in lines) {
         if (line.productName.trim().isEmpty) continue;
         final qty = line.quantity > 0 ? line.quantity : 1.0;
-        final unit = (line.unit ?? 'g').trim().isEmpty ? 'g' : (line.unit ?? 'g');
+        final unit =
+            (line.unit ?? 'g').trim().isEmpty ? 'g' : (line.unit ?? 'g');
         _rows.add(_InventoryRow(
           product: null,
           techCard: null,
@@ -620,7 +686,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     scheduleSave(); // Автосохранение при добавлении строк из чека
   }
 
-  Future<void> _scanReceipt(BuildContext context, LocalizationService loc) async {
+  Future<void> _scanReceipt(
+      BuildContext context, LocalizationService loc) async {
     if (_completed) return;
     final imageService = ImageService();
     final xFile = await imageService.pickImageFromGallery();
@@ -638,7 +705,10 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
     _addReceiptLines(result.lines);
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.t('inventory_receipt_scan_added').replaceAll('%s', '${result.lines.length}'))),
+      SnackBar(
+          content: Text(loc
+              .t('inventory_receipt_scan_added')
+              .replaceAll('%s', '${result.lines.length}'))),
     );
   }
 
@@ -652,7 +722,8 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   /// Автоматическая отправка данных на сервер каждые 30 секунд
   Future<void> _autoSaveToServer() async {
-    if (_completed || _rows.isEmpty) return; // Не сохранять если завершено или пусто
+    if (_completed || _rows.isEmpty)
+      return; // Не сохранять если завершено или пусто
 
     try {
       final account = context.read<AccountManagerSupabase>();
@@ -673,7 +744,8 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   /// Сохранить черновик инвентаризации на сервер
-  Future<void> _saveDraftToServer(String establishmentId, Map<String, dynamic> data) async {
+  Future<void> _saveDraftToServer(
+      String establishmentId, Map<String, dynamic> data) async {
     try {
       final account = context.read<AccountManagerSupabase>();
       final employeeId = account.currentEmployee?.id;
@@ -693,7 +765,9 @@ class _InventoryScreenState extends State<InventoryScreen>
   /// Минимум 2 пустых ячейки при открытии. При заполнении последней — добавляется ещё одна.
   int get _maxQuantityColumns {
     if (_rows.isEmpty) return 2;
-    return _rows.map((r) => r.quantities.length).fold<int>(2, (a, b) => a > b ? a : b);
+    return _rows
+        .map((r) => r.quantities.length)
+        .fold<int>(2, (a, b) => a > b ? a : b);
   }
 
   void _addQuantityToRow(int rowIndex) {
@@ -703,7 +777,8 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   void _setPfUnit(int rowIndex, String unit) {
-    if (rowIndex < 0 || rowIndex >= _rows.length || !_rows[rowIndex].isPf) return;
+    if (rowIndex < 0 || rowIndex >= _rows.length || !_rows[rowIndex].isPf)
+      return;
     setState(() {
       _rows[rowIndex] = _rows[rowIndex].copyWith(pfUnit: unit);
     });
@@ -711,7 +786,9 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   void _setProductUnit(int rowIndex, String unit) {
-    if (rowIndex < 0 || rowIndex >= _rows.length || _rows[rowIndex].product == null) return;
+    if (rowIndex < 0 ||
+        rowIndex >= _rows.length ||
+        _rows[rowIndex].product == null) return;
     setState(() {
       _rows[rowIndex] = _rows[rowIndex].copyWith(unitOverride: unit);
     });
@@ -733,8 +810,10 @@ class _InventoryScreenState extends State<InventoryScreen>
           final gross = ing.grossWeight * factor;
           final net = ing.netWeight * factor;
           if (result.containsKey(key)) {
-            result[key]!['grossGrams'] = (result[key]!['grossGrams'] as double) + gross;
-            result[key]!['netGrams'] = (result[key]!['netGrams'] as double) + net;
+            result[key]!['grossGrams'] =
+                (result[key]!['grossGrams'] as double) + gross;
+            result[key]!['netGrams'] =
+                (result[key]!['netGrams'] as double) + net;
           } else {
             result[key] = {
               'productId': key,
@@ -746,7 +825,8 @@ class _InventoryScreenState extends State<InventoryScreen>
         } else if (ing.sourceTechCardId != null) {
           final nested = tcById[ing.sourceTechCardId!];
           if (nested != null) {
-            final nestedYield = nested.yield > 0 ? nested.yield : nested.totalNetWeight;
+            final nestedYield =
+                nested.yield > 0 ? nested.yield : nested.totalNetWeight;
             if (nestedYield > 0) {
               final nestedFactor = (ing.netWeight * factor) / nestedYield;
               addIngredients(nested.ingredients, nestedFactor);
@@ -757,19 +837,25 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
 
     for (final r in _rows) {
-      if (!r.isPf || r.techCard == null || r.quantities.isEmpty || r.quantities[0] <= 0) continue;
+      if (!r.isPf ||
+          r.techCard == null ||
+          r.quantities.isEmpty ||
+          r.quantities[0] <= 0) continue;
       final tc = r.techCard!;
       if (tc.ingredients.isEmpty) continue;
       final yieldVal = tc.yield > 0 ? tc.yield : tc.totalNetWeight;
       if (yieldVal <= 0) continue;
       final qty = r.quantities[0];
       final pfU = r.pfUnit ?? _pfUnitPcs;
-      final factor = pfU == _pfUnitGrams ? qty / yieldVal : (qty * tc.portionWeight) / yieldVal;
+      final factor = pfU == _pfUnitGrams
+          ? qty / yieldVal
+          : (qty * tc.portionWeight) / yieldVal;
       addIngredients(tc.ingredients, factor);
     }
 
     final list = result.values.toList();
-    list.sort((a, b) => (a['productName'] as String).compareTo(b['productName'] as String));
+    list.sort((a, b) =>
+        (a['productName'] as String).compareTo(b['productName'] as String));
     return list;
   }
 
@@ -782,15 +868,18 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   void _onLastCellFocused(int rowIndex) {
-    if (rowIndex < 0 || rowIndex >= _rows.length || _rows[rowIndex].isFree) return;
+    if (rowIndex < 0 || rowIndex >= _rows.length || _rows[rowIndex].isFree)
+      return;
     setState(() => _rows[rowIndex].quantities.add(0.0));
   }
 
   /// При выходе из второй ячейки (после заполнения) — скролл выполняет tile через didUpdateWidget
   void _onCellFocusLost(int rowIndex, int colIndex) {
-    if (rowIndex < 0 || rowIndex >= _rows.length || _rows[rowIndex].isFree) return;
+    if (rowIndex < 0 || rowIndex >= _rows.length || _rows[rowIndex].isFree)
+      return;
     final row = _rows[rowIndex];
-    if (row.quantities.length < 2 || colIndex != row.quantities.length - 2) return;
+    if (row.quantities.length < 2 || colIndex != row.quantities.length - 2)
+      return;
     if (row.quantities[colIndex] <= 0) return;
   }
 
@@ -798,7 +887,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     // Все новые продукты начинаются с 2 колонок
     final quantities = <double>[0.0, 0.0];
     setState(() {
-      _rows.add(_InventoryRow(product: p, techCard: null, quantities: quantities));
+      _rows.add(
+          _InventoryRow(product: p, techCard: null, quantities: quantities));
     });
     saveNow(); // Сохранить немедленно при добавлении продукта
   }
@@ -878,7 +968,8 @@ class _InventoryScreenState extends State<InventoryScreen>
       return;
     }
 
-    final chefs = await account.getExecutiveChefsForEstablishment(establishment.id);
+    final chefs =
+        await account.getExecutiveChefsForEstablishment(establishment.id);
     if (chefs.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -890,7 +981,8 @@ class _InventoryScreenState extends State<InventoryScreen>
 
     final chef = chefs.first;
     final endTime = TimeOfDay.now();
-    final aggregatedProducts = _aggregateProductsFromPf(loc.currentLanguageCode);
+    final aggregatedProducts =
+        _aggregateProductsFromPf(loc.currentLanguageCode);
     final payload = _buildPayload(
       establishment: establishment,
       employee: employee,
@@ -909,7 +1001,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (docSaved == null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(loc.t('inventory_document_save_error') ?? 'Не удалось сохранить инвентаризацию во входящие. Проверьте подключение.'),
+          content: Text(loc.t('inventory_document_save_error') ??
+              'Не удалось сохранить инвентаризацию во входящие. Проверьте подключение.'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -923,14 +1016,16 @@ class _InventoryScreenState extends State<InventoryScreen>
         establishmentId: establishment.id,
         employeeId: employee.id,
         inventoryData: {
-          'rows': _rows.map((row) => {
-            'productId': row.product?.id,
-            'techCardId': row.techCard?.id,
-            'freeName': row.freeName,
-            'freeUnit': row.freeUnit,
-            'quantities': row.quantities,
-            'pfUnit': row.pfUnit,
-          }).toList(),
+          'rows': _rows
+              .map((row) => {
+                    'productId': row.product?.id,
+                    'techCardId': row.techCard?.id,
+                    'freeName': row.freeName,
+                    'freeUnit': row.freeUnit,
+                    'quantities': row.quantities,
+                    'pfUnit': row.pfUnit,
+                  })
+              .toList(),
           'aggregatedProducts': aggregatedProducts,
           'payload': payload,
         },
@@ -950,7 +1045,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     // Выбор формата экспорта и языка сохранения. При отмене — остаёмся в режиме редактирования.
     try {
       final result = await _showExportFormatAndLanguageDialog(context, loc);
-      if (result == null || !mounted) return; // Отмена — ячейки остаются доступны для заполнения
+      if (result == null || !mounted)
+        return; // Отмена — ячейки остаются доступны для заполнения
 
       if (result.format == 'excel') {
         final payloadForExport = _buildPayload(
@@ -980,7 +1076,9 @@ class _InventoryScreenState extends State<InventoryScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${loc.t('inventory_document_saved')} (Экспорт: ${e.toString()})')),
+          SnackBar(
+              content: Text(
+                  '${loc.t('inventory_document_saved')} (Экспорт: ${e.toString()})')),
         );
       }
     }
@@ -1028,14 +1126,16 @@ class _InventoryScreenState extends State<InventoryScreen>
       }
     }
     if (product == null) return 0.0;
-    final estPrice = productStore.getEstablishmentPrice(product.id, establishmentId)?.$1;
+    final estPrice =
+        productStore.getEstablishmentPrice(product.id, establishmentId)?.$1;
     final pricePerKg = product.computedPricePerKg ?? estPrice;
     if (pricePerKg == null || pricePerKg <= 0) return 0.0;
     return totalGrams / 1000.0 * pricePerKg;
   }
 
   /// Создание Excel с 2 листами: 1) продукты+ПФ+перерасчет, 2) все продукты включая ПФ
-  List<int>? _buildExcelBytes(Map<String, dynamic> payload, LocalizationService loc) {
+  List<int>? _buildExcelBytes(
+      Map<String, dynamic> payload, LocalizationService loc) {
     final rows = payload['rows'] as List<dynamic>? ?? [];
     final maxCols = _maxQuantityColumns;
     ProductStoreSupabase? productStore;
@@ -1043,7 +1143,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (mounted) {
       try {
         productStore = context.read<ProductStoreSupabase>();
-        establishmentId = context.read<AccountManagerSupabase>().establishment?.id;
+        establishmentId =
+            context.read<AccountManagerSupabase>().establishment?.id;
       } catch (_) {}
     }
     try {
@@ -1073,7 +1174,9 @@ class _InventoryScreenState extends State<InventoryScreen>
       final productsOnly = (rows.map((e) => e as Map<String, dynamic>))
           .where((r) => !((r['productId'] as String?) ?? '').startsWith('pf_'))
           .toList()
-        ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
+        ..sort((a, b) => ((a['productName'] as String?) ?? '')
+            .toLowerCase()
+            .compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
       var rowNum = 1;
       for (var i = 0; i < productsOnly.length; i++) {
         final r = productsOnly[i];
@@ -1090,7 +1193,9 @@ class _InventoryScreenState extends State<InventoryScreen>
           DoubleCellValue(total.toDouble()),
         ];
         for (var c = 0; c < maxCols; c++) {
-          final q = c < quantities.length ? (quantities[c] as num?)?.toDouble() ?? 0.0 : 0.0;
+          final q = c < quantities.length
+              ? (quantities[c] as num?)?.toDouble() ?? 0.0
+              : 0.0;
           rowCells.add(DoubleCellValue(q));
         }
         sheet1.appendRow(rowCells);
@@ -1100,7 +1205,9 @@ class _InventoryScreenState extends State<InventoryScreen>
       final pfRows = (rows.map((e) => e as Map<String, dynamic>))
           .where((r) => ((r['productId'] as String?) ?? '').startsWith('pf_'))
           .toList()
-        ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
+        ..sort((a, b) => ((a['productName'] as String?) ?? '')
+            .toLowerCase()
+            .compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
       if (pfRows.isNotEmpty) {
         sheet1.appendRow([]);
         sheet1.appendRow([TextCellValue(loc.t('inventory_block_pf'))]);
@@ -1121,7 +1228,9 @@ class _InventoryScreenState extends State<InventoryScreen>
             DoubleCellValue(total.toDouble()),
           ];
           for (var c = 0; c < maxCols; c++) {
-            final q = c < quantities.length ? (quantities[c] as num?)?.toDouble() ?? 0.0 : 0.0;
+            final q = c < quantities.length
+                ? (quantities[c] as num?)?.toDouble() ?? 0.0
+                : 0.0;
             rowCells.add(DoubleCellValue(q));
           }
           sheet1.appendRow(rowCells);
@@ -1148,8 +1257,10 @@ class _InventoryScreenState extends State<InventoryScreen>
           final net = (p['netGrams'] as num?)?.toDouble() ?? 0.0;
 
           if (groupedProducts.containsKey(name)) {
-            groupedProducts[name]!['grossGrams'] = (groupedProducts[name]!['grossGrams'] as double) + gross;
-            groupedProducts[name]!['netGrams'] = (groupedProducts[name]!['netGrams'] as double) + net;
+            groupedProducts[name]!['grossGrams'] =
+                (groupedProducts[name]!['grossGrams'] as double) + gross;
+            groupedProducts[name]!['netGrams'] =
+                (groupedProducts[name]!['netGrams'] as double) + net;
           } else {
             groupedProducts[name] = {
               'productName': name,
@@ -1160,7 +1271,9 @@ class _InventoryScreenState extends State<InventoryScreen>
         }
 
         final groupedList = groupedProducts.values.toList()
-          ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
+          ..sort((a, b) => ((a['productName'] as String?) ?? '')
+              .toLowerCase()
+              .compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
 
         for (var i = 0; i < groupedList.length; i++) {
           final p = groupedList[i];
@@ -1199,7 +1312,9 @@ class _InventoryScreenState extends State<InventoryScreen>
           existing['total'] = (existing['total'] as double) + total.toDouble();
           existing['price'] = (existing['price'] as double? ?? 0) + priceVal;
           final existingQuantities = existing['quantities'] as List<double>;
-          for (var c = 0; c < quantities.length && c < existingQuantities.length; c++) {
+          for (var c = 0;
+              c < quantities.length && c < existingQuantities.length;
+              c++) {
             existingQuantities[c] += (quantities[c] as num?)?.toDouble() ?? 0.0;
           }
         } else {
@@ -1208,7 +1323,8 @@ class _InventoryScreenState extends State<InventoryScreen>
             'unit': unit,
             'total': total.toDouble(),
             'price': priceVal,
-            'quantities': List<double>.from(quantities.map((q) => (q as num?)?.toDouble() ?? 0.0)),
+            'quantities': List<double>.from(
+                quantities.map((q) => (q as num?)?.toDouble() ?? 0.0)),
           };
         }
       }
@@ -1223,7 +1339,8 @@ class _InventoryScreenState extends State<InventoryScreen>
           final existing = allProducts[name]!;
           existing['total'] = (existing['total'] as double) + grossGrams;
           final extraCost = (productStore != null && establishmentId != null)
-              ? _computeCostForProductByName(productStore, establishmentId, name, grossGrams)
+              ? _computeCostForProductByName(
+                  productStore, establishmentId, name, grossGrams)
               : 0.0;
           existing['price'] = (existing['price'] as double? ?? 0) + extraCost;
           // Для ПФ добавляем количество в первую колонку
@@ -1236,7 +1353,8 @@ class _InventoryScreenState extends State<InventoryScreen>
         } else {
           // Новый продукт только из ПФ — вычисляем стоимость по цене из номенклатуры/basePrice
           final cost = (productStore != null && establishmentId != null)
-              ? _computeCostForProductByName(productStore, establishmentId, name, grossGrams)
+              ? _computeCostForProductByName(
+                  productStore, establishmentId, name, grossGrams)
               : 0.0;
           allProducts[name] = {
             'productName': name,
@@ -1250,7 +1368,9 @@ class _InventoryScreenState extends State<InventoryScreen>
 
       // Выводим все продукты в алфавитном порядке по наименованию
       final sortedProducts = allProducts.values.toList()
-        ..sort((a, b) => ((a['productName'] as String?) ?? '').toLowerCase().compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
+        ..sort((a, b) => ((a['productName'] as String?) ?? '')
+            .toLowerCase()
+            .compareTo(((b['productName'] as String?) ?? '').toLowerCase()));
 
       double totalSumAll = 0.0;
       for (var i = 0; i < sortedProducts.length; i++) {
@@ -1291,7 +1411,9 @@ class _InventoryScreenState extends State<InventoryScreen>
       // Удаляем пустой лист по умолчанию, оставляем только «Продукты + ПФ» и «Все продукты с ПФ»
       excel.setDefaultSheet('Продукты + ПФ');
       for (final name in excel.tables.keys.toList()) {
-        if (name != 'Продукты + ПФ' && name != 'Все продукты с ПФ' && excel.tables.keys.length > 2) {
+        if (name != 'Продукты + ПФ' &&
+            name != 'Все продукты с ПФ' &&
+            excel.tables.keys.length > 2) {
           excel.delete(name);
           break;
         }
@@ -1322,7 +1444,9 @@ class _InventoryScreenState extends State<InventoryScreen>
     // схлопывает layout и TextField теряет фокус → клавиатура закрывается.
     if (isKeyboardOpen && !_isInputMode && !isNarrow) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && MediaQuery.viewInsetsOf(context).bottom > 0 && !(MediaQuery.sizeOf(context).width < 600)) {
+        if (mounted &&
+            MediaQuery.viewInsetsOf(context).bottom > 0 &&
+            !(MediaQuery.sizeOf(context).width < 600)) {
           setState(() => _isInputMode = true);
         }
       });
@@ -1342,52 +1466,60 @@ class _InventoryScreenState extends State<InventoryScreen>
     final mobileKeyboardOpen = isNarrow && isKeyboardOpen;
 
     return Scaffold(
-      appBar: (isNarrow && isKeyboardOpen) ? AppBar(
-        leading: appBarBackButton(context),
-        title: Text(
-          loc.t('inventory_blank_title'),
-          style: const TextStyle(fontSize: 16),
-        ),
-        toolbarHeight: 40,
-        elevation: 0,
-      ) : _isInputMode ? AppBar(
-        leading: appBarBackButton(context),
-        title: Text(
-          loc.t('inventory_blank_title'),
-          style: const TextStyle(fontSize: 16),
-        ),
-        toolbarHeight: 48,
-        elevation: 0,
-      ) : AppBar(
-        leading: appBarBackButton(context),
-        title: Text(loc.t('inventory_blank_title')),
-      ),
+      appBar: (isNarrow && isKeyboardOpen)
+          ? AppBar(
+              leading: appBarBackButton(context),
+              title: Text(
+                loc.t('inventory_blank_title'),
+                style: const TextStyle(fontSize: 16),
+              ),
+              toolbarHeight: 40,
+              elevation: 0,
+            )
+          : _isInputMode
+              ? AppBar(
+                  leading: appBarBackButton(context),
+                  title: Text(
+                    loc.t('inventory_blank_title'),
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  toolbarHeight: 48,
+                  elevation: 0,
+                )
+              : AppBar(
+                  leading: appBarBackButton(context),
+                  title: Text(loc.t('inventory_blank_title')),
+                ),
       // Кнопка "Завершить" в bottomNavigationBar — Flutter поднимает её над клавиатурой автоматически.
       // Браузерный URL-бар (Safari/Chrome) остаётся ниже неё и не перекрывает таблицу.
       bottomNavigationBar: _buildFooter(loc, collapseLayout),
       body: Stack(
-          children: [
-            Column(
+        children: [
+          Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (!collapseLayout)
                 _buildHeader(
-                  loc, establishment, employee,
+                  loc,
+                  establishment,
+                  employee,
                   collapseLayout: collapseLayout,
                   hideInfoRow: mobileKeyboardOpen,
                 ),
               if (collapseLayout && !_completed && _rows.isNotEmpty)
                 _buildCompactSearchBar(loc),
               if (!collapseLayout) const Divider(height: 1),
-              if (collapseLayout && !_completed && _rows.isNotEmpty) const Divider(height: 1),
+              if (collapseLayout && !_completed && _rows.isNotEmpty)
+                const Divider(height: 1),
               Expanded(
                 child: _buildTable(loc),
               ),
             ],
           ),
-          if (!collapseLayout && !mobileKeyboardOpen) DataSafetyIndicator(isVisible: true),
+          if (!collapseLayout && !mobileKeyboardOpen)
+            DataSafetyIndicator(isVisible: true),
         ],
-        ),
+      ),
     );
   }
 
@@ -1409,7 +1541,8 @@ class _InventoryScreenState extends State<InventoryScreen>
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
-        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+        border: Border(
+            bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
       ),
       child: Row(
         children: [
@@ -1423,14 +1556,18 @@ class _InventoryScreenState extends State<InventoryScreen>
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 hintText: loc.t('inventory_filter_name') ?? 'По названию',
-                prefixIcon: Icon(Icons.search, size: 22, color: theme.colorScheme.onSurfaceVariant),
+                prefixIcon: Icon(Icons.search,
+                    size: 22, color: theme.colorScheme.onSurfaceVariant),
                 filled: true,
                 fillColor: theme.colorScheme.surfaceContainerHighest,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: theme.colorScheme.outlineVariant, width: 1.5),
+                  borderSide: BorderSide(
+                      color: theme.colorScheme.outlineVariant, width: 1.5),
                 ),
               ),
               style: const TextStyle(fontSize: 15),
@@ -1452,21 +1589,33 @@ class _InventoryScreenState extends State<InventoryScreen>
   }) {
     final theme = Theme.of(context);
     final narrow = MediaQuery.sizeOf(context).width < 420;
-    final dateStr = '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}';
-    final startStr = _startTime != null ? '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}' : '—';
-    final endStr = _endTime != null ? '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}' : null;
+    final dateStr =
+        '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}';
+    final startStr = _startTime != null
+        ? '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}'
+        : '—';
+    final endStr = _endTime != null
+        ? '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}'
+        : null;
     final roleStr = employee != null && employee!.roles.isNotEmpty
         ? loc.roleDisplayName(employee!.roles.first)
         : '—';
-    final headerLine = '$dateStr ${startStr} ${employee?.fullName ?? '—'} ($roleStr)${endStr != null ? ' $endStr' : ''}';
+    final headerLine =
+        '$dateStr ${startStr} ${employee?.fullName ?? '—'} ($roleStr)${endStr != null ? ' $endStr' : ''}';
     final headerRow = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
-        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+        border: Border(
+            bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
       ),
-      child: Text(headerLine, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis, maxLines: 1),
+      child: Text(headerLine,
+          style:
+              theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1),
     );
+
     /// Кнопка переключения алфавитного порядка А–Я ↔ Я–А.
     final sortAlphabetButton = !_completed && _rows.isNotEmpty
         ? IconButton(
@@ -1491,14 +1640,18 @@ class _InventoryScreenState extends State<InventoryScreen>
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
                 hintText: loc.t('inventory_filter_name') ?? 'По названию',
-                prefixIcon: Icon(Icons.search, size: 22, color: theme.colorScheme.onSurfaceVariant),
+                prefixIcon: Icon(Icons.search,
+                    size: 22, color: theme.colorScheme.onSurfaceVariant),
                 filled: true,
                 fillColor: theme.colorScheme.surfaceContainerHighest,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: theme.colorScheme.outlineVariant, width: 1.5),
+                  borderSide: BorderSide(
+                      color: theme.colorScheme.outlineVariant, width: 1.5),
                 ),
               ),
               style: const TextStyle(fontSize: 15),
@@ -1515,32 +1668,93 @@ class _InventoryScreenState extends State<InventoryScreen>
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: theme.colorScheme.surfaceContainerLow,
-            border: Border(bottom: BorderSide(color: theme.dividerColor, width: 1)),
+            border:
+                Border(bottom: BorderSide(color: theme.dividerColor, width: 1)),
           ),
           child: SafeArea(
             top: true,
             bottom: false,
             child: narrow
-            ? Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Строка с названием заведения и временем — скрывается при открытой клавиатуре
-                  if (!collapseLayout && !hideInfoRow) Row(
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          establishment?.name ?? '—',
-                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-                          overflow: TextOverflow.ellipsis,
+                      // Строка с названием заведения и временем — скрывается при открытой клавиатуре
+                      if (!collapseLayout && !hideInfoRow)
+                        Row(
+                          children: [
+                            Icon(Icons.store,
+                                size: 16, color: theme.colorScheme.primary),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                establishment?.name ?? '—',
+                                style: theme.textTheme.bodySmall
+                                    ?.copyWith(fontWeight: FontWeight.w500),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () => _pickDate(context),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 4),
+                                child: Text(
+                                  '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}',
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'}',
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ],
                         ),
-                      ),
+                      if (sortAlphabetButton != null &&
+                          nameFilterField != null) ...[
+                        if (!hideInfoRow) const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            if (!collapseLayout) ...[
+                              sortAlphabetButton!,
+                              const SizedBox(width: 8)
+                            ],
+                            Expanded(child: nameFilterField!),
+                          ],
+                        ),
+                      ],
+                    ],
+                  )
+                : Row(
+                    children: [
+                      if (sortAlphabetButton != null &&
+                          nameFilterField != null) ...[
+                        if (!collapseLayout) sortAlphabetButton!,
+                        if (!collapseLayout) const SizedBox(width: 6),
+                        nameFilterField!,
+                        const SizedBox(width: 12),
+                      ],
+                      if (!collapseLayout) ...[
+                        Icon(Icons.store,
+                            size: 16, color: theme.colorScheme.primary),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            establishment?.name ?? '—',
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(fontWeight: FontWeight.w500),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                      if (collapseLayout) const Spacer(),
                       InkWell(
                         onTap: () => _pickDate(context),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 4),
                           child: Text(
                             '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}',
                             style: theme.textTheme.bodySmall,
@@ -1554,54 +1768,6 @@ class _InventoryScreenState extends State<InventoryScreen>
                       ),
                     ],
                   ),
-                  if (sortAlphabetButton != null && nameFilterField != null) ...[
-                    if (!hideInfoRow) const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        if (!collapseLayout) ...[sortAlphabetButton!, const SizedBox(width: 8)],
-                        Expanded(child: nameFilterField!),
-                      ],
-                    ),
-                  ],
-                ],
-              )
-            : Row(
-                children: [
-                  if (sortAlphabetButton != null && nameFilterField != null) ...[
-                    if (!collapseLayout) sortAlphabetButton!,
-                    if (!collapseLayout) const SizedBox(width: 6),
-                    nameFilterField!,
-                    const SizedBox(width: 12),
-                  ],
-                  if (!collapseLayout) ...[
-                    Icon(Icons.store, size: 16, color: theme.colorScheme.primary),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        establishment?.name ?? '—',
-                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                  if (collapseLayout) const Spacer(),
-                  InkWell(
-                    onTap: () => _pickDate(context),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                      child: Text(
-                        '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${_startTime?.hour.toString().padLeft(2, '0') ?? '—'}:${_startTime?.minute.toString().padLeft(2, '0') ?? '—'}',
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
-              ),
           ),
         ),
       ],
@@ -1628,11 +1794,13 @@ class _InventoryScreenState extends State<InventoryScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.inventory_2_outlined, size: 64, color: Theme.of(context).colorScheme.outline),
+              Icon(Icons.inventory_2_outlined,
+                  size: 64, color: Theme.of(context).colorScheme.outline),
               const SizedBox(height: 16),
               Text(
                 loc.t('inventory_empty_hint'),
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -1719,23 +1887,35 @@ class _InventoryScreenState extends State<InventoryScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (_blockFilter != _InventoryBlockFilter.pfOnly && _productIndices.isNotEmpty) ...[
-                  _buildSectionHeaderRow(loc, loc.t('inventory_block_products'), leftW),
+                if (_blockFilter != _InventoryBlockFilter.pfOnly &&
+                    _productIndices.isNotEmpty) ...[
+                  _buildSectionHeaderRow(
+                      loc, loc.t('inventory_block_products'), leftW),
                   ..._productIndices.asMap().entries.map((e) {
-                    final lastIdx = _pfIndices.isNotEmpty ? _pfIndices.last : _productIndices.last;
-                    return _buildScrollableDataRow(loc, e.value, e.key + 1, isLastRow: e.value == lastIdx);
+                    final lastIdx = _pfIndices.isNotEmpty
+                        ? _pfIndices.last
+                        : _productIndices.last;
+                    return _buildScrollableDataRow(loc, e.value, e.key + 1,
+                        isLastRow: e.value == lastIdx);
                   }),
                 ],
-                if (_blockFilter != _InventoryBlockFilter.productsOnly && _pfIndices.isNotEmpty) ...[
-                  _buildSectionHeaderRow(loc, loc.t('inventory_block_pf'), leftW),
+                if (_blockFilter != _InventoryBlockFilter.productsOnly &&
+                    _pfIndices.isNotEmpty) ...[
+                  _buildSectionHeaderRow(
+                      loc, loc.t('inventory_block_pf'), leftW),
                   ..._pfIndices.asMap().entries.map((e) {
                     final lastIdx = _pfIndices.last;
-                    final rowNum = _blockFilter == _InventoryBlockFilter.pfOnly ? e.key + 1 : _productIndices.length + e.key + 1;
-                    return _buildScrollableDataRow(loc, e.value, rowNum, isLastRow: e.value == lastIdx);
+                    final rowNum = _blockFilter == _InventoryBlockFilter.pfOnly
+                        ? e.key + 1
+                        : _productIndices.length + e.key + 1;
+                    return _buildScrollableDataRow(loc, e.value, rowNum,
+                        isLastRow: e.value == lastIdx);
                   }),
                 ],
-                if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) ...[
-                  _buildSectionHeaderRow(loc, loc.t('inventory_pf_products_title'), leftW),
+                if (_aggregatedFromFile != null &&
+                    _aggregatedFromFile!.isNotEmpty) ...[
+                  _buildSectionHeaderRow(
+                      loc, loc.t('inventory_pf_products_title'), leftW),
                   _buildAggregatedBlockRow(loc, leftW),
                 ],
               ],
@@ -1763,6 +1943,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   static const double _colGap = 4; // Уменьшен с 10
   /// Высота заголовка секции (Продукты/ПФ) — для выравнивания фиксированной и прокручиваемой колонок.
   static const double _sectionHeaderHeight = 36;
+
   /// Фиксированная высота строки данных — для выравнивания ячеек ввода с текстом.
   static const double _dataRowHeight = 44;
 
@@ -1774,13 +1955,21 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   double _colNameWidth(BuildContext context) =>
-      _leftWidth(context) - _colNoWidth - _colGap - _colUnitWidth - _colGap - _colTotalWidth;
+      _leftWidth(context) -
+      _colNoWidth -
+      _colGap -
+      _colUnitWidth -
+      _colGap -
+      _colTotalWidth;
 
-  Widget _buildSectionHeaderRow(LocalizationService loc, String title, double leftW) {
+  Widget _buildSectionHeaderRow(
+      LocalizationService loc, String title, double leftW) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(width: leftW, child: _buildSectionHeader(loc, title, isFixed: true)),
+        SizedBox(
+            width: leftW,
+            child: _buildSectionHeader(loc, title, isFixed: true)),
         Expanded(child: SizedBox(height: _sectionHeaderHeight)),
       ],
     );
@@ -1792,12 +1981,16 @@ class _InventoryScreenState extends State<InventoryScreen>
       children: [
         Container(
           width: leftW,
-          decoration: BoxDecoration(border: Border(right: BorderSide(color: Theme.of(context).dividerColor.withOpacity(0.3)))),
+          decoration: BoxDecoration(
+              border: Border(
+                  right: BorderSide(
+                      color: Theme.of(context).dividerColor.withOpacity(0.3)))),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildFixedAggregatedHeaderRow(loc),
-              ..._aggregatedFromFile!.asMap().entries.map((e) => _buildFixedAggregatedDataRow(loc, e.value, e.key + 1)),
+              ..._aggregatedFromFile!.asMap().entries.map(
+                  (e) => _buildFixedAggregatedDataRow(loc, e.value, e.key + 1)),
             ],
           ),
         ),
@@ -1806,7 +1999,10 @@ class _InventoryScreenState extends State<InventoryScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildScrollableAggregatedHeaderRow(loc),
-              ..._aggregatedFromFile!.asMap().entries.map((e) => _buildScrollableAggregatedDataRow(loc, e.value)),
+              ..._aggregatedFromFile!
+                  .asMap()
+                  .entries
+                  .map((e) => _buildScrollableAggregatedDataRow(loc, e.value)),
             ],
           ),
         ),
@@ -1814,7 +2010,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  Widget _buildSectionHeader(LocalizationService loc, String title, {bool isFixed = false}) {
+  Widget _buildSectionHeader(LocalizationService loc, String title,
+      {bool isFixed = false}) {
     final theme = Theme.of(context);
     final leftW = isFixed ? _leftWidth(context) : null;
 
@@ -1825,7 +2022,9 @@ class _InventoryScreenState extends State<InventoryScreen>
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         decoration: BoxDecoration(
           color: theme.colorScheme.primaryContainer.withOpacity(0.5),
-          border: Border(bottom: BorderSide(color: theme.colorScheme.outline.withOpacity(0.3))),
+          border: Border(
+              bottom: BorderSide(
+                  color: theme.colorScheme.outline.withOpacity(0.3))),
         ),
         alignment: Alignment.centerLeft,
         child: Text(
@@ -1850,13 +2049,29 @@ class _InventoryScreenState extends State<InventoryScreen>
       ),
       child: Row(
         children: [
-          SizedBox(width: _colNoWidth, child: Text('#', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          SizedBox(
+              width: _colNoWidth,
+              child: Text('#',
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(fontWeight: FontWeight.bold))),
           SizedBox(width: _colGap),
-          SizedBox(width: _colNameWidth(context), child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          SizedBox(
+              width: _colNameWidth(context),
+              child: Text(loc.t('inventory_item_name'),
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(fontWeight: FontWeight.bold))),
           SizedBox(width: _colGap),
-          SizedBox(width: _colUnitWidth, child: Text(loc.t('inventory_unit'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          SizedBox(
+              width: _colUnitWidth,
+              child: Text(loc.t('inventory_unit'),
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(fontWeight: FontWeight.bold))),
           SizedBox(width: _colGap),
-          SizedBox(width: _colTotalWidth, child: Text(loc.t('inventory_total'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          SizedBox(
+              width: _colTotalWidth,
+              child: Text(loc.t('inventory_total'),
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(fontWeight: FontWeight.bold))),
         ],
       ),
     );
@@ -1877,10 +2092,14 @@ class _InventoryScreenState extends State<InventoryScreen>
           ...List.generate(
             maxCols,
             (colIndex) => Padding(
-              padding: EdgeInsets.only(right: colIndex < maxCols - 1 ? _colGap : 0),
+              padding:
+                  EdgeInsets.only(right: colIndex < maxCols - 1 ? _colGap : 0),
               child: SizedBox(
                 width: _colQtyWidth,
-                child: Text('${colIndex + 1}', textAlign: TextAlign.center, style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold)),
+                child: Text('${colIndex + 1}',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.labelMedium
+                        ?.copyWith(fontWeight: FontWeight.bold)),
               ),
             ),
           ),
@@ -1890,7 +2109,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  Widget _buildFixedDataRow(LocalizationService loc, int actualIndex, int rowNumber) {
+  Widget _buildFixedDataRow(
+      LocalizationService loc, int actualIndex, int rowNumber) {
     final theme = Theme.of(context);
     final row = _rows[actualIndex];
 
@@ -1899,64 +2119,95 @@ class _InventoryScreenState extends State<InventoryScreen>
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
-          color: rowNumber.isEven ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
+          border: Border(
+              bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+          color: rowNumber.isEven
+              ? theme.colorScheme.surface
+              : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-          SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
-          SizedBox(width: _colGap),
-          SizedBox(
-            width: _colNameWidth(context),
-            child: Text(
-              row.productName(loc.currentLanguageCode),
-              style: theme.textTheme.bodyMedium,
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
-              softWrap: true,
+            SizedBox(
+                width: _colNoWidth,
+                child: Text('$rowNumber',
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+            SizedBox(width: _colGap),
+            SizedBox(
+              width: _colNameWidth(context),
+              child: Text(
+                row.productName(loc.currentLanguageCode),
+                style: theme.textTheme.bodyMedium,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+              ),
             ),
-          ),
-          SizedBox(width: _colGap),
-          SizedBox(
-            width: _colUnitWidth,
-            child: !_completed
-                ? (row.isPf
-                    ? DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: row.pfUnit ?? _pfUnitPcs,
-                          isDense: true,
-                          isExpanded: true,
-                          items: [
-                            DropdownMenuItem(value: _pfUnitPcs, child: Text(loc.currentLanguageCode == 'ru' ? 'порц.' : 'pcs', style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
-                            DropdownMenuItem(value: _pfUnitGrams, child: Text(loc.currentLanguageCode == 'ru' ? 'гр' : 'g', style: theme.textTheme.bodySmall, overflow: TextOverflow.ellipsis)),
-                          ],
-                          onChanged: (v) => v != null ? _setPfUnit(actualIndex, v) : null,
-                        ),
-                      )
-                    : _ProductUnitDropdown(
-                        value: row.isCountedByPackage ? (row.unitOverride ?? 'pkg') : row.unit,
-                        lang: loc.currentLanguageCode,
-                        product: row.product,
-                        onChanged: (v) => _setProductUnit(actualIndex, v),
-                        theme: theme,
-                      ))
-                : Text(row.unitDisplayForBlank(loc.currentLanguageCode), style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
-          ),
-          SizedBox(width: _colGap),
-          Container(
-            width: _colTotalWidth,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            alignment: Alignment.center,
-            child: Text(_formatQty(row.totalDisplay), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-          ),
-        ],
+            SizedBox(width: _colGap),
+            SizedBox(
+              width: _colUnitWidth,
+              child: !_completed
+                  ? (row.isPf
+                      ? DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: row.pfUnit ?? _pfUnitPcs,
+                            isDense: true,
+                            isExpanded: true,
+                            items: [
+                              DropdownMenuItem(
+                                  value: _pfUnitPcs,
+                                  child: Text(
+                                      loc.currentLanguageCode == 'ru'
+                                          ? 'порц.'
+                                          : 'pcs',
+                                      style: theme.textTheme.bodySmall,
+                                      overflow: TextOverflow.ellipsis)),
+                              DropdownMenuItem(
+                                  value: _pfUnitGrams,
+                                  child: Text(
+                                      loc.currentLanguageCode == 'ru'
+                                          ? 'гр'
+                                          : 'g',
+                                      style: theme.textTheme.bodySmall,
+                                      overflow: TextOverflow.ellipsis)),
+                            ],
+                            onChanged: (v) =>
+                                v != null ? _setPfUnit(actualIndex, v) : null,
+                          ),
+                        )
+                      : _ProductUnitDropdown(
+                          value: row.isCountedByPackage
+                              ? (row.unitOverride ?? 'pkg')
+                              : row.unit,
+                          lang: loc.currentLanguageCode,
+                          product: row.product,
+                          onChanged: (v) => _setProductUnit(actualIndex, v),
+                          theme: theme,
+                        ))
+                  : Text(row.unitDisplayForBlank(loc.currentLanguageCode),
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      overflow: TextOverflow.ellipsis),
+            ),
+            SizedBox(width: _colGap),
+            Container(
+              width: _colTotalWidth,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              alignment: Alignment.center,
+              child: Text(_formatQty(row.totalDisplay),
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
       ),
-    ),
     );
   }
 
-  Widget _buildScrollableDataRow(LocalizationService loc, int actualIndex, int rowNumber, {bool isLastRow = false}) {
+  Widget _buildScrollableDataRow(
+      LocalizationService loc, int actualIndex, int rowNumber,
+      {bool isLastRow = false}) {
     final row = _rows[actualIndex];
     return _StandardInventoryRowTile(
       fixedPart: _buildFixedDataRow(loc, actualIndex, rowNumber),
@@ -1977,7 +2228,6 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-
   String _formatQty(double q) {
     if (q == q.truncateToDouble()) return q.toInt().toString();
     return q.toStringAsFixed(1);
@@ -1993,9 +2243,16 @@ class _InventoryScreenState extends State<InventoryScreen>
       ),
       child: Row(
         children: [
-          SizedBox(width: _colNoWidth, child: Text(loc.t('inventory_excel_number'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          SizedBox(
+              width: _colNoWidth,
+              child: Text(loc.t('inventory_excel_number'),
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(fontWeight: FontWeight.bold))),
           SizedBox(width: _colGap),
-          Expanded(child: Text(loc.t('inventory_item_name'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          Expanded(
+              child: Text(loc.t('inventory_item_name'),
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(fontWeight: FontWeight.bold))),
         ],
       ),
     );
@@ -2011,27 +2268,41 @@ class _InventoryScreenState extends State<InventoryScreen>
       ),
       child: Row(
         children: [
-          SizedBox(width: 72, child: Text(loc.t('inventory_pf_gross_g'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          SizedBox(
+              width: 72,
+              child: Text(loc.t('inventory_pf_gross_g'),
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(fontWeight: FontWeight.bold))),
           SizedBox(width: _colGap),
-          SizedBox(width: 72, child: Text(loc.t('inventory_pf_net_g'), style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+          SizedBox(
+              width: 72,
+              child: Text(loc.t('inventory_pf_net_g'),
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(fontWeight: FontWeight.bold))),
         ],
       ),
     );
   }
 
-  Widget _buildFixedAggregatedDataRow(LocalizationService loc, Map<String, dynamic> p, int rowNumber) {
+  Widget _buildFixedAggregatedDataRow(
+      LocalizationService loc, Map<String, dynamic> p, int rowNumber) {
     final theme = Theme.of(context);
     final name = p['productName'] as String? ?? '';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+        border: Border(
+            bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
         color: theme.colorScheme.surface,
       ),
       child: Row(
         children: [
-          SizedBox(width: _colNoWidth, child: Text('$rowNumber', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+          SizedBox(
+              width: _colNoWidth,
+              child: Text('$rowNumber',
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
           SizedBox(width: _colGap),
           Expanded(
             child: Text(
@@ -2046,7 +2317,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  Widget _buildScrollableAggregatedDataRow(LocalizationService loc, Map<String, dynamic> p) {
+  Widget _buildScrollableAggregatedDataRow(
+      LocalizationService loc, Map<String, dynamic> p) {
     final theme = Theme.of(context);
     final gross = ((p['grossGrams'] as num?)?.toDouble() ?? 0).round();
     final net = ((p['netGrams'] as num?)?.toDouble() ?? 0).round();
@@ -2058,15 +2330,20 @@ class _InventoryScreenState extends State<InventoryScreen>
       ),
       child: Row(
         children: [
-          SizedBox(width: 72, child: Text('$gross', style: theme.textTheme.bodyMedium)),
+          SizedBox(
+              width: 72,
+              child: Text('$gross', style: theme.textTheme.bodyMedium)),
           SizedBox(width: _colGap),
-          SizedBox(width: 72, child: Text('$net', style: theme.textTheme.bodyMedium)),
+          SizedBox(
+              width: 72,
+              child: Text('$net', style: theme.textTheme.bodyMedium)),
         ],
       ),
     );
   }
 
-  Future<void> _showProductPicker(BuildContext context, LocalizationService loc) async {
+  Future<void> _showProductPicker(
+      BuildContext context, LocalizationService loc) async {
     final productStore = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
     final est = account.establishment;
@@ -2079,7 +2356,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     final products = productStore.getNomenclatureProducts(estId);
     if (products.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${loc.t('nomenclature')}: ${loc.t('no_products')}')),
+        SnackBar(
+            content: Text('${loc.t('nomenclature')}: ${loc.t('no_products')}')),
       );
       return;
     }
@@ -2111,7 +2389,8 @@ class _InventoryScreenState extends State<InventoryScreen>
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx2, setState) => AlertDialog(
-            title: Text(loc.t('inventory_export_dialog_title') ?? 'Сохранение на устройство'),
+            title: Text(loc.t('inventory_export_dialog_title') ??
+                'Сохранение на устройство'),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -2124,7 +2403,8 @@ class _InventoryScreenState extends State<InventoryScreen>
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
-                    children: LocalizationService.productLanguageCodes.map((code) {
+                    children:
+                        LocalizationService.productLanguageCodes.map((code) {
                       return ChoiceChip(
                         label: Text(loc.getLanguageName(code)),
                         selected: selectedLang == code,
@@ -2141,11 +2421,14 @@ class _InventoryScreenState extends State<InventoryScreen>
                 child: Text(MaterialLocalizations.of(ctx2).cancelButtonLabel),
               ),
               FilledButton(
-                onPressed: () => Navigator.of(ctx).pop((format: 'excel', lang: selectedLang)),
-                child: Text(loc.t('inventory_export_excel') ?? 'Сохранить Excel'),
+                onPressed: () => Navigator.of(ctx)
+                    .pop((format: 'excel', lang: selectedLang)),
+                child:
+                    Text(loc.t('inventory_export_excel') ?? 'Сохранить Excel'),
               ),
               TextButton(
-                onPressed: () => Navigator.of(ctx).pop((format: 'csv', lang: selectedLang)),
+                onPressed: () =>
+                    Navigator.of(ctx).pop((format: 'csv', lang: selectedLang)),
                 child: const Text('CSV'),
               ),
             ],
@@ -2155,16 +2438,20 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
-  Future<void> _downloadExcel(List<int> bytes, Map<String, dynamic> payload, LocalizationService loc, String extension) async {
+  Future<void> _downloadExcel(List<int> bytes, Map<String, dynamic> payload,
+      LocalizationService loc, String extension) async {
     final header = payload['header'] as Map<String, dynamic>? ?? {};
-    final date = header['date'] as String? ?? DateTime.now().toIso8601String().split('T').first;
+    final date = header['date'] as String? ??
+        DateTime.now().toIso8601String().split('T').first;
     final fileName = 'inventory_$date.$extension';
     await saveFileBytes(fileName, bytes);
   }
 
-  Future<void> _downloadCsv(String csvData, Map<String, dynamic> payload, LocalizationService loc) async {
+  Future<void> _downloadCsv(String csvData, Map<String, dynamic> payload,
+      LocalizationService loc) async {
     final header = payload['header'] as Map<String, dynamic>? ?? {};
-    final date = header['date'] as String? ?? DateTime.now().toIso8601String().split('T').first;
+    final date = header['date'] as String? ??
+        DateTime.now().toIso8601String().split('T').first;
     final fileName = 'inventory_$date.csv';
     final bytes = utf8.encode(csvData);
     await saveFileBytes(fileName, bytes);
@@ -2172,10 +2459,12 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   /// Цена строки: из номенклатуры заведения (establishment_products) или карточки продукта × итого.
   /// 100 руб/кг → 10 г = 1 руб.
-  double? _computeRowPrice(_InventoryRow r, String establishmentId, ProductStoreSupabase productStore) {
+  double? _computeRowPrice(_InventoryRow r, String establishmentId,
+      ProductStoreSupabase productStore) {
     final p = r.product;
     if (p == null) return null;
-    final estPrice = productStore.getEstablishmentPrice(p.id, establishmentId)?.$1;
+    final estPrice =
+        productStore.getEstablishmentPrice(p.id, establishmentId)?.$1;
     if (r.isCountedByPackage) {
       final pp = p.packagePrice ?? estPrice;
       if (pp == null) return null;
@@ -2206,17 +2495,22 @@ class _InventoryScreenState extends State<InventoryScreen>
     List<Map<String, dynamic>>? aggregatedProducts,
   }) {
     final loc = context.read<LocalizationService>();
-    final roleKey = employee.roles.isNotEmpty ? 'role_${employee.roles.first}' : 'employee';
+    final roleKey =
+        employee.roles.isNotEmpty ? 'role_${employee.roles.first}' : 'employee';
     final header = {
       'establishmentName': establishment.name,
       'employeeName': employee.fullName,
-      'employeeRole': loc.tForLanguage(lang, roleKey) != roleKey ? loc.tForLanguage(lang, roleKey) : (employee.roleDisplayName),
+      'employeeRole': loc.tForLanguage(lang, roleKey) != roleKey
+          ? loc.tForLanguage(lang, roleKey)
+          : (employee.roleDisplayName),
       'department': employee.department,
-      'date': '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
+      'date':
+          '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
       'timeStart': _startTime != null
           ? '${_startTime!.hour.toString().padLeft(2, '0')}:${_startTime!.minute.toString().padLeft(2, '0')}'
           : null,
-      'timeEnd': '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}',
+      'timeEnd':
+          '${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}',
     };
     final rows = _rows.map((r) {
       final id = r.product != null
@@ -2227,7 +2521,11 @@ class _InventoryScreenState extends State<InventoryScreen>
       final map = <String, dynamic>{
         'productId': id,
         'productName': r.productName(lang),
-        'unit': r.isCountedByPackage ? (r.unitOverride == 'btl' ? (lang == 'ru' ? 'мл' : 'ml') : (lang == 'ru' ? 'г' : 'g')) : r.unitDisplayForBlank(lang),
+        'unit': r.isCountedByPackage
+            ? (r.unitOverride == 'btl'
+                ? (lang == 'ru' ? 'мл' : 'ml')
+                : (lang == 'ru' ? 'г' : 'g'))
+            : r.unitDisplayForBlank(lang),
         'quantities': r.isCountedByPackage
             ? r.quantities.map((q) => q * r.packageWeightGrams).toList()
             : r.isWeightInKg
@@ -2238,7 +2536,9 @@ class _InventoryScreenState extends State<InventoryScreen>
       if (r.isCountedByPackage) {
         map['packageCount'] = r.total;
         map['packageWeightGrams'] = r.packageWeightGrams;
-        map['unitRaw'] = r.unitOverride == 'btl' ? (lang == 'ru' ? 'бутылка' : 'bottle') : (lang == 'ru' ? 'упак.' : 'pkg');
+        map['unitRaw'] = r.unitOverride == 'btl'
+            ? (lang == 'ru' ? 'бутылка' : 'bottle')
+            : (lang == 'ru' ? 'упак.' : 'pkg');
       }
       if (r.isPf) map['pfUnit'] = r.pfUnit ?? _pfUnitPcs;
       // Цена: из номенклатуры заведения или карточки × итого
@@ -2293,7 +2593,8 @@ class _StandardInventoryRowTile extends StatefulWidget {
   final LocalizationService loc;
 
   @override
-  State<_StandardInventoryRowTile> createState() => _StandardInventoryRowTileState();
+  State<_StandardInventoryRowTile> createState() =>
+      _StandardInventoryRowTileState();
 }
 
 class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
@@ -2315,6 +2616,7 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
         );
       }
     }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       doScroll();
       Future.delayed(const Duration(milliseconds: 350), doScroll);
@@ -2349,7 +2651,9 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
-                  border: Border(bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
+                  border: Border(
+                      bottom: BorderSide(
+                          color: theme.dividerColor.withOpacity(0.5))),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2357,32 +2661,46 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
                     ...List.generate(
                       qtyCols,
                       (colIndex) {
-                        final isLastCell = widget.isLastRow && colIndex == qtyCols - 1;
+                        final isLastCell =
+                            widget.isLastRow && colIndex == qtyCols - 1;
                         return Padding(
-                          padding: EdgeInsets.only(right: colIndex < qtyCols - 1 ? widget.colGap : 0),
+                          padding: EdgeInsets.only(
+                              right:
+                                  colIndex < qtyCols - 1 ? widget.colGap : 0),
                           child: SizedBox(
                             width: widget.colQtyWidth,
                             child: Center(
                               child: widget.completed
-                                ? Text(widget.formatQty(row.quantityDisplayAt(colIndex)), style: theme.textTheme.bodyMedium)
-                                : _QtyCell(
-                                    key: ValueKey('qty_${widget.actualIndex}_$colIndex'),
-                                    value: row.quantities[colIndex],
-                                    useGrams: row.isWeightInKg,
-                                    onChanged: (v) => widget.onSetQuantity(widget.actualIndex, colIndex, v),
-                                    textInputAction: isLastCell ? TextInputAction.done : TextInputAction.next,
-                                    onFocusGained: () {
-                                      widget.onFocusChange(true);
-                                      if (colIndex == qtyCols - 1) {
-                                        widget.onLastCellFocused(widget.actualIndex);
-                                      }
-                                    },
-                                    onFocusLost: () {
-                                      widget.onFocusChange(false);
-                                      widget.onCellFocusLost(widget.actualIndex, colIndex);
-                                      if (colIndex == qtyCols - 2 && row.quantities[colIndex] > 0) _scrollToEnd();
-                                    },
-                                  ),
+                                  ? Text(
+                                      widget.formatQty(
+                                          row.quantityDisplayAt(colIndex)),
+                                      style: theme.textTheme.bodyMedium)
+                                  : _QtyCell(
+                                      key: ValueKey(
+                                          'qty_${widget.actualIndex}_$colIndex'),
+                                      value: row.quantities[colIndex],
+                                      useGrams: row.isWeightInKg,
+                                      onChanged: (v) => widget.onSetQuantity(
+                                          widget.actualIndex, colIndex, v),
+                                      textInputAction: isLastCell
+                                          ? TextInputAction.done
+                                          : TextInputAction.next,
+                                      onFocusGained: () {
+                                        widget.onFocusChange(true);
+                                        if (colIndex == qtyCols - 1) {
+                                          widget.onLastCellFocused(
+                                              widget.actualIndex);
+                                        }
+                                      },
+                                      onFocusLost: () {
+                                        widget.onFocusChange(false);
+                                        widget.onCellFocusLost(
+                                            widget.actualIndex, colIndex);
+                                        if (colIndex == qtyCols - 2 &&
+                                            row.quantities[colIndex] > 0)
+                                          _scrollToEnd();
+                                      },
+                                    ),
                             ),
                           ),
                         );
@@ -2437,25 +2755,28 @@ class _ProductUnitDropdown extends StatelessWidget {
   Widget build(BuildContext context) {
     final options = _allowedUnits(product);
     final normalized = value.trim().toLowerCase();
-    final match = options.where((u) => u.toLowerCase() == normalized).firstOrNull;
+    final match =
+        options.where((u) => u.toLowerCase() == normalized).firstOrNull;
     final displayValue = match ?? options.first;
     return DropdownButtonHideUnderline(
       child: DropdownButton<String>(
         value: displayValue,
         isDense: true,
         isExpanded: true,
-        items: options.map((u) => DropdownMenuItem(
-          value: u,
-          child: Text(
-            u == 'pkg'
-                ? (lang == 'ru' ? 'упак.' : 'pkg')
-                : u == 'btl'
-                    ? (lang == 'ru' ? 'бутылка' : 'bottle')
-                    : CulinaryUnits.displayName(u, lang),
-            style: theme.textTheme.bodySmall,
-            overflow: TextOverflow.ellipsis,
-          ),
-        )).toList(),
+        items: options
+            .map((u) => DropdownMenuItem(
+                  value: u,
+                  child: Text(
+                    u == 'pkg'
+                        ? (lang == 'ru' ? 'упак.' : 'pkg')
+                        : u == 'btl'
+                            ? (lang == 'ru' ? 'бутылка' : 'bottle')
+                            : CulinaryUnits.displayName(u, lang),
+                    style: theme.textTheme.bodySmall,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ))
+            .toList(),
         onChanged: (v) => v != null ? onChanged(v) : null,
       ),
     );
@@ -2464,9 +2785,11 @@ class _ProductUnitDropdown extends StatelessWidget {
 
 class _QtyCell extends StatefulWidget {
   final double value;
+
   /// true: отображать и вводить в граммах (значение хранится в кг, показываем value*1000).
   final bool useGrams;
   final void Function(double) onChanged;
+
   /// TextInputAction.next — «Далее» на клавиатуре переходит к следующей ячейке.
   final TextInputAction textInputAction;
   final VoidCallback? onFocusGained;
@@ -2492,7 +2815,8 @@ class _QtyCellState extends State<_QtyCell> {
   late double _currentValue;
   Timer? _updateTimer;
 
-  double get _displayValueRaw => widget.useGrams ? widget.value * 1000 : widget.value;
+  double get _displayValueRaw =>
+      widget.useGrams ? widget.value * 1000 : widget.value;
 
   @override
   void initState() {
@@ -2521,7 +2845,8 @@ class _QtyCellState extends State<_QtyCell> {
       widget.onFocusLost?.call();
       // При потере фокуса применяем изменения
       final textValue = _controller.text.trim();
-      final parsedValue = double.tryParse(textValue.replaceFirst(',', '.')) ?? 0;
+      final parsedValue =
+          double.tryParse(textValue.replaceFirst(',', '.')) ?? 0;
       final actualValue = widget.useGrams ? parsedValue / 1000 : parsedValue;
       widget.onChanged(actualValue);
     }
@@ -2545,36 +2870,40 @@ class _QtyCellState extends State<_QtyCell> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return TextField(
-      controller: _controller,
-      focusNode: _focus,
-      textInputAction: widget.textInputAction,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),
-      ],
-      textAlign: TextAlign.center,
-      style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12, height: 1.0),
-      decoration: InputDecoration(
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(3)),
-        filled: true,
-        fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-      ),
-      onChanged: (s) {
-        // Обновляем локальное значение
-        final v = double.tryParse(s.replaceFirst(',', '.')) ?? 0;
-        _currentValue = widget.useGrams ? v / 1000 : v;
+    return SizedBox(
+      height: 40,
+      child: TextField(
+        controller: _controller,
+        focusNode: _focus,
+        textInputAction: widget.textInputAction,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),
+        ],
+        textAlign: TextAlign.center,
+        style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13, height: 1.2),
+        decoration: InputDecoration(
+          isDense: false,
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+          filled: true,
+          fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+        ),
+        onChanged: (s) {
+          // Обновляем локальное значение
+          final v = double.tryParse(s.replaceFirst(',', '.')) ?? 0;
+          _currentValue = widget.useGrams ? v / 1000 : v;
 
-        // Откладываем применение изменений для избежания частых перестроений
-        _updateTimer?.cancel();
-        _updateTimer = Timer(const Duration(milliseconds: 150), () {
-          if (mounted) {
-            widget.onChanged(_currentValue);
-          }
-        });
-      },
+          // Откладываем применение изменений для избежания частых перестроений
+          _updateTimer?.cancel();
+          _updateTimer = Timer(const Duration(milliseconds: 150), () {
+            if (mounted) {
+              widget.onChanged(_currentValue);
+            }
+          });
+        },
+      ),
     );
   }
 }
@@ -2637,8 +2966,10 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
               itemBuilder: (_, i) {
                 final p = _filtered[i];
                 return ListTile(
-                  title: Text(p.getLocalizedName(widget.loc.currentLanguageCode)),
-                  subtitle: Text('${p.category} · ${CulinaryUnits.displayName((p.unit ?? 'g').trim().toLowerCase(), widget.loc.currentLanguageCode)}'),
+                  title:
+                      Text(p.getLocalizedName(widget.loc.currentLanguageCode)),
+                  subtitle: Text(
+                      '${p.category} · ${CulinaryUnits.displayName((p.unit ?? 'g').trim().toLowerCase(), widget.loc.currentLanguageCode)}'),
                   onTap: () => widget.onSelect(p),
                 );
               },
@@ -2755,13 +3086,15 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     if (!mounted) return false;
     if (MediaQuery.viewInsetsOf(context).bottom > 0) return true;
     if (MediaQuery.sizeOf(context).width >= 600) return false;
-    return _searchFocusNode.hasFocus || _iikoCellFocusNodes.any((n) => n.hasFocus);
+    return _searchFocusNode.hasFocus ||
+        _iikoCellFocusNodes.any((n) => n.hasFocus);
   }
 
   @override
   void initState() {
     super.initState(); // AutoSaveMixin.initState регистрирует lifecycle-хуки
-    _filterCtrl.addListener(() => setState(() => _nameFilter = _filterCtrl.text));
+    _filterCtrl
+        .addListener(() => setState(() => _nameFilter = _filterCtrl.text));
     _searchFocusNode.addListener(() => setState(() {}));
     _registerJsNavChannel();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -2835,7 +3168,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
     // Всегда ждём и бланк, и продукты вместе — так _rows и sheetNames всегда синхронны.
     // restoreBlankFromStorage запускаем параллельно с loadProducts чтобы не блокировать.
-    final blankFuture = iikoStore.restoreBlankFromStorage(establishmentId: estId);
+    final blankFuture =
+        iikoStore.restoreBlankFromStorage(establishmentId: estId);
 
     if (iikoStore.products.isEmpty) {
       // Продуктов нет в памяти — грузим из БД
@@ -3064,7 +3398,9 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       if (chefList.isEmpty) return;
       final chef = chefList.first as Map<String, dynamic>;
 
-      final dept = (employee.department == 'bar' || employee.hasRole('bar_manager') || employee.hasRole('bartender'))
+      final dept = (employee.department == 'bar' ||
+              employee.hasRole('bar_manager') ||
+              employee.hasRole('bartender'))
           ? 'bar'
           : 'kitchen';
       final payload = {
@@ -3139,7 +3475,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     for (final r in _rows) {
       if (r.total > 0 && r.product.code != null) {
         final sheet = r.product.sheetName;
-        qtyBySheetCode.putIfAbsent(sheet, () => {})[r.product.code!.trim()] = r.total;
+        qtyBySheetCode.putIfAbsent(sheet, () => {})[r.product.code!.trim()] =
+            r.total;
       }
     }
     final qtyByCodeFlat = <String, double>{
@@ -3154,7 +3491,11 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     String colLetter(int idx) {
       var result = '';
       var n = idx + 1;
-      while (n > 0) { n--; result = String.fromCharCode(65 + n % 26) + result; n ~/= 26; }
+      while (n > 0) {
+        n--;
+        result = String.fromCharCode(65 + n % 26) + result;
+        n ~/= 26;
+      }
       return result;
     }
 
@@ -3164,24 +3505,25 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     if (ssEntry != null) {
       final ssXml = utf8.decode(ssEntry.content as List<int>);
       final siRe = RegExp(r'<si>(.*?)</si>', dotAll: true);
-      final tRe  = RegExp(r'<t[^>]*>([^<]*)</t>');
+      final tRe = RegExp(r'<t[^>]*>([^<]*)</t>');
       for (final si in siRe.allMatches(ssXml)) {
-        sharedStrings.add(tRe.allMatches(si.group(1)!).map((m) => m.group(1)!).join());
+        sharedStrings
+            .add(tRe.allMatches(si.group(1)!).map((m) => m.group(1)!).join());
       }
     }
 
     // ── 3. Строим карту листов: displayName → { path, col } ───────────────────
-    final wbEntry   = arc.findFile('xl/workbook.xml');
+    final wbEntry = arc.findFile('xl/workbook.xml');
     final relsEntry = arc.findFile('xl/_rels/workbook.xml.rels');
     final sheetInfos = <String, ({String path, int col})>{};
 
     if (wbEntry != null && relsEntry != null) {
-      final wb   = utf8.decode(wbEntry.content   as List<int>);
+      final wb = utf8.decode(wbEntry.content as List<int>);
       final rels = utf8.decode(relsEntry.content as List<int>);
       for (final sm in RegExp(r'<sheet\b([^>]*)/>').allMatches(wb)) {
         final attrs = sm.group(1)!;
         final nameM = RegExp(r'name="([^"]*)"').firstMatch(attrs);
-        final rIdM  = RegExp(r'r:id="([^"]*)"').firstMatch(attrs);
+        final rIdM = RegExp(r'r:id="([^"]*)"').firstMatch(attrs);
         if (nameM == null || rIdM == null) continue;
         final displayName = nameM.group(1)!;
         final rId = rIdM.group(1)!;
@@ -3199,17 +3541,20 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
     // ── 4. Патчим каждый лист ─────────────────────────────────────────────────
     String patchSheetXml(String xml, String sheetName, int sheetQtyCol) {
-      final qtyByCode = qtyBySheetCode[sheetName]
-          ?? qtyBySheetCode[null]
-          ?? qtyByCodeFlat;
+      final qtyByCode =
+          qtyBySheetCode[sheetName] ?? qtyBySheetCode[null] ?? qtyByCodeFlat;
       if (qtyByCode.isEmpty) return xml;
 
       final qtyColLetter = colLetter(sheetQtyCol);
       int codeColIdx = 2;
       outer:
-      for (final rowM in RegExp(r'<row r="(\d+)"[^>]*>(.*?)</row>', dotAll: true).allMatches(xml)) {
+      for (final rowM
+          in RegExp(r'<row r="(\d+)"[^>]*>(.*?)</row>', dotAll: true)
+              .allMatches(xml)) {
         if (int.parse(rowM.group(1)!) > 20) break;
-        for (final cm in RegExp(r'<c r="([A-Z]+)\d+"(?:[^>]*)t="s"(?:[^>]*)><v>(\d+)</v></c>').allMatches(rowM.group(2)!)) {
+        for (final cm in RegExp(
+                r'<c r="([A-Z]+)\d+"(?:[^>]*)t="s"(?:[^>]*)><v>(\d+)</v></c>')
+            .allMatches(rowM.group(2)!)) {
           final idx = int.tryParse(cm.group(2)!) ?? -1;
           if (idx >= 0 && idx < sharedStrings.length) {
             final v = sharedStrings[idx].trim().toLowerCase();
@@ -3223,15 +3568,16 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         }
       }
       final codeColLetter = colLetter(codeColIdx);
-      devLog('_buildFromOriginal[$sheetName]: codeCol=$codeColLetter qtyCol=$qtyColLetter');
+      devLog(
+          '_buildFromOriginal[$sheetName]: codeCol=$codeColLetter qtyCol=$qtyColLetter');
 
       var patchedCount = 0;
       final result = xml.replaceAllMapped(
         RegExp(r'(<row r="(\d+)"[^>]*>)(.*?)(</row>)', dotAll: true),
         (m) {
-          final rowOpen  = m.group(1)!;
-          final rowIdx   = m.group(2)!;
-          var   rowBody  = m.group(3)!;
+          final rowOpen = m.group(1)!;
+          final rowIdx = m.group(2)!;
+          var rowBody = m.group(3)!;
           final rowClose = m.group(4)!;
 
           // Код может быть shared string (t="s") или число (бланки из Numbers)
@@ -3244,9 +3590,9 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           final val = codeM.group(2) ?? '';
           final String codeStr = attrs.contains('t="s"')
               ? ((int.tryParse(val) ?? -1) >= 0 &&
-                        (int.tryParse(val) ?? -1) < sharedStrings.length
-                    ? sharedStrings[int.parse(val)].trim()
-                    : '')
+                      (int.tryParse(val) ?? -1) < sharedStrings.length
+                  ? sharedStrings[int.parse(val)].trim()
+                  : '')
               : val.trim();
           if (codeStr.isEmpty) return m.group(0)!;
           final qty = qtyByCode[codeStr];
@@ -3254,22 +3600,28 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
           final qtyStr = qty == qty.roundToDouble()
               ? qty.toInt().toString()
-              : qty.toStringAsFixed(3)
+              : qty
+                  .toStringAsFixed(3)
                   .replaceAll(RegExp(r'0+$'), '')
                   .replaceAll(RegExp(r'\.$'), '');
           final cellRef = '$qtyColLetter$rowIdx';
 
-          final selfM  = RegExp('<c r="${RegExp.escape(cellRef)}"([^>]*)/>').firstMatch(rowBody);
+          final selfM = RegExp('<c r="${RegExp.escape(cellRef)}"([^>]*)/>')
+              .firstMatch(rowBody);
           final existM = RegExp(
-            '<c r="${RegExp.escape(cellRef)}"([^>]*)>(.*?)</c>', dotAll: true,
+            '<c r="${RegExp.escape(cellRef)}"([^>]*)>(.*?)</c>',
+            dotAll: true,
           ).firstMatch(rowBody);
 
           if (selfM != null) {
-            rowBody = rowBody.replaceFirst(selfM.group(0)!, '<c r="$cellRef"${selfM.group(1)!}><v>$qtyStr</v></c>');
+            rowBody = rowBody.replaceFirst(selfM.group(0)!,
+                '<c r="$cellRef"${selfM.group(1)!}><v>$qtyStr</v></c>');
           } else if (existM != null) {
-            rowBody = rowBody.replaceFirst(existM.group(0)!, '<c r="$cellRef"${existM.group(1)!}><v>$qtyStr</v></c>');
+            rowBody = rowBody.replaceFirst(existM.group(0)!,
+                '<c r="$cellRef"${existM.group(1)!}><v>$qtyStr</v></c>');
           } else {
-            final sM = RegExp('<c r="[A-Z]+$rowIdx" s="(\\d+)"').firstMatch(rowBody);
+            final sM =
+                RegExp('<c r="[A-Z]+$rowIdx" s="(\\d+)"').firstMatch(rowBody);
             final sAttr = sM != null ? ' s="${sM.group(1)}"' : '';
             rowBody += '<c r="$cellRef"$sAttr><v>$qtyStr</v></c>';
           }
@@ -3287,7 +3639,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       final sheetEntry = arc.findFile(entry.value.path);
       if (sheetEntry == null) continue;
       final xml = utf8.decode(sheetEntry.content as List<int>);
-      patchedXmls[entry.value.path] = patchSheetXml(xml, entry.key, entry.value.col);
+      patchedXmls[entry.value.path] =
+          patchSheetXml(xml, entry.key, entry.value.col);
     }
 
     // ── 5. Заменяем листы в ZIP без перепаковки остальных файлов ─────────────
@@ -3300,13 +3653,14 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
   /// Заменяет один файл в ZIP-архиве без изменения остальных entries.
   /// Возвращает новые байты ZIP.
-  Uint8List _zipReplaceFile(Uint8List zipBytes, String targetName, List<int> newContent) {
+  Uint8List _zipReplaceFile(
+      Uint8List zipBytes, String targetName, List<int> newContent) {
     // Сжимаем новые данные — raw DEFLATE (без zlib-заголовка и Adler32)
     // ZIP format требует именно raw deflate (метод 8), не zlib-обёртку
     final newCompressed = Deflate(newContent, level: 6).getBytes();
-    final newCrc        = _crc32(newContent);
+    final newCrc = _crc32(newContent);
     final newUncompSize = newContent.length;
-    final newCompSize   = newCompressed.length;
+    final newCompSize = newCompressed.length;
     final targetNameBytes = utf8.encode(targetName);
 
     // Собираем новый ZIP поэнтрийно
@@ -3328,41 +3682,42 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
       if (sig == 0x04034b50) {
         // Local file header
-        final compMethod  = _readU16(pos + 8);
-        final crc32orig   = _readU32(pos + 14);
-        final compSizeOrig   = _readU32(pos + 18);
+        final compMethod = _readU16(pos + 8);
+        final crc32orig = _readU32(pos + 14);
+        final compSizeOrig = _readU32(pos + 18);
         final uncompSizeOrig = _readU32(pos + 22);
-        final nameLen     = _readU16(pos + 26);
-        final extraLen    = _readU16(pos + 28);
-        final name        = utf8.decode(zipBytes.sublist(pos + 30, pos + 30 + nameLen));
-        final dataOffset  = pos + 30 + nameLen + extraLen;
+        final nameLen = _readU16(pos + 26);
+        final extraLen = _readU16(pos + 28);
+        final name =
+            utf8.decode(zipBytes.sublist(pos + 30, pos + 30 + nameLen));
+        final dataOffset = pos + 30 + nameLen + extraLen;
 
         final isTarget = (name == targetName);
-        final effectiveCompSize   = isTarget ? newCompSize   : compSizeOrig;
+        final effectiveCompSize = isTarget ? newCompSize : compSizeOrig;
         final effectiveUncompSize = isTarget ? newUncompSize : uncompSizeOrig;
-        final effectiveCrc        = isTarget ? newCrc        : crc32orig;
-        final effectiveMethod     = isTarget ? 8             : compMethod; // 8=deflate
+        final effectiveCrc = isTarget ? newCrc : crc32orig;
+        final effectiveMethod = isTarget ? 8 : compMethod; // 8=deflate
 
         final localHeaderOffset = out.length;
 
         // Пишем local header с обновлёнными полями
         final lh = Uint8List(30 + nameLen + extraLen);
         final lhBd = ByteData.sublistView(lh);
-        lhBd.setUint32(0,  0x04034b50, Endian.little); // sig
-        lhBd.setUint16(4,  _readU16(pos + 4),  Endian.little); // version needed
-        lhBd.setUint16(6,  _readU16(pos + 6),  Endian.little); // flags
-        lhBd.setUint16(8,  effectiveMethod,     Endian.little); // compression
+        lhBd.setUint32(0, 0x04034b50, Endian.little); // sig
+        lhBd.setUint16(4, _readU16(pos + 4), Endian.little); // version needed
+        lhBd.setUint16(6, _readU16(pos + 6), Endian.little); // flags
+        lhBd.setUint16(8, effectiveMethod, Endian.little); // compression
         lhBd.setUint16(10, _readU16(pos + 10), Endian.little); // mod time
         lhBd.setUint16(12, _readU16(pos + 12), Endian.little); // mod date
-        lhBd.setUint32(14, effectiveCrc,        Endian.little); // crc
-        lhBd.setUint32(18, effectiveCompSize,   Endian.little); // comp size
+        lhBd.setUint32(14, effectiveCrc, Endian.little); // crc
+        lhBd.setUint32(18, effectiveCompSize, Endian.little); // comp size
         lhBd.setUint32(22, effectiveUncompSize, Endian.little); // uncomp size
-        lhBd.setUint16(26, nameLen,             Endian.little);
-        lhBd.setUint16(28, extraLen,            Endian.little);
+        lhBd.setUint16(26, nameLen, Endian.little);
+        lhBd.setUint16(28, extraLen, Endian.little);
         lh.setRange(30, 30 + nameLen, zipBytes, pos + 30);
         if (extraLen > 0) {
-          lh.setRange(30 + nameLen, 30 + nameLen + extraLen,
-              zipBytes, pos + 30 + nameLen);
+          lh.setRange(30 + nameLen, 30 + nameLen + extraLen, zipBytes,
+              pos + 30 + nameLen);
         }
         out.add(lh);
 
@@ -3404,20 +3759,20 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     for (final entry in cdEntries) {
       final origCdPos = _findCdEntry(zipBytes, entry.name);
       if (origCdPos < 0) continue;
-      final nameLen  = _readU16(origCdPos + 28);
+      final nameLen = _readU16(origCdPos + 28);
       final extraLen = _readU16(origCdPos + 30);
-      final cmtLen   = _readU16(origCdPos + 32);
+      final cmtLen = _readU16(origCdPos + 32);
       final cdEntrySize = 46 + nameLen + extraLen + cmtLen;
 
       final ce = Uint8List(cdEntrySize);
       ce.setRange(0, cdEntrySize, zipBytes, origCdPos);
       final ceBd = ByteData.sublistView(ce);
       // Обновляем поля
-      ceBd.setUint16(10, entry.effectiveMethod,     Endian.little);
-      ceBd.setUint32(16, entry.effectiveCrc,        Endian.little);
-      ceBd.setUint32(20, entry.effectiveCompSize,   Endian.little);
+      ceBd.setUint16(10, entry.effectiveMethod, Endian.little);
+      ceBd.setUint32(16, entry.effectiveCrc, Endian.little);
+      ceBd.setUint32(20, entry.effectiveCompSize, Endian.little);
       ceBd.setUint32(24, entry.effectiveUncompSize, Endian.little);
-      ceBd.setUint32(42, entry.newOffset,           Endian.little); // local header offset
+      ceBd.setUint32(42, entry.newOffset, Endian.little); // local header offset
       out.add(ce);
     }
     final cdEnd = out.length;
@@ -3426,14 +3781,14 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     // End of central directory record
     final eocd = Uint8List(22);
     final eocdBd = ByteData.sublistView(eocd);
-    eocdBd.setUint32(0,  0x06054b50,      Endian.little); // sig
-    eocdBd.setUint16(4,  0,               Endian.little); // disk num
-    eocdBd.setUint16(6,  0,               Endian.little); // disk cd start
-    eocdBd.setUint16(8,  cdEntries.length, Endian.little);
+    eocdBd.setUint32(0, 0x06054b50, Endian.little); // sig
+    eocdBd.setUint16(4, 0, Endian.little); // disk num
+    eocdBd.setUint16(6, 0, Endian.little); // disk cd start
+    eocdBd.setUint16(8, cdEntries.length, Endian.little);
     eocdBd.setUint16(10, cdEntries.length, Endian.little);
-    eocdBd.setUint32(12, cdSize,           Endian.little);
-    eocdBd.setUint32(16, cdStart,          Endian.little);
-    eocdBd.setUint16(20, 0,               Endian.little); // comment length
+    eocdBd.setUint32(12, cdSize, Endian.little);
+    eocdBd.setUint32(16, cdStart, Endian.little);
+    eocdBd.setUint16(20, 0, Endian.little); // comment length
     out.add(eocd);
 
     return out.toBytes();
@@ -3451,15 +3806,18 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         if (nameLen == nameBytes.length) {
           bool match = true;
           for (int i = 0; i < nameLen; i++) {
-            if (zipBytes[pos + 46 + i] != nameBytes[i]) { match = false; break; }
+            if (zipBytes[pos + 46 + i] != nameBytes[i]) {
+              match = false;
+              break;
+            }
           }
           if (match) return pos;
         }
         final extraLen = bd.getUint16(pos + 30, Endian.little);
-        final cmtLen   = bd.getUint16(pos + 32, Endian.little);
+        final cmtLen = bd.getUint16(pos + 32, Endian.little);
         pos += 46 + nameLen + extraLen + cmtLen;
       } else if (sig == 0x04034b50) {
-        final nameLen  = bd.getUint16(pos + 26, Endian.little);
+        final nameLen = bd.getUint16(pos + 26, Endian.little);
         final extraLen = bd.getUint16(pos + 28, Endian.little);
         final compSize = bd.getUint32(pos + 18, Endian.little);
         pos += 30 + nameLen + extraLen + compSize;
@@ -3492,8 +3850,18 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   /// в БД при парсинге 2-го и последующих листов Excel.
   static bool _isIikoHeaderRow(String name) {
     final lower = name.trim().toLowerCase();
-    const headers = ['наименование', 'код', 'ед. изм', 'остаток', 'бланк',
-        'организация', 'на дату', 'склад', 'группа', 'товар'];
+    const headers = [
+      'наименование',
+      'код',
+      'ед. изм',
+      'остаток',
+      'бланк',
+      'организация',
+      'на дату',
+      'склад',
+      'группа',
+      'товар'
+    ];
     return headers.any((h) => lower == h || lower.startsWith(h));
   }
 
@@ -3518,11 +3886,21 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     final sheet = excel[sheetName];
 
     int row = 7;
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value = TextCellValue('Товар');
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value = TextCellValue('Код');
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value = TextCellValue('Наименование');
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value = TextCellValue('Ед. изм.');
-    sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value = TextCellValue('Остаток фактический');
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
+        .value = TextCellValue('Товар');
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row))
+        .value = TextCellValue('Код');
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row))
+        .value = TextCellValue('Наименование');
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row))
+        .value = TextCellValue('Ед. изм.');
+    sheet
+        .cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row))
+        .value = TextCellValue('Остаток фактический');
     row++;
 
     String? lastGroup;
@@ -3531,20 +3909,25 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       if (groupName != lastGroup) {
         lastGroup = groupName;
         if (groupName.isNotEmpty) {
-          sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row)).value =
-              TextCellValue(groupName);
+          sheet
+              .cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: row))
+              .value = TextCellValue(groupName);
           row++;
         }
       }
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row)).value =
-          TextCellValue(r.product.code ?? '');
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row)).value =
-          TextCellValue(r.product.name);
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row)).value =
-          TextCellValue(r.product.unit ?? '');
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: row))
+          .value = TextCellValue(r.product.code ?? '');
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: row))
+          .value = TextCellValue(r.product.name);
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: row))
+          .value = TextCellValue(r.product.unit ?? '');
       if (r.total > 0) {
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row)).value =
-            DoubleCellValue(r.total);
+        sheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row))
+            .value = DoubleCellValue(r.total);
       }
       row++;
     }
@@ -3579,11 +3962,13 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko', style: const TextStyle(fontSize: 16)),
+            Text(loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko',
+                style: const TextStyle(fontSize: 16)),
             Text(
-                account.establishment?.name ?? '',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
-              ),
+              account.establishment?.name ?? '',
+              style:
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+            ),
           ],
         ),
         actions: const [],
@@ -3607,7 +3992,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                     Consumer<IikoProductStore>(
                       builder: (ctx, store, _) {
                         final sheetNames = store.sheetNames;
-                        if (sheetNames.length <= 1) return const SizedBox.shrink();
+                        if (sheetNames.length <= 1)
+                          return const SizedBox.shrink();
                         final activeSheet = sheetNames.contains(_selectedSheet)
                             ? _selectedSheet!
                             : sheetNames.first;
@@ -3650,64 +4036,72 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                     ),
                     // Статус-строка — скрываем при фокусе (поиск или ячейка)
                     if (!_isKeyboardActive)
-                    Container(
-                      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      child: Row(
-                        children: [
-                          Icon(Icons.table_chart_outlined, size: 16,
-                              color: theme.colorScheme.primary),
-                          const SizedBox(width: 6),
-                          Text(
-                            'iiko · ${_rows.length} поз. · '
-                            '${_date.day.toString().padLeft(2, '0')}.'
-                            '${_date.month.toString().padLeft(2, '0')}.'
-                            '${_date.year}',
-                            style: TextStyle(fontSize: 12,
-                                color: theme.colorScheme.onSurfaceVariant),
-                          ),
-                          const Spacer(),
-                          // Индикатор защиты данных
-                          if (_lastSavedAt != null)
-                            Container(
-                              margin: const EdgeInsets.only(right: 4),
-                              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.green.withOpacity(0.4)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.security, size: 12, color: Colors.green),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Данные защищены',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.green[700],
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                      Container(
+                        color: theme.colorScheme.surfaceContainerHighest
+                            .withOpacity(0.5),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 6),
+                        child: Row(
+                          children: [
+                            Icon(Icons.table_chart_outlined,
+                                size: 16, color: theme.colorScheme.primary),
+                            const SizedBox(width: 6),
+                            Text(
+                              'iiko · ${_rows.length} поз. · '
+                              '${_date.day.toString().padLeft(2, '0')}.'
+                              '${_date.month.toString().padLeft(2, '0')}.'
+                              '${_date.year}',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.onSurfaceVariant),
                             ),
-                          TextButton(
-                            onPressed: () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: _date,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime(2030),
-                              );
-                              if (picked != null) setState(() => _date = picked);
-                            },
-                            child: const Text('Дата', style: TextStyle(fontSize: 12)),
-                          ),
-                        ],
+                            const Spacer(),
+                            // Индикатор защиты данных
+                            if (_lastSavedAt != null)
+                              Container(
+                                margin: const EdgeInsets.only(right: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 7, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                      color: Colors.green.withOpacity(0.4)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.security,
+                                        size: 12, color: Colors.green),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Данные защищены',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.green[700],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            TextButton(
+                              onPressed: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: _date,
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime(2030),
+                                );
+                                if (picked != null)
+                                  setState(() => _date = picked);
+                              },
+                              child: const Text('Дата',
+                                  style: TextStyle(fontSize: 12)),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
                     // Шапка таблицы
                     _IikoInventoryHeader(
                       qtyCols: _rows.isEmpty
@@ -3725,12 +4119,15 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                               onPointerDown: (_) {
                                 final pf = FocusManager.instance.primaryFocus;
                                 final isOurInput = pf != null &&
-                                    (_iikoCellFocusNodes.contains(pf) || pf == _searchFocusNode);
+                                    (_iikoCellFocusNodes.contains(pf) ||
+                                        pf == _searchFocusNode);
                                 if (!isOurInput) return;
                                 final nodeToRestore = pf!;
-                                Future.delayed(const Duration(milliseconds: 100), () {
+                                Future.delayed(
+                                    const Duration(milliseconds: 100), () {
                                   if (!mounted) return;
-                                  final current = FocusManager.instance.primaryFocus;
+                                  final current =
+                                      FocusManager.instance.primaryFocus;
                                   if (current != null &&
                                       (_iikoCellFocusNodes.contains(current) ||
                                           current == _searchFocusNode)) return;
@@ -3747,30 +4144,34 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                     ),
                     // Кнопки внизу — скрываем при фокусе (поиск или ячейка)
                     if (!_isKeyboardActive)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: FilledButton.icon(
-                              icon: const Icon(Icons.save_alt),
-                              label: const Text('Сохранить и скачать xlsx'),
-                              onPressed: _saveAndExport,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: FilledButton.icon(
+                                icon: const Icon(Icons.save_alt),
+                                label: const Text('Сохранить и скачать xlsx'),
+                                onPressed: _saveAndExport,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          OutlinedButton(
-                            onPressed: _confirmReset,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: theme.colorScheme.error,
-                              side: BorderSide(color: theme.colorScheme.error.withOpacity(0.5)),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            const SizedBox(width: 8),
+                            OutlinedButton(
+                              onPressed: _confirmReset,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: theme.colorScheme.error,
+                                side: BorderSide(
+                                    color: theme.colorScheme.error
+                                        .withOpacity(0.5)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 12),
+                              ),
+                              child: const Text('Обнулить',
+                                  style: TextStyle(fontSize: 13)),
                             ),
-                            child: const Text('Обнулить', style: TextStyle(fontSize: 13)),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ],
@@ -3780,11 +4181,11 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 }
 
 // Ширина фиксированных колонок (единицы и итого уже для названий)
-const double _iikoColName  = 168; // Наименование (больше под длинные названия)
-const double _iikoColUnit  =  34; // Ед. изм. (−30%)
-const double _iikoColTotal =  52; // Итого (чтобы слово влезало целиком)
-const double _iikoColCell  =  48; // Ячейка ввода (= _colQtyWidth)
-const double _iikoColGap   =   4; // Отступ между ячейками (= _colGap)
+const double _iikoColName = 168; // Наименование (больше под длинные названия)
+const double _iikoColUnit = 34; // Ед. изм. (−30%)
+const double _iikoColTotal = 52; // Итого (чтобы слово влезало целиком)
+const double _iikoColCell = 48; // Ячейка ввода (= _colQtyWidth)
+const double _iikoColGap = 4; // Отступ между ячейками (= _colGap)
 
 // ── Шапка таблицы ────────────────────────────────────────────────────────────
 // Левая часть фиксирована (Наименование + Итого), правая скроллируется вместе со строками.
@@ -3796,10 +4197,10 @@ class _IikoInventoryHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final headerBg   = theme.colorScheme.surfaceContainerHighest.withOpacity(0.5);
-    final borderClr  = theme.dividerColor;
-    final textStyle  = theme.textTheme.labelMedium?.copyWith(
-        fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface) ??
+    final headerBg = theme.colorScheme.surfaceContainerHighest.withOpacity(0.5);
+    final borderClr = theme.dividerColor;
+    final textStyle = theme.textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface) ??
         const TextStyle(fontSize: 12, fontWeight: FontWeight.bold);
     final border = BorderSide(color: borderClr);
 
@@ -3931,16 +4332,20 @@ class _SheetTabBar extends StatelessWidget {
                 onTap: () => onSelect(name),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(
-                    color: isActive ? theme.colorScheme.primary : Colors.transparent,
+                    color: isActive
+                        ? theme.colorScheme.primary
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     name,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight:
+                          isActive ? FontWeight.w600 : FontWeight.normal,
                       color: isActive
                           ? theme.colorScheme.onPrimary
                           : theme.colorScheme.onSurface.withOpacity(0.7),
@@ -4077,7 +4482,8 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
 
   String _fmt(double v) => v == v.roundToDouble()
       ? v.toInt().toString()
-      : v.toStringAsFixed(3)
+      : v
+          .toStringAsFixed(3)
           .replaceAll(RegExp(r'0+$'), '')
           .replaceAll(RegExp(r'\.$'), '');
 
@@ -4113,33 +4519,37 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
           width: _iikoColCell,
           child: Center(
             child: TextField(
-            controller: ctrl,
-            focusNode: fn,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            textInputAction: TextInputAction.next,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium,
-            decoration: InputDecoration(
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-              filled: true,
-              fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
-              hintText: '—',
-              hintStyle: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.3)),
+              controller: ctrl,
+              focusNode: fn,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              textInputAction: TextInputAction.next,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium,
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                filled: true,
+                fillColor:
+                    theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
+                hintText: '—',
+                hintStyle: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.3)),
+              ),
+              onChanged: (v) {
+                final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+                widget.onChanged(colIdx, qty);
+              },
+              onSubmitted: (v) {
+                final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
+                widget.onChanged(colIdx, qty);
+              },
             ),
-            onChanged: (v) {
-              final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
-              widget.onChanged(colIdx, qty);
-            },
-            onSubmitted: (v) {
-              final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
-              widget.onChanged(colIdx, qty);
-            },
           ),
         ),
-      ),
       );
     }
 
@@ -4147,10 +4557,12 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
       decoration: BoxDecoration(
         border: Border(left: cb, bottom: cb),
       ),
-      constraints: const BoxConstraints(minHeight: 44), // растёт при длинном названии
+      constraints:
+          const BoxConstraints(minHeight: 44), // растёт при длинном названии
       child: IntrinsicHeight(
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch, // все колонки одной высоты
+          crossAxisAlignment:
+              CrossAxisAlignment.stretch, // все колонки одной высоты
           children: [
             // ── Наименование ──
             Container(
@@ -4170,14 +4582,15 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
               width: _iikoColUnit,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                color:
+                    theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
                 border: Border(right: cb),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(
                 unit,
-                style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant),
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -4188,7 +4601,8 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
               width: _iikoColTotal,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                color:
+                    theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
                 border: Border(right: cb),
               ),
               child: Text(
