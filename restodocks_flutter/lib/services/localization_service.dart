@@ -40,7 +40,9 @@ class LocalizationService extends ChangeNotifier {
   TranslationManager? _translationManager;
   final Map<String, Map<String, String>> _autoUiTranslations = {};
   final Set<String> _autoUiInFlight = {};
+  final Set<String> _autoUiNoResult = {};
   Timer? _autoUiNotifyDebounce;
+  static const int _maxAutoUiInFlight = 2;
 
   void setTranslationManager(TranslationManager manager) {
     _translationManager = manager;
@@ -315,6 +317,8 @@ class LocalizationService extends ChangeNotifier {
     if (text.isEmpty) return false;
     // Вероятно это ключ локализации, а не текст интерфейса.
     if (RegExp(r'^[a-z0-9_]+$').hasMatch(text)) return false;
+    // Слишком короткие строки/символы обычно не требуют сетевого перевода.
+    if (text.length < 3) return false;
     return true;
   }
 
@@ -323,7 +327,9 @@ class LocalizationService extends ChangeNotifier {
     required String targetLanguage,
   }) {
     final inFlightKey = '$targetLanguage|$sourceText';
+    if (_autoUiNoResult.contains(inFlightKey)) return;
     if (_autoUiInFlight.contains(inFlightKey)) return;
+    if (_autoUiInFlight.length >= _maxAutoUiInFlight) return;
     _autoUiInFlight.add(inFlightKey);
     Future<void>(() async {
       try {
@@ -343,8 +349,12 @@ class LocalizationService extends ChangeNotifier {
           _autoUiNotifyDebounce = Timer(const Duration(milliseconds: 180), () {
             notifyListeners();
           });
+        } else {
+          // Не повторяем безрезультатные попытки на каждом rebuild.
+          _autoUiNoResult.add(inFlightKey);
         }
       } catch (_) {
+        _autoUiNoResult.add(inFlightKey);
       } finally {
         _autoUiInFlight.remove(inFlightKey);
       }

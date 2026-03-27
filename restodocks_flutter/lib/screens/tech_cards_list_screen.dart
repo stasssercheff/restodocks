@@ -2128,6 +2128,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         .toList(growable: false);
     if (targetLanguages.isEmpty) return;
     var i = 0;
+    final pendingUpdates = <String, Map<String, String>>{};
     for (final tc in cards) {
       if (!mounted) break;
       if (i > 0 && i % 2 == 0) {
@@ -2153,13 +2154,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         } catch (_) {}
       }
       if (hasUpdates && mounted) {
-        final idx = _list.indexWhere((c) => c.id == tc.id);
-        if (idx >= 0) {
-          final updated =
-              _list[idx].copyWith(dishNameLocalized: mergedLocalized);
-          setState(() => _list[idx] = updated);
-        }
+        pendingUpdates[tc.id] = mergedLocalized;
       }
+    }
+    if (pendingUpdates.isNotEmpty && mounted) {
+      setState(() {
+        for (final entry in pendingUpdates.entries) {
+          final idx = _list.indexWhere((c) => c.id == entry.key);
+          if (idx >= 0) {
+            _list[idx] = _list[idx].copyWith(dishNameLocalized: entry.value);
+          }
+        }
+      });
     }
   }
 
