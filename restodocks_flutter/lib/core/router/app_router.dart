@@ -182,7 +182,7 @@ class AppRouter {
         return '/privacy-consent?next=$next';
       }
       if (hasConsent && onConsentScreen) {
-        final next = state.uri.queryParameters['next'];
+        final next = state.queryParameters['next'];
         if (next != null && next.isNotEmpty) return Uri.decodeComponent(next);
         return '/home';
       }
