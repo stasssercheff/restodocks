@@ -91,7 +91,8 @@ class AppProviders {
           create: (context) => TranslationManager(
             aiService: context.read<AiServiceSupabase>(),
             translationService: context.read<TranslationService>(),
-            getSupportedLanguages: () => LocalizationService.productLanguageCodes,
+            getSupportedLanguages: () =>
+                LocalizationService.productLanguageCodes,
           ),
         ),
         Provider<OrderHistoryService>(
@@ -118,6 +119,9 @@ class AppProviders {
         Provider<MenuStopGoService>(
           create: (_) => MenuStopGoService(),
         ),
+        Provider<PrivacyPolicyConsentService>(
+          create: (_) => PrivacyPolicyConsentService(),
+        ),
         Provider<HaccpLogServiceSupabase>(
           create: (_) => HaccpLogServiceSupabase(),
         ),
@@ -132,8 +136,12 @@ class AppProviders {
             await accountManager.initialize();
             if (accountManager.isLoggedInSync) {
               await context.read<ProductStoreSupabase>().loadProducts();
-              await context.read<HomeLayoutConfigService>().loadForEmployee(accountManager.currentEmployee?.id);
-              await context.read<NotificationPreferencesService>().load(accountManager.currentEmployee?.id);
+              await context
+                  .read<HomeLayoutConfigService>()
+                  .loadForEmployee(accountManager.currentEmployee?.id);
+              await context
+                  .read<NotificationPreferencesService>()
+                  .load(accountManager.currentEmployee?.id);
             }
           },
           initialData: null,
