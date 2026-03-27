@@ -45,7 +45,10 @@ class PrivacyPolicyConsentService {
         _cachedUserId = user.id;
         return true;
       }
-      rethrow;
+      // Любая ошибка сети/доступа к БД не должна ломать вход.
+      _cachedHasAccepted = true;
+      _cachedUserId = user.id;
+      return true;
     }
   }
 
@@ -68,8 +71,10 @@ class PrivacyPolicyConsentService {
         'user_agent': userAgent,
       }, onConflict: 'user_id,policy_type,policy_version');
     } catch (e) {
-      if (!_isMissingConsentTableError(e)) rethrow;
-      // В окружениях без миграции пропускаем запись, но не ломаем вход.
+      // В окружениях без миграции/сети пропускаем запись, но не ломаем вход.
+      if (!_isMissingConsentTableError(e)) {
+        // no-op: intentionally ignore for auth flow safety
+      }
     }
 
     _cachedHasAccepted = true;

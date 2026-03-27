@@ -176,7 +176,13 @@ class AppRouter {
       }
       final consentService = context.read<PrivacyPolicyConsentService>();
       final onConsentScreen = loc.startsWith('/privacy-consent');
-      final hasConsent = await consentService.hasAcceptedCurrentVersion();
+      bool hasConsent = true;
+      try {
+        hasConsent = await consentService.hasAcceptedCurrentVersion();
+      } catch (_) {
+        // Никогда не блокируем вход из-за сбоя проверки consent.
+        hasConsent = true;
+      }
       if (!hasConsent && !onConsentScreen) {
         final next = Uri.encodeComponent(state.location);
         return '/privacy-consent?next=$next';
