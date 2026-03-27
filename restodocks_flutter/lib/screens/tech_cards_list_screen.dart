@@ -152,6 +152,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   }
 
   Future<void> _maybeShowTtkTour() async {
+    // В iOS/Flutter 3.38 тур-оверлей периодически ломает семантику/слои
+    // на экране ТТК (render asserts и пустой список). Временно отключаем,
+    // приоритет — стабильное отображение списка.
+    return;
     if (_ttkTourCheckDone) return;
     final accountManager = context.read<AccountManagerSupabase>();
     final employee = accountManager.currentEmployee;
@@ -3804,7 +3808,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       child: CustomScrollView(
         slivers: [
           SliverPersistentHeader(
-            pinned: true,
+            pinned: false,
             delegate: _TableHeaderDelegate(
               colSectionWidth: colSectionWidth,
               colCatWidth: colCatWidth,
