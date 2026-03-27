@@ -45,7 +45,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
     try {
-    final store = context.read<ProductStoreSupabase>();
+      final store = context.read<ProductStoreSupabase>();
       await store.loadProducts();
       if (mounted) {
         // Проверяем на дубликаты перед установкой
@@ -55,7 +55,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
         }
         final deduplicatedProducts = uniqueProducts.values.toList();
 
-        devLog('DEBUG: Loaded ${store.allProducts.length} products, deduplicated to ${deduplicatedProducts.length}');
+        devLog(
+            'DEBUG: Loaded ${store.allProducts.length} products, deduplicated to ${deduplicatedProducts.length}');
 
         setState(() {
           _products = deduplicatedProducts;
@@ -73,16 +74,21 @@ class _ProductsScreenState extends State<ProductsScreen> {
     }
   }
 
-  Future<void> _ensureTranslations(ProductStoreSupabase store, List<Product> products) async {
+  Future<void> _ensureTranslations(
+      ProductStoreSupabase store, List<Product> products) async {
     final lang = _currentLang;
     if (lang == 'ru') return;
-    final missing = products.where(
-      (p) => !(p.names?.containsKey(lang) == true && (p.names![lang]?.trim().isNotEmpty ?? false)),
-    ).toList();
+    final missing = products
+        .where(
+          (p) => !(p.names?.containsKey(lang) == true &&
+              (p.names![lang]?.trim().isNotEmpty ?? false)),
+        )
+        .toList();
     for (final p in missing) {
       if (!mounted) break;
       try {
-        await store.translateProductAwait(p.id)
+        await store
+            .translateProductAwait(p.id)
             .timeout(const Duration(seconds: 5), onTimeout: () => null);
       } catch (_) {}
       if (mounted) setState(() {});
@@ -112,18 +118,22 @@ class _ProductsScreenState extends State<ProductsScreen> {
         // Нормализуем название: убираем специальные символы, валютные значки, лишние пробелы
         String normalizedName = product.name
             .toLowerCase()
-            .replaceAll(RegExp(r'[^\w\s]'), '') // Убираем все специальные символы
-            .replaceAll(RegExp(r'\s+'), ' ')    // Заменяем множественные пробелы на один
+            .replaceAll(
+                RegExp(r'[^\w\s]'), '') // Убираем все специальные символы
+            .replaceAll(
+                RegExp(r'\s+'), ' ') // Заменяем множественные пробелы на один
             .trim(); // Убираем пробелы по краям
 
         // Ключ для группировки: нормализованное название + категория + калории + белки + жиры + углеводы
         // НЕ включаем цену и валюту, так как они могут различаться для одного продукта
-        final key = '${normalizedName}_${product.category ?? ""}_${product.calories ?? 0}_${product.protein ?? 0}_${product.fat ?? 0}_${product.carbs ?? 0}';
+        final key =
+            '${normalizedName}_${product.category ?? ""}_${product.calories ?? 0}_${product.protein ?? 0}_${product.fat ?? 0}_${product.carbs ?? 0}';
         groupedProducts.putIfAbsent(key, () => []).add(product);
       }
 
       // Находим группы с дубликатами
-      final duplicateGroups = groupedProducts.values.where((group) => group.length > 1).toList();
+      final duplicateGroups =
+          groupedProducts.values.where((group) => group.length > 1).toList();
 
       if (duplicateGroups.isEmpty) {
         if (mounted) {
@@ -156,7 +166,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
               bool isUsed = false;
               final establishment = account.establishment;
               if (establishment != null) {
-                final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.dataEstablishmentId);
+                final nomenclatureIds =
+                    store.getNomenclatureIdsForEstablishment(
+                        establishment.dataEstablishmentId);
                 if (nomenclatureIds.contains(productId)) {
                   isUsed = true;
                 }
@@ -175,7 +187,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
             if (mounted) {
               await _loadProducts();
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Удалено дубликатов: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
+                SnackBar(
+                    content: Text(
+                        'Удалено дубликатов: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
               );
             }
           },
@@ -195,20 +209,21 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   Future<void> _clearAllProducts() async {
+    final loc = context.read<LocalizationService>();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Полное очищение списка продуктов'),
-        content: const Text('ВНИМАНИЕ: Это действие удалит ВСЕ продукты из базы данных без возможности восстановления. Продукты, используемые в номенклатуре или ТТК, будут пропущены. Вы уверены?'),
+        title: Text(loc.t('products_clear_all_title')),
+        content: Text(loc.t('products_clear_all_warning')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Отмена'),
+            child: Text(loc.t('cancel')),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('ОЧИСТИТЬ ВСЕ'),
+            child: Text(loc.t('products_clear_all_action')),
           ),
         ],
       ),
@@ -243,10 +258,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
         // Проверяем в номенклатуре ТОЛЬКО текущего заведения
         final establishment = account.establishment;
         if (establishment != null) {
-          final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.dataEstablishmentId);
+          final nomenclatureIds = store.getNomenclatureIdsForEstablishment(
+              establishment.dataEstablishmentId);
           if (nomenclatureIds.contains(product.id)) {
             isUsed = true;
-            usageMessage = 'Продукт используется в номенклатуре заведения "${establishment.name}"';
+            usageMessage =
+                'Продукт используется в номенклатуре заведения "${establishment.name}"';
           }
         }
 
@@ -255,13 +272,17 @@ class _ProductsScreenState extends State<ProductsScreen> {
           for (final techCard in allTechCards) {
             try {
               // Предполагаем структуру ТТК
-              final ingredients = techCard['ingredients'] as List<dynamic>? ?? [];
-              if (ingredients.any((ing) => ing['product_id'] == product.id || ing['productId'] == product.id)) {
+              final ingredients =
+                  techCard['ingredients'] as List<dynamic>? ?? [];
+              if (ingredients.any((ing) =>
+                  ing['product_id'] == product.id ||
+                  ing['productId'] == product.id)) {
                 isUsed = true;
-                usageMessage = 'Продукт используется в ТТК "${techCard['dish_name'] ?? techCard['name'] ?? 'Неизвестно'}"';
+                usageMessage =
+                    'Продукт используется в ТТК "${techCard['dish_name'] ?? techCard['name'] ?? 'Неизвестно'}"';
                 break;
               }
-      } catch (e) {
+            } catch (e) {
               // Игнорируем ошибки в отдельных ТТК
               continue;
             }
@@ -287,34 +308,42 @@ class _ProductsScreenState extends State<ProductsScreen> {
       if (mounted) {
         await _loadProducts(); // Перезагружаем список
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Удалено продуктов: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
+          SnackBar(
+            content: Text(
+              loc
+                  .t('products_deleted_summary')
+                  .replaceFirst('%s', '$deletedCount')
+                  .replaceFirst('%s', '$skippedCount'),
+            ),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка очищения списка: $e')),
+          SnackBar(content: Text('${loc.t('error')}: $e')),
         );
       }
     }
   }
 
   Future<void> _removeDuplicatesByName() async {
+    final loc = context.read<LocalizationService>();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Удалить дубликаты по названию'),
-        content: const Text('Будут удалены продукты с одинаковым названием (независимо от цены и характеристик). Продукты, используемые в номенклатуре или ТТК, не будут удалены. Продолжить?'),
+        title: Text(loc.t('products_remove_duplicates_title')),
+        content: Text(loc.t('products_remove_duplicates_warning')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Отмена'),
+            child: Text(loc.t('cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Удалить'),
+            child: Text(loc.t('delete')),
           ),
         ],
       ),
@@ -342,7 +371,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
       final Map<String, List<Product>> groupedProducts = {};
 
       for (final product in _products) {
-        final key = product.name.toLowerCase().trim(); // Игнорируем регистр и пробелы
+        final key =
+            product.name.toLowerCase().trim(); // Игнорируем регистр и пробелы
         groupedProducts.putIfAbsent(key, () => []).add(product);
       }
 
@@ -365,10 +395,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
             // Проверяем в номенклатуре текущего заведения
             final establishment = account.establishment;
             if (establishment != null) {
-              final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.dataEstablishmentId);
+              final nomenclatureIds = store.getNomenclatureIdsForEstablishment(
+                  establishment.dataEstablishmentId);
               if (nomenclatureIds.contains(product.id)) {
                 isUsed = true;
-                usageMessage = 'Продукт используется в номенклатуре заведения "${establishment.name}"';
+                usageMessage =
+                    'Продукт используется в номенклатуре заведения "${establishment.name}"';
               }
             }
 
@@ -396,10 +428,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
       if (mounted) {
         await _loadProducts(); // Перезагружаем список
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Удалено дубликатов по названию: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
+          SnackBar(
+              content: Text(
+                  'Удалено дубликатов по названию: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
         );
-        }
-      } catch (e) {
+      }
+    } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -413,7 +447,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
   Future<void> _findDuplicatesWithAI(_DuplicateMode mode) async {
     if (_products.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Нужно минимум 2 продукта для поиска дубликатов')),
+        SnackBar(
+            content: Text('Нужно минимум 2 продукта для поиска дубликатов')),
       );
       return;
     }
@@ -442,14 +477,17 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     ),
                     const SizedBox(width: 16),
-                    Text(mode == _DuplicateMode.full ? 'Поиск полных дубликатов…' : 'Поиск дубликатов…'),
+                    Text(mode == _DuplicateMode.full
+                        ? 'Поиск полных дубликатов…'
+                        : 'Поиск дубликатов…'),
                   ],
                 ),
               ),
             ),
           );
         }
-        await Future<void>.delayed(const Duration(milliseconds: 100)); // даём показаться диалогу
+        await Future<void>.delayed(
+            const Duration(milliseconds: 100)); // даём показаться диалогу
 
         if (!mounted) return;
         Navigator.of(context).pop(); // закрываем "Поиск…"
@@ -457,10 +495,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
         // Полные дубликаты - группируем по всем полям
         final Map<String, List<Product>> groupedProducts = {};
         for (final product in _products) {
-          final key = '${product.name}_${product.calories}_${product.protein}_${product.fat}_${product.carbs}';
+          final key =
+              '${product.name}_${product.calories}_${product.protein}_${product.fat}_${product.carbs}';
           groupedProducts.putIfAbsent(key, () => []).add(product);
         }
-        duplicateGroups = groupedProducts.values.where((group) => group.length > 1).toList();
+        duplicateGroups =
+            groupedProducts.values.where((group) => group.length > 1).toList();
       } else {
         // Умный поиск дубликатов по названию с помощью ИИ
         duplicateGroups = await _findDuplicateGroupsWithAI();
@@ -470,7 +510,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
         if (mounted) {
           setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(mode == _DuplicateMode.full ? 'Полных дубликатов не найдено' : 'Дубликатов не найдено')),
+            SnackBar(
+                content: Text(mode == _DuplicateMode.full
+                    ? 'Полных дубликатов не найдено'
+                    : 'Дубликатов не найдено')),
           );
         }
         return;
@@ -497,7 +540,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
             try {
               allTechCards = await techCardService.getAllTechCards();
             } catch (e) {
-              devLog('Warning: Could not load tech cards for duplicate removal: $e');
+              devLog(
+                  'Warning: Could not load tech cards for duplicate removal: $e');
             }
 
             for (final productId in idsToRemove) {
@@ -514,7 +558,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
               final establishment = account.establishment;
               if (establishment != null) {
-                final nomenclatureIds = store.getNomenclatureIdsForEstablishment(establishment.dataEstablishmentId);
+                final nomenclatureIds =
+                    store.getNomenclatureIdsForEstablishment(
+                        establishment.dataEstablishmentId);
                 if (nomenclatureIds.contains(productId)) {
                   isUsed = true;
                 }
@@ -522,7 +568,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
               if (!isUsed) {
                 for (final techCard in allTechCards) {
-                  if (techCard.ingredients.any((ing) => ing.productId == productId)) {
+                  if (techCard.ingredients
+                      .any((ing) => ing.productId == productId)) {
                     isUsed = true;
                     break;
                   }
@@ -530,7 +577,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
               }
 
               if (isUsed) {
-                devLog('Skipping product ${product.name}: used in nomenclature or tech card');
+                devLog(
+                    'Skipping product ${product.name}: used in nomenclature or tech card');
                 skippedCount++;
               } else {
                 try {
@@ -548,13 +596,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
             if (mounted) {
               await _loadProducts();
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Удалено дубликатов: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
+                SnackBar(
+                    content: Text(
+                        'Удалено дубликатов: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
               );
             }
           },
         ),
       );
-
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -584,7 +633,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
         final similarProducts = <Product>[product];
 
         for (final otherProduct in _products) {
-          if (otherProduct.id == product.id || processedIds.contains(otherProduct.id)) continue;
+          if (otherProduct.id == product.id ||
+              processedIds.contains(otherProduct.id)) continue;
 
           // Используем ИИ для определения схожести названий
           try {
@@ -605,16 +655,19 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
             final result = await aiService.generateChecklistFromPrompt(prompt);
             if (result != null && result.itemTitles.isNotEmpty) {
-              final response = result.itemTitles.first.toString().toUpperCase().trim();
+              final response =
+                  result.itemTitles.first.toString().toUpperCase().trim();
               if (response == 'YES') {
                 similarProducts.add(otherProduct);
                 processedIds.add(otherProduct.id);
               }
             }
           } catch (e) {
-            devLog('AI similarity check failed for "${product.name}" vs "${otherProduct.name}": $e');
+            devLog(
+                'AI similarity check failed for "${product.name}" vs "${otherProduct.name}": $e');
             // Fallback: простая проверка
-            final similarity = _calculateSimilarity(product.name, otherProduct.name);
+            final similarity =
+                _calculateSimilarity(product.name, otherProduct.name);
             if (similarity > 0.7) {
               similarProducts.add(otherProduct);
               processedIds.add(otherProduct.id);
@@ -628,7 +681,6 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
         processedIds.add(product.id);
       }
-
     } catch (e) {
       devLog('Error in AI duplicate detection: $e');
     }
@@ -642,8 +694,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
     if (str1.isEmpty || str2.isEmpty) return 0.0;
 
     // Нормализуем строки
-    final normalized1 = str1.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').trim();
-    final normalized2 = str2.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').trim();
+    final normalized1 =
+        str1.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').trim();
+    final normalized2 =
+        str2.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').trim();
 
     if (normalized1 == normalized2) return 1.0;
 
@@ -658,13 +712,24 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
   /// Ключ сортировки: соус/специя и т.п. идут по букве слова-типа (С), не по первому слову названия
   static String _sortKeyForProduct(String name) {
-    const words = ['соус', 'специя', 'смесь', 'приправа', 'маринад', 'подлива', 'паста', 'масло'];
+    const words = [
+      'соус',
+      'специя',
+      'смесь',
+      'приправа',
+      'маринад',
+      'подлива',
+      'паста',
+      'масло'
+    ];
     final lower = name.trim().toLowerCase();
     for (final w in words) {
       final idx = lower.indexOf(w);
       if (idx >= 0) {
         final before = idx > 0 ? lower.substring(0, idx).trim() : '';
-        final after = idx + w.length < lower.length ? lower.substring(idx + w.length).trim() : '';
+        final after = idx + w.length < lower.length
+            ? lower.substring(idx + w.length).trim()
+            : '';
         final rest = [before, after].where((s) => s.isNotEmpty).join(' ');
         return '$w ${rest.isEmpty ? '' : rest}'.trim();
       }
@@ -679,7 +744,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       final query = _query.toLowerCase();
       list = list.where((product) {
         return product.name.toLowerCase().contains(query) ||
-               product.getLocalizedName(lang).toLowerCase().contains(query);
+            product.getLocalizedName(lang).toLowerCase().contains(query);
       }).toList();
     }
     list = List<Product>.from(list);
@@ -721,7 +786,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
       final store = context.read<ProductStoreSupabase>();
       final ep = store.getEstablishmentPrice(product.id, estId);
       final est = account.establishment;
-      await store.addToNomenclature(estId, product.id, price: ep?.$1, currency: ep?.$2 ?? est?.defaultCurrency);
+      await store.addToNomenclature(estId, product.id,
+          price: ep?.$1, currency: ep?.$2 ?? est?.defaultCurrency);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(loc.t('product_added_to_nomenclature'))),
@@ -731,7 +797,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))),
+          SnackBar(
+              content: Text(
+                  loc.t('error_with_message').replaceAll('%s', e.toString()))),
         );
       }
     }
@@ -752,7 +820,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.8),
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerHighest
+                    .withOpacity(0.8),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -767,38 +838,50 @@ class _ProductsScreenState extends State<ProductsScreen> {
           const SizedBox(width: 4),
           // 3. Фильтр А–Я / Я–А (три полоски)
           IconButton(
-            icon: Icon(_sort == _ProductSort.az ? Icons.filter_list : Icons.filter_list_alt),
-            tooltip: _sort == _ProductSort.az ? 'А–Я (нажмите для Я–А)' : 'Я–А (нажмите для А–Я)',
-            onPressed: () => setState(() => _sort = _sort == _ProductSort.az ? _ProductSort.za : _ProductSort.az),
+            icon: Icon(_sort == _ProductSort.az
+                ? Icons.filter_list
+                : Icons.filter_list_alt),
+            tooltip: _sort == _ProductSort.az
+                ? loc.t('products_sort_az_hint')
+                : loc.t('products_sort_za_hint'),
+            onPressed: () => setState(() => _sort =
+                _sort == _ProductSort.az ? _ProductSort.za : _ProductSort.az),
           ),
           // 4. Выявление дубликатов с ИИ
           PopupMenuButton<String>(
             icon: const Icon(Icons.auto_awesome),
-            tooltip: 'Поиск дубликатов',
+            tooltip: loc.t('products_find_duplicates'),
             onSelected: (v) async {
-              if (v == 'by_name_ai') await _findDuplicatesWithAI(_DuplicateMode.byName);
-              else if (v == 'full') await _findDuplicatesWithAI(_DuplicateMode.full);
+              if (v == 'by_name_ai')
+                await _findDuplicatesWithAI(_DuplicateMode.byName);
+              else if (v == 'full')
+                await _findDuplicatesWithAI(_DuplicateMode.full);
             },
             itemBuilder: (ctx) => [
-              const PopupMenuItem(value: 'by_name_ai', child: Text('Умный поиск дубликатов')),
-              const PopupMenuItem(value: 'full', child: Text('Полные дубликаты')),
+              PopupMenuItem(
+                  value: 'by_name_ai',
+                  child: Text(loc.t('products_duplicates_ai'))),
+              PopupMenuItem(
+                  value: 'full',
+                  child: Text(loc.t('products_duplicates_full'))),
             ],
           ),
           // 5. Загрузка (без добавления в номенклатуру — пополнение базы)
           IconButton(
             icon: const Icon(Icons.upload_file),
             tooltip: '${loc.t('upload_products')} (пополнение базы)',
-            onPressed: () => context.push('/products/upload?addToNomenclature=false'),
+            onPressed: () =>
+                context.push('/products/upload?addToNomenclature=false'),
           ),
           // 6. Обновить
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadProducts,
-                  ),
-              ],
-            ),
+          ),
+        ],
+      ),
       body: Column(
-                      children: [
+        children: [
           // Поиск
           Padding(
             padding: const EdgeInsets.all(16),
@@ -821,20 +904,23 @@ class _ProductsScreenState extends State<ProductsScreen> {
             child: _isLoading
                 ? _buildSkeletonLoading()
                 : _filteredProducts.isEmpty
-                  ? Center(
-                      child: Text(
-                          _query.isEmpty ? loc.t('no_products') : loc.t('no_products_found'),
+                    ? Center(
+                        child: Text(
+                          _query.isEmpty
+                              ? loc.t('no_products')
+                              : loc.t('no_products_found'),
                           style: theme.textTheme.bodyLarge,
-                      ),
-                    )
-                  : ListView.builder(
+                        ),
+                      )
+                    : ListView.builder(
                         itemCount: _filteredProducts.length,
                         itemBuilder: (context, index) {
                           final product = _filteredProducts[index];
                           return _ProductListItem(
                             product: product,
                             onTap: () => _showProductDetails(product),
-                            onAddToNomenclature: () => _addToNomenclature(product),
+                            onAddToNomenclature: () =>
+                                _addToNomenclature(product),
                           );
                         },
                       ),
@@ -874,8 +960,8 @@ class _ProductListItem extends StatelessWidget {
           onPressed: onAddToNomenclature,
         ),
         onTap: onTap,
-        ),
-      );
+      ),
+    );
   }
 }
 
@@ -934,7 +1020,8 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
     setState(() => _isUpdating = true);
     try {
       final store = context.read<ProductStoreSupabase>();
-      await store.setEstablishmentPrice(estId, widget.product.id, price, _currency);
+      await store.setEstablishmentPrice(
+          estId, widget.product.id, price, _currency);
       if (mounted) {
         widget.onPriceUpdated();
         Navigator.of(context).pop();
@@ -979,6 +1066,7 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
   }
 
   Future<void> _deleteProduct() async {
+    final loc = context.read<LocalizationService>();
     // Сначала проверяем, используется ли продукт
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
@@ -993,9 +1081,11 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
         try {
           final allTechCards = await techCardService.getAllTechCards();
           for (final techCard in allTechCards) {
-            if (techCard.ingredients.any((ing) => ing.productId == widget.product.id)) {
+            if (techCard.ingredients
+                .any((ing) => ing.productId == widget.product.id)) {
               isUsed = true;
-              usageMessage = 'Продукт используется в технологической карте "${techCard.dishName}"';
+              usageMessage =
+                  'Продукт используется в технологической карте "${techCard.dishName}"';
               break;
             }
           }
@@ -1011,33 +1101,39 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
       await showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Невозможно удалить продукт'),
+          title: Text(loc.t('products_cannot_delete_title')),
           content: Text(usageMessage),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+              child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+            ),
+          ],
+        ),
+      );
       return;
     }
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Удалить продукт'),
-        content: Text('Вы уверены, что хотите удалить продукт "${widget.product.getLocalizedName(context.read<LocalizationService>().currentLanguageCode)}"? Это действие нельзя отменить.'),
+        title: Text(loc.t('delete_product')),
+        content: Text(
+          loc.t('delete_product_confirm_named').replaceFirst(
+                '%s',
+                widget.product.getLocalizedName(
+                    context.read<LocalizationService>().currentLanguageCode),
+              ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Отмена'),
+            child: Text(loc.t('cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Удалить'),
+            child: Text(loc.t('delete')),
           ),
         ],
       ),
@@ -1050,12 +1146,12 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
       await store.deleteProduct(widget.product.id);
       if (mounted) {
         widget.onProductDeleted();
-      Navigator.of(context).pop();
+        Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка удаления: $e')),
+          SnackBar(content: Text('${loc.t('error')}: $e')),
         );
       }
     } finally {
@@ -1073,31 +1169,32 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
     return AlertDialog(
       title: Text(widget.product.getLocalizedName(loc.currentLanguageCode)),
       content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          children: [
             // Категория
             if (widget.product.category != 'manual')
               Text('${loc.t('category')}: ${widget.product.category}'),
 
-              const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
             // Установка цены
             Text(loc.t('price'), style: theme.textTheme.titleSmall),
             const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
+            Row(
+              children: [
+                Expanded(
                   child: TextField(
-                      controller: _priceController,
-                      decoration: InputDecoration(
+                    controller: _priceController,
+                    decoration: InputDecoration(
                       hintText: '0.00',
-                        border: const OutlineInputBorder(),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      border: const OutlineInputBorder(),
                     ),
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                   ),
+                ),
                 const SizedBox(width: 8),
                 DropdownButton<String>(
                   value: _currency ?? 'RUB',
@@ -1112,9 +1209,9 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
                   },
                 ),
               ],
-                  ),
-                ],
-              ),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton(
@@ -1143,7 +1240,6 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
       ],
     );
   }
-
 }
 
 class _ProductSkeletonItem extends StatelessWidget {
@@ -1156,7 +1252,7 @@ class _ProductSkeletonItem extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
-        children: [
+          children: [
             // Иконка
             Container(
               width: 40,
@@ -1190,9 +1286,9 @@ class _ProductSkeletonItem extends StatelessWidget {
                       color: Colors.grey[300],
                       borderRadius: BorderRadius.circular(4),
                     ),
-          ),
-        ],
-      ),
+                  ),
+                ],
+              ),
             ),
             // Кнопка добавления
             Container(
@@ -1210,11 +1306,11 @@ class _ProductSkeletonItem extends StatelessWidget {
   }
 }
 
-
 class _SmartDuplicatesDialog extends StatefulWidget {
   final List<List<Product>> groups;
   final _DuplicateMode mode;
   final LocalizationService loc;
+
   /// [onProgress] вызывается при удалении: (текущий индекс, всего).
   final Future<void> Function(
     List<String> idsToRemove,
@@ -1323,7 +1419,9 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
     final theme = Theme.of(context);
 
     return AlertDialog(
-      title: Text(widget.mode == _DuplicateMode.full ? "Полные дубликаты" : "Умный поиск дубликатов"),
+      title: Text(widget.mode == _DuplicateMode.full
+          ? "Полные дубликаты"
+          : "Умный поиск дубликатов"),
       content: SizedBox(
         width: 600,
         height: 500,
@@ -1360,7 +1458,8 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
               child: ListView.builder(
                 itemCount: widget.groups.length,
                 itemBuilder: (context, groupIndex) {
-                  final group = _SmartDuplicatesDialogState._sortedGroup(widget.groups[groupIndex]);
+                  final group = _SmartDuplicatesDialogState._sortedGroup(
+                      widget.groups[groupIndex]);
                   return Card(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: Padding(
@@ -1378,23 +1477,36 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
                           const SizedBox(height: 8),
                           ...group.map((product) => CheckboxListTile(
                                 value: _selectedToRemove.contains(product.id),
-                                onChanged: _saving ? null : (selected) => _toggleSelection(product.id),
+                                onChanged: _saving
+                                    ? null
+                                    : (selected) =>
+                                        _toggleSelection(product.id),
                                 title: Text(
-                                  product.getLocalizedName(widget.loc.currentLanguageCode),
+                                  product.getLocalizedName(
+                                      widget.loc.currentLanguageCode),
                                   style: TextStyle(
-                                    decoration: _selectedToRemove.contains(product.id)
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                    color: _selectedToRemove.contains(product.id)
-                                        ? theme.colorScheme.onSurface.withOpacity(0.6)
-                                        : null,
+                                    decoration:
+                                        _selectedToRemove.contains(product.id)
+                                            ? TextDecoration.lineThrough
+                                            : null,
+                                    color:
+                                        _selectedToRemove.contains(product.id)
+                                            ? theme.colorScheme.onSurface
+                                                .withOpacity(0.6)
+                                            : null,
                                   ),
                                 ),
                                 subtitle: Builder(
                                   builder: (ctx) {
-                                    final store = ctx.read<ProductStoreSupabase>();
-                                    final estId = ctx.read<AccountManagerSupabase>().establishment?.id ?? '';
-                                    final ep = store.getEstablishmentPrice(product.id, estId);
+                                    final store =
+                                        ctx.read<ProductStoreSupabase>();
+                                    final estId = ctx
+                                            .read<AccountManagerSupabase>()
+                                            .establishment
+                                            ?.id ??
+                                        '';
+                                    final ep = store.getEstablishmentPrice(
+                                        product.id, estId);
                                     final priceStr = ep != null && ep.$1 != null
                                         ? '${ep.$1} ${ep.$2 ?? ""}'
                                         : "не указана";
@@ -1405,7 +1517,8 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
                                   },
                                 ),
                                 dense: true,
-                                controlAffinity: ListTileControlAffinity.leading,
+                                controlAffinity:
+                                    ListTileControlAffinity.leading,
                               )),
                         ],
                       ),
@@ -1428,10 +1541,14 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
           child: const Text("Оставить первый в каждой группе"),
         ),
         FilledButton(
-          onPressed: _saving || _selectedToRemove.isEmpty ? null : _applyRemoval,
+          onPressed:
+              _saving || _selectedToRemove.isEmpty ? null : _applyRemoval,
           style: FilledButton.styleFrom(backgroundColor: Colors.red),
           child: _saving
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2))
               : Text("Удалить ${_selectedToRemove.length} дубликатов"),
         ),
       ],
