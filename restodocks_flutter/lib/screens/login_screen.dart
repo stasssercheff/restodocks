@@ -302,6 +302,7 @@ class _LoginScreenState extends State<LoginScreen> {
         return AlertDialog(
           title: Text(loc.t('before_registration')),
           content: RichText(
+            textAlign: TextAlign.center,
             text: TextSpan(
               style: Theme.of(ctx).textTheme.bodyMedium,
               children: [
