@@ -2134,6 +2134,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         await Future<void>.delayed(Duration.zero);
       }
       i++;
+      final mergedLocalized =
+          Map<String, String>.from(tc.dishNameLocalized ?? {});
+      var hasUpdates = false;
       for (final lang in targetLanguages) {
         final hasTranslation =
             tc.dishNameLocalized?.containsKey(lang) == true &&
@@ -2143,19 +2146,19 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           final translated = await svc
               .translateTechCardName(tc.id, tc.dishName, lang)
               .timeout(const Duration(seconds: 5), onTimeout: () => null);
-          if (translated != null && mounted) {
-            final idx = _list.indexWhere((c) => c.id == tc.id);
-            if (idx >= 0) {
-              final updated = _list[idx].copyWith(
-                dishNameLocalized: {
-                  ...(_list[idx].dishNameLocalized ?? {}),
-                  lang: translated
-                },
-              );
-              setState(() => _list[idx] = updated);
-            }
+          if (translated != null && translated.trim().isNotEmpty) {
+            mergedLocalized[lang] = translated;
+            hasUpdates = true;
           }
         } catch (_) {}
+      }
+      if (hasUpdates && mounted) {
+        final idx = _list.indexWhere((c) => c.id == tc.id);
+        if (idx >= 0) {
+          final updated =
+              _list[idx].copyWith(dishNameLocalized: mergedLocalized);
+          setState(() => _list[idx] = updated);
+        }
       }
     }
   }

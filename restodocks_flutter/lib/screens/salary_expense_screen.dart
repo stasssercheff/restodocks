@@ -31,14 +31,14 @@ class _EmployeeAdjustment {
     return '$sign${NumberFormatUtils.formatSum(amount, currency)} $currency';
   }
 
-  String get typeName {
+  String typeName(LocalizationService loc) {
     switch (type) {
       case _AdjustmentType.bonus:
-        return 'Премия';
+        return loc.t('salary_adjustment_bonus');
       case _AdjustmentType.fine:
-        return 'Штраф';
+        return loc.t('salary_adjustment_fine');
       case _AdjustmentType.advance:
-        return 'Аванс';
+        return loc.t('salary_adjustment_advance');
     }
   }
 }
@@ -51,26 +51,35 @@ class _SalaryTableHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = Theme.of(context).textTheme.labelSmall?.copyWith(
-      color: Theme.of(context).colorScheme.onSurfaceVariant,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.5,
-    );
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
+        );
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
           const SizedBox(width: 48),
-          Expanded(flex: 4, child: Text(loc.t('full_name') ?? 'Сотрудник', style: style)),
+          Expanded(
+              flex: 4,
+              child: Text(loc.t('full_name') ?? 'Сотрудник', style: style)),
           const SizedBox(width: 8),
-          Expanded(flex: 2, child: Text(loc.t('rate') ?? 'Ставка', style: style)),
+          Expanded(
+              flex: 2, child: Text(loc.t('rate') ?? 'Ставка', style: style)),
           const SizedBox(width: 8),
-          Expanded(flex: 1, child: Text(loc.t('salary_hours') ?? 'Часы', style: style)),
+          Expanded(
+              flex: 1,
+              child: Text(loc.t('salary_hours') ?? 'Часы', style: style)),
           const SizedBox(width: 8),
-          Expanded(flex: 2, child: Text(loc.t('ttk_total') ?? 'База', style: style)),
+          Expanded(
+              flex: 2, child: Text(loc.t('ttk_total') ?? 'База', style: style)),
           const SizedBox(width: 8),
           Expanded(flex: 2, child: Text('', style: style)),
           const SizedBox(width: 8),
-          Expanded(flex: 2, child: Text(loc.t('salary_payable') ?? 'К выплате', style: style)),
+          Expanded(
+              flex: 2,
+              child:
+                  Text(loc.t('salary_payable') ?? 'К выплате', style: style)),
         ],
       ),
     );
@@ -123,7 +132,8 @@ class _SalaryEmployeeCard extends StatelessWidget {
 
   Widget _buildDesktop(BuildContext context) {
     final isHourly = employee.paymentType == 'hourly';
-    final rate = isHourly ? (employee.hourlyRate ?? 0) : (employee.ratePerShift ?? 0);
+    final rate =
+        isHourly ? (employee.hourlyRate ?? 0) : (employee.ratePerShift ?? 0);
     final total = base + adjTotal;
     final roleCode = employee.positionRole ?? employee.roles.firstOrNull ?? '';
     final roleStr = roleCode.isEmpty ? '' : loc.roleDisplayName(roleCode);
@@ -156,14 +166,16 @@ class _SalaryEmployeeCard extends StatelessWidget {
                     children: [
                       Text(
                         employee.fullName,
-                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       if (roleStr.isNotEmpty)
                         Text(
                           roleStr,
-                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -195,7 +207,8 @@ class _SalaryEmployeeCard extends StatelessWidget {
                   flex: 2,
                   child: Text(
                     '${NumberFormatUtils.formatSum(base, currency)} $currency',
-                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -211,11 +224,13 @@ class _SalaryEmployeeCard extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.tune, size: 14, color: theme.colorScheme.primary),
+                          Icon(Icons.tune,
+                              size: 14, color: theme.colorScheme.primary),
                           if (adjustments.isNotEmpty) ...[
                             const SizedBox(width: 4),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: theme.colorScheme.primaryContainer,
                                 borderRadius: BorderRadius.circular(10),
@@ -263,7 +278,8 @@ class _SalaryEmployeeCard extends StatelessWidget {
 
   Widget _buildMobile(BuildContext context) {
     final isHourly = employee.paymentType == 'hourly';
-    final rate = isHourly ? (employee.hourlyRate ?? 0) : (employee.ratePerShift ?? 0);
+    final rate =
+        isHourly ? (employee.hourlyRate ?? 0) : (employee.ratePerShift ?? 0);
     final total = base + adjTotal;
     final label = isHourly ? loc.t('hourly_rate') : loc.t('rate_per_shift');
     final unitLabel = isHourly ? loc.t('salary_hours') : loc.t('salary_shifts');
@@ -289,13 +305,16 @@ class _SalaryEmployeeCard extends StatelessWidget {
                   Text(employee.fullName, style: theme.textTheme.titleMedium),
                   Builder(
                     builder: (_) {
-                      final roleCode = employee.positionRole ?? employee.roles.firstOrNull ?? '';
+                      final roleCode = employee.positionRole ??
+                          employee.roles.firstOrNull ??
+                          '';
                       if (roleCode.isEmpty) return const SizedBox.shrink();
                       return Padding(
                         padding: const EdgeInsets.only(top: 2),
                         child: Text(
                           loc.roleDisplayName(roleCode),
-                          style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant),
                         ),
                       );
                     },
@@ -305,12 +324,14 @@ class _SalaryEmployeeCard extends StatelessWidget {
                     children: [
                       Expanded(
                         flex: 2,
-                        child: Text('$label: $rate $currency', style: theme.textTheme.bodyMedium),
+                        child: Text('$label: $rate $currency',
+                            style: theme.textTheme.bodyMedium),
                       ),
                       Expanded(
                         child: Text(
                           '${shiftsOrHours.toStringAsFixed(isHourly ? 1 : 0)} $unitLabel',
-                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
@@ -318,7 +339,8 @@ class _SalaryEmployeeCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     '${loc.t('ttk_total')}: ${NumberFormatUtils.formatSum(base, currency)} $currency',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 8),
                   InkWell(
@@ -328,10 +350,12 @@ class _SalaryEmployeeCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Row(
                         children: [
-                          Icon(Icons.tune, size: 16, color: theme.colorScheme.primary),
+                          Icon(Icons.tune,
+                              size: 16, color: theme.colorScheme.primary),
                           const SizedBox(width: 6),
                           Text(
-                            loc.t('salary_deductions_bonuses') ?? 'Удержания и поощрения',
+                            loc.t('salary_deductions_bonuses') ??
+                                'Удержания и поощрения',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.primary,
                               fontWeight: FontWeight.w600,
@@ -340,7 +364,8 @@ class _SalaryEmployeeCard extends StatelessWidget {
                           if (adjustments.isNotEmpty) ...[
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: theme.colorScheme.primaryContainer,
                                 borderRadius: BorderRadius.circular(10),
@@ -407,7 +432,8 @@ class _SalaryEmployeeCard extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               child: Text(
                 loc.t('salary_no_adjustments') ?? 'Нет записей',
-                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
             ),
           ...adjustments.asMap().entries.map((entry) {
@@ -416,7 +442,8 @@ class _SalaryEmployeeCard extends StatelessWidget {
             final isPositive = adj.type == _AdjustmentType.bonus;
             return ListTile(
               dense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
               leading: CircleAvatar(
                 radius: 14,
                 backgroundColor: isPositive
@@ -428,7 +455,7 @@ class _SalaryEmployeeCard extends StatelessWidget {
                   color: isPositive ? Colors.green : Colors.red,
                 ),
               ),
-              title: Text(adj.typeName, style: theme.textTheme.bodySmall),
+              title: Text(adj.typeName(loc), style: theme.textTheme.bodySmall),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -442,7 +469,8 @@ class _SalaryEmployeeCard extends StatelessWidget {
                   const SizedBox(width: 4),
                   InkWell(
                     onTap: () => onRemoveAdjustment(idx),
-                    child: Icon(Icons.close, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                    child: Icon(Icons.close,
+                        size: 16, color: theme.colorScheme.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -455,7 +483,8 @@ class _SalaryEmployeeCard extends StatelessWidget {
               icon: const Icon(Icons.add, size: 16),
               label: Text(loc.t('salary_add_adjustment') ?? 'Добавить'),
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 minimumSize: const Size(0, 32),
                 textStyle: theme.textTheme.bodySmall,
               ),
@@ -472,9 +501,11 @@ class _SalaryEmployeeCard extends StatelessWidget {
 /// [embedInScaffold] = false: только контент (для вкладки в экране «Расходы»).
 /// [departmentFilter] = kitchen|bar|hall — показывать только сотрудников подразделения (для руководителей).
 class SalaryExpenseScreen extends StatefulWidget {
-  const SalaryExpenseScreen({super.key, this.embedInScaffold = true, this.departmentFilter});
+  const SalaryExpenseScreen(
+      {super.key, this.embedInScaffold = true, this.departmentFilter});
 
   final bool embedInScaffold;
+
   /// Фильтр по подразделению для руководителя: kitchen (кухня+руководство), bar (бар), hall (зал).
   final String? departmentFilter;
 
@@ -527,7 +558,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       final schedule = await loadSchedule(estab.id);
 
       // Только сотрудники с должностью (positionRole != null). Собственник без должности не показываем.
-      var withPosition = list.where((e) => e.isActive && e.positionRole != null).toList();
+      var withPosition =
+          list.where((e) => e.isActive && e.positionRole != null).toList();
 
       // Фильтр по подразделению для руководителя: шеф/сушеф (кухня), барменеджер (бар), менеджер зала (зал)
       final deptFilter = widget.departmentFilter;
@@ -535,13 +567,16 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
         withPosition = withPosition.where((e) {
           if (deptFilter == 'kitchen') {
             return e.department == 'kitchen' ||
-                (e.department == 'management' && (e.hasRole('executive_chef') || e.hasRole('sous_chef')));
+                (e.department == 'management' &&
+                    (e.hasRole('executive_chef') || e.hasRole('sous_chef')));
           }
           if (deptFilter == 'bar') {
-            return e.department == 'bar' || (e.department == 'management' && e.hasRole('bar_manager'));
+            return e.department == 'bar' ||
+                (e.department == 'management' && e.hasRole('bar_manager'));
           }
           if (deptFilter == 'hall') {
-            return e.department == 'dining_room' || e.department == 'hall' ||
+            return e.department == 'dining_room' ||
+                e.department == 'hall' ||
                 (e.department == 'management' && e.hasRole('floor_manager'));
           }
           return true;
@@ -645,7 +680,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
         .fold<double>(0, (s, e) => s + _totalForEmployee(e));
   }
 
-  void _showAddAdjustmentDialog(BuildContext context, Employee e, String currency) {
+  void _showAddAdjustmentDialog(
+      BuildContext context, Employee e, String currency) {
     final loc = context.read<LocalizationService>();
     _AdjustmentType selectedType = _AdjustmentType.bonus;
     final amountController = TextEditingController();
@@ -654,7 +690,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(loc.t('salary_add_adjustment_dialog_title') ?? 'Добавить удержание / поощрение'),
+          title: Text(loc.t('salary_add_adjustment_dialog_title') ??
+              'Добавить удержание / поощрение'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -666,19 +703,31 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                   border: OutlineInputBorder(),
                   filled: true,
                 ),
-                items: const [
-                  DropdownMenuItem(value: _AdjustmentType.bonus, child: Text('Премия')),
-                  DropdownMenuItem(value: _AdjustmentType.fine, child: Text('Штраф')),
-                  DropdownMenuItem(value: _AdjustmentType.advance, child: Text('Аванс')),
+                items: [
+                  DropdownMenuItem(
+                    value: _AdjustmentType.bonus,
+                    child: Text(loc.t('salary_adjustment_bonus')),
+                  ),
+                  DropdownMenuItem(
+                    value: _AdjustmentType.fine,
+                    child: Text(loc.t('salary_adjustment_fine')),
+                  ),
+                  DropdownMenuItem(
+                    value: _AdjustmentType.advance,
+                    child: Text(loc.t('salary_adjustment_advance')),
+                  ),
                 ],
-                onChanged: (v) => setDialogState(() => selectedType = v ?? selectedType),
+                onChanged: (v) =>
+                    setDialogState(() => selectedType = v ?? selectedType),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
                 decoration: InputDecoration(
-                  labelText: '${loc.t('salary_adjustment_amount') ?? 'Сумма'} ($currency)',
+                  labelText:
+                      '${loc.t('salary_adjustment_amount') ?? 'Сумма'} ($currency)',
                   border: const OutlineInputBorder(),
                   filled: true,
                 ),
@@ -689,7 +738,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Отмена'),
+              child: Text(loc.t('cancel')),
             ),
             FilledButton(
               onPressed: () {
@@ -697,8 +746,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                 if (amount == null || amount <= 0) return;
                 setState(() {
                   _adjustments.putIfAbsent(e.id, () => []).add(
-                    _EmployeeAdjustment(type: selectedType, amount: amount),
-                  );
+                        _EmployeeAdjustment(type: selectedType, amount: amount),
+                      );
                   _adjustmentsExpanded[e.id] = true;
                 });
                 Navigator.pop(ctx);
@@ -717,7 +766,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
     final accountManager = context.read<AccountManagerSupabase>();
     final currency = accountManager.establishment?.currencySymbol ??
         accountManager.currentEmployee?.currencySymbol ??
-        Establishment.currencySymbolFor(accountManager.establishment?.defaultCurrency ?? 'VND');
+        Establishment.currencySymbolFor(
+            accountManager.establishment?.defaultCurrency ?? 'VND');
 
     // 1. Сначала выбор диапазона дат
     final range = await showDateRangePicker(
@@ -728,8 +778,10 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       helpText: loc.t('salary_period'),
     );
     if (range == null || !mounted) return;
-    final exportPeriodStart = DateTime(range.start.year, range.start.month, range.start.day);
-    final exportPeriodEnd = DateTime(range.end.year, range.end.month, range.end.day);
+    final exportPeriodStart =
+        DateTime(range.start.year, range.start.month, range.start.day);
+    final exportPeriodEnd =
+        DateTime(range.end.year, range.end.month, range.end.day);
 
     // 2. Затем выбор языка
     final selectedLang = await showDialog<String>(
@@ -742,7 +794,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => const Center(
+      builder: (ctx) => Center(
         child: Card(
           child: Padding(
             padding: EdgeInsets.all(24),
@@ -751,7 +803,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
               children: [
                 CircularProgressIndicator(),
                 SizedBox(height: 16),
-                Text('Выгрузка...'),
+                Text(loc.t('loading')),
               ],
             ),
           ),
@@ -793,7 +845,11 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
           exportLang: selectedLang,
         );
         if (pngBytes != null && pngBytes.isNotEmpty) {
-          final deptName = dept == 'kitchen' ? 'kitchen' : dept == 'bar' ? 'bar' : 'hall';
+          final deptName = dept == 'kitchen'
+              ? 'kitchen'
+              : dept == 'bar'
+                  ? 'bar'
+                  : 'hall';
           final pngName =
               'schedule_${deptName}_${dateFormat.format(exportPeriodStart)}_${dateFormat.format(exportPeriodEnd)}.png';
           await saveFileBytes(pngName, pngBytes);
@@ -805,7 +861,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(
-            loc.t('salary_export_saved') ?? 'Выгружено: $fileName${pngFiles.isNotEmpty ? ' + ${pngFiles.length} график(ов)' : ''}',
+            loc.t('salary_export_saved') ??
+                'Выгружено: $fileName${pngFiles.isNotEmpty ? ' + ${pngFiles.length} график(ов)' : ''}',
           ),
         ),
       );
@@ -859,7 +916,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
     ).then((range) {
       if (range != null && mounted) {
         setState(() {
-          _periodStart = DateTime(range.start.year, range.start.month, range.start.day);
+          _periodStart =
+              DateTime(range.start.year, range.start.month, range.start.day);
           _periodEnd = DateTime(range.end.year, range.end.month, range.end.day);
         });
       }
@@ -871,151 +929,184 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
     final accountManager = context.read<AccountManagerSupabase>();
-    final currency = accountManager.establishment?.currencySymbol ?? accountManager.currentEmployee?.currencySymbol ?? Establishment.currencySymbolFor(accountManager.establishment?.defaultCurrency ?? 'VND');
+    final currency = accountManager.establishment?.currencySymbol ??
+        accountManager.currentEmployee?.currencySymbol ??
+        Establishment.currencySymbolFor(
+            accountManager.establishment?.defaultCurrency ?? 'VND');
     final dateFormat = DateFormat('dd.MM.yyyy');
 
     final body = _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.error_outline, size: 48, color: theme.colorScheme.error),
-                        const SizedBox(height: 16),
-                        Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: theme.colorScheme.error)),
-                        const SizedBox(height: 16),
-                        FilledButton(onPressed: _load, child: Text(loc.t('retry'))),
-                      ],
-                    ),
+        ? const Center(child: CircularProgressIndicator())
+        : _error != null
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.error_outline,
+                          size: 48, color: theme.colorScheme.error),
+                      const SizedBox(height: 16),
+                      Text(_error!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: theme.colorScheme.error)),
+                      const SizedBox(height: 16),
+                      FilledButton(
+                          onPressed: _load, child: Text(loc.t('retry'))),
+                    ],
                   ),
-                )
-              : _employees == null || _employees!.isEmpty
-                  ? Center(child: Text(loc.t('employees_empty_hint')))
-                  : Column(
-                      children: [
-                        // Период вверху + кнопка выгрузки
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(16),
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: InkWell(
-                                  onTap: () => _showPeriodPicker(context, loc),
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.calendar_month, color: theme.colorScheme.primary),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(loc.t('salary_period'), style: theme.textTheme.titleSmall),
-                                            Text(
-                                              '${dateFormat.format(_periodStart)} — ${dateFormat.format(_periodEnd)}',
-                                              style: theme.textTheme.bodyMedium?.copyWith(
-                                                fontWeight: FontWeight.w600,
-                                              ),
+                ),
+              )
+            : _employees == null || _employees!.isEmpty
+                ? Center(child: Text(loc.t('employees_empty_hint')))
+                : Column(
+                    children: [
+                      // Период вверху + кнопка выгрузки
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () => _showPeriodPicker(context, loc),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.calendar_month,
+                                        color: theme.colorScheme.primary),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(loc.t('salary_period'),
+                                              style:
+                                                  theme.textTheme.titleSmall),
+                                          Text(
+                                            '${dateFormat.format(_periodStart)} — ${dateFormat.format(_periodEnd)}',
+                                            style: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                              fontWeight: FontWeight.w600,
                                             ),
-                                          ],
-                                        ),
+                                          ),
+                                        ],
                                       ),
-                                      const Icon(Icons.chevron_right),
-                                    ],
-                                  ),
+                                    ),
+                                    const Icon(Icons.chevron_right),
+                                  ],
                                 ),
                               ),
-                              if (!_loading && _error == null && _employees != null && _employees!.isNotEmpty) ...[
-                                const SizedBox(width: 8),
-                                IconButton.filled(
-                                  icon: const Icon(Icons.download),
-                                  onPressed: () => _exportPayroll(context),
-                                  tooltip: loc.t('salary_export_btn') ?? 'Выгрузить',
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              final isDesktop = constraints.maxWidth >= 600;
-                              return ListView.builder(
-                                padding: const EdgeInsets.all(16),
-                                itemCount: _employees!.length + (isDesktop ? 1 : 0),
-                                itemBuilder: (context, i) {
-                                  if (isDesktop && i == 0) {
-                                    return _SalaryTableHeader(loc: loc);
-                                  }
-                                  final idx = isDesktop ? i - 1 : i;
-                                  final e = _employees![idx];
-                                  return _SalaryEmployeeCard(
-                                    employee: e,
-                                    loc: loc,
-                                    theme: theme,
-                                    currency: currency,
-                                    periodStart: _periodStart,
-                                    periodEnd: _periodEnd,
-                                    isDesktop: isDesktop,
-                                    included: _includeInTotal[e.id] ?? true,
-                                    adjustments: _adjustments[e.id] ?? [],
-                                    expanded: _adjustmentsExpanded[e.id] ?? false,
-                                    onIncludeChanged: (v) => setState(() => _includeInTotal[e.id] = v),
-                                    onToggleExpand: () => setState(() => _adjustmentsExpanded[e.id] = !(_adjustmentsExpanded[e.id] ?? false)),
-                                    onRemoveAdjustment: (adjustmentIndex) => setState(() {
-                                      _adjustments[e.id]!.removeAt(adjustmentIndex);
-                                      if (_adjustments[e.id]!.isEmpty) _adjustments.remove(e.id);
-                                    }),
-                                    onAddAdjustment: () => _showAddAdjustmentDialog(context, e, currency),
-                                    shiftsOrHours: _shiftsOrHoursFromSchedule(e),
-                                    base: _baseForEmployee(e),
-                                    adjTotal: _adjustmentsTotal(e.id),
-                                  );
-                                },
-                              );
-                            },
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            boxShadow: [
-                              BoxShadow(color: Colors.black12, blurRadius: 4, offset: const Offset(0, -2)),
-                            ],
-                          ),
-                          child: SafeArea(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  loc.t('salary_total_all'),
-                                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                                ),
-                                Text(
-                                  '${NumberFormatUtils.formatSum(_totalIncluded(), currency)} $currency',
-                                  style: theme.textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.primary,
-                                  ),
-                                ),
-                              ],
                             ),
+                            if (!_loading &&
+                                _error == null &&
+                                _employees != null &&
+                                _employees!.isNotEmpty) ...[
+                              const SizedBox(width: 8),
+                              IconButton.filled(
+                                icon: const Icon(Icons.download),
+                                onPressed: () => _exportPayroll(context),
+                                tooltip:
+                                    loc.t('salary_export_btn') ?? 'Выгрузить',
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final isDesktop = constraints.maxWidth >= 600;
+                            return ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount:
+                                  _employees!.length + (isDesktop ? 1 : 0),
+                              itemBuilder: (context, i) {
+                                if (isDesktop && i == 0) {
+                                  return _SalaryTableHeader(loc: loc);
+                                }
+                                final idx = isDesktop ? i - 1 : i;
+                                final e = _employees![idx];
+                                return _SalaryEmployeeCard(
+                                  employee: e,
+                                  loc: loc,
+                                  theme: theme,
+                                  currency: currency,
+                                  periodStart: _periodStart,
+                                  periodEnd: _periodEnd,
+                                  isDesktop: isDesktop,
+                                  included: _includeInTotal[e.id] ?? true,
+                                  adjustments: _adjustments[e.id] ?? [],
+                                  expanded: _adjustmentsExpanded[e.id] ?? false,
+                                  onIncludeChanged: (v) =>
+                                      setState(() => _includeInTotal[e.id] = v),
+                                  onToggleExpand: () => setState(() =>
+                                      _adjustmentsExpanded[e.id] =
+                                          !(_adjustmentsExpanded[e.id] ??
+                                              false)),
+                                  onRemoveAdjustment: (adjustmentIndex) =>
+                                      setState(() {
+                                    _adjustments[e.id]!
+                                        .removeAt(adjustmentIndex);
+                                    if (_adjustments[e.id]!.isEmpty)
+                                      _adjustments.remove(e.id);
+                                  }),
+                                  onAddAdjustment: () =>
+                                      _showAddAdjustmentDialog(
+                                          context, e, currency),
+                                  shiftsOrHours: _shiftsOrHoursFromSchedule(e),
+                                  base: _baseForEmployee(e),
+                                  adjTotal: _adjustmentsTotal(e.id),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          boxShadow: [
+                            BoxShadow(
+                                color: Colors.black12,
+                                blurRadius: 4,
+                                offset: const Offset(0, -2)),
+                          ],
+                        ),
+                        child: SafeArea(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                loc.t('salary_total_all'),
+                                style: theme.textTheme.titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                '${NumberFormatUtils.formatSum(_totalIncluded(), currency)} $currency',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    );
+                      ),
+                    ],
+                  );
     if (widget.embedInScaffold) {
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
           title: Text(loc.t('salary_expenses')),
           actions: [
-            if (!_loading && _error == null && _employees != null && _employees!.isNotEmpty)
+            if (!_loading &&
+                _error == null &&
+                _employees != null &&
+                _employees!.isNotEmpty)
               IconButton(
                 icon: const Icon(Icons.download),
                 onPressed: () => _exportPayroll(context),

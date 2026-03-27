@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../utils/dev_log.dart';
@@ -37,6 +38,7 @@ class LocalizationService extends ChangeNotifier {
   TranslationManager? _translationManager;
   final Map<String, Map<String, String>> _autoUiTranslations = {};
   final Set<String> _autoUiInFlight = {};
+  Timer? _autoUiNotifyDebounce;
 
   void setTranslationManager(TranslationManager manager) {
     _translationManager = manager;
@@ -331,7 +333,10 @@ class LocalizationService extends ChangeNotifier {
         if (normalized.isNotEmpty && normalized != sourceText) {
           _autoUiTranslations.putIfAbsent(targetLanguage, () => {});
           _autoUiTranslations[targetLanguage]![sourceText] = normalized;
-          notifyListeners();
+          _autoUiNotifyDebounce?.cancel();
+          _autoUiNotifyDebounce = Timer(const Duration(milliseconds: 180), () {
+            notifyListeners();
+          });
         }
       } catch (_) {
       } finally {

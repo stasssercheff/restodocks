@@ -45,7 +45,8 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     setState(() {
       _doc = doc;
       _loading = false;
-      if (doc == null) _error = 'Документ не найден';
+      if (doc == null)
+        _error = context.read<LocalizationService>().t('document_not_found');
     });
     if (doc != null) {
       final estId = context.read<AccountManagerSupabase>().establishment?.id;
@@ -84,7 +85,10 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
         to: targetLang,
       );
       // Показываем перевод только если он содержательно отличается от оригинала
-      if (translated != null && translated.trim().isNotEmpty && translated != comment && mounted) {
+      if (translated != null &&
+          translated.trim().isNotEmpty &&
+          translated != comment &&
+          mounted) {
         setState(() => _translatedComment = translated);
       }
     } catch (_) {}
@@ -103,7 +107,8 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
 
     // sourceLang — язык, на котором записаны productName в payload
     final sourceLangRaw = (payload['sourceLang'] as String?)?.trim() ?? '';
-    final sourceLang = sourceLangRaw.isNotEmpty ? sourceLangRaw : (lang == 'ru' ? 'en' : 'ru');
+    final sourceLang =
+        sourceLangRaw.isNotEmpty ? sourceLangRaw : (lang == 'ru' ? 'en' : 'ru');
 
     if (items.isEmpty) return;
 
@@ -125,7 +130,8 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
 
       // Ищем в store по productId — продукты в номенклатуре уже имеют переводы в names
       if (productId != null && productId.isNotEmpty) {
-        final product = store.allProducts.where((p) => p.id == productId).firstOrNull;
+        final product =
+            store.allProducts.where((p) => p.id == productId).firstOrNull;
         if (product != null) {
           final locName = product.getLocalizedName(lang);
           if (locName != productName) {
@@ -195,7 +201,8 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     return productName;
   }
 
-  Future<String?> _getTranslatedCommentForExport(Map<String, dynamic> doc, String targetLang) async {
+  Future<String?> _getTranslatedCommentForExport(
+      Map<String, dynamic> doc, String targetLang) async {
     if (!mounted) return null;
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
     final comment = (payload['comment'] as String?)?.trim() ?? '';
@@ -234,9 +241,14 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final dateStr = header['createdAt'] != null
-        ? DateFormat('yyyy-MM-dd').format((DateTime.tryParse(header['createdAt'].toString()) ?? DateTime.now()).toLocal())
+        ? DateFormat('yyyy-MM-dd').format(
+            (DateTime.tryParse(header['createdAt'].toString()) ??
+                    DateTime.now())
+                .toLocal())
         : DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final supplier = (header['supplierName'] ?? 'order').toString().replaceAll(RegExp(r'[^\w\-.\s]'), '_');
+    final supplier = (header['supplierName'] ?? 'order')
+        .toString()
+        .replaceAll(RegExp(r'[^\w\-.\s]'), '_');
 
     // Шаг 1: выбор языка документа
     final exportLang = await showDialog<String>(
@@ -248,7 +260,8 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(loc.t('order_export_language_subtitle') ?? 'Выберите язык для файла'),
+            Text(loc.t('order_export_language_subtitle') ??
+                'Выберите язык для файла'),
             const SizedBox(height: 16),
             Wrap(
               spacing: 8,
@@ -268,7 +281,8 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
                 ),
                 OutlinedButton(
                   onPressed: () => Navigator.of(ctx).pop('tr'),
-                  child: Text('🇹🇷  ${loc.t('order_export_language_tr') ?? 'Türkçe'}'),
+                  child: Text(
+                      '🇹🇷  ${loc.t('order_export_language_tr') ?? 'Türkçe'}'),
                 ),
               ],
             ),
@@ -295,12 +309,12 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.picture_as_pdf),
-              title: const Text('PDF'),
+              title: Text(loc.t('order_export_save_pdf')),
               onTap: () => Navigator.of(ctx).pop('pdf'),
             ),
             ListTile(
               leading: const Icon(Icons.table_chart),
-              title: const Text('Excel'),
+              title: Text(loc.t('order_export_save_excel')),
               onTap: () => Navigator.of(ctx).pop('excel'),
             ),
           ],
@@ -322,13 +336,15 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     // Если exportLang совпадает с текущим языком UI — используем уже загруженные _localizedNames
     // Если отличается — переводим через DeepL
     final exportTranslatedNames = <String, String>{};
-    final exportTranslatedComment = await _getTranslatedCommentForExport(doc, exportLang);
+    final exportTranslatedComment =
+        await _getTranslatedCommentForExport(doc, exportLang);
     if (exportLang == loc.currentLanguageCode) {
       exportTranslatedNames.addAll(_localizedNames);
     } else {
       // Нужен перевод на другой язык — запрашиваем
       final sourceLangRaw = (payload['sourceLang'] as String?)?.trim() ?? '';
-      final sourceLang = sourceLangRaw.isNotEmpty ? sourceLangRaw : loc.currentLanguageCode;
+      final sourceLang =
+          sourceLangRaw.isNotEmpty ? sourceLangRaw : loc.currentLanguageCode;
       if (sourceLang != exportLang) {
         final items2 = payload['items'] as List<dynamic>? ?? [];
         try {
@@ -359,32 +375,43 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     }
 
     try {
-      final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
+      final currency = context
+              .read<AccountManagerSupabase>()
+              .establishment
+              ?.defaultCurrency ??
+          'VND';
       if (format == 'pdf') {
-        final bytes = await OrderListExportService.buildOrderPdfBytesFromPayload(
+        final bytes =
+            await OrderListExportService.buildOrderPdfBytesFromPayload(
           payload: payload,
           t: tLang,
-          translatedNames: exportTranslatedNames.isNotEmpty ? exportTranslatedNames : null,
+          translatedNames:
+              exportTranslatedNames.isNotEmpty ? exportTranslatedNames : null,
           translatedComment: exportTranslatedComment,
           currency: currency,
         );
         await saveFileBytes('order_${supplier}_$dateStr.pdf', bytes);
       } else {
-        final bytes = await OrderListExportService.buildOrderExcelBytesFromPayload(
+        final bytes =
+            await OrderListExportService.buildOrderExcelBytesFromPayload(
           payload: payload,
           t: tLang,
-          translatedNames: exportTranslatedNames.isNotEmpty ? exportTranslatedNames : null,
+          translatedNames:
+              exportTranslatedNames.isNotEmpty ? exportTranslatedNames : null,
           translatedComment: exportTranslatedComment,
           currency: currency,
         );
         await saveFileBytes('order_${supplier}_$dateStr.xlsx', bytes);
       }
       if (mounted) {
-        AppToastService.show(loc.t('inventory_excel_downloaded') ?? 'Файл сохранён', duration: const Duration(seconds: 3));
+        AppToastService.show(
+            loc.t('inventory_excel_downloaded') ?? 'Файл сохранён',
+            duration: const Duration(seconds: 3));
       }
     } catch (e) {
       if (mounted) {
-        AppToastService.show('Ошибка: $e', duration: const Duration(seconds: 4));
+        AppToastService.show('Ошибка: $e',
+            duration: const Duration(seconds: 4));
       }
     }
   }
@@ -408,9 +435,12 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_error ?? 'Документ не найден', style: TextStyle(color: theme.colorScheme.error)),
+              Text(_error ?? 'Документ не найден',
+                  style: TextStyle(color: theme.colorScheme.error)),
               const SizedBox(height: 16),
-              FilledButton(onPressed: () => context.pop(), child: Text(loc.t('back') ?? 'Назад')),
+              FilledButton(
+                  onPressed: () => context.pop(),
+                  child: Text(loc.t('back') ?? 'Назад')),
             ],
           ),
         ),
@@ -422,7 +452,9 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     final items = payload['items'] as List<dynamic>? ?? [];
     final grandTotal = (payload['grandTotal'] as num?)?.toDouble() ?? 0;
     final rawComment = (payload['comment'] as String?)?.trim() ?? '';
-    final comment = (_translatedComment?.isNotEmpty == true) ? _translatedComment! : rawComment;
+    final comment = (_translatedComment?.isNotEmpty == true)
+        ? _translatedComment!
+        : rawComment;
 
     return Scaffold(
       appBar: AppBar(
@@ -453,7 +485,8 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
               const SizedBox(height: 16),
               Text(
                 '${loc.t('order_list_comment')}: $comment',
-                style: theme.textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(fontStyle: FontStyle.italic),
               ),
             ],
           ],
@@ -463,16 +496,28 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
   }
 
   Widget _buildHeader(LocalizationService loc, Map<String, dynamic> header) {
-    final createdAt = header['createdAt'] != null ? DateTime.tryParse(header['createdAt'].toString())?.toLocal() : null;
-    final orderFor = header['orderForDate'] != null ? DateTime.tryParse(header['orderForDate'].toString())?.toLocal() : null;
+    final createdAt = header['createdAt'] != null
+        ? DateTime.tryParse(header['createdAt'].toString())?.toLocal()
+        : null;
+    final orderFor = header['orderForDate'] != null
+        ? DateTime.tryParse(header['orderForDate'].toString())?.toLocal()
+        : null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _row(loc.t('inbox_header_employee') ?? 'Кто отправил', header['employeeName'] ?? '—'),
-        _row(loc.t('order_export_date_time') ?? 'Дата отправки', createdAt != null ? DateFormat('dd.MM.yyyy HH:mm').format(createdAt) : '—'),
-        _row(loc.t('order_export_to') ?? 'Поставщик', header['supplierName'] ?? '—'),
-        _row(loc.t('order_export_from') ?? 'Заведение', header['establishmentName'] ?? '—'),
-        _row(loc.t('order_export_order_for') ?? 'На дату', orderFor != null ? DateFormat('dd.MM.yyyy').format(orderFor) : '—'),
+        _row(loc.t('inbox_header_employee') ?? 'Кто отправил',
+            header['employeeName'] ?? '—'),
+        _row(
+            loc.t('order_export_date_time') ?? 'Дата отправки',
+            createdAt != null
+                ? DateFormat('dd.MM.yyyy HH:mm').format(createdAt)
+                : '—'),
+        _row(loc.t('order_export_to') ?? 'Поставщик',
+            header['supplierName'] ?? '—'),
+        _row(loc.t('order_export_from') ?? 'Заведение',
+            header['establishmentName'] ?? '—'),
+        _row(loc.t('order_export_order_for') ?? 'На дату',
+            orderFor != null ? DateFormat('dd.MM.yyyy').format(orderFor) : '—'),
       ],
     );
   }
@@ -483,14 +528,18 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 140, child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600))),
+          SizedBox(
+              width: 140,
+              child: Text(label,
+                  style: const TextStyle(fontWeight: FontWeight.w600))),
           Expanded(child: Text(value)),
         ],
       ),
     );
   }
 
-  Widget _buildTable(ThemeData theme, LocalizationService loc, List<dynamic> items, double grandTotal) {
+  Widget _buildTable(ThemeData theme, LocalizationService loc,
+      List<dynamic> items, double grandTotal) {
     // Минимальные ширины колонок (px): #, наименование, ед., кол-во, цена, сумма
     const colWidths = [28.0, 160.0, 48.0, 52.0, 68.0, 68.0];
     final totalMinWidth = colWidths.fold(0.0, (a, b) => a + b);
@@ -503,59 +552,67 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
         final tableWidth = useScroll ? totalMinWidth : availableWidth;
 
         Widget buildTable() => SizedBox(
-          width: tableWidth,
-          child: Table(
-            border: TableBorder.all(color: theme.dividerColor),
-            columnWidths: {
-              0: FixedColumnWidth(colWidths[0]),
-              1: useScroll
-                  ? FixedColumnWidth(colWidths[1])
-                  : FlexColumnWidth(colWidths[1]),
-              2: FixedColumnWidth(colWidths[2]),
-              3: FixedColumnWidth(colWidths[3]),
-              4: FixedColumnWidth(colWidths[4]),
-              5: FixedColumnWidth(colWidths[5]),
-            },
-            defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-            children: [
-              TableRow(
-                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest),
+              width: tableWidth,
+              child: Table(
+                border: TableBorder.all(color: theme.dividerColor),
+                columnWidths: {
+                  0: FixedColumnWidth(colWidths[0]),
+                  1: useScroll
+                      ? FixedColumnWidth(colWidths[1])
+                      : FlexColumnWidth(colWidths[1]),
+                  2: FixedColumnWidth(colWidths[2]),
+                  3: FixedColumnWidth(colWidths[3]),
+                  4: FixedColumnWidth(colWidths[4]),
+                  5: FixedColumnWidth(colWidths[5]),
+                },
+                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                 children: [
-                  _cell(theme, loc.t('order_export_no') ?? '#', bold: true),
-                  _cell(theme, loc.t('inventory_item_name'), bold: true),
-                  _cell(theme, loc.t('order_list_unit'), bold: true),
-                  _cell(theme, loc.t('order_list_quantity'), bold: true),
-                  _cell(theme, loc.t('order_list_unit_price') ?? 'Цена', bold: true),
-                  _cell(theme, _lineTotalHeader(loc), bold: true),
+                  TableRow(
+                    decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest),
+                    children: [
+                      _cell(theme, loc.t('order_export_no') ?? '#', bold: true),
+                      _cell(theme, loc.t('inventory_item_name'), bold: true),
+                      _cell(theme, loc.t('order_list_unit'), bold: true),
+                      _cell(theme, loc.t('order_list_quantity'), bold: true),
+                      _cell(theme, loc.t('order_list_unit_price') ?? 'Цена',
+                          bold: true),
+                      _cell(theme, _lineTotalHeader(loc), bold: true),
+                    ],
+                  ),
+                  ...items.asMap().entries.map((e) {
+                    final item = e.value as Map<String, dynamic>;
+                    return TableRow(
+                      children: [
+                        _cell(theme, '${e.key + 1}'),
+                        _cell(theme, _getItemName(item)),
+                        _cell(
+                            theme,
+                            CulinaryUnits.displayName(
+                                (item['unit'] ?? '').toString(),
+                                loc.currentLanguageCode)),
+                        _cell(theme, _fmtNum(item['quantity'])),
+                        _cell(theme, _fmtSum(item['pricePerUnit'])),
+                        _cell(theme, _fmtSum(item['lineTotal'])),
+                      ],
+                    );
+                  }),
+                  TableRow(
+                    decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerHighest),
+                    children: [
+                      _cell(theme, '', bold: true),
+                      _cell(theme, loc.t('order_list_grand_total') ?? 'Итого:',
+                          bold: true),
+                      _cell(theme, '', bold: true),
+                      _cell(theme, '', bold: true),
+                      _cell(theme, '', bold: true),
+                      _cell(theme, _fmtSum(grandTotal), bold: true),
+                    ],
+                  ),
                 ],
               ),
-              ...items.asMap().entries.map((e) {
-                final item = e.value as Map<String, dynamic>;
-                return TableRow(
-                  children: [
-                    _cell(theme, '${e.key + 1}'),
-                    _cell(theme, _getItemName(item)),
-                    _cell(theme, CulinaryUnits.displayName((item['unit'] ?? '').toString(), loc.currentLanguageCode)),
-                    _cell(theme, _fmtNum(item['quantity'])),
-                    _cell(theme, _fmtSum(item['pricePerUnit'])),
-                    _cell(theme, _fmtSum(item['lineTotal'])),
-                  ],
-                );
-              }),
-              TableRow(
-                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest),
-                children: [
-                  _cell(theme, '', bold: true),
-                  _cell(theme, loc.t('order_list_grand_total') ?? 'Итого:', bold: true),
-                  _cell(theme, '', bold: true),
-                  _cell(theme, '', bold: true),
-                  _cell(theme, '', bold: true),
-                  _cell(theme, _fmtSum(grandTotal), bold: true),
-                ],
-              ),
-            ],
-          ),
-        );
+            );
 
         if (useScroll) {
           return SingleChildScrollView(
@@ -585,7 +642,9 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
   }
 
   String _lineTotalHeader(LocalizationService loc) {
-    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
+    final currency =
+        context.read<AccountManagerSupabase>().establishment?.defaultCurrency ??
+            'VND';
     final t = loc.t('order_list_line_total_currency') ?? 'Сумма %s';
     return t.replaceFirst('%s', currency);
   }
@@ -599,7 +658,11 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
   String _fmtSum(dynamic v) {
     if (v == null) return '—';
     if (v is num) {
-      final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
+      final currency = context
+              .read<AccountManagerSupabase>()
+              .establishment
+              ?.defaultCurrency ??
+          'VND';
       return NumberFormatUtils.formatSum(v, currency);
     }
     return v.toString();
