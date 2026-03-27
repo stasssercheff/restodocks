@@ -2123,9 +2123,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   Future<void> _ensureTechCardTranslations(
       TechCardServiceSupabase svc, List<TechCard> cards) async {
     final currentLang = context.read<LocalizationService>().currentLanguageCode;
-    final targetLanguages = LocalizationService.productLanguageCodes
-        .where((lang) => lang != currentLang)
-        .toList(growable: false);
+    final targetLanguages =
+        currentLang == 'ru' ? const <String>[] : <String>[currentLang];
     if (targetLanguages.isEmpty) return;
     var i = 0;
     final pendingUpdates = <String, Map<String, String>>{};

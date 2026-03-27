@@ -2870,6 +2870,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         final techText = _technologyController.text.trim();
         final fieldsToTranslate = <String, String>{'dish_name': saveName};
         if (techText.isNotEmpty) fieldsToTranslate['technology'] = techText;
+        final fastTargets = <String>{if (curLang == 'ru') 'en' else 'ru'};
         translationManager
             .handleEntitySave(
           entityType: TranslationEntityType.techCard,
@@ -2877,14 +2878,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           textFields: fieldsToTranslate,
           sourceLanguage: curLang,
           userId: emp.id,
+          targetLanguages: fastTargets.toList(growable: false),
         )
             .then((_) async {
           final nameMap = Map<String, String>.from(
               savedForTranslation.dishNameLocalized ?? {});
           nameMap[curLang] = saveName;
           final newTechMap = Map<String, String>.from(techMap);
-          for (final targetLang in LocalizationService.productLanguageCodes) {
-            if (targetLang == curLang) continue;
+          for (final targetLang in fastTargets) {
             final translatedName = await translationManager.getLocalizedText(
               entityType: TranslationEntityType.techCard,
               entityId: created.id,
@@ -3006,6 +3007,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         final techText = _technologyController.text.trim();
         final fieldsToTranslate = <String, String>{'dish_name': name};
         if (techText.isNotEmpty) fieldsToTranslate['technology'] = techText;
+        final fastTargets = <String>{if (curLang == 'ru') 'en' else 'ru'};
         translationManager
             .handleEntitySave(
           entityType: TranslationEntityType.techCard,
@@ -3013,6 +3015,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           textFields: fieldsToTranslate,
           sourceLanguage: curLang,
           userId: emp.id,
+          targetLanguages: fastTargets.toList(growable: false),
         )
             .then((_) async {
           final nameMap =
@@ -3021,8 +3024,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           // Обновляем technologyLocalized
           final newTechMap =
               Map<String, String>.from(updated.technologyLocalized ?? techMap);
-          for (final targetLang in LocalizationService.productLanguageCodes) {
-            if (targetLang == curLang) continue;
+          for (final targetLang in fastTargets) {
             final translatedName = await translationManager.getLocalizedText(
               entityType: TranslationEntityType.techCard,
               entityId: tc.id,
