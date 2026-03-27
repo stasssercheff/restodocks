@@ -75,8 +75,10 @@ class _PrivacyConsentScreenState extends State<PrivacyConsentScreen> {
                     border: Border.all(color: Theme.of(context).dividerColor),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const SingleChildScrollView(
-                    child: SelectableText(privacyPolicyFullTextRu),
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      privacyPolicyFullText(loc.currentLanguageCode),
+                    ),
                   ),
                 ),
               ),

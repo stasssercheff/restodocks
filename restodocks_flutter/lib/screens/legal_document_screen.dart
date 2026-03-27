@@ -16,8 +16,8 @@ class LegalDocumentScreen extends StatelessWidget {
     final isPrivacy = type == LegalDocumentType.privacyPolicy;
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-            isPrivacy ? loc.t('privacy_policy') : loc.t('public_offer')),
+        title:
+            Text(isPrivacy ? loc.t('privacy_policy') : loc.t('public_offer')),
       ),
       body: SafeArea(
         child: Padding(
@@ -31,7 +31,9 @@ class LegalDocumentScreen extends StatelessWidget {
             ),
             child: SingleChildScrollView(
               child: SelectableText(
-                isPrivacy ? privacyPolicyFullTextRu : publicOfferFullTextRu,
+                isPrivacy
+                    ? privacyPolicyFullText(loc.currentLanguageCode)
+                    : publicOfferFullText(loc.currentLanguageCode),
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
