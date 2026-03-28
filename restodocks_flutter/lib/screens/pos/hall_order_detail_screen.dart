@@ -558,7 +558,10 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
         final tn = o.tableNumber ?? 0;
         final editable = o.status == PosOrderStatus.draft;
 
-        return ListView(
+        return RefreshIndicator(
+          onRefresh: _reloadAll,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(24),
             children: [
               Text(
@@ -745,7 +748,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                 ),
               ],
             ],
-          );
+          ),
+        );
       }(),
     );
   }
