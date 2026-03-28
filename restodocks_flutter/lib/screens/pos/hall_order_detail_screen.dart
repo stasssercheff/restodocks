@@ -209,12 +209,19 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
     }
   }
 
-  Future<void> _addDish(TechCard tc, LocalizationService loc) async {
+  Future<void> _addDish(
+    TechCard tc,
+    LocalizationService loc, {
+    int courseNumber = 1,
+    int? guestNumber,
+  }) async {
     try {
       await PosOrderService.instance.addLine(
         orderId: widget.orderId,
         techCardId: tc.id,
         quantity: 1,
+        courseNumber: courseNumber,
+        guestNumber: guestNumber,
       );
       if (mounted) await _refreshLines();
     } on PosOrderNotEditableException {
@@ -311,6 +318,7 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   }
 
   void _openAddDishSheet(LocalizationService loc) {
+    final guestCount = (_order?.guestCount ?? 1).clamp(1, 99);
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -319,9 +327,15 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
           loc: loc,
           dishes: _menuDishes,
           loading: _menuLoading,
-          onPick: (tc) async {
+          guestCount: guestCount,
+          onPick: (tc, courseNumber, guestNumber) async {
             Navigator.pop(ctx);
-            await _addDish(tc, loc);
+            await _addDish(
+              tc,
+              loc,
+              courseNumber: courseNumber,
+              guestNumber: guestNumber,
+            );
           },
         );
       },
@@ -551,6 +565,8 @@ class _LineTile extends StatelessWidget {
       '${loc.t('pos_order_line_qty_short')}: ${_formatPosQty(line.quantity)}',
       if (line.courseNumber > 1)
         '${loc.t('pos_order_course_short')}: ${line.courseNumber}',
+      if (line.guestNumber != null)
+        loc.t('pos_order_line_guest_short', args: {'n': '${line.guestNumber}'}),
       if (line.comment != null && line.comment!.trim().isNotEmpty)
         line.comment!.trim(),
     ].join(' · ');
@@ -725,13 +741,16 @@ class _AddDishSheet extends StatefulWidget {
     required this.loc,
     required this.dishes,
     required this.loading,
+    required this.guestCount,
     required this.onPick,
   });
 
   final LocalizationService loc;
   final List<TechCard> dishes;
   final bool loading;
-  final Future<void> Function(TechCard) onPick;
+  final int guestCount;
+  final Future<void> Function(TechCard tc, int courseNumber, int? guestNumber)
+      onPick;
 
   @override
   State<_AddDishSheet> createState() => _AddDishSheetState();
@@ -740,6 +759,8 @@ class _AddDishSheet extends StatefulWidget {
 class _AddDishSheetState extends State<_AddDishSheet> {
   final _search = TextEditingController();
   String _tab = 'kitchen';
+  int _course = 1;
+  int? _guest;
 
   @override
   void dispose() {
@@ -807,7 +828,80 @@ class _AddDishSheetState extends State<_AddDishSheet> {
               selected: {_tab},
               onSelectionChanged: (s) => setState(() => _tab = s.first),
             ),
-            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Text(
+                loc.t('pos_order_add_course_guest_hint'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          loc.t('pos_order_add_course_label'),
+                          style: Theme.of(context).textTheme.labelMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        DropdownButton<int>(
+                          isExpanded: true,
+                          value: _course.clamp(1, 8),
+                          items: [
+                            for (var c = 1; c <= 8; c++)
+                              DropdownMenuItem(value: c, child: Text('$c')),
+                          ],
+                          onChanged: (v) {
+                            if (v == null) return;
+                            setState(() => _course = v);
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          loc.t('pos_order_add_guest_label'),
+                          style: Theme.of(context).textTheme.labelMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        DropdownButton<int?>(
+                          isExpanded: true,
+                          value: _guest,
+                          items: [
+                            DropdownMenuItem<int?>(
+                              value: null,
+                              child: Text(loc.t('pos_order_add_guest_any')),
+                            ),
+                            for (var g = 1; g <= widget.guestCount; g++)
+                              DropdownMenuItem(
+                                value: g,
+                                child: Text(
+                                  loc.t('pos_order_line_guest_short',
+                                      args: {'n': '$g'}),
+                                ),
+                              ),
+                          ],
+                          onChanged: (v) => setState(() => _guest = v),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
             Expanded(
               child: widget.loading && widget.dishes.isEmpty
                   ? const Center(child: CircularProgressIndicator())
@@ -823,7 +917,7 @@ class _AddDishSheetState extends State<_AddDishSheet> {
                           subtitle: tc.sellingPrice != null
                               ? Text(tc.sellingPrice!.toStringAsFixed(0))
                               : null,
-                          onTap: () => widget.onPick(tc),
+                          onTap: () => widget.onPick(tc, _course, _guest),
                         );
                       },
                     ),
