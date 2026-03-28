@@ -1,7 +1,9 @@
+import '../models/pos_dining_table.dart';
 import '../models/pos_order.dart';
 import '../models/pos_order_line.dart';
 import '../utils/dev_log.dart';
 import '../utils/pos_order_department.dart';
+import 'pos_dining_layout_service.dart';
 import 'supabase_service.dart';
 
 /// Правка заказа недоступна (не черновик).
@@ -279,7 +281,30 @@ class PosOrderService {
           'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name)',
         )
         .single();
+    try {
+      await PosDiningLayoutService.instance
+          .updateTableStatus(diningTableId, PosTableStatus.occupied);
+    } catch (e, st) {
+      devLog('PosOrderService: createDraft table status $e $st');
+    }
     return PosOrder.fromJson(Map<String, dynamic>.from(row));
+  }
+
+  /// Закрыть счёт: заказ закрыт, стол снова свободен (оплата/склад — позже).
+  Future<void> closeOrder(String orderId) async {
+    final o = await fetchById(orderId);
+    if (o == null) throw StateError('pos_order_missing');
+    if (o.status == PosOrderStatus.closed) return;
+    await _supabase.client.from('pos_orders').update({
+      'status': PosOrderStatus.closed.toApi(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', orderId);
+    try {
+      await PosDiningLayoutService.instance
+          .updateTableStatus(o.diningTableId, PosTableStatus.free);
+    } catch (e, st) {
+      devLog('PosOrderService: closeOrder table free $e $st');
+    }
   }
 
   Future<void> updateGuestCount(String orderId, int guestCount) async {

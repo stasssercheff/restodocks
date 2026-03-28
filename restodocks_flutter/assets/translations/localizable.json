@@ -1663,6 +1663,10 @@
     "pos_order_send_empty": "Добавьте хотя бы одну позицию в заказ.",
     "pos_order_sent_toast": "Заказ отправлен",
     "pos_order_sent_readonly_hint": "Заказ отправлен на кухню и бар. Изменение позиций недоступно.",
+    "pos_order_close": "Закрыть счёт",
+    "pos_order_close_confirm": "Закрыть счёт и освободить стол? Учёт оплаты и списание со склада подключим позже.",
+    "pos_order_closed_toast": "Счёт закрыт, стол свободен",
+    "pos_order_closed_readonly_hint": "Счёт закрыт. Стол отображается как свободный.",
     "accept_and_continue": "Принять и продолжить"
   },
   "en": {
@@ -3243,6 +3247,10 @@
     "pos_order_send_empty": "Add at least one line to the order.",
     "pos_order_sent_toast": "Order sent",
     "pos_order_sent_readonly_hint": "Order sent to kitchen and bar. Lines cannot be edited.",
+    "pos_order_close": "Close bill",
+    "pos_order_close_confirm": "Close the bill and free the table? Payment and warehouse write-off will be added later.",
+    "pos_order_closed_toast": "Bill closed, table free",
+    "pos_order_closed_readonly_hint": "Bill closed. The table shows as free.",
     "accept_and_continue": "Accept and continue"
   },
   "es": {
@@ -4719,6 +4727,10 @@
     "pos_order_send_empty": "Añada al menos una posición al pedido.",
     "pos_order_sent_toast": "Pedido enviado",
     "pos_order_sent_readonly_hint": "Pedido enviado a cocina y bar. No se pueden editar las líneas.",
+    "pos_order_close": "Cerrar cuenta",
+    "pos_order_close_confirm": "¿Cerrar la cuenta y liberar la mesa? El pago y el almacén irán después.",
+    "pos_order_closed_toast": "Cuenta cerrada, mesa libre",
+    "pos_order_closed_readonly_hint": "Cuenta cerrada. La mesa aparece como libre.",
     "accept_and_continue": "Aceptar y continuar"
   },
   "de": {
@@ -4925,6 +4937,10 @@
     "pos_order_send_empty": "Mindestens eine Position hinzufügen.",
     "pos_order_sent_toast": "Bestellung gesendet",
     "pos_order_sent_readonly_hint": "An Küche und Bar gesendet. Positionen sind gesperrt.",
+    "pos_order_close": "Rechnung schließen",
+    "pos_order_close_confirm": "Rechnung schließen und Tisch freigeben? Zahlung und Lager folgen später.",
+    "pos_order_closed_toast": "Rechnung geschlossen, Tisch frei",
+    "pos_order_closed_readonly_hint": "Rechnung geschlossen. Tisch erscheint als frei.",
     "product_name_duplicate": "In der Nomenklatur dürfen keine zwei Produkte mit demselben Namen existieren (Groß-/Kleinschreibung egal; führende und nachfolgende Leerzeichen werden ignoriert)."
   },
   "fr": {
@@ -5131,6 +5147,10 @@
     "pos_order_send_empty": "Ajoutez au moins une ligne à la commande.",
     "pos_order_sent_toast": "Commande envoyée",
     "pos_order_sent_readonly_hint": "Envoyée en cuisine et au bar. Modification des lignes impossible.",
+    "pos_order_close": "Clôturer l’addition",
+    "pos_order_close_confirm": "Clôturer l’addition et libérer la table ? Paiement et stock suivront.",
+    "pos_order_closed_toast": "Addition clôturée, table libre",
+    "pos_order_closed_readonly_hint": "Addition clôturée. La table est affichée comme libre.",
     "product_name_duplicate": "La nomenclature ne peut pas contenir deux produits avec le même nom (sans tenir compte de la casse ; espaces en début et fin ignorés)."
   },
   "tr": {
@@ -6607,6 +6627,10 @@
     "pos_order_send_empty": "Siparişe en az bir satır ekleyin.",
     "pos_order_sent_toast": "Sipariş gönderildi",
     "pos_order_sent_readonly_hint": "Mutfak ve bara gönderildi. Satırlar düzenlenemez.",
+    "pos_order_close": "Hesabı kapat",
+    "pos_order_close_confirm": "Hesabı kapatıp masayı boşaltılsın mı? Ödeme ve depo sonra.",
+    "pos_order_closed_toast": "Hesap kapandı, masa boş",
+    "pos_order_closed_readonly_hint": "Hesap kapalı. Masa boş görünür.",
     "accept_and_continue": "Kabul et ve devam et"
   },
   "vi": {
@@ -8107,6 +8131,10 @@
     "pos_order_send_empty": "Thêm ít nhất một dòng vào đơn.",
     "pos_order_sent_toast": "Đã gửi đơn",
     "pos_order_sent_readonly_hint": "Đã gửi bếp và bar. Không chỉnh sửa dòng.",
+    "pos_order_close": "Đóng bill",
+    "pos_order_close_confirm": "Đóng bill và nhả bàn? Thanh toán và kho sẽ bổ sung sau.",
+    "pos_order_closed_toast": "Đã đóng bill, bàn trống",
+    "pos_order_closed_readonly_hint": "Bill đã đóng. Bàn hiển thị trống.",
     "accept_and_continue": "Chấp nhận và tiếp tục"
   }
 }

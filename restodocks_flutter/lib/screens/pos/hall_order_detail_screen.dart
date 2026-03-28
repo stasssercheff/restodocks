@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../services/services.dart';
+import '../../utils/pos_hall_permissions.dart';
 import '../../utils/pos_order_department.dart';
 import '../../widgets/app_bar_home_button.dart';
 
@@ -32,8 +33,20 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   bool _menuLoading = false;
 
   bool _sending = false;
+  bool _closing = false;
 
-  bool get _busy => _orderLoading || _linesLoading || _sending;
+  bool get _busy =>
+      _orderLoading || _linesLoading || _sending || _closing;
+
+  String _readonlyHint(PosOrder o, LocalizationService loc) {
+    if (o.status == PosOrderStatus.closed) {
+      return loc.t('pos_order_closed_readonly_hint');
+    }
+    if (o.status == PosOrderStatus.sent) {
+      return loc.t('pos_order_sent_readonly_hint');
+    }
+    return loc.t('pos_order_edit_forbidden_hint');
+  }
 
   String _statusLabel(LocalizationService loc, PosOrderStatus s) {
     switch (s) {
@@ -98,6 +111,38 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
       if (mounted) AppToastService.show('${loc.t('error')}: $e');
     } finally {
       if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _confirmClose(BuildContext context, LocalizationService loc) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('pos_order_close')),
+        content: Text(loc.t('pos_order_close_confirm')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(loc.t('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(loc.t('pos_order_close')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _closing = true);
+    try {
+      await PosOrderService.instance.closeOrder(widget.orderId);
+      if (!mounted) return;
+      AppToastService.show(loc.t('pos_order_closed_toast'));
+      await _reloadAll();
+    } catch (e) {
+      if (mounted) AppToastService.show('${loc.t('error')}: $e');
+    } finally {
+      if (mounted) setState(() => _closing = false);
     }
   }
 
@@ -249,6 +294,7 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final emp = context.watch<AccountManagerSupabase>().currentEmployee;
     final lang = loc.currentLanguageCode;
     final lc = Localizations.localeOf(context).toString();
     final dateFmt = DateFormat.yMMMd(lc);
@@ -364,12 +410,18 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                   ),
                 ],
               ],
+              if (posCanCloseHallOrder(emp) &&
+                  o.status != PosOrderStatus.closed) ...[
+                const SizedBox(height: 16),
+                FilledButton.tonal(
+                  onPressed: _closing ? null : () => _confirmClose(context, loc),
+                  child: Text(loc.t('pos_order_close')),
+                ),
+              ],
               if (!editable) ...[
                 const SizedBox(height: 16),
                 Text(
-                  o.status == PosOrderStatus.sent
-                      ? loc.t('pos_order_sent_readonly_hint')
-                      : loc.t('pos_order_edit_forbidden_hint'),
+                  _readonlyHint(o, loc),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),

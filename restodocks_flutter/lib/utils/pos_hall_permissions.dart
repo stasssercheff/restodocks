@@ -8,3 +8,11 @@ bool posCanManageHallTables(Employee? e) {
   final hall = e.department == 'hall' || e.department == 'dining_room';
   return e.hasRole('floor_manager') && hall;
 }
+
+/// Закрыть счёт зала и освободить стол (владелец/управление/любой сотрудник зала).
+bool posCanCloseHallOrder(Employee? e) {
+  if (e == null) return false;
+  if (posCanManageHallTables(e)) return true;
+  final hall = e.department == 'hall' || e.department == 'dining_room';
+  return hall;
+}

@@ -78,6 +78,13 @@ class PosDiningLayoutService {
     }).eq('id', table.id);
   }
 
+  Future<void> updateTableStatus(String tableId, PosTableStatus status) async {
+    await _supabase.client.from('pos_dining_tables').update({
+      'status': status.toApi(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', tableId);
+  }
+
   Future<void> deleteTable(String id) async {
     await _supabase.client.from('pos_dining_tables').delete().eq('id', id);
   }
