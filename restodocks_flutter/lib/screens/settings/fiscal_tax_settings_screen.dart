@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/establishment_fiscal_settings.dart';
@@ -173,6 +174,14 @@ class _FiscalTaxSettingsScreenState extends State<FiscalTaxSettingsScreen> {
                     Text(
                       loc.t('fiscal_pending_outbox', args: {'n': '$_pendingOutbox'}),
                       style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.fact_check_outlined),
+                      title: Text(loc.t('fiscal_outbox_title')),
+                      subtitle: Text(loc.t('fiscal_outbox_list_subtitle')),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => context.push('/settings/fiscal-outbox'),
                     ),
                     const SizedBox(height: 20),
                     DropdownButtonFormField<String>(

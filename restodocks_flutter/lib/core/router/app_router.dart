@@ -427,6 +427,13 @@ class AppRouter {
             ),
           ),
           GoRoute(
+            path: '/settings/fiscal-outbox',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const FiscalOutboxScreen(),
+            ),
+          ),
+          GoRoute(
             path: '/settings/system-errors',
             pageBuilder: (context, state) => _slideTransitionPage(
               state,

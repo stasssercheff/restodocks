@@ -1,5 +1,6 @@
 import 'package:uuid/uuid.dart';
 
+import '../models/fiscal_outbox_entry.dart';
 import '../utils/dev_log.dart';
 import 'supabase_service.dart';
 
@@ -48,5 +49,45 @@ class FiscalOutboxService {
       devLog('FiscalOutboxService: countPending $e $st');
       return 0;
     }
+  }
+
+  /// Последние записи очереди (новые сверху).
+  Future<List<FiscalOutboxEntry>> fetchRecent(
+    String establishmentId, {
+    int limit = 100,
+  }) async {
+    try {
+      final rows = await _supabase.client
+          .from(_table)
+          .select(
+            'id, pos_order_id, operation, status, error_message, created_at, updated_at, payload',
+          )
+          .eq('establishment_id', establishmentId)
+          .order('created_at', ascending: false)
+          .limit(limit.clamp(1, 500));
+
+      final out = <FiscalOutboxEntry>[];
+      for (final row in rows as List<dynamic>) {
+        if (row is! Map<String, dynamic>) continue;
+        try {
+          out.add(FiscalOutboxEntry.fromJson(Map<String, dynamic>.from(row)));
+        } catch (e) {
+          devLog('FiscalOutboxService: skip row $e');
+        }
+      }
+      return out;
+    } catch (e, st) {
+      devLog('FiscalOutboxService: fetchRecent $e $st');
+      rethrow;
+    }
+  }
+
+  /// Снять с очереди запись со статусом `failed` (вручную, до появления драйвера ККТ).
+  Future<void> markSkipped(String rowId) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _supabase.client.from(_table).update({
+      'status': 'skipped',
+      'updated_at': now,
+    }).eq('id', rowId).eq('status', 'failed');
   }
 }

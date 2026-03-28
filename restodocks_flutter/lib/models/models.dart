@@ -30,6 +30,7 @@ export 'pos_cash_register_row.dart';
 export 'pos_cash_shift.dart';
 export 'pos_cash_disbursement.dart';
 export 'establishment_fiscal_settings.dart';
+export 'fiscal_outbox_entry.dart';
 
 // Виджеты
 export '../widgets/data_safety_indicator.dart';
