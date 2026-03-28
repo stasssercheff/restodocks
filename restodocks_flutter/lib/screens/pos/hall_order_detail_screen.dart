@@ -938,6 +938,21 @@ class _LineTile extends StatelessWidget {
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
             ),
+            if (line.sellingPrice != null) ...[
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  formatPosOrderMenuDue(
+                    context,
+                    line.quantity * line.sellingPrice!,
+                  ),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+            ],
             if (line.servedAt != null) ...[
               const SizedBox(height: 8),
               Align(
