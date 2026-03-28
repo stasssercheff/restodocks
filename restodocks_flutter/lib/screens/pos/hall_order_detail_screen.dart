@@ -640,9 +640,26 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                   child: Center(child: CircularProgressIndicator()),
                 )
               else if (_linesError != null)
-                Text(
-                  loc.t('pos_tables_load_error'),
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        loc.t('pos_tables_load_error'),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton(
+                        onPressed:
+                            _busy ? null : () => _refreshLines(),
+                        child: Text(loc.t('retry')),
+                      ),
+                    ],
+                  ),
                 )
               else if (_lines.isEmpty)
                 Text(
