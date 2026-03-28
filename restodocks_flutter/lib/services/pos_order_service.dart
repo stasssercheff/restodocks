@@ -48,6 +48,11 @@ class PosOrderService {
       'tech_cards(dish_name, dish_name_localized, selling_price, department, '
       'category, sections)';
 
+  static const _orderSelectWithTable =
+      'id, establishment_id, dining_table_id, status, guest_count, created_at, '
+      'updated_at, payment_method, paid_at, '
+      'pos_dining_tables(table_number, floor_name, room_name, status)';
+
   Future<void> _touchOrderUpdated(String orderId) async {
     await _supabase.client.from('pos_orders').update({
       'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -202,7 +207,7 @@ class PosOrderService {
       final rows = await _supabase.client
           .from('pos_orders')
           .select(
-            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name, status), pos_order_lines(quantity, served_at, tech_cards(category, sections))',
+            '$_orderSelectWithTable, pos_order_lines(quantity, served_at, tech_cards(category, sections))',
           )
           .eq('establishment_id', establishmentId)
           .neq('status', 'closed')
@@ -324,7 +329,7 @@ class PosOrderService {
       final rows = await _supabase.client
           .from('pos_orders')
           .select(
-            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name, status)',
+            _orderSelectWithTable,
           )
           .eq('establishment_id', establishmentId)
           .neq('status', 'closed')
@@ -354,7 +359,7 @@ class PosOrderService {
       final rows = await _supabase.client
           .from('pos_orders')
           .select(
-            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name, status), pos_order_lines(quantity, tech_cards(selling_price))',
+            '$_orderSelectWithTable, pos_order_lines(quantity, tech_cards(selling_price))',
           )
           .eq('establishment_id', establishmentId)
           .neq('status', 'closed')
@@ -413,7 +418,7 @@ class PosOrderService {
       final rows = await _supabase.client
           .from('pos_orders')
           .select(
-            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name, status)',
+            _orderSelectWithTable,
           )
           .eq('establishment_id', establishmentId)
           .eq('dining_table_id', diningTableId)
@@ -434,7 +439,7 @@ class PosOrderService {
       final rows = await _supabase.client
           .from('pos_orders')
           .select(
-            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name, status)',
+            _orderSelectWithTable,
           )
           .eq('id', orderId)
           .limit(1);
@@ -465,7 +470,7 @@ class PosOrderService {
           'status': PosOrderStatus.draft.toApi(),
         })
         .select(
-          'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name, status)',
+          _orderSelectWithTable,
         )
         .single();
     try {
@@ -486,14 +491,20 @@ class PosOrderService {
         .updateTableStatus(o.diningTableId, PosTableStatus.billRequested);
   }
 
-  /// Закрыть счёт: заказ закрыт, стол снова свободен (оплата/склад — позже).
-  Future<void> closeOrder(String orderId) async {
+  /// Закрыть счёт: заказ закрыт, стол свободен; фиксируется способ оплаты и время.
+  Future<void> closeOrder(
+    String orderId, {
+    required PosPaymentMethod paymentMethod,
+  }) async {
     final o = await fetchById(orderId);
     if (o == null) throw StateError('pos_order_missing');
     if (o.status == PosOrderStatus.closed) return;
+    final now = DateTime.now().toUtc().toIso8601String();
     await _supabase.client.from('pos_orders').update({
       'status': PosOrderStatus.closed.toApi(),
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
+      'payment_method': paymentMethod.toApi(),
+      'paid_at': now,
+      'updated_at': now,
     }).eq('id', orderId);
     try {
       await PosDiningLayoutService.instance

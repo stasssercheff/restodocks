@@ -14,6 +14,8 @@ class PosOrder {
     this.floorName,
     this.roomName,
     this.tableStatus,
+    this.paymentMethod,
+    this.paidAt,
   });
 
   final String id;
@@ -30,6 +32,12 @@ class PosOrder {
   /// Статус стола из embed `pos_dining_tables` (свободен / занят / счёт).
   final PosTableStatus? tableStatus;
 
+  /// Способ оплаты при закрытии счёта (если уже закрыт).
+  final PosPaymentMethod? paymentMethod;
+
+  /// Когда зафиксирована оплата.
+  final DateTime? paidAt;
+
   factory PosOrder.fromJson(
     Map<String, dynamic> json, {
     Map<String, dynamic>? tableEmbed,
@@ -40,6 +48,12 @@ class PosOrder {
       t = embed;
     } else if (embed is List && embed.isNotEmpty && embed.first is Map) {
       t = Map<String, dynamic>.from(embed.first as Map);
+    }
+
+    DateTime? paidAt;
+    final paidRaw = json['paid_at'];
+    if (paidRaw != null) {
+      paidAt = DateTime.tryParse(paidRaw.toString());
     }
 
     return PosOrder(
@@ -56,7 +70,47 @@ class PosOrder {
       tableStatus: t != null
           ? PosTableStatus.fromApi(t['status'] as String? ?? 'free')
           : null,
+      paymentMethod:
+          PosPaymentMethod.fromApi(json['payment_method'] as String?),
+      paidAt: paidAt,
     );
+  }
+}
+
+/// Способ оплаты при закрытии счёта (учёт в БД, не фискальный чек).
+enum PosPaymentMethod {
+  cash,
+  card,
+  transfer,
+  other;
+
+  String toApi() {
+    switch (this) {
+      case PosPaymentMethod.cash:
+        return 'cash';
+      case PosPaymentMethod.card:
+        return 'card';
+      case PosPaymentMethod.transfer:
+        return 'transfer';
+      case PosPaymentMethod.other:
+        return 'other';
+    }
+  }
+
+  static PosPaymentMethod? fromApi(String? s) {
+    if (s == null || s.isEmpty) return null;
+    switch (s) {
+      case 'cash':
+        return PosPaymentMethod.cash;
+      case 'card':
+        return PosPaymentMethod.card;
+      case 'transfer':
+        return PosPaymentMethod.transfer;
+      case 'other':
+        return PosPaymentMethod.other;
+      default:
+        return null;
+    }
   }
 }
 

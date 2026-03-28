@@ -66,6 +66,19 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
     }
   }
 
+  String _paymentMethodLabel(LocalizationService loc, PosPaymentMethod m) {
+    switch (m) {
+      case PosPaymentMethod.cash:
+        return loc.t('pos_order_payment_cash');
+      case PosPaymentMethod.card:
+        return loc.t('pos_order_payment_card');
+      case PosPaymentMethod.transfer:
+        return loc.t('pos_order_payment_transfer');
+      case PosPaymentMethod.other:
+        return loc.t('pos_order_payment_other');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -136,27 +149,73 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   }
 
   Future<void> _confirmClose(BuildContext context, LocalizationService loc) async {
+    var method = PosPaymentMethod.cash;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('pos_order_close')),
-        content: Text(loc.t('pos_order_close_confirm')),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(loc.t('cancel')),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(loc.t('pos_order_close')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(loc.t('pos_order_close_confirm')),
+                const SizedBox(height: 16),
+                Text(
+                  loc.t('pos_order_payment_label'),
+                  style: Theme.of(ctx).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 8),
+                DropdownButton<PosPaymentMethod>(
+                  isExpanded: true,
+                  value: method,
+                  items: [
+                    DropdownMenuItem(
+                      value: PosPaymentMethod.cash,
+                      child: Text(loc.t('pos_order_payment_cash')),
+                    ),
+                    DropdownMenuItem(
+                      value: PosPaymentMethod.card,
+                      child: Text(loc.t('pos_order_payment_card')),
+                    ),
+                    DropdownMenuItem(
+                      value: PosPaymentMethod.transfer,
+                      child: Text(loc.t('pos_order_payment_transfer')),
+                    ),
+                    DropdownMenuItem(
+                      value: PosPaymentMethod.other,
+                      child: Text(loc.t('pos_order_payment_other')),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setLocal(() => method = v);
+                  },
+                ),
+              ],
+            ),
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.t('pos_order_close')),
-          ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(loc.t('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(loc.t('pos_order_close')),
+            ),
+          ],
+        ),
       ),
     );
     if (ok != true || !mounted) return;
     setState(() => _closing = true);
     try {
-      await PosOrderService.instance.closeOrder(widget.orderId);
+      await PosOrderService.instance.closeOrder(
+        widget.orderId,
+        paymentMethod: method,
+      );
       if (!mounted) return;
       AppToastService.show(loc.t('pos_order_closed_toast'));
       await _reloadAll();
@@ -495,6 +554,22 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
               Text(
                 '${dateFmt.format(o.createdAt.toLocal())} ${timeFmt.format(o.createdAt.toLocal())}',
               ),
+              if (o.status == PosOrderStatus.closed) ...[
+                if (o.paymentMethod != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    '${loc.t('pos_order_payment_label')}: ${_paymentMethodLabel(loc, o.paymentMethod!)}',
+                  ),
+                ],
+                if (o.paidAt != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    loc.t('pos_order_paid_at', args: {
+                      'time': timeFmt.format(o.paidAt!.toLocal()),
+                    }),
+                  ),
+                ],
+              ],
               const SizedBox(height: 24),
               Text(
                 loc.t('pos_order_lines_heading'),
