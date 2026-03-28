@@ -615,7 +615,7 @@ class AppRouter {
             path: '/pos/hall/tables',
             pageBuilder: (context, state) => _slideTransitionPage(
               state,
-              const PosFeaturePlaceholderScreen(feature: PosFeature.hallTables),
+              const HallTablesScreen(),
             ),
           ),
           GoRoute(

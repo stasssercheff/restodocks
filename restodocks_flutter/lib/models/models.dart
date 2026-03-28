@@ -21,6 +21,7 @@ export 'haccp_log_type.dart';
 export 'establishment_document.dart';
 export 'chat_room.dart';
 export 'chat_room_message.dart';
+export 'pos_dining_table.dart';
 
 // Виджеты
 export '../widgets/data_safety_indicator.dart';
