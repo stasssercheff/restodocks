@@ -27,6 +27,8 @@ class HallOrderDetailScreen extends StatefulWidget {
 class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   PosOrder? _order;
   bool _orderLoading = true;
+  /// Исключение при загрузке заказа (сеть и т.д.); null — если заказ просто не найден.
+  Object? _orderLoadError;
 
   List<PosOrderLine> _lines = [];
   bool _linesLoading = true;
@@ -105,25 +107,47 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   }
 
   Future<void> _loadOrder() async {
-    setState(() => _orderLoading = true);
+    setState(() {
+      _orderLoading = true;
+      _orderLoadError = null;
+    });
     try {
       final o = await PosOrderService.instance.fetchById(widget.orderId);
       if (!mounted) return;
       setState(() {
         _order = o;
         _orderLoading = false;
+        _orderLoadError = null;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _order = null;
         _orderLoading = false;
+        _orderLoadError = e;
       });
     }
   }
 
   Future<void> _reloadAll() async {
     await _loadOrder();
+    if (!mounted) return;
+    if (_orderLoadError != null) {
+      setState(() {
+        _linesLoading = false;
+        _lines = [];
+        _linesError = null;
+      });
+      return;
+    }
+    if (_order == null) {
+      setState(() {
+        _linesLoading = false;
+        _lines = [];
+        _linesError = null;
+      });
+      return;
+    }
     await _refreshLines();
   }
 
@@ -553,6 +577,30 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
         }
         final o = _order;
         if (o == null) {
+          if (_orderLoadError != null) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      loc.t('pos_tables_load_error'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: _busy ? null : _reloadAll,
+                      child: Text(loc.t('retry')),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
           return Center(child: Text(loc.t('document_not_found')));
         }
         final tn = o.tableNumber ?? 0;
