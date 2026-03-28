@@ -54,6 +54,13 @@ class PosProcurementScreen extends StatelessWidget {
               icon: const Icon(Icons.playlist_add_check),
               label: Text(loc.t('pos_procurement_open_order_lists')),
             ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () =>
+                  context.push('/product-order/new?department=$dept'),
+              icon: const Icon(Icons.add_business_outlined),
+              label: Text(loc.t('pos_procurement_new_supplier_order')),
+            ),
           ],
         ),
       ),
