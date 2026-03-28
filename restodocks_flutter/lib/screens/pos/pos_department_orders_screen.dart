@@ -293,7 +293,11 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
                         ],
                       ),
                       onTap: () async {
-                        await context.push('/pos/hall/orders/${o.id}');
+                        final d = widget.department;
+                        final path = (d == 'kitchen' || d == 'bar')
+                            ? '/pos/hall/orders/${o.id}?dept=$d'
+                            : '/pos/hall/orders/${o.id}';
+                        await context.push(path);
                         if (mounted) await _load();
                       },
                     );

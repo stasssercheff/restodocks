@@ -204,7 +204,9 @@ class _PosKitchenDisplayScreenState extends State<PosKitchenDisplayScreen> {
                   ],
                 ),
               ),
-              onTap: () => context.push('/pos/hall/orders/${o.id}'),
+              onTap: () => context.push(
+                    '/pos/hall/orders/${o.id}?dept=kitchen',
+                  ),
             ),
           );
         },

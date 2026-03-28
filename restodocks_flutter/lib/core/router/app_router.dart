@@ -642,9 +642,10 @@ class AppRouter {
             path: '/pos/hall/orders/:orderId',
             pageBuilder: (context, state) {
               final id = state.pathParameters['orderId'] ?? '';
+              final dept = state.queryParameters['dept'];
               return _slideTransitionPage(
                 state,
-                HallOrderDetailScreen(orderId: id),
+                HallOrderDetailScreen(orderId: id, departmentContext: dept),
               );
             },
           ),

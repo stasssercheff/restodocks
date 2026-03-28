@@ -18,9 +18,16 @@ bool _isBarDish(TechCard tc) => posLineIsBarDish(tc.category, tc.sections);
 
 /// Карточка заказа зала: позиции из меню (ТТК).
 class HallOrderDetailScreen extends StatefulWidget {
-  const HallOrderDetailScreen({super.key, required this.orderId});
+  const HallOrderDetailScreen({
+    super.key,
+    required this.orderId,
+    this.departmentContext,
+  });
 
   final String orderId;
+
+  /// `kitchen` | `bar` из `?dept=` — режим кухни/бара: без оплат, скидок и «Отдано» по строкам.
+  final String? departmentContext;
 
   @override
   State<HallOrderDetailScreen> createState() => _HallOrderDetailScreenState();
@@ -44,11 +51,26 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   bool _closing = false;
   bool _billing = false;
   String? _markingLineId;
+  bool _markingBatch = false;
 
   final _discountCtrl = TextEditingController();
   final _servicePctCtrl = TextEditingController();
   bool _pricingSaving = false;
   List<PosOrderPayment> _payments = [];
+
+  bool get _deptStaffView =>
+      widget.departmentContext == 'kitchen' ||
+      widget.departmentContext == 'bar';
+
+  List<PosOrderLine> get _linesVisibleInDeptView {
+    if (!_deptStaffView) return _lines;
+    final dept = widget.departmentContext!;
+    return _lines.where((l) {
+      final bar = posLineIsBarForOrderLine(l);
+      if (dept == 'bar') return bar;
+      return !bar;
+    }).toList();
+  }
 
   bool get _busy =>
       _orderLoading ||
@@ -56,7 +78,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
       _sending ||
       _closing ||
       _billing ||
-      _markingLineId != null;
+      _markingLineId != null ||
+      _markingBatch;
 
   String _readonlyHint(PosOrder o, LocalizationService loc) {
     if (o.status == PosOrderStatus.closed) {
@@ -680,6 +703,33 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
     }
   }
 
+  Future<void> _markDeptLinesServed(LocalizationService loc) async {
+    if (!_deptStaffView) return;
+    final emp = context.read<AccountManagerSupabase>().currentEmployee;
+    final dept = widget.departmentContext!;
+    final targets = _lines.where((l) {
+      final bar = posLineIsBarForOrderLine(l);
+      if (dept == 'bar') return bar;
+      return !bar;
+    }).where((l) => l.servedAt == null && posCanMarkOrderLineServed(emp, l)).toList();
+    if (targets.isEmpty) return;
+    setState(() => _markingBatch = true);
+    try {
+      for (final line in targets) {
+        await PosOrderService.instance.markLineServed(line.id, widget.orderId);
+      }
+      if (mounted) await _refreshLines();
+    } on PosOrderLineMarkServedException {
+      if (mounted) {
+        AppToastService.show(loc.t('pos_order_line_mark_served_forbidden'));
+      }
+    } catch (e) {
+      if (mounted) AppToastService.show('${loc.t('error')}: $e');
+    } finally {
+      if (mounted) setState(() => _markingBatch = false);
+    }
+  }
+
   Future<void> _editLineCourseGuest(PosOrderLine line, LocalizationService loc) async {
     final gc = (_order?.guestCount ?? 1).clamp(1, 99);
     var course = line.courseNumber.clamp(1, 8);
@@ -862,7 +912,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
             ),
           if (_order != null &&
               _lines.isNotEmpty &&
-              !_linesLoading)
+              !_linesLoading &&
+              !_deptStaffView)
             IconButton(
               icon: const Icon(Icons.picture_as_pdf_outlined),
               onPressed: _busy ? null : () => _printReceipt(loc),
@@ -877,6 +928,7 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
       ),
       floatingActionButton: () {
         final o = _order;
+        if (_deptStaffView) return const SizedBox.shrink();
         final draft = o?.status == PosOrderStatus.draft;
         if (!draft || o == null) return const SizedBox.shrink();
         return FloatingActionButton(
@@ -920,7 +972,9 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
           return Center(child: Text(loc.t('document_not_found')));
         }
         final tn = o.tableNumber ?? 0;
-        final editable = o.status == PosOrderStatus.draft;
+        final editable =
+            o.status == PosOrderStatus.draft && !_deptStaffView;
+        final lineRows = _deptStaffView ? _linesVisibleInDeptView : _lines;
 
         return RefreshIndicator(
           onRefresh: _reloadAll,
@@ -953,7 +1007,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
               Text(
                 '${dateFmt.format(o.createdAt.toLocal())} ${timeFmt.format(o.createdAt.toLocal())}',
               ),
-              if (editable || o.status == PosOrderStatus.sent) ...[
+              if (!_deptStaffView &&
+                  (editable || o.status == PosOrderStatus.sent)) ...[
                 const SizedBox(height: 16),
                 TextField(
                   controller: _discountCtrl,
@@ -982,7 +1037,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                   child: Text(loc.t('pos_order_apply_pricing')),
                 ),
               ],
-              if (!_linesLoading &&
+              if (!_deptStaffView &&
+                  !_linesLoading &&
                   _linesError == null &&
                   _lines.isNotEmpty) ...[
                 const SizedBox(height: 12),
@@ -1028,7 +1084,7 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                   ];
                 }(),
               ],
-              if (o.status == PosOrderStatus.closed) ...[
+              if (!_deptStaffView && o.status == PosOrderStatus.closed) ...[
                 if (o.paymentMethod != null) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -1085,13 +1141,20 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                     ],
                   ),
                 )
+              else if (_deptStaffView &&
+                  lineRows.isEmpty &&
+                  _lines.isNotEmpty)
+                Text(
+                  loc.t('pos_order_dept_detail_empty'),
+                  style: Theme.of(context).textTheme.bodyLarge,
+                )
               else if (_lines.isEmpty)
                 Text(
                   loc.t('pos_order_line_empty'),
                   style: Theme.of(context).textTheme.bodyLarge,
                 )
               else
-                ..._lines.map((line) => _LineTile(
+                ...lineRows.map((line) => _LineTile(
                       line: line,
                       lang: lang,
                       editable: editable,
@@ -1100,13 +1163,16 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                       timeFmt: timeFmt,
                       markingLine: _markingLineId == line.id,
                       loc: loc,
+                      compactDeptStaff: _deptStaffView,
                       onQty: (q) => _setQty(line, q, loc),
                       onDelete: () => _removeLine(line, loc),
                       onComment: () => _editLineComment(line, loc),
                       onEditCourseGuest: editable
                           ? () => _editLineCourseGuest(line, loc)
                           : null,
-                      onMarkServed: () => _markLineServed(line, loc),
+                      onMarkServed: _deptStaffView
+                          ? null
+                          : () => _markLineServed(line, loc),
                     )),
               if (editable) ...[
                 const SizedBox(height: 16),
@@ -1149,8 +1215,40 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                   ),
                 ],
               ],
+              if (_deptStaffView &&
+                  o.status == PosOrderStatus.sent &&
+                  !_linesLoading &&
+                  _linesError == null &&
+                  lineRows.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                if (lineRows.any((l) =>
+                    l.servedAt == null &&
+                    posCanMarkOrderLineServed(emp, l)))
+                  FilledButton.tonalIcon(
+                    onPressed: _busy
+                        ? null
+                        : () => _markDeptLinesServed(loc),
+                    icon: _markingBatch
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.restaurant),
+                    label: Text(loc.t('pos_order_line_mark_served')),
+                  )
+                else if (lineRows.every((l) => l.servedAt != null))
+                  Text(
+                    loc.t('pos_order_dept_all_served'),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+              ],
               if (posCanCloseHallOrder(emp) &&
-                  o.status != PosOrderStatus.closed) ...[
+                  o.status != PosOrderStatus.closed &&
+                  !_deptStaffView) ...[
                 const SizedBox(height: 16),
                 if (o.tableStatus != PosTableStatus.billRequested)
                   OutlinedButton.icon(
@@ -1203,7 +1301,7 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                       ),
                 ),
               ],
-              if (!editable) ...[
+              if (!editable && !_deptStaffView) ...[
                 const SizedBox(height: 16),
                 Text(
                   _readonlyHint(o, loc),
@@ -1237,11 +1335,12 @@ class _LineTile extends StatelessWidget {
     required this.timeFmt,
     required this.markingLine,
     required this.loc,
+    this.compactDeptStaff = false,
     required this.onQty,
     required this.onDelete,
     required this.onComment,
     this.onEditCourseGuest,
-    required this.onMarkServed,
+    this.onMarkServed,
   });
 
   final PosOrderLine line;
@@ -1252,11 +1351,13 @@ class _LineTile extends StatelessWidget {
   final DateFormat timeFmt;
   final bool markingLine;
   final LocalizationService loc;
+  /// Без цен и «отдано» по строке (экран кухни/бара).
+  final bool compactDeptStaff;
   final void Function(double) onQty;
   final VoidCallback onDelete;
   final VoidCallback onComment;
   final VoidCallback? onEditCourseGuest;
-  final VoidCallback onMarkServed;
+  final VoidCallback? onMarkServed;
 
   @override
   Widget build(BuildContext context) {
@@ -1318,7 +1419,7 @@ class _LineTile extends StatelessWidget {
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
             ),
-            if (line.sellingPrice != null) ...[
+            if (!compactDeptStaff && line.sellingPrice != null) ...[
               const SizedBox(height: 6),
               Align(
                 alignment: Alignment.centerRight,
@@ -1333,7 +1434,7 @@ class _LineTile extends StatelessWidget {
                 ),
               ),
             ],
-            if (line.servedAt != null) ...[
+            if (!compactDeptStaff && line.servedAt != null) ...[
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerLeft,
@@ -1352,9 +1453,11 @@ class _LineTile extends StatelessWidget {
                 ),
               ),
             ],
-            if (!editable &&
+            if (!compactDeptStaff &&
+                !editable &&
                 orderStatus == PosOrderStatus.sent &&
                 line.servedAt == null &&
+                onMarkServed != null &&
                 posCanMarkOrderLineServed(employee, line)) ...[
               const SizedBox(height: 8),
               Align(
