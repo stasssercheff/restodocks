@@ -21,8 +21,8 @@ class PosDiningLayoutService {
         if (row is! Map<String, dynamic>) continue;
         try {
           list.add(PosDiningTable.fromJson(Map<String, dynamic>.from(row)));
-        } catch (e, st) {
-          devLog('PosDiningLayoutService: skip row $e $st');
+        } catch (e) {
+          devLog('PosDiningLayoutService: skip row $e');
         }
       }
       list.sort((a, b) {

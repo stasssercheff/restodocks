@@ -25,8 +25,8 @@ class PosOrderService {
         if (row is! Map<String, dynamic>) continue;
         try {
           list.add(PosOrder.fromJson(Map<String, dynamic>.from(row)));
-        } catch (e, st) {
-          devLog('PosOrderService: skip row $e $st');
+        } catch (e) {
+          devLog('PosOrderService: skip row $e');
         }
       }
       return list;

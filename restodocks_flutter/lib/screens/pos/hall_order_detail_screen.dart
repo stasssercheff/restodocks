@@ -7,10 +7,18 @@ import '../../services/services.dart';
 import '../../widgets/app_bar_home_button.dart';
 
 /// Карточка заказа зала (позиции меню — в следующих итерациях).
-class HallOrderDetailScreen extends StatelessWidget {
+class HallOrderDetailScreen extends StatefulWidget {
   const HallOrderDetailScreen({super.key, required this.orderId});
 
   final String orderId;
+
+  @override
+  State<HallOrderDetailScreen> createState() => _HallOrderDetailScreenState();
+}
+
+class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
+  late final Future<PosOrder?> _orderFuture =
+      PosOrderService.instance.fetchById(widget.orderId);
 
   String _statusLabel(LocalizationService loc, PosOrderStatus s) {
     switch (s) {
@@ -36,7 +44,7 @@ class HallOrderDetailScreen extends StatelessWidget {
         title: Text(loc.t('pos_order_detail_title')),
       ),
       body: FutureBuilder<PosOrder?>(
-        future: PosOrderService.instance.fetchById(orderId),
+        future: _orderFuture,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
