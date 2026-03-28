@@ -5,20 +5,10 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../services/services.dart';
+import '../../utils/pos_order_department.dart';
 import '../../widgets/app_bar_home_button.dart';
 
-/// Категории бара (как в [MenuScreen]) для вкладок Бар/Кухня.
-const _barCategories = {
-  'beverages',
-  'alcoholic_cocktails',
-  'non_alcoholic_drinks',
-  'hot_drinks',
-  'drinks_pure',
-  'snacks',
-};
-
-bool _isBarDish(TechCard tc) =>
-    _barCategories.contains(tc.category) || tc.sections.contains('bar');
+bool _isBarDish(TechCard tc) => posLineIsBarDish(tc.category, tc.sections);
 
 /// Карточка заказа зала: позиции из меню (ТТК).
 class HallOrderDetailScreen extends StatefulWidget {

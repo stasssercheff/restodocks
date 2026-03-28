@@ -4,19 +4,7 @@ import 'package:provider/provider.dart';
 import '../../services/services.dart';
 import '../../widgets/app_bar_home_button.dart';
 
-/// Ключ локализации подзаголовка для `kitchen` / `bar` / `hall` в URL.
-String? posDepartmentLabelKeyForRoute(String? dept) {
-  switch (dept) {
-    case 'kitchen':
-      return 'kitchen';
-    case 'bar':
-      return 'bar';
-    case 'hall':
-      return 'dining_room';
-    default:
-      return null;
-  }
-}
+export '../../utils/pos_order_department.dart' show posDepartmentLabelKeyForRoute;
 
 /// Тип экрана модуля POS / склада / закупки (пока заглушка с локализованным текстом).
 enum PosFeature {

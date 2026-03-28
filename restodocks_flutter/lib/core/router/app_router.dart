@@ -641,10 +641,7 @@ class AppRouter {
               final dept = state.pathParameters['department'] ?? 'kitchen';
               return _slideTransitionPage(
                 state,
-                PosFeaturePlaceholderScreen(
-                  feature: PosFeature.departmentOrders,
-                  departmentLabelKey: posDepartmentLabelKeyForRoute(dept),
-                ),
+                PosDepartmentOrdersScreen(department: dept),
               );
             },
           ),
