@@ -19,12 +19,14 @@ class SystemErrorService {
     String? posOrderLineId,
     String? diningTableId,
   }) async {
+    final msg =
+        message.length > 8000 ? message.substring(0, 8000) : message;
     try {
       await _supabase.client.from('system_errors').insert({
         'establishment_id': establishmentId,
         'severity': severity,
         'source': source,
-        'message': message.length > 8000 ? message.substring(0, 8000) : message,
+        'message': msg,
         'context': context ?? {},
         if (employeeId != null) 'employee_id': employeeId,
         if (posOrderId != null) 'pos_order_id': posOrderId,
@@ -33,6 +35,17 @@ class SystemErrorService {
       });
     } catch (e, st) {
       devLog('SystemErrorService: insert failed $e $st');
+      await insertViaEdge(
+        establishmentId: establishmentId,
+        message: msg,
+        severity: severity,
+        source: source,
+        context: context,
+        employeeId: employeeId,
+        posOrderId: posOrderId,
+        posOrderLineId: posOrderLineId,
+        diningTableId: diningTableId,
+      );
     }
   }
 
@@ -59,6 +72,8 @@ class SystemErrorService {
     Map<String, dynamic>? context,
     String? employeeId,
     String? posOrderId,
+    String? posOrderLineId,
+    String? diningTableId,
   }) async {
     try {
       final res = await _supabase.client.functions.invoke(
@@ -71,6 +86,8 @@ class SystemErrorService {
           'context': context ?? {},
           if (employeeId != null) 'employeeId': employeeId,
           if (posOrderId != null) 'posOrderId': posOrderId,
+          if (posOrderLineId != null) 'posOrderLineId': posOrderLineId,
+          if (diningTableId != null) 'diningTableId': diningTableId,
         },
       );
       if (res.status != 200) {

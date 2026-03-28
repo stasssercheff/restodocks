@@ -417,4 +417,7 @@ GRANT EXECUTE ON FUNCTION warehouse_health_check(UUID) TO anon, authenticated;
 
 -- =============================================================================
 -- Готово. В Table Editor должна появиться pos_dining_tables; 404 на REST уйдёт.
+-- Касса зала + отдельный полный бандл (если нужен один файл): см. в репозитории
+-- supabase/MANUAL_MIGRATION_POS_CASH_STOCK.sql
+-- Edge: supabase functions deploy log-system-error
 -- =============================================================================

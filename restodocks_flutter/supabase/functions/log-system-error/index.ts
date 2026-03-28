@@ -43,6 +43,8 @@ Deno.serve(async (req: Request) => {
       context?: Record<string, unknown>;
       employeeId?: string | null;
       posOrderId?: string | null;
+      posOrderLineId?: string | null;
+      diningTableId?: string | null;
     };
 
     const establishmentId = body.establishmentId?.trim();
@@ -77,6 +79,8 @@ Deno.serve(async (req: Request) => {
     };
     if (body.employeeId) row.employee_id = body.employeeId;
     if (body.posOrderId) row.pos_order_id = body.posOrderId;
+    if (body.posOrderLineId) row.pos_order_line_id = body.posOrderLineId;
+    if (body.diningTableId) row.dining_table_id = body.diningTableId;
 
     const { data, error } = await supabase.from("system_errors").insert(row).select("id").single();
     if (error) {
