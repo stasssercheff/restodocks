@@ -815,6 +815,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               id != HomeTileId.banquetMenu && id != HomeTileId.banquetTtk)
           .toList();
     }
+    final isHall = emp.department == 'hall' || emp.department == 'dining_room';
+    final isKitchenOrBar =
+        emp.department == 'kitchen' || emp.department == 'bar';
+    if (!isHall) {
+      order = order
+          .where((id) =>
+              id != HomeTileId.hallOrders &&
+              id != HomeTileId.hallCashRegister &&
+              id != HomeTileId.hallTables)
+          .toList();
+    }
+    if (!isKitchenOrBar) {
+      order =
+          order.where((id) => id != HomeTileId.departmentOrders).toList();
+    }
     final tileLabels = <HomeTileId, String>{
       HomeTileId.messages: loc.t('inbox_tab_messages') ?? 'Сообщения',
       HomeTileId.schedule: loc.t('schedule'),
@@ -833,6 +848,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       HomeTileId.nomenclature: loc.t('nomenclature'),
       HomeTileId.inventory: loc.t('inventory_blank'),
       HomeTileId.writeoffs: loc.t('writeoffs') ?? 'Списания',
+      HomeTileId.hallOrders: loc.t('order_tab_orders'),
+      HomeTileId.hallCashRegister: loc.t('pos_nav_cash_register'),
+      HomeTileId.hallTables: loc.t('pos_nav_tables'),
+      HomeTileId.departmentOrders: loc.t('order_tab_orders'),
     };
     showDialog<void>(
       context: context,
@@ -2122,6 +2141,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ],
             ),
+            if (currentEmployee.hasRole('owner') ||
+                currentEmployee.department == 'management' ||
+                currentEmployee.hasRole('executive_chef') ||
+                currentEmployee.hasRole('sous_chef') ||
+                currentEmployee.hasRole('bar_manager') ||
+                currentEmployee.hasRole('floor_manager') ||
+                currentEmployee.hasRole('general_manager'))
+              ListTile(
+                leading: const Icon(Icons.tune),
+                title: Text(localization.t('pos_orders_display_settings_title') ??
+                    'Отображение заказов'),
+                subtitle: Text(
+                  localization.t('pos_orders_display_settings_subtitle') ??
+                      'Таймер и размеры шрифтов на экранах заказов',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/orders-display'),
+              ),
             if (currentEmployee.hasRole('owner') ||
                 currentEmployee.department == 'management' ||
                 currentEmployee.hasRole('executive_chef') ||

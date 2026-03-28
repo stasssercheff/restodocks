@@ -27,6 +27,7 @@ import '../../screens/writeoffs_screen.dart';
 import '../../screens/haccp_log_detail_screen.dart';
 import '../../screens/home/expenses_screen.dart';
 import '../../screens/home/department_placeholder_screen.dart';
+import '../../screens/pos/pos_feature_placeholder_screen.dart';
 import '../../screens/supabase_test_screen.dart';
 import '../../screens/checklist_edit_screen.dart';
 import '../../screens/checklist_fill_screen.dart';
@@ -406,6 +407,14 @@ class AppRouter {
             pageBuilder: (context, state) =>
                 _slideTransitionPage(state, const SettingsScreen()),
           ),
+          GoRoute(
+            path: '/settings/orders-display',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const PosFeaturePlaceholderScreen(
+                  feature: PosFeature.ordersDisplaySettings),
+            ),
+          ),
           // Добавить заведение (владелец)
           GoRoute(
             path: '/add-establishment',
@@ -583,6 +592,76 @@ class AppRouter {
               final id = state.pathParameters['id'] ?? 'kitchen';
               return _slideTransitionPage(
                   state, DepartmentPlaceholderScreen(department: id));
+            },
+          ),
+
+          // POS / зал / подразделения / склад / закупка (пока заглушки)
+          GoRoute(
+            path: '/pos/hall/orders',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const PosFeaturePlaceholderScreen(feature: PosFeature.hallOrders),
+            ),
+          ),
+          GoRoute(
+            path: '/pos/hall/cash-register',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const PosFeaturePlaceholderScreen(
+                  feature: PosFeature.hallCashRegister),
+            ),
+          ),
+          GoRoute(
+            path: '/pos/hall/tables',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const PosFeaturePlaceholderScreen(feature: PosFeature.hallTables),
+            ),
+          ),
+          GoRoute(
+            path: '/pos/orders/:department',
+            pageBuilder: (context, state) {
+              final dept = state.pathParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(
+                state,
+                PosFeaturePlaceholderScreen(
+                  feature: PosFeature.departmentOrders,
+                  departmentLabelKey: posDepartmentLabelKeyForRoute(dept),
+                ),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/pos/warehouse/:scope',
+            pageBuilder: (context, state) {
+              final scope = state.pathParameters['scope'] ?? 'kitchen';
+              if (scope == 'establishment') {
+                return _slideTransitionPage(
+                  state,
+                  const PosFeaturePlaceholderScreen(
+                      feature: PosFeature.warehouseEstablishment),
+                );
+              }
+              return _slideTransitionPage(
+                state,
+                PosFeaturePlaceholderScreen(
+                  feature: PosFeature.warehouse,
+                  departmentLabelKey: posDepartmentLabelKeyForRoute(scope),
+                ),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/pos/procurement/:department',
+            pageBuilder: (context, state) {
+              final dept = state.pathParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(
+                state,
+                PosFeaturePlaceholderScreen(
+                  feature: PosFeature.procurement,
+                  departmentLabelKey: posDepartmentLabelKeyForRoute(dept),
+                ),
+              );
             },
           ),
 

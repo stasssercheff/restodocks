@@ -49,3 +49,4 @@ export 'documentation_view_screen.dart';
 export 'haccp_documentation_screen.dart';
 export 'privacy_consent_screen.dart';
 export 'legal_document_screen.dart';
+export 'pos/pos_feature_placeholder_screen.dart';

@@ -18,6 +18,10 @@ enum HomeTileId {
   nomenclature,
   inventory,
   writeoffs,
+  hallOrders,
+  hallCashRegister,
+  hallTables,
+  departmentOrders,
 }
 
 extension HomeTileIdExt on HomeTileId {
@@ -30,7 +34,8 @@ extension HomeTileIdExt on HomeTileId {
 /// Сервис настройки порядка кнопок на домашнем экране.
 /// Каждый сотрудник может менять расположение кнопок — порядок сохраняется по employeeId.
 class HomeLayoutConfigService extends ChangeNotifier {
-  static final HomeLayoutConfigService _instance = HomeLayoutConfigService._internal();
+  static final HomeLayoutConfigService _instance =
+      HomeLayoutConfigService._internal();
   factory HomeLayoutConfigService() => _instance;
   HomeLayoutConfigService._internal();
 
@@ -38,11 +43,16 @@ class HomeLayoutConfigService extends ChangeNotifier {
   final Map<String, List<String>> _cache = {};
 
   List<HomeTileId> getOrder(String? employeeId) {
-    if (employeeId == null || employeeId.isEmpty) return HomeTileId.values.toList();
+    if (employeeId == null || employeeId.isEmpty)
+      return HomeTileId.values.toList();
     final saved = _cache[employeeId];
     if (saved != null && saved.isNotEmpty) {
-      final result = saved.map((k) => HomeTileIdExt.fromKey(k)).whereType<HomeTileId>().toList();
-      final missing = HomeTileId.values.where((t) => !result.contains(t)).toList();
+      final result = saved
+          .map((k) => HomeTileIdExt.fromKey(k))
+          .whereType<HomeTileId>()
+          .toList();
+      final missing =
+          HomeTileId.values.where((t) => !result.contains(t)).toList();
       return [...result, ...missing];
     }
     return HomeTileId.values.toList();
