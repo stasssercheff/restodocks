@@ -128,6 +128,7 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
 
     List<PosDiningTable> tables;
     try {
+      await PosDiningLayoutService.instance.ensureDefaultDiningLayoutIfEmpty(est.id);
       tables = await PosDiningLayoutService.instance.fetchTables(est.id);
     } catch (e) {
       AppToastService.show('${loc.t('error')}: $e');

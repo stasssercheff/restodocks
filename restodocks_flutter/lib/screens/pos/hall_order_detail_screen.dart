@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -499,11 +500,19 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
     final dateFmt = DateFormat.yMMMd(lc);
     final timeFmt = DateFormat.Hm(lc);
 
+    final canDisplaySettings = posCanConfigureOrdersDisplay(emp);
+
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(loc.t('pos_order_detail_title')),
         actions: [
+          if (canDisplaySettings)
+            IconButton(
+              icon: const Icon(Icons.tune_outlined),
+              onPressed: _busy ? null : () => context.push('/settings/orders-display'),
+              tooltip: loc.t('pos_orders_display_settings_title'),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _busy ? null : _reloadAll,
