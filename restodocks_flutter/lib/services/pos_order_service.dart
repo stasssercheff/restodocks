@@ -141,6 +141,22 @@ class PosOrderService {
     await _touchOrderUpdated(orderId);
   }
 
+  Future<void> updateLineCourseAndGuest(
+    String lineId,
+    String orderId, {
+    required int courseNumber,
+    int? guestNumber,
+  }) async {
+    if (courseNumber < 1) throw ArgumentError.value(courseNumber, 'courseNumber');
+    await _requireDraft(orderId);
+    await _supabase.client.from('pos_order_lines').update({
+      'course_number': courseNumber,
+      'guest_number': guestNumber,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', lineId);
+    await _touchOrderUpdated(orderId);
+  }
+
   Future<void> deleteLine(String lineId, String orderId) async {
     await _requireDraft(orderId);
     await _supabase.client.from('pos_order_lines').delete().eq('id', lineId);

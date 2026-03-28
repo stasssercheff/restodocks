@@ -273,6 +273,95 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
     }
   }
 
+  Future<void> _editLineCourseGuest(PosOrderLine line, LocalizationService loc) async {
+    final gc = (_order?.guestCount ?? 1).clamp(1, 99);
+    var course = line.courseNumber.clamp(1, 8);
+    var guest = line.guestNumber;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          return AlertDialog(
+            title: Text(loc.t('pos_order_line_edit_course_guest_title')),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    loc.t('pos_order_add_course_label'),
+                    style: Theme.of(ctx).textTheme.labelMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  DropdownButton<int>(
+                    isExpanded: true,
+                    value: course,
+                    items: [
+                      for (var c = 1; c <= 8; c++)
+                        DropdownMenuItem(value: c, child: Text('$c')),
+                    ],
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setLocal(() => course = v);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    loc.t('pos_order_add_guest_label'),
+                    style: Theme.of(ctx).textTheme.labelMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  DropdownButton<int?>(
+                    isExpanded: true,
+                    value: guest,
+                    items: [
+                      DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text(loc.t('pos_order_add_guest_any')),
+                      ),
+                      for (var g = 1; g <= gc; g++)
+                        DropdownMenuItem(
+                          value: g,
+                          child: Text(
+                            loc.t('pos_order_line_guest_short', args: {'n': '$g'}),
+                          ),
+                        ),
+                    ],
+                    onChanged: (v) => setLocal(() => guest = v),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(loc.t('cancel')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(loc.t('save')),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await PosOrderService.instance.updateLineCourseAndGuest(
+        line.id,
+        widget.orderId,
+        courseNumber: course,
+        guestNumber: guest,
+      );
+      if (mounted) await _refreshLines();
+    } on PosOrderNotEditableException {
+      if (mounted) AppToastService.show(loc.t('pos_order_edit_forbidden'));
+    } catch (e) {
+      if (mounted) AppToastService.show('${loc.t('error')}: $e');
+    }
+  }
+
   Future<void> _editLineComment(PosOrderLine line, LocalizationService loc) async {
     final ctrl = TextEditingController(text: line.comment ?? '');
     bool? ok;
@@ -440,6 +529,9 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                       onQty: (q) => _setQty(line, q, loc),
                       onDelete: () => _removeLine(line, loc),
                       onComment: () => _editLineComment(line, loc),
+                      onEditCourseGuest: editable
+                          ? () => _editLineCourseGuest(line, loc)
+                          : null,
                       onMarkServed: () => _markLineServed(line, loc),
                     )),
               if (editable) ...[
@@ -542,6 +634,7 @@ class _LineTile extends StatelessWidget {
     required this.onQty,
     required this.onDelete,
     required this.onComment,
+    this.onEditCourseGuest,
     required this.onMarkServed,
   });
 
@@ -556,6 +649,7 @@ class _LineTile extends StatelessWidget {
   final void Function(double) onQty;
   final VoidCallback onDelete;
   final VoidCallback onComment;
+  final VoidCallback? onEditCourseGuest;
   final VoidCallback onMarkServed;
 
   @override
@@ -588,6 +682,12 @@ class _LineTile extends StatelessWidget {
                   ),
                 ),
                 if (editable) ...[
+                  if (onEditCourseGuest != null)
+                    IconButton(
+                      onPressed: onEditCourseGuest,
+                      icon: const Icon(Icons.people_alt_outlined),
+                      tooltip: loc.t('pos_order_line_edit_course_guest_title'),
+                    ),
                   IconButton(
                     onPressed: onComment,
                     icon: Icon(
