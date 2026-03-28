@@ -19,17 +19,24 @@ class HallOrdersScreen extends StatefulWidget {
   State<HallOrdersScreen> createState() => _HallOrdersScreenState();
 }
 
+enum _HallBucket { active, served }
+
 class _HallOrdersScreenState extends State<HallOrdersScreen> {
   bool _loading = true;
   Object? _error;
-  List<PosOrder> _orders = [];
+  PosDepartmentOrderBuckets _buckets =
+      const PosDepartmentOrderBuckets(active: [], served: []);
+  _HallBucket _bucket = _HallBucket.active;
   Timer? _elapsedTimer;
 
   @override
   void initState() {
     super.initState();
     _elapsedTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted && _orders.isNotEmpty) setState(() {});
+      if (mounted &&
+          (_buckets.active.isNotEmpty || _buckets.served.isNotEmpty)) {
+        setState(() {});
+      }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _load();
@@ -66,10 +73,13 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
       _error = null;
     });
     try {
-      final list = await PosOrderService.instance.fetchActiveOrders(est.id);
+      final buckets = await PosOrderService.instance.fetchDepartmentOrderBuckets(
+        est.id,
+        'hall',
+      );
       if (!mounted) return;
       setState(() {
-        _orders = list;
+        _buckets = buckets;
         _loading = false;
       });
     } catch (e) {
@@ -238,6 +248,9 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
     );
   }
 
+  List<PosOrder> get _visibleOrders =>
+      _bucket == _HallBucket.active ? _buckets.active : _buckets.served;
+
   Widget _body(LocalizationService loc, DateFormat timeFmt) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
@@ -248,7 +261,7 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
           : loc.t('pos_tables_load_error');
       return Center(child: Text(message, textAlign: TextAlign.center));
     }
-    if (_orders.isEmpty) {
+    if (_buckets.active.isEmpty && _buckets.served.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -259,28 +272,65 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
         ),
       );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: _orders.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, i) {
-        final o = _orders[i];
-        final tn = o.tableNumber ?? 0;
-        final sub = [
-          '${loc.t('pos_orders_guests_short')}: ${o.guestCount}',
-          _statusLabel(loc, o.status),
-          timeFmt.format(o.createdAt.toLocal()),
-          loc.t('pos_order_list_timer', args: {
-            'time': formatPosOrderLiveDuration(o.createdAt),
-          }),
-        ].join(' · ');
-        return ListTile(
-          leading: const Icon(Icons.receipt_long),
-          title: Text(loc.t('pos_table_number', args: {'n': '$tn'})),
-          subtitle: Text(sub),
-          onTap: () => context.push('/pos/hall/orders/${o.id}'),
-        );
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: SegmentedButton<_HallBucket>(
+            segments: [
+              ButtonSegment(
+                value: _HallBucket.active,
+                label: Text(loc.t('pos_department_orders_tab_active')),
+              ),
+              ButtonSegment(
+                value: _HallBucket.served,
+                label: Text(loc.t('pos_department_orders_tab_served')),
+              ),
+            ],
+            selected: {_bucket},
+            onSelectionChanged: (s) => setState(() => _bucket = s.first),
+          ),
+        ),
+        Expanded(
+          child: _visibleOrders.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      _bucket == _HallBucket.active
+                          ? loc.t('pos_department_orders_active_empty')
+                          : loc.t('pos_department_orders_served_empty'),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _visibleOrders.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, i) {
+                    final o = _visibleOrders[i];
+                    final tn = o.tableNumber ?? 0;
+                    final sub = [
+                      '${loc.t('pos_orders_guests_short')}: ${o.guestCount}',
+                      _statusLabel(loc, o.status),
+                      timeFmt.format(o.createdAt.toLocal()),
+                      loc.t('pos_order_list_timer', args: {
+                        'time': formatPosOrderLiveDuration(o.createdAt),
+                      }),
+                    ].join(' · ');
+                    return ListTile(
+                      leading: const Icon(Icons.receipt_long),
+                      title:
+                          Text(loc.t('pos_table_number', args: {'n': '$tn'})),
+                      subtitle: Text(sub),
+                      onTap: () => context.push('/pos/hall/orders/${o.id}'),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }
