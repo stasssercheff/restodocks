@@ -586,7 +586,7 @@ class _EmployeeCard extends StatelessWidget {
 // --- Редактирование сотрудника ---
 
 const _departmentKeys = ['kitchen', 'bar', 'dining_room', 'management'];
-const _departmentLabels = {'kitchen': 'Кухня', 'bar': 'Бар', 'dining_room': 'Зал', 'management': 'Управление'};
+
 String _roleLabel(String code, LocalizationService loc) {
   final key = 'role_$code';
   final t = loc.t(key);
@@ -808,7 +808,12 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                       DropdownButtonFormField<String>(
                         value: _department,
                         decoration: InputDecoration(labelText: loc.t('department') ?? 'Отдел', border: const OutlineInputBorder(), filled: true),
-                        items: _departmentKeys.map((k) => DropdownMenuItem(value: k, child: Text(_departmentLabels[k] ?? k))).toList(),
+                        items: _departmentKeys
+                            .map((k) => DropdownMenuItem(
+                                  value: k,
+                                  child: Text(loc.departmentDisplayName(k)),
+                                ))
+                            .toList(),
                         onChanged: (v) => setState(() {
                           _department = v ?? _department;
                           if (_department != 'kitchen') _section = null;

@@ -24,8 +24,10 @@ class TechCardServiceSupabase {
 
   final SupabaseService _supabase = SupabaseService();
   final OfflineCacheService _offlineCache = OfflineCacheService();
+
   /// v2: раньше shallow-лист перезаписывал этот кэш без ингредиентов — меняем префикс, чтобы сбросить битые снимки.
   static const _cacheDataset = 'tech_cards_v2';
+
   /// Кэш одной карточки; v2 — сброс после багов с «пустыми» снимками в offline/web.
   static const _detailDataset = 'tech_card_detail_v2';
 
@@ -165,7 +167,8 @@ class TechCardServiceSupabase {
     if (cached != null && cached.isNotEmpty) {
       final cachedCards = cached.map(TechCard.fromJson).toList();
       // Обновим кэш в фоне полным вариантом (с tt_ingredients), чтобы прогреть detail-кэши.
-      unawaited(_refreshTechCardsCache(establishmentId, includeIngredients: true));
+      unawaited(
+          _refreshTechCardsCache(establishmentId, includeIngredients: true));
       return cachedCards;
     }
     return _fetchTechCardsFromServer(
@@ -214,7 +217,8 @@ class TechCardServiceSupabase {
         // В shallow-режиме ингредиенты не загружаем: догрузка в UI / bulk.
         // Не пишем в общий офлайн-кэш — иначе перетираем полный снимок «пустыми» строками.
         final list = (data as List)
-            .map((row) => TechCard.fromJson(Map<String, dynamic>.from(row as Map)))
+            .map((row) =>
+                TechCard.fromJson(Map<String, dynamic>.from(row as Map)))
             .toList();
         return list;
       }
@@ -400,14 +404,12 @@ class TechCardServiceSupabase {
       if (map == null) return null;
       final cardRaw = map['card'];
       if (cardRaw is! Map) return null;
-      final tc =
-          TechCard.fromJson(Map<String, dynamic>.from(cardRaw as Map));
+      final tc = TechCard.fromJson(Map<String, dynamic>.from(cardRaw as Map));
       final ingRaw = map['ingredients'] as List<dynamic>? ?? [];
       final ings = <TTIngredient>[];
       for (final j in ingRaw) {
         try {
-          ings.add(
-              TTIngredient.fromJson(Map<String, dynamic>.from(j as Map)));
+          ings.add(TTIngredient.fromJson(Map<String, dynamic>.from(j as Map)));
         } catch (_) {}
       }
       return tc.copyWith(ingredients: _sortIngredientsStableByIdSuffix(ings));
@@ -473,8 +475,8 @@ class TechCardServiceSupabase {
             .maybeSingle();
         if (row == null) return null;
         final ingredients = await _fetchIngredientsForTechCard(techCardId);
-        final tc = TechCard.fromJson(row as Map<String, dynamic>)
-            .copyWith(ingredients: _sortIngredientsStableByIdSuffix(ingredients));
+        final tc = TechCard.fromJson(row as Map<String, dynamic>).copyWith(
+            ingredients: _sortIngredientsStableByIdSuffix(ingredients));
         await _writeTechCardDetailCache(tc);
         return tc;
       } catch (e2) {
@@ -496,9 +498,7 @@ class TechCardServiceSupabase {
             .map((e) => Map<String, dynamic>.from(e))
             .toList(),
       );
-      return rows
-          .map((j) => TTIngredient.fromJson(j))
-          .toList();
+      return rows.map((j) => TTIngredient.fromJson(j)).toList();
     } catch (_) {
       return [];
     }
@@ -1115,7 +1115,8 @@ class TechCardServiceSupabase {
 
     // Внутри async-методов нельзя использовать named-аргумент `yield:` (это зарезервировано).
     // Поэтому назначаем выход через безопасный хелпер.
-    updatedTechCard = TechCard.withYieldValue(updatedTechCard, originalTechCard.yieldValue);
+    updatedTechCard =
+        TechCard.withYieldValue(updatedTechCard, originalTechCard.yieldValue);
 
     // Копируем ингредиенты
     for (final ingredient in originalTechCard.ingredients) {
@@ -1156,7 +1157,7 @@ class TechCardServiceSupabase {
     try {
       final res = await _supabase.client.functions.invoke(
         'translate-text',
-        body: {'text': dishName.trim(), 'from': 'ru', 'to': targetLang},
+        body: {'text': dishName.trim(), 'from': 'auto', 'to': targetLang},
       );
       final data = res.data as Map<String, dynamic>?;
       final translated = data?['translatedText'] as String?;

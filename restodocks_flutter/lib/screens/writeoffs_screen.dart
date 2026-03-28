@@ -479,7 +479,11 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
   List<int>? _buildExcelBytes(Map<String, dynamic> payload, LocalizationService loc) {
     try {
       final excel = Excel.createExcel();
-      final sheet = excel['Списание'];
+      var sheetName = loc.t('writeoff_excel_sheet');
+      if (sheetName.isEmpty || sheetName == 'writeoff_excel_sheet') {
+        sheetName = 'Write-off';
+      }
+      final sheet = excel[sheetName];
       var rows = (payload['rows'] as List<dynamic>? ?? []).map((e) => e as Map<String, dynamic>).toList();
       rows = rows..sort((a, b) => (a['productName']?.toString() ?? '').toLowerCase().compareTo((b['productName']?.toString() ?? '').toLowerCase()));
       sheet.appendRow([
@@ -502,7 +506,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
         sheet.appendRow([]);
         sheet.appendRow([TextCellValue(loc.t('writeoff_comment') ?? 'Комментарий'), TextCellValue(comment)]);
       }
-      excel.setDefaultSheet('Списание');
+      excel.setDefaultSheet(sheetName);
       final out = excel.encode();
       return out;
     } catch (_) {

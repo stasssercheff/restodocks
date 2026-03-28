@@ -44,7 +44,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
         final translated = await translationSvc.translate(
           entityType: TranslationEntityType.checklist,
           entityId: c.id,
-          fieldName: 'checklist_name',
+          fieldName: 'name',
           text: text,
           from: sourceLang,
           to: targetLang,

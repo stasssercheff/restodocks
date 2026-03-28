@@ -52,6 +52,7 @@ class ProductUploadScreen extends StatefulWidget {
 
   /// По умолчанию true — добавлять в номенклатуру. false — только пополнение базы.
   final bool defaultAddToNomenclature;
+
   /// Опционально: авто-запуск метода при открытии (beta UX).
   /// 'text' | 'file'
   final String? initialMethod;
@@ -97,7 +98,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     if (r['status'] == 'updated') {
       final oldPrice = r['oldPrice'] as double?;
       final newPrice = r['newPrice'] as double?;
-      if (oldPrice != null && newPrice != null && (oldPrice - newPrice).abs() < 0.01) return false;
+      if (oldPrice != null &&
+          newPrice != null &&
+          (oldPrice - newPrice).abs() < 0.01) return false;
     }
     return true;
   }
@@ -122,9 +125,10 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Widget _buildErrorScreen(String message) {
+    final loc = context.read<LocalizationService>();
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Загрузка продуктов'),
+        title: Text(loc.t('Загрузка продуктов')),
         leading: appBarBackButton(context),
       ),
       body: Center(
@@ -141,13 +145,13 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Вернуться назад'),
+              child: Text(loc.t('Вернуться назад')),
             ),
             const SizedBox(height: 16),
             // Кнопка для тестирования API
             OutlinedButton(
               onPressed: () => _testApiCall(context),
-              child: const Text('Тестировать API'),
+              child: Text(loc.t('Тестировать API')),
             ),
           ],
         ),
@@ -184,9 +188,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       if (response.isNotEmpty) {
         _addDebugLog('First item: ${response.first}');
         _addDebugLog('First item keys: ${response.first.keys.toList()}');
-        _addDebugLog('First item types: ${response.first.values.map((v) => v.runtimeType).toList()}');
+        _addDebugLog(
+            'First item types: ${response.first.values.map((v) => v.runtimeType).toList()}');
       }
-
     } catch (e, stackTrace) {
       _addDebugLog('API Test failed: $e');
       _addDebugLog('Stack trace: $stackTrace');
@@ -203,22 +207,24 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       final account = context.watch<AccountManagerSupabase>();
       final aiService = context.read<AiService>();
 
-      _addDebugLog('All providers available, isLoggedIn: ${account.isLoggedInSync}');
+      _addDebugLog(
+          'All providers available, isLoggedIn: ${account.isLoggedInSync}');
 
       // Проверяем авторизацию
       if (!account.isLoggedInSync) {
         _addDebugLog('Not logged in');
-        return _buildErrorScreen('Необходимо войти в систему');
+        return _buildErrorScreen(loc.t('Необходимо войти в систему'));
       }
 
       // Проверяем наличие заведения
       final establishmentId = account.dataEstablishmentId;
       if (establishmentId == null) {
         _addDebugLog('No establishment');
-        return _buildErrorScreen('Не найдено заведение');
+        return _buildErrorScreen(loc.t('Не найдено заведение'));
       }
 
-      _addDebugLog('ProductUploadScreen ready: establishmentId = $establishmentId');
+      _addDebugLog(
+          'ProductUploadScreen ready: establishmentId = $establishmentId');
 
       return _buildMainScreen(loc, account, aiService, establishmentId);
     } catch (e, stackTrace) {
@@ -233,7 +239,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     AiService aiService,
     String establishmentId,
   ) {
-
     return Scaffold(
       appBar: AppBar(
         title: Text(loc.t('upload_products')),
@@ -294,7 +299,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
                         const SizedBox(width: 16),
                         Expanded(
                           child: Text(
-                            _loadingMessage.isNotEmpty ? _loadingMessage : 'Обработка...',
+                            _loadingMessage.isNotEmpty
+                                ? _loadingMessage
+                                : 'Обработка...',
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ),
@@ -305,12 +312,16 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
                       LinearProgressIndicator(
                         value: _loadingProgress / _loadingTotal,
                         backgroundColor: Colors.blue.withOpacity(0.2),
-                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+                        valueColor:
+                            const AlwaysStoppedAnimation<Color>(Colors.blue),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '$_loadingProgress / $_loadingTotal',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.blue.shade700),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Colors.blue.shade700),
                       ),
                     ],
                   ],
@@ -327,8 +338,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             Text(
               'Продукты будут добавлены в общую базу и станут доступны для создания ТТК и меню.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey[600],
-              ),
+                    color: Colors.grey[600],
+                  ),
             ),
             const SizedBox(height: 24),
 
@@ -336,8 +347,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             Text(
               'Выберите способ:',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 16),
 
@@ -345,7 +356,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             _UploadMethodCard(
               icon: Icons.edit_note,
               title: '1. Загрузить из текста',
-              description: 'Вставьте список продуктов из Excel, мессенджера или заметок. '
+              description:
+                  'Вставьте список продуктов из Excel, мессенджера или заметок. '
                   'Формат распознаётся автоматически, дубликаты и сверка цен.',
               color: Colors.green,
               onTap: _isLoading ? null : () => _showTextUploadDialog(),
@@ -356,7 +368,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             _UploadMethodCard(
               icon: Icons.file_upload,
               title: '2. Загрузить из файла',
-              description: 'Excel (.xls, .xlsx). Модерация, поиск дубликатов, сверка цен.',
+              description:
+                  'Excel (.xls, .xlsx). Модерация, поиск дубликатов, сверка цен.',
               color: Colors.blue,
               onTap: _isLoading ? null : () => _uploadFromFileUnified(),
             ),
@@ -379,7 +392,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       builder: (ctx) => _PasteTextDialog(controller: controller),
     );
     if (result == null || result.trim().isEmpty || !mounted) return;
-    await _processWithDeferredModeration(text: result, source: 'вставленный текст');
+    await _processWithDeferredModeration(
+        text: result, source: 'вставленный текст');
   }
 
   /// 3. Загрузить из инвентаризационного бланка — вставить строки с названием + числами
@@ -404,12 +418,15 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       allowedExtensions: ['xlsx', 'xls'],
       withData: true,
     );
-    if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
+    if (result == null ||
+        result.files.isEmpty ||
+        result.files.single.bytes == null) return;
 
     final acc = context.read<AccountManagerSupabase>();
     final estId = acc.dataEstablishmentId;
     if (estId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Не найдено заведение')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Не найдено заведение')));
       return;
     }
 
@@ -428,7 +445,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         if (mounted) {
           setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Не удалось распознать структуру бланка iiko')),
+            const SnackBar(
+                content: Text('Не удалось распознать структуру бланка iiko')),
           );
         }
         return;
@@ -439,15 +457,17 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       await iikoStore.replaceAll(
         estId,
         products,
-        blankBytes: bytes,                           // оригинальный файл для экспорта
-        quantityColumnIndex: parsed.quantityCol,     // колонка «Остаток фактический»
+        blankBytes: bytes, // оригинальный файл для экспорта
+        quantityColumnIndex:
+            parsed.quantityCol, // колонка «Остаток фактический»
       );
 
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Загружено ${products.length} позиций iiko. Доступны в номенклатуре → вкладка iiko'),
+            content: Text(
+                'Загружено ${products.length} позиций iiko. Доступны в номенклатуре → вкладка iiko'),
             duration: const Duration(seconds: 5),
           ),
         );
@@ -455,7 +475,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
       }
     }
   }
@@ -467,45 +488,56 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   ///
   /// Строка считается ТОВАРОМ если в ней есть код (col C).
   /// Значение A в строке товара = текущая группа (меняется при заполненном A).
-  static const _emptyParsed = (products: <IikoProduct>[], quantityCol: null as int?, dataStartRow: 0);
+  static const _emptyParsed =
+      (products: <IikoProduct>[], quantityCol: null as int?, dataStartRow: 0);
 
-  ({List<IikoProduct> products, int? quantityCol, int dataStartRow}) _parseIikoBlank(
-      Uint8List bytes, String establishmentId) {
+  ({List<IikoProduct> products, int? quantityCol, int dataStartRow})
+      _parseIikoBlank(Uint8List bytes, String establishmentId) {
     try {
       final excel = Excel.decodeBytes(bytes.toList());
       if (excel.tables.isEmpty) return _emptyParsed;
       final sheet = excel.tables[excel.tables.keys.first]!;
 
       String _cell(int col, int row) {
-        final v = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value;
+        final v = sheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row))
+            .value;
         return _excelCellToStr(v).trim();
       }
 
       // ── Шаг 1: определяем колонки. Продукт = 3-й столбец (D, «Наименование»), не 1-й (A, группа). ──
       int colGroup = 0; // A — группа (только категория)
-      int colCode  = 2; // C — код
-      int colName  = 3; // D — наименование ТОВАРА (обязательно не A!)
-      int colUnit  = 4; // E — ед.изм.
-      int colQty   = 5; // F — остаток фактический
+      int colCode = 2; // C — код
+      int colName = 3; // D — наименование ТОВАРА (обязательно не A!)
+      int colUnit = 4; // E — ед.изм.
+      int colQty = 5; // F — остаток фактический
       int dataStart = 8;
 
       for (var r = 0; r < sheet.maxRows && r < 20; r++) {
         final rowCells = <int, String>{};
-        for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
+        for (var c = 0;
+            c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns);
+            c++) {
           final v = _cell(c, r).toLowerCase();
           if (v.isNotEmpty) rowCells[c] = v;
         }
         final nameEntry = rowCells.entries
-            .where((e) => (e.value.contains('наименование') || e.value.contains('товар')) && e.key != colGroup)
+            .where((e) =>
+                (e.value.contains('наименование') ||
+                    e.value.contains('товар')) &&
+                e.key != colGroup)
             .firstOrNull;
         if (nameEntry != null) {
           colName = nameEntry.key;
           for (final scanRow in [r, r - 1]) {
             if (scanRow < 0) continue;
-            for (var c = 0; c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns); c++) {
+            for (var c = 0;
+                c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns);
+                c++) {
               final v = _cell(c, scanRow).toLowerCase();
               if (v.contains('код') && !v.contains('штрих')) colCode = c;
-              if ((v.contains('ед') && v.length < 10) || v.contains('мера')) colUnit = c;
+              if ((v.contains('ед') && v.length < 10) || v.contains('мера'))
+                colUnit = c;
               if (v.contains('остаток') || v.contains('фактич')) colQty = c;
               if (v.contains('групп')) colGroup = c;
             }
@@ -524,9 +556,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       int sortOrder = 0;
 
       for (var r = dataStart; r < sheet.maxRows; r++) {
-        final codeVal  = _cell(colCode, r);
-        final nameVal  = _cell(colName, r);
-        final unitVal  = _cell(colUnit, r);
+        final codeVal = _cell(colCode, r);
+        final nameVal = _cell(colName, r);
+        final unitVal = _cell(colUnit, r);
         final groupVal = _cell(colGroup, r);
 
         // Строка с кодом = товар (основной критерий)
@@ -540,7 +572,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             id: const Uuid().v4(),
             establishmentId: establishmentId,
             code: codeVal,
-            name: nameVal,     // точно как в файле, каждый символ
+            name: nameVal, // точно как в файле, каждый символ
             unit: unitVal.isNotEmpty ? unitVal : null,
             groupName: currentGroupRaw,
             sortOrder: sortOrder++,
@@ -580,8 +612,15 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   static String _normalizeIikoUnit(String raw) {
     final v = raw.trim().toLowerCase();
     const map = {
-      'кг': 'kg', 'г': 'g', 'гр': 'g', 'л': 'l', 'мл': 'ml',
-      'шт': 'pcs', 'шт.': 'pcs', 'уп': 'pkg', 'уп.': 'pkg',
+      'кг': 'kg',
+      'г': 'g',
+      'гр': 'g',
+      'л': 'l',
+      'мл': 'ml',
+      'шт': 'pcs',
+      'шт.': 'pcs',
+      'уп': 'pkg',
+      'уп.': 'pkg',
     };
     return map[v] ?? v;
   }
@@ -589,7 +628,18 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   /// Строка-заголовок таблицы — пропустить.
   static bool _isIikoHeaderRow(String name) {
     final lower = name.toLowerCase();
-    const headers = ['наименование', 'код', 'ед. изм', 'остаток', 'бланк', 'организация', 'на дату', 'склад', 'группа', 'товар'];
+    const headers = [
+      'наименование',
+      'код',
+      'ед. изм',
+      'остаток',
+      'бланк',
+      'организация',
+      'на дату',
+      'склад',
+      'группа',
+      'товар'
+    ];
     return headers.any((h) => lower.contains(h));
   }
 
@@ -600,7 +650,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       allowedExtensions: ['xls', 'xlsx'],
       withData: true,
     );
-    if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
+    if (result == null ||
+        result.files.isEmpty ||
+        result.files.single.bytes == null) return;
 
     final bytes = result.files.single.bytes!;
     final loc = context.read<LocalizationService>();
@@ -619,7 +671,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     if (name.endsWith('.pages')) return 'Apple Pages (.pages)';
     if (name.endsWith('.rtf')) return 'RTF (.rtf)';
     if (name.endsWith('.docx') || name.endsWith('.doc')) return 'Word';
-    if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.csv')) return 'Excel/CSV';
+    if (name.endsWith('.xlsx') ||
+        name.endsWith('.xls') ||
+        name.endsWith('.csv')) return 'Excel/CSV';
     if (name.endsWith('.txt')) return 'Текст';
     return 'файл';
   }
@@ -629,7 +683,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   List<String> _extractRowsFromFile(Uint8List bytes, String name) {
     if (name.endsWith('.csv') || name.endsWith('.txt')) {
       final text = utf8.decode(bytes, allowMalformed: true);
-      return text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      return text
+          .split(RegExp(r'\r?\n'))
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
     }
     if (name.endsWith('.rtf')) {
       final rtfContent = utf8.decode(bytes, allowMalformed: true);
@@ -644,10 +702,13 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       }
       return rows;
     }
-    if (name.endsWith('.pages') || name.endsWith('.numbers')) return []; // не поддерживаются
+    if (name.endsWith('.pages') || name.endsWith('.numbers'))
+      return []; // не поддерживаются
     if (name.endsWith('.docx')) return _extractRowsFromDocx(bytes);
     if (name.endsWith('.doc')) return _extractRowsFromDoc(bytes);
-    if (name.endsWith('.xlsx') || name.endsWith('.xls') || name.endsWith('.excel')) {
+    if (name.endsWith('.xlsx') ||
+        name.endsWith('.xls') ||
+        name.endsWith('.excel')) {
       final rows = _extractRowsFromExcel(bytes);
       if (rows.isNotEmpty) return rows;
       final csvFallback = _tryCsvFallback(bytes);
@@ -659,7 +720,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   List<String> _extractRowsFromPages(Uint8List bytes) {
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
-      ArchiveFile? xmlFile = archive.findFile('index.xml.gz') ?? archive.findFile('Index/Document.xml') ?? archive.findFile('index.xml');
+      ArchiveFile? xmlFile = archive.findFile('index.xml.gz') ??
+          archive.findFile('Index/Document.xml') ??
+          archive.findFile('index.xml');
       if (xmlFile == null) {
         for (final f in archive.files) {
           if (f.name.endsWith('.xml') && !f.name.contains('Preferences')) {
@@ -674,8 +737,16 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         data = GZipDecoder().decodeBytes(data);
       }
       final xml = XmlDocument.parse(utf8.decode(data));
-      final text = xml.descendants.where((n) => n is XmlText).map((n) => (n as XmlText).text.trim()).where((s) => s.isNotEmpty).join('\n');
-      return text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      final text = xml.descendants
+          .where((n) => n is XmlText)
+          .map((n) => (n as XmlText).text.trim())
+          .where((s) => s.isNotEmpty)
+          .join('\n');
+      return text
+          .split(RegExp(r'\r?\n'))
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
     } catch (e) {
       _addDebugLog('Pages extract error: $e');
       return [];
@@ -687,12 +758,16 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     try {
       final archive = ZipDecoder().decodeBytes(bytes);
       for (final f in archive.files) {
-        if ((f.name.contains('Data') || f.name.contains('table')) && f.name.endsWith('.xml')) {
+        if ((f.name.contains('Data') || f.name.contains('table')) &&
+            f.name.endsWith('.xml')) {
           try {
             final xml = XmlDocument.parse(utf8.decode(f.content as List<int>));
             final rows = <String>[];
             for (final row in xml.findAllElements('row')) {
-              final cells = row.findElements('cell').map((c) => c.innerText.trim()).toList();
+              final cells = row
+                  .findElements('cell')
+                  .map((c) => c.innerText.trim())
+                  .toList();
               final line = cells.join('\t').trim();
               if (line.isNotEmpty && !_looksLikeGarbage(line)) rows.add(line);
             }
@@ -704,8 +779,16 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         if (f.name.endsWith('.xml')) {
           try {
             final xml = XmlDocument.parse(utf8.decode(f.content as List<int>));
-            final text = xml.descendants.where((n) => n is XmlText).map((n) => (n as XmlText).text.trim()).where((s) => s.isNotEmpty).join('\n');
-            final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+            final text = xml.descendants
+                .where((n) => n is XmlText)
+                .map((n) => (n as XmlText).text.trim())
+                .where((s) => s.isNotEmpty)
+                .join('\n');
+            final lines = text
+                .split(RegExp(r'\r?\n'))
+                .map((s) => s.trim())
+                .where((s) => s.isNotEmpty)
+                .toList();
             if (lines.length >= 2) return lines;
           } catch (_) {}
         }
@@ -713,7 +796,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       // Fallback: извлечь сырой текст из IWA и прочих файлов (для передачи в AI)
       final rawText = _extractRawTextFromZipForAI(bytes);
       if (rawText.trim().length >= 20) {
-        return rawText.split(RegExp(r'[\r\n\t]+')).map((s) => s.trim()).where((s) => s.length >= 2 && !_looksLikeGarbage(s)).toList();
+        return rawText
+            .split(RegExp(r'[\r\n\t]+'))
+            .map((s) => s.trim())
+            .where((s) => s.length >= 2 && !_looksLikeGarbage(s))
+            .toList();
       }
     } catch (e) {
       _addDebugLog('Numbers extract error: $e');
@@ -730,7 +817,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         if (f.content == null || f.content!.isEmpty) continue;
         // Не трогать .iwa — бинарный формат, даёт иероглифы
         if (f.name.endsWith('.iwa') || f.name.endsWith('.bin')) continue;
-        if (!f.name.endsWith('.xml') && !f.name.endsWith('.plist') && !f.name.endsWith('.xml.gz')) continue;
+        if (!f.name.endsWith('.xml') &&
+            !f.name.endsWith('.plist') &&
+            !f.name.endsWith('.xml.gz')) continue;
         try {
           var data = f.content as List<int>;
           if (f.name.endsWith('.gz')) {
@@ -740,7 +829,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           // Только строки, похожие на читаемый текст (без бинарного мусора)
           for (final line in decoded.split(RegExp(r'[\r\n]+'))) {
             final t = line.trim();
-            if (t.length >= 3 && t.length < 300 && _looksLikeReadableProductLine(t)) {
+            if (t.length >= 3 &&
+                t.length < 300 &&
+                _looksLikeReadableProductLine(t)) {
               buffer.writeln(t);
             }
           }
@@ -754,13 +845,19 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
   /// Строка похожа на название продукта (без иероглифов и мусора)
   bool _looksLikeReadableProductLine(String s) {
-    if (s.contains('<?xml') || s.startsWith('<') || s.contains('/Index/') ||
-        s.contains('TSP.') || s.contains('protobuf') || s.contains('gregorian') ||
-        s.contains('en_US') || s.contains('March"April')) return false;
+    if (s.contains('<?xml') ||
+        s.startsWith('<') ||
+        s.contains('/Index/') ||
+        s.contains('TSP.') ||
+        s.contains('protobuf') ||
+        s.contains('gregorian') ||
+        s.contains('en_US') ||
+        s.contains('March"April')) return false;
     // Должно быть минимум 50% букв (кириллица/латиница), без управляющих символов
     final letters = s.replaceAll(RegExp(r'[^a-zA-Zа-яА-ЯёЁ]'), '').length;
     if (letters < s.length * 0.3) return false;
-    if (RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\uFFFD]').hasMatch(s)) return false;
+    if (RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f\uFFFD]').hasMatch(s))
+      return false;
     return true;
   }
 
@@ -770,16 +867,27 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       final doc = archive.findFile('word/document.xml');
       if (doc == null) return [];
       final xml = XmlDocument.parse(utf8.decode(doc.content as List<int>));
-      final paras = xml.descendants.whereType<XmlElement>().where((e) => e.localName == 'p');
+      final paras = xml.descendants
+          .whereType<XmlElement>()
+          .where((e) => e.localName == 'p');
       final lines = <String>[];
       for (final p in paras) {
-        final texts = p.descendants.whereType<XmlElement>().where((e) => e.localName == 't').map((e) => e.innerText).toList();
+        final texts = p.descendants
+            .whereType<XmlElement>()
+            .where((e) => e.localName == 't')
+            .map((e) => e.innerText)
+            .toList();
         final line = texts.join('').trim();
         if (line.isNotEmpty) lines.add(line);
       }
       if (lines.isEmpty) {
-        final allT = xml.descendants.whereType<XmlElement>().where((e) => e.localName == 't').map((e) => e.innerText).join(' ');
-        if (allT.trim().isNotEmpty) return allT.split(RegExp(r'\s+')).where((s) => s.length > 1).toList();
+        final allT = xml.descendants
+            .whereType<XmlElement>()
+            .where((e) => e.localName == 't')
+            .map((e) => e.innerText)
+            .join(' ');
+        if (allT.trim().isNotEmpty)
+          return allT.split(RegExp(r'\s+')).where((s) => s.length > 1).toList();
       }
       return lines;
     } catch (e) {
@@ -796,16 +904,19 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       final text = utf8.decode(bytes, allowMalformed: true);
 
       // Ищем текст между разделителями или после определенных маркеров
-      final lines = text.split(RegExp(r'[\r\n]+'))
+      final lines = text
+          .split(RegExp(r'[\r\n]+'))
           .map((line) => line.trim())
           .where((line) => line.isNotEmpty && line.length > 2)
-          .where((line) => !line.contains(RegExp(r'[\x00-\x1F\x80-\x9F]'))) // Убираем бинарные символы
+          .where((line) => !line.contains(
+              RegExp(r'[\x00-\x1F\x80-\x9F]'))) // Убираем бинарные символы
           .toList();
 
       if (lines.isEmpty) {
         // Альтернативный подход: поиск текста между маркерами Word
         final altText = text.replaceAll(RegExp(r'[^\x20-\x7E\r\n\t]'), ' ');
-        final altLines = altText.split(RegExp(r'\s+'))
+        final altLines = altText
+            .split(RegExp(r'\s+'))
             .where((word) => word.length > 3 && word.length < 100)
             .toList();
 
@@ -838,7 +949,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       for (var r = 0; r < sheet.maxRows; r++) {
         final parts = <String>[];
         for (var c = 0; c < sheet.maxColumns; c++) {
-          final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r));
+          final cell = sheet
+              .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r));
           parts.add(_excelCellToStr(cell.value));
         }
         final line = parts.join('\t').trim();
@@ -888,7 +1000,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     if (bytes[0] == 0x50 && bytes[1] == 0x4B) return [];
     try {
       final text = utf8.decode(bytes, allowMalformed: true);
-      final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      final lines = text
+          .split(RegExp(r'\r?\n'))
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
       if (lines.isEmpty) return [];
       if (_looksLikeGarbage(lines.first)) return [];
       return lines;
@@ -899,30 +1015,34 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
   static bool _looksLikeGarbage(String line) {
     if (line.length < 2) return true;
-    if (line.startsWith('PK') || line.contains('.xml') || line.contains('workbook') ||
-        line.contains('theme') || line.contains('[Content_Types]') ||
+    if (line.startsWith('PK') ||
+        line.contains('.xml') ||
+        line.contains('workbook') ||
+        line.contains('theme') ||
+        line.contains('[Content_Types]') ||
         RegExp(r'^[\x00-\x1f\x7f-\xff]+$').hasMatch(line)) return true;
     return false;
   }
 
   Future<void> _showImportWithModeration() async {
+    final loc = context.read<LocalizationService>();
     final choice = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Импорт с модерацией'),
+        title: Text(loc.t('Импорт с модерацией')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.file_upload),
-              title: const Text('Из файла'),
+              title: Text(loc.t('Из файла')),
               subtitle: const Text('Excel (.xls, .xlsx)'),
               onTap: () => Navigator.of(ctx).pop('file'),
             ),
             ListTile(
               leading: const Icon(Icons.content_paste),
-              title: const Text('Вставить текст'),
-              subtitle: const Text('Из мессенджеров, заметок'),
+              title: Text(loc.t('Вставить текст')),
+              subtitle: Text(loc.t('Из мессенджеров, заметок')),
               onTap: () => Navigator.of(ctx).pop('text'),
             ),
           ],
@@ -930,7 +1050,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Отмена'),
+            child: Text(loc.t('cancel')),
           ),
         ],
       ),
@@ -943,58 +1063,67 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         allowedExtensions: ['xls', 'xlsx'],
         withData: true,
       );
-      if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
+      if (result == null ||
+          result.files.isEmpty ||
+          result.files.single.bytes == null) return;
       final bytes = result.files.single.bytes!;
       final name = result.files.single.name.toLowerCase();
       List<String> rows = _extractRowsFromFile(bytes, name);
       if (rows.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось извлечь данные из файла')),
+          SnackBar(content: Text(loc.t('Не удалось извлечь данные из файла'))),
         );
         return;
       }
-      await _processWithDeferredModeration(rows: rows, source: _sourceFromFileName(name));
+      await _processWithDeferredModeration(
+          rows: rows, source: _sourceFromFileName(name));
     } else {
       final controller = TextEditingController();
       final result = await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Вставить текст'),
+          title: Text(loc.t('Вставить текст')),
           content: SizedBox(
             width: 500,
             child: TextField(
               controller: controller,
               maxLines: 12,
               decoration: const InputDecoration(
-                hintText: 'Вставьте список продуктов (название, цена, ед. изм.)',
+                hintText:
+                    'Вставьте список продуктов (название, цена, ед. изм.)',
                 border: OutlineInputBorder(),
               ),
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Отмена')),
+            TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(loc.t('cancel'))),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(controller.text),
-              child: const Text('Анализ'),
+              child: Text(loc.t('Анализ')),
             ),
           ],
         ),
       );
       if (result != null && result.trim().isNotEmpty) {
-        await _processWithDeferredModeration(text: result, source: 'вставленный текст');
+        await _processWithDeferredModeration(
+            text: result, source: 'вставленный текст');
       }
     }
   }
 
   /// [mode] = 'inventory' — отключает повторную нормализацию названий через ИИ,
   /// чтобы сохранить названия дословно как в инвентаризационном бланке.
-  Future<void> _processWithDeferredModeration({List<String>? rows, String? text, String? source, String? mode}) async {
+  Future<void> _processWithDeferredModeration(
+      {List<String>? rows, String? text, String? source, String? mode}) async {
+    final loc = context.read<LocalizationService>();
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     if (est == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не найдено заведение')),
+          SnackBar(content: Text(loc.t('Не найдено заведение'))),
         );
       }
       return;
@@ -1009,22 +1138,37 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       final ai = context.read<AiService>();
 
       // ИИ обрабатывает входящие данные (текст или файл) — корректно определяет названия, цены, валюту, исправляет опечатки
-      final userLocale = WidgetsBinding.instance.platformDispatcher.locale.toString();
+      final userLocale =
+          WidgetsBinding.instance.platformDispatcher.locale.toString();
       if (rows != null && rows.isNotEmpty) {
-        parsed = await ai.parseProductList(rows: rows, source: source ?? 'строки', userLocale: userLocale, mode: mode);
+        parsed = await ai.parseProductList(
+            rows: rows,
+            source: source ?? 'строки',
+            userLocale: userLocale,
+            mode: mode);
       } else if (text != null && text.trim().isNotEmpty) {
-        parsed = await ai.parseProductList(text: text, source: source ?? 'вставленный текст', userLocale: userLocale, mode: mode);
+        parsed = await ai.parseProductList(
+            text: text,
+            source: source ?? 'вставленный текст',
+            userLocale: userLocale,
+            mode: mode);
       }
 
       // Fallback: локальный парсинг, если ИИ недоступен или вернул пустой результат
       if (parsed.isEmpty) {
         _setLoadingMessage('Разбор данных (локально)...');
-        final rawLines = rows ?? text!.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+        final rawLines = rows ??
+            text!
+                .split(RegExp(r'\r?\n'))
+                .map((s) => s.trim())
+                .where((s) => s.isNotEmpty)
+                .toList();
         for (var i = 0; i < rawLines.length; i++) {
           final line = rawLines[i];
           final r = _parseLine(line);
           if (r.name.isNotEmpty) {
-            parsed.add(ParsedProductItem(name: r.name, price: r.price, unit: null, currency: null));
+            parsed.add(ParsedProductItem(
+                name: r.name, price: r.price, unit: null, currency: null));
           }
         }
         // Уведомление о неудаче ИИ скрыто по запросу
@@ -1038,7 +1182,10 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         if (mounted) {
           setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Не удалось извлечь продукты. Проверьте формат данных.'), duration: Duration(seconds: 6)),
+            const SnackBar(
+                content: Text(
+                    'Не удалось извлечь продукты. Проверьте формат данных.'),
+                duration: Duration(seconds: 6)),
           );
         }
         return;
@@ -1048,7 +1195,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       final store = context.read<ProductStoreSupabase>();
       await store.loadProducts(force: true);
       await store.loadNomenclature(est.dataEstablishmentId);
-      final existingProducts = store.getNomenclatureProducts(est.dataEstablishmentId);
+      final existingProducts =
+          store.getNomenclatureProducts(est.dataEstablishmentId);
       final allProducts = store.allProducts;
 
       final moderationItems = <ModerationItem>[];
@@ -1057,7 +1205,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
       for (var i = 0; i < parsed.length; i++) {
         final p = parsed[i];
-        final match = await _findMatch(p.name, p.price, existingProducts, allProducts, est.dataEstablishmentId, store);
+        final match = await _findMatch(p.name, p.price, existingProducts,
+            allProducts, est.dataEstablishmentId, store);
         if (match.existingId != null) {
           moderationItems.add(ModerationItem(
             name: p.name,
@@ -1067,7 +1216,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             existingProductId: match.existingId,
             existingProductName: match.existingName,
             existingPrice: match.existingPrice,
-            existingPriceFromEstablishment: match.existingPriceFromEstablishment,
+            existingPriceFromEstablishment:
+                match.existingPriceFromEstablishment,
             category: ModerationCategory.priceUpdate,
           ));
         } else {
@@ -1109,7 +1259,14 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         .trim();
   }
 
-  Future<({String? existingId, String? existingName, double? existingPrice, bool existingPriceFromEstablishment, bool priceDiff})> _findMatch(
+  Future<
+      ({
+        String? existingId,
+        String? existingName,
+        double? existingPrice,
+        bool existingPriceFromEstablishment,
+        bool priceDiff
+      })> _findMatch(
     String name,
     double? price,
     List<Product> nomenclature,
@@ -1128,12 +1285,26 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           final existingPrice = ep?.$1;
           final fromEstablishment = existingPrice != null;
 
-          final priceDiff = price != null && existingPrice != null && (existingPrice - price).abs() > 0.01;
-          return (existingId: p.id, existingName: p.name, existingPrice: existingPrice, existingPriceFromEstablishment: fromEstablishment, priceDiff: priceDiff);
+          final priceDiff = price != null &&
+              existingPrice != null &&
+              (existingPrice - price).abs() > 0.01;
+          return (
+            existingId: p.id,
+            existingName: p.name,
+            existingPrice: existingPrice,
+            existingPriceFromEstablishment: fromEstablishment,
+            priceDiff: priceDiff
+          );
         }
       }
     }
-    return (existingId: null, existingName: null, existingPrice: null, existingPriceFromEstablishment: false, priceDiff: false);
+    return (
+      existingId: null,
+      existingName: null,
+      existingPrice: null,
+      existingPriceFromEstablishment: false,
+      priceDiff: false
+    );
   }
 
   Future<void> _uploadExcelSimple() async {
@@ -1143,7 +1314,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       allowedExtensions: ['xls', 'xlsx'],
       allowMultiple: false,
     );
-    devLog('Excel simple picker result: ${result != null ? "files selected" : "cancelled"}');
+    devLog(
+        'Excel simple picker result: ${result != null ? "files selected" : "cancelled"}');
 
     if (result != null && result.files.isNotEmpty) {
       final file = result.files.first;
@@ -1171,43 +1343,49 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         withData: true,
       );
 
-      _addDebugLog('File picker result: ${result != null ? "files selected" : "cancelled"}');
+      _addDebugLog(
+          'File picker result: ${result != null ? "files selected" : "cancelled"}');
 
-      if (result == null || result.files.isEmpty || result.files.single.bytes == null) {
+      if (result == null ||
+          result.files.isEmpty ||
+          result.files.single.bytes == null) {
         _addDebugLog('File picker cancelled or no data');
         setState(() => _isLoading = false);
         return;
       }
 
-    final fileName = result.files.single.name.toLowerCase();
-    final bytes = result.files.single.bytes!;
-    devLog('Processing file: $fileName');
+      final fileName = result.files.single.name.toLowerCase();
+      final bytes = result.files.single.bytes!;
+      devLog('Processing file: $fileName');
 
-    if (fileName.endsWith('.txt')) {
-      devLog('Processing as TXT file');
-      final text = utf8.decode(bytes, allowMalformed: true);
-      await _processText(text, loc, widget.defaultAddToNomenclature);
-    } else if (fileName.endsWith('.rtf')) {
-      final text = _extractTextFromRtf(utf8.decode(bytes, allowMalformed: true));
-      await _processText(text, loc, widget.defaultAddToNomenclature);
-    } else if (fileName.endsWith('.csv')) {
-      final text = utf8.decode(bytes, allowMalformed: true);
-      final lines = text.split('\n').where((line) => line.trim().isNotEmpty).toList();
-      // Конвертируем CSV в табличный формат
-      final convertedLines = lines.map((line) {
-        // Определяем разделитель
-        if (line.contains(';')) {
-          return line.split(';').map((cell) => cell.trim()).join('\t');
-        } else if (line.contains(',')) {
-          return line.split(',').map((cell) => cell.trim()).join('\t');
-        } else {
-          return line; // Уже в нужном формате
-        }
-      }).toList();
-      await _processText(convertedLines.join('\n'), loc, widget.defaultAddToNomenclature);
-    } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-      await _processExcel(bytes, loc);
-    }
+      if (fileName.endsWith('.txt')) {
+        devLog('Processing as TXT file');
+        final text = utf8.decode(bytes, allowMalformed: true);
+        await _processText(text, loc, widget.defaultAddToNomenclature);
+      } else if (fileName.endsWith('.rtf')) {
+        final text =
+            _extractTextFromRtf(utf8.decode(bytes, allowMalformed: true));
+        await _processText(text, loc, widget.defaultAddToNomenclature);
+      } else if (fileName.endsWith('.csv')) {
+        final text = utf8.decode(bytes, allowMalformed: true);
+        final lines =
+            text.split('\n').where((line) => line.trim().isNotEmpty).toList();
+        // Конвертируем CSV в табличный формат
+        final convertedLines = lines.map((line) {
+          // Определяем разделитель
+          if (line.contains(';')) {
+            return line.split(';').map((cell) => cell.trim()).join('\t');
+          } else if (line.contains(',')) {
+            return line.split(',').map((cell) => cell.trim()).join('\t');
+          } else {
+            return line; // Уже в нужном формате
+          }
+        }).toList();
+        await _processText(
+            convertedLines.join('\n'), loc, widget.defaultAddToNomenclature);
+      } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
+        await _processExcel(bytes, loc);
+      }
     } catch (e, stackTrace) {
       _addDebugLog('Error in _uploadFromFile: $e\n$stackTrace');
       if (mounted) {
@@ -1225,76 +1403,83 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
   Future<void> _showPasteDialog() async {
     _addDebugLog('_showPasteDialog called');
+    final loc = context.read<LocalizationService>();
 
     try {
       setState(() => _isLoading = true);
       _setLoadingMessage('Открытие диалога...');
       _startLoadingTimeout(); // Предотвращаем зависание
 
-      final loc = context.read<LocalizationService>();
       final controller = TextEditingController();
       bool addToNomenclature = widget.defaultAddToNomenclature;
 
       _addDebugLog('Showing paste dialog...');
       final result = await showDialog<({String text, bool addToNomenclature})>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setState) => AlertDialog(
-          title: Text('Вставить список продуктов'),
-          content: SizedBox(
-            width: 500,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Вставьте список продуктов в поле ниже.\nКаждая строка = один продукт.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: controller,
-                  maxLines: 12,
-                  decoration: const InputDecoration(
-                    hintText: 'Пример:\nАвокадо\t₫99,000\nБазилик\t₫267,000\nМолоко\t₫38,000',
-                    border: OutlineInputBorder(),
-                    alignLabelWithHint: true,
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setState) => AlertDialog(
+            title: Text(loc.t('paste_list')),
+            content: SizedBox(
+              width: 500,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    loc.t('paste_list_tooltip'),
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
-                ),
-                const SizedBox(height: 16),
-                CheckboxListTile(
-                  title: Text('Добавить в номенклатуру заведения', style: Theme.of(context).textTheme.bodyMedium),
-                  subtitle: Text('Продукты будут доступны для создания техкарт', style: Theme.of(context).textTheme.bodySmall),
-                  value: addToNomenclature,
-                  onChanged: (value) => setState(() => addToNomenclature = value ?? true),
-                  dense: true,
-                  controlAffinity: ListTileControlAffinity.leading,
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: controller,
+                    maxLines: 12,
+                    decoration: const InputDecoration(
+                      hintText:
+                          'Пример:\nАвокадо\t₫99,000\nБазилик\t₫267,000\nМолоко\t₫38,000',
+                      border: OutlineInputBorder(),
+                      alignLabelWithHint: true,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  CheckboxListTile(
+                    title: Text(loc.t('add_to_nomenclature'),
+                        style: Theme.of(context).textTheme.bodyMedium),
+                    subtitle: Text(loc.t('products_available_for_techcards'),
+                        style: Theme.of(context).textTheme.bodySmall),
+                    value: addToNomenclature,
+                    onChanged: (value) =>
+                        setState(() => addToNomenclature = value ?? true),
+                    dense: true,
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                ],
+              ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(loc.t('cancel')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop((
+                  text: controller.text,
+                  addToNomenclature: addToNomenclature
+                )),
+                child: Text(loc.t('add')),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Отмена'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(ctx).pop((text: controller.text, addToNomenclature: addToNomenclature)),
-              child: const Text('Добавить'),
-            ),
-          ],
         ),
-      ),
-    );
+      );
 
-    if (result != null && result.text.trim().isNotEmpty) {
-      await _processText(result.text, loc, result.addToNomenclature);
-    }
+      if (result != null && result.text.trim().isNotEmpty) {
+        await _processText(result.text, loc, result.addToNomenclature);
+      }
     } catch (e, stackTrace) {
       _addDebugLog('Error in _showPasteDialog: $e\n$stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка вставки текста: $e')),
+          SnackBar(content: Text('${loc.t('error')}: $e')),
         );
       }
     } finally {
@@ -1368,10 +1553,13 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
                 ),
                 const SizedBox(height: 16),
                 CheckboxListTile(
-                  title: Text('Добавить в номенклатуру заведения', style: Theme.of(context).textTheme.bodyMedium),
-                  subtitle: Text('Продукты будут доступны для создания техкарт', style: Theme.of(context).textTheme.bodySmall),
+                  title: Text('Добавить в номенклатуру заведения',
+                      style: Theme.of(context).textTheme.bodyMedium),
+                  subtitle: Text('Продукты будут доступны для создания техкарт',
+                      style: Theme.of(context).textTheme.bodySmall),
                   value: addToNomenclature,
-                  onChanged: (value) => setState(() => addToNomenclature = value ?? true),
+                  onChanged: (value) =>
+                      setState(() => addToNomenclature = value ?? true),
                   dense: true,
                   controlAffinity: ListTileControlAffinity.leading,
                 ),
@@ -1384,7 +1572,10 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               child: const Text('Отмена'),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(ctx).pop((text: controller.text, addToNomenclature: addToNomenclature)),
+              onPressed: () => Navigator.of(ctx).pop((
+                text: controller.text,
+                addToNomenclature: addToNomenclature
+              )),
               child: const Text('Обработать с AI'),
             ),
           ],
@@ -1410,13 +1601,15 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       return;
     }
 
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['xls', 'xlsx'],
-        withData: true,
-      );
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xls', 'xlsx'],
+      withData: true,
+    );
 
-    if (result == null || result.files.isEmpty || result.files.single.bytes == null) return;
+    if (result == null ||
+        result.files.isEmpty ||
+        result.files.single.bytes == null) return;
 
     final fileName = result.files.single.name;
     final bytes = result.files.single.bytes!;
@@ -1443,17 +1636,20 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       );
 
       // Обрабатываем результаты
-      final ambiguousResults = importResults.where((r) =>
-          r.matchResult.type == MatchType.ambiguous).toList();
-      final priceUpdateResults = importResults.where((r) =>
-          r.matchResult.type == MatchType.priceUpdate).toList();
+      final ambiguousResults = importResults
+          .where((r) => r.matchResult.type == MatchType.ambiguous)
+          .toList();
+      final priceUpdateResults = importResults
+          .where((r) => r.matchResult.type == MatchType.priceUpdate)
+          .toList();
 
       if (priceUpdateResults.isNotEmpty) {
         // Показываем диалог для выбора режима обновления цен
         final updateMode = await _showPriceUpdateModeDialog(priceUpdateResults);
         if (updateMode == 'manual') {
           // Обрабатываем вручную - показываем диалог для каждого продукта
-          await _processPriceUpdatesManually(importResults, importService, establishmentId, account);
+          await _processPriceUpdatesManually(
+              importResults, importService, establishmentId, account);
         } else if (updateMode == 'all') {
           // Обновляем все цены автоматически
           await importService.processImportResults(
@@ -1487,7 +1683,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
       // Перезагружаем номенклатуру чтобы цены в кэше соответствовали БД
       try {
-        await context.read<ProductStoreSupabase>().loadNomenclature(establishmentId);
+        await context
+            .read<ProductStoreSupabase>()
+            .loadNomenclature(establishmentId);
       } catch (_) {}
 
       // Показываем результаты
@@ -1495,12 +1693,13 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       final errorCount = importResults.where((r) => r.error != null).length;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Импорт завершен: $successCount успешно, $errorCount ошибок')),
+        SnackBar(
+            content: Text(loc.t(
+                'Импорт завершен: $successCount успешно, $errorCount ошибок'))),
       );
-
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка импорта: $e')),
+        SnackBar(content: Text('${loc.t('Ошибка импорта')}: $e')),
       );
     } finally {
       if (mounted) {
@@ -1512,32 +1711,35 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     }
   }
 
-  Future<String?> _showPriceUpdateModeDialog(List<ProductImportResult> results) async {
+  Future<String?> _showPriceUpdateModeDialog(
+      List<ProductImportResult> results) async {
+    final loc = context.read<LocalizationService>();
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Найдены продукты с измененными ценами'),
+        title: Text(loc.t('Найдены продукты с измененными ценами')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Найдено ${results.length} продуктов, у которых цена отличается от существующей в номенклатуре.'),
+            Text(loc.t(
+                'Найдено ${results.length} продуктов, у которых цена отличается от существующей в номенклатуре.')),
             const SizedBox(height: 16),
-            const Text('Выберите способ обновления:'),
+            Text(loc.t('Выберите способ обновления:')),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Отмена'),
+            child: Text(loc.t('Отмена')),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop('manual'),
-            child: const Text('Обновить вручную'),
+            child: Text(loc.t('Обновить вручную')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop('all'),
-            child: const Text('Обновить все цены'),
+            child: Text(loc.t('Обновить все цены')),
           ),
         ],
       ),
@@ -1553,7 +1755,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     final resolutions = <String, String>{};
 
     // Обрабатываем только результаты с priceUpdate
-    final priceUpdateResults = allResults.where((r) => r.matchResult.type == MatchType.priceUpdate).toList();
+    final priceUpdateResults = allResults
+        .where((r) => r.matchResult.type == MatchType.priceUpdate)
+        .toList();
 
     for (final result in priceUpdateResults) {
       final updatePrice = await _showPriceUpdateDialog(result);
@@ -1578,71 +1782,76 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<bool?> _showPriceUpdateDialog(ProductImportResult result) async {
+    final loc = context.read<LocalizationService>();
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Обновить цену продукта'),
+        title: Text(loc.t('Обновить цену продукта')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Продукт: ${result.fileName}'),
-            Text('Текущая цена в файле: ${result.filePrice}'),
+            Text(loc.t('Продукт: ${result.fileName}')),
+            Text(loc.t('Текущая цена в файле: ${result.filePrice}')),
             const SizedBox(height: 8),
             Text(
-              'Продукт найден в номенклатуре, но цена отличается.',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              loc.t('Продукт найден в номенклатуре, но цена отличается.'),
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Отмена импорта'),
+            child: Text(loc.t('Отмена импорта')),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Пропустить'),
+            child: Text(loc.t('Пропустить')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Обновить цену'),
+            child: Text(loc.t('Обновить цену')),
           ),
         ],
       ),
     );
   }
 
-  Future<Map<String, String>?> _showAmbiguousMatchesDialog(List<ProductImportResult> ambiguousResults) async {
+  Future<Map<String, String>?> _showAmbiguousMatchesDialog(
+      List<ProductImportResult> ambiguousResults) async {
+    final loc = context.read<LocalizationService>();
     final resolutions = <String, String>{};
 
     for (final result in ambiguousResults) {
       final resolution = await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Неоднозначное совпадение'),
+          title: Text(loc.t('Неоднозначное совпадение')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Продукт из файла: ${result.fileName}'),
-              Text('Найдено в базе: ${result.matchResult.existingProductName}'),
+              Text(loc.t('Продукт из файла: ${result.fileName}')),
+              Text(loc.t(
+                  'Найдено в базе: ${result.matchResult.existingProductName}')),
               const SizedBox(height: 16),
-              const Text('Что сделать?'),
+              Text(loc.t('Что сделать?')),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop('replace'),
-              child: const Text('Заменить существующий'),
+              child: Text(loc.t('Заменить существующий')),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop('create'),
-              child: const Text('Создать новый'),
+              child: Text(loc.t('Создать новый')),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Пропустить'),
+              child: Text(loc.t('Пропустить')),
             ),
           ],
         ),
@@ -1656,7 +1865,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     return resolutions.isNotEmpty ? resolutions : null;
   }
 
-  Future<void> _processTextWithAI(String text, LocalizationService loc, bool addToNomenclature) async {
+  Future<void> _processTextWithAI(
+      String text, LocalizationService loc, bool addToNomenclature) async {
     devLog('=== _processTextWithAI called ===');
     _addDebugLog('=== STARTING AI TEXT PROCESSING ===');
     _setLoadingMessage('Обрабатываем текст...');
@@ -1698,7 +1908,8 @@ ${text}
       _addDebugLog('Sending AI request...');
 
       // Добавляем таймаут для AI запроса (30 секунд)
-      final checklistResult = await aiService.generateChecklistFromPrompt(prompt).timeout(
+      final checklistResult =
+          await aiService.generateChecklistFromPrompt(prompt).timeout(
         const Duration(seconds: 30),
         onTimeout: () {
           _addDebugLog('AI request timed out after 30 seconds');
@@ -1730,9 +1941,9 @@ ${text}
               if (parts.length >= 2 && parts[1].isNotEmpty) {
                 // Обрабатываем цену: убираем запятые, точки, пробелы
                 final priceStr = parts[1]
-                    .replaceAll(',', '')  // Убираем разделители тысяч
-                    .replaceAll('.', '')  // Убираем десятичные точки
-                    .replaceAll(' ', '')  // Убираем пробелы
+                    .replaceAll(',', '') // Убираем разделители тысяч
+                    .replaceAll('.', '') // Убираем десятичные точки
+                    .replaceAll(' ', '') // Убираем пробелы
                     .trim();
 
                 price = double.tryParse(priceStr);
@@ -1740,7 +1951,10 @@ ${text}
               }
 
               // Проверяем валюту - если VND и цена больше 1000, делим на 1000 (предполагаем копейки)
-              if (parts.length >= 3 && parts[2] == 'VND' && price != null && price > 1000) {
+              if (parts.length >= 3 &&
+                  parts[2] == 'VND' &&
+                  price != null &&
+                  price > 1000) {
                 // Если цена слишком большая для VND (обычно до 1 млн), возможно это копейки
                 if (price > 1000000) {
                   price = price / 1000; // Конвертируем из копеек в рубли/донги
@@ -1767,7 +1981,8 @@ ${text}
         if (est != null) {
           _addDebugLog('Loading nomenclature before AI processing...');
           await store.loadNomenclature(est.dataEstablishmentId);
-          _addDebugLog('Nomenclature loaded for AI processing, products: ${store.nomenclatureProductIds.length}');
+          _addDebugLog(
+              'Nomenclature loaded for AI processing, products: ${store.nomenclatureProductIds.length}');
         }
 
         // Инициализируем processingResults для всех продуктов
@@ -1783,13 +1998,16 @@ ${text}
           });
         }
 
-        await _addProductsToNomenclature(items, loc, addToNomenclature, processingResults);
+        await _addProductsToNomenclature(
+            items, loc, addToNomenclature, processingResults);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Не удалось извлечь продукты из текста. Проверьте формат данных.'), duration: Duration(seconds: 5)),
+          const SnackBar(
+              content: Text(
+                  'Не удалось извлечь продукты из текста. Проверьте формат данных.'),
+              duration: Duration(seconds: 5)),
         );
       }
-
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка обработки текста AI: $e')),
@@ -1804,22 +2022,24 @@ ${text}
     }
   }
 
-
-  Future<void> _processText(String text, LocalizationService loc, bool addToNomenclature) async {
+  Future<void> _processText(
+      String text, LocalizationService loc, bool addToNomenclature) async {
     devLog('=== _processText called ===');
     devLog('Text length: ${text.length}');
     devLog('Add to nomenclature: $addToNomenclature');
     _addDebugLog('=== STARTING TEXT PROCESSING ===');
     _addDebugLog('Text length: ${text.length} characters');
     _addDebugLog('Add to nomenclature: $addToNomenclature');
-    _addDebugLog('Raw text preview (first 200 chars): "${text.substring(0, min(200, text.length))}"');
+    _addDebugLog(
+        'Raw text preview (first 200 chars): "${text.substring(0, min(200, text.length))}"');
 
     // Проверяем основные параметры
     final account = context.read<AccountManagerSupabase>();
     final establishmentId = account.establishment?.id;
     devLog('User logged in: ${account.isLoggedInSync}');
     devLog('Establishment ID: $establishmentId');
-    devLog('Services check - Account: ${account != null}, Establishment: ${account.establishment != null}');
+    devLog(
+        'Services check - Account: ${account != null}, Establishment: ${account.establishment != null}');
     _addDebugLog('User logged in: ${account.isLoggedInSync}');
     _addDebugLog('Establishment ID: $establishmentId');
 
@@ -1852,7 +2072,11 @@ ${text}
 
     // Обычный парсинг
     _setLoadingMessage('Разбираем текст...');
-    final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    final lines = text
+        .split(RegExp(r'\r?\n'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
     _addDebugLog('=== PARSING ${lines.length} LINES ===');
     for (var i = 0; i < min(3, lines.length); i++) {
       _addDebugLog('Raw line ${i}: "${lines[i]}"');
@@ -1861,23 +2085,28 @@ ${text}
     final parsedResults = lines.map(_parseLine).toList();
     _addDebugLog('Parsed ${parsedResults.length} lines:');
     for (var i = 0; i < min(5, parsedResults.length); i++) {
-      _addDebugLog('  Line ${i}: "${lines[i]}" -> name="${parsedResults[i].name}", price=${parsedResults[i].price}');
+      _addDebugLog(
+          '  Line ${i}: "${lines[i]}" -> name="${parsedResults[i].name}", price=${parsedResults[i].price}');
     }
 
     items = parsedResults.where((r) => r.name.isNotEmpty).toList();
-    _addDebugLog('After filtering empty names: ${items.length} items remain (from ${parsedResults.length} parsed)');
+    _addDebugLog(
+        'After filtering empty names: ${items.length} items remain (from ${parsedResults.length} parsed)');
 
     // Проверяем, есть ли товары с VND ценами - если да, но парсинг не сработал, используем AI
     final hasVNDInOriginal = text.contains('₫');
-    final hasVNDParsed = items.any((item) => item.price != null && item.price! > 1000); // VND цены обычно > 1000
+    final hasVNDParsed = items.any((item) =>
+        item.price != null && item.price! > 1000); // VND цены обычно > 1000
 
     if (hasVNDInOriginal && !hasVNDParsed) {
-      _addDebugLog('WARNING: Text contains VND prices but parsing failed, switching to AI');
+      _addDebugLog(
+          'WARNING: Text contains VND prices but parsing failed, switching to AI');
       return await _processTextWithAI(text, loc, addToNomenclature);
     }
 
     if (items.isEmpty) {
-      _addDebugLog('ERROR: All items were filtered out! Check _parseLine logic.');
+      _addDebugLog(
+          'ERROR: All items were filtered out! Check _parseLine logic.');
     } else {
       _addDebugLog('First 3 valid items:');
       for (var i = 0; i < min(3, items.length); i++) {
@@ -1898,7 +2127,8 @@ ${text}
     if (est != null) {
       _addDebugLog('Loading nomenclature before text processing...');
       await store.loadNomenclature(est.id);
-      _addDebugLog('Nomenclature loaded for text processing, products: ${store.nomenclatureProductIds.length}');
+      _addDebugLog(
+          'Nomenclature loaded for text processing, products: ${store.nomenclatureProductIds.length}');
     }
 
     _setLoadingMessage('Сохраняем ${items.length} продуктов...');
@@ -1916,11 +2146,16 @@ ${text}
       });
     }
 
-    await _addProductsToNomenclature(items, loc, addToNomenclature, processingResults);
+    await _addProductsToNomenclature(
+        items, loc, addToNomenclature, processingResults);
   }
 
   String _detectTextFormat(String text) {
-    final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).take(5);
+    final lines = text
+        .split(RegExp(r'\r?\n'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .take(5);
     devLog('DEBUG: Detecting format for ${lines.length} sample lines');
 
     // Проверяем на сложные форматы или форматы требующие AI
@@ -1945,20 +2180,23 @@ ${text}
     }
 
     if (hasComplexFormat) {
-      _addDebugLog('Detected complex format (or VND prices), using AI processing');
+      _addDebugLog(
+          'Detected complex format (or VND prices), using AI processing');
       return 'ai_needed';
     }
 
     // Проверяем на табличный формат
     final tabLines = lines.where((line) => line.contains('\t')).length;
-    _addDebugLog('Tab detection: ${tabLines}/${lines.length} lines contain tabs');
+    _addDebugLog(
+        'Tab detection: ${tabLines}/${lines.length} lines contain tabs');
     if (tabLines > lines.length * 0.5) {
       _addDebugLog('Detected tab-delimited format');
       return 'tab_delimited';
     }
 
     // Проверяем на формат с пробелами
-    final spaceLines = lines.where((line) => RegExp(r'\s{2,}').hasMatch(line)).length;
+    final spaceLines =
+        lines.where((line) => RegExp(r'\s{2,}').hasMatch(line)).length;
     if (spaceLines > lines.length * 0.3) {
       return 'space_delimited';
     }
@@ -1999,7 +2237,8 @@ ${text}
     _addDebugLog('File size: ${bytes.length} bytes');
 
     final isOle = _isOleXls(bytes);
-    _addDebugLog('Detected file type: ${isOle ? "xls/ole (BIFF)" : "xlsx/zip"}');
+    _addDebugLog(
+        'Detected file type: ${isOle ? "xls/ole (BIFF)" : "xlsx/zip"}');
 
     try {
       // Для OLE (.xls) и как основной путь — сервер-сайд парсинг через SheetJS
@@ -2015,13 +2254,15 @@ ${text}
         return;
       }
 
-      _addDebugLog('Server-side parse returned empty/null, falling back to local parsing');
+      _addDebugLog(
+          'Server-side parse returned empty/null, falling back to local parsing');
 
       // Fallback: локальный парсинг — работает для xlsx и иногда для xls
       final localRows = _extractRowsFromExcel(bytes);
       if (localRows.isNotEmpty) {
         _addDebugLog('Local Excel parse: ${localRows.length} rows');
-        await _processWithDeferredModeration(rows: localRows, source: isOle ? 'xls' : 'xlsx');
+        await _processWithDeferredModeration(
+            rows: localRows, source: isOle ? 'xls' : 'xlsx');
         return;
       }
 
@@ -2030,7 +2271,8 @@ ${text}
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Не удалось прочитать файл. Попробуйте пересохранить его как .xlsx в Excel или скопировать данные вручную.'),
+            content: Text(
+                'Не удалось прочитать файл. Попробуйте пересохранить его как .xlsx в Excel или скопировать данные вручную.'),
             duration: Duration(seconds: 6),
           ),
         );
@@ -2050,13 +2292,15 @@ ${text}
   }
 
   /// Альтернативная обработка Excel через конвертацию в CSV
-  Future<void> _processExcelAsCsv(Uint8List bytes, LocalizationService loc) async {
+  Future<void> _processExcelAsCsv(
+      Uint8List bytes, LocalizationService loc) async {
     try {
       _addDebugLog('=== TRYING EXCEL AS CSV CONVERSION ===');
 
       // Пробуем прочитать как CSV с разделителями табуляции или запятыми
       final content = String.fromCharCodes(bytes);
-      final lines = content.split('\n').where((line) => line.trim().isNotEmpty).toList();
+      final lines =
+          content.split('\n').where((line) => line.trim().isNotEmpty).toList();
 
       if (lines.isEmpty) {
         throw Exception('Файл пустой');
@@ -2099,15 +2343,19 @@ ${text}
         throw Exception('Не удалось конвертировать данные');
       }
 
-      await _processText(convertedLines.join('\n'), loc, widget.defaultAddToNomenclature);
-
+      await _processText(
+          convertedLines.join('\n'), loc, widget.defaultAddToNomenclature);
     } catch (e) {
       _addDebugLog('CSV conversion failed: $e');
       throw Exception('Не удалось обработать файл даже как CSV: $e');
     }
   }
 
-  Future<void> _addProductsToNomenclature(List<({String name, double? price})> items, LocalizationService loc, bool addToNomenclature, List<Map<String, dynamic>> processingResults) async {
+  Future<void> _addProductsToNomenclature(
+      List<({String name, double? price})> items,
+      LocalizationService loc,
+      bool addToNomenclature,
+      List<Map<String, dynamic>> processingResults) async {
     _addDebugLog('=== STARTING PRODUCT CREATION ===');
     _addDebugLog('Items to process: ${items.length}');
     _addDebugLog('Add to nomenclature: $addToNomenclature');
@@ -2162,140 +2410,162 @@ ${text}
         if (mounted) {
           setState(() {
             _loadingProgress = idx;
-            _loadingMessage = 'Обрабатываем ${idx + 1} из ${items.length}: ${item.name}';
+            _loadingMessage =
+                'Обрабатываем ${idx + 1} из ${items.length}: ${item.name}';
           });
         }
         idx++;
         try {
-        // ИИ — КБЖУ, категория, единица; название не меняем (как в источнике).
-        ProductVerificationResult? verification;
-        final storedName = item.name.trim();
-        try {
-          final aiService = context.read<AiServiceSupabase>();
-          verification = await aiService.verifyProduct(
-            item.name,
-            currentPrice: item.price,
-          );
-          _addDebugLog('AI verification for "${item.name}": calories=${verification?.suggestedCalories}');
-        } catch (aiError) {
-          _addDebugLog('AI verification failed for "${item.name}": $aiError');
-          verification = null;
-        }
+          // ИИ — КБЖУ, категория, единица; название не меняем (как в источнике).
+          ProductVerificationResult? verification;
+          final storedName = item.name.trim();
+          try {
+            final aiService = context.read<AiServiceSupabase>();
+            verification = await aiService.verifyProduct(
+              item.name,
+              currentPrice: item.price,
+            );
+            _addDebugLog(
+                'AI verification for "${item.name}": calories=${verification?.suggestedCalories}');
+          } catch (aiError) {
+            _addDebugLog('AI verification failed for "${item.name}": $aiError');
+            verification = null;
+          }
 
-        var names = <String, String>{for (final c in allLangs) c: storedName};
+          var names = <String, String>{for (final c in allLangs) c: storedName};
 
-        // ПРОВЕРКА НА СУЩЕСТВОВАНИЕ ПОХОЖЕГО ПРОДУКТА
-        Product? existingProduct = await _findSimilarProduct(storedName, store);
-        if (existingProduct != null) {
-          _addDebugLog('Found similar existing product: "${existingProduct.name}" (ID: ${existingProduct.id})');
+          // ПРОВЕРКА НА СУЩЕСТВОВАНИЕ ПОХОЖЕГО ПРОДУКТА
+          Product? existingProduct =
+              await _findSimilarProduct(storedName, store);
+          if (existingProduct != null) {
+            _addDebugLog(
+                'Found similar existing product: "${existingProduct.name}" (ID: ${existingProduct.id})');
 
-          // Если продукт найден, проверяем нужно ли обновлять цену
-          if (item.price != null) {
-            final ep = store.getEstablishmentPrice(existingProduct.id, estId);
-            final oldPrice = ep?.$1;
-            final newPrice = item.price;
+            // Если продукт найден, проверяем нужно ли обновлять цену
+            if (item.price != null) {
+              final ep = store.getEstablishmentPrice(existingProduct.id, estId);
+              final oldPrice = ep?.$1;
+              final newPrice = item.price;
 
-            // Проверяем, отличается ли цена (с учетом округления до 2 знаков)
-            final oldPriceRounded = (oldPrice ?? 0).roundToDouble();
-            final newPriceRounded = (newPrice ?? 0).roundToDouble();
+              // Проверяем, отличается ли цена (с учетом округления до 2 знаков)
+              final oldPriceRounded = (oldPrice ?? 0).roundToDouble();
+              final newPriceRounded = (newPrice ?? 0).roundToDouble();
 
-            if ((oldPrice == null && newPrice != null) || (oldPrice != null && (oldPriceRounded - newPriceRounded).abs() > 0.01)) {
-              // Цена изменилась или была null - обновляем
-              try {
-                _addDebugLog('Updating price for existing product "${existingProduct.name}": $oldPrice -> $newPrice');
-                await store.setEstablishmentPrice(estId, existingProduct.id, newPrice, defCur);
+              if ((oldPrice == null && newPrice != null) ||
+                  (oldPrice != null &&
+                      (oldPriceRounded - newPriceRounded).abs() > 0.01)) {
+                // Цена изменилась или была null - обновляем
+                try {
+                  _addDebugLog(
+                      'Updating price for existing product "${existingProduct.name}": $oldPrice -> $newPrice');
+                  await store.setEstablishmentPrice(
+                      estId, existingProduct.id, newPrice, defCur);
 
-                // Добавляем в номенклатуру если нужно
+                  // Добавляем в номенклатуру если нужно
+                  if (addToNomenclature) {
+                    await store.addToNomenclature(estId, existingProduct.id,
+                        price: newPrice, currency: defCur);
+                  }
+
+                  skipped++;
+                  _addDebugLog('Successfully updated existing product price');
+
+                  // Находим и обновляем соответствующий продукт в результатах
+                  final existingResult = processingResults.firstWhere(
+                    (r) =>
+                        _normalizeForComparison(r['name'] as String) ==
+                        _normalizeForComparison(item.name),
+                    orElse: () => <String, dynamic>{},
+                  );
+                  if (existingResult.isNotEmpty) {
+                    existingResult['status'] = 'updated';
+                    existingResult['oldPrice'] = oldPrice;
+                    existingResult['newPrice'] = newPrice;
+                    existingResult['productId'] = existingProduct.id;
+                  }
+
+                  continue; // Пропускаем создание нового продукта
+                } catch (updateError) {
+                  _addDebugLog(
+                      'Failed to update existing product price: $updateError');
+                  // Продолжаем с созданием нового продукта
+                }
+              } else {
+                // Цена не изменилась - отмечаем как пропущенный и не показываем в результатах
+                _addDebugLog(
+                    'Price unchanged for "${existingProduct.name}": $oldPrice (keeping existing)');
+
+                // Добавляем в номенклатуру если нужно (без изменения цены)
                 if (addToNomenclature) {
-                  await store.addToNomenclature(estId, existingProduct.id, price: newPrice, currency: defCur);
+                  try {
+                    await store.addToNomenclature(estId, existingProduct.id,
+                        price: oldPrice, currency: defCur);
+                  } catch (e) {
+                    _addDebugLog('Failed to add to nomenclature: $e');
+                  }
                 }
 
-                skipped++;
-                _addDebugLog('Successfully updated existing product price');
-
-                // Находим и обновляем соответствующий продукт в результатах
+                // Отмечаем как успешно обработанный, но без изменений
                 final existingResult = processingResults.firstWhere(
-                  (r) => _normalizeForComparison(r['name'] as String) == _normalizeForComparison(item.name),
+                  (r) =>
+                      _normalizeForComparison(r['name'] as String) ==
+                      _normalizeForComparison(item.name),
                   orElse: () => <String, dynamic>{},
                 );
                 if (existingResult.isNotEmpty) {
-                  existingResult['status'] = 'updated';
+                  existingResult['status'] = 'no_change';
                   existingResult['oldPrice'] = oldPrice;
                   existingResult['newPrice'] = newPrice;
                   existingResult['productId'] = existingProduct.id;
                 }
 
+                skipped++;
                 continue; // Пропускаем создание нового продукта
-              } catch (updateError) {
-                _addDebugLog('Failed to update existing product price: $updateError');
-                // Продолжаем с созданием нового продукта
               }
-            } else {
-              // Цена не изменилась - отмечаем как пропущенный и не показываем в результатах
-              _addDebugLog('Price unchanged for "${existingProduct.name}": $oldPrice (keeping existing)');
-
-              // Добавляем в номенклатуру если нужно (без изменения цены)
-              if (addToNomenclature) {
-                try {
-                  await store.addToNomenclature(estId, existingProduct.id, price: oldPrice, currency: defCur);
-                } catch (e) {
-                  _addDebugLog('Failed to add to nomenclature: $e');
-                }
-              }
-
-              // Отмечаем как успешно обработанный, но без изменений
-              final existingResult = processingResults.firstWhere(
-                (r) => _normalizeForComparison(r['name'] as String) == _normalizeForComparison(item.name),
-                orElse: () => <String, dynamic>{},
-              );
-              if (existingResult.isNotEmpty) {
-                existingResult['status'] = 'no_change';
-                existingResult['oldPrice'] = oldPrice;
-                existingResult['newPrice'] = newPrice;
-                existingResult['productId'] = existingProduct.id;
-              }
-
-              skipped++;
-              continue; // Пропускаем создание нового продукта
             }
           }
-        }
 
-        // Проверяем питательные данные от AI
-        double? calories = verification?.suggestedCalories;
-        double? protein = verification?.suggestedProtein;
-        double? fat = verification?.suggestedFat;
-        double? carbs = verification?.suggestedCarbs;
-        bool? containsGluten;
-        bool? containsLactose;
+          // Проверяем питательные данные от AI
+          double? calories = verification?.suggestedCalories;
+          double? protein = verification?.suggestedProtein;
+          double? fat = verification?.suggestedFat;
+          double? carbs = verification?.suggestedCarbs;
+          bool? containsGluten;
+          bool? containsLactose;
 
-        // Если AI дал данные, используем их приоритетно
-        final hasValidNutritionFromAI = (calories != null && calories > 0) ||
-                                       (protein != null && protein > 0) ||
-                                       (fat != null && fat > 0) ||
-                                       (carbs != null && carbs > 0);
+          // Если AI дал данные, используем их приоритетно
+          final hasValidNutritionFromAI = (calories != null && calories > 0) ||
+              (protein != null && protein > 0) ||
+              (fat != null && fat > 0) ||
+              (carbs != null && carbs > 0);
 
-        if (!hasValidNutritionFromAI) {
-          // Fallback к Nutrition API только если AI не дал данные
-          try {
-            final nutritionService = context.read<NutritionApiService>();
-            final nutritionResult = await NutritionApiService.fetchNutrition(storedName);
+          if (!hasValidNutritionFromAI) {
+            // Fallback к Nutrition API только если AI не дал данные
+            try {
+              final nutritionService = context.read<NutritionApiService>();
+              final nutritionResult =
+                  await NutritionApiService.fetchNutrition(storedName);
 
-            if (nutritionResult != null && nutritionResult.hasData) {
-              calories = calories ?? nutritionResult.calories;
-              protein = protein ?? nutritionResult.protein;
-              fat = fat ?? nutritionResult.fat;
-              carbs = carbs ?? nutritionResult.carbs;
-              containsGluten = nutritionResult.containsGluten ?? containsGluten;
-              containsLactose = nutritionResult.containsLactose ?? containsLactose;
-              devLog('DEBUG: Used Nutrition API fallback for "${storedName}": calories=$calories');
+              if (nutritionResult != null && nutritionResult.hasData) {
+                calories = calories ?? nutritionResult.calories;
+                protein = protein ?? nutritionResult.protein;
+                fat = fat ?? nutritionResult.fat;
+                carbs = carbs ?? nutritionResult.carbs;
+                containsGluten =
+                    nutritionResult.containsGluten ?? containsGluten;
+                containsLactose =
+                    nutritionResult.containsLactose ?? containsLactose;
+                devLog(
+                    'DEBUG: Used Nutrition API fallback for "${storedName}": calories=$calories');
+              }
+            } catch (nutritionError) {
+              devLog(
+                  'DEBUG: Nutrition API failed for "${storedName}": $nutritionError');
             }
-          } catch (nutritionError) {
-            devLog('DEBUG: Nutrition API failed for "${storedName}": $nutritionError');
+          } else {
+            devLog(
+                'DEBUG: Using AI nutrition data for "${storedName}": ${calories}kcal, ${protein}g protein');
           }
-        } else {
-          devLog('DEBUG: Using AI nutrition data for "${storedName}": ${calories}kcal, ${protein}g protein');
-        }
 
           final product = Product(
             id: const Uuid().v4(),
@@ -2329,7 +2599,8 @@ ${text}
                 aiService: context.read<AiServiceSupabase>(),
                 supabase: context.read<SupabaseService>(),
               ),
-              getSupportedLanguages: () => LocalizationService.productLanguageCodes,
+              getSupportedLanguages: () =>
+                  LocalizationService.productLanguageCodes,
             );
 
             await translationManager.handleEntitySave(
@@ -2342,14 +2613,16 @@ ${text}
                     'name_${entry.key}': entry.value,
               },
               sourceLanguage: 'ru',
-              userId: context.read<AccountManagerSupabase>().currentEmployee?.id,
+              userId:
+                  context.read<AccountManagerSupabase>().currentEmployee?.id,
             );
           } catch (e) {
             devLog('DEBUG: Failed to add product "${product.name}": $e');
             if (e.toString().contains('duplicate key') ||
                 e.toString().contains('already exists') ||
                 e.toString().contains('unique constraint')) {
-              devLog('DEBUG: Product "${product.name}" already exists, skipping');
+              devLog(
+                  'DEBUG: Product "${product.name}" already exists, skipping');
               skipped++;
               continue;
             } else {
@@ -2359,10 +2632,11 @@ ${text}
             }
           }
 
-            // Добавляем в номенклатуру только если выбрана эта опция
+          // Добавляем в номенклатуру только если выбрана эта опция
           if (addToNomenclature) {
             try {
-              devLog('DEBUG: Adding product "${product.name}" to nomenclature...');
+              devLog(
+                  'DEBUG: Adding product "${product.name}" to nomenclature...');
               await store.addToNomenclature(
                 estId,
                 savedProduct.id,
@@ -2370,29 +2644,37 @@ ${text}
                 currency: defCur,
               );
               added++;
-              devLog('DEBUG: Successfully added "${product.name}" to nomenclature');
+              devLog(
+                  'DEBUG: Successfully added "${product.name}" to nomenclature');
 
               // Находим и обновляем соответствующий продукт в результатах
               final existingResult = processingResults.firstWhere(
-                (r) => _normalizeForComparison(r['name'] as String) == _normalizeForComparison(item.name),
+                (r) =>
+                    _normalizeForComparison(r['name'] as String) ==
+                    _normalizeForComparison(item.name),
                 orElse: () => <String, dynamic>{},
               );
               if (existingResult.isNotEmpty) {
                 existingResult['status'] = 'added';
                 existingResult['oldPrice'] = null;
-                existingResult['newPrice'] = verification?.suggestedPrice ?? item.price;
+                existingResult['newPrice'] =
+                    verification?.suggestedPrice ?? item.price;
                 existingResult['productId'] = product.id;
               }
             } catch (e) {
-              devLog('DEBUG: Failed to add "${product.name}" to nomenclature: $e');
+              devLog(
+                  'DEBUG: Failed to add "${product.name}" to nomenclature: $e');
               if (e.toString().contains('duplicate key') ||
                   e.toString().contains('already exists') ||
                   e.toString().contains('unique constraint')) {
-                devLog('DEBUG: Product "${product.name}" already in nomenclature, skipping');
+                devLog(
+                    'DEBUG: Product "${product.name}" already in nomenclature, skipping');
                 skipped++;
                 // Обновляем статус продукта в результатах
                 final existingResult = processingResults.firstWhere(
-                  (r) => _normalizeForComparison(r['name'] as String) == _normalizeForComparison(item.name),
+                  (r) =>
+                      _normalizeForComparison(r['name'] as String) ==
+                      _normalizeForComparison(item.name),
                   orElse: () => <String, dynamic>{},
                 );
                 if (existingResult.isNotEmpty) {
@@ -2400,11 +2682,14 @@ ${text}
                   existingResult['reason'] = 'already_exists';
                 }
               } else {
-                devLog('DEBUG: Unexpected error adding "${product.name}" to nomenclature: $e');
+                devLog(
+                    'DEBUG: Unexpected error adding "${product.name}" to nomenclature: $e');
                 failed++;
                 // Обновляем статус продукта в результатах
                 final existingResult = processingResults.firstWhere(
-                  (r) => _normalizeForComparison(r['name'] as String) == _normalizeForComparison(item.name),
+                  (r) =>
+                      _normalizeForComparison(r['name'] as String) ==
+                      _normalizeForComparison(item.name),
                   orElse: () => <String, dynamic>{},
                 );
                 if (existingResult.isNotEmpty) {
@@ -2420,25 +2705,29 @@ ${text}
 
             // Находим и обновляем соответствующий продукт в результатах
             final existingResult = processingResults.firstWhere(
-              (r) => _normalizeForComparison(r['name'] as String) == _normalizeForComparison(item.name),
+              (r) =>
+                  _normalizeForComparison(r['name'] as String) ==
+                  _normalizeForComparison(item.name),
               orElse: () => <String, dynamic>{},
             );
             if (existingResult.isNotEmpty) {
               existingResult['status'] = 'added_db_only';
               existingResult['oldPrice'] = null;
-              existingResult['newPrice'] = verification?.suggestedPrice ?? item.price;
+              existingResult['newPrice'] =
+                  verification?.suggestedPrice ?? item.price;
               existingResult['productId'] = product.id;
             }
           }
 
           // Небольшая задержка
           await Future.delayed(const Duration(milliseconds: 100));
-
         } catch (e) {
           failed++;
           // Обновляем статус продукта в результатах
           final existingResult = processingResults.firstWhere(
-            (r) => _normalizeForComparison(r['name'] as String) == _normalizeForComparison(item.name),
+            (r) =>
+                _normalizeForComparison(r['name'] as String) ==
+                _normalizeForComparison(item.name),
             orElse: () => <String, dynamic>{},
           );
           if (existingResult.isNotEmpty) {
@@ -2462,14 +2751,16 @@ ${text}
 
       try {
         await store.loadNomenclature(estId);
-        _addDebugLog('Nomenclature loaded: ${store.nomenclatureProductIds.length}');
+        _addDebugLog(
+            'Nomenclature loaded: ${store.nomenclatureProductIds.length}');
       } catch (e) {
         _addDebugLog('Error loading nomenclature: $e');
         // Показываем предупреждение, но не останавливаемся
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Предупреждение: не удалось загрузить номенклатуру ($e)'),
+              content: Text(
+                  'Предупреждение: не удалось загрузить номенклатуру ($e)'),
               backgroundColor: Colors.orange,
               duration: const Duration(seconds: 3),
             ),
@@ -2477,17 +2768,19 @@ ${text}
         }
       }
 
-      if (mounted) setState(() {
-        _loadingProgress = items.length;
-        _loadingMessage = 'Готово';
-      });
+      if (mounted)
+        setState(() {
+          _loadingProgress = items.length;
+          _loadingMessage = 'Готово';
+        });
 
       // Показываем результат
       final message = failed == 0
           ? 'Добавлено: ${added + skipped}'
           : 'Добавлено: ${added + skipped}, Ошибок: $failed';
 
-      devLog('DEBUG: Final result - Added: $added, Skipped: $skipped, Failed: $failed');
+      devLog(
+          'DEBUG: Final result - Added: $added, Skipped: $skipped, Failed: $failed');
 
       // Сохраняем заказ в историю
       if (added > 0 || skipped > 0) {
@@ -2500,10 +2793,12 @@ ${text}
               establishmentId: estId,
               employeeId: employeeId,
               orderData: {
-                'items': items.map((item) => {
-                  'name': item.name,
-                  'price': item.price,
-                }).toList(),
+                'items': items
+                    .map((item) => {
+                          'name': item.name,
+                          'price': item.price,
+                        })
+                    .toList(),
                 'results': {
                   'added': added,
                   'skipped': skipped,
@@ -2536,7 +2831,9 @@ ${text}
                         ? 'Успешно обработано: ${added + skipped} продуктов.'
                         : 'Обработано: ${added + skipped}.\nОшибок: $failed.',
                   ),
-                  if (processingResults.where((r) => r['status'] == 'no_change').isNotEmpty) ...[
+                  if (processingResults
+                      .where((r) => r['status'] == 'no_change')
+                      .isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
                       '${processingResults.where((r) => r['status'] == 'no_change').length} продуктов без изменений цен',
@@ -2544,7 +2841,9 @@ ${text}
                     ),
                   ],
                   const SizedBox(height: 16),
-                  if (processingResults.where((r) => _isResultChanged(r)).isNotEmpty) ...[
+                  if (processingResults
+                      .where((r) => _isResultChanged(r))
+                      .isNotEmpty) ...[
                     const Text(
                       'Детальные результаты:',
                       style: TextStyle(fontWeight: FontWeight.bold),
@@ -2557,9 +2856,13 @@ ${text}
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: ListView.builder(
-                        itemCount: processingResults.where((r) => _isResultChanged(r)).length,
+                        itemCount: processingResults
+                            .where((r) => _isResultChanged(r))
+                            .length,
                         itemBuilder: (context, index) {
-                          final _changedResults = processingResults.where((r) => _isResultChanged(r)).toList();
+                          final _changedResults = processingResults
+                              .where((r) => _isResultChanged(r))
+                              .toList();
                           final result = _changedResults[index];
                           final status = result['status'] as String;
                           final name = result['name'] as String;
@@ -2574,37 +2877,53 @@ ${text}
                             case 'added':
                               statusText = 'Добавлен';
                               statusColor = Colors.green;
-                              priceText = newPrice != null ? '${newPrice.toStringAsFixed(0)} ${defCur}' : '';
+                              priceText = newPrice != null
+                                  ? '${newPrice.toStringAsFixed(0)} ${defCur}'
+                                  : '';
                               break;
                             case 'added_db_only':
                               statusText = 'Добавлен (только в БД)';
                               statusColor = Colors.blue;
-                              priceText = newPrice != null ? '${newPrice.toStringAsFixed(0)} ${defCur}' : '';
+                              priceText = newPrice != null
+                                  ? '${newPrice.toStringAsFixed(0)} ${defCur}'
+                                  : '';
                               break;
                             case 'updated':
                               statusText = 'Цена обновлена';
                               statusColor = Colors.orange;
-                              final samePrice = oldPrice != null && newPrice != null && (oldPrice - newPrice).abs() < 0.01;
-                              if (!samePrice && oldPrice != null && newPrice != null) {
-                                priceText = '${oldPrice.toStringAsFixed(0)} → ${newPrice.toStringAsFixed(0)} ${defCur}';
+                              final samePrice = oldPrice != null &&
+                                  newPrice != null &&
+                                  (oldPrice - newPrice).abs() < 0.01;
+                              if (!samePrice &&
+                                  oldPrice != null &&
+                                  newPrice != null) {
+                                priceText =
+                                    '${oldPrice.toStringAsFixed(0)} → ${newPrice.toStringAsFixed(0)} ${defCur}';
                               } else if (newPrice != null) {
-                                priceText = '${newPrice.toStringAsFixed(0)} ${defCur}';
+                                priceText =
+                                    '${newPrice.toStringAsFixed(0)} ${defCur}';
                               }
                               break;
                             case 'skipped':
                               statusText = 'Пропущен';
                               statusColor = Colors.blue;
-                              priceText = newPrice != null ? '${newPrice.toStringAsFixed(0)} ${defCur}' : '';
+                              priceText = newPrice != null
+                                  ? '${newPrice.toStringAsFixed(0)} ${defCur}'
+                                  : '';
                               break;
                             case 'error':
                               statusText = 'Ошибка';
                               statusColor = Colors.red;
-                              priceText = newPrice != null ? '${newPrice.toStringAsFixed(0)} ${defCur}' : '';
+                              priceText = newPrice != null
+                                  ? '${newPrice.toStringAsFixed(0)} ${defCur}'
+                                  : '';
                               break;
                             case 'pending':
                               statusText = 'Ожидает';
                               statusColor = Colors.grey;
-                              priceText = newPrice != null ? '${newPrice.toStringAsFixed(0)} ${defCur}' : '';
+                              priceText = newPrice != null
+                                  ? '${newPrice.toStringAsFixed(0)} ${defCur}'
+                                  : '';
                               break;
                             default:
                               statusText = 'Неизвестно';
@@ -2612,7 +2931,8 @@ ${text}
                           }
 
                           return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 4),
                             child: Row(
                               children: [
                                 Expanded(
@@ -2625,7 +2945,8 @@ ${text}
                                 ),
                                 const SizedBox(width: 8),
                                 Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
                                     color: statusColor.withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(4),
@@ -2681,7 +3002,6 @@ ${text}
           ),
         );
       }
-
     } catch (e) {
       devLog('DEBUG: Error in direct processing: $e');
       if (mounted) {
@@ -2702,7 +3022,8 @@ ${text}
   }
 
   /// Поиск похожего существующего продукта
-  Future<Product?> _findSimilarProduct(String productName, ProductStoreSupabase store) async {
+  Future<Product?> _findSimilarProduct(
+      String productName, ProductStoreSupabase store) async {
     try {
       // Получаем все продукты
       final allProducts = store.allProducts;
@@ -2719,9 +3040,12 @@ ${text}
         }
 
         // Проверяем на высокую схожесть (расстояние Левенштейна или простые метрики)
-        final similarity = _calculateSimilarity(normalizedSearch, normalizedExisting);
-        if (similarity > 0.8) { // 80% схожести
-          _addDebugLog('High similarity found: "$normalizedSearch" vs "$normalizedExisting" (${(similarity * 100).round()}%)');
+        final similarity =
+            _calculateSimilarity(normalizedSearch, normalizedExisting);
+        if (similarity > 0.8) {
+          // 80% схожести
+          _addDebugLog(
+              'High similarity found: "$normalizedSearch" vs "$normalizedExisting" (${(similarity * 100).round()}%)');
           return product;
         }
       }
@@ -2754,7 +3078,8 @@ ${allProducts.map((p) => p.name).join('\n')}
               orElse: () => null as Product,
             );
             if (aiProduct != null) {
-              _addDebugLog('AI found similar product: "$productName" -> "$aiSuggestion"');
+              _addDebugLog(
+                  'AI found similar product: "$productName" -> "$aiSuggestion"');
               return aiProduct;
             }
           }
@@ -2774,7 +3099,8 @@ ${allProducts.map((p) => p.name).join('\n')}
   String _normalizeForComparison(String name) {
     return name
         .toLowerCase()
-        .replaceAll(RegExp(r'[^\w\sа-яё]'), '') // Убираем пунктуацию, оставляем буквы и пробелы
+        .replaceAll(RegExp(r'[^\w\sа-яё]'),
+            '') // Убираем пунктуацию, оставляем буквы и пробелы
         .replaceAll(RegExp(r'\s+'), ' ') // Нормализуем пробелы
         .trim();
   }
@@ -2799,14 +3125,18 @@ ${allProducts.map((p) => p.name).join('\n')}
 
     // Тестовый вывод для отладки (можно удалить после тестирования)
     if (line.contains('Авокадо')) {
-      _addDebugLog('TEST: Found avocado line, contains tab: ${line.contains('\t')}, length: ${line.length}');
+      _addDebugLog(
+          'TEST: Found avocado line, contains tab: ${line.contains('\t')}, length: ${line.length}');
     }
     // Важно: паттерн с валютой ПЕРЕД числом (₫99,000) идёт первым
     final pricePatterns = [
-      RegExp(r'[₫$€£¥руб.]\s*[\d,\.]+\s*$'), // валюта перед числом: ₫99,000 или ₫ 99.000
-      RegExp(r'[\d,]+\s*[₫$€£¥руб.]?\s*$'), // число с опциональной валютой в конце
+      RegExp(
+          r'[₫$€£¥руб.]\s*[\d,\.]+\s*$'), // валюта перед числом: ₫99,000 или ₫ 99.000
+      RegExp(
+          r'[\d,]+\s*[₫$€£¥руб.]?\s*$'), // число с опциональной валютой в конце
       RegExp(r'\d+\.\d+\s*[₫$€£¥руб.]?\s*$'), // десятичное число
-      RegExp(r'\d{1,3}(?:,\d{3})*\s*[₫$€£¥руб.]?\s*$'), // число с разделителями тысяч
+      RegExp(
+          r'\d{1,3}(?:,\d{3})*\s*[₫$€£¥руб.]?\s*$'), // число с разделителями тысяч
     ];
 
     String name = line.trim();
@@ -2836,7 +3166,10 @@ ${allProducts.map((p) => p.name).join('\n')}
       final priceStr = parts.length > 1 ? parts[1].trim() : '';
 
       if (priceStr.isNotEmpty) {
-        final cleanPrice = priceStr.replaceAll(RegExp(r'[₫$€£руб.\s]'), '').replaceAll(',', '').replaceAll(' ', '');
+        final cleanPrice = priceStr
+            .replaceAll(RegExp(r'[₫$€£руб.\s]'), '')
+            .replaceAll(',', '')
+            .replaceAll(' ', '');
         price = double.tryParse(cleanPrice);
       }
     }
@@ -2852,7 +3185,8 @@ ${allProducts.map((p) => p.name).join('\n')}
   }
 
   List<String> _extractRowsFromRtf(String rtfContent) {
-    _addDebugLog('Starting RTF processing, content length: ${rtfContent.length}');
+    _addDebugLog(
+        'Starting RTF processing, content length: ${rtfContent.length}');
 
     // Сначала пробуем извлечь данные из таблиц RTF
     final tableRows = _extractTableDataFromRtf(rtfContent);
@@ -2863,10 +3197,15 @@ ${allProducts.map((p) => p.name).join('\n')}
 
     // Если таблиц нет, используем обычную обработку текста
     final text = _extractTextFromRtf(rtfContent);
-    _addDebugLog('Extracted text from RTF: "${text.substring(0, min(200, text.length))}"');
+    _addDebugLog(
+        'Extracted text from RTF: "${text.substring(0, min(200, text.length))}"');
 
     // Разбиваем на строки и фильтруем
-    final lines = text.split(RegExp(r'\r?\n')).map((s) => s.replaceAll(RegExp(r'\\'), '').trim()).where((s) => s.isNotEmpty).toList();
+    final lines = text
+        .split(RegExp(r'\r?\n'))
+        .map((s) => s.replaceAll(RegExp(r'\\'), '').trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
 
     // RTF может давать: таблицу (название\tцена), чередование строк, несколько колонок (№, поставщик и т.д.).
     // Объединяем пары название+цена при чередовании; всё остальное передаём как есть — ИИ разберётся.
@@ -2883,7 +3222,8 @@ ${allProducts.map((p) => p.name).join('\n')}
         final subLines = _splitComplexLine(line);
         if (subLines.isNotEmpty) {
           processedLines.addAll(subLines);
-        } else if (_looksLikeNameOnly(line) || line.contains(RegExp(r'[а-яА-ЯёЁa-zA-Z]'))) {
+        } else if (_looksLikeNameOnly(line) ||
+            line.contains(RegExp(r'[а-яА-ЯёЁa-zA-Z]'))) {
           // Строка с текстом (название, поставщик и т.д.) — не отбрасываем, ИИ определит роль
           processedLines.add(line);
         }
@@ -2905,17 +3245,23 @@ ${allProducts.map((p) => p.name).join('\n')}
       final tableContent = tableMatch.group(0) ?? '';
 
       // Извлекаем ячейки из таблицы
-      final cellPattern = RegExp(r'\\cell\s*([^\\]*(?:\\[^c][^e][^l][^l][^\\]*)*)');
+      final cellPattern =
+          RegExp(r'\\cell\s*([^\\]*(?:\\[^c][^e][^l][^l][^\\]*)*)');
       final cells = cellPattern.allMatches(tableContent);
 
       if (cells.length >= 2) {
         var cell1 = _cleanRtfCell(cells.first.group(1) ?? '');
-        var cell2 = cells.length > 1 ? _cleanRtfCell(cells.elementAt(1).group(1) ?? '') : '';
+        var cell2 = cells.length > 1
+            ? _cleanRtfCell(cells.elementAt(1).group(1) ?? '')
+            : '';
         // Если первая ячейка — число (цена), вторая — текст (название), поменять местами
-        if (cell1.isNotEmpty && cell2.isNotEmpty &&
+        if (cell1.isNotEmpty &&
+            cell2.isNotEmpty &&
             RegExp(r'^[\d\s,\.]+$').hasMatch(cell1.replaceAll(' ', '')) &&
             RegExp(r'[a-zA-Zа-яА-ЯёЁ]').hasMatch(cell2)) {
-          final t = cell1; cell1 = cell2; cell2 = t;
+          final t = cell1;
+          cell1 = cell2;
+          cell2 = t;
         }
         if (cell1.isNotEmpty) {
           rows.add(cell2.isNotEmpty ? '$cell1\t$cell2' : cell1);
@@ -2942,7 +3288,9 @@ ${allProducts.map((p) => p.name).join('\n')}
       } else if (_looksLikeProductLine(line)) {
         result.add(line);
         i++;
-      } else if (_looksLikePriceOnly(line) && i > 0 && _looksLikeNameOnly(lines[i - 1])) {
+      } else if (_looksLikePriceOnly(line) &&
+          i > 0 &&
+          _looksLikeNameOnly(lines[i - 1])) {
         // уже объединили с предыдущей строкой
         i++;
       } else if (isNameOnly || _looksLikePriceOnly(line)) {
@@ -2958,25 +3306,29 @@ ${allProducts.map((p) => p.name).join('\n')}
   bool _looksLikeNameOnly(String s) {
     if (s.isEmpty || s.length > 100) return false;
     // Буквы (кириллица/латиница), можно с пробелами, без цен
-    if (RegExp(r'[\d,.\s]{4,}').hasMatch(s)) return false; // подозрительно много цифр
+    if (RegExp(r'[\d,.\s]{4,}').hasMatch(s))
+      return false; // подозрительно много цифр
     if (RegExp(r'[₫$€руб]').hasMatch(s)) return false;
     return RegExp(r'[а-яА-ЯёЁa-zA-Z]').hasMatch(s);
   }
 
   bool _looksLikePriceOnly(String s) {
-    final t = s.replaceAll(RegExp(r'[₫$€руб\s]'), '').replaceAll(',', '').replaceAll('.', '');
+    final t = s
+        .replaceAll(RegExp(r'[₫$€руб\s]'), '')
+        .replaceAll(',', '')
+        .replaceAll('.', '');
     return RegExp(r'^\d+$').hasMatch(t) && t.length >= 2;
   }
 
   bool _looksLikeProductLine(String line) {
     // Проверяем, выглядит ли строка как продукт с ценой
     return line.contains('\t') ||
-           RegExp(r'\d+[,.]\d+').hasMatch(line) || // Десятичные числа
-           RegExp(r'\d{3,}').hasMatch(line) || // Большие числа (цены)
-           line.contains('₫') ||
-           line.contains('\$') ||
-           line.contains('руб') ||
-           line.contains('€');
+        RegExp(r'\d+[,.]\d+').hasMatch(line) || // Десятичные числа
+        RegExp(r'\d{3,}').hasMatch(line) || // Большие числа (цены)
+        line.contains('₫') ||
+        line.contains('\$') ||
+        line.contains('руб') ||
+        line.contains('€');
   }
 
   List<String> _splitComplexLine(String line) {
@@ -2984,7 +3336,8 @@ ${allProducts.map((p) => p.name).join('\n')}
 
     // Разбиваем по запятым, если это список продуктов
     if (line.contains(',') && !line.contains('\t')) {
-      final parts = line.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty);
+      final parts =
+          line.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty);
       for (final part in parts) {
         if (_looksLikeProductLine(part)) {
           result.add(part);
@@ -3042,7 +3395,10 @@ ${allProducts.map((p) => p.name).join('\n')}
       return cleaned;
     } catch (e) {
       _addDebugLog('Error cleaning RTF cell: $e');
-      return cellContent.replaceAll(RegExp(r'\\[^{]*'), '').replaceAll(RegExp(r'[{}]'), '').trim();
+      return cellContent
+          .replaceAll(RegExp(r'\\[^{]*'), '')
+          .replaceAll(RegExp(r'[{}]'), '')
+          .trim();
     }
   }
 
@@ -3058,10 +3414,14 @@ ${allProducts.map((p) => p.name).join('\n')}
       }
 
       // Удаляем шрифтовые таблицы и другие служебные группы
-      rtf = rtf.replaceAll(RegExp(r'\\fonttbl\{[^}]*\}', caseSensitive: false), '');
-      rtf = rtf.replaceAll(RegExp(r'\\colortbl\{[^}]*\}', caseSensitive: false), '');
-      rtf = rtf.replaceAll(RegExp(r'\\stylesheet\{[^}]*\}', caseSensitive: false), '');
-      rtf = rtf.replaceAll(RegExp(r'\\info\{[^}]*\}', caseSensitive: false), '');
+      rtf = rtf.replaceAll(
+          RegExp(r'\\fonttbl\{[^}]*\}', caseSensitive: false), '');
+      rtf = rtf.replaceAll(
+          RegExp(r'\\colortbl\{[^}]*\}', caseSensitive: false), '');
+      rtf = rtf.replaceAll(
+          RegExp(r'\\stylesheet\{[^}]*\}', caseSensitive: false), '');
+      rtf =
+          rtf.replaceAll(RegExp(r'\\info\{[^}]*\}', caseSensitive: false), '');
 
       // Обрабатываем специальные символы
       rtf = rtf.replaceAll('\\\'', '\'');
@@ -3100,31 +3460,40 @@ ${allProducts.map((p) => p.name).join('\n')}
 
       // Финальная очистка: сжимаем пробелы/табы, но сохраняем переносы строк
       rtf = rtf.replaceAll(RegExp(r'[{}]+'), '');
-      rtf = rtf.split('\n').map((line) => line.replaceAll(RegExp(r'[ \t]+'), ' ').trim()).join('\n');
+      rtf = rtf
+          .split('\n')
+          .map((line) => line.replaceAll(RegExp(r'[ \t]+'), ' ').trim())
+          .join('\n');
 
-      _addDebugLog('RTF extraction result: "${rtf.substring(0, min(100, rtf.length))}"');
+      _addDebugLog(
+          'RTF extraction result: "${rtf.substring(0, min(100, rtf.length))}"');
       return rtf;
     } catch (e) {
       _addDebugLog('Error extracting text from RTF: $e');
       // Fallback: простое извлечение
-      return rtf.replaceAll(RegExp(r'\\[^{]*'), '').replaceAll(RegExp(r'[{}]'), '').trim();
+      return rtf
+          .replaceAll(RegExp(r'\\[^{]*'), '')
+          .replaceAll(RegExp(r'[{}]'), '')
+          .trim();
     }
   }
 
   void _showDebugLogs(BuildContext context) {
+    final loc = context.read<LocalizationService>();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Логи отладки'),
+        title: Text(loc.t('Логи отладки')),
         content: SizedBox(
           width: double.maxFinite,
           height: 400,
           child: _debugLogs.isEmpty
-              ? const Center(child: Text('Логов пока нет'))
+              ? Center(child: Text(loc.t('Логов пока нет')))
               : SingleChildScrollView(
                   child: SelectableText(
                     _debugLogs.join('\n'),
-                    style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                    style:
+                        const TextStyle(fontSize: 12, fontFamily: 'monospace'),
                   ),
                 ),
         ),
@@ -3135,19 +3504,20 @@ ${allProducts.map((p) => p.name).join('\n')}
               await Clipboard.setData(ClipboardData(text: logs));
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Логи скопированы в буфер обмена')),
+                  const SnackBar(
+                      content: Text('Логи скопированы в буфер обмена')),
                 );
               }
             },
-            child: const Text('Копировать'),
+            child: Text(loc.t('Копировать')),
           ),
           TextButton(
             onPressed: () => setState(() => _debugLogs.clear()),
-            child: const Text('Очистить'),
+            child: Text(loc.t('Очистить')),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Закрыть'),
+            child: Text(loc.t('Закрыть')),
           ),
         ],
       ),
@@ -3173,25 +3543,25 @@ class _QuickActions extends StatelessWidget {
                 Icon(Icons.rocket_launch, color: Colors.green[700]),
                 const SizedBox(width: 8),
                 Text(
-                  'Быстрые действия:',
+                  loc.t('Быстрые действия:'),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green[700],
-                  ),
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green[700],
+                      ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
             _buildQuickAction(
               context,
-              'Посмотреть номенклатуру',
-              'Проверить добавленные продукты',
+              loc.t('Посмотреть номенклатуру'),
+              loc.t('Проверить добавленные продукты'),
               () => GoRouter.of(context).push('/products'),
             ),
             _buildQuickAction(
               context,
-              'Создать ТТК',
-              'Использовать новые продукты в рецептах',
+              loc.t('Создать ТТК'),
+              loc.t('Использовать новые продукты в рецептах'),
               () => GoRouter.of(context).push('/tech-cards'),
             ),
             _buildQuickAction(
@@ -3206,7 +3576,8 @@ class _QuickActions extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickAction(BuildContext context, String title, String subtitle, VoidCallback onTap) {
+  Widget _buildQuickAction(
+      BuildContext context, String title, String subtitle, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -3221,15 +3592,15 @@ class _QuickActions extends StatelessWidget {
                   Text(
                     title,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      fontWeight: FontWeight.w500,
-                    ),
+                          fontWeight: FontWeight.w500,
+                        ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.grey[600],
-                    ),
+                          color: Colors.grey[600],
+                        ),
                   ),
                 ],
               ),
@@ -3252,10 +3623,14 @@ class _UploadSchoolCard extends StatelessWidget {
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          leading: Icon(Icons.school, color: Theme.of(context).colorScheme.primary),
+          leading:
+              Icon(Icons.school, color: Theme.of(context).colorScheme.primary),
           title: Text(
             'Школа загрузки',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(context)
+                .textTheme
+                .titleSmall
+                ?.copyWith(fontWeight: FontWeight.bold),
           ),
           subtitle: const Text('Формат данных, типы файлов, модерация'),
           children: [
@@ -3264,12 +3639,14 @@ class _UploadSchoolCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Формат данных:', style: Theme.of(context).textTheme.titleSmall),
+                  Text('Формат данных:',
+                      style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                      color:
+                          Theme.of(context).colorScheme.surfaceContainerLowest,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
@@ -3280,31 +3657,46 @@ class _UploadSchoolCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(
                     'Название и цена — через Tab или пробелы. Распознаются запятые, символы валюты.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 16),
-                  Text('Поддерживаемые файлы:', style: Theme.of(context).textTheme.titleSmall),
+                  Text('Поддерживаемые файлы:',
+                      style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 4),
                   Text(
                     'Вставка текста или файл Excel (.xlsx, .xls).',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerLowest,
+                      color:
+                          Theme.of(context).colorScheme.surfaceContainerLowest,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                      border: Border.all(
+                          color: Theme.of(context).colorScheme.outlineVariant),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.table_chart, size: 14, color: Theme.of(context).colorScheme.primary),
+                            Icon(Icons.table_chart,
+                                size: 14,
+                                color: Theme.of(context).colorScheme.primary),
                             const SizedBox(width: 6),
-                            Text('Формат Excel файла:', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+                            Text('Формат Excel файла:',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(fontWeight: FontWeight.bold)),
                           ],
                         ),
                         const SizedBox(height: 6),
@@ -3314,27 +3706,35 @@ class _UploadSchoolCard extends StatelessWidget {
                           'Авокадо    |  990\n'
                           'Базилик    |  267\n'
                           'Молоко     |  380',
-                          style: TextStyle(fontFamily: 'monospace', fontSize: 12),
+                          style:
+                              TextStyle(fontFamily: 'monospace', fontSize: 12),
                         ),
                         const SizedBox(height: 6),
                         Text(
                           '• Столбец A — названия продуктов\n'
                           '• Столбец B — цены напротив каждого продукта\n'
                           '• Заголовки строк не нужны',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: Colors.grey[600]),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Text('Модерация:', style: Theme.of(context).textTheme.titleSmall),
+                  Text('Модерация:',
+                      style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 4),
                   Text(
                     'После загрузки откроется экран проверки. Там можно:\n'
                     '• Подтвердить или отклонить изменение цен\n'
                     '• Добавить новые продукты в номенклатуру\n'
                     '• Исправить предложенные названия',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                    style: Theme.of(context)
+                        .textTheme
+                        .bodySmall
+                        ?.copyWith(color: Colors.grey[600]),
                   ),
                 ],
               ),
@@ -3381,15 +3781,15 @@ class _UploadMethodCard extends StatelessWidget {
                     Text(
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       description,
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey[600],
-                      ),
+                            color: Colors.grey[600],
+                          ),
                     ),
                   ],
                 ),
@@ -3417,8 +3817,8 @@ class _FormatExample extends StatelessWidget {
             Text(
               'Пример формата данных:',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
             const SizedBox(height: 12),
             Container(
@@ -3447,8 +3847,8 @@ class _FormatExample extends StatelessWidget {
               '• Можно использовать любые символы валюты\n'
               '• Поддерживаются запятые в числах',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.grey[600],
-              ),
+                    color: Colors.grey[600],
+                  ),
             ),
           ],
         ),
@@ -3475,9 +3875,9 @@ class _TipsSection extends StatelessWidget {
                 Text(
                   'Полезные советы:',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue[700],
-                  ),
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue[700],
+                      ),
                 ),
               ],
             ),
@@ -3571,7 +3971,8 @@ class _PasteTextDialogState extends State<_PasteTextDialog> {
                     ),
                     const SizedBox(width: 8),
                     FilledButton(
-                      onPressed: () => Navigator.of(context).pop(widget.controller.text),
+                      onPressed: () =>
+                          Navigator.of(context).pop(widget.controller.text),
                       child: const Text('Анализ'),
                     ),
                   ],
@@ -3618,7 +4019,8 @@ class _InventoryPasteDialogState extends State<_InventoryPasteDialog> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.inventory_2_outlined, color: Colors.orange[700], size: 20),
+                    Icon(Icons.inventory_2_outlined,
+                        color: Colors.orange[700], size: 20),
                     const SizedBox(width: 8),
                     Text(
                       'Инвентаризационный бланк',
@@ -3663,7 +4065,8 @@ class _InventoryPasteDialogState extends State<_InventoryPasteDialog> {
                         'Т. Апельсин чипсы\n'
                         'Т. Абсент Грин Зомби/Фея (хаус)\n'
                         'Т. Мартини Бьянко вермут',
-                    hintStyle: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[400]),
+                    hintStyle: theme.textTheme.bodySmall
+                        ?.copyWith(color: Colors.grey[400]),
                     border: const OutlineInputBorder(),
                     contentPadding: const EdgeInsets.all(12),
                   ),
@@ -3680,8 +4083,10 @@ class _InventoryPasteDialogState extends State<_InventoryPasteDialog> {
                     FilledButton.icon(
                       icon: const Icon(Icons.auto_awesome, size: 16),
                       label: const Text('Распознать'),
-                      style: FilledButton.styleFrom(backgroundColor: Colors.orange[700]),
-                      onPressed: () => Navigator.of(context).pop(widget.controller.text),
+                      style: FilledButton.styleFrom(
+                          backgroundColor: Colors.orange[700]),
+                      onPressed: () =>
+                          Navigator.of(context).pop(widget.controller.text),
                     ),
                   ],
                 ),

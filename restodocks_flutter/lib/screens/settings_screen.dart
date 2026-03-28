@@ -961,8 +961,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   .read<AccountManagerSupabase>()
                                   .savePreferredLanguage(code);
                               Navigator.of(ctx).pop();
-                              // Фоновая подстановка переводов продуктов через Edge Function (DeepL)
-                              _translateProductsForLanguage(context, code);
+                              // Фоновые переводы продуктов и названий ТТК под выбранный язык (DeepL)
+                              _translateMissingForLanguage(context, code);
                             }
                           },
                         );
@@ -978,26 +978,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  /// Переводит продукты, у которых нет имени на выбранном языке (в фоне).
-  /// Использует Edge Function auto-translate-product (DeepL) — работает на web.
-  /// Уведомления «Переводы обновлены» показываются только если включена настройка.
-  void _translateProductsForLanguage(BuildContext context, String targetLang) {
+  /// При смене языка в настройках: в фоне добирает переводы продуктов и названий ТТК
+  /// на выбранный язык (если их ещё нет в данных). DeepL через Edge Functions.
+  /// Уведомления показываются только если включены в настройках экрана.
+  void _translateMissingForLanguage(BuildContext context, String targetLang) {
     final store = context.read<ProductStoreSupabase>();
+    final techSvc = context.read<TechCardServiceSupabase>();
+    final account = context.read<AccountManagerSupabase>();
     final screenPref = context.read<ScreenLayoutPreferenceService>();
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final loc = context.read<LocalizationService>();
     final showNotif = screenPref.showTranslationNotifications;
 
-    final needTranslation = <Product>[];
     Future(() async {
       await store.loadProducts(force: true);
+      final needProducts = <Product>[];
       for (final p in store.allProducts) {
         final names = p.names ?? {};
         if ((names[targetLang] ?? '').trim().isNotEmpty) continue;
         if ((p.name).trim().isEmpty) continue;
-        needTranslation.add(p);
+        needProducts.add(p);
       }
-      if (needTranslation.isEmpty) return;
+
+      var needTtk = <TechCard>[];
+      if (targetLang != 'ru') {
+        final estId = account.dataEstablishmentId;
+        if (estId != null) {
+          try {
+            final cards = await techSvc.getTechCardsForEstablishment(
+              estId,
+              includeIngredients: false,
+            );
+            for (final tc in cards) {
+              if (tc.dishName.trim().isEmpty) continue;
+              final has = tc.dishNameLocalized?.containsKey(targetLang) == true &&
+                  (tc.dishNameLocalized![targetLang]?.trim().isNotEmpty ?? false);
+              if (has) continue;
+              needTtk.add(tc);
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (needProducts.isEmpty && needTtk.isEmpty) return;
 
       if (showNotif) {
         scaffoldMessenger.showSnackBar(
@@ -1019,24 +1042,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       }
 
-      int updated = 0;
-      for (final p in needTranslation) {
+      var updatedProducts = 0;
+      for (final p in needProducts) {
         try {
           final result = await store.translateProductAwait(p.id);
           if (result != null && (result[targetLang] ?? '').trim().isNotEmpty) {
-            updated++;
+            updatedProducts++;
           }
+        } catch (_) {}
+      }
+
+      var updatedTtk = 0;
+      var i = 0;
+      for (final tc in needTtk) {
+        if (i > 0 && i % 2 == 0) {
+          await Future<void>.delayed(Duration.zero);
+        }
+        i++;
+        try {
+          final t = await techSvc
+              .translateTechCardName(tc.id, tc.dishName, targetLang)
+              .timeout(const Duration(seconds: 8), onTimeout: () => null);
+          if (t != null && t.trim().isNotEmpty) updatedTtk++;
         } catch (_) {}
       }
 
       if (showNotif) {
         scaffoldMessenger.removeCurrentSnackBar();
+        final n = updatedProducts + updatedTtk;
         scaffoldMessenger.showSnackBar(
           SnackBar(
-            content: Text(updated > 0
-                ? '${loc.t('translate_done')} (+$updated)'
-                : loc.t('translate_done')),
-            backgroundColor: updated > 0 ? Colors.green : null,
+            content: Text(
+                n > 0 ? '${loc.t('translate_done')} (+$n)' : loc.t('translate_done')),
+            backgroundColor: n > 0 ? Colors.green : null,
           ),
         );
       }

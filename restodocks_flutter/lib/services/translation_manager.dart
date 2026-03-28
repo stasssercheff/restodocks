@@ -16,9 +16,9 @@ class TranslationManager {
     required AiServiceSupabase aiService,
     required TranslationService translationService,
     required List<String> Function() getSupportedLanguages,
-  }) : _aiService = aiService,
-       _translationService = translationService,
-       _getSupportedLanguages = getSupportedLanguages;
+  })  : _aiService = aiService,
+        _translationService = translationService,
+        _getSupportedLanguages = getSupportedLanguages;
 
   /// Обработать сохранение сущности и выполнить переводы
   Future<void> handleEntitySave({
@@ -27,6 +27,7 @@ class TranslationManager {
     required Map<String, String> textFields, // fieldName -> text
     required String sourceLanguage,
     String? userId,
+    List<String>? targetLanguages,
   }) async {
     devLog('TranslationManager: Processing save for $entityType:$entityId');
 
@@ -42,7 +43,8 @@ class TranslationManager {
       final sourceText = textFields[fieldName]!;
       if (sourceText.trim().isEmpty) continue;
 
-      for (final targetLang in _getSupportedLanguages()) {
+      final targets = targetLanguages ?? _getSupportedLanguages();
+      for (final targetLang in targets) {
         if (targetLang == detectedLanguage) continue;
 
         try {
@@ -57,7 +59,8 @@ class TranslationManager {
             allowOverride: false, // Не перезаписывать manual overrides
           );
         } catch (e) {
-          devLog('TranslationManager: Failed to translate $fieldName to $targetLang: $e');
+          devLog(
+              'TranslationManager: Failed to translate $fieldName to $targetLang: $e');
         }
       }
     }
@@ -125,7 +128,8 @@ class TranslationManager {
   }
 
   /// Сгенерировать переводы для названия продукта
-  Future<Map<String, String>> generateTranslationsForProduct(String productName, String sourceLanguage) async {
+  Future<Map<String, String>> generateTranslationsForProduct(
+      String productName, String sourceLanguage) async {
     final translations = <String, String>{};
     translations[sourceLanguage] = productName;
 
@@ -172,7 +176,8 @@ class TranslationManager {
         'prompt': prompt,
       });
 
-      final detectedLang = response?['result']?.toString().trim().toLowerCase() ?? 'en';
+      final detectedLang =
+          response?['result']?.toString().trim().toLowerCase() ?? 'en';
 
       // Валидируем
       final codes = _getSupportedLanguages();

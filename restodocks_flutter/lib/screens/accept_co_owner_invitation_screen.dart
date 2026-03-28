@@ -11,10 +11,12 @@ class AcceptCoOwnerInvitationScreen extends StatefulWidget {
   final String token;
 
   @override
-  State<AcceptCoOwnerInvitationScreen> createState() => _AcceptCoOwnerInvitationScreenState();
+  State<AcceptCoOwnerInvitationScreen> createState() =>
+      _AcceptCoOwnerInvitationScreenState();
 }
 
-class _AcceptCoOwnerInvitationScreenState extends State<AcceptCoOwnerInvitationScreen> {
+class _AcceptCoOwnerInvitationScreenState
+    extends State<AcceptCoOwnerInvitationScreen> {
   bool _isLoading = true;
   String? _error;
   Map<String, dynamic>? _invitationData;
@@ -34,8 +36,9 @@ class _AcceptCoOwnerInvitationScreenState extends State<AcceptCoOwnerInvitationS
       );
 
       if (invitation == null) {
+        final loc = context.read<LocalizationService>();
         setState(() {
-          _error = 'Приглашение не найдено или истекло';
+          _error = loc.t('invitation_not_found_or_expired');
           _isLoading = false;
         });
         return;
@@ -68,14 +71,16 @@ class _AcceptCoOwnerInvitationScreenState extends State<AcceptCoOwnerInvitationS
       );
 
       if (mounted) {
+        final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Приглашение принято! Теперь зарегистрируйтесь.')),
+          SnackBar(content: Text(loc.t('invitation_accepted'))),
         );
         context.go('/register-co-owner?token=${widget.token}');
       }
     } catch (e) {
+      final loc = context.read<LocalizationService>();
       setState(() {
-        _error = 'Ошибка принятия приглашения: $e';
+        _error = '${loc.t('error')}: $e';
         _isLoading = false;
       });
     }
@@ -129,7 +134,8 @@ class _AcceptCoOwnerInvitationScreenState extends State<AcceptCoOwnerInvitationS
             const Icon(Icons.person_add, size: 64, color: Colors.blue),
             const SizedBox(height: 24),
             Text(
-              loc.t('co_owner_invitation_title') ?? 'Приглашение стать соучредителем',
+              loc.t('co_owner_invitation_title') ??
+                  'Приглашение стать соучредителем',
               style: Theme.of(context).textTheme.headlineSmall,
               textAlign: TextAlign.center,
             ),

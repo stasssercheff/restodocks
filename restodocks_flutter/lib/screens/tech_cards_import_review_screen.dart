@@ -16,7 +16,12 @@ enum _ImportDuplicateAction { createDuplicate, editExisting, deleteExisting }
 
 /// Экран просмотра и правки распознанных ТТК перед созданием (пакетный импорт из Excel).
 class TechCardsImportReviewScreen extends StatefulWidget {
-  const TechCardsImportReviewScreen({super.key, required this.cards, this.headerSignature, this.sourceRows, this.department = 'kitchen'});
+  const TechCardsImportReviewScreen(
+      {super.key,
+      required this.cards,
+      this.headerSignature,
+      this.sourceRows,
+      this.department = 'kitchen'});
 
   final List<TechCardRecognitionResult> cards;
   final String? headerSignature;
@@ -24,10 +29,12 @@ class TechCardsImportReviewScreen extends StatefulWidget {
   final String department;
 
   @override
-  State<TechCardsImportReviewScreen> createState() => _TechCardsImportReviewScreenState();
+  State<TechCardsImportReviewScreen> createState() =>
+      _TechCardsImportReviewScreenState();
 }
 
-class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScreen> {
+class _TechCardsImportReviewScreenState
+    extends State<TechCardsImportReviewScreen> {
   /// Цеха кухни (коды как в создании ТТК: preparation, confectionery)
   static const _kitchenSectionCodes = [
     'hot_kitchen',
@@ -58,38 +65,64 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
 
   /// Кухня: без напитков. Рыба, мясо, птица, заготовка и т.д.
   static const _kitchenCategoryOptions = [
-    'sauce', 'vegetables', 'zagotovka', 'salad', 'zakuska', 'meat', 'seafood', 'poultry', 'side', 'subside',
-    'bakery', 'dessert', 'decor', 'soup', 'misc', 'banquet', 'catering',
+    'sauce',
+    'vegetables',
+    'zagotovka',
+    'salad',
+    'zakuska',
+    'meat',
+    'seafood',
+    'poultry',
+    'side',
+    'subside',
+    'bakery',
+    'dessert',
+    'decor',
+    'soup',
+    'misc',
+    'banquet',
+    'catering',
   ];
 
   /// Бар: только напитки и снеки.
   static const _barCategoryOptions = [
-    'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure',
-    'snacks', 'zakuska', 'beverages',
+    'alcoholic_cocktails',
+    'non_alcoholic_drinks',
+    'hot_drinks',
+    'drinks_pure',
+    'snacks',
+    'zakuska',
+    'beverages',
   ];
 
-  bool get _isBar => widget.department == 'bar' || widget.department == 'banquet-catering-bar';
-  List<String> get _categoryOptions => _isBar ? _barCategoryOptions : _kitchenCategoryOptions;
+  bool get _isBar =>
+      widget.department == 'bar' || widget.department == 'banquet-catering-bar';
+  List<String> get _categoryOptions =>
+      _isBar ? _barCategoryOptions : _kitchenCategoryOptions;
 
   /// Коды цехов для выбора (кухня или бар)
-  List<String> get _sectionCodes => _isBar ? _barSectionCodes : _kitchenSectionCodes;
+  List<String> get _sectionCodes =>
+      _isBar ? _barSectionCodes : _kitchenSectionCodes;
 
   Map<String, String> _getSectionLabels(LocalizationService loc) {
     if (_isBar) {
       return {'bar': loc.t('bar') ?? 'Бар'};
     }
     return Map.fromEntries(
-      _kitchenSectionCodes.map((c) => MapEntry(c, loc.t(_kitchenSectionLocKeys[c] ?? c) ?? c)),
+      _kitchenSectionCodes
+          .map((c) => MapEntry(c, loc.t(_kitchenSectionLocKeys[c] ?? c) ?? c)),
     );
   }
 
   String _sectionsDisplayLabel(List<String> sections, LocalizationService loc) {
     if (sections.isEmpty) return loc.t('ttk_sections_hidden') ?? 'Скрыто';
-    if (sections.contains('all')) return loc.t('ttk_sections_all') ?? 'Все цеха';
+    if (sections.contains('all'))
+      return loc.t('ttk_sections_all') ?? 'Все цеха';
     if (sections.length == 1) {
       return _getSectionLabels(loc)[sections.first] ?? sections.first;
     }
-    return (loc.t('ttk_sections_count') ?? '%s цеха').replaceAll('%s', '${sections.length}');
+    return (loc.t('ttk_sections_count') ?? '%s цеха')
+        .replaceAll('%s', '${sections.length}');
   }
 
   late List<_ReviewItem> _items;
@@ -111,14 +144,16 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   int _typeRevision = 0;
 
   /// Массовый режим типа на экране проверки импорта. Если null — пользователь вручную правит карточки.
-  bool? _bulkIsSemiFinished; // true=все ПФ, false=все блюда, null=нет массового режима
+  bool?
+      _bulkIsSemiFinished; // true=все ПФ, false=все блюда, null=нет массового режима
 
   /// Индексы в _items, проходящие фильтр поиска по названию.
   List<int> get _filteredIndices {
     if (_searchQuery.isEmpty) return List.generate(_items.length, (i) => i);
     final q = _searchQuery.toLowerCase();
     return List.generate(_items.length, (i) => i)
-        .where((i) => (_items[i].result.dishName ?? '').toLowerCase().contains(q))
+        .where(
+            (i) => (_items[i].result.dishName ?? '').toLowerCase().contains(q))
         .toList();
   }
 
@@ -139,24 +174,29 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     _parseErrors = AiServiceSupabase.lastParseTechCardErrors;
     if (_parseErrors != null) AiServiceSupabase.lastParseTechCardErrors = null;
     final defaultSections = _isBar ? const ['bar'] : const ['all'];
-    final rawItems = widget.cards.map((c) => _ReviewItem(
-      result: c,
-      originalDishName: c.dishName,
-      category: _inferCategory(c.dishName ?? ''),
-      sections: defaultSections,
-      isSemiFinished: c.isSemiFinished ?? true,
-    )).toList();
+    final rawItems = widget.cards
+        .map((c) => _ReviewItem(
+              result: c,
+              originalDishName: c.dishName,
+              category: _inferCategory(c.dishName ?? ''),
+              sections: defaultSections,
+              isSemiFinished: c.isSemiFinished ?? true,
+            ))
+        .toList();
     _items = _groupDuplicatesForReview(rawItems);
     // Не включать «ПФ» по умолчанию, если у всех ПФ уже есть префикс в названии.
     final pfItems = _items.where((i) => i.isSemiFinished).toList();
     if (pfItems.isNotEmpty) {
-      final hasPfPrefix = RegExp(r'^пф\s|^п/ф\s|^п\.ф\.\s', caseSensitive: false);
-      final allAlreadyHave = pfItems.every((i) => hasPfPrefix.hasMatch((i.result.dishName ?? '').trim()));
+      final hasPfPrefix =
+          RegExp(r'^пф\s|^п/ф\s|^п\.ф\.\s', caseSensitive: false);
+      final allAlreadyHave = pfItems
+          .every((i) => hasPfPrefix.hasMatch((i.result.dishName ?? '').trim()));
       if (allAlreadyHave) _ensurePfPrefix = false;
     }
     // Напоминание при каждом открытии экрана проверки импорта (не только при первом формате).
     if (widget.cards.isNotEmpty) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _showFirstTimeImportNotice());
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _showFirstTimeImportNotice());
     }
   }
 
@@ -166,8 +206,10 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('tech_cards_import_first_time_title') ?? 'Первый импорт формата'),
-        content: Text(loc.t('tech_cards_import_first_time_message') ?? 'Проверьте правильность внесённых данных, при необходимости исправьте — это поможет обучить систему для следующих загрузок.'),
+        title: Text(loc.t('tech_cards_import_first_time_title') ??
+            'Первый импорт формата'),
+        content: Text(loc.t('tech_cards_import_first_time_message') ??
+            'Проверьте правильность внесённых данных, при необходимости исправьте — это поможет обучить систему для следующих загрузок.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -187,39 +229,99 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         .toSet()
         .toList();
     if (names.isNotEmpty) {
-      final template = loc.t('tech_cards_import_parse_errors_banner_with_names') ?? 'Обнаружены ошибки распознавания в карточках: %s. Проверьте их ниже.';
+      final template = loc
+              .t('tech_cards_import_parse_errors_banner_with_names') ??
+          'Обнаружены ошибки распознавания в карточках: %s. Проверьте их ниже.';
       return template.replaceFirst('%s', names.join(', '));
     }
-    return loc.t('tech_cards_import_parse_errors_banner') ?? 'Обнаружены ошибки распознавания. Проверьте карточки ниже.';
+    return loc.t('tech_cards_import_parse_errors_banner') ??
+        'Обнаружены ошибки распознавания. Проверьте карточки ниже.';
   }
 
   String _inferCategory(String dishName) {
     final lower = dishName.toLowerCase();
     if (_isBar) {
-      if (lower.contains('коктейл') || lower.contains('cocktail') || lower.contains('мохито') || lower.contains('маргарит')) return 'alcoholic_cocktails';
-      if (lower.contains('лимонад') || lower.contains('сок') || lower.contains('кола') || lower.contains('тоник') || lower.contains('soda') || lower.contains('juice')) return 'non_alcoholic_drinks';
-      if (lower.contains('кофе') || lower.contains('чай') || lower.contains('какао') || lower.contains('coffee') || lower.contains('tea') || lower.contains('cocoa')) return 'hot_drinks';
-      if (lower.contains('виски') || lower.contains('ром') || lower.contains('водка') || lower.contains('вино') || lower.contains('пиво') || lower.contains('whiskey') || lower.contains('rum') || lower.contains('vodka') || lower.contains('wine') || lower.contains('beer')) return 'drinks_pure';
-      if (lower.contains('орех') || lower.contains('чипс') || lower.contains('снек') || lower.contains('nuts') || lower.contains('chips') || lower.contains('snack')) return 'snacks';
-      if (lower.contains('закуск') || lower.contains('appetizer') || lower.contains('antipasti')) return 'zakuska';
+      if (lower.contains('коктейл') ||
+          lower.contains('cocktail') ||
+          lower.contains('мохито') ||
+          lower.contains('маргарит')) return 'alcoholic_cocktails';
+      if (lower.contains('лимонад') ||
+          lower.contains('сок') ||
+          lower.contains('кола') ||
+          lower.contains('тоник') ||
+          lower.contains('soda') ||
+          lower.contains('juice')) return 'non_alcoholic_drinks';
+      if (lower.contains('кофе') ||
+          lower.contains('чай') ||
+          lower.contains('какао') ||
+          lower.contains('coffee') ||
+          lower.contains('tea') ||
+          lower.contains('cocoa')) return 'hot_drinks';
+      if (lower.contains('виски') ||
+          lower.contains('ром') ||
+          lower.contains('водка') ||
+          lower.contains('вино') ||
+          lower.contains('пиво') ||
+          lower.contains('whiskey') ||
+          lower.contains('rum') ||
+          lower.contains('vodka') ||
+          lower.contains('wine') ||
+          lower.contains('beer')) return 'drinks_pure';
+      if (lower.contains('орех') ||
+          lower.contains('чипс') ||
+          lower.contains('снек') ||
+          lower.contains('nuts') ||
+          lower.contains('chips') ||
+          lower.contains('snack')) return 'snacks';
+      if (lower.contains('закуск') ||
+          lower.contains('appetizer') ||
+          lower.contains('antipasti')) return 'zakuska';
     }
     if (lower.contains('соус') || lower.contains('sauce')) return 'sauce';
-    if (lower.contains('овощ') || lower.contains('vegetable')) return 'vegetables';
-    if (lower.contains('заготовк') || lower.contains('preparation') || lower.contains('подготовк')) return 'zagotovka';
+    if (lower.contains('овощ') || lower.contains('vegetable'))
+      return 'vegetables';
+    if (lower.contains('заготовк') ||
+        lower.contains('preparation') ||
+        lower.contains('подготовк')) return 'zagotovka';
     if (lower.contains('салат') || lower.contains('salad')) return 'salad';
-    if (lower.contains('закуск') || lower.contains('appetizer') || lower.contains('antipasti')) return 'zakuska';
-    if (lower.contains('мяс') || lower.contains('meat') || lower.contains('говядин') || lower.contains('свинин') || lower.contains('баран')) return 'meat';
-    if (lower.contains('рыб') || lower.contains('fish') || lower.contains('море') || lower.contains('seafood')) return 'seafood';
-    if (lower.contains('птиц') || lower.contains('poultry') || lower.contains('куриц') || lower.contains('индейк') || lower.contains('утк') || lower.contains('цыплят')) return 'poultry';
+    if (lower.contains('закуск') ||
+        lower.contains('appetizer') ||
+        lower.contains('antipasti')) return 'zakuska';
+    if (lower.contains('мяс') ||
+        lower.contains('meat') ||
+        lower.contains('говядин') ||
+        lower.contains('свинин') ||
+        lower.contains('баран')) return 'meat';
+    if (lower.contains('рыб') ||
+        lower.contains('fish') ||
+        lower.contains('море') ||
+        lower.contains('seafood')) return 'seafood';
+    if (lower.contains('птиц') ||
+        lower.contains('poultry') ||
+        lower.contains('куриц') ||
+        lower.contains('индейк') ||
+        lower.contains('утк') ||
+        lower.contains('цыплят')) return 'poultry';
     if (lower.contains('гарнир') || lower.contains('side')) return 'side';
-    if (lower.contains('подгарнир') || lower.contains('subside')) return 'subside';
-    if (lower.contains('выпеч') || lower.contains('bakery') || lower.contains('хлеб') || lower.contains('тест')) return 'bakery';
-    if (lower.contains('десерт') || lower.contains('dessert') || lower.contains('крем') || lower.contains('торт')) return 'dessert';
+    if (lower.contains('подгарнир') || lower.contains('subside'))
+      return 'subside';
+    if (lower.contains('выпеч') ||
+        lower.contains('bakery') ||
+        lower.contains('хлеб') ||
+        lower.contains('тест')) return 'bakery';
+    if (lower.contains('десерт') ||
+        lower.contains('dessert') ||
+        lower.contains('крем') ||
+        lower.contains('торт')) return 'dessert';
     if (lower.contains('декор') || lower.contains('decor')) return 'decor';
     if (lower.contains('суп') || lower.contains('soup')) return 'soup';
-    if (lower.contains('напит') || lower.contains('beverage') || lower.contains('сок') || lower.contains('компот')) return 'beverages';
+    if (lower.contains('напит') ||
+        lower.contains('beverage') ||
+        lower.contains('сок') ||
+        lower.contains('компот')) return 'beverages';
     if (lower.contains('банкет') || lower.contains('banquet')) return 'banquet';
-    if (lower.contains('кейтринг') || lower.contains('catering')) return 'catering';
+    if (lower.contains('кейтринг') || lower.contains('catering'))
+      return 'catering';
     return 'misc';
   }
 
@@ -265,7 +367,8 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
             final isAll = selected.contains('all');
 
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: ConstrainedBox(
@@ -275,29 +378,36 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(children: [
-                        Icon(Icons.store, color: theme.colorScheme.primary, size: 22),
+                        Icon(Icons.store,
+                            color: theme.colorScheme.primary, size: 22),
                         const SizedBox(width: 10),
                         Text(loc.t('ttk_section_select') ?? 'Выбор цеха',
-                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                            style: theme.textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700)),
                       ]),
                       const SizedBox(height: 4),
                       Text(
-                        loc.t('ttk_section_hint') ?? 'ТТК будет видна только поварам выбранных цехов.',
+                        loc.t('ttk_section_hint') ??
+                            'ТТК будет видна только поварам выбранных цехов.',
                         style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: 0.6)),
                       ),
                       const SizedBox(height: 16),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
                           color: isHidden
-                              ? theme.colorScheme.errorContainer.withValues(alpha: 0.3)
+                              ? theme.colorScheme.errorContainer
+                                  .withValues(alpha: 0.3)
                               : theme.colorScheme.surfaceContainerLowest,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: isHidden
                                 ? theme.colorScheme.error.withValues(alpha: 0.4)
-                                : theme.colorScheme.outline.withValues(alpha: 0.3),
+                                : theme.colorScheme.outline
+                                    .withValues(alpha: 0.3),
                           ),
                         ),
                         child: Row(children: [
@@ -305,18 +415,21 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                               size: 18,
                               color: isHidden
                                   ? theme.colorScheme.error
-                                  : theme.colorScheme.onSurface.withValues(alpha: 0.4)),
+                                  : theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.4)),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               isHidden
                                   ? (loc.t('ttk_section_hidden') ?? 'Скрыто')
-                                  : (loc.t('ttk_section_uncheck_hint') ?? 'Снимите все цеха чтобы скрыть'),
+                                  : (loc.t('ttk_section_uncheck_hint') ??
+                                      'Снимите все цеха чтобы скрыть'),
                               style: TextStyle(
                                 fontSize: 12,
                                 color: isHidden
                                     ? theme.colorScheme.error
-                                    : theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                                    : theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.5),
                               ),
                             ),
                           ),
@@ -363,32 +476,66 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     );
     if (result != null && mounted) {
       setState(() => _items[index] = _ReviewItem(
-        result: item.result,
-        originalDishName: item.originalDishName,
-        category: item.category,
-        sections: result,
-        isSemiFinished: item.isSemiFinished,
-        alreadySaved: item.alreadySaved,
-      ));
+            result: item.result,
+            originalDishName: item.originalDishName,
+            category: item.category,
+            sections: result,
+            isSemiFinished: item.isSemiFinished,
+            alreadySaved: item.alreadySaved,
+          ));
     }
   }
 
   String _categoryLabel(String c, String lang) {
     const ru = {
-      'sauce': 'Соус', 'vegetables': 'Овощи', 'zagotovka': 'Заготовка', 'salad': 'Салат', 'zakuska': 'Закуска', 'meat': 'Мясо',
-      'seafood': 'Рыба', 'poultry': 'Птица', 'side': 'Гарнир', 'subside': 'Подгарнир', 'bakery': 'Выпечка',
-      'dessert': 'Десерт', 'decor': 'Декор', 'soup': 'Суп', 'misc': 'Разное',
-      'beverages': 'Напитки', 'banquet': 'Банкет', 'catering': 'Кейтеринг',
-      'alcoholic_cocktails': 'Алкогольные коктейли', 'non_alcoholic_drinks': 'Безалкогольные напитки',
-      'hot_drinks': 'Горячие напитки', 'drinks_pure': 'Напитки в чистом виде', 'snacks': 'Снеки',
+      'sauce': 'Соус',
+      'vegetables': 'Овощи',
+      'zagotovka': 'Заготовка',
+      'salad': 'Салат',
+      'zakuska': 'Закуска',
+      'meat': 'Мясо',
+      'seafood': 'Рыба',
+      'poultry': 'Птица',
+      'side': 'Гарнир',
+      'subside': 'Подгарнир',
+      'bakery': 'Выпечка',
+      'dessert': 'Десерт',
+      'decor': 'Декор',
+      'soup': 'Суп',
+      'misc': 'Разное',
+      'beverages': 'Напитки',
+      'banquet': 'Банкет',
+      'catering': 'Кейтеринг',
+      'alcoholic_cocktails': 'Алкогольные коктейли',
+      'non_alcoholic_drinks': 'Безалкогольные напитки',
+      'hot_drinks': 'Горячие напитки',
+      'drinks_pure': 'Напитки в чистом виде',
+      'snacks': 'Снеки',
     };
     const en = {
-      'sauce': 'Sauce', 'vegetables': 'Vegetables', 'zagotovka': 'Preparation', 'salad': 'Salad', 'zakuska': 'Appetizer', 'meat': 'Meat',
-      'seafood': 'Seafood', 'poultry': 'Poultry', 'side': 'Side dish', 'subside': 'Sub-side', 'bakery': 'Bakery',
-      'dessert': 'Dessert', 'decor': 'Decor', 'soup': 'Soup', 'misc': 'Misc',
-      'beverages': 'Beverages', 'banquet': 'Banquet', 'catering': 'Catering',
-      'alcoholic_cocktails': 'Alcoholic cocktails', 'non_alcoholic_drinks': 'Non-alcoholic drinks',
-      'hot_drinks': 'Hot drinks', 'drinks_pure': 'Drinks (neat)', 'snacks': 'Snacks',
+      'sauce': 'Sauce',
+      'vegetables': 'Vegetables',
+      'zagotovka': 'Preparation',
+      'salad': 'Salad',
+      'zakuska': 'Appetizer',
+      'meat': 'Meat',
+      'seafood': 'Seafood',
+      'poultry': 'Poultry',
+      'side': 'Side dish',
+      'subside': 'Sub-side',
+      'bakery': 'Bakery',
+      'dessert': 'Dessert',
+      'decor': 'Decor',
+      'soup': 'Soup',
+      'misc': 'Misc',
+      'beverages': 'Beverages',
+      'banquet': 'Banquet',
+      'catering': 'Catering',
+      'alcoholic_cocktails': 'Alcoholic cocktails',
+      'non_alcoholic_drinks': 'Non-alcoholic drinks',
+      'hot_drinks': 'Hot drinks',
+      'drinks_pure': 'Drinks (neat)',
+      'snacks': 'Snacks',
     };
     return (lang == 'ru' ? ru : en)[c] ?? c;
   }
@@ -396,7 +543,8 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   /// Сумма выходов ингредиентов карточки (г).
   static double _ingredientsOutputSum(TechCardRecognitionResult result) {
     return result.ingredients.fold<double>(
-      0, (s, i) => s + (i.outputGrams ?? i.netGrams ?? i.grossGrams ?? 0),
+      0,
+      (s, i) => s + (i.outputGrams ?? i.netGrams ?? i.grossGrams ?? 0),
     );
   }
 
@@ -406,7 +554,8 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     final sum = _ingredientsOutputSum(item.result);
     if (sum <= 0) return false;
     final yield = item.result.yieldGrams;
-    if (yield == null || yield <= 0) return true; // формат без поля «Выход» — подстраиваем под сумму
+    if (yield == null || yield <= 0)
+      return true; // формат без поля «Выход» — подстраиваем под сумму
     return (sum - yield).abs() > 1; // выход задан, но не совпадает
   }
 
@@ -421,11 +570,14 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
   String _formatAdjustWasteHint(_ReviewItem item, LocalizationService loc) {
     final yield = item.result.yieldGrams ?? 0;
     final sum = item.result.ingredients.fold<double>(
-      0, (s, i) => s + (i.outputGrams ?? i.netGrams ?? i.grossGrams ?? 0),
+      0,
+      (s, i) => s + (i.outputGrams ?? i.netGrams ?? i.grossGrams ?? 0),
     );
     final template = loc.t('tech_cards_import_adjust_waste_hint') ??
         'Выход в карточке %s г, сумма ингредиентов %s г. В редакторе можно подстроить % отхода под целевой выход.';
-    return template.replaceFirst('%s', yield.toStringAsFixed(0)).replaceFirst('%s', sum.toStringAsFixed(0));
+    return template
+        .replaceFirst('%s', yield.toStringAsFixed(0))
+        .replaceFirst('%s', sum.toStringAsFixed(0));
   }
 
   /// Подстроить % отхода под целевой выход для всех карточек (в любом формате, любое количество).
@@ -439,17 +591,20 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
         continue;
       }
       final sum = _ingredientsOutputSum(item.result);
-      final target = item.result.yieldGrams != null && item.result.yieldGrams! > 0
-          ? item.result.yieldGrams!
-          : sum;
+      final target =
+          item.result.yieldGrams != null && item.result.yieldGrams! > 0
+              ? item.result.yieldGrams!
+              : sum;
       if (target <= 0) {
         newItems.add(item);
         continue;
       }
       final adjusted = item.result.adjustWasteToMatchOutput(target);
       if (adjusted != null) {
-        final hadNoYield = item.result.yieldGrams == null || item.result.yieldGrams! <= 0;
-        final resultWithYield = hadNoYield ? adjusted.copyWith(yieldGrams: target) : adjusted;
+        final hadNoYield =
+            item.result.yieldGrams == null || item.result.yieldGrams! <= 0;
+        final resultWithYield =
+            hadNoYield ? adjusted.copyWith(yieldGrams: target) : adjusted;
         newItems.add(_ReviewItem(
           result: resultWithYield,
           originalDishName: item.originalDishName,
@@ -477,7 +632,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       final raw = (item.result.dishName ?? '').trim();
       if (raw.isEmpty) return '';
       final noSuffix = _stripDuplicateSuffix(raw);
-      return item.isSemiFinished ? normalizeForPfMatching(noSuffix) : _norm(noSuffix);
+      return item.isSemiFinished
+          ? normalizeForPfMatching(noSuffix)
+          : _norm(noSuffix);
     }
 
     final byKey = <String, List<_ReviewItem>>{};
@@ -511,7 +668,8 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     final availablePf = <String>{
       for (final t in techCardsPf) ...[
         _norm(t.name),
-        if (normalizeForPfMatching(t.name).isNotEmpty) normalizeForPfMatching(t.name),
+        if (normalizeForPfMatching(t.name).isNotEmpty)
+          normalizeForPfMatching(t.name),
       ],
     };
     final itemToDeps = <int, Set<String>>{};
@@ -553,18 +711,22 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     }
     if (stuck || remaining.isNotEmpty) {
       return List<_ReviewItem>.from(items)
-        ..sort((a, b) => (a.isSemiFinished == b.isSemiFinished) ? 0 : (a.isSemiFinished ? -1 : 1));
+        ..sort((a, b) => (a.isSemiFinished == b.isSemiFinished)
+            ? 0
+            : (a.isSemiFinished ? -1 : 1));
     }
     return result;
   }
 
   /// Нечёткое совпадение: продукт в каталоге содержит название ингредиента как префикс.
   static bool _fuzzyMatch(String ingredientNorm, String catalogNorm) {
-    if (ingredientNorm.isEmpty || catalogNorm.length < ingredientNorm.length) return false;
+    if (ingredientNorm.isEmpty || catalogNorm.length < ingredientNorm.length)
+      return false;
     if (catalogNorm == ingredientNorm) return true;
     return ingredientNorm.length >= 10 &&
         catalogNorm.startsWith(ingredientNorm) &&
-        (ingredientNorm.length == catalogNorm.length || catalogNorm[ingredientNorm.length] == ' ');
+        (ingredientNorm.length == catalogNorm.length ||
+            catalogNorm[ingredientNorm.length] == ' ');
   }
 
   Future<void> _createAll() async {
@@ -572,13 +734,15 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     final est = acc.establishment;
     final emp = acc.currentEmployee;
     if (est == null || emp == null) {
-      devLog('[ttk_save] _createAll: est=${est != null} emp=${emp != null} — return (no save)');
+      devLog(
+          '[ttk_save] _createAll: est=${est != null} emp=${emp != null} — return (no save)');
       if (mounted) {
         final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(est == null
               ? (loc.t('ttk_import_no_establishment') ?? 'Выберите заведение')
-              : (loc.t('ttk_import_no_employee') ?? 'Войдите как сотрудник для сохранения ТТК')),
+              : (loc.t('ttk_import_no_employee') ??
+                  'Войдите как сотрудник для сохранения ТТК')),
           duration: const Duration(seconds: 4),
         ));
       }
@@ -594,8 +758,10 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       // loadNomenclature загружает только IDs/цены, но не сами продукты.
       await productStore.loadProducts();
       await productStore.loadNomenclature(est.dataEstablishmentId);
-      final products = productStore.getNomenclatureProducts(est.dataEstablishmentId);
-      final allTc = await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
+      final products =
+          productStore.getNomenclatureProducts(est.dataEstablishmentId);
+      final allTc =
+          await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
       final techCardsPf = allTc
           .where((tc) => tc.isSemiFinished)
           .map((tc) => (id: tc.id, name: tc.dishName))
@@ -647,9 +813,13 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
             final pNorm = _norm(p.name);
             return pNorm == norm || _fuzzyMatch(norm, pNorm);
           });
-          final inPf = techCardsPf.any((t) => _norm(t.name) == norm || normalizeForPfMatching(t.name) == norm);
-          if (!inProducts && !inPf) productNamesToCreate.add(ing.productName.trim());
-          if (ing.pricePerKg != null && ing.pricePerKg! > 0 && !priceFromDoc.containsKey(norm)) {
+          final inPf = techCardsPf.any((t) =>
+              _norm(t.name) == norm || normalizeForPfMatching(t.name) == norm);
+          if (!inProducts && !inPf)
+            productNamesToCreate.add(ing.productName.trim());
+          if (ing.pricePerKg != null &&
+              ing.pricePerKg! > 0 &&
+              !priceFromDoc.containsKey(norm)) {
             priceFromDoc[norm] = ing.pricePerKg!;
           }
         }
@@ -694,7 +864,10 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
             price: docPrice,
             currency: defCur,
           );
-          productsForMapping = [...productsForMapping, (id: savedProduct.id, name: savedProduct.name)];
+          productsForMapping = [
+            ...productsForMapping,
+            (id: savedProduct.id, name: savedProduct.name)
+          ];
         } catch (e) {
           if (e.toString().contains('duplicate') ||
               e.toString().contains('already exists') ||
@@ -703,7 +876,10 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                 .where((p) => _norm(p.name) == norm)
                 .toList();
             if (existing.isNotEmpty) {
-              productsForMapping = [...productsForMapping, (id: existing.first.id, name: existing.first.name)];
+              productsForMapping = [
+                ...productsForMapping,
+                (id: existing.first.id, name: existing.first.name)
+              ];
             }
           }
         }
@@ -716,13 +892,15 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       final failedItems = <_ReviewItem>[];
       var abortAfterDuplicateAction = false;
       for (final item in sorted) {
-        if (item.alreadySaved) continue; // уже сохранена в систему через «Сохранить» в редакторе
+        if (item.alreadySaved)
+          continue; // уже сохранена в систему через «Сохранить» в редакторе
         try {
           var resultToSave = item.result;
           if (_ensurePfPrefix && item.isSemiFinished) {
             final raw = (item.result.dishName ?? '').trim();
             if (raw.isNotEmpty) {
-              resultToSave = item.result.copyWith(dishName: ensurePfPrefix(raw));
+              resultToSave =
+                  item.result.copyWith(dishName: ensurePfPrefix(raw));
             }
           }
           final proposedName = (resultToSave.dishName ?? '').trim();
@@ -755,7 +933,7 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
             final action = await showDialog<_ImportDuplicateAction>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: const Text('Такая ТТК уже есть в системе'),
+                title: Text(loc.t('ttk_duplicate_exists_in_system')),
                 content: Text('"${existingTc.dishName.trim()}"'),
                 actions: [
                   TextButton(
@@ -763,17 +941,22 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                     child: Text(loc.t('cancel') ?? 'Отмена'),
                   ),
                   FilledButton(
-                    onPressed: () =>
-                        Navigator.of(ctx).pop(_ImportDuplicateAction.createDuplicate),
-                    child: const Text('Создать дубликат'),
+                    onPressed: () => Navigator.of(ctx)
+                        .pop(_ImportDuplicateAction.createDuplicate),
+                    child: Text(loc.t('ttk_create_duplicate')),
                   ),
                   OutlinedButton(
-                    onPressed: () => Navigator.of(ctx).pop(_ImportDuplicateAction.editExisting),
-                    child: const Text('Внести правки'),
+                    onPressed: () => Navigator.of(ctx)
+                        .pop(_ImportDuplicateAction.editExisting),
+                    child: Text(loc.t('ttk_edit_existing')),
                   ),
                   TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(_ImportDuplicateAction.deleteExisting),
-                    child: const Text('Удалить', style: TextStyle(color: Colors.red)),
+                    onPressed: () => Navigator.of(ctx)
+                        .pop(_ImportDuplicateAction.deleteExisting),
+                    child: Text(
+                      loc.t('delete'),
+                      style: const TextStyle(color: Colors.red),
+                    ),
                   ),
                 ],
               ),
@@ -854,35 +1037,45 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
             created++;
           }
         } catch (e) {
-          final name = (item.result.dishName ?? '').trim().isEmpty ? (loc.t('tech_cards_import_unnamed') ?? 'Без названия') : (item.result.dishName ?? '').trim();
+          final name = (item.result.dishName ?? '').trim().isEmpty
+              ? (loc.t('tech_cards_import_unnamed') ?? 'Без названия')
+              : (item.result.dishName ?? '').trim();
           failed.add((name: name, error: e.toString()));
           failedItems.add(item);
           devLog('[ttk_import] Ошибка сохранения "$name": $e');
         }
-        if (mounted) setState(() => _saveProgress = productNamesToCreate.length + created);
+        if (mounted)
+          setState(() => _saveProgress = productNamesToCreate.length + created);
 
         if (abortAfterDuplicateAction) break;
       }
       if (abortAfterDuplicateAction) return;
       // Обучение: обратный маппинг по скорректированным данным. Таймаут 10 с — при плохой сети не блокируем.
-      final sig = widget.headerSignature ?? AiServiceSupabase.lastParseHeaderSignature;
+      final sig =
+          widget.headerSignature ?? AiServiceSupabase.lastParseHeaderSignature;
       final sourceRows = widget.sourceRows ?? AiServiceSupabase.lastParsedRows;
-      debugPrint('[tt_parse] save: sig=${sig?.isEmpty ?? true ? "null/empty" : "ok"} sourceRows=${sourceRows?.length ?? 0}');
+      debugPrint(
+          '[tt_parse] save: sig=${sig?.isEmpty ?? true ? "null/empty" : "ok"} sourceRows=${sourceRows?.length ?? 0}');
       if (sig != null && sig.isNotEmpty) {
         try {
           if (sourceRows != null && sourceRows.isNotEmpty) {
             final cardsForLearning = sorted
                 .where((item) {
                   final corr = (item.result.dishName ?? '').trim();
-                  final hasIng = item.result.ingredients.any((i) => (i.productName ?? '').trim().isNotEmpty && (i.grossGrams ?? 0) > 0);
-                  final hasTech = (item.result.technologyText ?? '').trim().length >= 20;
+                  final hasIng = item.result.ingredients.any((i) =>
+                      (i.productName ?? '').trim().isNotEmpty &&
+                      (i.grossGrams ?? 0) > 0);
+                  final hasTech =
+                      (item.result.technologyText ?? '').trim().length >= 20;
                   return corr.isNotEmpty || hasIng || hasTech;
                 })
                 .map((item) => (
                       dishName: (item.result.dishName ?? '').trim(),
                       originalDishName: item.originalDishName?.trim(),
                       ingredients: item.result.ingredients
-                          .where((i) => (i.productName ?? '').trim().isNotEmpty && (i.grossGrams ?? 0) > 0)
+                          .where((i) =>
+                              (i.productName ?? '').trim().isNotEmpty &&
+                              (i.grossGrams ?? 0) > 0)
                           .map((i) => (
                                 productName: (i.productName ?? '').trim(),
                                 grossWeight: i.grossGrams ?? 0,
@@ -891,7 +1084,11 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                           .toList(),
                       technologyText: item.result.technologyText?.trim(),
                     ))
-                .where((c) => c.dishName.isNotEmpty || c.ingredients.isNotEmpty || (c.technologyText != null && c.technologyText!.length >= 20))
+                .where((c) =>
+                    c.dishName.isNotEmpty ||
+                    c.ingredients.isNotEmpty ||
+                    (c.technologyText != null &&
+                        c.technologyText!.length >= 20))
                 .toList();
             if (cardsForLearning.isNotEmpty) {
               await AiServiceSupabase.learnColumnMappingFromCorrections(
@@ -923,17 +1120,20 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       if (created > 0) {
         // Сигнал для открытых экранов редактирования/таблиц ТТК,
         // чтобы они пересвязали вложенные ПФ без повторного открытия.
-        if (mounted) context.read<TechCardsReconcileNotifier>().markTechCardsUpdated();
+        if (mounted)
+          context.read<TechCardsReconcileNotifier>().markTechCardsUpdated();
       }
       if (mounted) {
         setState(() => _saving = false);
         if (failed.isEmpty) {
-          var msg = loc.t('tech_cards_import_created').replaceAll('%s', '$created');
+          var msg =
+              loc.t('tech_cards_import_created').replaceAll('%s', '$created');
           if (AiServiceSupabase.lastLearningSuccess != null) {
             msg += ' ${AiServiceSupabase.lastLearningSuccess!}';
           }
           if (AiServiceSupabase.lastLearningError != null) {
-            msg += ' ${loc.t('ttk_learn_error_hint') ?? '(Обучение не сохранилось)'}';
+            msg +=
+                ' ${loc.t('ttk_learn_error_hint') ?? '(Обучение не сохранилось)'}';
             final err = AiServiceSupabase.lastLearningError!;
             if (err.length <= 120) {
               msg += ' $err';
@@ -944,16 +1144,24 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(msg),
-              duration: AiServiceSupabase.lastLearningError != null ? const Duration(seconds: 8) : (AiServiceSupabase.lastLearningSuccess != null ? const Duration(seconds: 6) : const Duration(seconds: 4)),
+              duration: AiServiceSupabase.lastLearningError != null
+                  ? const Duration(seconds: 8)
+                  : (AiServiceSupabase.lastLearningSuccess != null
+                      ? const Duration(seconds: 6)
+                      : const Duration(seconds: 4)),
             ),
           );
           context.go('/tech-cards/${widget.department}?refresh=1');
         } else {
           _items = failedItems;
           final firstErr = failed.isNotEmpty ? failed.first.error : '';
-          final reason = firstErr.contains('RLS') || firstErr.contains('доступ') || firstErr.contains('права')
+          final reason = firstErr.contains('RLS') ||
+                  firstErr.contains('доступ') ||
+                  firstErr.contains('права')
               ? ' (проверьте права/сотрудника)'
-              : (firstErr.length > 80 ? ': ${firstErr.substring(0, 77)}...' : (firstErr.isNotEmpty ? ': $firstErr' : ''));
+              : (firstErr.length > 80
+                  ? ': ${firstErr.substring(0, 77)}...'
+                  : (firstErr.isNotEmpty ? ': $firstErr' : ''));
           final msg = created > 0
               ? '${loc.t('tech_cards_import_created').replaceAll('%s', '$created')}. Не удалось ${failed.length}: ${failed.map((f) => f.name).join(', ')}. Исправьте и повторите.'
               : 'Не удалось сохранить: ${failed.map((f) => f.name).join(', ')}$reason';
@@ -966,7 +1174,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
       if (mounted) {
         setState(() => _saving = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))),
+          SnackBar(
+              content: Text(
+                  loc.t('error_with_message').replaceAll('%s', e.toString()))),
         );
       }
     }
@@ -981,7 +1191,8 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text('${loc.t('tech_cards_import_review_title')} (${_items.length})'),
+        title: Text(
+            '${loc.t('tech_cards_import_review_title')} (${_items.length})'),
       ),
       body: Column(
         children: [
@@ -992,12 +1203,16 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  labelText: loc.t('tech_cards_import_search_hint') ?? 'Поиск по названию ТТК',
-                  hintText: loc.t('tech_cards_import_search_hint') ?? 'Введите часть названия...',
+                  labelText: loc.t('tech_cards_import_search_hint') ??
+                      'Поиск по названию ТТК',
+                  hintText: loc.t('tech_cards_import_search_hint') ??
+                      'Введите часть названия...',
                   prefixIcon: const Icon(Icons.search, size: 22),
                   isDense: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 ),
                 onChanged: (v) => setState(() => _searchQuery = v.trim()),
               ),
@@ -1006,10 +1221,12 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Text(
-                  (loc.t('tech_cards_import_search_count') ?? 'Показано: %s из %s')
+                  (loc.t('tech_cards_import_search_count') ??
+                          'Показано: %s из %s')
                       .replaceFirst('%s', '${_filteredIndices.length}')
                       .replaceFirst('%s', '${_items.length}'),
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
               ),
           ],
@@ -1018,7 +1235,8 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Text(
               loc.t('tech_cards_import_review_hint'),
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ),
           if (_items.any((i) => i.isSemiFinished))
@@ -1036,17 +1254,21 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                         width: 24,
                         child: Checkbox(
                           value: _ensurePfPrefix,
-                          onChanged: (v) => setState(() => _ensurePfPrefix = v ?? true),
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          onChanged: (v) =>
+                              setState(() => _ensurePfPrefix = v ?? true),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: GestureDetector(
-                          onTap: () => setState(() => _ensurePfPrefix = !_ensurePfPrefix),
+                          onTap: () => setState(
+                              () => _ensurePfPrefix = !_ensurePfPrefix),
                           behavior: HitTestBehavior.opaque,
                           child: Text(
-                            loc.t('ttk_import_ensure_pf_prefix') ?? 'Установить перед названием «ПФ»\n(если ещё нет)',
+                            loc.t('ttk_import_ensure_pf_prefix') ??
+                                'Установить перед названием «ПФ»\n(если ещё нет)',
                             style: theme.textTheme.bodyMedium,
                             maxLines: 2,
                           ),
@@ -1062,39 +1284,53 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                         width: 24,
                         child: Checkbox(
                           value: _bulkIsSemiFinished == true,
-                          onChanged: _saving ? null : (v) => setState(() {
-                            if (v == true) {
-                              _typeRevision++;
-                              _bulkIsSemiFinished = true;
-                              _items = _items.map((item) => _ReviewItem(
-                                result: item.result.copyWith(isSemiFinished: true),
-                                originalDishName: item.originalDishName,
-                                category: item.category,
-                                sections: item.sections,
-                                isSemiFinished: true,
-                                alreadySaved: item.alreadySaved,
-                              )).toList();
-                            } else {
-                              _bulkIsSemiFinished = null; // сброс — дальше ручные правки
-                            }
-                          }),
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          onChanged: _saving
+                              ? null
+                              : (v) => setState(() {
+                                    if (v == true) {
+                                      _typeRevision++;
+                                      _bulkIsSemiFinished = true;
+                                      _items = _items
+                                          .map((item) => _ReviewItem(
+                                                result: item.result.copyWith(
+                                                    isSemiFinished: true),
+                                                originalDishName:
+                                                    item.originalDishName,
+                                                category: item.category,
+                                                sections: item.sections,
+                                                isSemiFinished: true,
+                                                alreadySaved: item.alreadySaved,
+                                              ))
+                                          .toList();
+                                    } else {
+                                      _bulkIsSemiFinished =
+                                          null; // сброс — дальше ручные правки
+                                    }
+                                  }),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
                       const SizedBox(width: 8),
                       GestureDetector(
-                        onTap: _saving ? null : () => setState(() {
-                          _typeRevision++;
-                          _bulkIsSemiFinished = true;
-                          _items = _items.map((item) => _ReviewItem(
-                            result: item.result.copyWith(isSemiFinished: true),
-                            originalDishName: item.originalDishName,
-                            category: item.category,
-                            sections: item.sections,
-                            isSemiFinished: true,
-                            alreadySaved: item.alreadySaved,
-                          )).toList();
-                        }),
+                        onTap: _saving
+                            ? null
+                            : () => setState(() {
+                                  _typeRevision++;
+                                  _bulkIsSemiFinished = true;
+                                  _items = _items
+                                      .map((item) => _ReviewItem(
+                                            result: item.result
+                                                .copyWith(isSemiFinished: true),
+                                            originalDishName:
+                                                item.originalDishName,
+                                            category: item.category,
+                                            sections: item.sections,
+                                            isSemiFinished: true,
+                                            alreadySaved: item.alreadySaved,
+                                          ))
+                                      .toList();
+                                }),
                         behavior: HitTestBehavior.opaque,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 6),
@@ -1107,43 +1343,57 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                         width: 24,
                         child: Checkbox(
                           value: _bulkIsSemiFinished == false,
-                          onChanged: _saving ? null : (v) => setState(() {
-                            if (v == true) {
-                              _typeRevision++;
-                              _bulkIsSemiFinished = false;
-                              _items = _items.map((item) => _ReviewItem(
-                                result: item.result.copyWith(isSemiFinished: false),
-                                originalDishName: item.originalDishName,
-                                category: item.category,
-                                sections: item.sections,
-                                isSemiFinished: false,
-                                alreadySaved: item.alreadySaved,
-                              )).toList();
-                            } else {
-                              _bulkIsSemiFinished = null;
-                            }
-                          }),
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          onChanged: _saving
+                              ? null
+                              : (v) => setState(() {
+                                    if (v == true) {
+                                      _typeRevision++;
+                                      _bulkIsSemiFinished = false;
+                                      _items = _items
+                                          .map((item) => _ReviewItem(
+                                                result: item.result.copyWith(
+                                                    isSemiFinished: false),
+                                                originalDishName:
+                                                    item.originalDishName,
+                                                category: item.category,
+                                                sections: item.sections,
+                                                isSemiFinished: false,
+                                                alreadySaved: item.alreadySaved,
+                                              ))
+                                          .toList();
+                                    } else {
+                                      _bulkIsSemiFinished = null;
+                                    }
+                                  }),
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
                       const SizedBox(width: 8),
                       GestureDetector(
-                        onTap: _saving ? null : () => setState(() {
-                          _typeRevision++;
-                          _bulkIsSemiFinished = false;
-                          _items = _items.map((item) => _ReviewItem(
-                            result: item.result.copyWith(isSemiFinished: false),
-                            originalDishName: item.originalDishName,
-                            category: item.category,
-                            sections: item.sections,
-                            isSemiFinished: false,
-                            alreadySaved: item.alreadySaved,
-                          )).toList();
-                        }),
+                        onTap: _saving
+                            ? null
+                            : () => setState(() {
+                                  _typeRevision++;
+                                  _bulkIsSemiFinished = false;
+                                  _items = _items
+                                      .map((item) => _ReviewItem(
+                                            result: item.result.copyWith(
+                                                isSemiFinished: false),
+                                            originalDishName:
+                                                item.originalDishName,
+                                            category: item.category,
+                                            sections: item.sections,
+                                            isSemiFinished: false,
+                                            alreadySaved: item.alreadySaved,
+                                          ))
+                                      .toList();
+                                }),
                         behavior: HitTestBehavior.opaque,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 6),
-                          child: Text(loc.t('ttk_import_all_dishes') ?? 'Все блюда'),
+                          child: Text(
+                              loc.t('ttk_import_all_dishes') ?? 'Все блюда'),
                         ),
                       ),
                     ],
@@ -1159,17 +1409,20 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
               decoration: BoxDecoration(
                 color: theme.colorScheme.errorContainer.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: theme.colorScheme.error.withValues(alpha: 0.3)),
+                border: Border.all(
+                    color: theme.colorScheme.error.withValues(alpha: 0.3)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.warning_amber_rounded, size: 20, color: theme.colorScheme.error),
+                  Icon(Icons.warning_amber_rounded,
+                      size: 20, color: theme.colorScheme.error),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _formatParseErrorsBanner(loc),
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface),
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.colorScheme.onSurface),
                     ),
                   ),
                 ],
@@ -1203,12 +1456,17 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                                   hintText: loc.t('tech_cards_import_unnamed'),
                                   isDense: true,
                                   border: const OutlineInputBorder(),
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
                                 ),
                                 style: theme.textTheme.titleMedium,
                                 enabled: !_saving,
-                                onChanged: (v) => setState(() => _items[realIndex] = _ReviewItem(
-                                      result: item.result.copyWith(dishName: v.trim().isEmpty ? null : v.trim()),
+                                onChanged: (v) => setState(() =>
+                                    _items[realIndex] = _ReviewItem(
+                                      result: item.result.copyWith(
+                                          dishName: v.trim().isEmpty
+                                              ? null
+                                              : v.trim()),
                                       originalDishName: item.originalDishName,
                                       category: item.category,
                                       sections: item.sections,
@@ -1218,110 +1476,169 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                               ),
                             ),
                             TextButton.icon(
-                              onPressed: _saving ? null : () async {
-                                final sig = widget.headerSignature ?? AiServiceSupabase.lastParseHeaderSignature;
-                                final rows = widget.sourceRows ?? AiServiceSupabase.lastParsedRows;
-                                final raw = await context.push<dynamic>(
-                                  '/tech-cards/new',
-                                  extra: {
-                                    'result': _items[realIndex].result,
-                                    'category': _items[realIndex].category,
-                                    'sections': _normalizeSections(_items[realIndex].sections),
-                                    'isSemiFinished': _items[realIndex].isSemiFinished,
-                                    'typeRevision': _typeRevision,
-                                    if (sig != null && sig.isNotEmpty) 'headerSignature': sig,
-                                    if (rows != null && rows.isNotEmpty) 'sourceRows': rows,
-                                  },
-                                );
-                                TechCardRecognitionResult? result;
-                                bool savedToSystem = false;
-                                if (raw is Map) {
-                                  result = raw['result'] as TechCardRecognitionResult?;
-                                  savedToSystem = raw['savedToSystem'] == true;
-                                } else if (raw is TechCardRecognitionResult) {
-                                  result = raw;
-                                }
-                                if (result != null && mounted) {
-                                  final ai = context.read<AiService>();
-                                  final est = context.read<AccountManagerSupabase>().establishment;
-                                  // При «Назад» (savedToSystem == false): сохраняем обучение по правке, затем переразбор — у всех карточек применяется маппинг
-                                  if (!savedToSystem &&
-                                      rows != null &&
-                                      rows.isNotEmpty &&
-                                      sig != null &&
-                                      sig.isNotEmpty &&
-                                      est?.dataEstablishmentId != null) {
-                                    final orig = _items[realIndex].originalDishName?.trim() ?? '';
-                                    final corr = (result.dishName ?? '').trim();
-                                    if (orig.isNotEmpty && corr.isNotEmpty && orig != corr && est != null && est.dataEstablishmentId != null) {
-                                      await AiServiceSupabase.saveLearningCorrection(
-                                        headerSignature: sig,
-                                        field: 'dish_name',
-                                        originalValue: orig,
-                                        correctedValue: corr,
-                                        establishmentId: est.dataEstablishmentId!,
+                              onPressed: _saving
+                                  ? null
+                                  : () async {
+                                      final sig = widget.headerSignature ??
+                                          AiServiceSupabase
+                                              .lastParseHeaderSignature;
+                                      final rows = widget.sourceRows ??
+                                          AiServiceSupabase.lastParsedRows;
+                                      final raw = await context.push<dynamic>(
+                                        '/tech-cards/new',
+                                        extra: {
+                                          'result': _items[realIndex].result,
+                                          'category':
+                                              _items[realIndex].category,
+                                          'sections': _normalizeSections(
+                                              _items[realIndex].sections),
+                                          'isSemiFinished':
+                                              _items[realIndex].isSemiFinished,
+                                          'typeRevision': _typeRevision,
+                                          if (sig != null && sig.isNotEmpty)
+                                            'headerSignature': sig,
+                                          if (rows != null && rows.isNotEmpty)
+                                            'sourceRows': rows,
+                                        },
                                       );
-                                    }
-                                  }
-                                  if (ai is AiServiceSupabase &&
-                                      rows != null &&
-                                      rows.isNotEmpty &&
-                                      sig != null &&
-                                      sig.isNotEmpty &&
-                                      est?.dataEstablishmentId != null) {
-                                    final reparsed = await ai.reparseRowsWithStoredLearning(
-                                      rows,
-                                      sig,
-                                      est!.dataEstablishmentId,
-                                    );
-                                    if (mounted && reparsed.isNotEmpty && reparsed.length == _items.length) {
-                                      setState(() {
-                                        _items = reparsed.asMap().entries.map((e) {
-                                          final idx = e.key;
-                                          final r = e.value;
-                                          final preservedType = _items[idx].isSemiFinished;
-                                          if (idx == realIndex) {
-                                            final newType = result!.isSemiFinished ?? preservedType;
-                                            if (_bulkIsSemiFinished != null && newType != _bulkIsSemiFinished) _bulkIsSemiFinished = null;
-                                            return _ReviewItem(
-                                              result: result!.copyWith(isSemiFinished: newType),
-                                              originalDishName: _items[realIndex].originalDishName,
-                                              category: _items[realIndex].category,
-                                              sections: _items[realIndex].sections,
+                                      TechCardRecognitionResult? result;
+                                      bool savedToSystem = false;
+                                      if (raw is Map) {
+                                        result = raw['result']
+                                            as TechCardRecognitionResult?;
+                                        savedToSystem =
+                                            raw['savedToSystem'] == true;
+                                      } else if (raw
+                                          is TechCardRecognitionResult) {
+                                        result = raw;
+                                      }
+                                      if (result != null && mounted) {
+                                        final ai = context.read<AiService>();
+                                        final est = context
+                                            .read<AccountManagerSupabase>()
+                                            .establishment;
+                                        // При «Назад» (savedToSystem == false): сохраняем обучение по правке, затем переразбор — у всех карточек применяется маппинг
+                                        if (!savedToSystem &&
+                                            rows != null &&
+                                            rows.isNotEmpty &&
+                                            sig != null &&
+                                            sig.isNotEmpty &&
+                                            est?.dataEstablishmentId != null) {
+                                          final orig = _items[realIndex]
+                                                  .originalDishName
+                                                  ?.trim() ??
+                                              '';
+                                          final corr =
+                                              (result.dishName ?? '').trim();
+                                          if (orig.isNotEmpty &&
+                                              corr.isNotEmpty &&
+                                              orig != corr &&
+                                              est != null &&
+                                              est.dataEstablishmentId != null) {
+                                            await AiServiceSupabase
+                                                .saveLearningCorrection(
+                                              headerSignature: sig,
+                                              field: 'dish_name',
+                                              originalValue: orig,
+                                              correctedValue: corr,
+                                              establishmentId:
+                                                  est.dataEstablishmentId!,
+                                            );
+                                          }
+                                        }
+                                        if (ai is AiServiceSupabase &&
+                                            rows != null &&
+                                            rows.isNotEmpty &&
+                                            sig != null &&
+                                            sig.isNotEmpty &&
+                                            est?.dataEstablishmentId != null) {
+                                          final reparsed = await ai
+                                              .reparseRowsWithStoredLearning(
+                                            rows,
+                                            sig,
+                                            est!.dataEstablishmentId,
+                                          );
+                                          if (mounted &&
+                                              reparsed.isNotEmpty &&
+                                              reparsed.length ==
+                                                  _items.length) {
+                                            setState(() {
+                                              _items = reparsed
+                                                  .asMap()
+                                                  .entries
+                                                  .map((e) {
+                                                final idx = e.key;
+                                                final r = e.value;
+                                                final preservedType =
+                                                    _items[idx].isSemiFinished;
+                                                if (idx == realIndex) {
+                                                  final newType =
+                                                      result!.isSemiFinished ??
+                                                          preservedType;
+                                                  if (_bulkIsSemiFinished !=
+                                                          null &&
+                                                      newType !=
+                                                          _bulkIsSemiFinished)
+                                                    _bulkIsSemiFinished = null;
+                                                  return _ReviewItem(
+                                                    result: result!.copyWith(
+                                                        isSemiFinished:
+                                                            newType),
+                                                    originalDishName:
+                                                        _items[realIndex]
+                                                            .originalDishName,
+                                                    category: _items[realIndex]
+                                                        .category,
+                                                    sections: _items[realIndex]
+                                                        .sections,
+                                                    isSemiFinished: newType,
+                                                    alreadySaved: savedToSystem,
+                                                  );
+                                                }
+                                                return _ReviewItem(
+                                                  result: r.copyWith(
+                                                      isSemiFinished:
+                                                          preservedType),
+                                                  originalDishName: r.dishName,
+                                                  category: _inferCategory(
+                                                      r.dishName ?? ''),
+                                                  sections:
+                                                      _items[idx].sections,
+                                                  isSemiFinished: preservedType,
+                                                  alreadySaved:
+                                                      _items[idx].alreadySaved,
+                                                );
+                                              }).toList();
+                                            });
+                                            return;
+                                          }
+                                        }
+                                        if (result != null) {
+                                          final r = result;
+                                          setState(() {
+                                            final newType = r.isSemiFinished ??
+                                                _items[realIndex]
+                                                    .isSemiFinished;
+                                            if (_bulkIsSemiFinished != null &&
+                                                newType != _bulkIsSemiFinished)
+                                              _bulkIsSemiFinished = null;
+                                            _items[realIndex] = _ReviewItem(
+                                              result: r.copyWith(
+                                                  isSemiFinished: newType),
+                                              originalDishName:
+                                                  _items[realIndex]
+                                                      .originalDishName,
+                                              category:
+                                                  _items[realIndex].category,
+                                              sections:
+                                                  _items[realIndex].sections,
                                               isSemiFinished: newType,
                                               alreadySaved: savedToSystem,
                                             );
-                                          }
-                                          return _ReviewItem(
-                                            result: r.copyWith(isSemiFinished: preservedType),
-                                            originalDishName: r.dishName,
-                                            category: _inferCategory(r.dishName ?? ''),
-                                            sections: _items[idx].sections,
-                                            isSemiFinished: preservedType,
-                                            alreadySaved: _items[idx].alreadySaved,
-                                          );
-                                        }).toList();
-                                      });
-                                      return;
-                                    }
-                                  }
-                                  if (result != null) {
-                                    final r = result;
-                                    setState(() {
-                                      final newType = r.isSemiFinished ?? _items[realIndex].isSemiFinished;
-                                      if (_bulkIsSemiFinished != null && newType != _bulkIsSemiFinished) _bulkIsSemiFinished = null;
-                                      _items[realIndex] = _ReviewItem(
-                                        result: r.copyWith(isSemiFinished: newType),
-                                        originalDishName: _items[realIndex].originalDishName,
-                                        category: _items[realIndex].category,
-                                        sections: _items[realIndex].sections,
-                                        isSemiFinished: newType,
-                                        alreadySaved: savedToSystem,
-                                      );
-                                    });
-                                  }
-                                }
-                              },
+                                          });
+                                        }
+                                      }
+                                    },
                               icon: const Icon(Icons.open_in_new, size: 18),
                               label: Text(loc.t('open')),
                             ),
@@ -1329,9 +1646,13 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                               Padding(
                                 padding: const EdgeInsets.only(left: 8),
                                 child: Chip(
-                                  label: Text(loc.t('tech_cards_import_already_saved') ?? 'Уже сохранена', style: const TextStyle(fontSize: 12)),
+                                  label: Text(
+                                      loc.t('tech_cards_import_already_saved') ??
+                                          'Уже сохранена',
+                                      style: const TextStyle(fontSize: 12)),
                                   visualDensity: VisualDensity.compact,
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 0),
                                 ),
                               ),
                           ],
@@ -1356,26 +1677,47 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             DropdownButton<String>(
-                              value: _categoryOptions.contains(item.category) ? item.category : 'misc',
+                              value: _categoryOptions.contains(item.category)
+                                  ? item.category
+                                  : 'misc',
                               isDense: true,
-                              items: _categoryOptions.map((c) => DropdownMenuItem(value: c, child: Text(_categoryLabel(c, lang)))).toList(),
-                              onChanged: (v) => setState(() => _items[realIndex] = _ReviewItem(result: item.result, originalDishName: item.originalDishName, category: v ?? item.category, sections: item.sections, isSemiFinished: item.isSemiFinished)),
+                              items: _categoryOptions
+                                  .map((c) => DropdownMenuItem(
+                                      value: c,
+                                      child: Text(_categoryLabel(c, lang))))
+                                  .toList(),
+                              onChanged: (v) => setState(() =>
+                                  _items[realIndex] = _ReviewItem(
+                                      result: item.result,
+                                      originalDishName: item.originalDishName,
+                                      category: v ?? item.category,
+                                      sections: item.sections,
+                                      isSemiFinished: item.isSemiFinished)),
                             ),
                             InkWell(
-                              onTap: _saving ? null : () => _showSectionPicker(realIndex),
+                              onTap: _saving
+                                  ? null
+                                  : () => _showSectionPicker(realIndex),
                               borderRadius: BorderRadius.circular(8),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
-                                  border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.5)),
+                                  border: Border.all(
+                                      color: theme.colorScheme.outline
+                                          .withValues(alpha: 0.5)),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.store, size: 18, color: theme.colorScheme.primary),
+                                    Icon(Icons.store,
+                                        size: 18,
+                                        color: theme.colorScheme.primary),
                                     const SizedBox(width: 8),
-                                    Text(_sectionsDisplayLabel(_normalizeSections(item.sections), loc)),
+                                    Text(_sectionsDisplayLabel(
+                                        _normalizeSections(item.sections),
+                                        loc)),
                                     const SizedBox(width: 4),
                                     Icon(Icons.arrow_drop_down, size: 20),
                                   ],
@@ -1386,14 +1728,21 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                               value: item.isSemiFinished,
                               isDense: true,
                               items: [
-                                DropdownMenuItem(value: true, child: Text(loc.t('ttk_semi_finished'))),
-                                DropdownMenuItem(value: false, child: Text(loc.t('ttk_dish'))),
+                                DropdownMenuItem(
+                                    value: true,
+                                    child: Text(loc.t('ttk_semi_finished'))),
+                                DropdownMenuItem(
+                                    value: false,
+                                    child: Text(loc.t('ttk_dish'))),
                               ],
                               onChanged: (v) => setState(() {
                                 final isPf = v ?? item.isSemiFinished;
-                                if (_bulkIsSemiFinished != null && isPf != _bulkIsSemiFinished) _bulkIsSemiFinished = null;
+                                if (_bulkIsSemiFinished != null &&
+                                    isPf != _bulkIsSemiFinished)
+                                  _bulkIsSemiFinished = null;
                                 _items[realIndex] = _ReviewItem(
-                                  result: item.result.copyWith(isSemiFinished: isPf),
+                                  result: item.result
+                                      .copyWith(isSemiFinished: isPf),
                                   originalDishName: item.originalDishName,
                                   category: item.category,
                                   sections: item.sections,
@@ -1403,7 +1752,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                               }),
                             ),
                             Text(
-                              loc.t('tech_cards_ingredients_count').replaceAll('%s', '$count'),
+                              loc
+                                  .t('tech_cards_ingredients_count')
+                                  .replaceAll('%s', '$count'),
                               style: theme.textTheme.bodySmall,
                             ),
                           ],
@@ -1429,7 +1780,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           LinearProgressIndicator(
-                            value: _saveTotal > 0 ? (_saveProgress / _saveTotal).clamp(0.0, 1.0) : null,
+                            value: _saveTotal > 0
+                                ? (_saveProgress / _saveTotal).clamp(0.0, 1.0)
+                                : null,
                             minHeight: 6,
                             borderRadius: BorderRadius.circular(3),
                           ),
@@ -1437,7 +1790,8 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                           Text(
                             '$_saveProgress / $_saveTotal',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.7),
                             ),
                           ),
                         ],
@@ -1450,7 +1804,9 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                       child: TextButton.icon(
                         onPressed: _adjustWasteForAllCards,
                         icon: const Icon(Icons.tune, size: 20),
-                        label: Text(loc.t('tech_cards_import_adjust_waste_all') ?? 'Подстроить % отхода для всех карточек'),
+                        label: Text(
+                            loc.t('tech_cards_import_adjust_waste_all') ??
+                                'Подстроить % отхода для всех карточек'),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -1460,7 +1816,10 @@ class _TechCardsImportReviewScreenState extends State<TechCardsImportReviewScree
                     child: FilledButton(
                       onPressed: _saving || _items.isEmpty ? null : _createAll,
                       child: _saving
-                          ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2))
                           : Text(loc.t('tech_cards_import_create_all')),
                     ),
                   ),
@@ -1480,6 +1839,7 @@ class _ReviewItem {
   final String category;
   final List<String> sections;
   final bool isSemiFinished;
+
   /// true если карточка уже сохранена в систему через «Сохранить» в редакторе — при «Создать все» пропускаем.
   final bool alreadySaved;
 
@@ -1539,7 +1899,8 @@ class _CheckItem extends StatelessWidget {
                   : null,
             ),
             const SizedBox(width: 10),
-            Icon(icon, size: 16,
+            Icon(icon,
+                size: 16,
                 color: checked
                     ? theme.colorScheme.primary
                     : theme.colorScheme.onSurface.withValues(alpha: 0.55)),

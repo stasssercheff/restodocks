@@ -10,17 +10,21 @@ class TechCard extends Equatable {
   final String category;
   // Цеха: [] = Скрыто (только шеф/су-шеф), ['all'] = все, ['hot_kitchen', ...] = конкретные
   final List<String> sections;
+
   /// Отдел заведения: kitchen | bar (колонка tech_cards.department в БД).
   final String department;
   final bool isSemiFinished; // true = ПФ (полуфабрикат), false = блюдо
   final double portionWeight; // вес порции в граммах
   final double yield; // выход готового блюда в граммах
-  final Map<String, String>? technologyLocalized; // технология приготовления, многоязычно
+  final Map<String, String>?
+      technologyLocalized; // технология приготовления, многоязычно
   /// Описание и состав для меню зала (гостям), не кухонная ТТК.
   final String? descriptionForHall;
   final String? compositionForHall;
+
   /// Продажная стоимость. Устанавливается шефом (кухня) и барменеджером (бар).
   final double? sellingPrice;
+
   /// URL фото: блюдо — до 1, ПФ — до 10. Storage bucket tech_card_photos.
   final List<String>? photoUrls;
   final List<TTIngredient> ingredients;
@@ -56,7 +60,8 @@ class TechCard extends Equatable {
     return TechCard(
       id: json['id'] as String,
       dishName: json['dish_name'] as String,
-      dishNameLocalized: (json['dish_name_localized'] as Map<String, dynamic>?)?.map(
+      dishNameLocalized:
+          (json['dish_name_localized'] as Map<String, dynamic>?)?.map(
         (key, value) => MapEntry(key, value as String),
       ),
       category: json['category'] as String,
@@ -70,13 +75,17 @@ class TechCard extends Equatable {
       isSemiFinished: json['is_semi_finished'] as bool? ?? true,
       portionWeight: (json['portion_weight'] as num).toDouble(),
       yield: (json['yield'] as num).toDouble(),
-      technologyLocalized: (json['technology_localized'] as Map<String, dynamic>?)?.map(
+      technologyLocalized:
+          (json['technology_localized'] as Map<String, dynamic>?)?.map(
         (key, value) => MapEntry(key, value as String),
       ),
       descriptionForHall: json['description_for_hall'] as String?,
       compositionForHall: json['composition_for_hall'] as String?,
       sellingPrice: (json['selling_price'] as num?)?.toDouble(),
-      photoUrls: (json['photo_urls'] as List<dynamic>?)?.map((e) => e.toString()).where((s) => s.isNotEmpty).toList(),
+      photoUrls: (json['photo_urls'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .where((s) => s.isNotEmpty)
+          .toList(),
       ingredients: const [], // Загружается отдельно через сервис
       establishmentId: json['establishment_id'] as String,
       createdBy: json['created_by'] as String,
@@ -172,8 +181,21 @@ class TechCard extends Equatable {
 
   /// Локализованное название блюда
   String getLocalizedDishName(String languageCode) {
-    if (dishNameLocalized != null && dishNameLocalized!.containsKey(languageCode)) {
-      return dishNameLocalized![languageCode]!;
+    final localized = dishNameLocalized;
+    if (localized != null && localized.containsKey(languageCode)) {
+      final exact = localized[languageCode]?.trim();
+      if (exact != null && exact.isNotEmpty) return exact;
+    }
+    // Fallback to any existing translation before raw base name.
+    if (localized != null && localized.isNotEmpty) {
+      for (final code in ['en', 'ru', 'es', 'tr', 'vi']) {
+        final value = localized[code]?.trim();
+        if (value != null && value.isNotEmpty) return value;
+      }
+      for (final value in localized.values) {
+        final v = value.trim();
+        if (v.isNotEmpty) return v;
+      }
     }
     return dishName;
   }
@@ -186,7 +208,8 @@ class TechCard extends Equatable {
     const pfPrefixes = ['пф ', 'п/ф ', 'п.ф. ', 'pf ', 'prep ', 'sf ', 'hf '];
     final nameLower = name.trim().toLowerCase();
     for (final p in pfPrefixes) {
-      if (nameLower.startsWith(p)) return name; // уже есть префикс — не дублируем
+      if (nameLower.startsWith(p))
+        return name; // уже есть префикс — не дублируем
     }
     final prefix = sfPrefix ?? _defaultSfPrefix(languageCode);
     return '$prefix $name';
@@ -194,17 +217,25 @@ class TechCard extends Equatable {
 
   static String _defaultSfPrefix(String languageCode) {
     switch (languageCode) {
-      case 'en': return 'Prep';
-      case 'es': return 'SF';
-      case 'fr': return 'SF';
-      case 'de': return 'HF';
-      default: return 'ПФ';
+      case 'en':
+        return 'Prep';
+      case 'es':
+        return 'SF';
+      case 'it':
+        return 'PF';
+      case 'fr':
+        return 'SF';
+      case 'de':
+        return 'HF';
+      default:
+        return 'ПФ';
     }
   }
 
   /// Общий вес брутто всех ингредиентов
   double get totalGrossWeight {
-    return ingredients.fold(0, (sum, ingredient) => sum + ingredient.grossWeight);
+    return ingredients.fold(
+        0, (sum, ingredient) => sum + ingredient.grossWeight);
   }
 
   /// Общий вес нетто всех ингредиентов
@@ -214,12 +245,14 @@ class TechCard extends Equatable {
 
   /// Общие калории
   double get totalCalories {
-    return ingredients.fold(0, (sum, ingredient) => sum + ingredient.finalCalories);
+    return ingredients.fold(
+        0, (sum, ingredient) => sum + ingredient.finalCalories);
   }
 
   /// Общий белок
   double get totalProtein {
-    return ingredients.fold(0, (sum, ingredient) => sum + ingredient.finalProtein);
+    return ingredients.fold(
+        0, (sum, ingredient) => sum + ingredient.finalProtein);
   }
 
   /// Общие жиры
@@ -229,7 +262,8 @@ class TechCard extends Equatable {
 
   /// Общие углеводы
   double get totalCarbs {
-    return ingredients.fold(0, (sum, ingredient) => sum + ingredient.finalCarbs);
+    return ingredients.fold(
+        0, (sum, ingredient) => sum + ingredient.finalCarbs);
   }
 
   /// Общая стоимость
@@ -238,13 +272,18 @@ class TechCard extends Equatable {
   }
 
   /// КБЖУ на порцию
-  double get caloriesPerPortion => portionWeight > 0 ? totalCalories / portionWeight * 100 : 0;
-  double get proteinPerPortion => portionWeight > 0 ? totalProtein / portionWeight * 100 : 0;
-  double get fatPerPortion => portionWeight > 0 ? totalFat / portionWeight * 100 : 0;
-  double get carbsPerPortion => portionWeight > 0 ? totalCarbs / portionWeight * 100 : 0;
+  double get caloriesPerPortion =>
+      portionWeight > 0 ? totalCalories / portionWeight * 100 : 0;
+  double get proteinPerPortion =>
+      portionWeight > 0 ? totalProtein / portionWeight * 100 : 0;
+  double get fatPerPortion =>
+      portionWeight > 0 ? totalFat / portionWeight * 100 : 0;
+  double get carbsPerPortion =>
+      portionWeight > 0 ? totalCarbs / portionWeight * 100 : 0;
 
   /// Стоимость порции
-  double get costPerPortion => portionWeight > 0 ? totalCost / portionWeight * 100 : 0;
+  double get costPerPortion =>
+      portionWeight > 0 ? totalCost / portionWeight * 100 : 0;
 
   /// Процент выхода (отношение выхода к общему весу брутто)
   double get yieldPercentage {
@@ -282,9 +321,9 @@ class TechCard extends Equatable {
   /// Проверить корректность ТТК
   bool get isValid {
     return dishName.isNotEmpty &&
-           ingredients.isNotEmpty &&
-           portionWeight > 0 &&
-           yield > 0;
+        ingredients.isNotEmpty &&
+        portionWeight > 0 &&
+        yield > 0;
   }
 
   /// Краткая информация о ТТК
@@ -296,29 +335,28 @@ class TechCard extends Equatable {
     return '$dishName: $ingredientCount ингр., $calories ккал, $cost';
   }
 
-
   @override
   List<Object?> get props => [
-    id,
-    dishName,
-    dishNameLocalized,
-    category,
-    sections,
-    department,
-    isSemiFinished,
-    portionWeight,
-    yield,
-    technologyLocalized,
-    descriptionForHall,
-    compositionForHall,
-    sellingPrice,
-    photoUrls,
-    ingredients,
-    establishmentId,
-    createdBy,
-    createdAt,
-    updatedAt,
-  ];
+        id,
+        dishName,
+        dishNameLocalized,
+        category,
+        sections,
+        department,
+        isSemiFinished,
+        portionWeight,
+        yield,
+        technologyLocalized,
+        descriptionForHall,
+        compositionForHall,
+        sellingPrice,
+        photoUrls,
+        ingredients,
+        establishmentId,
+        createdBy,
+        createdAt,
+        updatedAt,
+      ];
 
   /// Создание новой ТТК
   /// Является ли ТТК скрытой (пустой список цехов = скрыто, только шеф/су-шеф)
@@ -329,8 +367,8 @@ class TechCard extends Equatable {
 
   /// Доступна ли ТТК для конкретного цеха
   bool isVisibleForSection(String? employeeSection) {
-    if (sections.isEmpty) return false;          // скрыто
-    if (sections.contains('all')) return true;   // все цеха
+    if (sections.isEmpty) return false; // скрыто
+    if (sections.contains('all')) return true; // все цеха
     if (employeeSection == null) return false;
     return sections.contains(employeeSection);
   }

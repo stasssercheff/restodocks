@@ -881,6 +881,9 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (row.quantities.length < 2 || colIndex != row.quantities.length - 2)
       return;
     if (row.quantities[colIndex] <= 0) return;
+    // Жесткая фиксация черновика при выходе из ячейки:
+    // ввод внутри ячейки сохраняем с debounce, чтобы не было микролагов.
+    saveNow();
   }
 
   void _addProduct(Product p) {
@@ -909,7 +912,9 @@ class _InventoryScreenState extends State<InventoryScreen>
       setState(() {});
     }
 
-    saveNow();
+    // При печати в ячейке используем debounce-автосохранение, чтобы не блокировать UI.
+    // Немедленно сохраняем при потере фокуса/ключевых действиях.
+    scheduleSave();
   }
 
   void _removeRow(int index) {

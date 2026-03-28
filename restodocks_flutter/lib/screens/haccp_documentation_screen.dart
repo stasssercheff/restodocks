@@ -139,7 +139,8 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
           builder: (ctx2, setState) {
             bool filled = mode == HaccpOrderThirdPageMode.filled;
             return AlertDialog(
-              title: Text('Приказ и приложение (печать)'),
+              title: Text(loc.t('haccp_order_print_title') ??
+                  'Order and appendix (print)'),
               content: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -147,22 +148,24 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                     RadioListTile<HaccpOrderThirdPageMode>(
                       value: HaccpOrderThirdPageMode.empty,
                       groupValue: mode,
-                      title: const Text('Пустой бланк (заполнение вручную)'),
+                      title: Text(loc.t('haccp_order_mode_empty') ??
+                          'Empty form (manual fill)'),
                       onChanged: (v) => setState(
                           () => mode = v ?? HaccpOrderThirdPageMode.empty),
                     ),
                     RadioListTile<HaccpOrderThirdPageMode>(
                       value: HaccpOrderThirdPageMode.filled,
                       groupValue: mode,
-                      title: const Text(
-                          'Заполненный бланк (ФИО/должности автоматически)'),
+                      title: Text(loc.t('haccp_order_mode_filled') ??
+                          'Filled form (name/position auto)'),
                       onChanged: (v) => setState(
                           () => mode = v ?? HaccpOrderThirdPageMode.filled),
                     ),
                     if (filled) ...[
                       const SizedBox(height: 10),
                       Text(
-                        'Выберите сотрудников для листа ознакомления:',
+                        loc.t('haccp_order_choose_employees') ??
+                            'Choose employees for acknowledgement sheet:',
                         style: Theme.of(ctx2).textTheme.bodySmall,
                       ),
                       const SizedBox(height: 8),
@@ -209,12 +212,12 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                                 ..clear()
                                 ..addAll(employees.map((e) => e.id));
                             }),
-                            child: const Text('Выбрать всех'),
+                            child: Text(loc.t('select_all') ?? 'Select all'),
                           ),
                           TextButton(
                             onPressed: () =>
                                 setState(() => selectedIds.clear()),
-                            child: const Text('Очистить'),
+                            child: Text(loc.t('clear_selection') ?? 'Clear'),
                           ),
                         ],
                       ),
@@ -383,11 +386,13 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
             FilledButton.icon(
               onPressed: () => _downloadHaccpOrder(context, loc),
               icon: const Icon(Icons.download),
-              label: const Text('Скачать приказ (3 страницы)'),
+              label: Text(
+                  loc.t('haccp_download_order') ?? 'Download order (3 pages)'),
             ),
             const SizedBox(height: 8),
             Text(
-              'После скачивания PDF распечатайте и заполните вручную там, где стоят линии.',
+              loc.t('haccp_print_after_download') ??
+                  'After downloading PDF, print and fill manually where lines are shown.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -504,7 +509,8 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _ogrnOgrnipController,
             decoration: InputDecoration(
-              labelText: 'ОГРН / ОГРНИП',
+              labelText:
+                  widget.loc.t('requisites_ogrn_ogrnip') ?? 'ОГРН / ОГРНИП',
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -513,7 +519,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _kppController,
             decoration: InputDecoration(
-              labelText: 'КПП',
+              labelText: widget.loc.t('requisites_kpp') ?? 'КПП',
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -522,7 +528,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _bankRsController,
             decoration: InputDecoration(
-              labelText: 'Р/С',
+              labelText: widget.loc.t('requisites_bank_account') ?? 'Р/С',
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -531,7 +537,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _bankBikController,
             decoration: InputDecoration(
-              labelText: 'БИК',
+              labelText: widget.loc.t('requisites_bik') ?? 'БИК',
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -540,7 +546,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _bankNameController,
             decoration: InputDecoration(
-              labelText: 'Банк',
+              labelText: widget.loc.t('requisites_bank_name') ?? 'Банк',
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -549,7 +555,8 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _directorFioController,
             decoration: InputDecoration(
-              labelText: 'ФИО руководителя',
+              labelText:
+                  widget.loc.t('requisites_director_fio') ?? 'ФИО руководителя',
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -558,7 +565,8 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _directorPositionController,
             decoration: InputDecoration(
-              labelText: 'Должность руководителя',
+              labelText: widget.loc.t('requisites_director_position') ??
+                  'Должность руководителя',
               border: const OutlineInputBorder(),
               filled: true,
             ),

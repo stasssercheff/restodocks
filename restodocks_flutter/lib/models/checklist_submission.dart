@@ -38,17 +38,19 @@ class ChecklistSubmission extends Equatable {
     );
   }
 
-  List<({String title, bool done})> get items {
+  List<({String title, bool done, String? itemId})> get items {
     final list = payload['items'] as List<dynamic>? ?? [];
     return list.map((e) {
       if (e is Map) {
         final m = Map<String, dynamic>.from(e);
+        final id = m['itemId']?.toString().trim();
         return (
           title: (m['title'] as String?) ?? '',
           done: m['done'] == true,
+          itemId: (id != null && id.isNotEmpty) ? id : null,
         );
       }
-      return (title: '', done: false);
+      return (title: '', done: false, itemId: null);
     }).toList();
   }
 

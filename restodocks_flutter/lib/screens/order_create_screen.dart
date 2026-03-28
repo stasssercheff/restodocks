@@ -98,7 +98,9 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
   List<OrderListItem> _getItemsWithQuantities() {
     return _items.asMap().entries.map((e) {
       final q = e.key < _qtyControllers.length
-          ? (double.tryParse(_qtyControllers[e.key].text.replaceFirst(',', '.')) ?? 0)
+          ? (double.tryParse(
+                  _qtyControllers[e.key].text.replaceFirst(',', '.')) ??
+              0)
           : e.value.quantity;
       return e.value.copyWith(quantity: q);
     }).toList();
@@ -109,7 +111,8 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
     final productId = item.productId;
     if (productId != null && productId.isNotEmpty) {
       final store = context.read<ProductStoreSupabase>();
-      final product = store.allProducts.where((p) => p.id == productId).firstOrNull;
+      final product =
+          store.allProducts.where((p) => p.id == productId).firstOrNull;
       if (product != null) return product.getLocalizedName(lang);
     }
     return item.productName;
@@ -165,12 +168,14 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
         'orderForDate': orderForDateStr,
         'department': dept,
       };
-      final itemsPayload = itemsWithQty.map((item) => {
-        'productId': item.productId,
-        'productName': item.productName,
-        'unit': item.unit,
-        'quantity': item.quantity,
-      }).toList();
+      final itemsPayload = itemsWithQty
+          .map((item) => {
+                'productId': item.productId,
+                'productName': item.productName,
+                'unit': item.unit,
+                'quantity': item.quantity,
+              })
+          .toList();
       final orderDoc = await OrderDocumentService().saveWithServerPrices(
         establishmentId: estId,
         createdByEmployeeId: employee.id,
@@ -184,20 +189,24 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
         if (orderDoc == null) {
           // Заказ сохранён локально, но входящие не созданы — показываем предупреждение, но не блокируем
           AppToastService.show(
-            loc.t('order_save_inbox_warning') ?? '${loc.t('order_list_save_with_quantities')} ✓ (входящие: ошибка — нет получателей)',
+            loc.t('order_save_inbox_warning') ??
+                '${loc.t('order_list_save_with_quantities')} ✓ (входящие: ошибка — нет получателей)',
             duration: const Duration(seconds: 5),
           );
           setState(() => _saving = false);
           if (context.canPop()) context.pop();
           return;
         }
-        AppToastService.show('${loc.t('order_list_save_with_quantities')} ✓', duration: const Duration(seconds: 3));
+        AppToastService.show('${loc.t('order_list_save_with_quantities')} ✓',
+            duration: const Duration(seconds: 3));
         // pop вместо go, чтобы разрешить await в OrderListsScreen и сразу показать новый заказ
         if (context.canPop()) context.pop();
       }
     } catch (e) {
       if (mounted) {
-        AppToastService.show('${context.read<LocalizationService>().t('error_short')}: $e', duration: const Duration(seconds: 4));
+        AppToastService.show(
+            '${context.read<LocalizationService>().t('error_short')}: $e',
+            duration: const Duration(seconds: 4));
         setState(() => _saving = false);
       }
     }
@@ -221,12 +230,14 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
       'createdAt': now.toIso8601String(),
       'orderForDate': orderForDateStr,
     };
-    final itemsPayload = itemsWithQty.map((item) => {
-      'productId': item.productId,
-      'productName': item.productName,
-      'unit': item.unit,
-      'quantity': item.quantity,
-    }).toList();
+    final itemsPayload = itemsWithQty
+        .map((item) => {
+              'productId': item.productId,
+              'productName': item.productName,
+              'unit': item.unit,
+              'quantity': item.quantity,
+            })
+        .toList();
     final orderDoc = await OrderDocumentService().saveWithServerPrices(
       establishmentId: establishment.id,
       createdByEmployeeId: employee.id,
@@ -259,10 +270,26 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                _LangButton(flag: '🇷🇺', label: loc.t('order_export_language_ru'), onTap: () => Navigator.of(ctx).pop('ru')),
-                _LangButton(flag: '🇺🇸', label: loc.t('order_export_language_en'), onTap: () => Navigator.of(ctx).pop('en')),
-                _LangButton(flag: '🇪🇸', label: loc.t('order_export_language_es'), onTap: () => Navigator.of(ctx).pop('es')),
-                _LangButton(flag: '🇹🇷', label: loc.t('order_export_language_tr') ?? 'Türkçe', onTap: () => Navigator.of(ctx).pop('tr')),
+                _LangButton(
+                    flag: '🇷🇺',
+                    label: loc.t('order_export_language_ru'),
+                    onTap: () => Navigator.of(ctx).pop('ru')),
+                _LangButton(
+                    flag: '🇺🇸',
+                    label: loc.t('order_export_language_en'),
+                    onTap: () => Navigator.of(ctx).pop('en')),
+                _LangButton(
+                    flag: '🇪🇸',
+                    label: loc.t('order_export_language_es'),
+                    onTap: () => Navigator.of(ctx).pop('es')),
+                _LangButton(
+                    flag: '🇮🇹',
+                    label: loc.t('order_export_language_it') ?? 'Italiano',
+                    onTap: () => Navigator.of(ctx).pop('it')),
+                _LangButton(
+                    flag: '🇹🇷',
+                    label: loc.t('order_export_language_tr') ?? 'Türkçe',
+                    onTap: () => Navigator.of(ctx).pop('tr')),
               ],
             ),
           ],
@@ -308,7 +335,9 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
         onExportToInbox: () async {
           final ok = await _saveOrderToInbox();
           if (mounted && !ok) {
-            AppToastService.show('${loc.t('error_short')}: ${loc.t('order_save_inbox_error')}', duration: const Duration(seconds: 4));
+            AppToastService.show(
+                '${loc.t('error_short')}: ${loc.t('order_save_inbox_error')}',
+                duration: const Duration(seconds: 4));
           }
         },
       ),
@@ -363,7 +392,9 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Expanded(child: Text(loc.t('order_export_order_for') ?? 'На дату')),
+                        Expanded(
+                            child: Text(
+                                loc.t('order_export_order_for') ?? 'На дату')),
                         TextButton(
                           onPressed: () async {
                             final picked = await showDatePicker(
@@ -380,7 +411,8 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                           },
                           child: Text(
                             _orderForDate != null
-                                ? DateFormat('dd.MM.yyyy').format(_orderForDate!)
+                                ? DateFormat('dd.MM.yyyy')
+                                    .format(_orderForDate!)
                                 : '...',
                           ),
                         ),
@@ -399,7 +431,8 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                     ),
                     const SizedBox(height: 8),
                     Table(
-                      border: TableBorder.all(color: Theme.of(context).dividerColor),
+                      border: TableBorder.all(
+                          color: Theme.of(context).dividerColor),
                       columnWidths: const {
                         0: FlexColumnWidth(2),
                         1: FixedColumnWidth(100),
@@ -465,8 +498,8 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                                             value: id,
                                             child: Text(
                                               _unitLabel(id, lang),
-                                              style: const TextStyle(
-                                                  fontSize: 12),
+                                              style:
+                                                  const TextStyle(fontSize: 12),
                                             ),
                                           ))
                                       .toList(),
@@ -486,9 +519,8 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                                     horizontal: 4, vertical: 4),
                                 child: i < _qtyControllers.length
                                     ? TextField(
-                                        keyboardType:
-                                            const TextInputType.numberWithOptions(
-                                                decimal: true),
+                                        keyboardType: const TextInputType
+                                            .numberWithOptions(decimal: true),
                                         decoration: const InputDecoration(
                                           isDense: true,
                                           border: OutlineInputBorder(),
@@ -571,7 +603,8 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                             ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
                             : Text(
                                 loc.t('order_list_save_with_quantities') ??
@@ -616,7 +649,8 @@ class _NoSuppliersHint extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.errorContainer.withOpacity(0.15),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).colorScheme.error.withOpacity(0.3)),
+        border: Border.all(
+            color: Theme.of(context).colorScheme.error.withOpacity(0.3)),
       ),
       child: Row(
         children: [
@@ -710,7 +744,8 @@ class _SupplierSelector extends StatelessWidget {
                   leading: CircleAvatar(
                     backgroundColor: Theme.of(ctx).colorScheme.primaryContainer,
                     child: Icon(Icons.store_outlined,
-                        color: Theme.of(ctx).colorScheme.onPrimaryContainer, size: 20),
+                        color: Theme.of(ctx).colorScheme.onPrimaryContainer,
+                        size: 20),
                   ),
                   title: Text(s.supplierName,
                       style: const TextStyle(fontWeight: FontWeight.w600)),

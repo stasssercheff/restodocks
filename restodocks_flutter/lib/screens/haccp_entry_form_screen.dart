@@ -573,16 +573,17 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
   /// Селектор «Разрешение к реализации»: разрешено / запрещено.
   Widget _approvalSelector() {
+    final loc = context.read<LocalizationService>();
     return DropdownButtonFormField<bool>(
       value: _approvalToSell,
       decoration: const InputDecoration(
         border: OutlineInputBorder(),
         isDense: true,
       ),
-      hint: const Text('Выберите'),
-      items: const [
-        DropdownMenuItem(value: true, child: Text('разрешено')),
-        DropdownMenuItem(value: false, child: Text('запрещено')),
+      hint: Text(loc.t('Выберите')),
+      items: [
+        DropdownMenuItem(value: true, child: Text(loc.t('разрешено'))),
+        DropdownMenuItem(value: false, child: Text(loc.t('запрещено'))),
       ],
       onChanged: (v) => setState(() => _approvalToSell = v),
     );
@@ -604,8 +605,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       ),
       value: null,
       items: [
-        const DropdownMenuItem<Employee?>(
-            value: null, child: Text('— Выбрать из списка —')),
+        DropdownMenuItem<Employee?>(
+            value: null, child: Text(loc.t('— Выбрать из списка —'))),
         ...employees.map((e) => DropdownMenuItem<Employee?>(
               value: e,
               child: Text(
@@ -739,15 +740,16 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   }
 
   Future<String?> _showCustomPositionDialog({String? initial}) async {
+    final loc = context.read<LocalizationService>();
     final ctrl = TextEditingController(text: initial ?? '');
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Должность (свой вариант)'),
+        title: Text(loc.t('Должность (свой вариант)')),
         content: TextField(
           controller: ctrl,
-          decoration: const InputDecoration(
-            hintText: 'Введите название должности',
+          decoration: InputDecoration(
+            hintText: loc.t('Введите название должности'),
             border: OutlineInputBorder(),
           ),
           autofocus: true,
@@ -2361,7 +2363,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               options: _presetOptions['oil_name'] ?? const [],
               presetFieldKey: 'oil_name',
             ),
-            _textField('organoleptic_start', 'Органолептика на начало жарки', multiline: true),
+            _textField('organoleptic_start', 'Органолептика на начало жарки',
+                multiline: true),
             _savedOptionTextField(
               key: 'frying_equipment_type',
               label: 'Тип жарочного оборудования',
@@ -2374,10 +2377,14 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               options: _presetOptions['frying_product_type'] ?? const [],
               presetFieldKey: 'frying_product_type',
             ),
-            _textField('frying_end_time', 'Время окончания жарки (например 14:00)'),
-            _textField('organoleptic_end', 'Органолептика по окончании жарки', multiline: true),
-            _textField('carry_over_kg', 'Переходящий остаток, кг', keyboardType: TextInputType.number),
-            _textField('utilized_kg', 'Утилизированный жир, кг', keyboardType: TextInputType.number),
+            _textField(
+                'frying_end_time', 'Время окончания жарки (например 14:00)'),
+            _textField('organoleptic_end', 'Органолептика по окончании жарки',
+                multiline: true),
+            _textField('carry_over_kg', 'Переходящий остаток, кг',
+                keyboardType: TextInputType.number),
+            _textField('utilized_kg', 'Утилизированный жир, кг',
+                keyboardType: TextInputType.number),
             _signatureFromAccount(),
             _textField('note', loc.t('haccp_note') ?? 'Примечание'),
           ],

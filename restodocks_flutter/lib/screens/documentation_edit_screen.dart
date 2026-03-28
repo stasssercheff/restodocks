@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:go_router/go_router.dart';
@@ -124,8 +126,9 @@ class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
     try {
       final svc = context.read<DocumentationServiceSupabase>();
       final loc = context.read<LocalizationService>();
+      final translationManager = context.read<TranslationManager>();
       if (_isNew) {
-        await svc.createDocument(
+        final created = await svc.createDocument(
           establishmentId: est.id,
           createdBy: emp.id,
           name: name,
@@ -134,6 +137,16 @@ class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
           visibilityIds: _visibilityIds,
           body: bodyFromDocument(_quillController.document),
         );
+        final topic = _topicController.text.trim();
+        final tf = <String, String>{'name': name};
+        if (topic.isNotEmpty) tf['topic'] = topic;
+        unawaited(translationManager.handleEntitySave(
+          entityType: TranslationEntityType.document,
+          entityId: created.id,
+          textFields: tf,
+          sourceLanguage: loc.currentLanguageCode,
+          userId: emp.id,
+        ));
         AppToastService.show(loc.t('documentation_created') ?? 'Документ создан');
       } else {
         final updated = _doc!.copyWith(
@@ -144,6 +157,16 @@ class _DocumentationEditScreenState extends State<DocumentationEditScreen> {
           body: bodyFromDocument(_quillController.document),
         );
         await svc.updateDocument(updated);
+        final topic = _topicController.text.trim();
+        final tf = <String, String>{'name': name};
+        if (topic.isNotEmpty) tf['topic'] = topic;
+        unawaited(translationManager.handleEntitySave(
+          entityType: TranslationEntityType.document,
+          entityId: updated.id,
+          textFields: tf,
+          sourceLanguage: loc.currentLanguageCode,
+          userId: emp.id,
+        ));
         AppToastService.show(loc.t('documentation_updated') ?? 'Документ обновлён');
       }
       if (mounted) context.pop();
