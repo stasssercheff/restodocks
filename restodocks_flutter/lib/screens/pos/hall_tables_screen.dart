@@ -113,11 +113,11 @@ class _HallTablesScreenState extends State<HallTablesScreen> {
           ),
         ],
       ),
-      body: _body(loc),
+      body: _body(context, loc),
     );
   }
 
-  Widget _body(LocalizationService loc) {
+  Widget _body(BuildContext context, LocalizationService loc) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -125,53 +125,76 @@ class _HallTablesScreenState extends State<HallTablesScreen> {
       final message = _error == 'no_establishment'
           ? loc.t('error_no_establishment_or_employee')
           : loc.t('pos_tables_load_error');
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline,
-                  size: 48, color: Theme.of(context).colorScheme.error),
-              const SizedBox(height: 16),
-              Text(
-                message,
-                textAlign: TextAlign.center,
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.45,
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.error),
+                    const SizedBox(height: 16),
+                    Text(
+                      message,
+                      textAlign: TextAlign.center,
+                    ),
+                    if (_error != 'no_establishment') ...[
+                      const SizedBox(height: 16),
+                      FilledButton(
+                          onPressed: _load, child: Text(loc.t('retry'))),
+                    ],
+                  ],
+                ),
               ),
-              if (_error != 'no_establishment') ...[
-                const SizedBox(height: 16),
-                FilledButton(onPressed: _load, child: Text(loc.t('retry'))),
-              ],
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
     if (_tables.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.table_restaurant,
-                  size: 64, color: Theme.of(context).colorScheme.outline),
-              const SizedBox(height: 16),
-              Text(
-                loc.t('pos_tables_empty_title'),
-                style: Theme.of(context).textTheme.titleMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                loc.t('pos_tables_empty_body'),
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.45,
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.table_restaurant,
+                        size: 64,
+                        color: Theme.of(context).colorScheme.outline),
+                    const SizedBox(height: 16),
+                    Text(
+                      loc.t('pos_tables_empty_title'),
+                      style: Theme.of(context).textTheme.titleMedium,
+                      textAlign: TextAlign.center,
                     ),
-                textAlign: TextAlign.center,
+                    const SizedBox(height: 8),
+                    Text(
+                      loc.t('pos_tables_empty_body'),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
@@ -179,35 +202,45 @@ class _HallTablesScreenState extends State<HallTablesScreen> {
     final floors = _buildFloorGroups(_tables, loc);
     Future<void> onTable(PosDiningTable t) => _onTableTap(t);
     if (floors.length == 1 && floors.first.rooms.length == 1) {
-      return _TableGrid(
-        tables: floors.first.rooms.first.tables,
-        loc: loc,
-        onTableTap: onTable,
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: _TableGrid(
+          tables: floors.first.rooms.first.tables,
+          loc: loc,
+          onTableTap: onTable,
+        ),
       );
     }
     if (floors.length == 1) {
       final f = floors.first;
-      return _RoomTabsOrGrid(floor: f, loc: loc, onTableTap: onTable);
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: _RoomTabsOrGrid(floor: f, loc: loc, onTableTap: onTable),
+      );
     }
-    return DefaultTabController(
-      length: floors.length,
-      child: Column(
-        children: [
-          TabBar(
-            isScrollable: true,
-            tabs: [
-              for (final f in floors) Tab(text: f.tabLabel(loc)),
-            ],
-          ),
-          Expanded(
-              child: TabBarView(
-              children: [
-                for (final f in floors)
-                  _RoomTabsOrGrid(floor: f, loc: loc, onTableTap: onTable),
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: DefaultTabController(
+        length: floors.length,
+        child: Column(
+          children: [
+            TabBar(
+              isScrollable: true,
+              tabs: [
+                for (final f in floors) Tab(text: f.tabLabel(loc)),
               ],
             ),
-          ),
-        ],
+            Expanded(
+              child: TabBarView(
+                children: [
+                  for (final f in floors)
+                    _RoomTabsOrGrid(
+                        floor: f, loc: loc, onTableTap: onTable),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -354,6 +387,7 @@ class _TableGrid extends StatelessWidget {
         final w = c.maxWidth;
         final cross = w >= 600 ? 4 : 2;
         return GridView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: cross,
