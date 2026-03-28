@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../services/services.dart';
+import '../../utils/number_format_utils.dart';
 import '../../utils/pos_hall_permissions.dart';
 import '../../utils/pos_order_department.dart';
 import '../../widgets/app_bar_home_button.dart';
@@ -65,6 +66,29 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
       case PosOrderStatus.closed:
         return loc.t('pos_order_status_closed');
     }
+  }
+
+  double _sumLinesMenuDue() {
+    var s = 0.0;
+    for (final l in _lines) {
+      final p = l.sellingPrice;
+      if (p == null) continue;
+      s += l.quantity * p;
+    }
+    return s;
+  }
+
+  bool _linesMissingMenuPrice() =>
+      _lines.any((l) => l.sellingPrice == null);
+
+  String _formatMenuDue(double amount) {
+    final account = context.read<AccountManagerSupabase>();
+    final est = account.establishment;
+    final currency = est?.defaultCurrency ?? 'RUB';
+    final sym = est?.currencySymbol ??
+        Establishment.currencySymbolFor(currency);
+    final numStr = NumberFormatUtils.formatSum(amount, currency);
+    return '$numStr $sym';
   }
 
   String _paymentMethodLabel(LocalizationService loc, PosPaymentMethod m) {
@@ -563,6 +587,29 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
               Text(
                 '${dateFmt.format(o.createdAt.toLocal())} ${timeFmt.format(o.createdAt.toLocal())}',
               ),
+              if (!_linesLoading &&
+                  _linesError == null &&
+                  _lines.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  '${loc.t('pos_order_total_due_label')}: ${_formatMenuDue(_sumLinesMenuDue())}',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                if (_linesMissingMenuPrice())
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      loc.t('pos_order_total_partial'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                          ),
+                    ),
+                  ),
+              ],
               if (o.status == PosOrderStatus.closed) ...[
                 if (o.paymentMethod != null) ...[
                   const SizedBox(height: 8),
