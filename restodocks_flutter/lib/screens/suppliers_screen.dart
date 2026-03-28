@@ -23,7 +23,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
   bool _loading = true;
   String? _error;
   final TextEditingController _searchController = TextEditingController();
-  bool _sortAsc = true; // true = А–Я, false = Я–А
+  bool _sortAsc = true; // supplier name A→Z / Z→A
 
   @override
   void dispose() {
@@ -262,50 +262,37 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
   }
 
   Widget _buildSearchAndSortPanel(LocalizationService loc) {
+    final sortHint = loc.t(_sortAsc ? 'order_sort_az' : 'order_sort_za');
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerLow,
         border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: loc.t('order_search_supplier_or_product') ?? 'Поиск по поставщику или продукту',
-              prefixIcon: const Icon(Icons.search, size: 22),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, size: 20),
-                      onPressed: () => setState(() => _searchController.clear()),
-                    )
-                  : null,
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: loc.t('order_search_supplier_or_product'),
+                prefixIcon: const Icon(Icons.search, size: 22),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 20),
+                        onPressed: () => setState(() => _searchController.clear()),
+                      )
+                    : null,
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Text(
-                loc.t('order_sort') ?? 'Сортировка:',
-                style: Theme.of(context).textTheme.labelMedium,
-              ),
-              const SizedBox(width: 8),
-              ChoiceChip(
-                label: Text(loc.t('order_sort_az') ?? 'А–Я'),
-                selected: _sortAsc,
-                onSelected: (_) => setState(() => _sortAsc = true),
-              ),
-              const SizedBox(width: 6),
-              ChoiceChip(
-                label: Text(loc.t('order_sort_za') ?? 'Я–А'),
-                selected: !_sortAsc,
-                onSelected: (_) => setState(() => _sortAsc = false),
-              ),
-            ],
+          IconButton(
+            icon: const Icon(Icons.sort),
+            tooltip: '${loc.t('order_sort')} $sortHint',
+            onPressed: () => setState(() => _sortAsc = !_sortAsc),
           ),
         ],
       ),

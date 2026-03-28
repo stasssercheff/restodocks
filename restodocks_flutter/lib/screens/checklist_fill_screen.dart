@@ -146,26 +146,25 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     }
   }
 
-  /// Переводим название чеклиста и title каждого пункта через TranslationService (кешируется).
+  /// Подтягиваем переводы названия и пунктов из БД (и при отсутствии — один проход API).
+  /// Поля `name` и `item_<id>` совпадают с тем, что пишет TranslationManager при сохранении шаблона.
   Future<void> _translateTitles(Checklist checklist) async {
     if (!mounted) return;
     final loc = context.read<LocalizationService>();
     final targetLang = loc.currentLanguageCode;
-    if (targetLang == 'ru') return; // title хранятся на русском
-
     final translationSvc = context.read<TranslationService>();
     final updated = <String, String>{};
 
-    // Перевод названия чеклиста
+    const legacyFrom = 'ru';
     final nameText = checklist.name.trim();
     if (nameText.isNotEmpty) {
       try {
         final translated = await translationSvc.translate(
           entityType: TranslationEntityType.checklist,
           entityId: checklist.id,
-          fieldName: 'checklist_name',
+          fieldName: 'name',
           text: nameText,
-          from: 'ru',
+          from: legacyFrom,
           to: targetLang,
         );
         if (translated != null && translated != nameText && mounted) {
@@ -181,11 +180,11 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
 
       try {
         final translated = await translationSvc.translate(
-          entityType: TranslationEntityType.ui,
-          entityId: 'checklist_item_${item.id}',
-          fieldName: 'title',
+          entityType: TranslationEntityType.checklist,
+          entityId: checklist.id,
+          fieldName: 'item_${item.id}',
           text: title,
-          from: 'ru',
+          from: legacyFrom,
           to: targetLang,
         );
         if (translated != null && translated.trim().isNotEmpty && translated != title) {
@@ -261,6 +260,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     final items = <Map<String, dynamic>>[];
     for (var i = 0; i < c.items.length; i++) {
       items.add({
+        'itemId': c.items[i].id,
         'title': c.items[i].title,
         'techCardId': c.items[i].techCardId,
         'done': i < _done.length ? _done[i] : false,

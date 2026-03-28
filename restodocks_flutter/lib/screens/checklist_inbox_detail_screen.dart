@@ -69,7 +69,7 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
         final translatedName = await translationSvc.translate(
           entityType: TranslationEntityType.checklist,
           entityId: sub.checklistId,
-          fieldName: 'checklist_name',
+          fieldName: 'name',
           text: sub.checklistName,
           from: sourceLang,
           to: targetLang,
@@ -101,10 +101,14 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
       for (var i = 0; i < items.length; i++) {
         final title = items[i].title;
         if (title.trim().isEmpty) continue;
+        final itemId = items[i].itemId;
+        final fieldName = (itemId != null && itemId.isNotEmpty)
+            ? 'item_$itemId'
+            : 'item_$i';
         final translated = await translationSvc.translate(
           entityType: TranslationEntityType.checklist,
           entityId: sub.checklistId,
-          fieldName: 'item_$i',
+          fieldName: fieldName,
           text: title,
           from: sourceLang,
           to: targetLang,

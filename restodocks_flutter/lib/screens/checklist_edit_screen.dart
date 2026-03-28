@@ -368,12 +368,20 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         savedId = updated.id;
         dept = updated.assignedDepartment;
       }
-      // Переводим название и пункты чеклиста фоново
+      // Переводим название и пункты чеклиста фоново (поля name, item_<id> — те же, что при отображении)
       final sourceLang = loc.currentLanguageCode;
+      final persisted = await svc.getChecklistById(savedId);
       final fieldsToTranslate = <String, String>{'name': name};
-      for (var i = 0; i < _items.length; i++) {
-        final t = _items[i].title.trim();
-        if (t.isNotEmpty) fieldsToTranslate['item_$i'] = t;
+      if (persisted != null) {
+        for (final it in persisted.items) {
+          final t = it.title.trim();
+          if (t.isNotEmpty) fieldsToTranslate['item_${it.id}'] = t;
+        }
+      } else {
+        for (var i = 0; i < _items.length; i++) {
+          final t = _items[i].title.trim();
+          if (t.isNotEmpty) fieldsToTranslate['item_$i'] = t;
+        }
       }
       translationManager.handleEntitySave(
         entityType: TranslationEntityType.checklist,

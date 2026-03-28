@@ -48,6 +48,33 @@ class TranslationService {
     bool allowOverride = true,
   }) async {
     if (text.trim().isEmpty) return text;
+
+    // Сквозной кеш в БД: любая уже сохранённая пара для этой версии исходного текста
+    // (не зависит от того, с каким `from` вызвали translate).
+    try {
+      final bySource = await _getFromDatabaseBySourceTextAndTarget(
+        entityType,
+        entityId,
+        fieldName,
+        text.trim(),
+        to,
+      );
+      if (bySource != null) {
+        final keyRequested =
+            '${entityType}_${entityId}_${fieldName}_${from}_${to}';
+        final keyActual =
+            '${entityType}_${entityId}_${fieldName}_${bySource.sourceLanguage}_${to}';
+        _cache[keyActual] = bySource;
+        _cache[keyRequested] = bySource;
+        if (bySource.isManualOverride && !allowOverride) {
+          return bySource.translatedText;
+        }
+        return bySource.translatedText;
+      }
+    } catch (e) {
+      devLog('[TranslationService] by-source-text lookup: $e');
+    }
+
     if (from == to) return text;
 
     final cacheKey = '${entityType}_${entityId}_${fieldName}_${from}_${to}';
@@ -208,6 +235,31 @@ class TranslationService {
     }
   }
 
+  /// Перевод для данной версии source_text и целевого языка (любой source_language в строке).
+  Future<Translation?> _getFromDatabaseBySourceTextAndTarget(
+    TranslationEntityType entityType,
+    String entityId,
+    String fieldName,
+    String sourceText,
+    String targetLanguage,
+  ) async {
+    final rows = await _supabase.client
+        .from('translations')
+        .select()
+        .eq('entity_type', entityType.name)
+        .eq('entity_id', entityId)
+        .eq('field_name', fieldName)
+        .eq('source_text', sourceText)
+        .eq('target_language', targetLanguage)
+        .limit(1);
+    if (rows is List && rows.isNotEmpty) {
+      return Translation.fromJson(
+        Map<String, dynamic>.from(rows.first as Map),
+      );
+    }
+    return null;
+  }
+
   /// Получить перевод из базы данных
   Future<Translation?> _getFromDatabase(
     TranslationEntityType entityType,
@@ -227,7 +279,7 @@ class TranslationService {
         .maybeSingle();
 
     if (response != null) {
-      return Translation.fromJson(response);
+      return Translation.fromJson(Map<String, dynamic>.from(response as Map));
     }
 
     return null;
