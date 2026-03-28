@@ -1131,6 +1131,8 @@ class _AddDishSheetState extends State<_AddDishSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: TextField(
                 controller: _search,
+                autofocus: true,
+                textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   hintText: loc.t('pos_order_line_search_hint'),
                   prefixIcon: const Icon(Icons.search),
