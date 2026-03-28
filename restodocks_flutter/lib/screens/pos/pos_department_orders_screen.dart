@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../utils/pos_order_department.dart';
+import '../../utils/pos_order_live_duration.dart';
 import '../../widgets/app_bar_home_button.dart';
 
 /// Заказы POS для подразделения (кухня / бар / зал): фильтр по типу блюд в строках.
@@ -20,15 +23,32 @@ class PosDepartmentOrdersScreen extends StatefulWidget {
       _PosDepartmentOrdersScreenState();
 }
 
+enum _DeptBucket { active, served }
+
 class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
   bool _loading = true;
   Object? _error;
-  List<PosOrder> _orders = [];
+  PosDepartmentOrderBuckets _buckets =
+      const PosDepartmentOrderBuckets(active: [], served: []);
+  _DeptBucket _bucket = _DeptBucket.active;
+  Timer? _elapsedTimer;
 
   @override
   void initState() {
     super.initState();
+    _elapsedTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted &&
+          (_buckets.active.isNotEmpty || _buckets.served.isNotEmpty)) {
+        setState(() {});
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _elapsedTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -46,13 +66,13 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
       _error = null;
     });
     try {
-      final list = await PosOrderService.instance.fetchActiveOrdersForDepartment(
+      final buckets = await PosOrderService.instance.fetchDepartmentOrderBuckets(
         est.id,
         widget.department,
       );
       if (!mounted) return;
       setState(() {
-        _orders = list;
+        _buckets = buckets;
         _loading = false;
       });
     } catch (e) {
@@ -111,6 +131,9 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
     );
   }
 
+  List<PosOrder> get _visibleOrders =>
+      _bucket == _DeptBucket.active ? _buckets.active : _buckets.served;
+
   Widget _body(LocalizationService loc, DateFormat timeFmt) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
@@ -121,7 +144,7 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
           : loc.t('pos_tables_load_error');
       return Center(child: Text(message, textAlign: TextAlign.center));
     }
-    if (_orders.isEmpty) {
+    if (_buckets.active.isEmpty && _buckets.served.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -132,25 +155,64 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
         ),
       );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: _orders.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, i) {
-        final o = _orders[i];
-        final tn = o.tableNumber ?? 0;
-        final sub = [
-          '${loc.t('pos_orders_guests_short')}: ${o.guestCount}',
-          _statusLabel(loc, o.status),
-          timeFmt.format(o.createdAt.toLocal()),
-        ].join(' · ');
-        return ListTile(
-          leading: const Icon(Icons.receipt_long),
-          title: Text(loc.t('pos_table_number', args: {'n': '$tn'})),
-          subtitle: Text(sub),
-          onTap: () => context.push('/pos/hall/orders/${o.id}'),
-        );
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: SegmentedButton<_DeptBucket>(
+            segments: [
+              ButtonSegment(
+                value: _DeptBucket.active,
+                label: Text(loc.t('pos_department_orders_tab_active')),
+              ),
+              ButtonSegment(
+                value: _DeptBucket.served,
+                label: Text(loc.t('pos_department_orders_tab_served')),
+              ),
+            ],
+            selected: {_bucket},
+            onSelectionChanged: (s) => setState(() => _bucket = s.first),
+          ),
+        ),
+        Expanded(
+          child: _visibleOrders.isEmpty
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      _bucket == _DeptBucket.active
+                          ? loc.t('pos_department_orders_active_empty')
+                          : loc.t('pos_department_orders_served_empty'),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _visibleOrders.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, i) {
+                    final o = _visibleOrders[i];
+                    final tn = o.tableNumber ?? 0;
+                    final sub = [
+                      '${loc.t('pos_orders_guests_short')}: ${o.guestCount}',
+                      _statusLabel(loc, o.status),
+                      timeFmt.format(o.createdAt.toLocal()),
+                      loc.t('pos_order_list_timer', args: {
+                        'time': formatPosOrderLiveDuration(o.createdAt),
+                      }),
+                    ].join(' · ');
+                    return ListTile(
+                      leading: const Icon(Icons.receipt_long),
+                      title: Text(loc.t('pos_table_number', args: {'n': '$tn'})),
+                      subtitle: Text(sub),
+                      onTap: () => context.push('/pos/hall/orders/${o.id}'),
+                    );
+                  },
+                ),
+        ),
+      ],
     );
   }
 }

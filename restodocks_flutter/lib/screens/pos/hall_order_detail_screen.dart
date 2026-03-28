@@ -35,9 +35,15 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   bool _sending = false;
   bool _closing = false;
   bool _billing = false;
+  String? _markingLineId;
 
   bool get _busy =>
-      _orderLoading || _linesLoading || _sending || _closing || _billing;
+      _orderLoading ||
+      _linesLoading ||
+      _sending ||
+      _closing ||
+      _billing ||
+      _markingLineId != null;
 
   String _readonlyHint(PosOrder o, LocalizationService loc) {
     if (o.status == PosOrderStatus.closed) {
@@ -244,6 +250,22 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
     }
   }
 
+  Future<void> _markLineServed(PosOrderLine line, LocalizationService loc) async {
+    setState(() => _markingLineId = line.id);
+    try {
+      await PosOrderService.instance.markLineServed(line.id, widget.orderId);
+      if (mounted) await _refreshLines();
+    } on PosOrderLineMarkServedException {
+      if (mounted) {
+        AppToastService.show(loc.t('pos_order_line_mark_served_forbidden'));
+      }
+    } catch (e) {
+      if (mounted) AppToastService.show('${loc.t('error')}: $e');
+    } finally {
+      if (mounted) setState(() => _markingLineId = null);
+    }
+  }
+
   Future<void> _editLineComment(PosOrderLine line, LocalizationService loc) async {
     final ctrl = TextEditingController(text: line.comment ?? '');
     bool? ok;
@@ -396,10 +418,15 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                       line: line,
                       lang: lang,
                       editable: editable,
+                      orderStatus: o.status,
+                      employee: emp,
+                      timeFmt: timeFmt,
+                      markingLine: _markingLineId == line.id,
                       loc: loc,
                       onQty: (q) => _setQty(line, q, loc),
                       onDelete: () => _removeLine(line, loc),
                       onComment: () => _editLineComment(line, loc),
+                      onMarkServed: () => _markLineServed(line, loc),
                     )),
               if (editable) ...[
                 const SizedBox(height: 16),
@@ -493,19 +520,29 @@ class _LineTile extends StatelessWidget {
     required this.line,
     required this.lang,
     required this.editable,
+    required this.orderStatus,
+    required this.employee,
+    required this.timeFmt,
+    required this.markingLine,
     required this.loc,
     required this.onQty,
     required this.onDelete,
     required this.onComment,
+    required this.onMarkServed,
   });
 
   final PosOrderLine line;
   final String lang;
   final bool editable;
+  final PosOrderStatus orderStatus;
+  final Employee? employee;
+  final DateFormat timeFmt;
+  final bool markingLine;
   final LocalizationService loc;
   final void Function(double) onQty;
   final VoidCallback onDelete;
   final VoidCallback onComment;
+  final VoidCallback onMarkServed;
 
   @override
   Widget build(BuildContext context) {
@@ -559,6 +596,45 @@ class _LineTile extends StatelessWidget {
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
             ),
+            if (line.servedAt != null) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Chip(
+                  visualDensity: VisualDensity.compact,
+                  avatar: Icon(
+                    Icons.check_circle,
+                    size: 18,
+                    color: Colors.green.shade700,
+                  ),
+                  label: Text(
+                    loc.t('pos_order_line_served_at', args: {
+                      'time': timeFmt.format(line.servedAt!.toLocal()),
+                    }),
+                  ),
+                ),
+              ),
+            ],
+            if (!editable &&
+                orderStatus == PosOrderStatus.sent &&
+                line.servedAt == null &&
+                posCanMarkOrderLineServed(employee, line)) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: markingLine
+                    ? const SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : FilledButton.tonalIcon(
+                        onPressed: onMarkServed,
+                        icon: const Icon(Icons.restaurant),
+                        label: Text(loc.t('pos_order_line_mark_served')),
+                      ),
+              ),
+            ],
             if (editable) ...[
               const SizedBox(height: 8),
               Row(

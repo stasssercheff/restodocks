@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:restodocks/core/supabase_env.dart';
 import 'package:restodocks/core/supabase_url_resolver_stub.dart'
     if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart'
     as supabase_url;
@@ -17,11 +18,6 @@ import 'supabase_service.dart';
 const _keyEmployeeId = 'restodocks_employee_id';
 const _keyEstablishmentId = 'restodocks_establishment_id';
 
-const _supabaseAnonKey = String.fromEnvironment(
-  'SUPABASE_ANON_KEY',
-  defaultValue:
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE',
-);
 const _strictLegacyAuthSession =
     bool.fromEnvironment('AUTH_STRICT_SESSION', defaultValue: true);
 const _keyRememberPin = 'restodocks_remember_pin';
@@ -830,8 +826,8 @@ class AccountManagerSupabase extends ChangeNotifier {
         '${supabase_url.getSupabaseBaseUrl()}/functions/v1/authenticate-employee';
     final dio = Dio(BaseOptions(
       headers: {
-        'apikey': _supabaseAnonKey,
-        'Authorization': 'Bearer $_supabaseAnonKey',
+        'apikey': kSupabaseAnonKeyFromEnvironment,
+        'Authorization': 'Bearer $kSupabaseAnonKeyFromEnvironment',
         'Content-Type': 'application/json',
       },
       validateStatus: (_) => true, // не бросать на 4xx

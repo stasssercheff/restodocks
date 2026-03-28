@@ -22,6 +22,19 @@ class PosOrderTableBusyException implements Exception {
   final PosOrder existingOrder;
 }
 
+/// Отметить «отдано» можно только для отправленного заказа.
+class PosOrderLineMarkServedException implements Exception {
+  PosOrderLineMarkServedException();
+}
+
+/// Заказы подразделения: очередь и уже отданные по строкам.
+class PosDepartmentOrderBuckets {
+  const PosDepartmentOrderBuckets({required this.active, required this.served});
+
+  final List<PosOrder> active;
+  final List<PosOrder> served;
+}
+
 /// Заказы зала (pos_orders).
 class PosOrderService {
   PosOrderService._();
@@ -30,8 +43,9 @@ class PosOrderService {
   final SupabaseService _supabase = SupabaseService();
 
   static const _lineSelect = 'id, order_id, tech_card_id, quantity, comment, '
-      'course_number, guest_number, sort_order, created_at, updated_at, '
-      'tech_cards(dish_name, dish_name_localized, selling_price, department)';
+      'course_number, guest_number, sort_order, created_at, updated_at, served_at, '
+      'tech_cards(dish_name, dish_name_localized, selling_price, department, '
+      'category, sections)';
 
   Future<void> _touchOrderUpdated(String orderId) async {
     await _supabase.client.from('pos_orders').update({
@@ -132,6 +146,20 @@ class PosOrderService {
     await _touchOrderUpdated(orderId);
   }
 
+  /// Отметить позицию отданной гостю (после отправки заказа на кухню/бар).
+  Future<void> markLineServed(String lineId, String orderId) async {
+    final o = await fetchById(orderId);
+    if (o == null) throw StateError('pos_order_missing');
+    if (o.status != PosOrderStatus.sent) {
+      throw PosOrderLineMarkServedException();
+    }
+    await _supabase.client.from('pos_order_lines').update({
+      'served_at': DateTime.now().toUtc().toIso8601String(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', lineId).eq('order_id', orderId);
+    await _touchOrderUpdated(orderId);
+  }
+
   /// Черновик → отправлен (кухня/бар увидят по статусу и строкам). Без строк — ошибка.
   Future<void> submitOrder(String orderId) async {
     await _requireDraft(orderId);
@@ -143,9 +171,9 @@ class PosOrderService {
     }).eq('id', orderId);
   }
 
-  /// Активные заказы, для экрана подразделения: [routeDepartment] = kitchen | bar | hall.
-  /// Кухня/бар — по категориям/секциям ТТК (как меню); зал — все незакрытые.
-  Future<List<PosOrder>> fetchActiveOrdersForDepartment(
+  /// Незакрытые заказы для экрана подразделения, разбитые на очередь и отданные.
+  /// [routeDepartment] = kitchen | bar | hall.
+  Future<PosDepartmentOrderBuckets> fetchDepartmentOrderBuckets(
     String establishmentId,
     String routeDepartment,
   ) async {
@@ -157,13 +185,14 @@ class PosOrderService {
       final rows = await _supabase.client
           .from('pos_orders')
           .select(
-            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name, status), pos_order_lines(quantity, tech_cards(category, sections))',
+            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name, status), pos_order_lines(quantity, served_at, tech_cards(category, sections))',
           )
           .eq('establishment_id', establishmentId)
           .neq('status', 'closed')
           .order('created_at', ascending: false);
 
-      final list = <PosOrder>[];
+      final active = <PosOrder>[];
+      final served = <PosOrder>[];
       for (final row in rows as List<dynamic>) {
         if (row is! Map<String, dynamic>) continue;
         try {
@@ -171,14 +200,19 @@ class PosOrderService {
           final linesRaw = m['pos_order_lines'];
           m.remove('pos_order_lines');
           if (!_orderMatchesDepartment(linesRaw, dept)) continue;
-          list.add(PosOrder.fromJson(m));
+          final o = PosOrder.fromJson(m);
+          if (_allRelevantLinesServed(linesRaw, dept)) {
+            served.add(o);
+          } else {
+            active.add(o);
+          }
         } catch (e) {
           devLog('PosOrderService: skip order row $e');
         }
       }
-      return list;
+      return PosDepartmentOrderBuckets(active: active, served: served);
     } catch (e, st) {
-      devLog('PosOrderService: fetchActiveOrdersForDepartment $e $st');
+      devLog('PosOrderService: fetchDepartmentOrderBuckets $e $st');
       rethrow;
     }
   }
@@ -221,6 +255,49 @@ class PosOrderService {
           ? secRaw.map((e) => e.toString()).toList()
           : <String>[];
       out.add((cat, sections));
+    }
+    return out;
+  }
+
+  /// По строкам подразделения: все отмечены «отдано».
+  bool _allRelevantLinesServed(dynamic linesRaw, String routeDepartment) {
+    final infos = _parseLineServeInfos(linesRaw);
+    if (infos.isEmpty) return false;
+    final relevant = infos.where((e) {
+      final (isBar, _) = e;
+      if (routeDepartment == 'hall') return true;
+      if (routeDepartment == 'bar') return isBar;
+      return !isBar;
+    }).toList();
+    if (relevant.isEmpty) return false;
+    return relevant.every((e) => e.$2 != null);
+  }
+
+  List<(bool, DateTime?)> _parseLineServeInfos(dynamic linesRaw) {
+    if (linesRaw is! List) return [];
+    final out = <(bool, DateTime?)>[];
+    for (final item in linesRaw) {
+      if (item is! Map) continue;
+      final line = Map<String, dynamic>.from(item);
+      DateTime? servedAt;
+      final servedRaw = line['served_at'];
+      if (servedRaw != null) {
+        servedAt = DateTime.tryParse(servedRaw.toString());
+      }
+      final tc = line['tech_cards'];
+      Map<String, dynamic>? t;
+      if (tc is Map<String, dynamic>) {
+        t = tc;
+      } else if (tc is List && tc.isNotEmpty && tc.first is Map) {
+        t = Map<String, dynamic>.from(tc.first as Map);
+      }
+      if (t == null) continue;
+      final cat = t['category'] as String? ?? '';
+      final secRaw = t['sections'];
+      final sections = secRaw is List
+          ? secRaw.map((e) => e.toString()).toList()
+          : <String>[];
+      out.add((posLineIsBarDish(cat, sections), servedAt));
     }
     return out;
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../services/services.dart';
+import '../../utils/pos_order_live_duration.dart';
 import '../../widgets/app_bar_home_button.dart';
 
 /// Активные заказы зала (pos_orders), создание черновика по столу.
@@ -20,15 +23,25 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
   bool _loading = true;
   Object? _error;
   List<PosOrder> _orders = [];
+  Timer? _elapsedTimer;
 
   @override
   void initState() {
     super.initState();
+    _elapsedTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted && _orders.isNotEmpty) setState(() {});
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _load();
       if (!mounted) return;
       await _maybeOpenFromTableQuery();
     });
+  }
+
+  @override
+  void dispose() {
+    _elapsedTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _maybeOpenFromTableQuery() async {
@@ -257,6 +270,9 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
           '${loc.t('pos_orders_guests_short')}: ${o.guestCount}',
           _statusLabel(loc, o.status),
           timeFmt.format(o.createdAt.toLocal()),
+          loc.t('pos_order_list_timer', args: {
+            'time': formatPosOrderLiveDuration(o.createdAt),
+          }),
         ].join(' · ');
         return ListTile(
           leading: const Icon(Icons.receipt_long),

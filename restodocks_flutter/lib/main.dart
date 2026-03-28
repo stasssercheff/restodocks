@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/core.dart';
+import 'core/supabase_env.dart';
 import 'utils/dev_log.dart';
 import 'core/initial_location_stub.dart'
     if (dart.library.html) 'core/initial_location_web.dart' as initial_loc;
@@ -17,15 +18,6 @@ import 'core/supabase_url_resolver_stub.dart'
 import 'services/services.dart';
 import 'services/translation_manager.dart';
 import 'widgets/widgets.dart';
-
-const String _supabaseUrlEnv = String.fromEnvironment(
-  'SUPABASE_URL',
-  defaultValue: 'https://osglfptwbuqqmqunttha.supabase.co',
-);
-const String _supabaseAnonKey = String.fromEnvironment(
-  'SUPABASE_ANON_KEY',
-  defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE',
-);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,12 +45,12 @@ Future<void> main() async {
 }
 
 Future<void> _bootstrapApp() async {
-  final supabaseUrl = supabase_url.resolveSupabaseUrl(_supabaseUrlEnv);
-  devLog('=== SUPABASE INIT: url=$supabaseUrl key=${_supabaseAnonKey.substring(0, 15)}... ===');
+  final supabaseUrl = supabase_url.resolveSupabaseUrl(kSupabaseUrlFromEnvironment);
+  devLog('=== SUPABASE INIT: url=$supabaseUrl key=${kSupabaseAnonKeyFromEnvironment.substring(0, 15)}... ===');
 
   await Supabase.initialize(
     url: supabaseUrl,
-    anonKey: _supabaseAnonKey,
+    anonKey: kSupabaseAnonKeyFromEnvironment,
     authOptions: const FlutterAuthClientOptions(
       detectSessionInUri: true,
       authFlowType: AuthFlowType.implicit, // сессия из hash при переходе по ссылке подтверждения

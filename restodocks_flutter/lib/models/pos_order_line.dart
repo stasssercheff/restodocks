@@ -15,6 +15,9 @@ class PosOrderLine {
     this.dishNameLocalized,
     this.sellingPrice,
     this.techCardDepartment,
+    this.techCardCategory,
+    this.techCardSections = const [],
+    this.servedAt,
   });
 
   final String id;
@@ -34,6 +37,13 @@ class PosOrderLine {
   final double? sellingPrice;
   final String? techCardDepartment;
 
+  /// Категория и секции ТТК (для маршрутизации кухня/бар).
+  final String? techCardCategory;
+  final List<String> techCardSections;
+
+  /// Когда блюдо отдано гостю (после отправки заказа).
+  final DateTime? servedAt;
+
   factory PosOrderLine.fromJson(Map<String, dynamic> json) {
     Map<String, dynamic>? tc;
     final embed = json['tech_cards'];
@@ -47,6 +57,17 @@ class PosOrderLine {
     final loc = tc?['dish_name_localized'];
     if (loc is Map<String, dynamic>) {
       locMap = loc.map((k, v) => MapEntry(k, v.toString()));
+    }
+
+    final secRaw = tc?['sections'];
+    final sections = secRaw is List
+        ? secRaw.map((e) => e.toString()).toList()
+        : <String>[];
+
+    final servedRaw = json['served_at'];
+    DateTime? servedAt;
+    if (servedRaw != null) {
+      servedAt = DateTime.tryParse(servedRaw.toString());
     }
 
     return PosOrderLine(
@@ -64,6 +85,9 @@ class PosOrderLine {
       dishNameLocalized: locMap,
       sellingPrice: (tc?['selling_price'] as num?)?.toDouble(),
       techCardDepartment: tc?['department'] as String?,
+      techCardCategory: tc?['category'] as String?,
+      techCardSections: sections,
+      servedAt: servedAt,
     );
   }
 
