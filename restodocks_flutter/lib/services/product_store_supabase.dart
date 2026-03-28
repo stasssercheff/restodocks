@@ -1183,6 +1183,32 @@ class ProductStoreSupabase {
     _priceCache.remove('${establishmentId}_$productId');
   }
 
+  /// Слияние дубликатов в один продукт: RPC переносит ссылки (ТТК, склад, номенклатура) и удаляет строки источников.
+  Future<void> mergeProductsInto(
+    String targetProductId,
+    List<String> sourceProductIds,
+  ) async {
+    final sources = sourceProductIds
+        .where((id) => id.isNotEmpty && id != targetProductId)
+        .toList();
+    if (sources.isEmpty) return;
+    await _supabase.client.rpc(
+      'merge_products_into',
+      params: {
+        'p_target': targetProductId,
+        'p_sources': sources,
+      },
+    );
+    for (final id in sources) {
+      _nomenclatureIds.remove(id);
+      _allProducts.removeWhere((p) => p.id == id);
+      _priceCache.removeWhere(
+        (key, _) => key.endsWith('_$id'),
+      );
+    }
+    _bumpCatalogRevision();
+  }
+
   /// Полностью удалить продукт из базы данных
   Future<void> deleteProduct(String productId) async {
     // Сначала удаляем из всех номенклатур

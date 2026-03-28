@@ -1126,6 +1126,12 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           await _ensureLoaded(skipAutoTranslation: true);
           if (mounted) setState(() {});
         },
+        onMergeProducts: (targetId, sourceIds) async {
+          final store = context.read<ProductStoreSupabase>();
+          await store.mergeProductsInto(targetId, sourceIds);
+          await _ensureLoaded(skipAutoTranslation: true);
+          if (mounted) setState(() {});
+        },
       ),
     );
   }
@@ -2474,6 +2480,7 @@ class _DuplicatesDialog extends StatefulWidget {
     required this.onRemove,
     this.showAiOption = true,
     this.onRequestAi,
+    this.onMergeProducts,
   });
 
   final List<List<NomenclatureItem>> groups;
@@ -2481,6 +2488,10 @@ class _DuplicatesDialog extends StatefulWidget {
   final Future<void> Function(List<String> idsToRemove) onRemove;
   final bool showAiOption;
   final VoidCallback? onRequestAi;
+
+  /// Слияние в БД: один эталон [targetId], строки [sourceIds] удаляются после переноса ссылок.
+  final Future<void> Function(String targetId, List<String> sourceIds)?
+      onMergeProducts;
 
   @override
   State<_DuplicatesDialog> createState() => _DuplicatesDialogState();
@@ -2504,9 +2515,59 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
   Future<void> _applyRemoval() async {
     if (_selectedToRemove.isEmpty) return;
     setState(() => _saving = true);
-    await widget.onRemove(_selectedToRemove.toList());
-    if (mounted) Navigator.of(context).pop();
-    setState(() => _saving = false);
+    try {
+      await widget.onRemove(_selectedToRemove.toList());
+      if (mounted) Navigator.of(context).pop();
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _applyMerge() async {
+    final merge = widget.onMergeProducts;
+    if (merge == null) return;
+    final loc = widget.loc;
+    for (final group in widget.groups) {
+      final kept =
+          group.where((i) => !_selectedToRemove.contains(i.id)).toList();
+      if (kept.length != 1) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(loc.t('duplicates_merge_need_one_kept') ??
+                  'В каждой группе оставьте ровно один эталон.')),
+        );
+        return;
+      }
+      final removed =
+          group.where((i) => _selectedToRemove.contains(i.id)).toList();
+      if (removed.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(loc.t('duplicates_merge_pick_per_group') ??
+                  'В каждой группе отметьте дубликаты для слияния.')),
+        );
+        return;
+      }
+    }
+    setState(() => _saving = true);
+    try {
+      for (final group in widget.groups) {
+        final kept = group.firstWhere((i) => !_selectedToRemove.contains(i.id));
+        final sources =
+            group.where((i) => _selectedToRemove.contains(i.id)).map((i) => i.id).toList();
+        if (sources.isEmpty) continue;
+        await merge(kept.id, sources);
+      }
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${loc.t('error')}: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -2525,6 +2586,16 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
                   'Найдены похожие названия. Выберите, какие удалить (останется один эталон).',
               style: theme.textTheme.bodySmall,
             ),
+            if (widget.onMergeProducts != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                widget.loc.t('duplicates_hint_merge') ??
+                    '«Объединить» переносит ссылки (ТТК, склад) на один продукт и удаляет дубликаты из справочника. «Снять с номенклатуры» — только убрать из списка заведения.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
             if (widget.showAiOption && widget.onRequestAi != null) ...[
               const SizedBox(height: 8),
               Align(
@@ -2602,16 +2673,35 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
           child: Text(widget.loc.t('duplicates_remove_all') ??
               'Удалить все кроме первого'),
         ),
-        FilledButton(
-          onPressed:
-              _saving || _selectedToRemove.isEmpty ? null : _applyRemoval,
-          child: _saving
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2))
-              : Text(widget.loc.t('duplicates_apply') ?? 'Применить'),
-        ),
+        if (widget.onMergeProducts != null) ...[
+          OutlinedButton(
+            onPressed: _saving || _selectedToRemove.isEmpty
+                ? null
+                : _applyRemoval,
+            child: Text(widget.loc.t('duplicates_nomenclature_only') ??
+                'Снять с номенклатуры'),
+          ),
+          FilledButton(
+            onPressed: _saving || _selectedToRemove.isEmpty ? null : _applyMerge,
+            child: _saving
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(widget.loc.t('duplicates_merge_catalog') ??
+                    'Объединить в справочнике'),
+          ),
+        ] else
+          FilledButton(
+            onPressed:
+                _saving || _selectedToRemove.isEmpty ? null : _applyRemoval,
+            child: _saving
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(widget.loc.t('duplicates_apply') ?? 'Применить'),
+          ),
       ],
     );
   }
