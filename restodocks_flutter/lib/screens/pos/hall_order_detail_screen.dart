@@ -101,10 +101,7 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _reloadAll();
-      _loadMenu();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reloadAll());
   }
 
   Future<void> _loadOrder() async {
@@ -150,6 +147,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
       return;
     }
     await _refreshLines();
+    if (!mounted) return;
+    await _loadMenu();
   }
 
   Future<void> _submit(LocalizationService loc) async {
