@@ -70,6 +70,7 @@ class _HallTablesScreenState extends State<HallTablesScreen> {
 
     if (table.status == PosTableStatus.free) {
       await context.push('/pos/hall/orders?table=${table.id}');
+      if (mounted) await _load();
       return;
     }
 
@@ -78,6 +79,7 @@ class _HallTablesScreenState extends State<HallTablesScreen> {
     if (!mounted) return;
     if (order != null) {
       await context.push('/pos/hall/orders/${order.id}');
+      if (mounted) await _load();
       return;
     }
 
