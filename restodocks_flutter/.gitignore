@@ -83,3 +83,6 @@ flutter_*.js.map
 # Vercel project link (org/project id) — в CI задаётся через secrets
 .vercel/
 .vercel
+
+# Supabase CLI локальный кэш (project-ref, версия CLI)
+supabase/.temp/
