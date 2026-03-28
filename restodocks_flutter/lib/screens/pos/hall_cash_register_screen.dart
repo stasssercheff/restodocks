@@ -181,7 +181,10 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen> {
                     fontWeight: FontWeight.w600,
                   ),
             ),
-            onTap: () => context.push('/pos/hall/orders/${o.id}'),
+            onTap: () async {
+              await context.push('/pos/hall/orders/${o.id}');
+              if (mounted) await _load();
+            },
           );
         },
       ),

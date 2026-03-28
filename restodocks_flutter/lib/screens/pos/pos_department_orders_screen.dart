@@ -292,7 +292,10 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
                           ],
                         ],
                       ),
-                      onTap: () => context.push('/pos/hall/orders/${o.id}'),
+                      onTap: () async {
+                        await context.push('/pos/hall/orders/${o.id}');
+                        if (mounted) await _load();
+                      },
                     );
                   },
                 ),

@@ -422,7 +422,10 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
                           ],
                         ],
                       ),
-                      onTap: () => context.push('/pos/hall/orders/${o.id}'),
+                      onTap: () async {
+                        await context.push('/pos/hall/orders/${o.id}');
+                        if (mounted) await _load();
+                      },
                     );
                   },
                 ),
