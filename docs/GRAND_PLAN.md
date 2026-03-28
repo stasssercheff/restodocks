@@ -15,6 +15,7 @@
 | Касса зала: смены, выдачи, отчёты | [x] | `pos_cash_shifts`, `pos_cash_disbursements`, `PosCashHallService` |
 | KDS, отчёт смены, закрытые счета | [x] | `pos_*` экраны, `router` |
 | Настройки отображения заказов | [x] | `PosOrdersDisplaySettingsScreen` |
+| Экран заказа для кухни/бара: без оплат и скидок, «Отдано» на весь чек по подразделению | [x] | `HallOrderDetailScreen` + `?dept=kitchen|bar`, списки подразделений, KDS |
 
 ---
 
