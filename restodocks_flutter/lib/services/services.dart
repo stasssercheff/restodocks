@@ -57,4 +57,7 @@ export 'privacy_policy_consent_service.dart';
 export 'pos_dining_layout_service.dart';
 export 'pos_order_service.dart';
 export 'pos_fiscal_service.dart';
+export 'fiscal_tax_presets_service.dart';
+export 'establishment_fiscal_settings_service.dart';
+export 'fiscal_outbox_service.dart';
 export 'pos_orders_display_settings_service.dart';

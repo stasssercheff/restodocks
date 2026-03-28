@@ -194,6 +194,50 @@ DROP POLICY IF EXISTS "auth_pos_order_payments_all" ON pos_order_payments;
 CREATE POLICY "auth_pos_order_payments_all" ON pos_order_payments
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
+-- --- 20260328270000_fiscal_core_outbox_settings.sql ---
+-- (см. файл миграции; для краткости — ключевые объекты)
+CREATE TABLE IF NOT EXISTS establishment_fiscal_settings (
+  establishment_id UUID PRIMARY KEY REFERENCES establishments(id) ON DELETE CASCADE,
+  tax_region TEXT NOT NULL DEFAULT 'RU',
+  price_tax_mode TEXT NOT NULL DEFAULT 'tax_included'
+    CHECK (price_tax_mode IN ('tax_included', 'tax_excluded')),
+  vat_override_percent NUMERIC(6, 2)
+    CHECK (vat_override_percent IS NULL OR (vat_override_percent >= 0 AND vat_override_percent <= 100)),
+  fiscal_section_id TEXT,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE establishment_fiscal_settings ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_establishment_fiscal_settings_all" ON establishment_fiscal_settings;
+CREATE POLICY "anon_establishment_fiscal_settings_all" ON establishment_fiscal_settings
+  FOR ALL TO anon USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "auth_establishment_fiscal_settings_all" ON establishment_fiscal_settings;
+CREATE POLICY "auth_establishment_fiscal_settings_all" ON establishment_fiscal_settings
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS fiscal_outbox (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  establishment_id UUID NOT NULL REFERENCES establishments(id) ON DELETE CASCADE,
+  pos_order_id UUID REFERENCES pos_orders(id) ON DELETE SET NULL,
+  operation TEXT NOT NULL CHECK (operation IN ('sale', 'refund', 'correction')),
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'synced', 'failed', 'skipped')),
+  client_request_id UUID NOT NULL UNIQUE,
+  payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+  error_message TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_fiscal_outbox_establishment ON fiscal_outbox(establishment_id);
+ALTER TABLE fiscal_outbox ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "anon_fiscal_outbox_all" ON fiscal_outbox;
+CREATE POLICY "anon_fiscal_outbox_all" ON fiscal_outbox
+  FOR ALL TO anon USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "auth_fiscal_outbox_all" ON fiscal_outbox;
+CREATE POLICY "auth_fiscal_outbox_all" ON fiscal_outbox
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
+ALTER TABLE tech_cards ADD COLUMN IF NOT EXISTS fiscal_system_tag TEXT;
+
 -- =============================================================================
 -- Готово. В Table Editor должна появиться pos_dining_tables; 404 на REST уйдёт.
 -- =============================================================================

@@ -533,16 +533,21 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
     ).grandTotal;
 
     setState(() => _closing = true);
+    final estBefore = context.read<AccountManagerSupabase>().establishment;
     try {
       await PosOrderService.instance.closeOrder(
         widget.orderId,
         tipsAmount: tips,
         payments: parts,
       );
-      await PosFiscalService.instance.registerSalePlaceholder(
-        orderId: widget.orderId,
-        amount: grand,
-      );
+      if (estBefore != null) {
+        await PosFiscalService.instance.queueSaleAfterOrderClose(
+          establishmentId: estBefore.id,
+          orderId: widget.orderId,
+          grandTotal: grand,
+          currencyCode: estBefore.defaultCurrency,
+        );
+      }
       if (!mounted) return;
       AppToastService.show(loc.t('pos_order_closed_toast'));
       await _reloadAll();

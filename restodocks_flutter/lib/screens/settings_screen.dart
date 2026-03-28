@@ -2155,6 +2155,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/settings/orders-display'),
               ),
+            if (posCanManageFiscalTaxSettings(currentEmployee))
+              ListTile(
+                leading: const Icon(Icons.account_balance_outlined),
+                title: Text(localization.t('fiscal_settings_title')),
+                subtitle: Text(
+                  localization.t('fiscal_settings_subtitle'),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/fiscal-tax'),
+              ),
             if (posCanConfigureOrdersDisplay(currentEmployee))
               ExpansionTile(
                 initiallyExpanded: false,

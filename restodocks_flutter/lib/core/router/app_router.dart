@@ -417,6 +417,13 @@ class AppRouter {
               const PosOrdersDisplaySettingsScreen(),
             ),
           ),
+          GoRoute(
+            path: '/settings/fiscal-tax',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const FiscalTaxSettingsScreen(),
+            ),
+          ),
           // Добавить заведение (владелец)
           GoRoute(
             path: '/add-establishment',

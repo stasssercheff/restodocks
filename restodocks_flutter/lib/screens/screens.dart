@@ -61,3 +61,4 @@ export 'pos/pos_procurement_screen.dart';
 export 'pos/pos_warehouse_hub_screen.dart';
 export 'pos/pos_shift_report_screen.dart';
 export 'pos/pos_kitchen_display_screen.dart';
+export 'settings/fiscal_tax_settings_screen.dart';

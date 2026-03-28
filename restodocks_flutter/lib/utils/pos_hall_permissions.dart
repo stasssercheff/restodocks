@@ -32,6 +32,13 @@ bool posCanManageHallTables(Employee? e) {
   return e.hasRole('floor_manager') && hall;
 }
 
+/// Налоги и очередь фискализации (владелец, управление).
+bool posCanManageFiscalTaxSettings(Employee? e) {
+  if (e == null) return false;
+  if (e.hasRole('owner') || e.hasRole('general_manager')) return true;
+  return e.department == 'management';
+}
+
 /// Отчёт смены / свод по оплатам (владелец, управление, менеджер зала).
 bool posCanViewPosShiftReport(Employee? e) {
   if (e == null) return false;

@@ -26,6 +26,7 @@ export 'pos_order.dart';
 export 'pos_order_line.dart';
 export 'pos_order_payment.dart';
 export 'pos_cash_register_row.dart';
+export 'establishment_fiscal_settings.dart';
 
 // Виджеты
 export '../widgets/data_safety_indicator.dart';
