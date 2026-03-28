@@ -1266,7 +1266,12 @@ class _AddDishSheetState extends State<_AddDishSheet> {
                             return ListTile(
                               title: Text(name),
                               subtitle: tc.sellingPrice != null
-                                  ? Text(tc.sellingPrice!.toStringAsFixed(0))
+                                  ? Text(
+                                      formatPosOrderMenuDue(
+                                        ctx,
+                                        tc.sellingPrice!,
+                                      ),
+                                    )
                                   : null,
                               onTap: () => widget.onPick(tc, _course, _guest),
                             );
