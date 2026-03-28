@@ -29,7 +29,8 @@ import '../../screens/home/expenses_screen.dart';
 import '../../screens/home/department_placeholder_screen.dart';
 import '../../screens/pos/hall_cash_register_screen.dart';
 import '../../screens/pos/pos_orders_display_settings_screen.dart';
-import '../../screens/pos/pos_feature_placeholder_screen.dart';
+import '../../screens/pos/pos_procurement_screen.dart';
+import '../../screens/pos/pos_warehouse_hub_screen.dart';
 import '../../screens/supabase_test_screen.dart';
 import '../../screens/checklist_edit_screen.dart';
 import '../../screens/checklist_fill_screen.dart';
@@ -649,19 +650,9 @@ class AppRouter {
             path: '/pos/warehouse/:scope',
             pageBuilder: (context, state) {
               final scope = state.pathParameters['scope'] ?? 'kitchen';
-              if (scope == 'establishment') {
-                return _slideTransitionPage(
-                  state,
-                  const PosFeaturePlaceholderScreen(
-                      feature: PosFeature.warehouseEstablishment),
-                );
-              }
               return _slideTransitionPage(
                 state,
-                PosFeaturePlaceholderScreen(
-                  feature: PosFeature.warehouse,
-                  departmentLabelKey: posDepartmentLabelKeyForRoute(scope),
-                ),
+                PosWarehouseHubScreen(scope: scope),
               );
             },
           ),
@@ -671,10 +662,7 @@ class AppRouter {
               final dept = state.pathParameters['department'] ?? 'kitchen';
               return _slideTransitionPage(
                 state,
-                PosFeaturePlaceholderScreen(
-                  feature: PosFeature.procurement,
-                  departmentLabelKey: posDepartmentLabelKeyForRoute(dept),
-                ),
+                PosProcurementScreen(department: dept),
               );
             },
           ),
