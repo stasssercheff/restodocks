@@ -619,6 +619,13 @@ class AppRouter {
             ),
           ),
           GoRoute(
+            path: '/pos/hall/tables/manage',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const HallTablesManageScreen(),
+            ),
+          ),
+          GoRoute(
             path: '/pos/orders/:department',
             pageBuilder: (context, state) {
               final dept = state.pathParameters['department'] ?? 'kitchen';

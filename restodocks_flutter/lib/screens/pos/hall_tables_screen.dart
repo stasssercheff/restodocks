@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../services/services.dart';
+import '../../utils/pos_hall_permissions.dart';
 import '../../widgets/app_bar_home_button.dart';
 
 const _kDefaultFloor = '__fd__';
@@ -62,12 +64,24 @@ class _HallTablesScreenState extends State<HallTablesScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final emp = context.watch<AccountManagerSupabase>().currentEmployee;
 
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(loc.t('pos_hall_tables_title')),
         actions: [
+          if (posCanManageHallTables(emp))
+            IconButton(
+              icon: const Icon(Icons.edit_note),
+              tooltip: loc.t('pos_tables_manage_title'),
+              onPressed: _loading
+                  ? null
+                  : () async {
+                      await context.push('/pos/hall/tables/manage');
+                      if (context.mounted) _load();
+                    },
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _load,

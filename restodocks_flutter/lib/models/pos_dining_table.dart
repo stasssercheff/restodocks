@@ -29,6 +29,7 @@ class PosDiningTable {
       status: PosTableStatus.fromApi(json['status'] as String? ?? 'free'),
     );
   }
+
 }
 
 enum PosTableStatus {

@@ -36,4 +36,49 @@ class PosDiningLayoutService {
       rethrow;
     }
   }
+
+  String? _nullIfEmpty(String? s) {
+    if (s == null) return null;
+    final t = s.trim();
+    return t.isEmpty ? null : t;
+  }
+
+  Future<PosDiningTable> insertTable({
+    required String establishmentId,
+    String? floorName,
+    String? roomName,
+    required int tableNumber,
+    int sortOrder = 0,
+    PosTableStatus status = PosTableStatus.free,
+  }) async {
+    final payload = <String, dynamic>{
+      'establishment_id': establishmentId,
+      'floor_name': _nullIfEmpty(floorName),
+      'room_name': _nullIfEmpty(roomName),
+      'table_number': tableNumber,
+      'sort_order': sortOrder,
+      'status': status.toApi(),
+    };
+    final row = await _supabase.client
+        .from('pos_dining_tables')
+        .insert(payload)
+        .select()
+        .single();
+    return PosDiningTable.fromJson(Map<String, dynamic>.from(row));
+  }
+
+  Future<void> updateTable(PosDiningTable table) async {
+    await _supabase.client.from('pos_dining_tables').update({
+      'floor_name': _nullIfEmpty(table.floorName),
+      'room_name': _nullIfEmpty(table.roomName),
+      'table_number': table.tableNumber,
+      'sort_order': table.sortOrder,
+      'status': table.status.toApi(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', table.id);
+  }
+
+  Future<void> deleteTable(String id) async {
+    await _supabase.client.from('pos_dining_tables').delete().eq('id', id);
+  }
 }
