@@ -2,14 +2,9 @@ import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../utils/dev_log.dart';
-import 'package:flutter/foundation.dart';
+import 'package:restodocks/core/supabase_env.dart';
 import 'package:restodocks/core/supabase_url_resolver_stub.dart'
     if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart' as supabase_url;
-
-const _supabaseAnonKey = String.fromEnvironment(
-  'SUPABASE_ANON_KEY',
-  defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zZ2xmcHR3YnVxcW1xdW50dGhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNTk0MDQsImV4cCI6MjA4MDYzNTQwNH0.Jy7yi2TNdSrmoBdILXBGRYB_vxGtq8scCZ9eCA9vfTE',
-);
 
 /// POST к Edge Function с retry при 5xx/сети (proxy/ EarlyDrop).
 /// 4xx не retry. Возвращает (status, data).
@@ -23,10 +18,10 @@ Future<({int status, Map<String, dynamic>? data})> postEdgeFunctionWithRetry(
   final sessionToken = Supabase.instance.client.auth.currentSession?.accessToken;
   final authBearer = (sessionToken != null && sessionToken.isNotEmpty)
       ? sessionToken
-      : _supabaseAnonKey;
+      : kSupabaseAnonKeyFromEnvironment;
   final dio = Dio(BaseOptions(
     headers: {
-      'apikey': _supabaseAnonKey,
+      'apikey': kSupabaseAnonKeyFromEnvironment,
       'Authorization': 'Bearer $authBearer',
       'Content-Type': 'application/json',
     },

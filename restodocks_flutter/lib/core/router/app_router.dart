@@ -22,11 +22,17 @@ import '../../screens/checklist_inbox_detail_screen.dart';
 import '../../screens/iiko_inventory_inbox_detail_screen.dart';
 import '../../screens/inventory_merge_screen.dart';
 import '../../screens/writeoff_inbox_detail_screen.dart';
+import '../../screens/tech_card_change_inbox_detail_screen.dart';
 import '../../screens/writeoff_summary_inbox_screen.dart';
 import '../../screens/writeoffs_screen.dart';
 import '../../screens/haccp_log_detail_screen.dart';
 import '../../screens/home/expenses_screen.dart';
 import '../../screens/home/department_placeholder_screen.dart';
+import '../../screens/pos/hall_cash_register_screen.dart';
+import '../../screens/pos/pos_orders_display_settings_screen.dart';
+import '../../screens/pos/pos_procurement_screen.dart';
+import '../../screens/pos/pos_warehouse_hub_screen.dart';
+import '../../screens/pos/pos_stock_screen.dart';
 import '../../screens/supabase_test_screen.dart';
 import '../../screens/checklist_edit_screen.dart';
 import '../../screens/checklist_fill_screen.dart';
@@ -406,6 +412,27 @@ class AppRouter {
             pageBuilder: (context, state) =>
                 _slideTransitionPage(state, const SettingsScreen()),
           ),
+          GoRoute(
+            path: '/settings/orders-display',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const PosOrdersDisplaySettingsScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/settings/fiscal-tax',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const FiscalTaxSettingsScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/settings/system-errors',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const SystemErrorsScreen(),
+            ),
+          ),
           // Добавить заведение (владелец)
           GoRoute(
             path: '/add-establishment',
@@ -475,6 +502,16 @@ class AppRouter {
                   final id = state.pathParameters['id'] ?? '';
                   return _slideTransitionPage(
                       state, WriteoffInboxDetailScreen(documentId: id));
+                },
+              ),
+              GoRoute(
+                path: 'ttk-change/:id',
+                pageBuilder: (context, state) {
+                  final id = state.pathParameters['id'] ?? '';
+                  return _slideTransitionPage(
+                    state,
+                    TechCardChangeInboxDetailScreen(requestId: id),
+                  );
                 },
               ),
               GoRoute(
@@ -583,6 +620,107 @@ class AppRouter {
               final id = state.pathParameters['id'] ?? 'kitchen';
               return _slideTransitionPage(
                   state, DepartmentPlaceholderScreen(department: id));
+            },
+          ),
+
+          // POS: зал, списки по подразделениям, хабы склада и закупки
+          GoRoute(
+            path: '/pos/hall/orders',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const HallOrdersScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/pos/hall/orders/:orderId',
+            pageBuilder: (context, state) {
+              final id = state.pathParameters['orderId'] ?? '';
+              return _slideTransitionPage(
+                state,
+                HallOrderDetailScreen(orderId: id),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/pos/hall/cash-register',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const HallCashRegisterScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/pos/hall/order-history',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const HallOrderHistoryScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/pos/hall/tables',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const HallTablesScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/pos/hall/tables/manage',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const HallTablesManageScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/pos/orders/:department',
+            pageBuilder: (context, state) {
+              final dept = state.pathParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(
+                state,
+                PosDepartmentOrdersScreen(department: dept),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/pos/warehouse/:scope',
+            pageBuilder: (context, state) {
+              final scope = state.pathParameters['scope'] ?? 'kitchen';
+              return _slideTransitionPage(
+                state,
+                PosWarehouseHubScreen(scope: scope),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/pos/stock',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const PosStockScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/pos/procurement/:department',
+            pageBuilder: (context, state) {
+              final dept = state.pathParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(
+                state,
+                PosProcurementScreen(department: dept),
+              );
+            },
+          ),
+          GoRoute(
+            path: '/pos/shift-report',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const PosShiftReportScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/pos/kds/:department',
+            pageBuilder: (context, state) {
+              final dept = state.pathParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(
+                state,
+                PosKitchenDisplayScreen(department: dept),
+              );
             },
           ),
 

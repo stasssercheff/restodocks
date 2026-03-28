@@ -1,0 +1,54 @@
+{
+  "version": "2026.1",
+  "notes": "Справочные ставки; проверяйте актуальность по законодательству. Режим цены: tax_included (как в РФ/ЕС в меню) или tax_excluded (часто США).",
+  "regions": {
+    "RU": {
+      "labelKey": "fiscal_region_ru",
+      "defaultPriceTaxMode": "tax_included",
+      "vatRates": [0, 10, 20],
+      "defaultVatPercent": 20
+    },
+    "AE": {
+      "labelKey": "fiscal_region_ae",
+      "defaultPriceTaxMode": "tax_included",
+      "vatRates": [0, 5],
+      "defaultVatPercent": 5,
+      "extraTaxes": [{ "code": "sugar_levy_uae", "labelKey": "fiscal_extra_uae_sugar", "percent": 50, "appliesToTags": ["SYS_NON_ALCO_SUGAR"] }]
+    },
+    "KZ": {
+      "labelKey": "fiscal_region_kz",
+      "defaultPriceTaxMode": "tax_included",
+      "vatRates": [0, 12],
+      "defaultVatPercent": 12
+    },
+    "DE": {
+      "labelKey": "fiscal_region_de",
+      "defaultPriceTaxMode": "tax_included",
+      "vatRates": [7, 19],
+      "defaultVatPercent": 19
+    },
+    "US": {
+      "labelKey": "fiscal_region_us",
+      "defaultPriceTaxMode": "tax_excluded",
+      "vatRates": [],
+      "defaultVatPercent": null,
+      "salesTaxNoteKey": "fiscal_us_sales_tax_note"
+    },
+    "RS": {
+      "labelKey": "fiscal_region_rs",
+      "defaultPriceTaxMode": "tax_included",
+      "vatRates": [10, 20],
+      "defaultVatPercent": 20
+    }
+  },
+  "systemTags": {
+    "SYS_FOOD": { "description": "Пища общепита" },
+    "SYS_NON_ALCO_SUGAR": { "description": "Безалкогольные с сахаром (спец. налоги в отдельных юрисдикциях)" },
+    "SYS_NON_ALCO_PURE": { "description": "Безалкогольные без сахара" },
+    "SYS_ALCO_SOFT": { "description": "Алкоголь низкой крепости" },
+    "SYS_ALCO_HARD": { "description": "Крепкий алкоголь; может требовать маркировку" },
+    "SYS_TOBACCO": { "description": "Табачная продукция; может требовать маркировку" },
+    "SYS_SERVICE": { "description": "Услуги" },
+    "SYS_RETAIL": { "description": "Розница непищевая" }
+  }
+}

@@ -38,6 +38,9 @@ class AppProviders {
         ChangeNotifierProvider<MobileUiScaleService>(
           create: (_) => MobileUiScaleService(),
         ),
+        ChangeNotifierProvider<PosOrdersDisplaySettingsService>(
+          create: (_) => PosOrdersDisplaySettingsService(),
+        ),
         ChangeNotifierProvider<NotificationPreferencesService>(
           create: (_) => NotificationPreferencesService(),
         ),

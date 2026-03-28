@@ -3001,6 +3001,21 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             sellingPrice: sellingPrice,
             photoUrls: photoUrls,
             ingredients: toSaveIngredients);
+        final canPublishDirect = emp.hasRole('owner') ||
+            emp.hasRole('general_manager');
+        if (!canPublishDirect) {
+          await TechCardChangeRequestService.instance.submitProposal(
+            techCard: updated,
+            authorEmployeeId: emp.id,
+          );
+          if (mounted) {
+            setState(() => _saving = false);
+            await clearDraft();
+            AppToastService.show(loc.t('tech_card_change_submitted'));
+            context.pop(true);
+          }
+          return;
+        }
         await svc.saveTechCard(updated,
             changedByEmployeeId: emp.id, changedByName: emp.fullName);
         // Переводим название и технологию фоново

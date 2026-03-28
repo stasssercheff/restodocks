@@ -160,6 +160,41 @@ class InboxService {
         ));
       }
 
+      // Заявки на изменение ТТК — владелец и генеральный директор
+      if (currentEmployee.hasRole('owner') ||
+          currentEmployee.hasRole('general_manager')) {
+        try {
+          final ttkRows =
+              await TechCardChangeRequestService.instance.listPending(establishmentId);
+          for (final row in ttkRows) {
+            final payload = row['proposed_payload'];
+            var dish = 'ТТК';
+            var dept = 'kitchen';
+            if (payload is Map<String, dynamic>) {
+              final card = payload['card'];
+              if (card is Map<String, dynamic>) {
+                dish = card['dish_name']?.toString() ?? dish;
+                dept = card['department']?.toString() ?? 'kitchen';
+              }
+            }
+            documents.add(InboxDocument(
+              id: row['id']?.toString() ?? '',
+              type: DocumentType.techCardChangeRequest,
+              title: dish,
+              description: 'ТТК',
+              createdAt: DateTime.parse(row['created_at'].toString()).toLocal(),
+              employeeId: row['author_employee_id']?.toString() ?? '',
+              employeeName: '—',
+              department: _mapSectionToDepartment(dept),
+              fileUrl: null,
+              metadata: Map<String, dynamic>.from(row),
+            ));
+          }
+        } catch (e) {
+          devLog('InboxService: ttk change requests $e');
+        }
+      }
+
       // Заказы продуктов (данные уже загружены параллельно выше)
       for (final doc in orderDocs) {
         final payload = doc['payload'] as Map<String, dynamic>? ?? {};

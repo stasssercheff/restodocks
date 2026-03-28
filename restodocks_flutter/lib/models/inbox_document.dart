@@ -17,6 +17,8 @@ enum DocumentType {
   checklistMissedDeadline,
   /// Списание (персонал, проработка, порча, брекераж, отказ гостя)
   writeoff,
+  /// Изменение ТТК на согласовании у владельца
+  techCardChangeRequest,
 }
 
 /// Модель документа во входящих
@@ -78,6 +80,8 @@ class InboxDocument extends Equatable {
         return Icons.warning_amber;
       case DocumentType.writeoff:
         return Icons.remove_circle_outline;
+      case DocumentType.techCardChangeRequest:
+        return Icons.restaurant_menu;
     }
   }
 
@@ -113,6 +117,8 @@ class InboxDocument extends Equatable {
           _ => cat,
         };
         return '${loc.t('writeoffs') ?? 'Списания'} ($catName) $date';
+      case DocumentType.techCardChangeRequest:
+        return title;
     }
   }
 
@@ -133,6 +139,8 @@ class InboxDocument extends Equatable {
         return loc.t('inbox_msg_checklist_not_done') ?? 'Чеклист не выполнен';
       case DocumentType.writeoff:
         return loc.t('writeoffs') ?? 'Списания';
+      case DocumentType.techCardChangeRequest:
+        return loc.t('doc_type_ttk_change');
     }
   }
 

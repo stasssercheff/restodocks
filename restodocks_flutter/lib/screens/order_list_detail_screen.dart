@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../models/models.dart';
 import '../services/app_toast_service.dart';
 import '../services/services.dart';
+import '../utils/order_list_units.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/order_export_sheet.dart';
 
@@ -28,6 +29,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
   String? _establishmentId;
   final _commentCtrl = TextEditingController();
   List<TextEditingController> _qtyControllers = [];
+  List<TextEditingController> _receivedControllers = [];
 
   static String _unitLabel(String unitId, String lang) => unitId == 'pkg'
       ? (lang == 'ru' ? 'упак.' : 'pkg')
@@ -89,6 +91,17 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                 ))
             .toList() ??
         [];
+    for (final c in _receivedControllers) {
+      c.dispose();
+    }
+    _receivedControllers = found?.items
+            .map((e) => TextEditingController(
+                  text: e.receivedQuantity != null && e.receivedQuantity! > 0
+                      ? e.receivedQuantity!.toString()
+                      : '',
+                ))
+            .toList() ??
+        [];
     setState(() {
       _list = found;
       _loading = false;
@@ -112,6 +125,9 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     for (final c in _qtyControllers) {
       c.dispose();
     }
+    for (final c in _receivedControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -126,6 +142,74 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
   void _updateComment() {
     if (_list == null) return;
     setState(() => _list = _list!.copyWith(comment: _commentCtrl.text));
+  }
+
+  Product? _productById(ProductStoreSupabase store, String? id) {
+    if (id == null || id.isEmpty) return null;
+    for (final p in store.allProducts) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+
+  Future<void> _saveReceivedQuantities() async {
+    if (_list == null || _establishmentId == null) return;
+    if (_list!.savedAt == null) return;
+    final loc = context.read<LocalizationService>();
+    final store = context.read<ProductStoreSupabase>();
+    if (store.allProducts.isEmpty) {
+      await store.loadProducts();
+    }
+    final oldItems = _list!.items;
+    final newItems = <OrderListItem>[];
+    for (var i = 0; i < _list!.items.length; i++) {
+      final it = _list!.items[i];
+      final r = i < _receivedControllers.length
+          ? double.tryParse(
+              _receivedControllers[i].text.replaceFirst(',', '.'))
+          : null;
+      newItems.add(it.copyWith(receivedQuantity: r));
+    }
+    final estId = _establishmentId!;
+    try {
+      for (var i = 0; i < newItems.length; i++) {
+        final old = i < oldItems.length ? oldItems[i] : null;
+        final neu = newItems[i];
+        final pid = neu.productId;
+        if (pid == null || pid.isEmpty) continue;
+        final oldR = old?.receivedQuantity;
+        final newR = neu.receivedQuantity;
+        if (oldR == newR) continue;
+        final p = _productById(store, pid);
+        final gOld = orderListQuantityToGrams(oldR ?? 0, neu.unit, p);
+        final gNew = orderListQuantityToGrams(newR ?? 0, neu.unit, p);
+        final delta = gNew - gOld;
+        if (delta == 0) continue;
+        await PosStockService.instance.applyImportDelta(
+          establishmentId: estId,
+          productId: pid,
+          deltaGrams: delta,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${loc.t('error')}: $e')),
+      );
+      return;
+    }
+    final updated = _list!.copyWith(items: newItems);
+    final lists =
+        await loadOrderLists(estId, department: _list!.department);
+    final idx = lists.indexWhere((l) => l.id == updated.id);
+    if (idx < 0) return;
+    lists[idx] = updated;
+    await saveOrderLists(estId, lists, department: _list!.department);
+    if (!mounted) return;
+    setState(() => _list = updated);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(loc.t('order_list_received_saved'))),
+    );
   }
 
   Future<void> _saveWithQuantities() async {
@@ -392,6 +476,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       );
     }
     final list = _list!;
+    final showReceived = list.savedAt != null;
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
@@ -443,11 +528,18 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                   Table(
                     border:
                         TableBorder.all(color: Theme.of(context).dividerColor),
-                    columnWidths: const {
-                      0: FlexColumnWidth(2),
-                      1: FixedColumnWidth(100),
-                      2: FixedColumnWidth(100),
-                    },
+                    columnWidths: showReceived
+                        ? const {
+                            0: FlexColumnWidth(2),
+                            1: FixedColumnWidth(88),
+                            2: FixedColumnWidth(88),
+                            3: FixedColumnWidth(88),
+                          }
+                        : const {
+                            0: FlexColumnWidth(2),
+                            1: FixedColumnWidth(100),
+                            2: FixedColumnWidth(100),
+                          },
                     children: [
                       TableRow(
                         decoration: BoxDecoration(
@@ -476,6 +568,14 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                                 style: const TextStyle(
                                     fontWeight: FontWeight.bold)),
                           ),
+                          if (showReceived)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 8),
+                              child: Text(loc.t('order_list_received_qty'),
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold)),
+                            ),
                         ],
                       ),
                       ...list.items.asMap().entries.map((e) {
@@ -539,11 +639,37 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                                     )
                                   : const SizedBox.shrink(),
                             ),
+                            if (showReceived)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 4, vertical: 4),
+                                child: i < _receivedControllers.length
+                                    ? TextField(
+                                        keyboardType: const TextInputType
+                                            .numberWithOptions(decimal: true),
+                                        decoration: const InputDecoration(
+                                          isDense: true,
+                                          border: OutlineInputBorder(),
+                                          contentPadding: EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 8),
+                                        ),
+                                        style: const TextStyle(fontSize: 12),
+                                        controller: _receivedControllers[i],
+                                      )
+                                    : const SizedBox.shrink(),
+                              ),
                           ],
                         );
                       }),
                     ],
                   ),
+                  if (showReceived) ...[
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: _saveReceivedQuantities,
+                      child: Text(loc.t('order_list_save_received')),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   Text(loc.t('order_list_comment'),
                       style: Theme.of(context).textTheme.labelLarge),
