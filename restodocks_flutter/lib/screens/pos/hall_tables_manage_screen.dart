@@ -280,17 +280,24 @@ class _HallTablesManageScreenState extends State<HallTablesManageScreen> {
             ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loading ? null : _load,
+            tooltip: loc.t('refresh'),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _loading ? null : () => _openForm(loc, null),
         tooltip: loc.t('pos_tables_manage_add'),
         child: const Icon(Icons.add),
       ),
-      body: _body(loc),
+      body: _body(context, loc),
     );
   }
 
-  Widget _body(LocalizationService loc) {
+  Widget _body(BuildContext context, LocalizationService loc) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -298,24 +305,66 @@ class _HallTablesManageScreenState extends State<HallTablesManageScreen> {
       final message = _error == 'no_establishment'
           ? loc.t('error_no_establishment_or_employee')
           : loc.t('pos_tables_load_error');
-      return Center(child: Text(message, textAlign: TextAlign.center));
-    }
-    if (_tables.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            loc.t('pos_tables_manage_empty'),
-            textAlign: TextAlign.center,
-          ),
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.45,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(message, textAlign: TextAlign.center),
+                      if (_error != 'no_establishment') ...[
+                        const SizedBox(height: 16),
+                        FilledButton(
+                          onPressed: _load,
+                          child: Text(loc.t('retry')),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: _tables.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, i) {
+    if (_tables.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.45,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    loc.t('pos_tables_manage_empty'),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        itemCount: _tables.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (context, i) {
         final t = _tables[i];
         final sub = [
           if (t.floorName != null && t.floorName!.isNotEmpty) t.floorName,
@@ -347,6 +396,7 @@ class _HallTablesManageScreenState extends State<HallTablesManageScreen> {
           ),
         );
       },
+      ),
     );
   }
 }
