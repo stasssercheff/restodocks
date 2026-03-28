@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../models/models.dart';
 import '../services/app_toast_service.dart';
 import '../services/services.dart';
+import '../utils/order_list_units.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/order_export_sheet.dart';
 
@@ -143,10 +144,23 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
     setState(() => _list = _list!.copyWith(comment: _commentCtrl.text));
   }
 
+  Product? _productById(ProductStoreSupabase store, String? id) {
+    if (id == null || id.isEmpty) return null;
+    for (final p in store.allProducts) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+
   Future<void> _saveReceivedQuantities() async {
     if (_list == null || _establishmentId == null) return;
     if (_list!.savedAt == null) return;
     final loc = context.read<LocalizationService>();
+    final store = context.read<ProductStoreSupabase>();
+    if (store.allProducts.isEmpty) {
+      await store.loadProducts();
+    }
+    final oldItems = _list!.items;
     final newItems = <OrderListItem>[];
     for (var i = 0; i < _list!.items.length; i++) {
       final it = _list!.items[i];
@@ -156,14 +170,41 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
           : null;
       newItems.add(it.copyWith(receivedQuantity: r));
     }
+    final estId = _establishmentId!;
+    try {
+      for (var i = 0; i < newItems.length; i++) {
+        final old = i < oldItems.length ? oldItems[i] : null;
+        final neu = newItems[i];
+        final pid = neu.productId;
+        if (pid == null || pid.isEmpty) continue;
+        final oldR = old?.receivedQuantity;
+        final newR = neu.receivedQuantity;
+        if (oldR == newR) continue;
+        final p = _productById(store, pid);
+        final gOld = orderListQuantityToGrams(oldR ?? 0, neu.unit, p);
+        final gNew = orderListQuantityToGrams(newR ?? 0, neu.unit, p);
+        final delta = gNew - gOld;
+        if (delta == 0) continue;
+        await PosStockService.instance.applyImportDelta(
+          establishmentId: estId,
+          productId: pid,
+          deltaGrams: delta,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${loc.t('error')}: $e')),
+      );
+      return;
+    }
     final updated = _list!.copyWith(items: newItems);
-    final lists = await loadOrderLists(_establishmentId!,
-        department: _list!.department);
+    final lists =
+        await loadOrderLists(estId, department: _list!.department);
     final idx = lists.indexWhere((l) => l.id == updated.id);
     if (idx < 0) return;
     lists[idx] = updated;
-    await saveOrderLists(_establishmentId!, lists,
-        department: _list!.department);
+    await saveOrderLists(estId, lists, department: _list!.department);
     if (!mounted) return;
     setState(() => _list = updated);
     ScaffoldMessenger.of(context).showSnackBar(

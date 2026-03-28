@@ -22,6 +22,7 @@ class _PosStockScreenState extends State<PosStockScreen> {
       [];
   List<({DateTime createdAt, String productId, double deltaGrams, String reason})>
       _movements = [];
+  Map<String, ({double importGrams, double saleGrams})>? _agg;
   DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
   RealtimeChannel? _rtBal;
   RealtimeChannel? _rtMov;
@@ -107,12 +108,31 @@ class _PosStockScreenState extends State<PosStockScreen> {
         _loading = false;
       });
       await _loadMovements();
+      await _loadAgg();
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = e;
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _loadAgg() async {
+    final est = context.read<AccountManagerSupabase>().establishment?.id;
+    if (est == null) return;
+    final start = DateTime(_month.year, _month.month);
+    final end = DateTime(_month.year, _month.month + 1);
+    try {
+      final a = await PosStockService.instance.aggregateImportVsSale(
+        establishmentId: est,
+        fromUtc: start.toUtc(),
+        toUtc: end.toUtc(),
+      );
+      if (!mounted) return;
+      setState(() => _agg = a);
+    } catch (_) {
+      if (mounted) setState(() => _agg = null);
     }
   }
 
@@ -170,6 +190,7 @@ class _PosStockScreenState extends State<PosStockScreen> {
       _month = DateTime(y.year, y.month);
     });
     await _loadMovements();
+    await _loadAgg();
   }
 
   @override
@@ -179,6 +200,12 @@ class _PosStockScreenState extends State<PosStockScreen> {
     final emp = context.watch<AccountManagerSupabase>().currentEmployee;
     final canHealth = posCanRunWarehouseHealthCheck(emp);
     final monthFmt = DateFormat.yMMMM(Localizations.localeOf(context).toString());
+    final showReconciliation = _agg != null &&
+        _agg!.entries.any(
+          (e) =>
+              e.value.importGrams.abs() > 0.0001 ||
+              e.value.saleGrams.abs() > 0.0001,
+        );
 
     return Scaffold(
       appBar: AppBar(
@@ -316,6 +343,99 @@ class _PosStockScreenState extends State<PosStockScreen> {
                                 childCount: _balances.length,
                               ),
                             ),
+                          if (showReconciliation) ...[
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      loc.t('pos_stock_reconciliation_title'),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      loc.t('pos_stock_reconciliation_hint'),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
+                                child: Card(
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    child: DataTable(
+                                      headingRowHeight: 40,
+                                      dataRowMinHeight: 36,
+                                      dataRowMaxHeight: 48,
+                                      columns: [
+                                        DataColumn(
+                                            label: Text(loc.t('nomenclature'))),
+                                        DataColumn(
+                                          label: Text(
+                                              loc.t('pos_stock_col_import')),
+                                          numeric: true,
+                                        ),
+                                        DataColumn(
+                                          label: Text(
+                                              loc.t('pos_stock_col_sale')),
+                                          numeric: true,
+                                        ),
+                                        DataColumn(
+                                          label: Text(
+                                              loc.t('pos_stock_col_net')),
+                                          numeric: true,
+                                        ),
+                                      ],
+                                      rows: () {
+                                        final rows = _agg!.entries
+                                            .where((e) =>
+                                                e.value.importGrams.abs() >
+                                                    0.0001 ||
+                                                e.value.saleGrams.abs() >
+                                                    0.0001)
+                                            .toList()
+                                          ..sort((a, b) => _productName(
+                                                  a.key, store)
+                                              .compareTo(_productName(b.key, store)));
+                                        return rows.map((e) {
+                                          final net = e.value.importGrams -
+                                              e.value.saleGrams;
+                                          return DataRow(cells: [
+                                            DataCell(Text(_productName(
+                                                e.key, store))),
+                                            DataCell(Text(e
+                                                .value.importGrams
+                                                .toStringAsFixed(1))),
+                                            DataCell(Text(e.value.saleGrams
+                                                .toStringAsFixed(1))),
+                                            DataCell(Text(
+                                                net.toStringAsFixed(1))),
+                                          ]);
+                                        }).toList();
+                                      }(),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                           SliverToBoxAdapter(
                             child: Padding(
                               padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),

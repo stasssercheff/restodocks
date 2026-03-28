@@ -180,4 +180,8 @@ GRANT EXECUTE ON FUNCTION warehouse_health_check(UUID) TO anon, authenticated;
 -- =============================================================================
 -- Готово. Если ошибка на UNIQUE idx_est_stock_mov_unique_pos_sale_line_product —
 -- удалите дубликаты (одинаковые pos_order_line_id + product_id + pos_sale) вручную.
+--
+-- Edge Function log-system-error (запись system_errors с сервера): деплой отдельно:
+--   cd restodocks_flutter && supabase functions deploy log-system-error
+-- Таблица system_errors должна уже существовать (миграция выше).
 -- =============================================================================

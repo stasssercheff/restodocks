@@ -49,4 +49,35 @@ class SystemErrorService {
         .limit(limit);
     return List<Map<String, dynamic>>.from(rows as List);
   }
+
+  /// Запись через Edge Function `log-system-error` (тот же payload, source по умолчанию `edge`).
+  Future<void> insertViaEdge({
+    required String establishmentId,
+    required String message,
+    String severity = 'error',
+    String source = 'edge',
+    Map<String, dynamic>? context,
+    String? employeeId,
+    String? posOrderId,
+  }) async {
+    try {
+      final res = await _supabase.client.functions.invoke(
+        'log-system-error',
+        body: {
+          'establishmentId': establishmentId,
+          'message': message.length > 8000 ? message.substring(0, 8000) : message,
+          'severity': severity,
+          'source': source,
+          'context': context ?? {},
+          if (employeeId != null) 'employeeId': employeeId,
+          if (posOrderId != null) 'posOrderId': posOrderId,
+        },
+      );
+      if (res.status != 200) {
+        devLog('SystemErrorService.insertViaEdge: status=${res.status} data=${res.data}');
+      }
+    } catch (e, st) {
+      devLog('SystemErrorService: insertViaEdge failed $e $st');
+    }
+  }
 }

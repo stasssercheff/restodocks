@@ -40,6 +40,10 @@ verify_jwt = false
 [functions.get-training-video-url]
 verify_jwt = false
 
+# log-system-error: запись в system_errors (anon JWT или service role в apikey)
+[functions.log-system-error]
+verify_jwt = false
+
 # auto-translate-product: вызывается из приложения и скриптов batch_translate (anon key)
 [functions.auto-translate-product]
 verify_jwt = false

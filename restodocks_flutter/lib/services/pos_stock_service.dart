@@ -175,4 +175,66 @@ class PosStockService {
     final list = raw as List<dynamic>;
     return list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
+
+  /// Приход на склад по факту получения из списка заказа (`reason` = import).
+  Future<void> applyImportDelta({
+    required String establishmentId,
+    required String productId,
+    required double deltaGrams,
+  }) async {
+    if (deltaGrams == 0) return;
+    try {
+      await _supabase.client.rpc(
+        'apply_establishment_stock_delta',
+        params: {
+          'p_establishment_id': establishmentId,
+          'p_product_id': productId,
+          'p_delta_grams': deltaGrams,
+          'p_reason': 'import',
+          'p_pos_order_id': null,
+          'p_pos_order_line_id': null,
+        },
+      );
+    } catch (err, st) {
+      devLog('PosStockService: import rpc $err $st');
+      await SystemErrorService.instance.insert(
+        establishmentId: establishmentId,
+        message: 'pos_stock import apply_establishment_stock_delta: $err',
+        severity: 'error',
+        source: 'pos_stock',
+        context: {'productId': productId, 'deltaGrams': deltaGrams},
+      );
+      rethrow;
+    }
+  }
+
+  /// Суммы по продукту: приход (import) и расход (pos_sale, в граммах положительным числом).
+  Future<Map<String, ({double importGrams, double saleGrams})>>
+      aggregateImportVsSale({
+    required String establishmentId,
+    required DateTime fromUtc,
+    required DateTime toUtc,
+  }) async {
+    final movements = await fetchMovements(
+      establishmentId: establishmentId,
+      fromUtc: fromUtc,
+      toUtc: toUtc,
+      limit: 20000,
+    );
+    final acc = <String, ({double i, double s})>{};
+    for (final m in movements) {
+      final cur = acc[m.productId] ?? (i: 0, s: 0);
+      if (m.reason == 'import') {
+        acc[m.productId] = (i: cur.i + m.deltaGrams, s: cur.s);
+      } else if (m.reason == 'pos_sale') {
+        acc[m.productId] = (
+          i: cur.i,
+          s: cur.s + m.deltaGrams.abs(),
+        );
+      }
+    }
+    return acc.map(
+      (k, v) => MapEntry(k, (importGrams: v.i, saleGrams: v.s)),
+    );
+  }
 }
