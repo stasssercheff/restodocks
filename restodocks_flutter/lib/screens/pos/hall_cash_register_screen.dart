@@ -96,11 +96,12 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen> {
           ),
         ],
       ),
-      body: _body(loc, timeFmt),
+      body: _body(context, loc, timeFmt),
     );
   }
 
-  Widget _body(LocalizationService loc, DateFormat timeFmt) {
+  Widget _body(
+      BuildContext context, LocalizationService loc, DateFormat timeFmt) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -111,46 +112,61 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen> {
       return Center(child: Text(message, textAlign: TextAlign.center));
     }
     if (_rows.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            loc.t('pos_cash_register_empty'),
-            textAlign: TextAlign.center,
-          ),
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.45,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    loc.t('pos_cash_register_empty'),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: _rows.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, i) {
-        final r = _rows[i];
-        final o = r.order;
-        final tn = o.tableNumber ?? 0;
-        final sub = [
-          '${loc.t('pos_orders_guests_short')}: ${o.guestCount}',
-          _statusLabel(loc, o.status),
-          timeFmt.format(o.updatedAt.toLocal()),
-          loc.t('pos_order_bill_requested'),
-        ].join(' · ');
-        return ListTile(
-          leading: const Icon(Icons.point_of_sale),
-          title: Text(loc.t('pos_table_number', args: {'n': '$tn'})),
-          subtitle: Text(
-            sub,
-            style: posOrderListSubtitleStyle(context),
-          ),
-          trailing: Text(
-            formatPosOrderMenuDue(context, r.totalDue),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-          onTap: () => context.push('/pos/hall/orders/${o.id}'),
-        );
-      },
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        itemCount: _rows.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (context, i) {
+          final r = _rows[i];
+          final o = r.order;
+          final tn = o.tableNumber ?? 0;
+          final sub = [
+            '${loc.t('pos_orders_guests_short')}: ${o.guestCount}',
+            _statusLabel(loc, o.status),
+            timeFmt.format(o.updatedAt.toLocal()),
+            loc.t('pos_order_bill_requested'),
+          ].join(' · ');
+          return ListTile(
+            leading: const Icon(Icons.point_of_sale),
+            title: Text(loc.t('pos_table_number', args: {'n': '$tn'})),
+            subtitle: Text(
+              sub,
+              style: posOrderListSubtitleStyle(context),
+            ),
+            trailing: Text(
+              formatPosOrderMenuDue(context, r.totalDue),
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            onTap: () => context.push('/pos/hall/orders/${o.id}'),
+          );
+        },
+      ),
     );
   }
 }

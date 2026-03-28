@@ -272,14 +272,15 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
         tooltip: loc.t('pos_orders_fab_new'),
         child: const Icon(Icons.add),
       ),
-      body: _body(loc, timeFmt),
+      body: _body(context, loc, timeFmt),
     );
   }
 
   List<PosOrder> get _visibleOrders =>
       _bucket == _HallBucket.active ? _buckets.active : _buckets.served;
 
-  Widget _body(LocalizationService loc, DateFormat timeFmt) {
+  Widget _body(
+      BuildContext context, LocalizationService loc, DateFormat timeFmt) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -290,13 +291,24 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
       return Center(child: Text(message, textAlign: TextAlign.center));
     }
     if (_buckets.active.isEmpty && _buckets.served.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            loc.t('pos_orders_empty_active'),
-            textAlign: TextAlign.center,
-          ),
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.45,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    loc.t('pos_orders_empty_active'),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -321,19 +333,30 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
           ),
         ),
         Expanded(
-          child: _visibleOrders.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      _bucket == _HallBucket.active
-                          ? loc.t('pos_department_orders_active_empty')
-                          : loc.t('pos_department_orders_served_empty'),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                )
-              : ListView.separated(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: _visibleOrders.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(
+                        height: MediaQuery.sizeOf(context).height * 0.35,
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(
+                              _bucket == _HallBucket.active
+                                  ? loc.t('pos_department_orders_active_empty')
+                                  : loc.t('pos_department_orders_served_empty'),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(16),
                   itemCount: _visibleOrders.length,
                   separatorBuilder: (_, __) => const Divider(height: 1),
@@ -378,6 +401,7 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
                     );
                   },
                 ),
+          ),
         ),
       ],
     );

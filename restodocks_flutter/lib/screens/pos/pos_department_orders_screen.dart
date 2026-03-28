@@ -156,14 +156,15 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
           ),
         ],
       ),
-      body: _body(loc, timeFmt),
+      body: _body(context, loc, timeFmt),
     );
   }
 
   List<PosOrder> get _visibleOrders =>
       _bucket == _DeptBucket.active ? _buckets.active : _buckets.served;
 
-  Widget _body(LocalizationService loc, DateFormat timeFmt) {
+  Widget _body(
+      BuildContext context, LocalizationService loc, DateFormat timeFmt) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -174,13 +175,24 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
       return Center(child: Text(message, textAlign: TextAlign.center));
     }
     if (_buckets.active.isEmpty && _buckets.served.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            loc.t('pos_department_orders_empty'),
-            textAlign: TextAlign.center,
-          ),
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: [
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.45,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    loc.t('pos_department_orders_empty'),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -205,19 +217,30 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
           ),
         ),
         Expanded(
-          child: _visibleOrders.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Text(
-                      _bucket == _DeptBucket.active
-                          ? loc.t('pos_department_orders_active_empty')
-                          : loc.t('pos_department_orders_served_empty'),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                )
-              : ListView.separated(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: _visibleOrders.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: [
+                      SizedBox(
+                        height: MediaQuery.sizeOf(context).height * 0.35,
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(
+                              _bucket == _DeptBucket.active
+                                  ? loc.t('pos_department_orders_active_empty')
+                                  : loc.t('pos_department_orders_served_empty'),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.all(16),
                   itemCount: _visibleOrders.length,
                   separatorBuilder: (_, __) => const Divider(height: 1),
@@ -261,6 +284,7 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
                     );
                   },
                 ),
+          ),
         ),
       ],
     );
