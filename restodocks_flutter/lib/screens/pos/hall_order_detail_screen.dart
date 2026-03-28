@@ -1231,22 +1231,45 @@ class _AddDishSheetState extends State<_AddDishSheet> {
             Expanded(
               child: widget.loading && widget.dishes.isEmpty
                   ? const Center(child: CircularProgressIndicator())
-                  : ListView.builder(
-                      itemCount: _filtered.length,
-                      itemBuilder: (ctx, i) {
-                        final tc = _filtered[i];
-                        final name = tc.dishNameLocalized?[lang]?.trim().isNotEmpty == true
-                            ? tc.dishNameLocalized![lang]!
-                            : tc.dishName;
-                        return ListTile(
-                          title: Text(name),
-                          subtitle: tc.sellingPrice != null
-                              ? Text(tc.sellingPrice!.toStringAsFixed(0))
-                              : null,
-                          onTap: () => widget.onPick(tc, _course, _guest),
-                        );
-                      },
-                    ),
+                  : _filtered.isEmpty
+                      ? Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(
+                              _search.text.trim().isNotEmpty
+                                  ? loc.t('no_results')
+                                  : loc.t('pos_order_add_dish_empty_hint'),
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: _filtered.length,
+                          itemBuilder: (ctx, i) {
+                            final tc = _filtered[i];
+                            final name = tc.dishNameLocalized?[lang]
+                                        ?.trim()
+                                        .isNotEmpty ==
+                                    true
+                                ? tc.dishNameLocalized![lang]!
+                                : tc.dishName;
+                            return ListTile(
+                              title: Text(name),
+                              subtitle: tc.sellingPrice != null
+                                  ? Text(tc.sellingPrice!.toStringAsFixed(0))
+                                  : null,
+                              onTap: () => widget.onPick(tc, _course, _guest),
+                            );
+                          },
+                        ),
             ),
           ],
         ),
