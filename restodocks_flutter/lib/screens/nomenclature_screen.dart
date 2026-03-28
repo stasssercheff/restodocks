@@ -15,6 +15,7 @@ import 'package:uuid/uuid.dart';
 import '../models/iiko_product.dart';
 import '../utils/number_format_utils.dart';
 import '../utils/product_name_utils.dart';
+import '../utils/nomenclature_duplicate_groups.dart';
 import '../services/iiko_product_store.dart';
 import '../services/iiko_xlsx_sanitizer.dart';
 
@@ -979,43 +980,122 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       return;
     }
 
-    // Локальный поиск дублей по названию — без ИИ, мгновенно
-    String _norm(String s) =>
-        s.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
-
-    final Map<String, List<NomenclatureItem>> grouped = {};
-    for (final item in productItems) {
-      // Проверяем по локализованному имени
-      final localName = _norm(item.getLocalizedName(loc.currentLanguageCode));
-      grouped.putIfAbsent(localName, () => []).add(item);
-      // Также по базовому имени из БД (может отличаться от локализованного)
-      if (item.product != null) {
-        final baseName = _norm(item.product!.name);
-        if (baseName != localName) {
-          grouped.putIfAbsent(baseName, () => []).add(item);
-        }
-      }
-    }
-
-    // Оставляем только группы с дублями, дедуплицируем элементы внутри группы
-    final duplicateGroups = grouped.values
-        .map((g) {
-          final seen = <String>{};
-          return g.where((item) => seen.add(item.id)).toList();
-        })
-        .where((g) => g.length >= 2)
-        .toList()
-      ..sort((a, b) =>
-          b.length.compareTo(a.length)); // самые большие группы первыми
+    final duplicateGroups = buildNomenclatureDuplicateGroups(
+      productItems: productItems,
+      languageCode: loc.currentLanguageCode,
+    );
 
     if (duplicateGroups.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(loc.t('duplicates_none') ?? 'Дубликатов не найдено')),
+          content: Text(
+              loc.t('duplicates_none') ?? 'Дубликатов не найдено'),
+          action: SnackBarAction(
+            label: loc.t('duplicates_search_ai') ?? 'ИИ',
+            onPressed: () => _showDuplicatesWithAI(),
+          ),
+        ),
       );
       return;
     }
 
+    await _openDuplicatesDialog(duplicateGroups, loc);
+  }
+
+  /// Edge `ai-find-duplicates` (лимит ~150 названий на стороне функции).
+  Future<void> _showDuplicatesWithAI() async {
+    final loc = context.read<LocalizationService>();
+    final productItems = _nomenclatureItems.where((i) => i.isProduct).toList();
+
+    if (productItems.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(loc.t('duplicates_need_more') ??
+                'Нужно минимум 2 продукта для поиска дубликатов')),
+      );
+      return;
+    }
+    if (productItems.length > 150) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('duplicates_ai_limit'))),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                  child: Text(loc.t('duplicates_ai_progress') ??
+                      'Поиск дубликатов (ИИ)…')),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final ai = context.read<AiServiceSupabase>();
+      final payload = productItems
+          .map((e) => (
+                id: e.id,
+                name: e.getLocalizedName(loc.currentLanguageCode),
+              ))
+          .toList();
+      final idGroups = await ai.findDuplicates(payload);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+
+      final idToItem = {for (final i in productItems) i.id: i};
+      final duplicateGroups = <List<NomenclatureItem>>[];
+      for (final g in idGroups) {
+        final items = <NomenclatureItem>[];
+        for (final id in g) {
+          final it = idToItem[id];
+          if (it != null) items.add(it);
+        }
+        if (items.length >= 2) duplicateGroups.add(items);
+      }
+
+      if (duplicateGroups.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  loc.t('duplicates_none') ?? 'Дубликатов не найдено')),
+        );
+        return;
+      }
+
+      await _openDuplicatesDialog(duplicateGroups, loc, showAiOption: false);
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${loc.t('duplicates_ai_error')}: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _openDuplicatesDialog(
+    List<List<NomenclatureItem>> duplicateGroups,
+    LocalizationService loc, {
+    bool showAiOption = true,
+  }) async {
     final idToItem = {for (final i in _nomenclatureItems) i.id: i};
 
     if (!mounted) return;
@@ -1024,6 +1104,13 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       builder: (ctx) => _DuplicatesDialog(
         groups: duplicateGroups,
         loc: loc,
+        showAiOption: showAiOption,
+        onRequestAi: showAiOption
+            ? () {
+                Navigator.of(ctx).pop();
+                _showDuplicatesWithAI();
+              }
+            : null,
         onRemove: (idsToRemove) async {
           final store = context.read<ProductStoreSupabase>();
           final est = context.read<AccountManagerSupabase>().establishment;
@@ -2385,11 +2472,15 @@ class _DuplicatesDialog extends StatefulWidget {
     required this.groups,
     required this.loc,
     required this.onRemove,
+    this.showAiOption = true,
+    this.onRequestAi,
   });
 
   final List<List<NomenclatureItem>> groups;
   final LocalizationService loc;
   final Future<void> Function(List<String> idsToRemove) onRemove;
+  final bool showAiOption;
+  final VoidCallback? onRequestAi;
 
   @override
   State<_DuplicatesDialog> createState() => _DuplicatesDialogState();
@@ -2434,6 +2525,17 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
                   'Найдены похожие названия. Выберите, какие удалить (останется один эталон).',
               style: theme.textTheme.bodySmall,
             ),
+            if (widget.showAiOption && widget.onRequestAi != null) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _saving ? null : widget.onRequestAi,
+                  icon: const Icon(Icons.auto_awesome, size: 18),
+                  label: Text(widget.loc.t('duplicates_search_ai') ?? 'ИИ'),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Expanded(
               child: ListView.builder(
