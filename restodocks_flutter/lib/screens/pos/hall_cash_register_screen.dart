@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../services/services.dart';
+import '../../utils/pos_floor_room_label.dart';
 import '../../utils/pos_hall_permissions.dart';
 import '../../utils/pos_order_menu_due_format.dart';
 import '../../utils/pos_orders_list_subtitle_style.dart';
@@ -153,9 +154,26 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen> {
           return ListTile(
             leading: const Icon(Icons.point_of_sale),
             title: Text(loc.t('pos_table_number', args: {'n': '$tn'})),
-            subtitle: Text(
-              sub,
-              style: posOrderListSubtitleStyle(context),
+            isThreeLine: true,
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  posFloorRoomSummaryLine(loc,
+                      floorName: o.floorName, roomName: o.roomName),
+                  style: posOrderListSubtitleStyle(context)?.copyWith(
+                    color:
+                        Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  sub,
+                  style: posOrderListSubtitleStyle(context),
+                ),
+              ],
             ),
             trailing: Text(
               formatPosOrderMenuDue(context, r.totalDue),

@@ -392,11 +392,22 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
                       leading: const Icon(Icons.receipt_long),
                       title:
                           Text(loc.t('pos_table_number', args: {'n': '$tn'})),
-                      isThreeLine: due != null,
+                      isThreeLine: true,
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          Text(
+                            posFloorRoomSummaryLine(loc,
+                                floorName: o.floorName, roomName: o.roomName),
+                            style: posOrderListSubtitleStyle(context)?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
                           Text(
                             sub,
                             style: posOrderListSubtitleStyle(context),

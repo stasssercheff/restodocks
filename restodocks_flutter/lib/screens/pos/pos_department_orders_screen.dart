@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../services/services.dart';
+import '../../utils/pos_floor_room_label.dart';
 import '../../utils/pos_hall_permissions.dart';
 import '../../utils/pos_order_department.dart';
 import '../../utils/pos_order_live_duration.dart';
@@ -261,11 +262,22 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
                     return ListTile(
                       leading: const Icon(Icons.receipt_long),
                       title: Text(loc.t('pos_table_number', args: {'n': '$tn'})),
-                      isThreeLine: due != null,
+                      isThreeLine: true,
                       subtitle: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          Text(
+                            posFloorRoomSummaryLine(loc,
+                                floorName: o.floorName, roomName: o.roomName),
+                            style: posOrderListSubtitleStyle(context)?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
                           Text(
                             sub,
                             style: posOrderListSubtitleStyle(context),
