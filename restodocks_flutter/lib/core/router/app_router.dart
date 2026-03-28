@@ -600,8 +600,18 @@ class AppRouter {
             path: '/pos/hall/orders',
             pageBuilder: (context, state) => _slideTransitionPage(
               state,
-              const PosFeaturePlaceholderScreen(feature: PosFeature.hallOrders),
+              const HallOrdersScreen(),
             ),
+          ),
+          GoRoute(
+            path: '/pos/hall/orders/:orderId',
+            pageBuilder: (context, state) {
+              final id = state.pathParameters['orderId'] ?? '';
+              return _slideTransitionPage(
+                state,
+                HallOrderDetailScreen(orderId: id),
+              );
+            },
           ),
           GoRoute(
             path: '/pos/hall/cash-register',

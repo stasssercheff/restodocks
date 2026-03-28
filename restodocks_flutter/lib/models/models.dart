@@ -22,6 +22,7 @@ export 'establishment_document.dart';
 export 'chat_room.dart';
 export 'chat_room_message.dart';
 export 'pos_dining_table.dart';
+export 'pos_order.dart';
 
 // Виджеты
 export '../widgets/data_safety_indicator.dart';

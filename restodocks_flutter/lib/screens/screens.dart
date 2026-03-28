@@ -52,3 +52,5 @@ export 'legal_document_screen.dart';
 export 'pos/pos_feature_placeholder_screen.dart';
 export 'pos/hall_tables_screen.dart';
 export 'pos/hall_tables_manage_screen.dart';
+export 'pos/hall_orders_screen.dart';
+export 'pos/hall_order_detail_screen.dart';

@@ -55,3 +55,4 @@ export 'getting_started_read_service.dart';
 export 'page_tour_service.dart';
 export 'privacy_policy_consent_service.dart';
 export 'pos_dining_layout_service.dart';
+export 'pos_order_service.dart';
