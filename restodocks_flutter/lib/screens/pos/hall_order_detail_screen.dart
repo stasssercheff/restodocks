@@ -36,6 +36,7 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
 
   List<TechCard> _menuDishes = [];
   bool _menuLoading = false;
+  bool _menuLoadFailed = false;
 
   bool _sending = false;
   bool _closing = false;
@@ -270,7 +271,10 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
     final account = context.read<AccountManagerSupabase>();
     final est = account.establishment;
     if (est == null) return;
-    setState(() => _menuLoading = true);
+    setState(() {
+      _menuLoading = true;
+      _menuLoadFailed = false;
+    });
     try {
       final svc = context.read<TechCardServiceSupabase>();
       final all = await svc.getTechCardsForEstablishment(est.dataEstablishmentId);
@@ -280,10 +284,17 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
         setState(() {
           _menuDishes = dishes;
           _menuLoading = false;
+          _menuLoadFailed = false;
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _menuLoading = false);
+      if (mounted) {
+        setState(() {
+          _menuLoading = false;
+          _menuLoadFailed = true;
+          _menuDishes = [];
+        });
+      }
     }
   }
 
@@ -741,6 +752,23 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                   icon: const Icon(Icons.restaurant_menu),
                   label: Text(loc.t('pos_order_line_add')),
                 ),
+                if (_menuLoadFailed) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    loc.t('pos_tables_load_error'),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _menuLoading ? null : _loadMenu,
+                      icon: const Icon(Icons.refresh_outlined),
+                      label: Text(loc.t('retry')),
+                    ),
+                  ),
+                ],
                 if (!_linesLoading && _lines.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   FilledButton.icon(
