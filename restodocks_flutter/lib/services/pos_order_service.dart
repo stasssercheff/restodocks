@@ -1,3 +1,5 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../models/pos_cash_register_row.dart';
 import '../models/pos_dining_table.dart';
 import '../models/pos_order.dart';
@@ -67,10 +69,47 @@ class PosOrderService {
       'tech_cards(dish_name, dish_name_localized, selling_price, department, '
       'category, sections)';
 
-  static const _orderSelectWithTable =
+  /// Полный select (после миграции `20260328260000_pos_orders_pricing_split_payments.sql`).
+  static const _orderFullWithTable =
       'id, establishment_id, dining_table_id, status, guest_count, created_at, '
       'updated_at, payment_method, paid_at, discount_amount, service_charge_percent, tips_amount, '
       'pos_dining_tables(table_number, floor_name, room_name, status)';
+
+  /// Без колонок скидки — если миграция не прогнана, иначе PostgREST 400 на `pos_orders`.
+  static const _orderCoreWithTable =
+      'id, establishment_id, dining_table_id, status, guest_count, created_at, '
+      'updated_at, payment_method, paid_at, '
+      'pos_dining_tables(table_number, floor_name, room_name, status)';
+
+  static bool _isMissingColumnError(Object e) {
+    if (e is PostgrestException) {
+      final m = e.message.toLowerCase();
+      if (m.contains('does not exist')) return true;
+      if (e.details != null &&
+          e.details.toString().toLowerCase().contains('column')) {
+        return true;
+      }
+    }
+    final s = e.toString().toLowerCase();
+    return s.contains('42703') ||
+        (s.contains('column') && s.contains('does not exist'));
+  }
+
+  /// Повтор запроса без `discount_amount` / `service_charge_percent` / `tips_amount`.
+  Future<List<dynamic>> _selectOrdersWithPricingFallback(
+    Future<List<dynamic>> Function(String orderFields) run,
+  ) async {
+    try {
+      return await run(_orderFullWithTable);
+    } catch (e, st) {
+      if (!_isMissingColumnError(e)) {
+        devLog('PosOrderService: select orders $e $st');
+        rethrow;
+      }
+      devLog('PosOrderService: retry pos_orders without pricing columns (apply MANUAL migration)');
+      return await run(_orderCoreWithTable);
+    }
+  }
 
   Future<void> _touchOrderUpdated(String orderId) async {
     await _supabase.client.from('pos_orders').update({
@@ -223,14 +262,17 @@ class PosOrderService {
       dept = 'kitchen';
     }
     try {
-      final rows = await _supabase.client
-          .from('pos_orders')
-          .select(
-            '$_orderSelectWithTable, pos_order_lines(quantity, served_at, tech_cards(category, sections, selling_price))',
-          )
-          .eq('establishment_id', establishmentId)
-          .neq('status', 'closed')
-          .order('created_at', ascending: false);
+      final rows = await _selectOrdersWithPricingFallback((sel) async {
+        final r = await _supabase.client
+            .from('pos_orders')
+            .select(
+              '$sel, pos_order_lines(quantity, served_at, tech_cards(category, sections, selling_price))',
+            )
+            .eq('establishment_id', establishmentId)
+            .neq('status', 'closed')
+            .order('created_at', ascending: false);
+        return r as List<dynamic>;
+      });
 
       final active = <PosOrder>[];
       final served = <PosOrder>[];
@@ -361,14 +403,15 @@ class PosOrderService {
 
   Future<List<PosOrder>> fetchActiveOrders(String establishmentId) async {
     try {
-      final rows = await _supabase.client
-          .from('pos_orders')
-          .select(
-            _orderSelectWithTable,
-          )
-          .eq('establishment_id', establishmentId)
-          .neq('status', 'closed')
-          .order('created_at', ascending: false);
+      final rows = await _selectOrdersWithPricingFallback((sel) async {
+        final r = await _supabase.client
+            .from('pos_orders')
+            .select(sel)
+            .eq('establishment_id', establishmentId)
+            .neq('status', 'closed')
+            .order('created_at', ascending: false);
+        return r as List<dynamic>;
+      });
 
       final list = <PosOrder>[];
       for (final row in rows as List<dynamic>) {
@@ -391,14 +434,17 @@ class PosOrderService {
     String establishmentId,
   ) async {
     try {
-      final rows = await _supabase.client
-          .from('pos_orders')
-          .select(
-            '$_orderSelectWithTable, pos_order_lines(quantity, tech_cards(selling_price))',
-          )
-          .eq('establishment_id', establishmentId)
-          .neq('status', 'closed')
-          .order('updated_at', ascending: false);
+      final rows = await _selectOrdersWithPricingFallback((sel) async {
+        final r = await _supabase.client
+            .from('pos_orders')
+            .select(
+              '$sel, pos_order_lines(quantity, tech_cards(selling_price))',
+            )
+            .eq('establishment_id', establishmentId)
+            .neq('status', 'closed')
+            .order('updated_at', ascending: false);
+        return r as List<dynamic>;
+      });
 
       final out = <PosCashRegisterRow>[];
       for (final row in rows as List<dynamic>) {
@@ -464,17 +510,17 @@ class PosOrderService {
     String diningTableId,
   ) async {
     try {
-      final rows = await _supabase.client
-          .from('pos_orders')
-          .select(
-            _orderSelectWithTable,
-          )
-          .eq('establishment_id', establishmentId)
-          .eq('dining_table_id', diningTableId)
-          .neq('status', 'closed')
-          .order('created_at', ascending: false)
-          .limit(1);
-      final list = rows as List<dynamic>;
+      final list = await _selectOrdersWithPricingFallback((sel) async {
+        final r = await _supabase.client
+            .from('pos_orders')
+            .select(sel)
+            .eq('establishment_id', establishmentId)
+            .eq('dining_table_id', diningTableId)
+            .neq('status', 'closed')
+            .order('created_at', ascending: false)
+            .limit(1);
+        return r as List<dynamic>;
+      });
       if (list.isEmpty) return null;
       return PosOrder.fromJson(Map<String, dynamic>.from(list.first as Map));
     } catch (e, st) {
@@ -485,14 +531,14 @@ class PosOrderService {
 
   Future<PosOrder?> fetchById(String orderId) async {
     try {
-      final rows = await _supabase.client
-          .from('pos_orders')
-          .select(
-            _orderSelectWithTable,
-          )
-          .eq('id', orderId)
-          .limit(1);
-      final list = rows as List<dynamic>;
+      final list = await _selectOrdersWithPricingFallback((sel) async {
+        final r = await _supabase.client
+            .from('pos_orders')
+            .select(sel)
+            .eq('id', orderId)
+            .limit(1);
+        return r as List<dynamic>;
+      });
       if (list.isEmpty) return null;
       return PosOrder.fromJson(Map<String, dynamic>.from(list.first as Map));
     } catch (e, st) {
@@ -510,7 +556,7 @@ class PosOrderService {
     if (existing != null) {
       throw PosOrderTableBusyException(existing);
     }
-    final row = await _supabase.client
+    final inserted = await _supabase.client
         .from('pos_orders')
         .insert({
           'establishment_id': establishmentId,
@@ -518,17 +564,18 @@ class PosOrderService {
           'guest_count': guestCount,
           'status': PosOrderStatus.draft.toApi(),
         })
-        .select(
-          _orderSelectWithTable,
-        )
+        .select('id')
         .single();
+    final newId = inserted['id'] as String;
+    final o = await fetchById(newId);
+    if (o == null) throw StateError('pos_order_missing');
     try {
       await PosDiningLayoutService.instance
           .updateTableStatus(diningTableId, PosTableStatus.occupied);
     } catch (e, st) {
       devLog('PosOrderService: createDraft table status $e $st');
     }
-    return PosOrder.fromJson(Map<String, dynamic>.from(row));
+    return o;
   }
 
   /// Гости просят счёт: стол в статусе «счёт» (касса / официант видят на плане).
@@ -598,14 +645,17 @@ class PosOrderService {
     required DateTime toUtc,
   }) async {
     try {
-      final rows = await _supabase.client
-          .from('pos_orders')
-          .select(_orderSelectWithTable)
-          .eq('establishment_id', establishmentId)
-          .eq('status', PosOrderStatus.closed.toApi())
-          .gte('paid_at', fromUtc.toUtc().toIso8601String())
-          .lte('paid_at', toUtc.toUtc().toIso8601String())
-          .order('paid_at', ascending: false);
+      final rows = await _selectOrdersWithPricingFallback((sel) async {
+        final r = await _supabase.client
+            .from('pos_orders')
+            .select(sel)
+            .eq('establishment_id', establishmentId)
+            .eq('status', PosOrderStatus.closed.toApi())
+            .gte('paid_at', fromUtc.toUtc().toIso8601String())
+            .lte('paid_at', toUtc.toUtc().toIso8601String())
+            .order('paid_at', ascending: false);
+        return r as List<dynamic>;
+      });
       final list = <PosOrder>[];
       for (final row in rows as List<dynamic>) {
         if (row is! Map<String, dynamic>) continue;
