@@ -29,6 +29,7 @@ import '../services/translation_manager.dart';
 import '../services/iiko_product_store.dart';
 import '../services/iiko_xlsx_sanitizer.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../utils/moderation_items_from_import_results.dart';
 
 // Глобальная переменная для хранения debug логов
 List<String> _debugLogs = [];
@@ -1635,67 +1636,58 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         account.establishment?.defaultCurrency ?? 'VND',
       );
 
-      // Обрабатываем результаты
       final ambiguousResults = importResults
           .where((r) => r.matchResult.type == MatchType.ambiguous)
           .toList();
-      final priceUpdateResults = importResults
-          .where((r) => r.matchResult.type == MatchType.priceUpdate)
-          .toList();
 
-      if (priceUpdateResults.isNotEmpty) {
-        // Показываем диалог для выбора режима обновления цен
-        final updateMode = await _showPriceUpdateModeDialog(priceUpdateResults);
-        if (updateMode == 'manual') {
-          // Обрабатываем вручную - показываем диалог для каждого продукта
-          await _processPriceUpdatesManually(
-              importResults, importService, establishmentId, account);
-        } else if (updateMode == 'all') {
-          // Обновляем все цены автоматически
-          await importService.processImportResults(
-            importResults,
-            {},
-            establishmentId,
-            account.establishment?.defaultCurrency ?? 'VND',
-          );
+      Map<String, String>? ambiguousResolutions;
+      if (ambiguousResults.isNotEmpty) {
+        ambiguousResolutions =
+            await _showAmbiguousMatchesDialog(ambiguousResults);
+        if (ambiguousResolutions == null) {
+          return;
         }
-        // Если null - пользователь отменил, ничего не делаем
-      } else if (ambiguousResults.isNotEmpty) {
-        // Показываем модальное окно для разрешения неоднозначностей
-        final resolutions = await _showAmbiguousMatchesDialog(ambiguousResults);
-        if (resolutions != null) {
-          await importService.processImportResults(
-            importResults,
-            resolutions,
-            establishmentId,
-            account.establishment?.defaultCurrency ?? 'VND',
-          );
-        }
-      } else {
-        // Обрабатываем без неоднозначностей
-        await importService.processImportResults(
-          importResults,
-          {},
-          establishmentId,
-          account.establishment?.defaultCurrency ?? 'VND',
-        );
       }
 
-      // Перезагружаем номенклатуру чтобы цены в кэше соответствовали БД
-      try {
-        await context
-            .read<ProductStoreSupabase>()
-            .loadNomenclature(establishmentId);
-      } catch (_) {}
+      final productStore = context.read<ProductStoreSupabase>();
+      await productStore.loadProducts(force: true);
+      await productStore.loadNomenclature(establishmentId);
 
-      // Показываем результаты
-      final successCount = importResults.where((r) => r.error == null).length;
-      final errorCount = importResults.where((r) => r.error != null).length;
+      final moderationItems = moderationItemsFromProductImportResults(
+        results: importResults,
+        establishmentId: establishmentId,
+        store: productStore,
+        ambiguousResolutions: ambiguousResolutions,
+      );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text(loc.t(
-                'Импорт завершен: $successCount успешно, $errorCount ошибок'))),
+      if (moderationItems.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(loc.t('import_review_nothing_to_apply')),
+            ),
+          );
+        }
+        return;
+      }
+
+      String? sheetLang;
+      for (final r in importResults) {
+        if (r.detectedLanguage != null && r.detectedLanguage!.isNotEmpty) {
+          sheetLang = r.detectedLanguage;
+          break;
+        }
+      }
+
+      if (!mounted) return;
+      _cancelLoadingTimeout();
+      context.push(
+        '/import-review',
+        extra: ImportReviewPayload(
+          items: moderationItems,
+          generateTranslationsForNewProducts: true,
+          importSourceLanguage: sheetLang,
+        ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1709,114 +1701,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         });
       }
     }
-  }
-
-  Future<String?> _showPriceUpdateModeDialog(
-      List<ProductImportResult> results) async {
-    final loc = context.read<LocalizationService>();
-    return showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('Найдены продукты с измененными ценами')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(loc.t(
-                'Найдено ${results.length} продуктов, у которых цена отличается от существующей в номенклатуре.')),
-            const SizedBox(height: 16),
-            Text(loc.t('Выберите способ обновления:')),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(loc.t('Отмена')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop('manual'),
-            child: Text(loc.t('Обновить вручную')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop('all'),
-            child: Text(loc.t('Обновить все цены')),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _processPriceUpdatesManually(
-    List<ProductImportResult> allResults,
-    IntelligentProductImportService importService,
-    String establishmentId,
-    AccountManagerSupabase account,
-  ) async {
-    final resolutions = <String, String>{};
-
-    // Обрабатываем только результаты с priceUpdate
-    final priceUpdateResults = allResults
-        .where((r) => r.matchResult.type == MatchType.priceUpdate)
-        .toList();
-
-    for (final result in priceUpdateResults) {
-      final updatePrice = await _showPriceUpdateDialog(result);
-      if (updatePrice == true) {
-        resolutions[result.fileName] = 'update';
-      } else if (updatePrice == false) {
-        resolutions[result.fileName] = 'skip';
-      }
-      // Если null - пользователь отменил весь процесс
-      else {
-        return;
-      }
-    }
-
-    // Обрабатываем все результаты с resolutions
-    await importService.processImportResults(
-      allResults,
-      resolutions,
-      establishmentId,
-      account.establishment?.defaultCurrency ?? 'VND',
-    );
-  }
-
-  Future<bool?> _showPriceUpdateDialog(ProductImportResult result) async {
-    final loc = context.read<LocalizationService>();
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('Обновить цену продукта')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(loc.t('Продукт: ${result.fileName}')),
-            Text(loc.t('Текущая цена в файле: ${result.filePrice}')),
-            const SizedBox(height: 8),
-            Text(
-              loc.t('Продукт найден в номенклатуре, но цена отличается.'),
-              style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(loc.t('Отмена импорта')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(loc.t('Пропустить')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(loc.t('Обновить цену')),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<Map<String, String>?> _showAmbiguousMatchesDialog(

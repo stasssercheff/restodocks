@@ -4,15 +4,25 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../models/translation.dart';
 import '../services/services.dart';
+import '../utils/product_name_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Экран модерации импорта: просмотр и подтверждение перед записью в БД.
 /// Режим отложенной модерации — без диалогов на каждую строку.
 class ImportReviewScreen extends StatefulWidget {
-  const ImportReviewScreen({super.key, required this.items});
+  const ImportReviewScreen({
+    super.key,
+    required this.items,
+    this.generateTranslationsForNewProducts = false,
+    this.importSourceLanguage,
+  });
 
   final List<ModerationItem> items;
+  /// Как при интеллектуальном импорте Excel: переводы для новых продуктов.
+  final bool generateTranslationsForNewProducts;
+  final String? importSourceLanguage;
 
   @override
   State<ImportReviewScreen> createState() => _ImportReviewScreenState();
@@ -117,6 +127,16 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
             price: price,
             currency: cur,
           );
+          if (item.linkAliasFromImportName) {
+            final key = normalizeProductAliasKey(item.name);
+            if (key.isNotEmpty) {
+              await store.saveProductAlias(
+                key,
+                item.existingProductId!,
+                establishmentId: est.dataEstablishmentId,
+              );
+            }
+          }
           if (newPrice != null) updated++;
         } else {
           final cur = item.currency ?? defCur;
@@ -159,6 +179,22 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
             price: item.displayPrice,
             currency: item.displayPrice != null ? cur : null,
           );
+          if (widget.generateTranslationsForNewProducts) {
+            final tm = TranslationManager(
+              aiService: context.read<AiServiceSupabase>(),
+              translationService: TranslationService(
+                aiService: context.read<AiServiceSupabase>(),
+                supabase: context.read<SupabaseService>(),
+              ),
+              getSupportedLanguages: () => LocalizationService.productLanguageCodes,
+            );
+            await tm.handleEntitySave(
+              entityType: TranslationEntityType.product,
+              entityId: savedProduct.id,
+              textFields: {'name': item.displayName},
+              sourceLanguage: widget.importSourceLanguage ?? 'en',
+            );
+          }
           devLog('💾 ImportReview: ✅ saved "${item.displayName}"');
           created++;
         }

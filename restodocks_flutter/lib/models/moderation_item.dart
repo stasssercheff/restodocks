@@ -27,6 +27,8 @@ class ModerationItem extends Equatable {
   final bool existingPriceFromEstablishment;
   final ModerationCategory category;
   final bool approved;
+  /// После привязки к существующему продукту сохранить алиас имени из файла (импорт Excel: fuzzy / ambiguous→replace).
+  final bool linkAliasFromImportName;
 
   const ModerationItem({
     required this.name,
@@ -41,6 +43,7 @@ class ModerationItem extends Equatable {
     this.existingPriceFromEstablishment = false,
     required this.category,
     this.approved = true,
+    this.linkAliasFromImportName = false,
   });
 
   /// Всегда исходное имя из файла. [normalizedName] не используется для сохранения (политика: не переименовывать автоматически).
@@ -60,6 +63,7 @@ class ModerationItem extends Equatable {
     bool? existingPriceFromEstablishment,
     ModerationCategory? category,
     bool? approved,
+    bool? linkAliasFromImportName,
   }) {
     return ModerationItem(
       name: name ?? this.name,
@@ -74,6 +78,8 @@ class ModerationItem extends Equatable {
     existingPriceFromEstablishment: existingPriceFromEstablishment ?? this.existingPriceFromEstablishment,
     category: category ?? this.category,
       approved: approved ?? this.approved,
+      linkAliasFromImportName:
+          linkAliasFromImportName ?? this.linkAliasFromImportName,
     );
   }
 
@@ -91,5 +97,6 @@ class ModerationItem extends Equatable {
         existingPriceFromEstablishment,
         category,
         approved,
+        linkAliasFromImportName,
       ];
 }

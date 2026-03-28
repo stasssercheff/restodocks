@@ -789,13 +789,31 @@ class AppRouter {
           GoRoute(
             path: '/import-review',
             pageBuilder: (context, state) {
-              final items = state.extra as List<ModerationItem>?;
+              final extra = state.extra;
+              List<ModerationItem>? items;
+              var generateTranslationsForNewProducts = false;
+              String? importSourceLanguage;
+              if (extra is ImportReviewPayload) {
+                items = extra.items;
+                generateTranslationsForNewProducts =
+                    extra.generateTranslationsForNewProducts;
+                importSourceLanguage = extra.importSourceLanguage;
+              } else if (extra is List<ModerationItem>) {
+                items = extra;
+              }
               if (items == null || items.isEmpty) {
                 return _slideTransitionPage(
                     state, const _RedirectToNomenclature());
               }
               return _slideTransitionPage(
-                  state, ImportReviewScreen(items: items));
+                state,
+                ImportReviewScreen(
+                  items: items,
+                  generateTranslationsForNewProducts:
+                      generateTranslationsForNewProducts,
+                  importSourceLanguage: importSourceLanguage,
+                ),
+              );
             },
           ),
 

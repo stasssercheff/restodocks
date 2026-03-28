@@ -78,7 +78,9 @@
 
 | Задача | Статус | Подробности |
 |--------|--------|-------------|
-| Единый экран модерации импорта | [ ] | См. [restodocks_flutter/docs/TZ_INTELLIGENT_IMPORT_PLAN.md](../restodocks_flutter/docs/TZ_INTELLIGENT_IMPORT_PLAN.md) |
+| Единый экран модерации импорта | [x] | `ImportReviewScreen`, маршрут `/import-review`, модель `ModerationItem`, буфер `ImportReviewPayload`; поток вставки текста / AI-парсинга и **интеллектуальный Excel** → один экран перед записью в БД |
+| Edge Functions `ai-parse-product-list` и др. по ТЗ | [~] | Парсинг списка уже вызывается из клиента; отдельные функции из ТЗ — по необходимости |
+| Поиск дубликатов / удаление дубликатов | [ ] | Этапы 3–4 [TZ_INTELLIGENT_IMPORT_PLAN.md](../restodocks_flutter/docs/TZ_INTELLIGENT_IMPORT_PLAN.md) |
 
 ---
 
@@ -97,6 +99,20 @@
 | Beta = `staging`, Prod = `main` | [x] | [DEPLOY_RULES.md](DEPLOY_RULES.md) |
 | SQL-бандл POS/stock/cash | [x] | `restodocks_flutter/supabase/MANUAL_MIGRATION_POS_CASH_STOCK.sql` |
 | Админка (Workers) | [~] | Ручной деплой по правилам репозитория |
+
+---
+
+## Бэклог крупных эпиков (что ещё не закрыто)
+
+Ориентир для следующих итераций; детали — в таблицах разделов выше.
+
+| Приоритет | Эпик | Раздел |
+|-----------|------|--------|
+| 1 | Дубликаты номенклатуры (поиск, слияние) | §7 |
+| 2 | Довести `fiscal_outbox`, затем физическая ККТ | §6 |
+| 3 | WMS (партии, сроки, склады, штрихкоды) → актовая инвентаризация | §2 |
+| 4 | ERP: P&L и единый контур «закупка–продажа–деньги» | §4 |
+| 5 | iiko и другие внешние системы | §8 |
 
 ---
 

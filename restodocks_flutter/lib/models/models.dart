@@ -13,6 +13,7 @@ export 'schedule_model.dart';
 export 'order_list.dart';
 export 'product_import_result.dart';
 export 'moderation_item.dart';
+export 'import_review_payload.dart';
 export 'translation.dart';
 export 'nomenclature_item.dart';
 export 'inbox_document.dart';
