@@ -110,6 +110,19 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
     }
   }
 
+  /// Этаж и зал для подписи в диалоге нового заказа (как на экране столов).
+  String _dialogFloorRoomLine(LocalizationService loc, PosDiningTable t) {
+    final floor = t.floorName?.trim();
+    final room = t.roomName?.trim();
+    final floorPart = (floor == null || floor.isEmpty)
+        ? loc.t('pos_tables_tab_floor_default')
+        : loc.t('pos_tables_tab_floor_named', args: {'name': floor});
+    final roomPart = (room == null || room.isEmpty)
+        ? loc.t('pos_tables_tab_room_default')
+        : loc.t('pos_tables_tab_room_named', args: {'name': room});
+    return '$floorPart · $roomPart';
+  }
+
   String _statusLabel(LocalizationService loc, PosOrderStatus s) {
     switch (s) {
       case PosOrderStatus.draft:
@@ -164,12 +177,21 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Text(
+                    _dialogFloorRoomLine(loc, selected),
+                    style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                  const SizedBox(height: 16),
                   DropdownButtonFormField<PosDiningTable>(
                     key: ValueKey(selected.id),
                     initialValue: selected,
                     decoration: InputDecoration(
-                        labelText: loc.t('pos_orders_select_table')),
+                      labelText: loc.t('pos_orders_select_table'),
+                    ),
                     items: tables
                         .map(
                           (t) => DropdownMenuItem(
@@ -185,10 +207,12 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
                       if (v != null) setLocal(() => selected = v);
                     },
                   ),
+                  const SizedBox(height: 20),
                   TextField(
                     controller: guestsCtrl,
                     decoration: InputDecoration(
-                        labelText: loc.t('pos_orders_guests_label')),
+                      labelText: loc.t('pos_orders_guests_label'),
+                    ),
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   ),
