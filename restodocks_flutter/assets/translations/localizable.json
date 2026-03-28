@@ -1669,6 +1669,9 @@
     "pos_order_close_confirm": "Закрыть счёт и освободить стол? Учёт оплаты и списание со склада подключим позже.",
     "pos_order_closed_toast": "Счёт закрыт, стол свободен",
     "pos_order_closed_readonly_hint": "Счёт закрыт. Стол отображается как свободный.",
+    "pos_order_request_bill": "Просят счёт",
+    "pos_order_request_bill_toast": "Стол отмечен: гости просят счёт",
+    "pos_order_bill_requested": "Гости просят счёт (на плане столов — жёлтый)",
     "accept_and_continue": "Принять и продолжить"
   },
   "en": {
@@ -3255,6 +3258,9 @@
     "pos_order_close_confirm": "Close the bill and free the table? Payment and warehouse write-off will be added later.",
     "pos_order_closed_toast": "Bill closed, table free",
     "pos_order_closed_readonly_hint": "Bill closed. The table shows as free.",
+    "pos_order_request_bill": "Guests ask for the bill",
+    "pos_order_request_bill_toast": "Table marked: bill requested",
+    "pos_order_bill_requested": "Bill requested (yellow on the table map)",
     "accept_and_continue": "Accept and continue"
   },
   "es": {
@@ -4737,6 +4743,9 @@
     "pos_order_close_confirm": "¿Cerrar la cuenta y liberar la mesa? El pago y el almacén irán después.",
     "pos_order_closed_toast": "Cuenta cerrada, mesa libre",
     "pos_order_closed_readonly_hint": "Cuenta cerrada. La mesa aparece como libre.",
+    "pos_order_request_bill": "Pidieron la cuenta",
+    "pos_order_request_bill_toast": "Mesa marcada: pidieron la cuenta",
+    "pos_order_bill_requested": "Cuenta pedida (amarillo en el plano)",
     "accept_and_continue": "Aceptar y continuar"
   },
   "de": {
@@ -4949,6 +4958,9 @@
     "pos_order_close_confirm": "Rechnung schließen und Tisch freigeben? Zahlung und Lager folgen später.",
     "pos_order_closed_toast": "Rechnung geschlossen, Tisch frei",
     "pos_order_closed_readonly_hint": "Rechnung geschlossen. Tisch erscheint als frei.",
+    "pos_order_request_bill": "Gäste möchten zahlen",
+    "pos_order_request_bill_toast": "Tisch markiert: Rechnung angefordert",
+    "pos_order_bill_requested": "Rechnung angefordert (gelb im Tischplan)",
     "product_name_duplicate": "In der Nomenklatur dürfen keine zwei Produkte mit demselben Namen existieren (Groß-/Kleinschreibung egal; führende und nachfolgende Leerzeichen werden ignoriert)."
   },
   "fr": {
@@ -5161,6 +5173,9 @@
     "pos_order_close_confirm": "Clôturer l’addition et libérer la table ? Paiement et stock suivront.",
     "pos_order_closed_toast": "Addition clôturée, table libre",
     "pos_order_closed_readonly_hint": "Addition clôturée. La table est affichée comme libre.",
+    "pos_order_request_bill": "Les clients demandent l’addition",
+    "pos_order_request_bill_toast": "Table marquée : addition demandée",
+    "pos_order_bill_requested": "Addition demandée (jaune sur le plan)",
     "product_name_duplicate": "La nomenclature ne peut pas contenir deux produits avec le même nom (sans tenir compte de la casse ; espaces en début et fin ignorés)."
   },
   "tr": {
@@ -6643,6 +6658,9 @@
     "pos_order_close_confirm": "Hesabı kapatıp masayı boşaltılsın mı? Ödeme ve depo sonra.",
     "pos_order_closed_toast": "Hesap kapandı, masa boş",
     "pos_order_closed_readonly_hint": "Hesap kapalı. Masa boş görünür.",
+    "pos_order_request_bill": "Hesap isteniyor",
+    "pos_order_request_bill_toast": "Masa işaretlendi: hesap istendi",
+    "pos_order_bill_requested": "Hesap istendi (planda sarı)",
     "accept_and_continue": "Kabul et ve devam et"
   },
   "vi": {
@@ -8149,6 +8167,9 @@
     "pos_order_close_confirm": "Đóng bill và nhả bàn? Thanh toán và kho sẽ bổ sung sau.",
     "pos_order_closed_toast": "Đã đóng bill, bàn trống",
     "pos_order_closed_readonly_hint": "Bill đã đóng. Bàn hiển thị trống.",
+    "pos_order_request_bill": "Khách xin thanh toán",
+    "pos_order_request_bill_toast": "Đã đánh dấu bàn: xin thanh toán",
+    "pos_order_bill_requested": "Đã xin thanh toán (vàng trên sơ đồ bàn)",
     "accept_and_continue": "Chấp nhận và tiếp tục"
   }
 }

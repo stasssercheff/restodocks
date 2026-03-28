@@ -1,3 +1,5 @@
+import 'pos_dining_table.dart';
+
 /// Заказ зала (pos_orders).
 class PosOrder {
   const PosOrder({
@@ -11,6 +13,7 @@ class PosOrder {
     this.tableNumber,
     this.floorName,
     this.roomName,
+    this.tableStatus,
   });
 
   final String id;
@@ -23,6 +26,9 @@ class PosOrder {
   final int? tableNumber;
   final String? floorName;
   final String? roomName;
+
+  /// Статус стола из embed `pos_dining_tables` (свободен / занят / счёт).
+  final PosTableStatus? tableStatus;
 
   factory PosOrder.fromJson(
     Map<String, dynamic> json, {
@@ -47,6 +53,9 @@ class PosOrder {
       tableNumber: t != null ? (t['table_number'] as num?)?.toInt() : null,
       floorName: t?['floor_name'] as String?,
       roomName: t?['room_name'] as String?,
+      tableStatus: t != null
+          ? PosTableStatus.fromApi(t['status'] as String? ?? 'free')
+          : null,
     );
   }
 }

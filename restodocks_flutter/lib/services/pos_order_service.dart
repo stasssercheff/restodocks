@@ -157,7 +157,7 @@ class PosOrderService {
       final rows = await _supabase.client
           .from('pos_orders')
           .select(
-            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name), pos_order_lines(quantity, tech_cards(category, sections))',
+            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name, status), pos_order_lines(quantity, tech_cards(category, sections))',
           )
           .eq('establishment_id', establishmentId)
           .neq('status', 'closed')
@@ -230,7 +230,7 @@ class PosOrderService {
       final rows = await _supabase.client
           .from('pos_orders')
           .select(
-            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name)',
+            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name, status)',
           )
           .eq('establishment_id', establishmentId)
           .neq('status', 'closed')
@@ -261,7 +261,7 @@ class PosOrderService {
       final rows = await _supabase.client
           .from('pos_orders')
           .select(
-            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name)',
+            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name, status)',
           )
           .eq('establishment_id', establishmentId)
           .eq('dining_table_id', diningTableId)
@@ -282,7 +282,7 @@ class PosOrderService {
       final rows = await _supabase.client
           .from('pos_orders')
           .select(
-            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name)',
+            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name, status)',
           )
           .eq('id', orderId)
           .limit(1);
@@ -313,7 +313,7 @@ class PosOrderService {
           'status': PosOrderStatus.draft.toApi(),
         })
         .select(
-          'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name)',
+          'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name, status)',
         )
         .single();
     try {
@@ -323,6 +323,15 @@ class PosOrderService {
       devLog('PosOrderService: createDraft table status $e $st');
     }
     return PosOrder.fromJson(Map<String, dynamic>.from(row));
+  }
+
+  /// Гости просят счёт: стол в статусе «счёт» (касса / официант видят на плане).
+  Future<void> markTableBillRequested(String orderId) async {
+    final o = await fetchById(orderId);
+    if (o == null) throw StateError('pos_order_missing');
+    if (o.status == PosOrderStatus.closed) return;
+    await PosDiningLayoutService.instance
+        .updateTableStatus(o.diningTableId, PosTableStatus.billRequested);
   }
 
   /// Закрыть счёт: заказ закрыт, стол снова свободен (оплата/склад — позже).

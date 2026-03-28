@@ -34,9 +34,10 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
 
   bool _sending = false;
   bool _closing = false;
+  bool _billing = false;
 
   bool get _busy =>
-      _orderLoading || _linesLoading || _sending || _closing;
+      _orderLoading || _linesLoading || _sending || _closing || _billing;
 
   String _readonlyHint(PosOrder o, LocalizationService loc) {
     if (o.status == PosOrderStatus.closed) {
@@ -111,6 +112,20 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
       if (mounted) AppToastService.show('${loc.t('error')}: $e');
     } finally {
       if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _requestBill(LocalizationService loc) async {
+    setState(() => _billing = true);
+    try {
+      await PosOrderService.instance.markTableBillRequested(widget.orderId);
+      if (!mounted) return;
+      AppToastService.show(loc.t('pos_order_request_bill_toast'));
+      await _loadOrder();
+    } catch (e) {
+      if (mounted) AppToastService.show('${loc.t('error')}: $e');
+    } finally {
+      if (mounted) setState(() => _billing = false);
     }
   }
 
@@ -413,6 +428,45 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
               if (posCanCloseHallOrder(emp) &&
                   o.status != PosOrderStatus.closed) ...[
                 const SizedBox(height: 16),
+                if (o.tableStatus != PosTableStatus.billRequested)
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : () => _requestBill(loc),
+                    icon: _billing
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.payments_outlined),
+                    label: Text(loc.t('pos_order_request_bill')),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.notifications_active_outlined,
+                          color: Colors.amber.shade800,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            loc.t('pos_order_bill_requested'),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: Colors.amber.shade900,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 12),
                 FilledButton.tonal(
                   onPressed: _closing ? null : () => _confirmClose(context, loc),
                   child: Text(loc.t('pos_order_close')),
