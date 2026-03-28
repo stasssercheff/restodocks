@@ -46,6 +46,7 @@ class _HallTablesScreenState extends State<HallTablesScreen> {
       _error = null;
     });
     try {
+      await PosDiningLayoutService.instance.ensureDefaultDiningLayoutIfEmpty(est.id);
       final list = await PosDiningLayoutService.instance.fetchTables(est.id);
       if (!mounted) return;
       setState(() {

@@ -12,6 +12,7 @@ import '../models/models.dart';
 import '../utils/dev_log.dart';
 import 'offline_cache_service.dart';
 import 'realtime_sync_service.dart';
+import 'pos_dining_layout_service.dart';
 import 'secure_storage_service.dart';
 import 'supabase_service.dart';
 
@@ -333,6 +334,12 @@ class AccountManagerSupabase extends ChangeNotifier {
     final createdEstablishment = Establishment.fromJson(response);
 
     _establishment = createdEstablishment;
+    try {
+      await PosDiningLayoutService.instance
+          .ensureDefaultDiningLayoutIfEmpty(createdEstablishment.id);
+    } catch (e, st) {
+      devLog('createEstablishment: default dining layout $e $st');
+    }
     return createdEstablishment;
   }
 
@@ -360,6 +367,11 @@ class AccountManagerSupabase extends ChangeNotifier {
     m['owner_id'] = m['owner_id']?.toString() ?? '';
     final est = Establishment.fromJson(m);
     _establishment = est;
+    try {
+      await PosDiningLayoutService.instance.ensureDefaultDiningLayoutIfEmpty(est.id);
+    } catch (e, st) {
+      devLog('registerCompanyWithPromo: default dining layout $e $st');
+    }
     return est;
   }
 

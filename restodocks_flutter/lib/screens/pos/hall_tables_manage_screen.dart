@@ -50,6 +50,7 @@ class _HallTablesManageScreenState extends State<HallTablesManageScreen> {
       _error = null;
     });
     try {
+      await PosDiningLayoutService.instance.ensureDefaultDiningLayoutIfEmpty(est.id);
       final list = await PosDiningLayoutService.instance.fetchTables(est.id);
       if (!mounted) return;
       setState(() {
@@ -264,8 +265,21 @@ class _HallTablesManageScreenState extends State<HallTablesManageScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: 72,
         leading: appBarBackButton(context),
-        title: Text(loc.t('pos_tables_manage_title')),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(loc.t('pos_tables_manage_title')),
+            Text(
+              loc.t('pos_tables_manage_owner_hint'),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _loading ? null : () => _openForm(loc, null),

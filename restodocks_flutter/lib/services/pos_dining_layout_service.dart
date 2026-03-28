@@ -9,6 +9,29 @@ class PosDiningLayoutService {
 
   final SupabaseService _supabase = SupabaseService();
 
+  /// Стартовый этаж и зал (как в миграции seed); названия можно сменить в «Редактирование столов».
+  static const defaultFloorLabel = '1';
+  static const defaultRoomLabel = 'Основной';
+
+  /// Если у заведения ещё нет столов — один стол в основном зале (первый вход / новое заведение).
+  Future<void> ensureDefaultDiningLayoutIfEmpty(String establishmentId) async {
+    try {
+      final existing = await fetchTables(establishmentId);
+      if (existing.isNotEmpty) return;
+      await insertTable(
+        establishmentId: establishmentId,
+        floorName: defaultFloorLabel,
+        roomName: defaultRoomLabel,
+        tableNumber: 1,
+        sortOrder: 0,
+        status: PosTableStatus.free,
+      );
+    } catch (e, st) {
+      devLog('PosDiningLayoutService: ensureDefaultDiningLayoutIfEmpty $e $st');
+      rethrow;
+    }
+  }
+
   Future<List<PosDiningTable>> fetchTables(String establishmentId) async {
     try {
       final rows = await _supabase.client
