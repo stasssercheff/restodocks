@@ -42,4 +42,5 @@ const _$DocumentTypeEnumMap = {
   DocumentType.checklistSubmission: 'checklistSubmission',
   DocumentType.checklistMissedDeadline: 'checklistMissedDeadline',
   DocumentType.writeoff: 'writeoff',
+  DocumentType.techCardChangeRequest: 'techCardChangeRequest',
 };

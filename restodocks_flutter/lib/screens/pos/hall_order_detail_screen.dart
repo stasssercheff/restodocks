@@ -539,6 +539,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
         widget.orderId,
         tipsAmount: tips,
         payments: parts,
+        closedByEmployeeId:
+            context.read<AccountManagerSupabase>().currentEmployee?.id,
       );
       if (estBefore != null) {
         await PosFiscalService.instance.queueSaleAfterOrderClose(

@@ -69,6 +69,12 @@ class PosWarehouseHubScreen extends StatelessWidget {
               icon: const Icon(Icons.inventory_2_outlined),
               label: Text(loc.t('pos_warehouse_open_inventory')),
             ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => context.push('/pos/stock'),
+              icon: const Icon(Icons.table_chart_outlined),
+              label: Text(loc.t('pos_stock_open_movements')),
+            ),
           ],
         ),
       ),

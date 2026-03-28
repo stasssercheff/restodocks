@@ -2166,6 +2166,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/settings/fiscal-tax'),
               ),
+            if (posCanRunWarehouseHealthCheck(currentEmployee) ||
+                _isPlatformAdminEmail(currentEmployee.email))
+              ListTile(
+                leading: const Icon(Icons.bug_report_outlined),
+                title: Text(localization.t('settings_system_errors_title') ??
+                    'Журнал ошибок'),
+                subtitle: Text(
+                  localization.t('settings_system_errors_subtitle') ??
+                      'POS, склад, фоновые сбои',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/system-errors'),
+              ),
             if (posCanConfigureOrdersDisplay(currentEmployee))
               ExpansionTile(
                 initiallyExpanded: false,

@@ -1250,6 +1250,8 @@ class _DocumentTile extends StatelessWidget {
                   context.push('/inbox/iiko/${document.id}');
                 } else if (document.type == DocumentType.checklistMissedDeadline) {
                   context.push('/checklists/${document.id}?view=1');
+                } else if (document.type == DocumentType.techCardChangeRequest) {
+                  context.push('/inbox/ttk-change/${document.id}');
                 } else {
                   onDownload(document);
                 }
@@ -1319,6 +1321,10 @@ class _DocumentTile extends StatelessWidget {
     }
     if (document.type == DocumentType.checklistMissedDeadline) {
       context.push('/checklists/${document.id}?view=1');
+      return;
+    }
+    if (document.type == DocumentType.techCardChangeRequest) {
+      context.push('/inbox/ttk-change/${document.id}');
       return;
     }
     final loc = context.read<LocalizationService>();

@@ -120,11 +120,15 @@ class OrderListItem {
   /// Количество (заполняется при открытии списка / сохранении).
   final double quantity;
 
+  /// Фактически получено (закупка); null — ещё не отмечено.
+  final double? receivedQuantity;
+
   const OrderListItem({
     this.productId,
     required this.productName,
     required this.unit,
     this.quantity = 0,
+    this.receivedQuantity,
   });
 
   Map<String, dynamic> toJson() => {
@@ -132,6 +136,7 @@ class OrderListItem {
         'productName': productName,
         'unit': unit,
         'quantity': quantity,
+        if (receivedQuantity != null) 'receivedQuantity': receivedQuantity,
       };
 
   factory OrderListItem.fromJson(Map<String, dynamic> json) => OrderListItem(
@@ -139,6 +144,7 @@ class OrderListItem {
         productName: json['productName'] as String? ?? '',
         unit: json['unit'] as String? ?? 'g',
         quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
+        receivedQuantity: (json['receivedQuantity'] as num?)?.toDouble(),
       );
 
   OrderListItem copyWith({
@@ -146,11 +152,13 @@ class OrderListItem {
     String? productName,
     String? unit,
     double? quantity,
+    double? receivedQuantity,
   }) =>
       OrderListItem(
         productId: productId ?? this.productId,
         productName: productName ?? this.productName,
         unit: unit ?? this.unit,
         quantity: quantity ?? this.quantity,
+        receivedQuantity: receivedQuantity ?? this.receivedQuantity,
       );
 }

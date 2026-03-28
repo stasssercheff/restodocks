@@ -67,3 +67,9 @@ bool posCanConfigureOrdersDisplay(Employee? e) {
       e.hasRole('floor_manager') ||
       e.hasRole('general_manager');
 }
+
+/// Сверка склада (health check) — владелец / генеральный директор.
+bool posCanRunWarehouseHealthCheck(Employee? e) {
+  if (e == null) return false;
+  return e.hasRole('owner') || e.hasRole('general_manager');
+}

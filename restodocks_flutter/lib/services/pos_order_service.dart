@@ -7,6 +7,7 @@ import '../utils/dev_log.dart';
 import '../utils/pos_order_department.dart';
 import '../utils/pos_order_totals.dart';
 import 'pos_dining_layout_service.dart';
+import 'pos_stock_service.dart';
 import 'supabase_service.dart';
 
 /// Правка заказа недоступна (не черновик).
@@ -626,6 +627,7 @@ class PosOrderService {
     String orderId, {
     required double tipsAmount,
     required List<({PosPaymentMethod method, double amount})> payments,
+    String? closedByEmployeeId,
   }) async {
     if (payments.isEmpty) {
       throw ArgumentError('payments empty');
@@ -689,6 +691,18 @@ class PosOrderService {
           .updateTableStatus(o.diningTableId, PosTableStatus.free);
     } catch (e, st) {
       devLog('PosOrderService: closeOrder table free $e $st');
+    }
+
+    try {
+      await PosStockService.instance.applySaleDeductionForOrder(
+        establishmentId: o.establishmentId,
+        orderId: orderId,
+        lines: lines,
+        diningTableId: o.diningTableId,
+        closedByEmployeeId: closedByEmployeeId,
+      );
+    } catch (e, st) {
+      devLog('PosOrderService: stock deduction $e $st');
     }
   }
 

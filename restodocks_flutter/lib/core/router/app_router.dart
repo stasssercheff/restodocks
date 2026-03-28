@@ -22,6 +22,7 @@ import '../../screens/checklist_inbox_detail_screen.dart';
 import '../../screens/iiko_inventory_inbox_detail_screen.dart';
 import '../../screens/inventory_merge_screen.dart';
 import '../../screens/writeoff_inbox_detail_screen.dart';
+import '../../screens/tech_card_change_inbox_detail_screen.dart';
 import '../../screens/writeoff_summary_inbox_screen.dart';
 import '../../screens/writeoffs_screen.dart';
 import '../../screens/haccp_log_detail_screen.dart';
@@ -31,6 +32,7 @@ import '../../screens/pos/hall_cash_register_screen.dart';
 import '../../screens/pos/pos_orders_display_settings_screen.dart';
 import '../../screens/pos/pos_procurement_screen.dart';
 import '../../screens/pos/pos_warehouse_hub_screen.dart';
+import '../../screens/pos/pos_stock_screen.dart';
 import '../../screens/supabase_test_screen.dart';
 import '../../screens/checklist_edit_screen.dart';
 import '../../screens/checklist_fill_screen.dart';
@@ -424,6 +426,13 @@ class AppRouter {
               const FiscalTaxSettingsScreen(),
             ),
           ),
+          GoRoute(
+            path: '/settings/system-errors',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const SystemErrorsScreen(),
+            ),
+          ),
           // Добавить заведение (владелец)
           GoRoute(
             path: '/add-establishment',
@@ -493,6 +502,16 @@ class AppRouter {
                   final id = state.pathParameters['id'] ?? '';
                   return _slideTransitionPage(
                       state, WriteoffInboxDetailScreen(documentId: id));
+                },
+              ),
+              GoRoute(
+                path: 'ttk-change/:id',
+                pageBuilder: (context, state) {
+                  final id = state.pathParameters['id'] ?? '';
+                  return _slideTransitionPage(
+                    state,
+                    TechCardChangeInboxDetailScreen(requestId: id),
+                  );
                 },
               ),
               GoRoute(
@@ -630,6 +649,13 @@ class AppRouter {
             ),
           ),
           GoRoute(
+            path: '/pos/hall/order-history',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const HallOrderHistoryScreen(),
+            ),
+          ),
+          GoRoute(
             path: '/pos/hall/tables',
             pageBuilder: (context, state) => _slideTransitionPage(
               state,
@@ -662,6 +688,13 @@ class AppRouter {
                 PosWarehouseHubScreen(scope: scope),
               );
             },
+          ),
+          GoRoute(
+            path: '/pos/stock',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const PosStockScreen(),
+            ),
           ),
           GoRoute(
             path: '/pos/procurement/:department',
