@@ -28,6 +28,7 @@ import '../../screens/haccp_log_detail_screen.dart';
 import '../../screens/home/expenses_screen.dart';
 import '../../screens/home/department_placeholder_screen.dart';
 import '../../screens/pos/hall_cash_register_screen.dart';
+import '../../screens/pos/pos_orders_display_settings_screen.dart';
 import '../../screens/pos/pos_feature_placeholder_screen.dart';
 import '../../screens/supabase_test_screen.dart';
 import '../../screens/checklist_edit_screen.dart';
@@ -412,8 +413,7 @@ class AppRouter {
             path: '/settings/orders-display',
             pageBuilder: (context, state) => _slideTransitionPage(
               state,
-              const PosFeaturePlaceholderScreen(
-                  feature: PosFeature.ordersDisplaySettings),
+              const PosOrdersDisplaySettingsScreen(),
             ),
           ),
           // Добавить заведение (владелец)

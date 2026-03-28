@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../utils/pos_order_live_duration.dart';
+import '../../utils/pos_orders_list_subtitle_style.dart';
 import '../../widgets/app_bar_home_button.dart';
 
 /// Активные заказы зала (pos_orders), создание черновика по столу.
@@ -28,25 +29,41 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
       const PosDepartmentOrderBuckets(active: [], served: []);
   _HallBucket _bucket = _HallBucket.active;
   Timer? _elapsedTimer;
+  PosOrdersDisplaySettingsService? _displaySettings;
 
   @override
   void initState() {
     super.initState();
-    _elapsedTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted &&
-          (_buckets.active.isNotEmpty || _buckets.served.isNotEmpty)) {
-        setState(() {});
-      }
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _displaySettings = context.read<PosOrdersDisplaySettingsService>();
+      _displaySettings!.addListener(_onPosDisplayChanged);
+      _startElapsedTimer();
       await _load();
       if (!mounted) return;
       await _maybeOpenFromTableQuery();
     });
   }
 
+  void _onPosDisplayChanged() {
+    if (!mounted) return;
+    _startElapsedTimer();
+    setState(() {});
+  }
+
+  void _startElapsedTimer() {
+    _elapsedTimer?.cancel();
+    final sec = _displaySettings?.timerIntervalSeconds ?? 30;
+    _elapsedTimer = Timer.periodic(Duration(seconds: sec), (_) {
+      if (mounted &&
+          (_buckets.active.isNotEmpty || _buckets.served.isNotEmpty)) {
+        setState(() {});
+      }
+    });
+  }
+
   @override
   void dispose() {
+    _displaySettings?.removeListener(_onPosDisplayChanged);
     _elapsedTimer?.cancel();
     super.dispose();
   }
@@ -324,7 +341,10 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
                       leading: const Icon(Icons.receipt_long),
                       title:
                           Text(loc.t('pos_table_number', args: {'n': '$tn'})),
-                      subtitle: Text(sub),
+                      subtitle: Text(
+                        sub,
+                        style: posOrderListSubtitleStyle(context),
+                      ),
                       onTap: () => context.push('/pos/hall/orders/${o.id}'),
                     );
                   },

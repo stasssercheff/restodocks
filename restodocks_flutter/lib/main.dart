@@ -85,6 +85,7 @@ Future<void> _bootstrapApp() async {
   await TtkBranchFilterService().initialize();
   await ScreenLayoutPreferenceService().initialize();
   await MobileUiScaleService().initialize();
+  await PosOrdersDisplaySettingsService().initialize();
   AppToastService.init(AppRouter.rootNavigatorKey);
 }
 

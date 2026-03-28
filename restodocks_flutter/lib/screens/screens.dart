@@ -56,3 +56,4 @@ export 'pos/hall_orders_screen.dart';
 export 'pos/hall_cash_register_screen.dart';
 export 'pos/hall_order_detail_screen.dart';
 export 'pos/pos_department_orders_screen.dart';
+export 'pos/pos_orders_display_settings_screen.dart';

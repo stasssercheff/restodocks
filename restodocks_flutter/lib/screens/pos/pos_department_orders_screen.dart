@@ -9,6 +9,7 @@ import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../utils/pos_order_department.dart';
 import '../../utils/pos_order_live_duration.dart';
+import '../../utils/pos_orders_list_subtitle_style.dart';
 import '../../widgets/app_bar_home_button.dart';
 
 /// Заказы POS для подразделения (кухня / бар / зал): фильтр по типу блюд в строках.
@@ -32,21 +33,39 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
       const PosDepartmentOrderBuckets(active: [], served: []);
   _DeptBucket _bucket = _DeptBucket.active;
   Timer? _elapsedTimer;
+  PosOrdersDisplaySettingsService? _displaySettings;
 
   @override
   void initState() {
     super.initState();
-    _elapsedTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _displaySettings = context.read<PosOrdersDisplaySettingsService>();
+      _displaySettings!.addListener(_onPosDisplayChanged);
+      _startElapsedTimer();
+      _load();
+    });
+  }
+
+  void _onPosDisplayChanged() {
+    if (!mounted) return;
+    _startElapsedTimer();
+    setState(() {});
+  }
+
+  void _startElapsedTimer() {
+    _elapsedTimer?.cancel();
+    final sec = _displaySettings?.timerIntervalSeconds ?? 30;
+    _elapsedTimer = Timer.periodic(Duration(seconds: sec), (_) {
       if (mounted &&
           (_buckets.active.isNotEmpty || _buckets.served.isNotEmpty)) {
         setState(() {});
       }
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   @override
   void dispose() {
+    _displaySettings?.removeListener(_onPosDisplayChanged);
     _elapsedTimer?.cancel();
     super.dispose();
   }
@@ -206,7 +225,10 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
                     return ListTile(
                       leading: const Icon(Icons.receipt_long),
                       title: Text(loc.t('pos_table_number', args: {'n': '$tn'})),
-                      subtitle: Text(sub),
+                      subtitle: Text(
+                        sub,
+                        style: posOrderListSubtitleStyle(context),
+                      ),
                       onTap: () => context.push('/pos/hall/orders/${o.id}'),
                     );
                   },

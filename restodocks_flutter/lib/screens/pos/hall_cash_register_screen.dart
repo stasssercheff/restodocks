@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../utils/number_format_utils.dart';
+import '../../utils/pos_orders_list_subtitle_style.dart';
 import '../../widgets/app_bar_home_button.dart';
 
 /// Виртуальная касса: столы, где запрошен счёт, с суммой к оплате по ТТК.
@@ -138,7 +139,10 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen> {
         return ListTile(
           leading: const Icon(Icons.point_of_sale),
           title: Text(loc.t('pos_table_number', args: {'n': '$tn'})),
-          subtitle: Text(sub),
+          subtitle: Text(
+            sub,
+            style: posOrderListSubtitleStyle(context),
+          ),
           trailing: Text(
             _formatDue(r.totalDue),
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
