@@ -5,8 +5,8 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../services/services.dart';
-import '../../utils/number_format_utils.dart';
 import '../../utils/pos_hall_permissions.dart';
+import '../../utils/pos_order_menu_due_format.dart';
 import '../../utils/pos_orders_list_subtitle_style.dart';
 import '../../widgets/app_bar_home_button.dart';
 
@@ -58,16 +58,6 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen> {
         _loading = false;
       });
     }
-  }
-
-  String _formatDue(double amount) {
-    final account = context.read<AccountManagerSupabase>();
-    final est = account.establishment;
-    final currency = est?.defaultCurrency ?? 'RUB';
-    final sym = est?.currencySymbol ??
-        Establishment.currencySymbolFor(currency);
-    final numStr = NumberFormatUtils.formatSum(amount, currency);
-    return '$numStr $sym';
   }
 
   String _statusLabel(LocalizationService loc, PosOrderStatus s) {
@@ -153,7 +143,7 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen> {
             style: posOrderListSubtitleStyle(context),
           ),
           trailing: Text(
-            _formatDue(r.totalDue),
+            formatPosOrderMenuDue(context, r.totalDue),
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),

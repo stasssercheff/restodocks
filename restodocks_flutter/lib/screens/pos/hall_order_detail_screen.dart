@@ -6,8 +6,8 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../services/services.dart';
-import '../../utils/number_format_utils.dart';
 import '../../utils/pos_hall_permissions.dart';
+import '../../utils/pos_order_menu_due_format.dart';
 import '../../utils/pos_order_department.dart';
 import '../../widgets/app_bar_home_button.dart';
 
@@ -80,16 +80,6 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
 
   bool _linesMissingMenuPrice() =>
       _lines.any((l) => l.sellingPrice == null);
-
-  String _formatMenuDue(double amount) {
-    final account = context.read<AccountManagerSupabase>();
-    final est = account.establishment;
-    final currency = est?.defaultCurrency ?? 'RUB';
-    final sym = est?.currencySymbol ??
-        Establishment.currencySymbolFor(currency);
-    final numStr = NumberFormatUtils.formatSum(amount, currency);
-    return '$numStr $sym';
-  }
 
   String _paymentMethodLabel(LocalizationService loc, PosPaymentMethod m) {
     switch (m) {
@@ -592,7 +582,7 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                   _lines.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Text(
-                  '${loc.t('pos_order_total_due_label')}: ${_formatMenuDue(_sumLinesMenuDue())}',
+                  '${loc.t('pos_order_total_due_label')}: ${formatPosOrderMenuDue(context, _sumLinesMenuDue())}',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),

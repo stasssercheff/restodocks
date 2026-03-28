@@ -10,6 +10,7 @@ import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../utils/pos_hall_permissions.dart';
 import '../../utils/pos_order_live_duration.dart';
+import '../../utils/pos_order_menu_due_format.dart';
 import '../../utils/pos_orders_list_subtitle_style.dart';
 import '../../widgets/app_bar_home_button.dart';
 
@@ -347,13 +348,31 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
                         'time': formatPosOrderLiveDuration(o.createdAt),
                       }),
                     ].join(' · ');
+                    final due = _buckets.menuDueByOrderId[o.id];
+                    final partial =
+                        _buckets.menuDuePartialOrderIds.contains(o.id);
                     return ListTile(
                       leading: const Icon(Icons.receipt_long),
                       title:
                           Text(loc.t('pos_table_number', args: {'n': '$tn'})),
-                      subtitle: Text(
-                        sub,
-                        style: posOrderListSubtitleStyle(context),
+                      isThreeLine: due != null,
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            sub,
+                            style: posOrderListSubtitleStyle(context),
+                          ),
+                          if (due != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              '${partial ? '≈ ' : ''}${formatPosOrderMenuDue(context, due)}',
+                              style: posOrderListSubtitleStyle(context)
+                                  ?.copyWith(fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ],
                       ),
                       onTap: () => context.push('/pos/hall/orders/${o.id}'),
                     );

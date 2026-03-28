@@ -30,10 +30,21 @@ class PosOrderLineMarkServedException implements Exception {
 
 /// Заказы подразделения: очередь и уже отданные по строкам.
 class PosDepartmentOrderBuckets {
-  const PosDepartmentOrderBuckets({required this.active, required this.served});
+  const PosDepartmentOrderBuckets({
+    required this.active,
+    required this.served,
+    this.menuDueByOrderId = const {},
+    this.menuDuePartialOrderIds = const {},
+  });
 
   final List<PosOrder> active;
   final List<PosOrder> served;
+
+  /// Сумма по меню (quantity × selling_price) по id заказа — из того же запроса, что списки.
+  final Map<String, double> menuDueByOrderId;
+
+  /// Заказы, где у части строк нет цены в ТТК — сумма приблизительная.
+  final Set<String> menuDuePartialOrderIds;
 }
 
 /// Заказы зала (pos_orders).
@@ -207,7 +218,7 @@ class PosOrderService {
       final rows = await _supabase.client
           .from('pos_orders')
           .select(
-            '$_orderSelectWithTable, pos_order_lines(quantity, served_at, tech_cards(category, sections))',
+            '$_orderSelectWithTable, pos_order_lines(quantity, served_at, tech_cards(category, sections, selling_price))',
           )
           .eq('establishment_id', establishmentId)
           .neq('status', 'closed')
@@ -215,6 +226,8 @@ class PosOrderService {
 
       final active = <PosOrder>[];
       final served = <PosOrder>[];
+      final menuDue = <String, double>{};
+      final partialIds = <String>{};
       for (final row in rows as List<dynamic>) {
         if (row is! Map<String, dynamic>) continue;
         try {
@@ -223,6 +236,9 @@ class PosOrderService {
           m.remove('pos_order_lines');
           if (!_orderMatchesDepartment(linesRaw, dept)) continue;
           final o = PosOrder.fromJson(m);
+          final (due, partial) = _menuDueFromLinesRaw(linesRaw);
+          menuDue[o.id] = due;
+          if (partial) partialIds.add(o.id);
           if (_allRelevantLinesServed(linesRaw, dept)) {
             served.add(o);
           } else {
@@ -232,7 +248,12 @@ class PosOrderService {
           devLog('PosOrderService: skip order row $e');
         }
       }
-      return PosDepartmentOrderBuckets(active: active, served: served);
+      return PosDepartmentOrderBuckets(
+        active: active,
+        served: served,
+        menuDueByOrderId: menuDue,
+        menuDuePartialOrderIds: partialIds,
+      );
     } catch (e, st) {
       devLog('PosOrderService: fetchDepartmentOrderBuckets $e $st');
       rethrow;
@@ -390,8 +411,15 @@ class PosOrderService {
   }
 
   double _sumLineTotals(dynamic linesRaw) {
-    if (linesRaw is! List) return 0;
+    final (s, _) = _menuDueFromLinesRaw(linesRaw);
+    return s;
+  }
+
+  /// Сумма по строкам; [partial] — есть строка без selling_price в ТТК.
+  (double sum, bool partial) _menuDueFromLinesRaw(dynamic linesRaw) {
+    if (linesRaw is! List) return (0.0, false);
     var s = 0.0;
+    var partial = false;
     for (final item in linesRaw) {
       if (item is! Map) continue;
       final line = Map<String, dynamic>.from(item);
@@ -403,10 +431,15 @@ class PosOrderService {
       } else if (tc is List && tc.isNotEmpty && tc.first is Map) {
         t = Map<String, dynamic>.from(tc.first as Map);
       }
-      final price = (t?['selling_price'] as num?)?.toDouble() ?? 0;
+      final priceRaw = t?['selling_price'];
+      if (priceRaw == null) {
+        partial = true;
+        continue;
+      }
+      final price = (priceRaw as num).toDouble();
       s += q * price;
     }
-    return s;
+    return (s, partial);
   }
 
   /// Один активный (не закрытый) заказ по столу, если есть.
