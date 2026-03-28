@@ -208,9 +208,47 @@ class PosStockService {
     }
   }
 
-  /// Суммы по продукту: приход (import) и расход (pos_sale, в граммах положительным числом).
-  Future<Map<String, ({double importGrams, double saleGrams})>>
-      aggregateImportVsSale({
+  /// Ручная корректировка остатка (инвентаризация, порча, пересорт).
+  Future<void> applyAdjustmentDelta({
+    required String establishmentId,
+    required String productId,
+    required double deltaGrams,
+  }) async {
+    if (deltaGrams == 0) return;
+    try {
+      await _supabase.client.rpc(
+        'apply_establishment_stock_delta',
+        params: {
+          'p_establishment_id': establishmentId,
+          'p_product_id': productId,
+          'p_delta_grams': deltaGrams,
+          'p_reason': 'adjustment',
+          'p_pos_order_id': null,
+          'p_pos_order_line_id': null,
+        },
+      );
+    } catch (err, st) {
+      devLog('PosStockService: adjustment rpc $err $st');
+      await SystemErrorService.instance.insert(
+        establishmentId: establishmentId,
+        message: 'pos_stock adjustment apply_establishment_stock_delta: $err',
+        severity: 'error',
+        source: 'pos_stock',
+        context: {'productId': productId, 'deltaGrams': deltaGrams},
+      );
+      rethrow;
+    }
+  }
+
+  /// Сводка за период: приход, расход POS, ручные корректировки (все в граммах; расход — модуль).
+  Future<
+      Map<
+          String,
+          ({
+            double importGrams,
+            double saleGrams,
+            double adjustmentGrams,
+          })>> aggregateStockReconciliation({
     required String establishmentId,
     required DateTime fromUtc,
     required DateTime toUtc,
@@ -221,20 +259,34 @@ class PosStockService {
       toUtc: toUtc,
       limit: 20000,
     );
-    final acc = <String, ({double i, double s})>{};
+    final acc = <String, ({double i, double s, double a})>{};
     for (final m in movements) {
-      final cur = acc[m.productId] ?? (i: 0, s: 0);
+      final cur = acc[m.productId] ?? (i: 0, s: 0, a: 0);
       if (m.reason == 'import') {
-        acc[m.productId] = (i: cur.i + m.deltaGrams, s: cur.s);
+        acc[m.productId] = (i: cur.i + m.deltaGrams, s: cur.s, a: cur.a);
       } else if (m.reason == 'pos_sale') {
         acc[m.productId] = (
           i: cur.i,
           s: cur.s + m.deltaGrams.abs(),
+          a: cur.a,
+        );
+      } else if (m.reason == 'adjustment') {
+        acc[m.productId] = (
+          i: cur.i,
+          s: cur.s,
+          a: cur.a + m.deltaGrams,
         );
       }
     }
     return acc.map(
-      (k, v) => MapEntry(k, (importGrams: v.i, saleGrams: v.s)),
+      (k, v) => MapEntry(
+        k,
+        (
+          importGrams: v.i,
+          saleGrams: v.s,
+          adjustmentGrams: v.a,
+        ),
+      ),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../utils/pos_hall_permissions.dart';
 import '../../widgets/app_bar_home_button.dart';
@@ -22,7 +23,13 @@ class _PosStockScreenState extends State<PosStockScreen> {
       [];
   List<({DateTime createdAt, String productId, double deltaGrams, String reason})>
       _movements = [];
-  Map<String, ({double importGrams, double saleGrams})>? _agg;
+  Map<
+      String,
+      ({
+        double importGrams,
+        double saleGrams,
+        double adjustmentGrams,
+      })>? _agg;
   DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
   RealtimeChannel? _rtBal;
   RealtimeChannel? _rtMov;
@@ -124,7 +131,7 @@ class _PosStockScreenState extends State<PosStockScreen> {
     final start = DateTime(_month.year, _month.month);
     final end = DateTime(_month.year, _month.month + 1);
     try {
-      final a = await PosStockService.instance.aggregateImportVsSale(
+      final a = await PosStockService.instance.aggregateStockReconciliation(
         establishmentId: est,
         fromUtc: start.toUtc(),
         toUtc: end.toUtc(),
@@ -204,10 +211,18 @@ class _PosStockScreenState extends State<PosStockScreen> {
         _agg!.entries.any(
           (e) =>
               e.value.importGrams.abs() > 0.0001 ||
-              e.value.saleGrams.abs() > 0.0001,
+              e.value.saleGrams.abs() > 0.0001 ||
+              e.value.adjustmentGrams.abs() > 0.0001,
         );
 
     return Scaffold(
+      floatingActionButton: canHealth
+          ? FloatingActionButton.extended(
+              onPressed: () => _showAdjustmentDialog(context),
+              icon: const Icon(Icons.tune),
+              label: Text(loc.t('pos_stock_adjustment_fab')),
+            )
+          : null,
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(loc.t('pos_stock_title')),
@@ -398,6 +413,11 @@ class _PosStockScreenState extends State<PosStockScreen> {
                                           numeric: true,
                                         ),
                                         DataColumn(
+                                          label: Text(loc
+                                              .t('pos_stock_col_adjustment')),
+                                          numeric: true,
+                                        ),
+                                        DataColumn(
                                           label: Text(
                                               loc.t('pos_stock_col_net')),
                                           numeric: true,
@@ -409,6 +429,9 @@ class _PosStockScreenState extends State<PosStockScreen> {
                                                 e.value.importGrams.abs() >
                                                     0.0001 ||
                                                 e.value.saleGrams.abs() >
+                                                    0.0001 ||
+                                                e.value.adjustmentGrams
+                                                        .abs() >
                                                     0.0001)
                                             .toList()
                                           ..sort((a, b) => _productName(
@@ -416,7 +439,8 @@ class _PosStockScreenState extends State<PosStockScreen> {
                                               .compareTo(_productName(b.key, store)));
                                         return rows.map((e) {
                                           final net = e.value.importGrams -
-                                              e.value.saleGrams;
+                                              e.value.saleGrams +
+                                              e.value.adjustmentGrams;
                                           return DataRow(cells: [
                                             DataCell(Text(_productName(
                                                 e.key, store))),
@@ -424,6 +448,9 @@ class _PosStockScreenState extends State<PosStockScreen> {
                                                 .value.importGrams
                                                 .toStringAsFixed(1))),
                                             DataCell(Text(e.value.saleGrams
+                                                .toStringAsFixed(1))),
+                                            DataCell(Text(e
+                                                .value.adjustmentGrams
                                                 .toStringAsFixed(1))),
                                             DataCell(Text(
                                                 net.toStringAsFixed(1))),
@@ -487,5 +514,144 @@ class _PosStockScreenState extends State<PosStockScreen> {
                       ),
                     ),
     );
+  }
+
+  Future<void> _showAdjustmentDialog(BuildContext context) async {
+    final loc = context.read<LocalizationService>();
+    final store = context.read<ProductStoreSupabase>();
+    final est = context.read<AccountManagerSupabase>().establishment?.id;
+    if (est == null) return;
+    if (store.allProducts.isEmpty) {
+      await store.loadProducts();
+    }
+    if (!context.mounted) return;
+    final products = List<Product>.from(store.allProducts)
+      ..sort((a, b) => a.name.compareTo(b.name));
+    if (products.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('pos_stock_empty'))),
+      );
+      return;
+    }
+
+    final filter = TextEditingController();
+    final grams = TextEditingController();
+    try {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          Product? selected;
+          return StatefulBuilder(
+            builder: (context, setSt) {
+              final q = filter.text.trim().toLowerCase();
+              final filtered = q.isEmpty
+                  ? products.take(100).toList()
+                  : products
+                      .where((p) => p.name.toLowerCase().contains(q))
+                      .take(100)
+                      .toList();
+              return AlertDialog(
+                title: Text(loc.t('pos_stock_adjustment_title')),
+                content: SizedBox(
+                  width: 400,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        loc.t('pos_stock_adjustment_hint'),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: filter,
+                        decoration: InputDecoration(
+                          labelText: loc.t('search'),
+                          border: const OutlineInputBorder(),
+                        ),
+                        onChanged: (_) => setSt(() {}),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 180,
+                        child: Scrollbar(
+                          child: ListView.builder(
+                            itemCount: filtered.length,
+                            itemBuilder: (_, i) {
+                              final p = filtered[i];
+                              return ListTile(
+                                dense: true,
+                                selected: selected?.id == p.id,
+                                title: Text(p.name),
+                                onTap: () {
+                                  selected = p;
+                                  setSt(() {});
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: grams,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          signed: true,
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText: loc.t('pos_stock_adjustment_grams'),
+                          border: const OutlineInputBorder(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: Text(loc.t('cancel')),
+                  ),
+                  FilledButton(
+                    onPressed: () async {
+                      final d = double.tryParse(
+                        grams.text.trim().replaceFirst(',', '.'),
+                      );
+                      if (selected == null || d == null || d == 0) {
+                        return;
+                      }
+                      try {
+                        await PosStockService.instance.applyAdjustmentDelta(
+                          establishmentId: est,
+                          productId: selected!.id,
+                          deltaGrams: d,
+                        );
+                        if (dialogContext.mounted) {
+                          Navigator.pop(dialogContext, true);
+                        }
+                      } catch (e) {
+                        if (dialogContext.mounted) {
+                          ScaffoldMessenger.of(dialogContext).showSnackBar(
+                            SnackBar(content: Text('$e')),
+                          );
+                        }
+                      }
+                    },
+                    child: Text(loc.t('pos_stock_adjustment_apply')),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+      if (ok == true && mounted) {
+        await _load();
+      }
+    } finally {
+      filter.dispose();
+      grams.dispose();
+    }
   }
 }
