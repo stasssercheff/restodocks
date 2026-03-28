@@ -16,6 +16,9 @@ class PosOrder {
     this.tableStatus,
     this.paymentMethod,
     this.paidAt,
+    this.discountAmount = 0,
+    this.serviceChargePercent = 0,
+    this.tipsAmount = 0,
   });
 
   final String id;
@@ -37,6 +40,15 @@ class PosOrder {
 
   /// Когда зафиксирована оплата.
   final DateTime? paidAt;
+
+  /// Скидка с суммы по меню (руб/валюта заведения).
+  final double discountAmount;
+
+  /// Сервисный сбор, % от суммы после скидки.
+  final double serviceChargePercent;
+
+  /// Чаевые (фиксируются при закрытии).
+  final double tipsAmount;
 
   factory PosOrder.fromJson(
     Map<String, dynamic> json, {
@@ -73,6 +85,10 @@ class PosOrder {
       paymentMethod:
           PosPaymentMethod.fromApi(json['payment_method'] as String?),
       paidAt: paidAt,
+      discountAmount: (json['discount_amount'] as num?)?.toDouble() ?? 0,
+      serviceChargePercent:
+          (json['service_charge_percent'] as num?)?.toDouble() ?? 0,
+      tipsAmount: (json['tips_amount'] as num?)?.toDouble() ?? 0,
     );
   }
 }
@@ -82,7 +98,10 @@ enum PosPaymentMethod {
   cash,
   card,
   transfer,
-  other;
+  other,
+
+  /// Несколько платежей — детали в pos_order_payments.
+  split;
 
   String toApi() {
     switch (this) {
@@ -94,6 +113,8 @@ enum PosPaymentMethod {
         return 'transfer';
       case PosPaymentMethod.other:
         return 'other';
+      case PosPaymentMethod.split:
+        return 'split';
     }
   }
 
@@ -108,6 +129,8 @@ enum PosPaymentMethod {
         return PosPaymentMethod.transfer;
       case 'other':
         return PosPaymentMethod.other;
+      case 'split':
+        return PosPaymentMethod.split;
       default:
         return null;
     }

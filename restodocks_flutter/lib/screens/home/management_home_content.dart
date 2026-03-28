@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../services/services.dart';
 import '../../services/screen_layout_preference_service.dart';
 import '../../models/models.dart';
+import '../../utils/pos_hall_permissions.dart';
 import 'expandable_banquet_section.dart';
 
 /// Домашняя страница менеджмента (шеф, барменеджер, менеджер зала, управляющий).
@@ -167,13 +168,26 @@ class ManagementHomeContent extends StatelessWidget {
             title: loc.t('pos_nav_tables') ?? 'Столы',
             onTap: () => context.push('/pos/hall/tables'),
           ),
+          if (posCanViewPosShiftReport(employee))
+            _Tile(
+              icon: Icons.summarize_outlined,
+              title: loc.t('pos_shift_report_title'),
+              onTap: () => context.push('/pos/shift-report'),
+            ),
         ],
-        if (dept == 'kitchen' || dept == 'bar')
+        if (dept == 'kitchen' || dept == 'bar') ...[
           _Tile(
             icon: Icons.receipt_long,
             title: loc.t('order_tab_orders') ?? 'Заказы',
             onTap: () => context.push('/pos/orders/$dept'),
           ),
+          _Tile(
+            icon: Icons.tv_outlined,
+            title: loc.t('pos_kds_title'),
+            subtitle: loc.t('pos_kds_hint'),
+            onTap: () => context.push('/pos/kds/$dept'),
+          ),
+        ],
         _Tile(
           icon: Icons.warehouse,
           title: loc.t('pos_nav_warehouse') ?? 'Склад',

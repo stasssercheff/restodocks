@@ -2,8 +2,10 @@ import '../models/pos_cash_register_row.dart';
 import '../models/pos_dining_table.dart';
 import '../models/pos_order.dart';
 import '../models/pos_order_line.dart';
+import '../models/pos_order_payment.dart';
 import '../utils/dev_log.dart';
 import '../utils/pos_order_department.dart';
+import '../utils/pos_order_totals.dart';
 import 'pos_dining_layout_service.dart';
 import 'supabase_service.dart';
 
@@ -28,20 +30,25 @@ class PosOrderLineMarkServedException implements Exception {
   PosOrderLineMarkServedException();
 }
 
+/// Сумма платежей не совпадает с итогом счёта.
+class PosOrderPaymentMismatchException implements Exception {
+  PosOrderPaymentMismatchException();
+}
+
 /// Заказы подразделения: очередь и уже отданные по строкам.
 class PosDepartmentOrderBuckets {
   const PosDepartmentOrderBuckets({
     required this.active,
     required this.served,
-    this.menuDueByOrderId = const {},
+    this.grandDueByOrderId = const {},
     this.menuDuePartialOrderIds = const {},
   });
 
   final List<PosOrder> active;
   final List<PosOrder> served;
 
-  /// Сумма по меню (quantity × selling_price) по id заказа — из того же запроса, что списки.
-  final Map<String, double> menuDueByOrderId;
+  /// Итог к оплате (меню − скидка + сервис; чаевые для незакрытых = 0) по id заказа.
+  final Map<String, double> grandDueByOrderId;
 
   /// Заказы, где у части строк нет цены в ТТК — сумма приблизительная.
   final Set<String> menuDuePartialOrderIds;
@@ -61,7 +68,7 @@ class PosOrderService {
 
   static const _orderSelectWithTable =
       'id, establishment_id, dining_table_id, status, guest_count, created_at, '
-      'updated_at, payment_method, paid_at, '
+      'updated_at, payment_method, paid_at, discount_amount, service_charge_percent, tips_amount, '
       'pos_dining_tables(table_number, floor_name, room_name, status)';
 
   Future<void> _touchOrderUpdated(String orderId) async {
@@ -226,7 +233,7 @@ class PosOrderService {
 
       final active = <PosOrder>[];
       final served = <PosOrder>[];
-      final menuDue = <String, double>{};
+      final grandDue = <String, double>{};
       final partialIds = <String>{};
       for (final row in rows as List<dynamic>) {
         if (row is! Map<String, dynamic>) continue;
@@ -236,8 +243,14 @@ class PosOrderService {
           m.remove('pos_order_lines');
           if (!_orderMatchesDepartment(linesRaw, dept)) continue;
           final o = PosOrder.fromJson(m);
-          final (due, partial) = _menuDueFromLinesRaw(linesRaw);
-          menuDue[o.id] = due;
+          final (menuSub, partial) = _menuDueFromLinesRaw(linesRaw);
+          final grand = computePosOrderTotalsRaw(
+            menuSubtotal: menuSub,
+            discountAmount: o.discountAmount,
+            serviceChargePercent: o.serviceChargePercent,
+            tipsAmount: 0,
+          ).grandTotal;
+          grandDue[o.id] = grand;
           if (partial) partialIds.add(o.id);
           if (_allRelevantLinesServed(linesRaw, dept)) {
             served.add(o);
@@ -251,7 +264,7 @@ class PosOrderService {
       return PosDepartmentOrderBuckets(
         active: active,
         served: served,
-        menuDueByOrderId: menuDue,
+        grandDueByOrderId: grandDue,
         menuDuePartialOrderIds: partialIds,
       );
     } catch (e, st) {
@@ -395,9 +408,16 @@ class PosOrderService {
           m.remove('pos_order_lines');
           final o = PosOrder.fromJson(m);
           if (o.tableStatus != PosTableStatus.billRequested) continue;
+          final (menuSub, _) = _menuDueFromLinesRaw(linesRaw);
+          final grand = computePosOrderTotalsRaw(
+            menuSubtotal: menuSub,
+            discountAmount: o.discountAmount,
+            serviceChargePercent: o.serviceChargePercent,
+            tipsAmount: 0,
+          ).grandTotal;
           out.add(PosCashRegisterRow(
             order: o,
-            totalDue: _sumLineTotals(linesRaw),
+            totalDue: grand,
           ));
         } catch (e) {
           devLog('PosOrderService: skip cash row $e');
@@ -408,11 +428,6 @@ class PosOrderService {
       devLog('PosOrderService: fetchCashRegisterRows $e $st');
       rethrow;
     }
-  }
-
-  double _sumLineTotals(dynamic linesRaw) {
-    final (s, _) = _menuDueFromLinesRaw(linesRaw);
-    return s;
   }
 
   /// Сумма по строкам; [partial] — есть строка без selling_price в ТТК.
@@ -524,21 +539,151 @@ class PosOrderService {
         .updateTableStatus(o.diningTableId, PosTableStatus.billRequested);
   }
 
-  /// Закрыть счёт: заказ закрыт, стол свободен; фиксируется способ оплаты и время.
-  Future<void> closeOrder(
+  double _menuSubtotalFromLinesList(List<PosOrderLine> lines) {
+    var s = 0.0;
+    for (final l in lines) {
+      final p = l.sellingPrice;
+      if (p == null) continue;
+      s += l.quantity * p;
+    }
+    return s;
+  }
+
+  /// Скидка и сервисный сбор (черновик или отправлен).
+  Future<void> updateOrderPricing(
     String orderId, {
-    required PosPaymentMethod paymentMethod,
+    required double discountAmount,
+    required double serviceChargePercent,
   }) async {
     final o = await fetchById(orderId);
     if (o == null) throw StateError('pos_order_missing');
-    if (o.status == PosOrderStatus.closed) return;
-    final now = DateTime.now().toUtc().toIso8601String();
+    if (o.status != PosOrderStatus.draft && o.status != PosOrderStatus.sent) {
+      throw PosOrderNotEditableException();
+    }
     await _supabase.client.from('pos_orders').update({
-      'status': PosOrderStatus.closed.toApi(),
-      'payment_method': paymentMethod.toApi(),
-      'paid_at': now,
-      'updated_at': now,
+      'discount_amount': discountAmount.clamp(0, 1e15),
+      'service_charge_percent': serviceChargePercent.clamp(0, 100),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
     }).eq('id', orderId);
+  }
+
+  Future<List<PosOrderPayment>> fetchPaymentsForOrder(String orderId) async {
+    try {
+      final rows = await _supabase.client
+          .from('pos_order_payments')
+          .select('id, order_id, amount, payment_method, created_at')
+          .eq('order_id', orderId)
+          .order('created_at', ascending: true);
+      final out = <PosOrderPayment>[];
+      for (final row in rows as List<dynamic>) {
+        if (row is! Map<String, dynamic>) continue;
+        try {
+          out.add(PosOrderPayment.fromJson(Map<String, dynamic>.from(row)));
+        } catch (e) {
+          devLog('PosOrderService: skip payment $e');
+        }
+      }
+      return out;
+    } catch (e, st) {
+      devLog('PosOrderService: fetchPaymentsForOrder $e $st');
+      rethrow;
+    }
+  }
+
+  /// Закрытые заказы за период по [paid_at] (UTC).
+  Future<List<PosOrder>> fetchClosedOrdersPaidBetween({
+    required String establishmentId,
+    required DateTime fromUtc,
+    required DateTime toUtc,
+  }) async {
+    try {
+      final rows = await _supabase.client
+          .from('pos_orders')
+          .select(_orderSelectWithTable)
+          .eq('establishment_id', establishmentId)
+          .eq('status', PosOrderStatus.closed.toApi())
+          .gte('paid_at', fromUtc.toUtc().toIso8601String())
+          .lte('paid_at', toUtc.toUtc().toIso8601String())
+          .order('paid_at', ascending: false);
+      final list = <PosOrder>[];
+      for (final row in rows as List<dynamic>) {
+        if (row is! Map<String, dynamic>) continue;
+        try {
+          list.add(PosOrder.fromJson(Map<String, dynamic>.from(row)));
+        } catch (e) {
+          devLog('PosOrderService: skip closed row $e');
+        }
+      }
+      return list;
+    } catch (e, st) {
+      devLog('PosOrderService: fetchClosedOrdersPaidBetween $e $st');
+      rethrow;
+    }
+  }
+
+  /// Закрыть счёт: один или несколько платежей, чаевые; стол освобождается.
+  Future<void> closeOrder(
+    String orderId, {
+    required double tipsAmount,
+    required List<({PosPaymentMethod method, double amount})> payments,
+  }) async {
+    if (payments.isEmpty) {
+      throw ArgumentError('payments empty');
+    }
+    final o = await fetchById(orderId);
+    if (o == null) throw StateError('pos_order_missing');
+    if (o.status == PosOrderStatus.closed) return;
+
+    final lines = await fetchLines(orderId);
+    final menuSub = _menuSubtotalFromLinesList(lines);
+    final totals = computePosOrderTotalsRaw(
+      menuSubtotal: menuSub,
+      discountAmount: o.discountAmount,
+      serviceChargePercent: o.serviceChargePercent,
+      tipsAmount: tipsAmount,
+    );
+    if (!posPaymentsMatchTotal(
+      payments.map((e) => e.amount),
+      totals.grandTotal,
+    )) {
+      throw PosOrderPaymentMismatchException();
+    }
+
+    final now = DateTime.now().toUtc().toIso8601String();
+    final paymentRows = payments
+        .map(
+          (p) => <String, dynamic>{
+            'order_id': orderId,
+            'amount': p.amount,
+            'payment_method': p.method.toApi(),
+          },
+        )
+        .toList();
+    try {
+      await _supabase.client.from('pos_order_payments').insert(paymentRows);
+    } catch (e, st) {
+      devLog('PosOrderService: insert payments $e $st');
+      rethrow;
+    }
+
+    try {
+      await _supabase.client.from('pos_orders').update({
+        'status': PosOrderStatus.closed.toApi(),
+        'tips_amount': tipsAmount.clamp(0, 1e15),
+        'payment_method': payments.length > 1
+            ? PosPaymentMethod.split.toApi()
+            : payments.first.method.toApi(),
+        'paid_at': now,
+        'updated_at': now,
+      }).eq('id', orderId);
+    } catch (e, st) {
+      devLog('PosOrderService: close order update $e $st');
+      try {
+        await _supabase.client.from('pos_order_payments').delete().eq('order_id', orderId);
+      } catch (_) {}
+      rethrow;
+    }
+
     try {
       await PosDiningLayoutService.instance
           .updateTableStatus(o.diningTableId, PosTableStatus.free);

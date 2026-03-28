@@ -256,7 +256,7 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
                         'time': formatPosOrderLiveDuration(o.createdAt),
                       }),
                     ].join(' · ');
-                    final due = _buckets.menuDueByOrderId[o.id];
+                    final due = _buckets.grandDueByOrderId[o.id];
                     final partial =
                         _buckets.menuDuePartialOrderIds.contains(o.id);
                     return ListTile(

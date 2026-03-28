@@ -666,6 +666,23 @@ class AppRouter {
               );
             },
           ),
+          GoRoute(
+            path: '/pos/shift-report',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const PosShiftReportScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/pos/kds/:department',
+            pageBuilder: (context, state) {
+              final dept = state.pathParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(
+                state,
+                PosKitchenDisplayScreen(department: dept),
+              );
+            },
+          ),
 
           GoRoute(
             path: '/products',

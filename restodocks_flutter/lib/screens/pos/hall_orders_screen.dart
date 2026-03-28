@@ -385,7 +385,7 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
                         'time': formatPosOrderLiveDuration(o.createdAt),
                       }),
                     ].join(' · ');
-                    final due = _buckets.menuDueByOrderId[o.id];
+                    final due = _buckets.grandDueByOrderId[o.id];
                     final partial =
                         _buckets.menuDuePartialOrderIds.contains(o.id);
                     return ListTile(

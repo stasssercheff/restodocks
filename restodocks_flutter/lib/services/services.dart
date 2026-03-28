@@ -56,4 +56,5 @@ export 'page_tour_service.dart';
 export 'privacy_policy_consent_service.dart';
 export 'pos_dining_layout_service.dart';
 export 'pos_order_service.dart';
+export 'pos_fiscal_service.dart';
 export 'pos_orders_display_settings_service.dart';

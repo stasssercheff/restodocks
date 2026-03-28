@@ -10,6 +10,8 @@ import '../../utils/pos_floor_room_label.dart';
 import '../../utils/pos_hall_permissions.dart';
 import '../../utils/pos_order_menu_due_format.dart';
 import '../../utils/pos_order_department.dart';
+import '../../utils/pos_order_receipt_pdf.dart';
+import '../../utils/pos_order_totals.dart';
 import '../../widgets/app_bar_home_button.dart';
 
 bool _isBarDish(TechCard tc) => posLineIsBarDish(tc.category, tc.sections);
@@ -42,6 +44,11 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   bool _closing = false;
   bool _billing = false;
   String? _markingLineId;
+
+  final _discountCtrl = TextEditingController();
+  final _servicePctCtrl = TextEditingController();
+  bool _pricingSaving = false;
+  List<PosOrderPayment> _payments = [];
 
   bool get _busy =>
       _orderLoading ||
@@ -95,6 +102,59 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
         return loc.t('pos_order_payment_transfer');
       case PosPaymentMethod.other:
         return loc.t('pos_order_payment_other');
+      case PosPaymentMethod.split:
+        return loc.t('pos_order_payment_split');
+    }
+  }
+
+  PosOrderTotals? _totalsPreview() {
+    final o = _order;
+    if (o == null) return null;
+    return computePosOrderTotals(
+      menuSubtotal: _sumLinesMenuDue(),
+      orderFields: o,
+    );
+  }
+
+  Future<void> _savePricing(LocalizationService loc) async {
+    final o = _order;
+    if (o == null) return;
+    if (o.status != PosOrderStatus.draft && o.status != PosOrderStatus.sent) {
+      return;
+    }
+    final d =
+        double.tryParse(_discountCtrl.text.replaceAll(',', '.').trim()) ?? 0;
+    final s =
+        double.tryParse(_servicePctCtrl.text.replaceAll(',', '.').trim()) ?? 0;
+    setState(() => _pricingSaving = true);
+    try {
+      await PosOrderService.instance.updateOrderPricing(
+        widget.orderId,
+        discountAmount: d,
+        serviceChargePercent: s,
+      );
+      if (mounted) await _loadOrder();
+    } on PosOrderNotEditableException {
+      if (mounted) AppToastService.show(loc.t('pos_order_edit_forbidden'));
+    } catch (e) {
+      if (mounted) AppToastService.show('${loc.t('error')}: $e');
+    } finally {
+      if (mounted) setState(() => _pricingSaving = false);
+    }
+  }
+
+  Future<void> _printReceipt(LocalizationService loc) async {
+    final o = _order;
+    if (o == null || _lines.isEmpty) return;
+    try {
+      await sharePosOrderPreReceiptPdf(
+        context: context,
+        order: o,
+        lines: _lines,
+        loc: loc,
+      );
+    } catch (e) {
+      if (mounted) AppToastService.show('${loc.t('error')}: $e');
     }
   }
 
@@ -102,6 +162,41 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _reloadAll());
+  }
+
+  @override
+  void dispose() {
+    _discountCtrl.dispose();
+    _servicePctCtrl.dispose();
+    super.dispose();
+  }
+
+  void _applyPricingFieldsFromOrder(PosOrder o) {
+    _discountCtrl.text =
+        o.discountAmount <= 0 ? '' : _fmtNumField(o.discountAmount);
+    _servicePctCtrl.text = o.serviceChargePercent <= 0
+        ? ''
+        : _fmtNumField(o.serviceChargePercent);
+  }
+
+  String _fmtNumField(double v) {
+    if (v == v.roundToDouble()) return v.toInt().toString();
+    final s = v.toStringAsFixed(2);
+    return s.replaceFirst(RegExp(r'\.?0+$'), '');
+  }
+
+  Future<void> _loadPayments() async {
+    if (_order?.status != PosOrderStatus.closed) {
+      if (mounted) setState(() => _payments = []);
+      return;
+    }
+    try {
+      final list =
+          await PosOrderService.instance.fetchPaymentsForOrder(widget.orderId);
+      if (mounted) setState(() => _payments = list);
+    } catch (_) {
+      if (mounted) setState(() => _payments = []);
+    }
   }
 
   Future<void> _loadOrder() async {
@@ -117,6 +212,7 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
         _orderLoading = false;
         _orderLoadError = null;
       });
+      if (o != null) _applyPricingFieldsFromOrder(o);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -149,6 +245,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
     await _refreshLines();
     if (!mounted) return;
     await _loadMenu();
+    if (!mounted) return;
+    await _loadPayments();
   }
 
   Future<void> _submit(LocalizationService loc) async {
@@ -189,76 +287,269 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   }
 
   Future<void> _confirmClose(BuildContext context, LocalizationService loc) async {
+    final o = _order;
+    if (o == null) return;
+    final menuSub = _sumLinesMenuDue();
+    final tipsCtrl = TextEditingController(text: '0');
     var method = PosPaymentMethod.cash;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: Text(loc.t('pos_order_close')),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(loc.t('pos_order_close_confirm')),
-                const SizedBox(height: 16),
-                Text(
-                  loc.t('pos_order_payment_label'),
-                  style: Theme.of(ctx).textTheme.titleSmall,
-                ),
-                const SizedBox(height: 8),
-                DropdownButton<PosPaymentMethod>(
-                  isExpanded: true,
-                  value: method,
-                  items: [
-                    DropdownMenuItem(
-                      value: PosPaymentMethod.cash,
-                      child: Text(loc.t('pos_order_payment_cash')),
+    var split = false;
+    final splitA = TextEditingController();
+    final splitB = TextEditingController();
+    var methodB = PosPaymentMethod.card;
+    _CloseBillResult? result;
+    try {
+      result = await showDialog<_CloseBillResult>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx, setLocal) {
+            double tipsVal() =>
+                double.tryParse(tipsCtrl.text.replaceAll(',', '.').trim()) ?? 0;
+            final grand = computePosOrderTotalsRaw(
+              menuSubtotal: menuSub,
+              discountAmount: o.discountAmount,
+              serviceChargePercent: o.serviceChargePercent,
+              tipsAmount: tipsVal(),
+            ).grandTotal;
+            if (split && splitA.text.isEmpty && splitB.text.isEmpty) {
+              final h = grand / 2;
+              splitA.text = h.toStringAsFixed(2);
+              splitB.text = (grand - h).toStringAsFixed(2);
+            }
+            return AlertDialog(
+              title: Text(loc.t('pos_order_close')),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(loc.t('pos_order_close_confirm')),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: tipsCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText: loc.t('pos_order_tips_label'),
+                      ),
+                      onChanged: (_) => setLocal(() {}),
                     ),
-                    DropdownMenuItem(
-                      value: PosPaymentMethod.card,
-                      child: Text(loc.t('pos_order_payment_card')),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${loc.t('pos_order_grand_total_label')}: ${formatPosOrderMenuDue(ctx, grand)}',
+                      style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
-                    DropdownMenuItem(
-                      value: PosPaymentMethod.transfer,
-                      child: Text(loc.t('pos_order_payment_transfer')),
+                    const SizedBox(height: 12),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(loc.t('pos_order_split_payment')),
+                      value: split,
+                      onChanged: (v) {
+                        setLocal(() {
+                          split = v;
+                          if (v) {
+                            final h = grand / 2;
+                            splitA.text = h.toStringAsFixed(2);
+                            splitB.text = (grand - h).toStringAsFixed(2);
+                          }
+                        });
+                      },
                     ),
-                    DropdownMenuItem(
-                      value: PosPaymentMethod.other,
-                      child: Text(loc.t('pos_order_payment_other')),
-                    ),
+                    if (!split) ...[
+                      Text(
+                        loc.t('pos_order_payment_label'),
+                        style: Theme.of(ctx).textTheme.titleSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButton<PosPaymentMethod>(
+                        isExpanded: true,
+                        value: method,
+                        items: [
+                          DropdownMenuItem(
+                            value: PosPaymentMethod.cash,
+                            child: Text(loc.t('pos_order_payment_cash')),
+                          ),
+                          DropdownMenuItem(
+                            value: PosPaymentMethod.card,
+                            child: Text(loc.t('pos_order_payment_card')),
+                          ),
+                          DropdownMenuItem(
+                            value: PosPaymentMethod.transfer,
+                            child: Text(loc.t('pos_order_payment_transfer')),
+                          ),
+                          DropdownMenuItem(
+                            value: PosPaymentMethod.other,
+                            child: Text(loc.t('pos_order_payment_other')),
+                          ),
+                        ],
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setLocal(() => method = v);
+                        },
+                      ),
+                    ] else ...[
+                      TextField(
+                        controller: splitA,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText:
+                              '${loc.t('pos_order_payment_label')} 1',
+                        ),
+                        onChanged: (_) => setLocal(() {}),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButton<PosPaymentMethod>(
+                        isExpanded: true,
+                        value: method,
+                        items: [
+                          DropdownMenuItem(
+                            value: PosPaymentMethod.cash,
+                            child: Text(loc.t('pos_order_payment_cash')),
+                          ),
+                          DropdownMenuItem(
+                            value: PosPaymentMethod.card,
+                            child: Text(loc.t('pos_order_payment_card')),
+                          ),
+                          DropdownMenuItem(
+                            value: PosPaymentMethod.transfer,
+                            child: Text(loc.t('pos_order_payment_transfer')),
+                          ),
+                          DropdownMenuItem(
+                            value: PosPaymentMethod.other,
+                            child: Text(loc.t('pos_order_payment_other')),
+                          ),
+                        ],
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setLocal(() => method = v);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: splitB,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: InputDecoration(
+                          labelText:
+                              '${loc.t('pos_order_payment_label')} 2',
+                        ),
+                        onChanged: (_) => setLocal(() {}),
+                      ),
+                      const SizedBox(height: 8),
+                      DropdownButton<PosPaymentMethod>(
+                        isExpanded: true,
+                        value: methodB,
+                        items: [
+                          DropdownMenuItem(
+                            value: PosPaymentMethod.cash,
+                            child: Text(loc.t('pos_order_payment_cash')),
+                          ),
+                          DropdownMenuItem(
+                            value: PosPaymentMethod.card,
+                            child: Text(loc.t('pos_order_payment_card')),
+                          ),
+                          DropdownMenuItem(
+                            value: PosPaymentMethod.transfer,
+                            child: Text(loc.t('pos_order_payment_transfer')),
+                          ),
+                          DropdownMenuItem(
+                            value: PosPaymentMethod.other,
+                            child: Text(loc.t('pos_order_payment_other')),
+                          ),
+                        ],
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setLocal(() => methodB = v);
+                        },
+                      ),
+                    ],
                   ],
-                  onChanged: (v) {
-                    if (v == null) return;
-                    setLocal(() => method = v);
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(loc.t('cancel')),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final tips =
+                        double.tryParse(tipsCtrl.text.replaceAll(',', '.').trim()) ?? 0;
+                    final g = computePosOrderTotalsRaw(
+                      menuSubtotal: menuSub,
+                      discountAmount: o.discountAmount,
+                      serviceChargePercent: o.serviceChargePercent,
+                      tipsAmount: tips,
+                    ).grandTotal;
+                    late final List<({PosPaymentMethod method, double amount})>
+                        parts;
+                    if (!split) {
+                      parts = [(method: method, amount: g)];
+                    } else {
+                      final a = double.tryParse(
+                            splitA.text.replaceAll(',', '.').trim(),
+                          ) ??
+                          0;
+                      final b = double.tryParse(
+                            splitB.text.replaceAll(',', '.').trim(),
+                          ) ??
+                          0;
+                      parts = [
+                        (method: method, amount: a),
+                        (method: methodB, amount: b),
+                      ];
+                    }
+                    Navigator.pop(
+                      ctx,
+                      _CloseBillResult(tips: tips, payments: parts),
+                    );
                   },
+                  child: Text(loc.t('pos_order_close')),
                 ),
               ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(loc.t('cancel')),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(loc.t('pos_order_close')),
-            ),
-          ],
+            );
+          },
         ),
-      ),
-    );
-    if (ok != true || !mounted) return;
+      );
+    } finally {
+      tipsCtrl.dispose();
+      splitA.dispose();
+      splitB.dispose();
+    }
+    if (result == null || !mounted) return;
+
+    final tips = result.tips;
+    final parts = result.payments;
+    final grand = computePosOrderTotalsRaw(
+      menuSubtotal: menuSub,
+      discountAmount: o.discountAmount,
+      serviceChargePercent: o.serviceChargePercent,
+      tipsAmount: tips,
+    ).grandTotal;
+
     setState(() => _closing = true);
     try {
       await PosOrderService.instance.closeOrder(
         widget.orderId,
-        paymentMethod: method,
+        tipsAmount: tips,
+        payments: parts,
+      );
+      await PosFiscalService.instance.registerSalePlaceholder(
+        orderId: widget.orderId,
+        amount: grand,
       );
       if (!mounted) return;
       AppToastService.show(loc.t('pos_order_closed_toast'));
       await _reloadAll();
+    } on PosOrderPaymentMismatchException {
+      if (mounted) {
+        AppToastService.show(loc.t('pos_order_payment_mismatch'));
+      }
     } catch (e) {
       if (mounted) AppToastService.show('${loc.t('error')}: $e');
     } finally {
@@ -562,6 +853,14 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
               onPressed: _busy ? null : () => context.push('/settings/orders-display'),
               tooltip: loc.t('pos_orders_display_settings_title'),
             ),
+          if (_order != null &&
+              _lines.isNotEmpty &&
+              !_linesLoading)
+            IconButton(
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              onPressed: _busy ? null : () => _printReceipt(loc),
+              tooltip: loc.t('pos_order_print_receipt'),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _busy ? null : _reloadAll,
@@ -647,28 +946,80 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
               Text(
                 '${dateFmt.format(o.createdAt.toLocal())} ${timeFmt.format(o.createdAt.toLocal())}',
               ),
+              if (editable || o.status == PosOrderStatus.sent) ...[
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _discountCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: loc.t('pos_order_discount_label'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _servicePctCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: loc.t('pos_order_service_percent_label'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                FilledButton.tonal(
+                  onPressed: _pricingSaving || _busy
+                      ? null
+                      : () => _savePricing(loc),
+                  child: Text(loc.t('pos_order_apply_pricing')),
+                ),
+              ],
               if (!_linesLoading &&
                   _linesError == null &&
                   _lines.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                Text(
-                  '${loc.t('pos_order_total_due_label')}: ${formatPosOrderMenuDue(context, _sumLinesMenuDue())}',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                ...() {
+                  final t = _totalsPreview();
+                  if (t == null) return <Widget>[];
+                  return [
+                    Text(
+                      '${loc.t('pos_order_subtotal_menu_label')}: ${formatPosOrderMenuDue(context, t.menuSubtotal)}',
+                    ),
+                    if (t.discountAmount > 0)
+                      Text(
+                        '${loc.t('pos_order_discount_label')}: −${formatPosOrderMenuDue(context, t.discountAmount)}',
                       ),
-                ),
-                if (_linesMissingMenuPrice())
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      loc.t('pos_order_total_partial'),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
+                    if (t.serviceAmount > 0)
+                      Text(
+                        '${loc.t('pos_order_service_amount_label')}: ${formatPosOrderMenuDue(context, t.serviceAmount)}',
+                      ),
+                    if (t.tipsAmount > 0)
+                      Text(
+                        '${loc.t('pos_order_tips_label')}: ${formatPosOrderMenuDue(context, t.tipsAmount)}',
+                      ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${loc.t('pos_order_grand_total_label')}: ${formatPosOrderMenuDue(context, t.grandTotal)}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
                           ),
                     ),
-                  ),
+                    if (_linesMissingMenuPrice())
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          loc.t('pos_order_total_partial'),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                        ),
+                      ),
+                  ];
+                }(),
               ],
               if (o.status == PosOrderStatus.closed) ...[
                 if (o.paymentMethod != null) ...[
@@ -683,6 +1034,14 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                     loc.t('pos_order_paid_at', args: {
                       'time': timeFmt.format(o.paidAt!.toLocal()),
                     }),
+                  ),
+                ],
+                if (_payments.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  ..._payments.map(
+                    (p) => Text(
+                      '${_paymentMethodLabel(loc, p.paymentMethod)}: ${formatPosOrderMenuDue(context, p.amount)}',
+                    ),
                   ),
                 ],
               ],
@@ -829,6 +1188,13 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                   onPressed: _closing ? null : () => _confirmClose(context, loc),
                   child: Text(loc.t('pos_order_close')),
                 ),
+                const SizedBox(height: 8),
+                Text(
+                  loc.t('pos_order_fiscal_not_configured'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
               ],
               if (!editable) ...[
                 const SizedBox(height: 16),
@@ -845,6 +1211,13 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
       }(),
     );
   }
+}
+
+class _CloseBillResult {
+  _CloseBillResult({required this.tips, required this.payments});
+
+  final double tips;
+  final List<({PosPaymentMethod method, double amount})> payments;
 }
 
 class _LineTile extends StatelessWidget {

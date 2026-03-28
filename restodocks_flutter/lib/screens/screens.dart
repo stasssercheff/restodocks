@@ -59,3 +59,5 @@ export 'pos/pos_department_orders_screen.dart';
 export 'pos/pos_orders_display_settings_screen.dart';
 export 'pos/pos_procurement_screen.dart';
 export 'pos/pos_warehouse_hub_screen.dart';
+export 'pos/pos_shift_report_screen.dart';
+export 'pos/pos_kitchen_display_screen.dart';
