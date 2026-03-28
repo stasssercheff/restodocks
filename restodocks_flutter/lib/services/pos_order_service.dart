@@ -16,6 +16,12 @@ class PosOrderSubmitEmptyException implements Exception {
   PosOrderSubmitEmptyException();
 }
 
+/// На столе уже есть активный счёт.
+class PosOrderTableBusyException implements Exception {
+  PosOrderTableBusyException(this.existingOrder);
+  final PosOrder existingOrder;
+}
+
 /// Заказы зала (pos_orders).
 class PosOrderService {
   PosOrderService._();
@@ -246,6 +252,31 @@ class PosOrderService {
     }
   }
 
+  /// Один активный (не закрытый) заказ по столу, если есть.
+  Future<PosOrder?> fetchActiveOrderForTable(
+    String establishmentId,
+    String diningTableId,
+  ) async {
+    try {
+      final rows = await _supabase.client
+          .from('pos_orders')
+          .select(
+            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name)',
+          )
+          .eq('establishment_id', establishmentId)
+          .eq('dining_table_id', diningTableId)
+          .neq('status', 'closed')
+          .order('created_at', ascending: false)
+          .limit(1);
+      final list = rows as List<dynamic>;
+      if (list.isEmpty) return null;
+      return PosOrder.fromJson(Map<String, dynamic>.from(list.first as Map));
+    } catch (e, st) {
+      devLog('PosOrderService: fetchActiveOrderForTable $e $st');
+      rethrow;
+    }
+  }
+
   Future<PosOrder?> fetchById(String orderId) async {
     try {
       final rows = await _supabase.client
@@ -269,6 +300,10 @@ class PosOrderService {
     required String diningTableId,
     int guestCount = 1,
   }) async {
+    final existing = await fetchActiveOrderForTable(establishmentId, diningTableId);
+    if (existing != null) {
+      throw PosOrderTableBusyException(existing);
+    }
     final row = await _supabase.client
         .from('pos_orders')
         .insert({

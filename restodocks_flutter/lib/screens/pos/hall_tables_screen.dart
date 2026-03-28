@@ -61,6 +61,29 @@ class _HallTablesScreenState extends State<HallTablesScreen> {
     }
   }
 
+  Future<void> _onTableTap(PosDiningTable table) async {
+    final account = context.read<AccountManagerSupabase>();
+    final est = account.establishment;
+    final loc = context.read<LocalizationService>();
+    if (est == null) return;
+
+    if (table.status == PosTableStatus.free) {
+      await context.push('/pos/hall/orders?table=${table.id}');
+      return;
+    }
+
+    final order = await PosOrderService.instance
+        .fetchActiveOrderForTable(est.id, table.id);
+    if (!mounted) return;
+    if (order != null) {
+      await context.push('/pos/hall/orders/${order.id}');
+      return;
+    }
+
+    AppToastService.show(loc.t('pos_tables_sync_hint'));
+    await _load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -153,15 +176,17 @@ class _HallTablesScreenState extends State<HallTablesScreen> {
     }
 
     final floors = _buildFloorGroups(_tables, loc);
+    Future<void> onTable(PosDiningTable t) => _onTableTap(t);
     if (floors.length == 1 && floors.first.rooms.length == 1) {
       return _TableGrid(
         tables: floors.first.rooms.first.tables,
         loc: loc,
+        onTableTap: onTable,
       );
     }
     if (floors.length == 1) {
       final f = floors.first;
-      return _RoomTabsOrGrid(floor: f, loc: loc);
+      return _RoomTabsOrGrid(floor: f, loc: loc, onTableTap: onTable);
     }
     return DefaultTabController(
       length: floors.length,
@@ -174,9 +199,10 @@ class _HallTablesScreenState extends State<HallTablesScreen> {
             ],
           ),
           Expanded(
-            child: TabBarView(
+              child: TabBarView(
               children: [
-                for (final f in floors) _RoomTabsOrGrid(floor: f, loc: loc),
+                for (final f in floors)
+                  _RoomTabsOrGrid(floor: f, loc: loc, onTableTap: onTable),
               ],
             ),
           ),
@@ -266,15 +292,24 @@ class _RoomGroup {
 }
 
 class _RoomTabsOrGrid extends StatelessWidget {
-  const _RoomTabsOrGrid({required this.floor, required this.loc});
+  const _RoomTabsOrGrid({
+    required this.floor,
+    required this.loc,
+    required this.onTableTap,
+  });
 
   final _FloorGroup floor;
   final LocalizationService loc;
+  final Future<void> Function(PosDiningTable) onTableTap;
 
   @override
   Widget build(BuildContext context) {
     if (floor.rooms.length == 1) {
-      return _TableGrid(tables: floor.rooms.first.tables, loc: loc);
+      return _TableGrid(
+        tables: floor.rooms.first.tables,
+        loc: loc,
+        onTableTap: onTableTap,
+      );
     }
     return DefaultTabController(
       length: floor.rooms.length,
@@ -290,7 +325,7 @@ class _RoomTabsOrGrid extends StatelessWidget {
             child: TabBarView(
               children: [
                 for (final r in floor.rooms)
-                  _TableGrid(tables: r.tables, loc: loc),
+                  _TableGrid(tables: r.tables, loc: loc, onTableTap: onTableTap),
               ],
             ),
           ),
@@ -301,10 +336,15 @@ class _RoomTabsOrGrid extends StatelessWidget {
 }
 
 class _TableGrid extends StatelessWidget {
-  const _TableGrid({required this.tables, required this.loc});
+  const _TableGrid({
+    required this.tables,
+    required this.loc,
+    required this.onTableTap,
+  });
 
   final List<PosDiningTable> tables;
   final LocalizationService loc;
+  final Future<void> Function(PosDiningTable) onTableTap;
 
   @override
   Widget build(BuildContext context) {
@@ -321,7 +361,11 @@ class _TableGrid extends StatelessWidget {
             childAspectRatio: 1.1,
           ),
           itemCount: tables.length,
-          itemBuilder: (context, i) => _TableCard(table: tables[i], loc: loc),
+          itemBuilder: (context, i) => _TableCard(
+            table: tables[i],
+            loc: loc,
+            onTap: () => onTableTap(tables[i]),
+          ),
         );
       },
     );
@@ -329,10 +373,15 @@ class _TableGrid extends StatelessWidget {
 }
 
 class _TableCard extends StatelessWidget {
-  const _TableCard({required this.table, required this.loc});
+  const _TableCard({
+    required this.table,
+    required this.loc,
+    required this.onTap,
+  });
 
   final PosDiningTable table;
   final LocalizationService loc;
+  final VoidCallback onTap;
 
   Color _statusColor(BuildContext context) {
     switch (table.status) {
@@ -367,39 +416,44 @@ class _TableCard extends StatelessWidget {
 
     return Card(
       elevation: 2,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: border, width: 3),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: border.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                _statusLabel(),
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: scheme.onSurface,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
                 textAlign: TextAlign.center,
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: border.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _statusLabel(),
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: scheme.onSurface,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

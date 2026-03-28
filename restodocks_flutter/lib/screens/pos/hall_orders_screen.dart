@@ -24,7 +24,18 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _load();
+      if (!mounted) return;
+      await _maybeOpenFromTableQuery();
+    });
+  }
+
+  Future<void> _maybeOpenFromTableQuery() async {
+    final tid = GoRouterState.of(context).queryParameters['table'];
+    if (tid == null || tid.isEmpty) return;
+    final loc = context.read<LocalizationService>();
+    await _openCreate(loc, preselectedTableId: tid);
   }
 
   Future<void> _load() async {
@@ -68,7 +79,8 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
     }
   }
 
-  Future<void> _openCreate(LocalizationService loc) async {
+  Future<void> _openCreate(LocalizationService loc,
+      {String? preselectedTableId}) async {
     final account = context.read<AccountManagerSupabase>();
     final est = account.establishment;
     if (est == null) return;
@@ -87,6 +99,14 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
     }
 
     PosDiningTable selected = tables.first;
+    if (preselectedTableId != null) {
+      for (final t in tables) {
+        if (t.id == preselectedTableId) {
+          selected = t;
+          break;
+        }
+      }
+    }
     final guestsCtrl = TextEditingController(text: '1');
     var guestsParsed = 1;
 
@@ -168,6 +188,11 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
       if (!mounted) return;
       AppToastService.show(loc.t('pos_orders_created'));
       await context.push('/pos/hall/orders/${order.id}');
+      if (mounted) await _load();
+    } on PosOrderTableBusyException catch (e) {
+      if (!mounted) return;
+      AppToastService.show(loc.t('pos_orders_table_busy'));
+      await context.push('/pos/hall/orders/${e.existingOrder.id}');
       if (mounted) await _load();
     } catch (e) {
       AppToastService.show('${loc.t('error')}: $e');
