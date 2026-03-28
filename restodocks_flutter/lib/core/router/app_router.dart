@@ -597,7 +597,7 @@ class AppRouter {
             },
           ),
 
-          // POS / зал / подразделения / склад / закупка (пока заглушки)
+          // POS: зал, списки по подразделениям, хабы склада и закупки
           GoRoute(
             path: '/pos/hall/orders',
             pageBuilder: (context, state) => _slideTransitionPage(

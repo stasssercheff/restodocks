@@ -13,6 +13,7 @@ import '../services/inventory_download.dart';
 import '../services/services.dart';
 import '../services/home_layout_config_service.dart';
 import '../services/screen_layout_preference_service.dart';
+import '../utils/pos_hall_permissions.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/getting_started_document.dart';
 import '../widgets/long_operation_progress_dialog.dart';
@@ -2141,13 +2142,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ],
             ),
-            if (currentEmployee.hasRole('owner') ||
-                currentEmployee.department == 'management' ||
-                currentEmployee.hasRole('executive_chef') ||
-                currentEmployee.hasRole('sous_chef') ||
-                currentEmployee.hasRole('bar_manager') ||
-                currentEmployee.hasRole('floor_manager') ||
-                currentEmployee.hasRole('general_manager'))
+            if (posCanConfigureOrdersDisplay(currentEmployee))
               ListTile(
                 leading: const Icon(Icons.tune),
                 title: Text(localization.t('pos_orders_display_settings_title') ??
@@ -2160,13 +2155,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/settings/orders-display'),
               ),
-            if (currentEmployee.hasRole('owner') ||
-                currentEmployee.department == 'management' ||
-                currentEmployee.hasRole('executive_chef') ||
-                currentEmployee.hasRole('sous_chef') ||
-                currentEmployee.hasRole('bar_manager') ||
-                currentEmployee.hasRole('floor_manager') ||
-                currentEmployee.hasRole('general_manager'))
+            if (posCanConfigureOrdersDisplay(currentEmployee))
               ExpansionTile(
                 initiallyExpanded: false,
                 leading: const Icon(Icons.people),

@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../services/services.dart';
+import '../../utils/pos_hall_permissions.dart';
 import '../../utils/pos_order_department.dart';
 import '../../utils/pos_order_live_duration.dart';
 import '../../utils/pos_orders_list_subtitle_style.dart';
@@ -117,10 +118,12 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final emp = context.watch<AccountManagerSupabase>().currentEmployee;
     final timeFmt = DateFormat.Hm(Localizations.localeOf(context).toString());
     final deptKey = posDepartmentLabelKeyForRoute(widget.department);
     final deptLabel =
         deptKey != null ? loc.t(deptKey) : widget.department;
+    final canDisplaySettings = posCanConfigureOrdersDisplay(emp);
 
     return Scaffold(
       appBar: AppBar(
@@ -139,6 +142,12 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
           ],
         ),
         actions: [
+          if (canDisplaySettings)
+            IconButton(
+              icon: const Icon(Icons.tune_outlined),
+              onPressed: () => context.push('/settings/orders-display'),
+              tooltip: loc.t('pos_orders_display_settings_title'),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _load,

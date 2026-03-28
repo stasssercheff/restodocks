@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../utils/number_format_utils.dart';
+import '../../utils/pos_hall_permissions.dart';
 import '../../utils/pos_orders_list_subtitle_style.dart';
 import '../../widgets/app_bar_home_button.dart';
 
@@ -83,13 +84,21 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final emp = context.watch<AccountManagerSupabase>().currentEmployee;
     final timeFmt = DateFormat.Hm(Localizations.localeOf(context).toString());
+    final canDisplaySettings = posCanConfigureOrdersDisplay(emp);
 
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(loc.t('pos_hall_cash_title')),
         actions: [
+          if (canDisplaySettings)
+            IconButton(
+              icon: const Icon(Icons.tune_outlined),
+              onPressed: () => context.push('/settings/orders-display'),
+              tooltip: loc.t('pos_orders_display_settings_title'),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _load,

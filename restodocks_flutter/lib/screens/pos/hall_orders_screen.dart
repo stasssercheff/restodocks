@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../services/services.dart';
+import '../../utils/pos_hall_permissions.dart';
 import '../../utils/pos_order_live_duration.dart';
 import '../../utils/pos_orders_list_subtitle_style.dart';
 import '../../widgets/app_bar_home_button.dart';
@@ -242,13 +243,21 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final emp = context.watch<AccountManagerSupabase>().currentEmployee;
     final timeFmt = DateFormat.Hm(Localizations.localeOf(context).toString());
+    final canDisplaySettings = posCanConfigureOrdersDisplay(emp);
 
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(loc.t('pos_hall_orders_title')),
         actions: [
+          if (canDisplaySettings)
+            IconButton(
+              icon: const Icon(Icons.tune_outlined),
+              onPressed: () => context.push('/settings/orders-display'),
+              tooltip: loc.t('pos_orders_display_settings_title'),
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _load,

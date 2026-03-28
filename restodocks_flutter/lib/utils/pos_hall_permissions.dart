@@ -39,3 +39,15 @@ bool posCanCloseHallOrder(Employee? e) {
   final hall = e.department == 'hall' || e.department == 'dining_room';
   return hall;
 }
+
+/// Таймер и шрифты на экранах списков заказов: те же роли, что пункт «Отображение заказов» в настройках.
+bool posCanConfigureOrdersDisplay(Employee? e) {
+  if (e == null) return false;
+  if (e.hasRole('owner')) return true;
+  if (e.department == 'management') return true;
+  return e.hasRole('executive_chef') ||
+      e.hasRole('sous_chef') ||
+      e.hasRole('bar_manager') ||
+      e.hasRole('floor_manager') ||
+      e.hasRole('general_manager');
+}
