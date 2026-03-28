@@ -31,8 +31,8 @@ class HallOrderDetailScreen extends StatefulWidget {
 }
 
 class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
-  late final Future<PosOrder?> _orderFuture =
-      PosOrderService.instance.fetchById(widget.orderId);
+  PosOrder? _order;
+  bool _orderLoading = true;
 
   List<PosOrderLine> _lines = [];
   bool _linesLoading = true;
@@ -40,6 +40,10 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
 
   List<TechCard> _menuDishes = [];
   bool _menuLoading = false;
+
+  bool _sending = false;
+
+  bool get _busy => _orderLoading || _linesLoading || _sending;
 
   String _statusLabel(LocalizationService loc, PosOrderStatus s) {
     switch (s) {
@@ -56,9 +60,55 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _refreshLines();
+      _reloadAll();
       _loadMenu();
     });
+  }
+
+  Future<void> _loadOrder() async {
+    setState(() => _orderLoading = true);
+    try {
+      final o = await PosOrderService.instance.fetchById(widget.orderId);
+      if (!mounted) return;
+      setState(() {
+        _order = o;
+        _orderLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _order = null;
+        _orderLoading = false;
+      });
+    }
+  }
+
+  Future<void> _reloadAll() async {
+    await _loadOrder();
+    await _refreshLines();
+  }
+
+  Future<void> _submit(LocalizationService loc) async {
+    if (_lines.isEmpty) {
+      AppToastService.show(loc.t('pos_order_send_empty'));
+      return;
+    }
+    setState(() => _sending = true);
+    try {
+      await PosOrderService.instance.submitOrder(widget.orderId);
+      if (!mounted) return;
+      AppToastService.show(loc.t('pos_order_sent_toast'));
+      await _loadOrder();
+      await _refreshLines();
+    } on PosOrderNotEditableException {
+      if (mounted) AppToastService.show(loc.t('pos_order_edit_forbidden'));
+    } on PosOrderSubmitEmptyException {
+      if (mounted) AppToastService.show(loc.t('pos_order_send_empty'));
+    } catch (e) {
+      if (mounted) AppToastService.show('${loc.t('error')}: $e');
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   Future<void> _loadMenu() async {
@@ -221,38 +271,35 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _linesLoading ? null : _refreshLines,
+            onPressed: _busy ? null : _reloadAll,
             tooltip: loc.t('refresh'),
           ),
         ],
       ),
-      floatingActionButton: FutureBuilder<PosOrder?>(
-        future: _orderFuture,
-        builder: (context, snap) {
-          final o = snap.data;
-          final draft = o?.status == PosOrderStatus.draft;
-          if (!draft || o == null) return const SizedBox.shrink();
-          return FloatingActionButton(
-            onPressed: _menuLoading && _menuDishes.isEmpty ? null : () => _openAddDishSheet(loc),
-            tooltip: loc.t('pos_order_line_add'),
-            child: const Icon(Icons.add),
-          );
-        },
-      ),
-      body: FutureBuilder<PosOrder?>(
-        future: _orderFuture,
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final o = snap.data;
-          if (o == null) {
-            return Center(child: Text(loc.t('document_not_found')));
-          }
-          final tn = o.tableNumber ?? 0;
-          final editable = o.status == PosOrderStatus.draft;
+      floatingActionButton: () {
+        final o = _order;
+        final draft = o?.status == PosOrderStatus.draft;
+        if (!draft || o == null) return const SizedBox.shrink();
+        return FloatingActionButton(
+          onPressed: (_menuLoading && _menuDishes.isEmpty) || _sending
+              ? null
+              : () => _openAddDishSheet(loc),
+          tooltip: loc.t('pos_order_line_add'),
+          child: const Icon(Icons.add),
+        );
+      }(),
+      body: () {
+        if (_orderLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final o = _order;
+        if (o == null) {
+          return Center(child: Text(loc.t('document_not_found')));
+        }
+        final tn = o.tableNumber ?? 0;
+        final editable = o.status == PosOrderStatus.draft;
 
-          return ListView(
+        return ListView(
             padding: const EdgeInsets.all(24),
             children: [
               Text(
@@ -306,17 +353,33 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
               if (editable) ...[
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
-                  onPressed: _menuLoading && _menuDishes.isEmpty
+                  onPressed: (_menuLoading && _menuDishes.isEmpty) || _sending
                       ? null
                       : () => _openAddDishSheet(loc),
                   icon: const Icon(Icons.restaurant_menu),
                   label: Text(loc.t('pos_order_line_add')),
                 ),
+                if (!_linesLoading && _lines.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  FilledButton.icon(
+                    onPressed: _sending ? null : () => _submit(loc),
+                    icon: _sending
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.send),
+                    label: Text(loc.t('pos_order_send')),
+                  ),
+                ],
               ],
               if (!editable) ...[
                 const SizedBox(height: 16),
                 Text(
-                  loc.t('pos_order_edit_forbidden_hint'),
+                  o.status == PosOrderStatus.sent
+                      ? loc.t('pos_order_sent_readonly_hint')
+                      : loc.t('pos_order_edit_forbidden_hint'),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
@@ -324,8 +387,7 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
               ],
             ],
           );
-        },
-      ),
+      }(),
     );
   }
 }

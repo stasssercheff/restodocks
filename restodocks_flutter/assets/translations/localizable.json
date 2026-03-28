@@ -1658,6 +1658,10 @@
     "pos_order_course_short": "Курс",
     "pos_order_line_comment": "Комментарий к позиции",
     "pos_order_line_comment_hint": "Например: без лука, остро",
+    "pos_order_send": "Отправить на кухню и бар",
+    "pos_order_send_empty": "Добавьте хотя бы одну позицию в заказ.",
+    "pos_order_sent_toast": "Заказ отправлен",
+    "pos_order_sent_readonly_hint": "Заказ отправлен на кухню и бар. Изменение позиций недоступно.",
     "accept_and_continue": "Принять и продолжить"
   },
   "en": {
@@ -3233,6 +3237,10 @@
     "pos_order_course_short": "Course",
     "pos_order_line_comment": "Line comment",
     "pos_order_line_comment_hint": "e.g. no onion, spicy",
+    "pos_order_send": "Send to kitchen & bar",
+    "pos_order_send_empty": "Add at least one line to the order.",
+    "pos_order_sent_toast": "Order sent",
+    "pos_order_sent_readonly_hint": "Order sent to kitchen and bar. Lines cannot be edited.",
     "accept_and_continue": "Accept and continue"
   },
   "es": {
@@ -4704,6 +4712,10 @@
     "pos_order_course_short": "Tanda",
     "pos_order_line_comment": "Comentario al plato",
     "pos_order_line_comment_hint": "p. ej. sin cebolla, picante",
+    "pos_order_send": "Enviar a cocina y bar",
+    "pos_order_send_empty": "Añada al menos una posición al pedido.",
+    "pos_order_sent_toast": "Pedido enviado",
+    "pos_order_sent_readonly_hint": "Pedido enviado a cocina y bar. No se pueden editar las líneas.",
     "accept_and_continue": "Aceptar y continuar"
   },
   "de": {
@@ -4905,6 +4917,10 @@
     "pos_order_course_short": "Gang",
     "pos_order_line_comment": "Kommentar zur Position",
     "pos_order_line_comment_hint": "z. B. ohne Zwiebeln, scharf",
+    "pos_order_send": "An Küche & Bar senden",
+    "pos_order_send_empty": "Mindestens eine Position hinzufügen.",
+    "pos_order_sent_toast": "Bestellung gesendet",
+    "pos_order_sent_readonly_hint": "An Küche und Bar gesendet. Positionen sind gesperrt.",
     "product_name_duplicate": "In der Nomenklatur dürfen keine zwei Produkte mit demselben Namen existieren (Groß-/Kleinschreibung egal; führende und nachfolgende Leerzeichen werden ignoriert)."
   },
   "fr": {
@@ -5106,6 +5122,10 @@
     "pos_order_course_short": "Service",
     "pos_order_line_comment": "Commentaire sur la ligne",
     "pos_order_line_comment_hint": "ex. sans oignon, épicé",
+    "pos_order_send": "Envoyer cuisine et bar",
+    "pos_order_send_empty": "Ajoutez au moins une ligne à la commande.",
+    "pos_order_sent_toast": "Commande envoyée",
+    "pos_order_sent_readonly_hint": "Envoyée en cuisine et au bar. Modification des lignes impossible.",
     "product_name_duplicate": "La nomenclature ne peut pas contenir deux produits avec le même nom (sans tenir compte de la casse ; espaces en début et fin ignorés)."
   },
   "tr": {
@@ -6577,6 +6597,10 @@
     "pos_order_course_short": "Servis",
     "pos_order_line_comment": "Satır yorumu",
     "pos_order_line_comment_hint": "ör. soğansız, acılı",
+    "pos_order_send": "Mutfak ve bara gönder",
+    "pos_order_send_empty": "Siparişe en az bir satır ekleyin.",
+    "pos_order_sent_toast": "Sipariş gönderildi",
+    "pos_order_sent_readonly_hint": "Mutfak ve bara gönderildi. Satırlar düzenlenemez.",
     "accept_and_continue": "Kabul et ve devam et"
   },
   "vi": {
@@ -8072,6 +8096,10 @@
     "pos_order_course_short": "Lượt",
     "pos_order_line_comment": "Ghi chú món",
     "pos_order_line_comment_hint": "vd. không hành, cay",
+    "pos_order_send": "Gửi bếp và bar",
+    "pos_order_send_empty": "Thêm ít nhất một dòng vào đơn.",
+    "pos_order_sent_toast": "Đã gửi đơn",
+    "pos_order_sent_readonly_hint": "Đã gửi bếp và bar. Không chỉnh sửa dòng.",
     "accept_and_continue": "Chấp nhận và tiếp tục"
   }
 }

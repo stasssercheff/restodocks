@@ -8,6 +8,11 @@ class PosOrderNotEditableException implements Exception {
   PosOrderNotEditableException();
 }
 
+/// Отправка заказа без позиций.
+class PosOrderSubmitEmptyException implements Exception {
+  PosOrderSubmitEmptyException();
+}
+
 /// Заказы зала (pos_orders).
 class PosOrderService {
   PosOrderService._();
@@ -116,6 +121,17 @@ class PosOrderService {
     await _requireDraft(orderId);
     await _supabase.client.from('pos_order_lines').delete().eq('id', lineId);
     await _touchOrderUpdated(orderId);
+  }
+
+  /// Черновик → отправлен (кухня/бар увидят по статусу и строкам). Без строк — ошибка.
+  Future<void> submitOrder(String orderId) async {
+    await _requireDraft(orderId);
+    final lines = await fetchLines(orderId);
+    if (lines.isEmpty) throw PosOrderSubmitEmptyException();
+    await _supabase.client.from('pos_orders').update({
+      'status': PosOrderStatus.sent.toApi(),
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', orderId);
   }
 
   Future<List<PosOrder>> fetchActiveOrders(String establishmentId) async {
