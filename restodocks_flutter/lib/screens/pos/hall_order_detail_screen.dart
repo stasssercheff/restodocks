@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../services/services.dart';
+import '../../utils/pos_floor_room_label.dart';
 import '../../utils/pos_hall_permissions.dart';
 import '../../utils/pos_order_menu_due_format.dart';
 import '../../utils/pos_order_department.dart';
@@ -563,6 +564,14 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
               Text(
                 loc.t('pos_table_number', args: {'n': '$tn'}),
                 style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                posFloorRoomSummaryLine(loc,
+                    floorName: o.floorName, roomName: o.roomName),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
               ),
               const SizedBox(height: 8),
               Text(

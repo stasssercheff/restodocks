@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
 import '../../services/services.dart';
+import '../../utils/pos_floor_room_label.dart';
 import '../../utils/pos_hall_permissions.dart';
 import '../../utils/pos_order_live_duration.dart';
 import '../../utils/pos_order_menu_due_format.dart';
@@ -110,19 +111,6 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
     }
   }
 
-  /// Этаж и зал для подписи в диалоге нового заказа (как на экране столов).
-  String _dialogFloorRoomLine(LocalizationService loc, PosDiningTable t) {
-    final floor = t.floorName?.trim();
-    final room = t.roomName?.trim();
-    final floorPart = (floor == null || floor.isEmpty)
-        ? loc.t('pos_tables_tab_floor_default')
-        : loc.t('pos_tables_tab_floor_named', args: {'name': floor});
-    final roomPart = (room == null || room.isEmpty)
-        ? loc.t('pos_tables_tab_room_default')
-        : loc.t('pos_tables_tab_room_named', args: {'name': room});
-    return '$floorPart · $roomPart';
-  }
-
   String _statusLabel(LocalizationService loc, PosOrderStatus s) {
     switch (s) {
       case PosOrderStatus.draft:
@@ -180,7 +168,9 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    _dialogFloorRoomLine(loc, selected),
+                    posFloorRoomSummaryLine(loc,
+                        floorName: selected.floorName,
+                        roomName: selected.roomName),
                     style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
                           color: Theme.of(ctx).colorScheme.onSurfaceVariant,
                         ),
