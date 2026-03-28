@@ -27,6 +27,7 @@ import '../../screens/writeoffs_screen.dart';
 import '../../screens/haccp_log_detail_screen.dart';
 import '../../screens/home/expenses_screen.dart';
 import '../../screens/home/department_placeholder_screen.dart';
+import '../../screens/pos/hall_cash_register_screen.dart';
 import '../../screens/pos/pos_feature_placeholder_screen.dart';
 import '../../screens/supabase_test_screen.dart';
 import '../../screens/checklist_edit_screen.dart';
@@ -617,8 +618,7 @@ class AppRouter {
             path: '/pos/hall/cash-register',
             pageBuilder: (context, state) => _slideTransitionPage(
               state,
-              const PosFeaturePlaceholderScreen(
-                  feature: PosFeature.hallCashRegister),
+              const HallCashRegisterScreen(),
             ),
           ),
           GoRoute(

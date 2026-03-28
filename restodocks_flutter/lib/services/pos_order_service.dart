@@ -1,3 +1,4 @@
+import '../models/pos_cash_register_row.dart';
 import '../models/pos_dining_table.dart';
 import '../models/pos_order.dart';
 import '../models/pos_order_line.dart';
@@ -327,6 +328,64 @@ class PosOrderService {
       devLog('PosOrderService: fetchActiveOrders $e $st');
       rethrow;
     }
+  }
+
+  /// Столы со статусом «счёт» — для экрана кассы (сумма по позициям × цена ТТК).
+  Future<List<PosCashRegisterRow>> fetchCashRegisterRows(
+    String establishmentId,
+  ) async {
+    try {
+      final rows = await _supabase.client
+          .from('pos_orders')
+          .select(
+            'id, establishment_id, dining_table_id, status, guest_count, created_at, updated_at, pos_dining_tables(table_number, floor_name, room_name, status), pos_order_lines(quantity, tech_cards(selling_price))',
+          )
+          .eq('establishment_id', establishmentId)
+          .neq('status', 'closed')
+          .order('updated_at', ascending: false);
+
+      final out = <PosCashRegisterRow>[];
+      for (final row in rows as List<dynamic>) {
+        if (row is! Map<String, dynamic>) continue;
+        try {
+          final m = Map<String, dynamic>.from(row);
+          final linesRaw = m['pos_order_lines'];
+          m.remove('pos_order_lines');
+          final o = PosOrder.fromJson(m);
+          if (o.tableStatus != PosTableStatus.billRequested) continue;
+          out.add(PosCashRegisterRow(
+            order: o,
+            totalDue: _sumLineTotals(linesRaw),
+          ));
+        } catch (e) {
+          devLog('PosOrderService: skip cash row $e');
+        }
+      }
+      return out;
+    } catch (e, st) {
+      devLog('PosOrderService: fetchCashRegisterRows $e $st');
+      rethrow;
+    }
+  }
+
+  double _sumLineTotals(dynamic linesRaw) {
+    if (linesRaw is! List) return 0;
+    var s = 0.0;
+    for (final item in linesRaw) {
+      if (item is! Map) continue;
+      final line = Map<String, dynamic>.from(item);
+      final q = (line['quantity'] as num?)?.toDouble() ?? 0;
+      final tc = line['tech_cards'];
+      Map<String, dynamic>? t;
+      if (tc is Map<String, dynamic>) {
+        t = tc;
+      } else if (tc is List && tc.isNotEmpty && tc.first is Map) {
+        t = Map<String, dynamic>.from(tc.first as Map);
+      }
+      final price = (t?['selling_price'] as num?)?.toDouble() ?? 0;
+      s += q * price;
+    }
+    return s;
   }
 
   /// Один активный (не закрытый) заказ по столу, если есть.
