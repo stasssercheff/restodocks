@@ -46,6 +46,7 @@ async function fetchGeo(ip: string): Promise<{ country?: string; city?: string }
 
 export async function handleRequest(req: Request): Promise<Response> {
   const cors = resolveCorsHeaders(req);
+  try {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
@@ -65,8 +66,14 @@ export async function handleRequest(req: Request): Promise<Response> {
     });
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+      status: 500,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
 
   try {
     const body = (await req.json()) as { establishment_id?: string };
@@ -162,6 +169,12 @@ export async function handleRequest(req: Request): Promise<Response> {
     return new Response(JSON.stringify({ ok: true, ip, country: geo.country, city: geo.city }), {
       headers: { ...cors, "Content-Type": "application/json" },
     });
+  } catch (e) {
+    return new Response(JSON.stringify({ error: String(e) }), {
+      status: 500,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e) }), {
       status: 500,

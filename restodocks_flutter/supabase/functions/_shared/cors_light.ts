@@ -21,13 +21,26 @@ function matchesRule(origin: string, rule: string): boolean {
   return false;
 }
 
-export function corsPreflightHeaders(req: Request): Record<string, string> {
-  const requestOrigin = req.headers.get("origin");
-  const envRules = (Deno.env.get("RD_ALLOWED_ORIGINS") ?? "")
+/** Дефолты + RD_ALLOWED_ORIGINS (env не должен выкидывать restodocks.pages.dev и т.д.). */
+function mergedRules(): string[] {
+  const env = (Deno.env.get("RD_ALLOWED_ORIGINS") ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  const rules = envRules.length > 0 ? envRules : defaultRules;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const r of [...defaultRules, ...env]) {
+    const k = r.trim().toLowerCase();
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(r.trim());
+  }
+  return out;
+}
+
+export function corsPreflightHeaders(req: Request): Record<string, string> {
+  const requestOrigin = req.headers.get("origin");
+  const rules = mergedRules();
 
   if (!requestOrigin) {
     return {

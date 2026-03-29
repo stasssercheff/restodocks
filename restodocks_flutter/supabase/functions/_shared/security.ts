@@ -24,13 +24,25 @@ function matchesOriginRule(origin: string, rule: string): boolean {
   return false;
 }
 
-export function resolveCorsHeaders(req: Request): Record<string, string> {
-  const requestOrigin = req.headers.get("origin");
-  const envOrigins = (Deno.env.get("RD_ALLOWED_ORIGINS") ?? "")
+function mergedAllowedOrigins(): string[] {
+  const env = (Deno.env.get("RD_ALLOWED_ORIGINS") ?? "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
-  const allowlist = envOrigins.length > 0 ? envOrigins : defaultAllowedOrigins;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const r of [...defaultAllowedOrigins, ...env]) {
+    const k = r.trim().toLowerCase();
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(r.trim());
+  }
+  return out;
+}
+
+export function resolveCorsHeaders(req: Request): Record<string, string> {
+  const requestOrigin = req.headers.get("origin");
+  const allowlist = mergedAllowedOrigins();
 
   // Native iOS/Android requests usually have no Origin.
   if (!requestOrigin) {
@@ -165,7 +177,6 @@ export async function hasValidApiKeyOrUser(req: Request): Promise<boolean> {
   if (!token) return false;
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
   if (!supabaseUrl || !anonKey) return false;
 
   try {
