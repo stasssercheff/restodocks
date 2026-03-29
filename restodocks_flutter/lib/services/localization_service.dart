@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../utils/cyrillic_transliteration.dart';
 import '../utils/dev_log.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -161,7 +162,9 @@ class LocalizationService extends ChangeNotifier {
   /// Используется в профиле, инвентаризации, списке сотрудников и везде, где показывается должность.
   String roleDisplayName(String roleCode) {
     if (roleCode.isEmpty) return t('employee');
-    final key = 'role_$roleCode';
+    final normalized =
+        roleCode.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+    final key = 'role_$normalized';
     final translated = t(key);
     return translated == key ? roleCode : translated;
   }
@@ -170,10 +173,39 @@ class LocalizationService extends ChangeNotifier {
   String formatStoredHealthPosition(String? stored) {
     if (stored == null || stored.trim().isEmpty) return '';
     final s = stored.trim();
-    if (RegExp(r'^[a-z][a-z0-9_]*$').hasMatch(s)) {
-      return roleDisplayName(s);
+    final normalized = s.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+    if (RegExp(r'^[a-z][a-z0-9_]*$').hasMatch(normalized)) {
+      return roleDisplayName(normalized);
     }
     return s;
+  }
+
+  /// [formatStoredHealthPosition] для заданного языка (например экспорт PDF не на языке UI).
+  String formatStoredHealthPositionForLanguage(
+      String? stored, String languageCode) {
+    if (stored == null || stored.trim().isEmpty) return '';
+    final s = stored.trim();
+    final normalized = s.toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+    if (RegExp(r'^[a-z][a-z0-9_]*$').hasMatch(normalized)) {
+      final key = 'role_$normalized';
+      final translated = tForLanguage(languageCode, key);
+      return translated == key ? s : translated;
+    }
+    return s;
+  }
+
+  /// ФИО: для нерусского интерфейса — латиница (транслит), для ru — как в базе.
+  String displayPersonNameForUi(String? name) {
+    if (name == null || name.isEmpty) return '—';
+    return displayPersonNameForLanguage(name, currentLanguageCode);
+  }
+
+  /// То же для заданного языка (экспорт PDF и т.п.). Пустая строка — пустая ячейка.
+  String displayPersonNameForLanguage(String? name, String languageCode) {
+    if (name == null || name.isEmpty) return '';
+    if (languageCode == 'ru') return name;
+    if (!RegExp(r'[А-Яа-яЁё]').hasMatch(name)) return name;
+    return transliterateRuToLatin(name);
   }
 
   /// Должность в гигиеническом журнале: из JSON или из карточки сотрудника.

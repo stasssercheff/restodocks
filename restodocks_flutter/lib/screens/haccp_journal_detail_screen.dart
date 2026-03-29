@@ -73,10 +73,29 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  String _roleLabelForPdf(Employee e, LocalizationService loc, String pdfLang) {
+    if (e.roles.isEmpty) return '';
+    final normalized =
+        e.roles.first.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+    final key = 'role_$normalized';
+    final t = loc.tForLanguage(pdfLang, key);
+    return t == key ? e.roles.first : t;
+  }
+
+  String _employeePdfLine(
+      Employee e, LocalizationService loc, String pdfLang) {
+    final rawName =
+        '${e.fullName}${e.surname != null ? ' ${e.surname}' : ''}';
+    final namePart = loc.displayPersonNameForLanguage(rawName, pdfLang);
+    final rolePart = _roleLabelForPdf(e, loc, pdfLang);
+    return rolePart.isEmpty ? namePart : '$namePart, $rolePart';
+  }
+
   /// Экспорт PDF: титульный лист + страницы за выбранный период + заключительный лист.
   Future<void> _exportPdf({
     required DateTime dateFrom,
     required DateTime dateTo,
+    required String pdfLanguageCode,
   }) async {
     final logType = _logType;
     if (logType == null) return;
@@ -95,8 +114,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     final emps = await acc.getEmployeesForEstablishment(est.id);
     final idToName = {
       for (final e in emps)
-        e.id:
-            '${e.fullName}${e.surname != null ? ' ${e.surname}' : ''}, ${e.roles.isNotEmpty ? loc.roleDisplayName(e.roles.first) : ''}',
+        e.id: _employeePdfLine(e, loc, pdfLanguageCode),
     };
 
     final svc = context.read<HaccpLogServiceSupabase>();
@@ -108,9 +126,9 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     );
 
     final bytes = await HaccpPdfExportService.buildJournalPdf(
+      loc: loc,
+      pdfLanguageCode: pdfLanguageCode,
       establishmentName: est.name,
-      journalTitle: loc.t(logType.displayNameKey) ?? logType.displayNameRu,
-      sanpinRef: logType.sanpinRef,
       logType: logType,
       logs: logsForPeriod,
       employeeIdToName: idToName,
@@ -133,6 +151,46 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
   /// Три варианта периода экспорта: 1) весь месяц, 2) с 1 числа по сегодня, 3) с даты по дату.
   Future<void> _showExportOptions() async {
     final loc = context.read<LocalizationService>();
+    var pdfLang = loc.currentLanguageCode;
+    final langResult = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        var selected = pdfLang;
+        return StatefulBuilder(
+          builder: (ctx2, setSt) => AlertDialog(
+            title: Text(loc.t('haccp_pdf_language_title')),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: LocalizationService.supportedLocales.map((l) {
+                  return RadioListTile<String>(
+                    value: l.languageCode,
+                    groupValue: selected,
+                    onChanged: (v) {
+                      if (v != null) setSt(() => selected = v);
+                    },
+                    title: Text(loc.getLanguageName(l.languageCode)),
+                  );
+                }).toList(),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(loc.t('cancel')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, selected),
+                child: Text(loc.t('done')),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (langResult == null || !mounted) return;
+    pdfLang = langResult;
+
     final now = DateTime.now();
 
     final choice = await showModalBottomSheet<String>(
@@ -192,7 +250,8 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     if (choice == 'month_to_today') {
       dateFrom = DateTime(now.year, now.month, 1);
       dateTo = now;
-      await _exportPdf(dateFrom: dateFrom, dateTo: dateTo);
+      await _exportPdf(
+          dateFrom: dateFrom, dateTo: dateTo, pdfLanguageCode: pdfLang);
       return;
     }
 
@@ -201,7 +260,8 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
       if (picked == null || !mounted) return;
       dateFrom = DateTime(picked.year, picked.month, 1);
       dateTo = DateTime(picked.year, picked.month + 1, 0); // last day of month
-      await _exportPdf(dateFrom: dateFrom, dateTo: dateTo);
+      await _exportPdf(
+          dateFrom: dateFrom, dateTo: dateTo, pdfLanguageCode: pdfLang);
       return;
     }
 
@@ -210,7 +270,8 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
       if (range == null || !mounted) return;
       dateFrom = range.$1;
       dateTo = range.$2;
-      await _exportPdf(dateFrom: dateFrom, dateTo: dateTo);
+      await _exportPdf(
+          dateFrom: dateFrom, dateTo: dateTo, pdfLanguageCode: pdfLang);
     }
   }
 
@@ -764,11 +825,14 @@ class _JournalTableView extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final idToEmp = {for (final e in employees) e.id: e};
-    final idToName = {
-      for (final e in employees)
-        e.id:
-            '${e.fullName}${e.surname != null ? ' ${e.surname}' : ''}, ${e.roles.isNotEmpty ? loc.roleDisplayName(e.roles.first) : ''}',
-    };
+    final idToName = <String, String>{};
+    for (final e in employees) {
+      final raw = '${e.fullName}${e.surname != null ? ' ${e.surname}' : ''}';
+      final name = loc.displayPersonNameForUi(raw);
+      final role =
+          e.roles.isNotEmpty ? loc.roleDisplayName(e.roles.first) : '';
+      idToName[e.id] = role.isEmpty ? name : '$name, $role';
+    }
     if (!HaccpLogType.supportedInApp.contains(logType)) {
       return const Center(child: Text('Неизвестный тип журнала'));
     }
@@ -799,7 +863,7 @@ class _JournalTableView extends StatelessWidget {
                   ],
                 )
               : Text(
-                  'Рекомендуемый образец',
+                  loc.t('haccp_recommended_sample'),
                   style: Theme.of(context)
                       .textTheme
                       .titleSmall
@@ -828,42 +892,43 @@ class _JournalTableView extends StatelessWidget {
       case HaccpLogType.healthHygiene:
         return _buildHealthHygieneTable(idToEmp, loc);
       case HaccpLogType.fridgeTemperature:
-        return _buildFridgeTable(idToEmp);
+        return _buildFridgeTable(idToEmp, loc);
       case HaccpLogType.warehouseTempHumidity:
-        return _buildWarehouseTable(idToEmp, idToName);
+        return _buildWarehouseTable(idToEmp, idToName, loc);
       case HaccpLogType.finishedProductBrakerage:
-        return _buildBrakerageFinishedTable(idToName);
+        return _buildBrakerageFinishedTable(idToName, loc);
       case HaccpLogType.incomingRawBrakerage:
-        return _buildBrakerageIncomingTable(idToEmp, idToName);
+        return _buildBrakerageIncomingTable(idToEmp, idToName, loc);
       case HaccpLogType.fryingOil:
-        return _buildFryingOilTable(idToName);
+        return _buildFryingOilTable(idToName, loc);
       case HaccpLogType.medBookRegistry:
-        return _buildMedBookTable(idToName);
+        return _buildMedBookTable(idToName, loc);
       case HaccpLogType.medExaminations:
-        return _buildMedExaminationsTable(idToName);
+        return _buildMedExaminationsTable(idToName, loc);
       case HaccpLogType.disinfectantAccounting:
-        return _buildDisinfectantAccountingTable(idToName);
+        return _buildDisinfectantAccountingTable(idToName, loc);
       case HaccpLogType.equipmentWashing:
-        return _buildEquipmentWashingTable(idToName);
+        return _buildEquipmentWashingTable(idToName, loc);
       case HaccpLogType.generalCleaningSchedule:
-        return _buildGeneralCleaningTable(idToName);
+        return _buildGeneralCleaningTable(idToName, loc);
       case HaccpLogType.sieveFilterMagnet:
-        return _buildSieveFilterMagnetTable(idToName);
+        return _buildSieveFilterMagnetTable(idToName, loc);
       default:
         return const SizedBox.shrink();
     }
   }
 
-  Widget _buildMedExaminationsTable(Map<String, String> idToName) {
+  Widget _buildMedExaminationsTable(
+      Map<String, String> idToName, LocalizationService loc) {
     final rows = <TableRow>[
       TableRow(children: [
-        _header('№'),
-        _header('Ф. И. О.'),
-        _header('Должность'),
-        _header('Дата осмотра'),
-        _header('Заключение'),
-        _header('Решение'),
-        _header('Подпись')
+        _header(loc.t('haccp_tbl_serial_short')),
+        _header(loc.t('haccp_tbl_med_exam_fio')),
+        _header(loc.t('haccp_tbl_position')),
+        _header(loc.t('haccp_tbl_exam_date')),
+        _header(loc.t('haccp_tbl_conclusion')),
+        _header(loc.t('haccp_tbl_decision')),
+        _header(loc.t('haccp_tbl_signature'))
       ]),
       ...logs.asMap().entries.map((e) {
         final log = e.value;
@@ -893,14 +958,15 @@ class _JournalTableView extends StatelessWidget {
     }, border: TableBorder.all(color: Colors.grey), children: rows);
   }
 
-  Widget _buildDisinfectantAccountingTable(Map<String, String> idToName) {
+  Widget _buildDisinfectantAccountingTable(
+      Map<String, String> idToName, LocalizationService loc) {
     final rows = <TableRow>[
       TableRow(children: [
-        _header('Дата'),
-        _header('Объект/Дезсредство'),
-        _header('Кол-во/Площадь'),
-        _header('Поступление'),
-        _header('Ответственный')
+        _header(loc.t('haccp_tbl_date')),
+        _header(loc.t('haccp_tbl_object_agent')),
+        _header(loc.t('haccp_tbl_qty_short')),
+        _header(loc.t('haccp_tbl_receipt')),
+        _header(loc.t('haccp_tbl_responsible'))
       ]),
       ...logs.map((log) => TableRow(children: [
             _wrapTap(_cell(_dateFmt.format(log.createdAt)), log),
@@ -934,15 +1000,16 @@ class _JournalTableView extends StatelessWidget {
     }, border: TableBorder.all(color: Colors.grey), children: rows);
   }
 
-  Widget _buildEquipmentWashingTable(Map<String, String> idToName) {
+  Widget _buildEquipmentWashingTable(
+      Map<String, String> idToName, LocalizationService loc) {
     final rows = <TableRow>[
       TableRow(children: [
-        _header('Дата'),
-        _header('Время'),
-        _header('Оборудование'),
-        _header('Моющее'),
-        _header('Дез. раствор'),
-        _header('Контролёр')
+        _header(loc.t('haccp_tbl_date')),
+        _header(loc.t('haccp_tbl_time')),
+        _header(loc.t('haccp_tbl_equipment')),
+        _header(loc.t('haccp_tbl_wash_solution')),
+        _header(loc.t('haccp_tbl_disinfect_solution')),
+        _header(loc.t('haccp_tbl_controller'))
       ]),
       ...logs.map((log) => TableRow(children: [
             _wrapTap(_cell(_dateFmt.format(log.createdAt)), log),
@@ -967,13 +1034,14 @@ class _JournalTableView extends StatelessWidget {
     }, border: TableBorder.all(color: Colors.grey), children: rows);
   }
 
-  Widget _buildGeneralCleaningTable(Map<String, String> idToName) {
+  Widget _buildGeneralCleaningTable(
+      Map<String, String> idToName, LocalizationService loc) {
     final rows = <TableRow>[
       TableRow(children: [
-        _header('№'),
-        _header('Помещение'),
-        _header('Дата'),
-        _header('Ответственный')
+        _header(loc.t('haccp_tbl_serial_short')),
+        _header(loc.t('haccp_tbl_room')),
+        _header(loc.t('haccp_tbl_date')),
+        _header(loc.t('haccp_tbl_responsible'))
       ]),
       ...logs.asMap().entries.map((e) {
         final log = e.value;
@@ -1001,15 +1069,16 @@ class _JournalTableView extends StatelessWidget {
     }, border: TableBorder.all(color: Colors.grey), children: rows);
   }
 
-  Widget _buildSieveFilterMagnetTable(Map<String, String> idToName) {
+  Widget _buildSieveFilterMagnetTable(
+      Map<String, String> idToName, LocalizationService loc) {
     final rows = <TableRow>[
       TableRow(children: [
-        _header('№ сита/магнита'),
-        _header('Наименование / Расположение'),
-        _header('Состояние'),
-        _header('Дата очистки'),
-        _header('ФИО'),
-        _header('Комментарии')
+        _header(loc.t('haccp_tbl_sieve_magnet_no')),
+        _header(loc.t('haccp_tbl_name')),
+        _header(loc.t('haccp_tbl_condition')),
+        _header(loc.t('haccp_tbl_cleaning_date')),
+        _header(loc.t('haccp_tbl_med_exam_fio')),
+        _header(loc.t('haccp_tbl_comments'))
       ]),
       ...logs.map((log) => TableRow(children: [
             _wrapTap(_cell(log.sieveNo ?? '—'), log),
@@ -1038,17 +1107,17 @@ class _JournalTableView extends StatelessWidget {
     }, border: TableBorder.all(color: Colors.grey), children: rows);
   }
 
-  Widget _buildMedBookTable(Map<String, String> idToName) {
+  Widget _buildMedBookTable(Map<String, String> idToName, LocalizationService loc) {
     final rows = <TableRow>[
       TableRow(
         children: [
-          _header('№ п/п'),
-          _header('Фамилия, имя, отчество'),
-          _header('Должность'),
-          _header('Номер медицинской книжки'),
-          _header('Срок действия медицинской книжки'),
-          _header('Расписка и дата получения медицинской книжки'),
-          _header('Расписка и дата возврата медицинской книжки'),
+          _header(loc.t('haccp_tbl_pp_no')),
+          _header(loc.t('haccp_tbl_fio_full')),
+          _header(loc.t('haccp_tbl_position')),
+          _header(loc.t('haccp_tbl_med_book_no')),
+          _header(loc.t('haccp_tbl_med_book_valid')),
+          _header(loc.t('haccp_tbl_med_book_receipt')),
+          _header(loc.t('haccp_tbl_med_book_return')),
         ],
       ),
       ...logs.asMap().entries.map((e) {
@@ -1092,21 +1161,21 @@ class _JournalTableView extends StatelessWidget {
     );
   }
 
-  Widget _buildFryingOilTable(Map<String, String> idToName) {
+  Widget _buildFryingOilTable(Map<String, String> idToName, LocalizationService loc) {
     final rows = <TableRow>[
       TableRow(
         children: [
-          _header('Дата'),
-          _header('Время начала'),
-          _header('Вид жира'),
-          _header('Оценка на начало'),
-          _header('Оборудование'),
-          _header('Вид продукции'),
-          _header('Время окончания жарки'),
-          _header('Оценка по окончании'),
-          _header('Переходящий остаток, кг'),
-          _header('Утилизировано, кг'),
-          _header('Контролёр'),
+          _header(loc.t('haccp_tbl_date')),
+          _header(loc.t('haccp_tbl_time_start')),
+          _header(loc.t('haccp_tbl_fat_type')),
+          _header(loc.t('haccp_tbl_score_start')),
+          _header(loc.t('haccp_tbl_equipment')),
+          _header(loc.t('haccp_tbl_product_type')),
+          _header(loc.t('haccp_tbl_time_end')),
+          _header(loc.t('haccp_tbl_score_end')),
+          _header(loc.t('haccp_tbl_carry_kg')),
+          _header(loc.t('haccp_tbl_utilized_kg')),
+          _header(loc.t('haccp_tbl_controller')),
         ],
       ),
       ...logs.map((log) => TableRow(
@@ -1161,17 +1230,14 @@ class _JournalTableView extends StatelessWidget {
     final rows = <TableRow>[
       TableRow(
         children: [
-          _header('№ п/п'),
-          _header('Дата'),
-          _header('Ф. И. О. работника (последнее при наличии)'),
-          _header('Должность'),
-          _header(
-              'Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов семьи'),
-          _header(
-              'Подпись сотрудника об отсутствии заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук и открытых поверхностей тела'),
-          _header(
-              'Результат осмотра медицинским работником (ответственным лицом) (допущен / отстранен)'),
-          _header('Подпись медицинского работника (ответственного лица)'),
+          _header(loc.t('haccp_tbl_pp_no')),
+          _header(loc.t('haccp_tbl_date')),
+          _header(loc.t('haccp_tbl_employee_fio_long')),
+          _header(loc.t('haccp_tbl_position')),
+          _header(loc.t('haccp_tbl_sign_family_infect')),
+          _header(loc.t('haccp_tbl_sign_skin_resp')),
+          _header(loc.t('haccp_tbl_exam_outcome')),
+          _header(loc.t('haccp_tbl_med_worker_sign')),
         ],
       ),
       ...logs.asMap().entries.map((e) {
@@ -1180,22 +1246,24 @@ class _JournalTableView extends StatelessWidget {
         final parsed = HaccpLog.parseHealthHygieneDescription(log.description);
         final subjectId = parsed.subjectEmployeeId ?? log.createdByEmployeeId;
         final emp = idToEmp[subjectId];
-        final name = parsed.employeeNameSnapshot ??
+        final rawName = parsed.employeeNameSnapshot ??
             (emp != null
                 ? '${emp.fullName}${emp.surname != null ? ' ${emp.surname}' : ''}'
                 : null) ??
             '—';
+        final name = loc.displayPersonNameForUi(rawName);
         final pos = loc.healthHygienePositionLabel(
           storedPosition: parsed.positionOverride,
           employee: emp,
         );
         final creator = idToEmp[log.createdByEmployeeId];
-        final creatorName = creator != null
+        final creatorRaw = creator != null
             ? '${creator.fullName}${creator.surname != null ? ' ${creator.surname}' : ''}'
             : '—';
+        final creatorName = loc.displayPersonNameForUi(creatorRaw);
         final r = log.statusOk == true
-            ? 'допущен'
-            : (log.statusOk == false ? 'отстранен' : '—');
+            ? loc.t('haccp_status_admitted')
+            : (log.statusOk == false ? loc.t('haccp_status_suspended') : '—');
         return TableRow(
           children: [
             _wrapTap(_cell('$i'), log),
@@ -1204,12 +1272,16 @@ class _JournalTableView extends StatelessWidget {
             _wrapTap(_cell(pos), log),
             _wrapTap(
                 _cell(log.statusOk != null
-                    ? (log.statusOk! ? 'Да' : 'Нет')
+                    ? (log.statusOk!
+                        ? loc.t('haccp_bool_yes')
+                        : loc.t('haccp_bool_no'))
                     : '—'),
                 log),
             _wrapTap(
                 _cell(log.status2Ok != null
-                    ? (log.status2Ok! ? 'Да' : 'Нет')
+                    ? (log.status2Ok!
+                        ? loc.t('haccp_bool_yes')
+                        : loc.t('haccp_bool_no'))
                     : '—'),
                 log),
             _wrapTap(_cell(r), log),
@@ -1234,14 +1306,14 @@ class _JournalTableView extends StatelessWidget {
     );
   }
 
-  Widget _buildFridgeTable(Map<String, Employee> idToEmp) {
+  Widget _buildFridgeTable(Map<String, Employee> idToEmp, LocalizationService loc) {
     final rows = <TableRow>[
       TableRow(
         children: [
-          _header('Помещение'),
-          _header('Оборудование'),
-          _header('Дата'),
-          _header('Температура °C'),
+          _header(loc.t('haccp_tbl_room')),
+          _header(loc.t('haccp_tbl_equipment')),
+          _header(loc.t('haccp_tbl_date')),
+          _header(loc.t('haccp_tbl_temp_celsius')),
         ],
       ),
       ...logs.map((log) => TableRow(
@@ -1270,18 +1342,19 @@ class _JournalTableView extends StatelessWidget {
   }
 
   /// Приложение № 3: 5 обязательных колонок. При просмотре «Все» — 6-я колонка «Помещение». Подсветка красным при t>25°C или влажность>75%.
-  Widget _buildWarehouseTable(
-      Map<String, Employee> idToEmp, Map<String, String> idToName) {
+  Widget _buildWarehouseTable(Map<String, Employee> idToEmp,
+      Map<String, String> idToName, LocalizationService loc) {
     final showPremisesColumn = warehousePremisesName == null;
     final rows = <TableRow>[
       TableRow(
         children: [
-          _header('№ п/п'),
-          if (showPremisesColumn) _header('Наименование складского помещения'),
-          _header('Дата'),
-          _header('Температура, °C'),
-          _header('Относительная влажность, %'),
-          _header('Подпись ответственного лица'),
+          _header(loc.t('haccp_tbl_pp_no')),
+          if (showPremisesColumn)
+            _header(loc.t('haccp_warehouse_premises')),
+          _header(loc.t('haccp_tbl_date')),
+          _header(loc.t('haccp_tbl_temp_c_label')),
+          _header(loc.t('haccp_tbl_rel_humidity_pct')),
+          _header(loc.t('haccp_tbl_responsible_sign')),
         ],
       ),
       ...logs.asMap().entries.map((e) {
@@ -1331,18 +1404,19 @@ class _JournalTableView extends StatelessWidget {
     );
   }
 
-  Widget _buildBrakerageFinishedTable(Map<String, String> idToName) {
+  Widget _buildBrakerageFinishedTable(
+      Map<String, String> idToName, LocalizationService loc) {
     final rows = <TableRow>[
       TableRow(
         children: [
-          _header('Дата/час'),
-          _header('Время бракеража'),
-          _header('Блюдо'),
-          _header('Органолептика'),
-          _header('Разрешение'),
-          _header('Подписи'),
-          _header('Взвешивание'),
-          _header('Прим.'),
+          _header(loc.t('haccp_tbl_dish_made_at')),
+          _header(loc.t('haccp_tbl_brakerage_removed_at')),
+          _header(loc.t('haccp_tbl_dish_name_ready')),
+          _header(loc.t('haccp_tbl_organo_result')),
+          _header(loc.t('haccp_tbl_sale_allowed')),
+          _header(loc.t('haccp_tbl_brakerage_commission_sigs')),
+          _header(loc.t('haccp_tbl_portion_weighing')),
+          _header(loc.t('haccp_tbl_note_short')),
         ],
       ),
       ...logs.map((log) => TableRow(
@@ -1374,22 +1448,22 @@ class _JournalTableView extends StatelessWidget {
     );
   }
 
-  Widget _buildBrakerageIncomingTable(
-      Map<String, Employee> idToEmp, Map<String, String> idToName) {
+  Widget _buildBrakerageIncomingTable(Map<String, Employee> idToEmp,
+      Map<String, String> idToName, LocalizationService loc) {
     final rows = <TableRow>[
       TableRow(
         children: [
-          _header('Поступление'),
-          _header('Наименование'),
-          _header('Фасовка'),
-          _header('Поставщик'),
-          _header('Кол-во'),
-          _header('№ док.'),
-          _header('Оценка'),
-          _header('Хранение/срок'),
-          _header('Реализация'),
-          _header('Подпись'),
-          _header('Прим.'),
+          _header(loc.t('haccp_tbl_received_at')),
+          _header(loc.t('haccp_tbl_name')),
+          _header(loc.t('haccp_tbl_packaging')),
+          _header(loc.t('haccp_tbl_manufacturer')),
+          _header(loc.t('haccp_tbl_qty_short')),
+          _header(loc.t('haccp_tbl_doc_no')),
+          _header(loc.t('haccp_tbl_organo_short')),
+          _header(loc.t('haccp_tbl_storage_shelf')),
+          _header(loc.t('haccp_tbl_sale_date')),
+          _header(loc.t('haccp_tbl_signature')),
+          _header(loc.t('haccp_tbl_note_short')),
         ],
       ),
       ...logs.map((log) {

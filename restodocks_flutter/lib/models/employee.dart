@@ -20,7 +20,11 @@ enum EmployeeRole {
   final String displayName;
 
   static EmployeeRole? fromCode(String code) {
-    return EmployeeRole.values.where((role) => role.code == code).firstOrNull;
+    final normalized =
+        code.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+    return EmployeeRole.values
+        .where((role) => role.code == normalized)
+        .firstOrNull;
   }
 }
 
