@@ -139,7 +139,7 @@ WITH CHECK (
 
 -- ---------------------------------------------------------------------------
 -- 6) Nutrition layer: remove anon; keep global reads/writes for authenticated only.
---    Links/queue scoped through products.establishment_id.
+--    Links/queue scoped via establishment_products (products has no establishment_id).
 -- ---------------------------------------------------------------------------
 -- nutrition_profiles
 DROP POLICY IF EXISTS "anon_select_nutrition_profiles" ON public.nutrition_profiles;
@@ -190,9 +190,9 @@ TO authenticated
 USING (
   EXISTS (
     SELECT 1
-    FROM public.products pr
-    WHERE pr.id = product_nutrition_links.product_id
-      AND pr.establishment_id IN (SELECT public.current_user_establishment_ids())
+    FROM public.establishment_products ep
+    WHERE ep.product_id = product_nutrition_links.product_id
+      AND ep.establishment_id IN (SELECT public.current_user_establishment_ids())
   )
 );
 
@@ -203,9 +203,9 @@ TO authenticated
 WITH CHECK (
   EXISTS (
     SELECT 1
-    FROM public.products pr
-    WHERE pr.id = product_nutrition_links.product_id
-      AND pr.establishment_id IN (SELECT public.current_user_establishment_ids())
+    FROM public.establishment_products ep
+    WHERE ep.product_id = product_nutrition_links.product_id
+      AND ep.establishment_id IN (SELECT public.current_user_establishment_ids())
   )
 );
 
@@ -216,17 +216,17 @@ TO authenticated
 USING (
   EXISTS (
     SELECT 1
-    FROM public.products pr
-    WHERE pr.id = product_nutrition_links.product_id
-      AND pr.establishment_id IN (SELECT public.current_user_establishment_ids())
+    FROM public.establishment_products ep
+    WHERE ep.product_id = product_nutrition_links.product_id
+      AND ep.establishment_id IN (SELECT public.current_user_establishment_ids())
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1
-    FROM public.products pr
-    WHERE pr.id = product_nutrition_links.product_id
-      AND pr.establishment_id IN (SELECT public.current_user_establishment_ids())
+    FROM public.establishment_products ep
+    WHERE ep.product_id = product_nutrition_links.product_id
+      AND ep.establishment_id IN (SELECT public.current_user_establishment_ids())
   )
 );
 
@@ -237,9 +237,9 @@ TO authenticated
 USING (
   EXISTS (
     SELECT 1
-    FROM public.products pr
-    WHERE pr.id = product_nutrition_links.product_id
-      AND pr.establishment_id IN (SELECT public.current_user_establishment_ids())
+    FROM public.establishment_products ep
+    WHERE ep.product_id = product_nutrition_links.product_id
+      AND ep.establishment_id IN (SELECT public.current_user_establishment_ids())
   )
 );
 
@@ -258,9 +258,9 @@ TO authenticated
 USING (
   EXISTS (
     SELECT 1
-    FROM public.products pr
-    WHERE pr.id = nutrition_research_queue.product_id
-      AND pr.establishment_id IN (SELECT public.current_user_establishment_ids())
+    FROM public.establishment_products ep
+    WHERE ep.product_id = nutrition_research_queue.product_id
+      AND ep.establishment_id IN (SELECT public.current_user_establishment_ids())
   )
 );
 
@@ -271,9 +271,9 @@ TO authenticated
 WITH CHECK (
   EXISTS (
     SELECT 1
-    FROM public.products pr
-    WHERE pr.id = nutrition_research_queue.product_id
-      AND pr.establishment_id IN (SELECT public.current_user_establishment_ids())
+    FROM public.establishment_products ep
+    WHERE ep.product_id = nutrition_research_queue.product_id
+      AND ep.establishment_id IN (SELECT public.current_user_establishment_ids())
   )
 );
 
@@ -284,17 +284,17 @@ TO authenticated
 USING (
   EXISTS (
     SELECT 1
-    FROM public.products pr
-    WHERE pr.id = nutrition_research_queue.product_id
-      AND pr.establishment_id IN (SELECT public.current_user_establishment_ids())
+    FROM public.establishment_products ep
+    WHERE ep.product_id = nutrition_research_queue.product_id
+      AND ep.establishment_id IN (SELECT public.current_user_establishment_ids())
   )
 )
 WITH CHECK (
   EXISTS (
     SELECT 1
-    FROM public.products pr
-    WHERE pr.id = nutrition_research_queue.product_id
-      AND pr.establishment_id IN (SELECT public.current_user_establishment_ids())
+    FROM public.establishment_products ep
+    WHERE ep.product_id = nutrition_research_queue.product_id
+      AND ep.establishment_id IN (SELECT public.current_user_establishment_ids())
   )
 );
 
@@ -305,8 +305,8 @@ TO authenticated
 USING (
   EXISTS (
     SELECT 1
-    FROM public.products pr
-    WHERE pr.id = nutrition_research_queue.product_id
-      AND pr.establishment_id IN (SELECT public.current_user_establishment_ids())
+    FROM public.establishment_products ep
+    WHERE ep.product_id = nutrition_research_queue.product_id
+      AND ep.establishment_id IN (SELECT public.current_user_establishment_ids())
   )
 );
