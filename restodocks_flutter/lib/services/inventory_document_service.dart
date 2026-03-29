@@ -64,6 +64,24 @@ class InventoryDocumentService {
     }
   }
 
+  /// Список документов для экрана «Расходы» (вкладка списаний) — только при Pro (RPC).
+  Future<List<Map<String, dynamic>>> listForEstablishmentExpenses(
+      String establishmentId) async {
+    try {
+      final data = await _supabase.client.rpc(
+        'list_inventory_documents_for_expenses',
+        params: {'p_establishment_id': establishmentId},
+      );
+      if (data == null) return [];
+      return (data as List)
+          .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      devLog('Ошибка list_inventory_documents_for_expenses: $e');
+      rethrow;
+    }
+  }
+
   /// Список всех документов инвентаризации по заведению (для собственника/управления).
   Future<List<Map<String, dynamic>>> listForEstablishment(String establishmentId) async {
     try {

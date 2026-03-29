@@ -914,8 +914,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       HomeButtonConfigService homeBtn) {
     final accountManager = context.read<AccountManagerSupabase>();
     final emp = accountManager.currentEmployee;
-    final actions = homeButtonActionsFor(emp);
-    final effective = homeBtn.effectiveAction(emp);
+    final actions = homeButtonActionsFor(emp,
+        hasProSubscription: accountManager.hasProSubscription);
+    final effective = homeBtn.effectiveAction(emp,
+        hasProSubscription: accountManager.hasProSubscription);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(

@@ -548,10 +548,29 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
     });
     try {
       final acc = context.read<AccountManagerSupabase>();
+      final loc = context.read<LocalizationService>();
       final estab = acc.establishment;
       if (estab == null) {
         setState(() => _error = 'Заведение не найдено');
         _loading = false;
+        return;
+      }
+      try {
+        await SupabaseService().client.rpc(
+          'require_establishment_pro_for_expenses',
+          params: {'p_establishment_id': estab.id},
+        );
+      } catch (e) {
+        final msg = e.toString();
+        final friendly = msg.contains('EXPENSES_PRO_REQUIRED') || msg.contains('P0001')
+            ? loc.t('pro_required_expenses')
+            : msg;
+        if (mounted) {
+          setState(() {
+            _error = friendly;
+            _loading = false;
+          });
+        }
         return;
       }
       final list = await acc.getEmployeesForEstablishment(estab.id);

@@ -55,6 +55,7 @@ import '../../services/ai_service.dart';
 import '../../services/services.dart';
 import '../../widgets/app_shell.dart';
 import '../../widgets/inbox_notification_listener.dart';
+import '../../widgets/pro_required_screen.dart';
 import '../feature_flags.dart';
 import '../theme/app_theme.dart';
 
@@ -624,16 +625,28 @@ class AppRouter {
           ),
           GoRoute(
             path: '/expenses',
-            pageBuilder: (context, state) =>
-                _slideTransitionPage(state, const ExpensesScreen()),
+            pageBuilder: (context, state) {
+              final pro =
+                  context.read<AccountManagerSupabase>().hasProSubscription;
+              return _slideTransitionPage(
+                state,
+                pro ? const ExpensesScreen() : const ProRequiredScreen(),
+              );
+            },
           ),
           GoRoute(
             path: '/expenses/salary',
             pageBuilder: (context, state) {
+              final pro =
+                  context.read<AccountManagerSupabase>().hasProSubscription;
               final department = state.queryParameters[
                   'department']; // kitchen|bar|hall для ФЗП по подразделению
               return _slideTransitionPage(
-                  state, SalaryExpenseScreen(departmentFilter: department));
+                state,
+                pro
+                    ? SalaryExpenseScreen(departmentFilter: department)
+                    : const ProRequiredScreen(),
+              );
             },
           ),
           GoRoute(

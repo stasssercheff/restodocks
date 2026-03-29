@@ -31,7 +31,8 @@ class AppShell extends StatelessWidget {
 
     final isOwner = currentEmployee.hasRole('owner');
     final homeBtnConfig = context.watch<HomeButtonConfigService>();
-    final middleAction = homeBtnConfig.effectiveAction(currentEmployee);
+    final middleAction = homeBtnConfig.effectiveAction(currentEmployee,
+        hasProSubscription: accountManager.hasProSubscription);
     final noDataAccess = !isOwner && !currentEmployee.effectiveDataAccess;
     final isKitchenNoData = noDataAccess && currentEmployee.department == 'kitchen';
     final middleLabel = noDataAccess

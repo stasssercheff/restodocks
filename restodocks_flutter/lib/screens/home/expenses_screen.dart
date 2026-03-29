@@ -14,6 +14,14 @@ import '../../widgets/app_bar_home_button.dart';
 import '../../widgets/scroll_to_top_app_bar_title.dart';
 import '../salary_expense_screen.dart';
 
+String _expensesRpcErrorMessage(Object e, LocalizationService loc) {
+  final s = e.toString();
+  if (s.contains('EXPENSES_PRO_REQUIRED') || s.contains('P0001')) {
+    return loc.t('pro_required_expenses');
+  }
+  return s;
+}
+
 /// Экран «Расходы» для собственника: вкладки «ФЗП», «Заказы продуктов», «Списания».
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key});
@@ -133,7 +141,8 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
         });
         return;
       }
-      final docs = await OrderDocumentService().listForEstablishment(establishmentId);
+      final docs =
+          await OrderDocumentService().listForEstablishmentExpenses(establishmentId);
 
       if (mounted) {
         final excluded = await _loadExcludedOrderIds(establishmentId);
@@ -145,9 +154,10 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
       }
     } catch (e) {
       if (mounted) {
+        final loc = context.read<LocalizationService>();
         setState(() {
           _loading = false;
-          _error = e.toString();
+          _error = _expensesRpcErrorMessage(e, loc);
         });
       }
     }
@@ -781,7 +791,8 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
       _error = null;
     });
     try {
-      final raw = await InventoryDocumentService().listForEstablishment(establishmentId);
+      final raw = await InventoryDocumentService()
+          .listForEstablishmentExpenses(establishmentId);
       final docs = raw.where((d) {
         final p = d['payload'] as Map<String, dynamic>?;
         return p?['type']?.toString() == 'writeoff';
@@ -796,9 +807,10 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
       }
     } catch (e) {
       if (mounted) {
+        final loc = context.read<LocalizationService>();
         setState(() {
           _loading = false;
-          _error = e.toString();
+          _error = _expensesRpcErrorMessage(e, loc);
         });
       }
     }

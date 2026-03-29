@@ -111,8 +111,9 @@ extension HomeButtonActionExt on HomeButtonAction {
   }
 }
 
-/// Доступные действия для роли
-List<HomeButtonAction> homeButtonActionsFor(Employee? emp) {
+/// Доступные действия для роли. [hasProSubscription] — раздел «Расходы» только при Pro.
+List<HomeButtonAction> homeButtonActionsFor(Employee? emp,
+    {bool hasProSubscription = false}) {
   if (emp == null) return [HomeButtonAction.schedule];
   final isOwner = emp.hasRole('owner');
   final isChef = emp.hasRole('executive_chef') || emp.hasRole('sous_chef');
@@ -134,7 +135,7 @@ List<HomeButtonAction> homeButtonActionsFor(Employee? emp) {
       HomeButtonAction.checklists,
       HomeButtonAction.nomenclature,
       if (FeatureFlags.posModuleEnabled) HomeButtonAction.inventory,
-      HomeButtonAction.expenses,
+      if (hasProSubscription) HomeButtonAction.expenses,
     ];
   }
   // Линейный сотрудник
@@ -159,9 +160,13 @@ class HomeButtonConfigService extends ChangeNotifier {
   HomeButtonAction get action => _action;
 
   /// Действие с учётом допустимых для роли (если сохранённое недоступно — первое из списка)
-  HomeButtonAction effectiveAction(Employee? emp) {
-    final allowed = homeButtonActionsFor(emp);
-    return allowed.contains(_action) ? _action : (allowed.firstOrNull ?? HomeButtonAction.schedule);
+  HomeButtonAction effectiveAction(Employee? emp,
+      {bool hasProSubscription = false}) {
+    final allowed =
+        homeButtonActionsFor(emp, hasProSubscription: hasProSubscription);
+    return allowed.contains(_action)
+        ? _action
+        : (allowed.firstOrNull ?? HomeButtonAction.schedule);
   }
 
   Future<void> initialize() async {

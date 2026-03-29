@@ -72,6 +72,24 @@ class OrderDocumentService {
     }
   }
 
+  /// Список заказов для экрана «Расходы» — только при Pro (сервер: RPC).
+  Future<List<Map<String, dynamic>>> listForEstablishmentExpenses(
+      String establishmentId) async {
+    try {
+      final data = await _supabase.client.rpc(
+        'list_order_documents_for_expenses',
+        params: {'p_establishment_id': establishmentId},
+      );
+      if (data == null) return [];
+      return (data as List)
+          .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      devLog('Ошибка list_order_documents_for_expenses: $e');
+      rethrow;
+    }
+  }
+
   /// Список заказов по заведению (для входящих шефа и собственника), по дате.
   Future<List<Map<String, dynamic>>> listForEstablishment(String establishmentId) async {
     try {
