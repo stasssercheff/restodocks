@@ -8,6 +8,8 @@ import 'package:restodocks/core/supabase_url_resolver_stub.dart'
     if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart'
     as supabase_url;
 
+import '../core/clear_hash_stub.dart'
+    if (dart.library.html) '../core/clear_hash_web.dart' as clear_hash;
 import '../models/models.dart';
 import '../utils/dev_log.dart';
 import 'establishment_data_warmup_service.dart';
@@ -101,7 +103,11 @@ class AccountManagerSupabase extends ChangeNotifier {
 
     await _tryRestoreSession();
     if (isLoggedInSync) {
-      await _bindRealtimeSync();
+      unawaited(
+        _bindRealtimeSync().catchError((Object e, StackTrace st) {
+          devLog('🔐 AccountManager: _bindRealtimeSync at init: $e $st');
+        }),
+      );
       _initialized = true;
       return;
     }
@@ -111,7 +117,11 @@ class AccountManagerSupabase extends ChangeNotifier {
     await _tryRestoreSession();
     _initialized = true;
     if (isLoggedInSync) {
-      await _bindRealtimeSync();
+      unawaited(
+        _bindRealtimeSync().catchError((Object e, StackTrace st) {
+          devLog('🔐 AccountManager: _bindRealtimeSync at init (retry): $e $st');
+        }),
+      );
       return;
     }
 
@@ -301,7 +311,11 @@ class AccountManagerSupabase extends ChangeNotifier {
   Future<void> switchEstablishment(Establishment establishment) async {
     _establishment = establishment;
     await _secureStorage.set(_keyEstablishmentId, establishment.id);
-    await _bindRealtimeSync();
+    unawaited(
+      _bindRealtimeSync().catchError((Object e, StackTrace st) {
+        devLog('🔐 AccountManager: _bindRealtimeSync after switch: $e $st');
+      }),
+    );
     notifyListeners();
   }
 
@@ -785,6 +799,16 @@ class AccountManagerSupabase extends ChangeNotifier {
     lastLoginError = null;
     if (emailTrim.isEmpty) return null;
 
+    // «Зомби»-сессия после confirm/выхода: JWT есть, профиль не готов — мешает следующему входу.
+    if (_supabase.isAuthenticated) {
+      try {
+        await _supabase.signOut();
+        devLog('🔐 Login: cleared existing Supabase session before password sign-in');
+      } catch (e) {
+        devLog('🔐 Login: pre-signOut failed (ignored): $e');
+      }
+    }
+
     // 1. Пробуем Supabase Auth (учётки в auth.users)
     try {
       await _supabase.signInWithEmail(emailTrim, passwordTrimmed);
@@ -1089,7 +1113,12 @@ class AccountManagerSupabase extends ChangeNotifier {
     await _secureStorage.set(_keyEmployeeId, employee.id);
     await _secureStorage.set(_keyEstablishmentId, establishment.id);
     devLog('🔐 AccountManager: Data saved to secure storage');
-    await _bindRealtimeSync();
+    // Не блокировать UI: realtime/WebSocket на web иногда подвисает — иначе вечный спиннер на «Войти».
+    unawaited(
+      _bindRealtimeSync().catchError((Object e, StackTrace st) {
+        devLog('🔐 AccountManager: _bindRealtimeSync after login: $e $st');
+      }),
+    );
 
     if (rememberCredentials && email != null && password != null) {
       await _secureStorage.set(_keyRememberEmail, email);
@@ -1098,6 +1127,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       await _secureStorage.remove(_keyRememberEmail);
       await _secureStorage.remove(_keyRememberPassword);
     }
+    notifyListeners();
   }
 
   /// Загрузить сохранённые учётные данные (для автозаполнения формы входа)
@@ -1123,6 +1153,11 @@ class AccountManagerSupabase extends ChangeNotifier {
     await _clearStoredSession();
     _currentEmployee = null;
     _establishment = null;
+    _initialized = false;
+    if (kIsWeb) {
+      clear_hash.clearHashFromUrl();
+    }
+    notifyListeners();
   }
 
   Future<void> _bindRealtimeSync() async {
