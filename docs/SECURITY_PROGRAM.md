@@ -17,6 +17,7 @@
 | Регистрация | Создание заведений через `register_company_with_promo` и RPC, не прямой anon INSERT |
 | Edge `send-email` | Лимиты по IP и пользователю, размеры тел, путь service role vs JWT |
 | `product_alias_rejections`, `product_aliases`, nutrition, iiko blanks, ai_ttk, tt_parse | См. миграции `20260429140000`, `20260429160000` |
+| POS / склад / `system_errors` / `tech_card_change_requests` | См. `20260430100000` (anon снят, tenant через `current_user_establishment_ids()`; опасные policy на `employees` / `allow_all_establishment_products` — drop при наличии) |
 | Секреты | Service role в Supabase Secrets; `backup_config.env` в `.gitignore` |
 
 ## 3. Операционный чек-лист (регулярно)
