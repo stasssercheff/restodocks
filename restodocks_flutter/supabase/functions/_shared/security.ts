@@ -121,6 +121,9 @@ export function hasValidApiKey(req: Request): boolean {
   if (!apiKey) return false;
   const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
   if (service && apiKey === service) return true;
+  // Стандартный клиент Supabase всегда шлёт публичный anon key в apikey (не JWT пользователя).
+  const anon = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
+  if (anon && apiKey === anon) return true;
   return false;
 }
 
@@ -146,6 +149,14 @@ export function isServiceRoleBearer(req: Request): boolean {
 export async function hasValidApiKeyOrUser(req: Request): Promise<boolean> {
   if (hasValidApiKey(req)) return true;
   if (isServiceRoleBearer(req)) return true;
+
+  // postEdgeFunctionWithRetry без сессии: Bearer = anon key — getUser(anon) не работает.
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
+  const authHeaderEarly = req.headers.get("authorization") ?? req.headers.get("Authorization");
+  if (anonKey && authHeaderEarly?.startsWith("Bearer ")) {
+    const t = authHeaderEarly.slice("Bearer ".length).trim();
+    if (t === anonKey) return true;
+  }
 
   const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return false;
