@@ -913,7 +913,6 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                           !widget.employee.hasRole('owner') &&
                           (_department == 'kitchen' || _department == 'bar' || _department == 'dining_room')) ...[
                         const SizedBox(height: 8),
-                        Text(loc.t('employment_status') ?? 'Статус', style: theme.textTheme.titleSmall),
                         DropdownButtonFormField<String>(
                           value: _employmentStatus,
                           decoration: InputDecoration(labelText: loc.t('employment_status') ?? 'Статус', border: const OutlineInputBorder(), filled: true),

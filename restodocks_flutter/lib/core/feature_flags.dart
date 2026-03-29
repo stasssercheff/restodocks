@@ -32,9 +32,11 @@ class FeatureFlags {
   /// Включается только в Beta (`IS_BETA=true`) и не на основном домене **restodocks.com**.
   static bool get posModuleEnabled => isBeta && !_isProdMarketingHost;
 
-  /// Экран «Журнал ошибок»: только в beta и не в нативном iOS (IPA / TestFlight / App Store).
-  /// В веб-бете остаётся для отладки.
+  /// Экран «Журнал ошибок»: только в beta, не на основном прод-домене **restodocks.com**
+  /// (даже если в сборке ошибочно передан `IS_BETA=true`), и не в нативном iOS (IPA).
+  /// В веб-бете (например Pages) остаётся для отладки.
   static bool get showSystemErrorsJournal =>
       isBeta &&
+      !_isProdMarketingHost &&
       (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS);
 }
