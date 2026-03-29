@@ -22,6 +22,8 @@
 
 ## 3. Операционный чек-лист (регулярно)
 
+Пошагово для владельца без отдельной роли security: **`docs/SECURITY_OWNER_CHECKLIST.md`**.
+
 1. **Миграции** на Beta/Prod совпадают с `supabase/migrations` (после merge — `supabase db push` или ручной SQL).
 2. **Edge Functions** задеплоены после изменений в `restodocks_flutter/supabase/functions`.
 3. **Ключи**: ротация при утечке; MFA на GitHub и Supabase Dashboard для админов.
