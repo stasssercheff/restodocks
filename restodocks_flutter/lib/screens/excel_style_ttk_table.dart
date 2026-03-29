@@ -781,7 +781,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
           ?.where((tc) => tc.id == ingredient.sourceTechCardId)
           .firstOrNull;
       if (pf != null) return pf.getDisplayNameInLists(lang);
-      return ingredient.sourceTechCardName ?? ingredient.productName;
+      return TechCard.pfLinkedIngredientDisplayName(ingredient, lang);
     }
     final product = widget.productStore.findProductForIngredient(ingredient.productId, ingredient.productName);
     if (product != null) return product.getLocalizedName(lang);

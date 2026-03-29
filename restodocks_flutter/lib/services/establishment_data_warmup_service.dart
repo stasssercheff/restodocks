@@ -12,25 +12,49 @@ class EstablishmentDataWarmupService {
       EstablishmentDataWarmupService._();
 
   String? _lastDataEstablishmentId;
-  bool _running = false;
+  String? _lastWarmupLang;
+  Future<void> _chain = Future<void>.value();
 
-  /// Идёт без блокировки UI. Повтор для того же [dataEstablishmentId] в одной сессии пропускается.
+  /// Сброс кэша «последний прогретый язык» — следующий [runForEstablishment] не пропустится по языку.
+  void markTranslationsStale() {
+    _lastWarmupLang = null;
+  }
+
+  /// Идёт без блокировки UI. Запросы выстраиваются в очередь; повтор для того же заведения и того же языка пропускается.
   Future<void> runForEstablishment({
     required String dataEstablishmentId,
     required TechCardServiceSupabase techCards,
     required ProductStoreSupabase productStore,
     required TranslationService translationService,
     required LocalizationService localization,
+  }) {
+    _chain = _chain.then((_) => _runForEstablishmentBody(
+          dataEstablishmentId: dataEstablishmentId,
+          techCards: techCards,
+          productStore: productStore,
+          translationService: translationService,
+          localization: localization,
+        ));
+    return _chain;
+  }
+
+  Future<void> _runForEstablishmentBody({
+    required String dataEstablishmentId,
+    required TechCardServiceSupabase techCards,
+    required ProductStoreSupabase productStore,
+    required TranslationService translationService,
+    required LocalizationService localization,
   }) async {
-    if (_running) return;
-    if (_lastDataEstablishmentId == dataEstablishmentId) return;
-    _running = true;
     try {
+      final lang = localization.currentLanguageCode;
+      if (_lastDataEstablishmentId == dataEstablishmentId &&
+          _lastWarmupLang == lang) {
+        return;
+      }
       final cards = await techCards.getTechCardsForEstablishment(
         dataEstablishmentId,
         includeIngredients: true,
       );
-      final lang = localization.currentLanguageCode;
       final ids = <String>{};
       for (final tc in cards) {
         ids.add(tc.id);
@@ -50,15 +74,16 @@ class EstablishmentDataWarmupService {
       await productStore.loadNomenclature(dataEstablishmentId).catchError((_) {});
 
       _lastDataEstablishmentId = dataEstablishmentId;
+      _lastWarmupLang = localization.currentLanguageCode;
     } catch (e, st) {
       devLog('EstablishmentDataWarmupService: $e $st');
-    } finally {
-      _running = false;
     }
   }
 
   void resetSession() {
     _lastDataEstablishmentId = null;
+    _lastWarmupLang = null;
+    _chain = Future<void>.value();
     TechCard.clearTranslationOverlay();
   }
 }

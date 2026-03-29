@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
@@ -15,6 +17,7 @@ import 'core/initial_location_stub.dart'
     if (dart.library.html) 'core/initial_location_web.dart' as initial_loc;
 import 'core/supabase_url_resolver_stub.dart'
     if (dart.library.html) 'core/supabase_url_resolver_web.dart' as supabase_url;
+import 'models/models.dart';
 import 'services/services.dart';
 import 'services/translation_manager.dart';
 import 'widgets/widgets.dart';
@@ -73,10 +76,33 @@ Future<void> _bootstrapApp() async {
   await AccountManagerSupabase().initialize();
   await LocalizationService.initialize();
 
+  LocalizationService.onBeforeLocaleChanged = () {
+    TechCard.clearTranslationOverlay();
+    EstablishmentDataWarmupService.instance.markTranslationsStale();
+  };
+  LocalizationService.onAfterLocaleChanged = () async {
+    final acc = AccountManagerSupabase();
+    final est = acc.establishment;
+    if (est == null) return;
+    final dataId = est.dataEstablishmentId.trim();
+    if (dataId.isEmpty) return;
+    final loc = LocalizationService();
+    await EstablishmentDataWarmupService.instance.runForEstablishment(
+      dataEstablishmentId: dataId,
+      techCards: TechCardServiceSupabase(),
+      productStore: ProductStoreSupabase(),
+      translationService: TranslationService(
+        aiService: AiServiceSupabase(),
+        supabase: SupabaseService(),
+      ),
+      localization: loc,
+    );
+  };
+
   // Подключаем callback: при загрузке профиля сотрудника применяем его preferred_language.
   // Это обеспечивает сохранение языка между браузерами и режимом инкогнито (хранится в Supabase).
   AccountManagerSupabase().onPreferredLanguageLoaded = (langCode) {
-    LocalizationService().setLocale(Locale(langCode));
+    unawaited(LocalizationService().setLocale(Locale(langCode)));
   };
 
   await ThemeService().initialize();

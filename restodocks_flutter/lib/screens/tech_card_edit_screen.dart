@@ -756,6 +756,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// чтобы не блокировать UI при каждом пересчёте.
   Timer? _cookTableSyncDebounce;
 
+  late final VoidCallback _localizationListener;
+
   /// 'photo' | 'excel' — какая кнопка сейчас загружает (чтобы показывать правильный текст).
   final _nameController = TextEditingController();
 
@@ -2268,6 +2270,18 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     // Сразу 2 строки для внесения продуктов; при заполнении последней добавится следующая
     _ingredients.add(TTIngredient.emptyPlaceholder());
     _ingredients.add(TTIngredient.emptyPlaceholder());
+    final locSvc = LocalizationService();
+    _localizationListener = () {
+      if (!mounted) return;
+      final tc = _techCard;
+      if (tc == null) return;
+      final code = locSvc.currentLanguageCode;
+      final next = tc.getLocalizedDishName(code);
+      if (_nameController.text != next) {
+        _nameController.text = next;
+      }
+    };
+    locSvc.addListener(_localizationListener);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _load();
 
@@ -2285,6 +2299,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
   @override
   void dispose() {
+    LocalizationService().removeListener(_localizationListener);
     _reconcileOpenCardTimer?.cancel();
     _portionWeightUpdateDebounce?.cancel();
     if (_reconcileNotifier != null) {
@@ -5989,10 +6004,13 @@ class _TtkTableState extends State<_TtkTable> {
   /// Все ингредиенты в ТТК добавляются из номенклатуры и имеют productId,
   /// поэтому getLocalizedName всегда вернёт корректный перевод.
   String _getIngredientDisplayName(TTIngredient ing, String lang) {
+    final sid = ing.sourceTechCardId?.trim();
+    if (sid != null && sid.isNotEmpty) {
+      return TechCard.pfLinkedIngredientDisplayName(ing, lang);
+    }
     final product = widget.productStore
         .findProductForIngredient(ing.productId, ing.productName);
-    if (product != null)
-      return ing.sourceTechCardName ?? product.getLocalizedName(lang);
+    if (product != null) return product.getLocalizedName(lang);
     return ing.productName;
   }
 
@@ -7037,9 +7055,11 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                 final cookProduct = widget.productStore
                     ?.findProductForIngredient(ing.productId, ing.productName);
                 final cookLang = widget.loc.currentLanguageCode;
-                final cookDisplayName = ing.sourceTechCardName ??
-                    cookProduct?.getLocalizedName(cookLang) ??
-                    ing.productName;
+                final cookDisplayName = ing.sourceTechCardId != null &&
+                        ing.sourceTechCardId!.trim().isNotEmpty
+                    ? TechCard.pfLinkedIngredientDisplayName(ing, cookLang)
+                    : (cookProduct?.getLocalizedName(cookLang) ??
+                        ing.productName);
                 // Название — placeholder (объединённая ячейка рисуется поверх в Stack)
                 return TableRow(
                   children: [

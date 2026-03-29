@@ -44,6 +44,12 @@ class LocalizationService extends ChangeNotifier {
   Timer? _autoUiNotifyDebounce;
   static const int _maxAutoUiInFlight = 2;
 
+  /// Синхронно до смены [currentLocale]: сброс оверлея переводов ТТК, чтобы не кратковременно смешивать языки.
+  static void Function()? onBeforeLocaleChanged;
+
+  /// После смены локали: перезагрузка оверлея названий ТТК для нового языка (не импортировать тяжёлые сервисы сюда).
+  static Future<void> Function()? onAfterLocaleChanged;
+
   void setTranslationManager(TranslationManager manager) {
     _translationManager = manager;
   }
@@ -100,6 +106,11 @@ class LocalizationService extends ChangeNotifier {
   Future<void> setLocale(Locale locale) async {
     if (!supportedLocales.any((l) => l.languageCode == locale.languageCode))
       return;
+    try {
+      onBeforeLocaleChanged?.call();
+    } catch (e, st) {
+      devLog('onBeforeLocaleChanged: $e $st');
+    }
     _currentLocale = supportedLocales
         .firstWhere((l) => l.languageCode == locale.languageCode);
     notifyListeners();
@@ -107,6 +118,12 @@ class LocalizationService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_keyLocale, _currentLocale.languageCode);
     } catch (_) {}
+    try {
+      await onAfterLocaleChanged?.call();
+      notifyListeners();
+    } catch (e, st) {
+      devLog('onAfterLocaleChanged: $e $st');
+    }
   }
 
   /// Получение перевода для текущей локали (fallback: en → ru → key)
