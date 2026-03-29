@@ -75,10 +75,8 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// Предпочитаемый язык пользователя
   String get preferredLanguage => _currentEmployee?.preferredLanguage ?? 'ru';
 
-  /// Есть ли PRO подписка
-  bool get hasProSubscription =>
-      _establishment?.subscriptionType == 'pro' ||
-      _establishment?.subscriptionType == 'premium';
+  /// Pro/Premium или активные 72 ч пробного Pro (см. establishments.pro_trial_ends_at).
+  bool get hasProSubscription => _establishment?.hasEffectiveProAccess ?? false;
 
   /// Co-owner с view_only: только просмотр (при >1 заведении у пригласившего)
   bool get isViewOnlyOwner => _currentEmployee?.isViewOnlyOwner ?? false;
@@ -343,6 +341,36 @@ class AccountManagerSupabase extends ChangeNotifier {
       devLog('createEstablishment: default dining layout $e $st');
     }
     return createdEstablishment;
+  }
+
+  /// Регистрация без промокода: 72 ч Pro (pro_trial_ends_at на сервере), затем free.
+  Future<Establishment> registerCompanyWithoutPromo({
+    required String name,
+    required String address,
+    required String pinCode,
+  }) async {
+    final res = await _supabase.client.rpc(
+      'register_company_without_promo',
+      params: {
+        'p_name': name.trim(),
+        'p_address': address.trim(),
+        'p_pin_code': pinCode.trim().toUpperCase(),
+      },
+    );
+    final raw = res as Map<String, dynamic>?;
+    if (raw == null) {
+      throw Exception('register_company_without_promo returned null');
+    }
+    final m = Map<String, dynamic>.from(raw);
+    m['owner_id'] = m['owner_id']?.toString() ?? '';
+    final est = Establishment.fromJson(m);
+    _establishment = est;
+    try {
+      await PosDiningLayoutService.instance.ensureDefaultDiningLayoutIfEmpty(est.id);
+    } catch (e, st) {
+      devLog('registerCompanyWithoutPromo: default dining layout $e $st');
+    }
+    return est;
   }
 
   /// Регистрация компании только через RPC с проверкой промокода (защищённый путь).

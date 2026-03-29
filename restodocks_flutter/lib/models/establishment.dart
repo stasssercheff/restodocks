@@ -67,12 +67,25 @@ class Establishment extends Equatable {
   @JsonKey(name: 'subscription_type')
   final String? subscriptionType;
 
+  /// Пробный Pro до этой даты (регистрация без промокода, 72 ч).
+  @JsonKey(name: 'pro_trial_ends_at')
+  final DateTime? proTrialEndsAt;
+
   /// ID родительского заведения (для филиалов). NULL = основное заведение.
   @JsonKey(name: 'parent_establishment_id')
   final String? parentEstablishmentId;
 
   // Alias for subscriptionType for backward compatibility
   String? get subscriptionPlan => subscriptionType;
+
+  /// Постоянный Pro/Premium или активные 72 ч пробного Pro.
+  bool get hasEffectiveProAccess {
+    final st = subscriptionType?.toLowerCase().trim();
+    if (st == 'pro' || st == 'premium') return true;
+    final trial = proTrialEndsAt;
+    if (trial != null && DateTime.now().isBefore(trial)) return true;
+    return false;
+  }
 
   /// Основное заведение (не филиал)
   bool get isMain => parentEstablishmentId == null || parentEstablishmentId!.isEmpty;
@@ -110,6 +123,7 @@ class Establishment extends Equatable {
     this.email,
     this.defaultCurrency = 'RUB',
     this.subscriptionType,
+    this.proTrialEndsAt,
     this.parentEstablishmentId,
     required this.createdAt,
     required this.updatedAt,
@@ -135,6 +149,7 @@ class Establishment extends Equatable {
     String? email,
     String? defaultCurrency,
     String? subscriptionType,
+    DateTime? proTrialEndsAt,
     String? parentEstablishmentId,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -158,6 +173,7 @@ class Establishment extends Equatable {
       email: email ?? this.email,
       defaultCurrency: defaultCurrency ?? this.defaultCurrency,
       subscriptionType: subscriptionType ?? this.subscriptionType,
+      proTrialEndsAt: proTrialEndsAt ?? this.proTrialEndsAt,
       parentEstablishmentId: parentEstablishmentId ?? this.parentEstablishmentId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -236,6 +252,8 @@ class Establishment extends Equatable {
     phone,
     email,
     defaultCurrency,
+    subscriptionType,
+    proTrialEndsAt,
     parentEstablishmentId,
     createdAt,
     updatedAt,

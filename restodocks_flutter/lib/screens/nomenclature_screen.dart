@@ -1347,8 +1347,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
   bool _canShowNutrition(BuildContext context) {
     final account = context.read<AccountManagerSupabase>();
-    final employee = account.currentEmployee;
-    return employee?.hasProSubscription ?? false;
+    return account.hasProSubscription;
   }
 
   bool _needsTranslation(NomenclatureItem item) {

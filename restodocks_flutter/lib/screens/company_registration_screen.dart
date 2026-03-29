@@ -100,7 +100,8 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
         return;
       }
 
-      final promoCode = _promoController.text.trim().toUpperCase();
+      final promoRaw = _promoController.text.trim();
+      final promoCode = promoRaw.toUpperCase();
       final accountManager = context.read<AccountManagerSupabase>();
       final name = _nameController.text.trim();
       final address = _selectedCountry!.name(lang);
@@ -109,12 +110,18 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
 
       for (var attempt = 0; attempt < maxRetries; attempt++) {
         try {
-          final establishment = await accountManager.registerCompanyWithPromo(
-            promoCode: promoCode,
-            name: name,
-            address: address,
-            pinCode: _pinCode,
-          );
+          final establishment = promoRaw.isEmpty
+              ? await accountManager.registerCompanyWithoutPromo(
+                  name: name,
+                  address: address,
+                  pinCode: _pinCode,
+                )
+              : await accountManager.registerCompanyWithPromo(
+                  promoCode: promoCode,
+                  name: name,
+                  address: address,
+                  pinCode: _pinCode,
+                );
 
           Supabase.instance.client.functions.invoke('register-metadata', body: {
             'establishment_id': establishment.id,
@@ -285,15 +292,11 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
                 TextFormField(
                   controller: _promoController,
                   decoration: InputDecoration(
-                    labelText: loc.t('promo_code'),
-                    hintText: loc.t('enter_promo_code'),
+                    labelText: loc.t('promo_code_optional'),
+                    hintText: loc.t('enter_promo_code_optional'),
                     prefixIcon: const Icon(Icons.confirmation_number_outlined),
                   ),
                   textCapitalization: TextCapitalization.characters,
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return loc.t('promo_code_required');
-                    return null;
-                  },
                 ),
                 const SizedBox(height: 20),
                 Text(loc.t('generated_pin'), style: Theme.of(context).textTheme.titleSmall),
