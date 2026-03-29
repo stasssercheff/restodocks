@@ -20,8 +20,30 @@ class TechCard extends Equatable {
     }
   }
 
+  /// Копия оверлея для догрузки переводов (без изменения кэша).
+  static Map<String, String> snapshotTranslationOverlay() =>
+      Map<String, String>.from(_translationOverlayByCardId);
+
+  /// Уже выполнен полный цикл «БД + при необходимости API» для этого заведения и языка UI.
+  static String? _overlaySessionDataEstablishmentId;
+  static String? _overlaySessionLang;
+
+  static bool translationOverlaySessionMatches(
+      String dataEstablishmentId, String lang) {
+    return _overlaySessionDataEstablishmentId == dataEstablishmentId &&
+        _overlaySessionLang == lang;
+  }
+
+  static void markTranslationOverlaySession(
+      String dataEstablishmentId, String lang) {
+    _overlaySessionDataEstablishmentId = dataEstablishmentId;
+    _overlaySessionLang = lang;
+  }
+
   static void clearTranslationOverlay() {
     _translationOverlayByCardId = {};
+    _overlaySessionDataEstablishmentId = null;
+    _overlaySessionLang = null;
   }
 
   final String id;

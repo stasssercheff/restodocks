@@ -75,6 +75,7 @@ class EstablishmentDataWarmupService {
         existingFromDatabase: fromDb,
       );
       TechCard.setTranslationOverlay(overlay, merge: true);
+      TechCard.markTranslationOverlaySession(dataEstablishmentId, lang);
 
       await productStore.loadProducts().catchError((_) {});
       await productStore.loadNomenclature(dataEstablishmentId).catchError((_) {});

@@ -50,8 +50,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   Map<String, TechCard> _techCardsById = {};
   Map<String, ({double cost, double output})> _resolvedCostMemo = {};
 
-  String? _overlayFetchedForLang;
-  int _overlayFetchedForListVersion = -1;
+  /// Полный цикл перевода названий (API) — показываем прогресс, кроме русского UI.
+  bool _translationNamesLoading = false;
+
+  /// Чтобы при смене языка перезапустить оверлей без повторного открытия экрана.
+  String? _prefetchListenerLang;
+  late final VoidCallback _localizationPrefetchListener;
 
   String _tcListName(TechCard tc, String lang) => tc.getDisplayNameInLists(lang);
 
@@ -68,17 +72,26 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     return ids.toList();
   }
 
-  Future<void> _prefetchDishNameTranslationOverlay(List<TechCard> allEstablishmentCards) async {
+  Future<void> _prefetchDishNameTranslationOverlay(
+      List<TechCard> allEstablishmentCards) async {
     if (allEstablishmentCards.isEmpty || !mounted) return;
+    final acc = context.read<AccountManagerSupabase>();
+    final est = acc.establishment;
+    if (est == null) return;
+    final dataEstId = est.dataEstablishmentId.trim();
+    if (dataEstId.isEmpty) return;
     final lang = context.read<LocalizationService>().currentLanguageCode;
-    // Смена языка — старый оверлей несовместим; иначе merge смешивает локали.
-    if (_overlayFetchedForLang != null && _overlayFetchedForLang != lang) {
-      TechCard.clearTranslationOverlay();
-      _overlayFetchedForLang = null;
-    }
-    if (_overlayFetchedForLang == lang &&
-        _overlayFetchedForListVersion == _listVersion) {
+
+    // Уже был полный прогрев для этого заведения и языка — не гоняем пачку API при каждом _load.
+    if (TechCard.translationOverlaySessionMatches(dataEstId, lang)) {
+      await _refreshTechCardNameOverlayAfterWarmSession(
+          allEstablishmentCards, lang);
       return;
+    }
+
+    final showProgress = lang != 'ru';
+    if (showProgress && mounted) {
+      setState(() => _translationNamesLoading = true);
     }
     try {
       final ts = context.read<TranslationService>();
@@ -88,16 +101,47 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         targetLanguage: lang,
       );
       if (!mounted) return;
+      TechCard.setTranslationOverlay(fromDb, merge: true);
+      final base = TechCard.snapshotTranslationOverlay();
       final map = await ts.ensureMissingTechCardDishNameTranslations(
         techCards: allEstablishmentCards,
         targetLanguage: lang,
-        existingFromDatabase: fromDb,
+        existingFromDatabase: base,
       );
+      if (!mounted) return;
       TechCard.setTranslationOverlay(map, merge: true);
-      setState(() {
-        _overlayFetchedForLang = lang;
-        _overlayFetchedForListVersion = _listVersion;
-      });
+      TechCard.markTranslationOverlaySession(dataEstId, lang);
+      setState(() {});
+    } catch (_) {
+    } finally {
+      if (mounted) {
+        setState(() => _translationNamesLoading = false);
+      }
+    }
+  }
+
+  /// После первого полного прогрева: только БД + добивка новых карточек без перевода.
+  Future<void> _refreshTechCardNameOverlayAfterWarmSession(
+      List<TechCard> allEstablishmentCards, String lang) async {
+    if (!mounted) return;
+    try {
+      final ts = context.read<TranslationService>();
+      final ids = _techCardIdsForTranslationOverlay(allEstablishmentCards);
+      final fromDb = await ts.fetchTechCardDishNameTranslationsForTargetLanguage(
+        techCardIds: ids,
+        targetLanguage: lang,
+      );
+      if (!mounted) return;
+      TechCard.setTranslationOverlay(fromDb, merge: true);
+      final base = TechCard.snapshotTranslationOverlay();
+      final map = await ts.ensureMissingTechCardDishNameTranslations(
+        techCards: allEstablishmentCards,
+        targetLanguage: lang,
+        existingFromDatabase: base,
+      );
+      if (!mounted) return;
+      TechCard.setTranslationOverlay(map, merge: true);
+      setState(() {});
     } catch (_) {}
   }
 
@@ -175,6 +219,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         setState(() {});
       }
     });
+    _prefetchListenerLang = LocalizationService().currentLanguageCode;
+    _localizationPrefetchListener = () {
+      if (!mounted || _loading || _techCardsById.isEmpty) return;
+      final lang = LocalizationService().currentLanguageCode;
+      if (_prefetchListenerLang == lang) return;
+      _prefetchListenerLang = lang;
+      unawaited(_prefetchDishNameTranslationOverlay(
+          _techCardsById.values.toList()));
+    };
+    LocalizationService().addListener(_localizationPrefetchListener);
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowTtkTour());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _load();
@@ -441,6 +495,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   @override
   void dispose() {
+    LocalizationService().removeListener(_localizationPrefetchListener);
     _searchDebounceTimer?.cancel();
     _ingredientsHydrationDebounce?.cancel();
     _reconcileTimer?.cancel();
@@ -3090,33 +3145,65 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         ),
         actions: _buildAppBarActions(loc, canEdit),
       ),
-      body: Stack(
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _buildBody(loc, canEdit, showCost),
-          if (_loadingExcel)
-            ColoredBox(
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
-              child: Center(
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2)),
-                        const SizedBox(height: 16),
-                        Text(_loadingTtkIsPdf
-                            ? loc.t('loading_ttk_pdf')
-                            : loc.t('loading_excel')),
-                      ],
+          if (_translationNamesLoading)
+            Material(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const LinearProgressIndicator(minHeight: 3),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Text(
+                      loc.t('ttk_loading_name_translations'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
+          Expanded(
+            child: Stack(
+              children: [
+                _buildBody(loc, canEdit, showCost),
+                if (_loadingExcel)
+                  ColoredBox(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surface
+                        .withOpacity(0.7),
+                    child: Center(
+                      child: Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2)),
+                              const SizedBox(height: 16),
+                              Text(_loadingTtkIsPdf
+                                  ? loc.t('loading_ttk_pdf')
+                                  : loc.t('loading_excel')),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ],
       ),
       floatingActionButton: null,
