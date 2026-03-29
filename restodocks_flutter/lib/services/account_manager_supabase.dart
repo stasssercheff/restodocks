@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'dart:async' show unawaited;
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
@@ -6,7 +7,6 @@ import 'package:restodocks/core/supabase_env.dart';
 import 'package:restodocks/core/supabase_url_resolver_stub.dart'
     if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart'
     as supabase_url;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import '../utils/dev_log.dart';
@@ -365,11 +365,8 @@ class AccountManagerSupabase extends ChangeNotifier {
     m['owner_id'] = m['owner_id']?.toString() ?? '';
     final est = Establishment.fromJson(m);
     _establishment = est;
-    try {
-      await PosDiningLayoutService.instance.ensureDefaultDiningLayoutIfEmpty(est.id);
-    } catch (e, st) {
-      devLog('registerCompanyWithoutPromo: default dining layout $e $st');
-    }
+    // Дефолтный стол создаётся в register_company_without_promo (SECURITY DEFINER);
+    // до входа владельца клиент anon — RLS на pos_dining_tables недоступен.
     return est;
   }
 
@@ -397,12 +394,22 @@ class AccountManagerSupabase extends ChangeNotifier {
     m['owner_id'] = m['owner_id']?.toString() ?? '';
     final est = Establishment.fromJson(m);
     _establishment = est;
-    try {
-      await PosDiningLayoutService.instance.ensureDefaultDiningLayoutIfEmpty(est.id);
-    } catch (e, st) {
-      devLog('registerCompanyWithPromo: default dining layout $e $st');
-    }
+    // Дефолтный стол — в register_company_with_promo (см. registerCompanyWithoutPromo).
     return est;
+  }
+
+  /// IP/гео при регистрации компании (Edge register-metadata). Не блокирует UX; ошибки не пробрасываются.
+  void registerMetadataBestEffort(String establishmentId) {
+    unawaited(
+      (() async {
+        try {
+          await _supabase.client.functions.invoke(
+            'register-metadata',
+            body: {'establishment_id': establishmentId},
+          );
+        } catch (_) {}
+      })(),
+    );
   }
 
   /// Поиск заведения по названию

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import '../services/countries_cities_data.dart';
@@ -123,9 +122,7 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
                   pinCode: _pinCode,
                 );
 
-          Supabase.instance.client.functions.invoke('register-metadata', body: {
-            'establishment_id': establishment.id,
-          });
+          accountManager.registerMetadataBestEffort(establishment.id);
 
           if (!mounted) return;
           context.push('/register-owner', extra: establishment);

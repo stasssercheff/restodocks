@@ -16,12 +16,16 @@ class OwnerRegistrationScreen extends StatefulWidget {
 }
 
 String _ownerRegisterErrorMessage(Object e, LocalizationService loc) {
-  final s = e.toString();
+  final s = e.toString().toLowerCase();
   if (s.contains('over_email_send_rate_limit') ||
-      s.contains('email rate limit exceeded')) {
+      s.contains('email rate limit exceeded') ||
+      s.contains('over_request_rate_limit') ||
+      s.contains('too many requests') ||
+      s.contains('429') ||
+      s.contains('rate limit')) {
     return loc.t('auth_email_rate_limit');
   }
-  return loc.t('register_error', args: {'error': s});
+  return loc.t('register_error', args: {'error': e.toString()});
 }
 
 class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {

@@ -9,6 +9,9 @@ import {
   resolveCorsHeaders,
 } from "../_shared/security.ts";
 
+/** Окно после создания заведения без владельца: anon может один раз записать метаданные (шаг «компания» до входа). */
+const ORPHAN_ESTABLISHMENT_MAX_AGE_MS = 2 * 60 * 60 * 1000;
+
 function getClientIp(req: Request): string {
   const cfIp = req.headers.get("cf-connecting-ip");
   if (cfIp) return cfIp;
@@ -80,39 +83,72 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const ip = getClientIp(req);
-    const geo = await fetchGeo(ip);
-
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const userId = await getAuthenticatedUserId(req);
-    if (!isServiceRoleRequest(req)) {
-      if (!userId) {
-        return new Response(JSON.stringify({ error: "Authenticated user required" }), {
-          status: 401,
-          headers: { ...cors, "Content-Type": "application/json" },
-        });
-      }
+
+    let allowed = false;
+
+    if (isServiceRoleRequest(req)) {
+      allowed = true;
+    } else if (userId) {
       const { data: allowedEmployee } = await supabase
         .from("employees")
         .select("id")
         .eq("id", userId)
         .eq("establishment_id", establishmentId)
         .maybeSingle();
-      if (!allowedEmployee?.id) {
+      if (allowedEmployee?.id) {
+        allowed = true;
+      } else {
         const { data: allowedOwner } = await supabase
           .from("establishments")
           .select("id")
           .eq("id", establishmentId)
           .eq("owner_id", userId)
           .maybeSingle();
-        if (!allowedOwner?.id) {
-          return new Response(JSON.stringify({ error: "Forbidden for establishment" }), {
-            status: 403,
-            headers: { ...cors, "Content-Type": "application/json" },
-          });
-        }
+        if (allowedOwner?.id) allowed = true;
       }
     }
+
+    // Регистрация компании: ещё нет сессии владельца — только anon + заведение без owner_id, не старше окна.
+    if (!allowed) {
+      const { data: est, error: estErr } = await supabase
+        .from("establishments")
+        .select("id, owner_id, created_at")
+        .eq("id", establishmentId)
+        .maybeSingle();
+      if (estErr || !est) {
+        return new Response(JSON.stringify({ error: "Establishment not found" }), {
+          status: 404,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+      if (est.owner_id != null && String(est.owner_id).length > 0) {
+        return new Response(JSON.stringify({ error: "Forbidden for establishment" }), {
+          status: 403,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+      const created = new Date(est.created_at as string);
+      if (Number.isNaN(created.getTime()) || Date.now() - created.getTime() > ORPHAN_ESTABLISHMENT_MAX_AGE_MS) {
+        return new Response(JSON.stringify({ error: "Forbidden for establishment" }), {
+          status: 403,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+      allowed = true;
+    }
+
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: "Authenticated user required" }), {
+        status: 401,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    const ip = getClientIp(req);
+    const geo = await fetchGeo(ip);
+
     const { error } = await supabase
       .from("establishments")
       .update({
