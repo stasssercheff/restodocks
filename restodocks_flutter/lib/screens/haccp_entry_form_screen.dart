@@ -10,6 +10,7 @@ import '../models/haccp_log_type.dart';
 import '../models/product.dart';
 import '../models/tech_card.dart';
 import '../services/services.dart';
+import '../utils/employee_display_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Одна строка формы гигиенического журнала (сотрудник + должность + допуск).
@@ -418,6 +419,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         ),
       );
 
+  /// Локализованный заголовок таблицы; при отсутствии ключа — [fallback].
+  String _th(LocalizationService loc, String key, String fallback) {
+    final v = loc.t(key);
+    return v == key ? fallback : v;
+  }
+
   Widget _tableCell(Widget child) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
@@ -610,7 +617,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         ...employees.map((e) => DropdownMenuItem<Employee?>(
               value: e,
               child: Text(
-                '${e.surname != null ? '${e.surname} ' : ''}${e.fullName} (${e.roles.isNotEmpty ? loc.roleDisplayName(e.roles.first) : ''})',
+                '${loc.displayPersonNameForLanguage(employeeFullNameRaw(e), loc.currentLanguageCode)} (${e.roles.isNotEmpty ? loc.roleDisplayName(e.roles.first) : ''})',
               ),
             )),
       ],
@@ -620,13 +627,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
   /// Подпись — ФИО сотрудника из учётной записи (только отображение).
   Widget _signatureFromAccount() {
-    return Consumer<AccountManagerSupabase>(
-      builder: (_, acc, __) {
+    return Consumer2<AccountManagerSupabase, LocalizationService>(
+      builder: (_, acc, loc, __) {
         final emp = acc.currentEmployee;
         final name = emp != null
-            ? (emp.surname != null
-                ? '${emp.surname} ${emp.fullName}'
-                : emp.fullName)
+            ? loc.displayPersonNameForLanguage(
+                employeeFullNameRaw(emp), loc.currentLanguageCode)
             : '—';
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
@@ -890,9 +896,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     final dateStr = DateFormat('dd.MM.yyyy').format(DateTime.now());
     final currentEmp = context.watch<AccountManagerSupabase>().currentEmployee;
     final creatorName = currentEmp != null
-        ? (currentEmp.surname != null
-            ? '${currentEmp.surname} ${currentEmp.fullName}'
-            : currentEmp.fullName)
+        ? loc.displayPersonNameForLanguage(
+            employeeFullNameRaw(currentEmp), loc.currentLanguageCode)
         : '—';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -914,18 +919,19 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           children: [
             TableRow(
               children: [
-                _tableHeaderCell('№ п/п'),
-                _tableHeaderCell('Дата'),
-                _tableHeaderCell('Ф. И. О. работника (последнее при наличии)'),
-                _tableHeaderCell('Должность'),
-                _tableHeaderCell(
-                    'Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов семьи'),
-                _tableHeaderCell(
-                    'Подпись сотрудника об отсутствии заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук и открытых поверхностей тела'),
-                _tableHeaderCell(
-                    'Результат осмотра медицинским работником (ответственным лицом) (допущен / отстранен)'),
-                _tableHeaderCell(
-                    'Подпись медицинского работника (ответственного лица)'),
+                _tableHeaderCell(_th(loc, 'haccp_tbl_pp_no', '№ п/п')),
+                _tableHeaderCell(_th(loc, 'haccp_tbl_date', 'Дата')),
+                _tableHeaderCell(_th(loc, 'haccp_tbl_employee_fio_long',
+                    'Ф. И. О. работника (последнее при наличии)')),
+                _tableHeaderCell(_th(loc, 'haccp_tbl_position', 'Должность')),
+                _tableHeaderCell(_th(loc, 'haccp_tbl_sign_family_infect',
+                    'Подпись сотрудника об отсутствии признаков инфекционных заболеваний у сотрудника и членов семьи')),
+                _tableHeaderCell(_th(loc, 'haccp_tbl_sign_skin_resp',
+                    'Подпись сотрудника об отсутствии заболеваний верхних дыхательных путей и гнойничковых заболеваний кожи рук и открытых поверхностей тела')),
+                _tableHeaderCell(_th(loc, 'haccp_tbl_exam_outcome',
+                    'Результат осмотра медицинским работником (ответственным лицом) (допущен / отстранен)')),
+                _tableHeaderCell(_th(loc, 'haccp_tbl_med_worker_sign',
+                    'Подпись медицинского работника (ответственного лица)')),
                 _tableHeaderCell(''),
               ],
             ),
@@ -933,9 +939,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               final row = _healthRows[i];
               final emp = _healthEmployeeById(row.employeeId);
               final name = emp != null
-                  ? (emp.surname != null
-                      ? '${emp.surname} ${emp.fullName}'
-                      : emp.fullName)
+                  ? loc.displayPersonNameForLanguage(
+                      employeeFullNameRaw(emp), loc.currentLanguageCode)
                   : '—';
               return TableRow(
                 children: [
@@ -972,7 +977,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                                   : Colors.orange)),
                     ],
                   )),
-                  _tableCell(Text(row.statusOk ? 'допущен' : 'отстранен',
+                  _tableCell(Text(
+                      row.statusOk
+                          ? (loc.t('haccp_status_admitted'))
+                          : (loc.t('haccp_status_suspended')),
                       style: const TextStyle(fontSize: 12))),
                   _tableCell(
                       Text(creatorName, style: const TextStyle(fontSize: 11))),
@@ -1012,9 +1020,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: available.map((e) {
-                      final name = e.surname != null
-                          ? '${e.surname} ${e.fullName}'
-                          : e.fullName;
+                      final name = loc.displayPersonNameForLanguage(
+                          employeeFullNameRaw(e), loc.currentLanguageCode);
                       return ListTile(
                         title: Text(name),
                         subtitle: Text(
@@ -1060,9 +1067,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       children: [
         TableRow(
           children: [
-            _tableHeaderCell('Наименование производственного помещения'),
-            _tableHeaderCell('Наименование холодильного оборудования'),
-            _tableHeaderCell('Температура °C'),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_room_name_prod',
+                'Наименование производственного помещения')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_fridge_equipment_name',
+                'Наименование холодильного оборудования')),
+            _tableHeaderCell(
+                _th(loc, 'haccp_tbl_temp_celsius', 'Температура °C')),
           ],
         ),
         TableRow(
@@ -1129,15 +1139,18 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           },
           border: TableBorder.all(color: Theme.of(context).dividerColor),
           children: [
-            TableRow(
-              children: [
-                _tableHeaderCell('№ п/п'),
-                _tableHeaderCell('Дата'),
-                _tableHeaderCell('Температура, °C'),
-                _tableHeaderCell('Относительная влажность, %'),
-                _tableHeaderCell('Подпись ответственного лица'),
-              ],
-            ),
+                TableRow(
+                  children: [
+                _tableHeaderCell(_th(loc, 'haccp_tbl_pp_no', '№ п/п')),
+                _tableHeaderCell(_th(loc, 'haccp_tbl_date', 'Дата')),
+                _tableHeaderCell(_th(loc, 'haccp_tbl_temp_c_label',
+                    'Температура, °C')),
+                _tableHeaderCell(_th(loc, 'haccp_tbl_rel_humidity_pct',
+                    'Относительная влажность, %')),
+                _tableHeaderCell(_th(loc, 'haccp_tbl_responsible_sign',
+                    'Подпись ответственного лица')),
+                  ],
+                ),
             TableRow(
               children: [
                 _tableCell(const Text('1')),
@@ -1207,14 +1220,21 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       children: [
         TableRow(
           children: [
-            _tableHeaderCell('Дата и час изготовления блюда'),
-            _tableHeaderCell('Время снятия бракеража'),
-            _tableHeaderCell('Наименование готового блюда'),
-            _tableHeaderCell('Результаты органолептической оценки'),
-            _tableHeaderCell('Разрешение к реализации'),
-            _tableHeaderCell('Подписи членов бракеражной комиссии'),
-            _tableHeaderCell('Результаты взвешивания порционных блюд'),
-            _tableHeaderCell('Примечание'),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_dish_made_at',
+                'Дата и час изготовления блюда')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_brakerage_removed_at',
+                'Время снятия бракеража')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_dish_name_ready',
+                'Наименование готового блюда')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_organo_result',
+                'Результаты органолептической оценки')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_sale_allowed',
+                'Разрешение к реализации')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_brakerage_commission_sigs',
+                'Подписи членов бракеражной комиссии')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_portion_weighing',
+                'Результаты взвешивания порционных блюд')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_note', 'Примечание')),
           ],
         ),
         TableRow(
@@ -1256,17 +1276,21 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       children: [
         TableRow(
           children: [
-            _tableHeaderCell('Дата и час поступления'),
-            _tableHeaderCell('Наименование'),
-            _tableHeaderCell('Фасовка'),
-            _tableHeaderCell('Изготовитель/поставщик'),
-            _tableHeaderCell('Кол-во'),
-            _tableHeaderCell('№ документа'),
-            _tableHeaderCell('Органолептическая оценка'),
-            _tableHeaderCell('Условия хранения, срок реализации'),
-            _tableHeaderCell('Дата реализации'),
-            _tableHeaderCell('Подпись'),
-            _tableHeaderCell('Прим.'),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_received_at',
+                'Дата и час поступления')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_name', 'Наименование')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_packaging', 'Фасовка')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_manufacturer',
+                'Изготовитель/поставщик')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_qty_short', 'Кол-во')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_doc_no', '№ документа')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_organo_short',
+                'Органолептическая оценка')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_storage_shelf',
+                'Условия хранения, срок реализации')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_sale_date', 'Дата реализации')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_signature', 'Подпись')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_note_short', 'Прим.')),
           ],
         ),
         TableRow(
@@ -1384,13 +1408,18 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       children: [
         TableRow(
           children: [
-            _tableHeaderCell('№ п/п'),
-            _tableHeaderCell('Фамилия, имя, отчество'),
-            _tableHeaderCell('Должность'),
-            _tableHeaderCell('Номер медицинской книжки'),
-            _tableHeaderCell('Срок действия медицинской книжки'),
-            _tableHeaderCell('Расписка и дата получения медицинской книжки'),
-            _tableHeaderCell('Расписка и дата возврата медицинской книжки'),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_pp_no', '№ п/п')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_fio_full',
+                'Фамилия, имя, отчество')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_position', 'Должность')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_med_book_no',
+                'Номер медицинской книжки')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_med_book_valid',
+                'Срок действия медицинской книжки')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_med_book_receipt',
+                'Расписка и дата получения медицинской книжки')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_med_book_return',
+                'Расписка и дата возврата медицинской книжки')),
           ],
         ),
         TableRow(
@@ -1482,17 +1511,26 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       children: [
         TableRow(
           children: [
-            _tableHeaderCell('Дата'),
-            _tableHeaderCell('Время начала использования жира'),
-            _tableHeaderCell('Вид фритюрного жира'),
-            _tableHeaderCell('Органолептическая оценка на начало жарки'),
-            _tableHeaderCell('Тип жарочного оборудования'),
-            _tableHeaderCell('Вид продукции'),
-            _tableHeaderCell('Время окончания жарки'),
-            _tableHeaderCell('Органолептическая оценка по окончании жарки'),
-            _tableHeaderCell('Переходящий остаток, кг'),
-            _tableHeaderCell('Утилизированный жир, кг'),
-            _tableHeaderCell('Должность, Ф.И.О. контролера'),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_date', 'Дата')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_oil_use_start',
+                'Время начала использования жира')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_frying_fat_type',
+                'Вид фритюрного жира')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_organo_fry_start',
+                'Органолептическая оценка на начало жарки')),
+            _tableHeaderCell(
+                _th(loc, 'haccp_tbl_fryer_type', 'Тип жарочного оборудования')),
+            _tableHeaderCell(
+                _th(loc, 'haccp_tbl_product_type', 'Вид продукции')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_time_end', 'Время окончания жарки')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_organo_fry_end',
+                'Органолептическая оценка по окончании жарки')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_carry_remainder_kg',
+                'Переходящий остаток, кг')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_fat_disposed_kg',
+                'Утилизированный жир, кг')),
+            _tableHeaderCell(_th(loc, 'haccp_tbl_controller_fio_role',
+                'Должность, Ф.И.О. контролера')),
           ],
         ),
         TableRow(
@@ -1537,14 +1575,15 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Данные работника', style: Theme.of(context).textTheme.titleSmall),
+        Text(_th(loc, 'haccp_form_worker_data', 'Данные работника'),
+            style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 4),
         Padding(
           padding: const EdgeInsets.only(bottom: 8),
           child: _employeeSelectorDropdown(
             loc: loc,
             employees: _formEmployees,
-            label: 'Сотрудник',
+            label: _th(loc, 'haccp_form_pick_employee', 'Сотрудник'),
             onSelected: (e) {
               if (e != null) {
                 _setText(
@@ -1573,24 +1612,26 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           border: TableBorder.all(color: Theme.of(context).dividerColor),
           children: [
             TableRow(children: [
-              _tableHeaderCell('Ф. И. О.'),
-              _tableHeaderCell('Возраст (дата рождения)')
+              _tableHeaderCell(_th(loc, 'haccp_tbl_med_exam_fio', 'Ф. И. О.')),
+              _tableHeaderCell(_th(loc, 'haccp_tbl_age_dob',
+                  'Возраст (дата рождения)'))
             ]),
             TableRow(children: [
               _tableCell(_textField('med_exam_employee_name', 'Ф. И. О.')),
               _tableCell(_textField('med_exam_dob', 'Дата рождения'))
             ]),
             TableRow(children: [
-              _tableHeaderCell('Пол'),
-              _tableHeaderCell('Должность')
+              _tableHeaderCell(_th(loc, 'haccp_tbl_gender_short', 'Пол')),
+              _tableHeaderCell(_th(loc, 'haccp_tbl_position', 'Должность'))
             ]),
             TableRow(children: [
               _tableCell(_textField('med_exam_gender', 'Пол')),
               _tableCell(_textField('med_exam_position', 'Должность'))
             ]),
             TableRow(children: [
-              _tableHeaderCell('Структурное подразделение'),
-              _tableHeaderCell('Дата приёма на работу')
+              _tableHeaderCell(_th(loc, 'haccp_tbl_struct_unit',
+                  'Структурное подразделение')),
+              _tableHeaderCell(_th(loc, 'haccp_tbl_hire_date', 'Дата приёма на работу'))
             ]),
             TableRow(children: [
               _tableCell(_textField('med_exam_department', 'Подразделение')),
@@ -1600,7 +1641,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        Text('Медицинский осмотр',
+        Text(_th(loc, 'haccp_form_med_exam', 'Медицинский осмотр'),
             style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 4),
         Table(
@@ -1608,8 +1649,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           border: TableBorder.all(color: Theme.of(context).dividerColor),
           children: [
             TableRow(children: [
-              _tableHeaderCell('Вид (предварительный/периодический)'),
-              _tableHeaderCell('ЛПУ')
+              _tableHeaderCell(_th(loc, 'haccp_tbl_exam_kind',
+                  'Вид (предварительный/периодический)')),
+              _tableHeaderCell(_th(loc, 'haccp_tbl_lpu', 'ЛПУ'))
             ]),
             TableRow(children: [
               _tableCell(_textField('med_exam_type', 'Вид')),
@@ -1617,16 +1659,16 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   _textField('med_exam_institution', 'Лечебное учреждение'))
             ]),
             TableRow(children: [
-              _tableHeaderCell('Вредный фактор №90'),
-              _tableHeaderCell('Вредный фактор №83')
+              _tableHeaderCell(_th(loc, 'haccp_tbl_harmful_90', 'Вредный фактор №90')),
+              _tableHeaderCell(_th(loc, 'haccp_tbl_harmful_83', 'Вредный фактор №83'))
             ]),
             TableRow(children: [
               _tableCell(_textField('med_exam_harmful_1', '№ по приказу 90')),
               _tableCell(_textField('med_exam_harmful_2', '№ по приказу 83'))
             ]),
             TableRow(children: [
-              _tableHeaderCell('Дата прохождения'),
-              _tableHeaderCell('Заключение')
+              _tableHeaderCell(_th(loc, 'haccp_tbl_exam_pass_date', 'Дата прохождения')),
+              _tableHeaderCell(_th(loc, 'haccp_tbl_conclusion', 'Заключение'))
             ]),
             TableRow(children: [
               _tableCell(_datePickerCell('med_exam_date', _medExamDate,
@@ -1634,8 +1676,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               _tableCell(_textField('med_exam_conclusion', 'Заключение')),
             ]),
             TableRow(children: [
-              _tableHeaderCell('Решение работодателя'),
-              _tableHeaderCell('Дата следующего осмотра')
+              _tableHeaderCell(_th(loc, 'haccp_tbl_employer_decision',
+                  'Решение работодателя')),
+              _tableHeaderCell(_th(loc, 'haccp_tbl_next_exam_date',
+                  'Дата следующего осмотра'))
             ]),
             TableRow(children: [
               _tableCell(_textField('med_exam_employer_decision',
@@ -1644,8 +1688,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   (d) => setState(() => _medExamNextDate = d))),
             ]),
             TableRow(children: [
-              _tableHeaderCell('Дата исключения из списков'),
-              _tableHeaderCell('Примечание')
+              _tableHeaderCell(_th(loc, 'haccp_tbl_exclusion_date',
+                  'Дата исключения из списков')),
+              _tableHeaderCell(_th(loc, 'haccp_tbl_note', 'Примечание'))
             ]),
             TableRow(children: [
               _tableCell(_datePickerCell(
@@ -1683,7 +1728,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('Расчёт потребности в дезинфицирующих средствах',
+        Text(_th(loc, 'haccp_form_disinfect_need_title',
+                'Расчёт потребности в дезинфицирующих средствах'),
             style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 4),
         // Без фиксированной ширины Table внутри горизонтального scroll получает
@@ -1710,18 +1756,18 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               border: TableBorder.all(color: Theme.of(context).dividerColor),
               children: [
                 TableRow(children: [
-                  _tableHeaderCell('Объект'),
-                  _tableHeaderCell('Кол-во'),
-                  _tableHeaderCell('Площадь м²'),
-                  _tableHeaderCell('Вид Т/Г'),
-                  _tableHeaderCell('Кратность/мес'),
-                  _tableHeaderCell('Дезсредство'),
-                  _tableHeaderCell('Конц.%'),
-                  _tableHeaderCell('Расход/м²'),
-                  _tableHeaderCell('Раствор на 1 обр.'),
-                  _tableHeaderCell('Потребность 1 обр.'),
-                  _tableHeaderCell('В месяц'),
-                  _tableHeaderCell('В год'),
+                  _tableHeaderCell(_th(loc, 'haccp_tbl_object_short', 'Объект')),
+                  _tableHeaderCell(_th(loc, 'haccp_tbl_qty_short', 'Кол-во')),
+                  _tableHeaderCell(_th(loc, 'haccp_tbl_area_m2', 'Площадь м²')),
+                  _tableHeaderCell(_th(loc, 'haccp_tbl_tg_type', 'Вид Т/Г')),
+                  _tableHeaderCell(_th(loc, 'haccp_tbl_frequency_month', 'Кратность/мес')),
+                  _tableHeaderCell(_th(loc, 'haccp_tbl_disinfectant_short', 'Дезсредство')),
+                  _tableHeaderCell(_th(loc, 'haccp_tbl_conc_pct', 'Конц.%')),
+                  _tableHeaderCell(_th(loc, 'haccp_tbl_consumption_m2', 'Расход/м²')),
+                  _tableHeaderCell(_th(loc, 'haccp_tbl_solution_per_round', 'Раствор на 1 обр.')),
+                  _tableHeaderCell(_th(loc, 'haccp_tbl_need_1_round', 'Потребность 1 обр.')),
+                  _tableHeaderCell(_th(loc, 'haccp_tbl_per_month', 'В месяц')),
+                  _tableHeaderCell(_th(loc, 'haccp_tbl_per_year', 'В год')),
                 ]),
                 TableRow(children: [
                   _tableCell(_savedOptionTextField(
@@ -1766,7 +1812,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Text('Поступление дезинфицирующих средств',
+        Text(_th(loc, 'haccp_form_disinfect_receipt_title',
+                'Поступление дезинфицирующих средств'),
             style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 4),
         Table(
@@ -1781,12 +1828,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           border: TableBorder.all(color: Theme.of(context).dividerColor),
           children: [
             TableRow(children: [
-              _tableHeaderCell('Дата'),
-              _tableHeaderCell('Наименование'),
-              _tableHeaderCell('Счёт, дата'),
-              _tableHeaderCell('Кол-во'),
-              _tableHeaderCell('Срок годности'),
-              _tableHeaderCell('Ответственный')
+              _tableHeaderCell(_th(loc, 'haccp_tbl_date', 'Дата')),
+              _tableHeaderCell(_th(loc, 'haccp_tbl_name', 'Наименование')),
+              _tableHeaderCell(_th(loc, 'haccp_tbl_invoice_date', 'Счёт, дата')),
+              _tableHeaderCell(_th(loc, 'haccp_tbl_qty_short', 'Кол-во')),
+              _tableHeaderCell(_th(loc, 'haccp_tbl_expiry', 'Срок годности')),
+              _tableHeaderCell(_th(loc, 'haccp_tbl_responsible', 'Ответственный'))
             ]),
             TableRow(children: [
               _tableCell(_datePickerCell(
@@ -1832,16 +1879,16 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       border: TableBorder.all(color: Theme.of(context).dividerColor),
       children: [
         TableRow(children: [
-          _tableHeaderCell('Дата'),
-          _tableHeaderCell('Время мойки'),
-          _tableHeaderCell('Оборудование'),
-          _tableHeaderCell('Моющий раствор'),
-          _tableHeaderCell('Конц.%'),
-          _tableHeaderCell('Дез. раствор'),
-          _tableHeaderCell('Конц.%'),
-          _tableHeaderCell('Ополаскивание t°'),
-          _tableHeaderCell('Ф.И.О. мойщика'),
-          _tableHeaderCell('Контроль'),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_date', 'Дата')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_wash_time', 'Время мойки')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_equipment', 'Оборудование')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_cleaning_solution', 'Моющий раствор')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_conc_pct', 'Конц.%')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_disinfect_solution', 'Дез. раствор')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_conc_pct', 'Конц.%')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_rinse_temp', 'Ополаскивание t°')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_washer_fio', 'Ф.И.О. мойщика')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_controller', 'Контроль')),
         ]),
         TableRow(children: [
           _tableCell(Text(DateFormat('dd.MM.yyyy').format(DateTime.now()))),
@@ -1885,10 +1932,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       border: TableBorder.all(color: Theme.of(context).dividerColor),
       children: [
         TableRow(children: [
-          _tableHeaderCell('№'),
-          _tableHeaderCell('Помещение / зона'),
-          _tableHeaderCell('Дата проведения'),
-          _tableHeaderCell('Ответственный')
+          _tableHeaderCell(_th(loc, 'haccp_tbl_no_short', '№')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_room_zone', 'Помещение / зона')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_gen_clean_date', 'Дата проведения')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_responsible', 'Ответственный'))
         ]),
         TableRow(children: [
           _tableCell(const Text('1')),
@@ -1919,12 +1966,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       border: TableBorder.all(color: Theme.of(context).dividerColor),
       children: [
         TableRow(children: [
-          _tableHeaderCell('№ сита/магнита'),
-          _tableHeaderCell('Наименование / Расположение'),
-          _tableHeaderCell('Состояние'),
-          _tableHeaderCell('Дата очистки'),
-          _tableHeaderCell('ФИО, Подпись'),
-          _tableHeaderCell('Комментарии')
+          _tableHeaderCell(_th(loc, 'haccp_tbl_sieve_magnet_no', '№ сита/магнита')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_name_location', 'Наименование / Расположение')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_condition', 'Состояние')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_cleaning_date', 'Дата очистки')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_fio_signature', 'ФИО, Подпись')),
+          _tableHeaderCell(_th(loc, 'haccp_tbl_comments', 'Комментарии'))
         ]),
         TableRow(children: [
           _tableCell(_textField('sieve_no', '№')),
@@ -2054,9 +2101,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               final row = _healthRows[i];
               final emp = _healthEmployeeById(row.employeeId);
               final name = emp != null
-                  ? (emp.surname != null
-                      ? '${emp.surname} ${emp.fullName}'
-                      : emp.fullName)
+                  ? loc.displayPersonNameForLanguage(
+                      employeeFullNameRaw(emp), loc.currentLanguageCode)
                   : '—';
               return Card(
                 margin: const EdgeInsets.only(bottom: 10),

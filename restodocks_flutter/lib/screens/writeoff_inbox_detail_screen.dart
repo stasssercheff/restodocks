@@ -7,6 +7,7 @@ import '../models/models.dart';
 import '../services/services.dart';
 import '../services/inventory_download.dart';
 import '../services/screen_layout_preference_service.dart';
+import '../utils/employee_display_utils.dart';
 import '../utils/translit_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 
@@ -23,6 +24,7 @@ class WriteoffInboxDetailScreen extends StatefulWidget {
 
 class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
   Map<String, dynamic>? _doc;
+  Employee? _authorEmployee;
   bool _loading = true;
   String? _error;
 
@@ -50,20 +52,33 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
     return fallback;
   }
 
-  String _headerEmployee(String raw, bool translit) {
-    if (raw == '—') return raw;
-    return translit ? cyrillicToLatin(raw) : raw;
-  }
-
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _error = null;
     });
+    final acc = context.read<AccountManagerSupabase>();
     final doc = await InventoryDocumentService().getById(widget.documentId);
+    Employee? author;
+    if (doc != null && mounted) {
+      final empId = doc['created_by_employee_id']?.toString();
+      final estId = doc['establishment_id']?.toString();
+      if (empId != null && estId != null) {
+        try {
+          final emps = await acc.getEmployeesForEstablishment(estId);
+          for (final e in emps) {
+            if (e.id == empId) {
+              author = e;
+              break;
+            }
+          }
+        } catch (_) {}
+      }
+    }
     if (!mounted) return;
     setState(() {
       _doc = doc;
+      _authorEmployee = author;
       _loading = false;
       if (doc == null)
         _error = context.read<LocalizationService>().t('document_not_found');
@@ -243,15 +258,29 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
         .map((e) => e as Map<String, dynamic>)
         .toList();
     final store = context.watch<ProductStoreSupabase>();
-    final translit =
-        context.watch<ScreenLayoutPreferenceService>().showNameTranslit;
+    final acc = context.watch<AccountManagerSupabase>();
+    final layoutPrefs = context.watch<ScreenLayoutPreferenceService>();
+    final useTranslit =
+        loc.currentLanguageCode != 'ru' || layoutPrefs.showNameTranslit;
     final lang = loc.currentLanguageCode;
     rows.sort((a, b) => _localizedRowProductName(a, lang, store)
         .toLowerCase()
         .compareTo(_localizedRowProductName(b, lang, store).toLowerCase()));
     final comment = payload['comment']?.toString();
-    final empHeader =
-        _headerEmployee(header['employeeName']?.toString() ?? '—', translit);
+    final rawEmp = header['employeeName']?.toString() ?? '—';
+    final String empHeader;
+    if (_authorEmployee != null) {
+      empHeader = employeeNameWithPositionLine(
+        _authorEmployee!,
+        loc,
+        establishment: acc.establishment,
+        translit: useTranslit,
+      );
+    } else if (rawEmp == '—') {
+      empHeader = rawEmp;
+    } else {
+      empHeader = useTranslit ? cyrillicToLatin(rawEmp) : rawEmp;
+    }
 
     return Scaffold(
       appBar: AppBar(

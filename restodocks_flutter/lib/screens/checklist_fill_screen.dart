@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../utils/employee_display_utils.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -401,7 +402,10 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                 children: [
                   _buildHeader(loc, emp, c),
                   const SizedBox(height: 24),
-                  _buildTableHeader(loc, cfg),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: _buildTableHeader(loc, cfg),
+                  ),
                   const Divider(height: 24),
                   ...List.generate(c.items.length, (i) => _buildRow(loc, c, cfg, i)),
                   const SizedBox(height: 24),
@@ -464,9 +468,21 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(emp?.fullName ?? '—', style: Theme.of(context).textTheme.bodyLarge),
-            Text(loc.t('department') ?? 'Отдел: ${emp?.department ?? '—'}', style: Theme.of(context).textTheme.bodySmall),
-            Text(loc.t('role') ?? 'Должность: ${emp?.primaryRole?.displayName ?? '—'}', style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              emp != null
+                  ? loc.displayPersonNameForLanguage(
+                      employeeFullNameRaw(emp), loc.currentLanguageCode)
+                  : '—',
+              style: Theme.of(context).textTheme.bodyLarge,
+            ),
+            Text(
+              '${loc.t('department')}: ${emp?.department ?? '—'}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            Text(
+              '${loc.t('role')}: ${emp != null && emp.roles.isNotEmpty ? loc.roleDisplayName(emp.roles.first) : '—'}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
             if (emp?.department == 'kitchen' && emp?.section != null)
               Text('${loc.t('kitchen_section') ?? 'Цех'}: ${KitchenSection.fromCode(emp!.section!)?.displayName ?? emp.section}', style: Theme.of(context).textTheme.bodySmall),
             if (checklist.deadlineAt != null || checklist.scheduledForAt != null) ...[
@@ -494,8 +510,11 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     if (cfg.hasNumeric) {
       children.add(SizedBox(
           width: 86,
-          child: Text(loc.t('checklist_action_numeric') ?? 'Цифра',
-              style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
+          child: Center(
+            child: Text(loc.t('checklist_action_numeric'),
+                style: Theme.of(context).textTheme.labelLarge,
+                textAlign: TextAlign.center),
+          )));
     }
     if (cfg.dropdownOptions != null && cfg.dropdownOptions!.isNotEmpty) {
       children.add(SizedBox(
@@ -507,10 +526,12 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
       children.add(
         SizedBox(
           width: statusWidth,
-          child: Text(
-            loc.t('checklist_status') ?? 'Статус',
-            style: Theme.of(context).textTheme.labelLarge,
-            textAlign: TextAlign.center,
+          child: Center(
+            child: Text(
+              loc.t('checklist_status'),
+              style: Theme.of(context).textTheme.labelLarge,
+              textAlign: TextAlign.center,
+            ),
           ),
         ),
       );
@@ -628,8 +649,10 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
             if (cfg.hasToggle)
               SizedBox(
                 width: statusWidth,
-                child: ClipRect(
+                child: Center(
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Checkbox(
@@ -645,7 +668,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                           });
                         },
                       ),
-                      Expanded(
+                      Flexible(
                         child: Text(
                           done
                               ? (loc.t('done') ?? 'Сделано')
