@@ -8,17 +8,23 @@ import 'package:restodocks/core/supabase_url_resolver_stub.dart'
 
 /// POST к Edge Function с retry при 5xx/сети (proxy/ EarlyDrop).
 /// 4xx не retry. Возвращает (status, data).
+///
+/// [bearerAlwaysAnon] — всегда Bearer = anon (например register-metadata до входа;
+/// иначе протухший JWT в сессии даёт 401 на Edge).
 Future<({int status, Map<String, dynamic>? data})> postEdgeFunctionWithRetry(
   String functionPath,
   Map<String, dynamic> body, {
   int maxRetries = 3,
   List<int> retryDelays = const [500, 1000],
+  bool bearerAlwaysAnon = false,
 }) async {
   final url = '${supabase_url.getSupabaseBaseUrl()}/functions/v1/$functionPath';
   final sessionToken = Supabase.instance.client.auth.currentSession?.accessToken;
-  final authBearer = (sessionToken != null && sessionToken.isNotEmpty)
-      ? sessionToken
-      : kSupabaseAnonKeyFromEnvironment;
+  final authBearer = bearerAlwaysAnon
+      ? kSupabaseAnonKeyFromEnvironment
+      : ((sessionToken != null && sessionToken.isNotEmpty)
+          ? sessionToken
+          : kSupabaseAnonKeyFromEnvironment);
   final dio = Dio(BaseOptions(
     headers: {
       'apikey': kSupabaseAnonKeyFromEnvironment,

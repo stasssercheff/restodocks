@@ -409,6 +409,7 @@ class AccountManagerSupabase extends ChangeNotifier {
             'register-metadata',
             {'establishment_id': establishmentId},
             maxRetries: 1,
+            bearerAlwaysAnon: true,
           );
         } catch (_) {}
       })(),
