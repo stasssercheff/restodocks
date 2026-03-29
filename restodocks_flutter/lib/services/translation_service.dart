@@ -287,16 +287,52 @@ class TranslationService {
   }
 
 
+  /// Сколько ТТК потребуют вызова [translate] в [ensureMissingTechCardDishNameTranslations]
+  /// (после учёта строк из БД в [existingFromDatabase]).
+  static int countTechCardsNeedingDishNameTranslation({
+    required List<TechCard> techCards,
+    required String targetLanguage,
+    required Map<String, String> existingFromDatabase,
+  }) {
+    if (techCards.isEmpty || targetLanguage == 'ru') return 0;
+    final out = existingFromDatabase;
+    var n = 0;
+    for (final tc in techCards) {
+      if (_needsDishNameFill(tc, targetLanguage, out)) n++;
+    }
+    return n;
+  }
+
+  static bool _needsDishNameFill(
+    TechCard tc,
+    String targetLanguage,
+    Map<String, String> out,
+  ) {
+    final loc = tc.dishNameLocalized;
+    if (loc != null) {
+      final direct = loc[targetLanguage]?.trim();
+      if (direct != null && direct.isNotEmpty) return false;
+    }
+    final o = out[tc.id]?.trim();
+    if (o != null && o.isNotEmpty) return false;
+    return true;
+  }
+
   /// Переводы названий ТТК из таблицы [translations] для целевого языка (пакетно, без N+1).
   /// При нескольких строках на один [entity_id] берётся первая непустая [translated_text].
   Future<Map<String, String>> fetchTechCardDishNameTranslationsForTargetLanguage({
     required List<String> techCardIds,
     required String targetLanguage,
+    void Function(int doneChunks, int totalChunks)? onChunkProgress,
   }) async {
     final out = <String, String>{};
     if (techCardIds.isEmpty) return out;
     const chunkSize = 90;
+    final totalChunks = (techCardIds.length + chunkSize - 1) ~/ chunkSize;
+    var chunkIndex = 0;
     for (var i = 0; i < techCardIds.length; i += chunkSize) {
+      chunkIndex++;
+      onChunkProgress?.call(chunkIndex, totalChunks);
       final end = (i + chunkSize > techCardIds.length)
           ? techCardIds.length
           : i + chunkSize;
@@ -334,21 +370,13 @@ class TranslationService {
     required List<TechCard> techCards,
     required String targetLanguage,
     required Map<String, String> existingFromDatabase,
+    void Function(int done, int total)? onProgress,
   }) async {
     final out = Map<String, String>.from(existingFromDatabase);
     if (techCards.isEmpty) return out;
     if (targetLanguage == 'ru') return out;
 
-    bool needsFill(TechCard tc) {
-      final loc = tc.dishNameLocalized;
-      if (loc != null) {
-        final direct = loc[targetLanguage]?.trim();
-        if (direct != null && direct.isNotEmpty) return false;
-      }
-      final o = out[tc.id]?.trim();
-      if (o != null && o.isNotEmpty) return false;
-      return true;
-    }
+    bool needsFill(TechCard tc) => _needsDishNameFill(tc, targetLanguage, out);
 
     String inferSourceLang(String text) {
       final t = text.trim();
@@ -364,8 +392,15 @@ class TranslationService {
     }
     if (byId.isEmpty) return out;
 
-    const batch = 5;
     final todo = byId.values.toList();
+    final totalTodo = todo.length;
+    var done = 0;
+    void bump() {
+      done++;
+      onProgress?.call(done, totalTodo);
+    }
+
+    const batch = 5;
     for (var i = 0; i < todo.length; i += batch) {
       final end = (i + batch > todo.length) ? todo.length : i + batch;
       final chunk = todo.sublist(i, end);
@@ -375,7 +410,9 @@ class TranslationService {
           final source = (rawRu != null && rawRu.isNotEmpty)
               ? rawRu
               : tc.dishName.trim();
-          if (source.isEmpty) return;
+          if (source.isEmpty) {
+            return;
+          }
           final from = inferSourceLang(source);
           if (from == targetLanguage) {
             out[tc.id] = source;
@@ -395,6 +432,8 @@ class TranslationService {
           }
         } catch (e) {
           devLog('[TranslationService] ensureMissing TTK ${tc.id}: $e');
+        } finally {
+          bump();
         }
       }));
     }

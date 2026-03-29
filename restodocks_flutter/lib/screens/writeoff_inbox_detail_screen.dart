@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 import '../services/inventory_download.dart';
+import '../services/screen_layout_preference_service.dart';
+import '../utils/translit_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Просмотр списания из входящих.
@@ -15,7 +17,8 @@ class WriteoffInboxDetailScreen extends StatefulWidget {
   final String documentId;
 
   @override
-  State<WriteoffInboxDetailScreen> createState() => _WriteoffInboxDetailScreenState();
+  State<WriteoffInboxDetailScreen> createState() =>
+      _WriteoffInboxDetailScreenState();
 }
 
 class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
@@ -27,6 +30,29 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
   void initState() {
     super.initState();
     _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<ProductStoreSupabase>().loadProducts(force: true);
+    });
+  }
+
+  String _localizedRowProductName(
+    Map<String, dynamic> r,
+    String lang,
+    ProductStoreSupabase store,
+  ) {
+    final pid = r['productId']?.toString() ?? '';
+    final fallback = r['productName']?.toString() ?? '';
+    if (pid.isEmpty || pid.startsWith('pf_')) return fallback;
+    for (final p in store.allProducts) {
+      if (p.id == pid) return p.getLocalizedName(lang);
+    }
+    return fallback;
+  }
+
+  String _headerEmployee(String raw, bool translit) {
+    if (raw == '—') return raw;
+    return translit ? cyrillicToLatin(raw) : raw;
   }
 
   Future<void> _load() async {
@@ -39,7 +65,8 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
     setState(() {
       _doc = doc;
       _loading = false;
-      if (doc == null) _error = context.read<LocalizationService>().t('document_not_found');
+      if (doc == null)
+        _error = context.read<LocalizationService>().t('document_not_found');
     });
     if (doc != null) {
       final estId = context.read<AccountManagerSupabase>().establishment?.id;
@@ -114,19 +141,23 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
       final bytes = _buildExcelBytes(payload, result);
       if (bytes != null && bytes.isNotEmpty) {
         final header = payload['header'] as Map<String, dynamic>? ?? {};
-        final date = header['date'] ?? DateTime.now().toIso8601String().split('T').first;
+        final date =
+            header['date'] ?? DateTime.now().toIso8601String().split('T').first;
         final cat = payload['category']?.toString() ?? 'writeoff';
         await saveFileBytes('writeoff_${cat}_$date.xlsx', bytes);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
+            SnackBar(
+                content: Text(
+                    loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         final loc = context.read<LocalizationService>();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('error') ?? 'Ошибка'}: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${loc.t('error') ?? 'Ошибка'}: $e')));
       }
     }
   }
@@ -145,22 +176,28 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
         TextCellValue(loc.t('inventory_excel_total') ?? 'Количество'),
       ]);
       rows = rows.map((e) => e as Map<String, dynamic>).toList();
-      rows.sort((a, b) => (a['productName']?.toString() ?? '').compareTo(b['productName']?.toString() ?? ''));
-      final lang = loc.currentLanguageCode;
+      final store = context.read<ProductStoreSupabase>();
+      rows.sort((a, b) => _localizedRowProductName(a, saveLang, store)
+          .toLowerCase()
+          .compareTo(
+              _localizedRowProductName(b, saveLang, store).toLowerCase()));
       for (var i = 0; i < rows.length; i++) {
         final r = rows[i];
         final unitRaw = (r['unit']?.toString() ?? 'g').trim().toLowerCase();
         sheet.appendRow([
           IntCellValue(i + 1),
-          TextCellValue(r['productName']?.toString() ?? ''),
-          TextCellValue(CulinaryUnits.displayName(unitRaw, lang)),
+          TextCellValue(_localizedRowProductName(r, saveLang, store)),
+          TextCellValue(CulinaryUnits.displayName(unitRaw, saveLang)),
           DoubleCellValue((r['total'] as num?)?.toDouble() ?? 0),
         ]);
       }
       final comment = payload['comment']?.toString();
       if (comment != null && comment.isNotEmpty) {
         sheet.appendRow([]);
-        sheet.appendRow([TextCellValue(loc.t('writeoff_comment') ?? 'Комментарий'), TextCellValue(comment)]);
+        sheet.appendRow([
+          TextCellValue(loc.t('writeoff_comment') ?? 'Комментарий'),
+          TextCellValue(comment)
+        ]);
       }
       excel.setDefaultSheet('Списание');
       return excel.encode();
@@ -188,9 +225,12 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_error ?? loc.t('document_not_found'), style: TextStyle(color: theme.colorScheme.error)),
+              Text(_error ?? loc.t('document_not_found'),
+                  style: TextStyle(color: theme.colorScheme.error)),
               const SizedBox(height: 16),
-              FilledButton(onPressed: () => context.pop(), child: Text(loc.t('back') ?? 'Назад')),
+              FilledButton(
+                  onPressed: () => context.pop(),
+                  child: Text(loc.t('back') ?? 'Назад')),
             ],
           ),
         ),
@@ -199,9 +239,19 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
 
     final payload = _doc!['payload'] as Map<String, dynamic>? ?? {};
     final header = payload['header'] as Map<String, dynamic>? ?? {};
-    var rows = (payload['rows'] as List<dynamic>? ?? []).map((e) => e as Map<String, dynamic>).toList();
-    rows.sort((a, b) => (a['productName']?.toString() ?? '').compareTo(b['productName']?.toString() ?? ''));
+    var rows = (payload['rows'] as List<dynamic>? ?? [])
+        .map((e) => e as Map<String, dynamic>)
+        .toList();
+    final store = context.watch<ProductStoreSupabase>();
+    final translit =
+        context.watch<ScreenLayoutPreferenceService>().showNameTranslit;
+    final lang = loc.currentLanguageCode;
+    rows.sort((a, b) => _localizedRowProductName(a, lang, store)
+        .toLowerCase()
+        .compareTo(_localizedRowProductName(b, lang, store).toLowerCase()));
     final comment = payload['comment']?.toString();
+    final empHeader =
+        _headerEmployee(header['employeeName']?.toString() ?? '—', translit);
 
     return Scaffold(
       appBar: AppBar(
@@ -220,15 +270,18 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _headerRow(loc.t('inventory_establishment'), header['establishmentName'] ?? '—'),
-            _headerRow(loc.t('inventory_employee'), header['employeeName'] ?? '—'),
+            _headerRow(loc.t('inventory_establishment'),
+                header['establishmentName'] ?? '—'),
+            _headerRow(loc.t('inventory_employee'), empHeader),
             _headerRow(loc.t('inventory_date'), header['date'] ?? '—'),
-            _headerRow(loc.t('writeoffs') ?? 'Списания', _categoryName(loc, payload['category']?.toString())),
+            _headerRow(loc.t('writeoffs') ?? 'Списания',
+                _categoryName(loc, payload['category']?.toString())),
             if (comment != null && comment.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text(
                 loc.t('writeoff_comment') ?? 'Комментарий',
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
               Text(comment, style: theme.textTheme.bodyMedium),
@@ -249,7 +302,8 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
               },
               children: [
                 TableRow(
-                  decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest),
+                  decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest),
                   children: [
                     _cell(theme, '#', bold: true),
                     _cell(theme, loc.t('inventory_item_name'), bold: true),
@@ -259,12 +313,13 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
                 ),
                 ...rows.asMap().entries.map((e) {
                   final r = e.value;
-                  final unitRaw = (r['unit']?.toString() ?? 'g').trim().toLowerCase();
+                  final unitRaw =
+                      (r['unit']?.toString() ?? 'g').trim().toLowerCase();
                   return TableRow(
                     children: [
                       _cell(theme, '${e.key + 1}'),
-                      _cell(theme, r['productName']?.toString() ?? ''),
-                      _cell(theme, CulinaryUnits.displayName(unitRaw, loc.currentLanguageCode)),
+                      _cell(theme, _localizedRowProductName(r, lang, store)),
+                      _cell(theme, CulinaryUnits.displayName(unitRaw, lang)),
                       _cell(theme, _fmt(r['total'])),
                     ],
                   );
@@ -285,7 +340,8 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
         children: [
           SizedBox(
             width: 140,
-            child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(label,
+                style: const TextStyle(fontWeight: FontWeight.w600)),
           ),
           Expanded(child: Text(value)),
         ],
@@ -298,14 +354,18 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Text(
         text,
-        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: bold ? FontWeight.w600 : null),
+        style: theme.textTheme.bodyMedium
+            ?.copyWith(fontWeight: bold ? FontWeight.w600 : null),
       ),
     );
   }
 
   String _fmt(dynamic v) {
     if (v == null) return '—';
-    if (v is num) return v == v.truncateToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
+    if (v is num)
+      return v == v.truncateToDouble()
+          ? v.toInt().toString()
+          : v.toStringAsFixed(1);
     return v.toString();
   }
 }

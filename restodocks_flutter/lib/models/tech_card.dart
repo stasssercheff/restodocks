@@ -4,46 +4,74 @@ import 'tt_ingredient.dart';
 
 /// Технологическая карта (ТТК)
 class TechCard extends Equatable {
-  /// Подписи из таблицы `translations` (целевой язык) для [id] — выставляется после пакетной загрузки.
-  static Map<String, String> _translationOverlayByCardId = {};
+  /// Оверлей: язык UI → id ТТК → переведённое название (несколько языков хранятся одновременно).
+  static final Map<String, Map<String, String>> _translationOverlayByLang = {};
 
-  /// Оверлей переводов из `translations` (по id ТТК).
-  /// [merge] true — дополняет и перезаписывает совпадающие id, **не удаляя** переводы
-  /// для других карточек. Иначе открытие списка ТТК после главной затирало оверлей
-  /// неполным подмножеством id и ломало названия.
-  static void setTranslationOverlay(Map<String, String> map, {bool merge = true}) {
+  /// Завершён полный прогрев для пары заведение + язык (сессия + диск).
+  static final Map<String, Set<String>> _warmedLanguagesByEstablishment = {};
+
+  /// [languageCode] — целевой язык слоя (en, ru, …). Другие языки не трогаем.
+  static void setTranslationOverlay(
+    Map<String, String> map, {
+    required String languageCode,
+    bool merge = true,
+  }) {
     if (map.isEmpty && merge) return;
+    final bucket =
+        _translationOverlayByLang.putIfAbsent(languageCode, () => {});
     if (merge) {
-      _translationOverlayByCardId = {..._translationOverlayByCardId, ...map};
+      bucket.addAll(map);
     } else {
-      _translationOverlayByCardId = Map<String, String>.from(map);
+      _translationOverlayByLang[languageCode] = Map<String, String>.from(map);
     }
   }
 
-  /// Копия оверлея для догрузки переводов (без изменения кэша).
-  static Map<String, String> snapshotTranslationOverlay() =>
-      Map<String, String>.from(_translationOverlayByCardId);
+  /// Текущий слой для языка (для ensureMissing и т.п.).
+  static Map<String, String> snapshotTranslationOverlay(String languageCode) =>
+      Map<String, String>.from(_translationOverlayByLang[languageCode] ?? {});
 
-  /// Уже выполнен полный цикл «БД + при необходимости API» для этого заведения и языка UI.
-  static String? _overlaySessionDataEstablishmentId;
-  static String? _overlaySessionLang;
+  /// Сериализация для SharedPreferences.
+  static Map<String, Map<String, String>> exportTranslationOverlays() {
+    return _translationOverlayByLang.map(
+      (k, v) => MapEntry(k, Map<String, String>.from(v)),
+    );
+  }
+
+  static void importTranslationOverlays(
+    Map<String, Map<String, String>> data, {
+    bool merge = true,
+  }) {
+    for (final e in data.entries) {
+      setTranslationOverlay(e.value, languageCode: e.key, merge: merge);
+    }
+  }
+
+  static void restoreWarmedLanguages(
+      String dataEstablishmentId, Set<String> langs) {
+    _warmedLanguagesByEstablishment[dataEstablishmentId.trim()] =
+        Set<String>.from(langs);
+  }
+
+  static Set<String> exportWarmedLanguages(String dataEstablishmentId) =>
+      Set<String>.from(
+        _warmedLanguagesByEstablishment[dataEstablishmentId.trim()] ?? {});
 
   static bool translationOverlaySessionMatches(
       String dataEstablishmentId, String lang) {
-    return _overlaySessionDataEstablishmentId == dataEstablishmentId &&
-        _overlaySessionLang == lang;
+    return _warmedLanguagesByEstablishment[dataEstablishmentId.trim()]
+            ?.contains(lang) ??
+        false;
   }
 
   static void markTranslationOverlaySession(
       String dataEstablishmentId, String lang) {
-    _overlaySessionDataEstablishmentId = dataEstablishmentId;
-    _overlaySessionLang = lang;
+    final id = dataEstablishmentId.trim();
+    _warmedLanguagesByEstablishment.putIfAbsent(id, () => {}).add(lang);
   }
 
   static void clearTranslationOverlay() {
-    _translationOverlayByCardId = {};
-    _overlaySessionDataEstablishmentId = null;
-    _overlaySessionLang = null;
+    _translationOverlayByLang.clear();
+    _warmedLanguagesByEstablishment.clear();
   }
 
   final String id;
@@ -242,7 +270,8 @@ class TechCard extends Equatable {
       final exact = localized[languageCode]?.trim();
       if (exact != null && exact.isNotEmpty) return exact;
     }
-    final table = (translationTableOverride ?? _translationOverlayByCardId[id])
+    final table = (translationTableOverride ??
+            _translationOverlayByLang[languageCode]?[id])
         ?.trim();
     if (table != null && table.isNotEmpty) return table;
     // Fallback to any existing translation before raw base name.
@@ -302,7 +331,8 @@ class TechCard extends Equatable {
   static String pfLinkedIngredientDisplayName(TTIngredient ing, String languageCode) {
     final sid = ing.sourceTechCardId?.trim();
     if (sid == null || sid.isEmpty) return ing.productName.trim();
-    final fromOverlay = _translationOverlayByCardId[sid]?.trim();
+    final fromOverlay =
+        _translationOverlayByLang[languageCode]?[sid]?.trim();
     final base = (fromOverlay != null && fromOverlay.isNotEmpty)
         ? fromOverlay
         : (ing.sourceTechCardName ?? ing.productName).trim();

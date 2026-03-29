@@ -983,17 +983,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           leading: Text(language['flag']!,
                               style: const TextStyle(fontSize: 24)),
                           title: Text(language['name']!),
-                          onTap: () async {
+                          onTap: () {
                             final code = language['code']!;
-                            await localization.setLocale(Locale(code));
-                            if (ctx.mounted) {
-                              await ctx
+                            Navigator.of(ctx, rootNavigator: true).pop();
+                            scheduleMicrotask(() async {
+                              await localization.setLocale(Locale(code));
+                              if (!context.mounted) return;
+                              await context
                                   .read<AccountManagerSupabase>()
                                   .savePreferredLanguage(code);
-                              Navigator.of(ctx).pop();
-                              // Фоновые переводы продуктов и названий ТТК под выбранный язык (DeepL)
+                              if (!context.mounted) return;
                               _translateMissingForLanguage(context, code);
-                            }
+                            });
                           },
                         );
                       }).toList(),
@@ -2303,7 +2304,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 leading: const Icon(Icons.menu_book),
                 title: Text(localization.t('documentation') ?? 'Документация'),
-                subtitle: const Text('Законы, бланки и приказы по ПЭП'),
+                subtitle: Text(localization.t('documentation_haccp_subtitle')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/haccp-documentation'),
               ),

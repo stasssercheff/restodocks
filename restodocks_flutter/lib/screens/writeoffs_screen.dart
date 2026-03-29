@@ -8,6 +8,7 @@ import '../mixins/auto_save_mixin.dart';
 import '../models/models.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
+import '../utils/employee_display_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 
 String _unitDisplay(String? unit, String lang) {
@@ -380,6 +381,7 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
       category: cat,
       rows: rows,
       lang: lang,
+      loc: loc,
     );
     if (comment.isNotEmpty) {
       payload['comment'] = comment;
@@ -428,10 +430,12 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     required WriteoffCategory category,
     required List<_WriteoffRow> rows,
     required String lang,
+    required LocalizationService loc,
   }) {
     final header = {
       'establishmentName': establishment.name,
-      'employeeName': employee.fullName,
+      'employeeName':
+          employeeNameWithPositionLine(employee, loc, establishment: establishment),
       'department': employee.department,
       'date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
       'timeEnd': DateFormat('HH:mm').format(DateTime.now()),

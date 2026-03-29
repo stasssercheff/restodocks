@@ -17,7 +17,6 @@ import 'core/initial_location_stub.dart'
     if (dart.library.html) 'core/initial_location_web.dart' as initial_loc;
 import 'core/supabase_url_resolver_stub.dart'
     if (dart.library.html) 'core/supabase_url_resolver_web.dart' as supabase_url;
-import 'models/models.dart';
 import 'services/services.dart';
 import 'services/translation_manager.dart';
 import 'widgets/widgets.dart';
@@ -76,10 +75,7 @@ Future<void> _bootstrapApp() async {
   await AccountManagerSupabase().initialize();
   await LocalizationService.initialize();
 
-  LocalizationService.onBeforeLocaleChanged = () {
-    TechCard.clearTranslationOverlay();
-    EstablishmentDataWarmupService.instance.markTranslationsStale();
-  };
+  // Оверлей переводов ТТК не сбрасываем при смене языка — слои по языкам копятся локально; догрузка — в onAfterLocaleChanged.
   LocalizationService.onAfterLocaleChanged = () async {
     final acc = AccountManagerSupabase();
     final est = acc.establishment;

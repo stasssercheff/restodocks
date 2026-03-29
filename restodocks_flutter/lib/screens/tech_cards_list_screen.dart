@@ -25,6 +25,7 @@ import '../services/services.dart';
 import '../services/excel_export_service.dart';
 import '../services/tech_card_cost_hydrator.dart';
 import '../services/tech_card_nutrition_hydrator.dart';
+import '../services/tech_card_translation_cache.dart';
 
 enum _TtkImportMode { single, multi }
 
@@ -52,6 +53,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   /// Полный цикл перевода названий (API) — показываем прогресс, кроме русского UI.
   bool _translationNamesLoading = false;
+
+  /// Детерминированный прогресс: [0..total] шагов (чанки БД + добор переводов).
+  int _translationProgressDone = 0;
+  int _translationProgressTotal = 0;
 
   /// Чтобы при смене языка перезапустить оверлей без повторного открытия экрана.
   String? _prefetchListenerLang;
@@ -82,6 +87,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     if (dataEstId.isEmpty) return;
     final lang = context.read<LocalizationService>().currentLanguageCode;
 
+    await TechCardTranslationCache.loadForEstablishment(dataEstId);
+
     // Уже был полный прогрев для этого заведения и языка — не гоняем пачку API при каждом _load.
     if (TechCard.translationOverlaySessionMatches(dataEstId, lang)) {
       await _refreshTechCardNameOverlayAfterWarmSession(
@@ -91,31 +98,80 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
     final showProgress = lang != 'ru';
     if (showProgress && mounted) {
-      setState(() => _translationNamesLoading = true);
+      setState(() {
+        _translationNamesLoading = true;
+        _translationProgressDone = 0;
+        _translationProgressTotal = 1;
+      });
     }
     try {
       final ts = context.read<TranslationService>();
       final ids = _techCardIdsForTranslationOverlay(allEstablishmentCards);
+      const chunkSize = 90;
+      final totalChunks =
+          ids.isEmpty ? 0 : (ids.length + chunkSize - 1) ~/ chunkSize;
+      final preMissing =
+          TranslationService.countTechCardsNeedingDishNameTranslation(
+        techCards: allEstablishmentCards,
+        targetLanguage: lang,
+        existingFromDatabase: {},
+      );
+      var totalWork = totalChunks + preMissing;
+      var done = 0;
+
+      void reportProgress() {
+        if (!mounted || !showProgress) return;
+        setState(() {
+          _translationProgressDone = done;
+          _translationProgressTotal = totalWork;
+        });
+      }
+
       final fromDb = await ts.fetchTechCardDishNameTranslationsForTargetLanguage(
         techCardIds: ids,
         targetLanguage: lang,
+        onChunkProgress: (chunkDone, chunkTotal) {
+          done = chunkDone;
+          totalWork = chunkTotal + preMissing;
+          reportProgress();
+        },
       );
       if (!mounted) return;
-      TechCard.setTranslationOverlay(fromDb, merge: true);
-      final base = TechCard.snapshotTranslationOverlay();
+      done = totalChunks;
+      final missingAfter =
+          TranslationService.countTechCardsNeedingDishNameTranslation(
+        techCards: allEstablishmentCards,
+        targetLanguage: lang,
+        existingFromDatabase: fromDb,
+      );
+      totalWork = totalChunks + missingAfter;
+      reportProgress();
+
+      TechCard.setTranslationOverlay(fromDb, languageCode: lang, merge: true);
+      final base = TechCard.snapshotTranslationOverlay(lang);
       final map = await ts.ensureMissingTechCardDishNameTranslations(
         techCards: allEstablishmentCards,
         targetLanguage: lang,
         existingFromDatabase: base,
+        onProgress: (d, t) {
+          done = totalChunks + d;
+          totalWork = totalChunks + t;
+          reportProgress();
+        },
       );
       if (!mounted) return;
-      TechCard.setTranslationOverlay(map, merge: true);
+      TechCard.setTranslationOverlay(map, languageCode: lang, merge: true);
       TechCard.markTranslationOverlaySession(dataEstId, lang);
+      await TechCardTranslationCache.saveForEstablishment(dataEstId);
       setState(() {});
     } catch (_) {
     } finally {
       if (mounted) {
-        setState(() => _translationNamesLoading = false);
+        setState(() {
+          _translationNamesLoading = false;
+          _translationProgressDone = 0;
+          _translationProgressTotal = 0;
+        });
       }
     }
   }
@@ -124,6 +180,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   Future<void> _refreshTechCardNameOverlayAfterWarmSession(
       List<TechCard> allEstablishmentCards, String lang) async {
     if (!mounted) return;
+    final acc = context.read<AccountManagerSupabase>();
+    final est = acc.establishment;
+    final dataEstId = est?.dataEstablishmentId.trim() ?? '';
     try {
       final ts = context.read<TranslationService>();
       final ids = _techCardIdsForTranslationOverlay(allEstablishmentCards);
@@ -132,15 +191,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         targetLanguage: lang,
       );
       if (!mounted) return;
-      TechCard.setTranslationOverlay(fromDb, merge: true);
-      final base = TechCard.snapshotTranslationOverlay();
+      TechCard.setTranslationOverlay(fromDb, languageCode: lang, merge: true);
+      final base = TechCard.snapshotTranslationOverlay(lang);
       final map = await ts.ensureMissingTechCardDishNameTranslations(
         techCards: allEstablishmentCards,
         targetLanguage: lang,
         existingFromDatabase: base,
       );
       if (!mounted) return;
-      TechCard.setTranslationOverlay(map, merge: true);
+      TechCard.setTranslationOverlay(map, languageCode: lang, merge: true);
+      if (dataEstId.isNotEmpty) {
+        await TechCardTranslationCache.saveForEstablishment(dataEstId);
+      }
       setState(() {});
     } catch (_) {}
   }
@@ -3155,12 +3217,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const LinearProgressIndicator(minHeight: 3),
+                  LinearProgressIndicator(
+                    minHeight: 3,
+                    value: _translationProgressTotal > 0
+                        ? (_translationProgressDone / _translationProgressTotal)
+                            .clamp(0.0, 1.0)
+                        : null,
+                  ),
                   Padding(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     child: Text(
-                      loc.t('ttk_loading_name_translations'),
+                      _translationProgressTotal > 0
+                          ? '${loc.t('ttk_loading_name_translations')}  '
+                              '${_translationProgressDone} / ${_translationProgressTotal} '
+                              '(${(_translationProgressDone * 100 / _translationProgressTotal).round()}%)'
+                          : loc.t('ttk_loading_name_translations'),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),

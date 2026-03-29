@@ -24,6 +24,7 @@ export 'notification_preferences_service.dart';
 export 'inbox_viewed_service.dart';
 export 'translation_service.dart';
 export 'establishment_data_warmup_service.dart';
+export 'tech_card_translation_cache.dart';
 export 'push_notification_service.dart';
 export 'translation_manager.dart';
 export 'ai_service.dart';

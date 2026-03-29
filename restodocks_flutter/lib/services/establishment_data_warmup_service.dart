@@ -3,6 +3,7 @@ import '../utils/dev_log.dart';
 import 'localization_service.dart';
 import 'product_store_supabase.dart';
 import 'tech_card_service_supabase.dart';
+import 'tech_card_translation_cache.dart';
 import 'translation_service.dart';
 
 /// Фоновая подгрузка данных заведения после входа: ТТК, номенклатура/продукты, оверлей переводов названий ТТК.
@@ -11,16 +12,9 @@ class EstablishmentDataWarmupService {
   static final EstablishmentDataWarmupService instance =
       EstablishmentDataWarmupService._();
 
-  String? _lastDataEstablishmentId;
-  String? _lastWarmupLang;
   Future<void> _chain = Future<void>.value();
 
-  /// Сброс кэша «последний прогретый язык» — следующий [runForEstablishment] не пропустится по языку.
-  void markTranslationsStale() {
-    _lastWarmupLang = null;
-  }
-
-  /// Идёт без блокировки UI. Запросы выстраиваются в очередь; повтор для того же заведения и того же языка пропускается.
+  /// Запросы выстраиваются в очередь. Переводы для пары заведение+язык пропускаются, если уже в памяти/на диске.
   Future<void> runForEstablishment({
     required String dataEstablishmentId,
     required TechCardServiceSupabase techCards,
@@ -46,11 +40,9 @@ class EstablishmentDataWarmupService {
     required LocalizationService localization,
   }) async {
     try {
+      await TechCardTranslationCache.loadForEstablishment(dataEstablishmentId);
       final lang = localization.currentLanguageCode;
-      if (_lastDataEstablishmentId == dataEstablishmentId &&
-          _lastWarmupLang == lang) {
-        return;
-      }
+
       final cards = await techCards.getTechCardsForEstablishment(
         dataEstablishmentId,
         includeIngredients: true,
@@ -63,33 +55,33 @@ class EstablishmentDataWarmupService {
           if (sid != null && sid.isNotEmpty) ids.add(sid);
         }
       }
-      final fromDb = await translationService
-          .fetchTechCardDishNameTranslationsForTargetLanguage(
-        techCardIds: ids.toList(),
-        targetLanguage: lang,
-      );
-      final overlay = await translationService
-          .ensureMissingTechCardDishNameTranslations(
-        techCards: cards,
-        targetLanguage: lang,
-        existingFromDatabase: fromDb,
-      );
-      TechCard.setTranslationOverlay(overlay, merge: true);
-      TechCard.markTranslationOverlaySession(dataEstablishmentId, lang);
+
+      if (!TechCard.translationOverlaySessionMatches(dataEstablishmentId, lang)) {
+        final fromDb = await translationService
+            .fetchTechCardDishNameTranslationsForTargetLanguage(
+          techCardIds: ids.toList(),
+          targetLanguage: lang,
+        );
+        final overlay = await translationService
+            .ensureMissingTechCardDishNameTranslations(
+          techCards: cards,
+          targetLanguage: lang,
+          existingFromDatabase: fromDb,
+        );
+        TechCard.setTranslationOverlay(overlay,
+            languageCode: lang, merge: true);
+        TechCard.markTranslationOverlaySession(dataEstablishmentId, lang);
+        await TechCardTranslationCache.saveForEstablishment(dataEstablishmentId);
+      }
 
       await productStore.loadProducts().catchError((_) {});
       await productStore.loadNomenclature(dataEstablishmentId).catchError((_) {});
-
-      _lastDataEstablishmentId = dataEstablishmentId;
-      _lastWarmupLang = localization.currentLanguageCode;
     } catch (e, st) {
       devLog('EstablishmentDataWarmupService: $e $st');
     }
   }
 
   void resetSession() {
-    _lastDataEstablishmentId = null;
-    _lastWarmupLang = null;
     _chain = Future<void>.value();
     TechCard.clearTranslationOverlay();
   }
