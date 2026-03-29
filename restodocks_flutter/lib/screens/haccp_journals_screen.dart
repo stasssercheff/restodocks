@@ -81,7 +81,10 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
                   child: ListTile(
                     leading: Icon(_iconForType(t)),
                     title: Text(loc.t(t.displayNameKey) ?? t.displayNameRu),
-                    subtitle: Text(t.sanpinRef, style: const TextStyle(fontSize: 11)),
+                    subtitle: Text(
+                      _journalSubtitle(loc, t),
+                      style: const TextStyle(fontSize: 11),
+                    ),
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () => context.push('/haccp-journals/${t.code}'),
                   ),
@@ -89,6 +92,13 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
               },
             ),
     );
+  }
+
+  /// Подзаголовок (Приложение … / рекомендуемая форма) — из JSON, не из enum.
+  static String _journalSubtitle(LocalizationService loc, HaccpLogType t) {
+    final key = 'haccp_sanpin_line_${t.code}';
+    final v = loc.t(key);
+    return v == key ? t.sanpinRef : v;
   }
 
   /// Иконки для поддерживаемых журналов (СанПиН 1–5 + фритюрные жиры).
