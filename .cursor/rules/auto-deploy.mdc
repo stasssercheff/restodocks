@@ -39,3 +39,10 @@ alwaysApply: true
 
 - Деплой админки — **только вручную**: GitHub → Actions → Deploy Admin to Cloudflare Workers → Run workflow
 - Автодеплой отключён, чтобы не тратить лимиты
+
+## IPA (локально на Mac пользователя)
+
+- Если изменили `restodocks_flutter/pubspec.yaml` → поле **version** (в т.ч. только `+build`), после этого **всегда** запускай локальную сборку для App Store Connect:
+  - `cd restodocks_flutter && flutter pub get && flutter build ipa --release`
+- Готовый файл: `restodocks_flutter/build/ios/ipa/restodocks.ipa`
+- Не подставляй номер сборки сам, если пользователь не просил bump — но после bump **сборку делай каждый раз**, пока пользователь так просит.
