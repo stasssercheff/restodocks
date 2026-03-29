@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/clear_hash_stub.dart'
     if (dart.library.html) '../core/clear_hash_web.dart' as clear_hash;
+import '../core/deep_link_bootstrap.dart';
 import '../services/services.dart';
 import '../widgets/post_registration_trial_dialog.dart';
 
@@ -30,8 +32,10 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
   Future<void> _processCallback() async {
     if (!mounted) return;
 
+    final callbackUri = DeepLinkBootstrap.authCallbackUri(isWeb: kIsWeb);
+
     // Supabase при ошибке редиректит с #error=access_denied&error_code=otp_expired
-    final fragment = Uri.base.fragment;
+    final fragment = callbackUri.fragment;
     if (fragment.contains('error=') &&
         (fragment.contains('otp_expired') || fragment.contains('access_denied'))) {
       setState(() {
@@ -48,7 +52,7 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
 
     // Явно восстанавливаем сессию из hash/query (#access_token=... или ?access_token=...)
     try {
-      await Supabase.instance.client.auth.getSessionFromUrl(Uri.base);
+      await Supabase.instance.client.auth.getSessionFromUrl(callbackUri);
     } catch (_) {}
     await Future.delayed(const Duration(milliseconds: 400));
     if (!mounted) return;
@@ -68,7 +72,7 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
       await Future.delayed(const Duration(milliseconds: 600));
       if (!mounted) return;
       try {
-        await Supabase.instance.client.auth.getSessionFromUrl(Uri.base);
+        await Supabase.instance.client.auth.getSessionFromUrl(callbackUri);
       } catch (_) {}
       await account.initialize(forceRetryFromAuth: true);
       if (!mounted) return;

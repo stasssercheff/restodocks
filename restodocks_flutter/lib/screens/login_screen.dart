@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -391,9 +393,13 @@ class _LoginScreenState extends State<LoginScreen> {
       final accountManager = context.read<AccountManagerSupabase>();
       final loc = context.read<LocalizationService>();
 
-      final result = await accountManager.findEmployeeByEmailAndPasswordGlobal(
+      final result = await accountManager
+          .findEmployeeByEmailAndPasswordGlobal(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
+      ).timeout(
+        const Duration(seconds: 60),
+        onTimeout: () => throw TimeoutException('login'),
       );
 
       if (result == null) {
@@ -434,6 +440,16 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (!mounted) return;
       final loc = context.read<LocalizationService>();
+      if (e is TimeoutException) {
+        final hint = loc.currentLanguageCode == 'ru'
+            ? 'Сервер не ответил вовремя. Проверьте интернет, VPN или блокировки.'
+            : 'Server did not respond in time. Check network, VPN, or firewall.';
+        setState(() {
+          _isUnconfirmedEmail = false;
+          _errorMessage = loc.t('login_error', args: {'error': hint});
+        });
+        return;
+      }
       final errStr = e.toString();
       if (errStr.contains('employee_not_found')) {
         setState(() {

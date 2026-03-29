@@ -93,6 +93,9 @@ String _getInitialLocation() {
         return uri.hasQuery ? '${uri.path}?${uri.query}' : uri.path;
       }
     } catch (_) {}
+  } else {
+    final loc = initial_loc.getInitialLocation();
+    if (loc.isNotEmpty && loc != '/') return loc;
   }
   return '/';
 }

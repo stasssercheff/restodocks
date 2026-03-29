@@ -11,6 +11,8 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/core.dart';
+import 'core/deep_link_bootstrap.dart';
+import 'core/mobile_deep_link_listener.dart';
 import 'core/supabase_env.dart';
 import 'utils/dev_log.dart';
 import 'core/initial_location_stub.dart'
@@ -36,17 +38,16 @@ Future<void> main() async {
     return true;
   };
 
-  try {
-    await _bootstrapApp();
-    runApp(const RestodocksApp());
-  } catch (e, st) {
-    devLog('Startup failed: $e');
-    devLog('Stack: $st');
-    runApp(_BootstrapFailureApp(message: '$e'));
-  }
+  // Сначала рисуем лёгкий экран загрузки — иначе на web долгий «белый экран»
+  // пока Supabase, переводы и сервисы инициализируются в _bootstrapApp().
+  runApp(const _StartupGate());
 }
 
 Future<void> _bootstrapApp() async {
+  if (!kIsWeb) {
+    await DeepLinkBootstrap.captureInitial();
+  }
+
   final supabaseUrl = supabase_url.resolveSupabaseUrl(kSupabaseUrlFromEnvironment);
   devLog('=== SUPABASE INIT: url=$supabaseUrl key=${kSupabaseAnonKeyFromEnvironment.substring(0, 15)}... ===');
 
@@ -69,6 +70,22 @@ Future<void> _bootstrapApp() async {
         await Future.delayed(const Duration(milliseconds: 500));
       } catch (e) {
         devLog('[Auth] getSessionFromUrl error: $e');
+      }
+    }
+  } else {
+    final u = DeepLinkBootstrap.initialUri;
+    if (u != null) {
+      final hasTokens =
+          u.fragment.contains('access_token') || u.query.contains('access_token');
+      if (hasTokens) {
+        try {
+          devLog(
+              '[Auth] getSessionFromUrl mobile path=${u.path} frag=${u.fragment.isNotEmpty}');
+          await Supabase.instance.client.auth.getSessionFromUrl(u);
+          await Future.delayed(const Duration(milliseconds: 500));
+        } catch (e) {
+          devLog('[Auth] getSessionFromUrl (mobile) error: $e');
+        }
       }
     }
   }
@@ -109,6 +126,59 @@ Future<void> _bootstrapApp() async {
   await MobileUiScaleService().initialize();
   await PosOrdersDisplaySettingsService().initialize();
   AppToastService.init(AppRouter.rootNavigatorKey);
+}
+
+class _StartupGate extends StatefulWidget {
+  const _StartupGate();
+
+  @override
+  State<_StartupGate> createState() => _StartupGateState();
+}
+
+class _StartupGateState extends State<_StartupGate> {
+  bool _ready = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _run();
+  }
+
+  Future<void> _run() async {
+    try {
+      await _bootstrapApp();
+      if (!mounted) return;
+      setState(() => _ready = true);
+    } catch (e, st) {
+      devLog('Startup failed: $e');
+      devLog('Stack: $st');
+      if (!mounted) return;
+      setState(() => _error = '$e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_error != null) {
+      return _BootstrapFailureApp(message: _error!);
+    }
+    if (!_ready) {
+      return const MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+          ),
+        ),
+      );
+    }
+    return const RestodocksApp();
+  }
 }
 
 /// Минимальный экран, если до runApp(RestodocksApp) не дошли (иначе на устройстве — вечный белый кадр).
@@ -186,7 +256,8 @@ class RestodocksApp extends StatelessWidget {
             ],
             routerConfig: AppRouter.router,
             builder: (context, child) {
-              final c = child ?? const SizedBox.shrink();
+              final raw = child ?? const SizedBox.shrink();
+              final c = kIsWeb ? raw : MobileDeepLinkListener(child: raw);
               final media = MediaQuery.of(context);
               final isPhone = media.size.shortestSide < 600;
               Widget content = c;
