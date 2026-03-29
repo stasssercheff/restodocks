@@ -8,6 +8,9 @@ import '../core/config/roles_config.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
+/// Один раз за сессию показываем подсказку про PIN заведения при открытии экрана.
+bool _employeeRegisterPinHintShownThisSession = false;
+
 /// Регистрация сотрудника: имя, фамилия (pro), почта, пароль, PIN, подразделение → цех → должность.
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -37,6 +40,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void initState() {
     super.initState();
     _updateRoleFromSection();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_employeeRegisterPinHintShownThisSession && mounted) {
+        _employeeRegisterPinHintShownThisSession = true;
+        _showEmployeePinInfoDialog();
+      }
+    });
+  }
+
+  void _showEmployeePinInfoDialog() {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(
+          Icons.info_outline,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+        title: Text(loc.t('employee_register_pin_dialog_title')),
+        content: SingleChildScrollView(
+          child: Text(loc.t('employee_register_pin_dialog_body')),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.push('/register-company');
+            },
+            child: Text(loc.t('register_company')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -341,6 +381,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     labelText: loc.t('company_pin'),
                     hintText: loc.t('enter_company_pin'),
                     prefixIcon: const Icon(Icons.pin),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.help_outline),
+                      tooltip: loc.t('employee_register_pin_hint_tooltip'),
+                      onPressed: () => _showEmployeePinInfoDialog(),
+                    ),
                   ),
                   keyboardType: TextInputType.text,
                   textCapitalization: TextCapitalization.characters,
