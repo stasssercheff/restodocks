@@ -55,7 +55,7 @@ class DeepLinkBootstrap {
     try {
       _appLinks ??= AppLinks();
       final uri = await _appLinks!.getInitialLink();
-      if (isOurHttpsLink(uri)) {
+      if (uri != null && isOurHttpsLink(uri)) {
         initialUri = uri;
         rememberAuthConfirmUri(uri);
       }
