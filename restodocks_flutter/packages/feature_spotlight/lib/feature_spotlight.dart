@@ -199,7 +199,6 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
   OverlayEntry? _overlayEntry;
   /// Starts a tour using the provided [controller].
   void startTour(SpotlightController controller) {
-    _pendingNav = null;
     setState(() {
       _activeController = controller;
       _activeController?.addListener(_onControllerUpdate);
@@ -228,32 +227,16 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
     });
   }
 
-  /// Next/previous через кадр — без задержки 100ms, coalescing при быстром нажатии.
-  String? _pendingNav;
-  bool _navScheduled = false;
+  void _immediateNext() {
+    final c = _activeController;
+    if (c == null || !c.isTourActive) return;
+    _applyTourNav((ctrl) => ctrl.next());
+  }
 
-  void _deferredNext() => _scheduleNav('next');
-  void _deferredPrevious() => _scheduleNav('previous');
-
-  void _scheduleNav(String action) {
-    _pendingNav = action;
-    if (_navScheduled) return;
-    _navScheduled = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _navScheduled = false;
-      final a = _pendingNav;
-      _pendingNav = null;
-      if (a == null || !mounted) return;
-      final c = _activeController;
-      if (c == null || !c.isTourActive) return;
-      _applyTourNav((ctrl) {
-        if (a == 'next') {
-          ctrl.next();
-        } else {
-          ctrl.previous();
-        }
-      });
-    });
+  void _immediatePrevious() {
+    final c = _activeController;
+    if (c == null || !c.isTourActive) return;
+    _applyTourNav((ctrl) => ctrl.previous());
   }
 
   /// Смена шага: listener не дублирует overlay; overlay — после кадра, где перестроились SpotlightTarget.
@@ -273,8 +256,6 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
 
   /// Stops the currently active tour.
   void _stopTour() {
-    _pendingNav = null;
-    _navScheduled = false;
     _activeController?.removeListener(_onControllerUpdate);
     _activeController?.stop();
     _overlayEntry?.remove();
@@ -284,61 +265,70 @@ class FeatureSpotlightState extends State<FeatureSpotlight> {
     });
   }
 
+  /// Содержимое оверлея тура. Один и тот же [OverlayEntry] обновляется через [OverlayEntry.markNeedsBuild],
+  /// иначе при смене шага remove+insert обрывает pointerDown/pointerUp — кнопки срабатывают со 2-го нажатия.
+  Widget _buildActiveOverlayContent() {
+    final key = _activeController!.getKeyForCurrentStep();
+    if (key == null || key.currentContext == null) {
+      final currentStep = _activeController!.currentStep!;
+      return _SpotlightOverlay(
+        targetRect: Rect.zero,
+        shape: currentStep.shape,
+        text: currentStep.text,
+        tooltipBuilder: currentStep.tooltipBuilder,
+        fixedTooltipPosition: true,
+        skipButtonOnTooltip: currentStep.skipButtonOnTooltip,
+        useGlowOnly: currentStep.useGlowOnly,
+        onNext: _immediateNext,
+        onPrevious: _immediatePrevious,
+        onSkip: _stopTour,
+      );
+    }
+
+    final renderBox = key.currentContext!.findRenderObject() as RenderBox;
+    final targetSize = renderBox.size;
+    final targetOffset = renderBox.localToGlobal(Offset.zero);
+    final currentStep = _activeController!.currentStep!;
+
+    final targetRect = Rect.fromLTWH(
+      targetOffset.dx - currentStep.padding.left,
+      targetOffset.dy - currentStep.padding.top,
+      targetSize.width + currentStep.padding.horizontal,
+      targetSize.height + currentStep.padding.vertical,
+    );
+
+    return _SpotlightOverlay(
+      targetRect: targetRect,
+      shape: currentStep.shape,
+      text: currentStep.text,
+      tooltipBuilder: currentStep.tooltipBuilder,
+      fixedTooltipPosition: currentStep.fixedTooltipPosition,
+      skipButtonOnTooltip: currentStep.skipButtonOnTooltip,
+      useGlowOnly: currentStep.useGlowOnly,
+      onNext: _immediateNext,
+      onPrevious: _immediatePrevious,
+      onSkip: _stopTour,
+    );
+  }
+
   void _updateOverlay() {
     if (!mounted) return;
-    _overlayEntry?.remove();
-    _overlayEntry = null;
-    if (_activeController?.isTourActive ?? false) {
+    final active = _activeController?.isTourActive ?? false;
+    if (!active) {
+      _overlayEntry?.remove();
+      _overlayEntry = null;
+      setState(() {});
+      return;
+    }
+    if (_overlayEntry == null) {
       _overlayEntry = OverlayEntry(
-        builder: (context) {
-          final key = _activeController!.getKeyForCurrentStep();
-          if (key == null || key.currentContext == null) {
-            // Таргет ещё не готов — сразу показываем tooltip, без retry с задержкой 200ms.
-            // Устраняет «большую задержку» первых 4–5 нажатий в туре ТТК.
-            final currentStep = _activeController!.currentStep!;
-            return _SpotlightOverlay(
-              targetRect: Rect.zero,
-              shape: currentStep.shape,
-              text: currentStep.text,
-              tooltipBuilder: currentStep.tooltipBuilder,
-              fixedTooltipPosition: true,
-              skipButtonOnTooltip: currentStep.skipButtonOnTooltip,
-              useGlowOnly: currentStep.useGlowOnly,
-              onNext: _deferredNext,
-              onPrevious: _deferredPrevious,
-              onSkip: _stopTour,
-            );
-          }
-
-          final renderBox = key.currentContext!.findRenderObject() as RenderBox;
-          final targetSize = renderBox.size;
-          final targetOffset = renderBox.localToGlobal(Offset.zero);
-          final currentStep = _activeController!.currentStep!;
-
-          final targetRect = Rect.fromLTWH(
-            targetOffset.dx - currentStep.padding.left,
-            targetOffset.dy - currentStep.padding.top,
-            targetSize.width + currentStep.padding.horizontal,
-            targetSize.height + currentStep.padding.vertical,
-          );
-
-          return _SpotlightOverlay(
-            targetRect: targetRect,
-            shape: currentStep.shape,
-            text: currentStep.text,
-            tooltipBuilder: currentStep.tooltipBuilder,
-            fixedTooltipPosition: currentStep.fixedTooltipPosition,
-            skipButtonOnTooltip: currentStep.skipButtonOnTooltip,
-            useGlowOnly: currentStep.useGlowOnly,
-            onNext: _deferredNext,
-            onPrevious: _deferredPrevious,
-            onSkip: _stopTour,
-          );
-        },
+        builder: (context) => _buildActiveOverlayContent(),
       );
       Overlay.of(context).insert(_overlayEntry!);
+    } else {
+      _overlayEntry!.markNeedsBuild();
     }
-    setState(() {}); // Re-render to remove overlay when tour ends
+    setState(() {});
   }
 
   @override
