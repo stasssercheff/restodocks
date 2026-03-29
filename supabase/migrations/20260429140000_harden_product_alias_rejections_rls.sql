@@ -5,6 +5,10 @@ ALTER TABLE public.product_alias_rejections ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "anon_select_product_alias_rejections" ON public.product_alias_rejections;
 DROP POLICY IF EXISTS "anon_insert_product_alias_rejections" ON public.product_alias_rejections;
+DROP POLICY IF EXISTS "auth_select_product_alias_rejections" ON public.product_alias_rejections;
+DROP POLICY IF EXISTS "auth_insert_product_alias_rejections" ON public.product_alias_rejections;
+DROP POLICY IF EXISTS "auth_update_product_alias_rejections" ON public.product_alias_rejections;
+DROP POLICY IF EXISTS "auth_delete_product_alias_rejections" ON public.product_alias_rejections;
 
 -- Глобальные строки (establishment_id IS NULL) — видны всем залогиненным (общий словарь отказов).
 -- Строки заведения — только своё заведение.
