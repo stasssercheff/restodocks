@@ -41,6 +41,13 @@ class EmailService {
       };
       final res = await postEdgeFunctionWithRetry('send-registration-email', body);
       if (res.status == 200) return (ok: true, error: null);
+      if (res.status == 0) {
+        return (
+          ok: false,
+          error:
+              'Сеть или CORS: запрос к send-registration-email не дошёл (проверьте сайт и Edge Functions).',
+        );
+      }
       final msg = res.data is Map
           ? (res.data!['error'] ?? res.data!['message'] ?? res.status)
           : res.status;
@@ -59,6 +66,13 @@ class EmailService {
         {'type': 'confirmation_only', 'to': to.trim()},
       );
       if (res.status == 200) return (ok: true, error: null);
+      if (res.status == 0) {
+        return (
+          ok: false,
+          error:
+              'Сеть или CORS: запрос к send-registration-email не дошёл (проверьте сайт и Edge Functions).',
+        );
+      }
       final msg = res.data is Map
           ? (res.data!['error'] ?? res.data!['message'] ?? res.status)
           : res.status;
@@ -79,6 +93,13 @@ class EmailService {
         {'type': 'confirmation_only', 'to': to.trim(), 'password': password},
       );
       if (res.status == 200) return (ok: true, error: null);
+      if (res.status == 0) {
+        return (
+          ok: false,
+          error:
+              'Сеть или CORS: запрос к send-registration-email не дошёл (проверьте сайт и Edge Functions).',
+        );
+      }
       final msg = res.data is Map
           ? (res.data!['error'] ?? res.data!['message'] ?? res.status)
           : res.status;

@@ -9,6 +9,7 @@ const defaultAllowedOrigins = [
   "https://restodocks.com",
   "https://www.restodocks.com",
   "https://restodocks.pages.dev",
+  "*.restodocks.pages.dev",
 ];
 
 function matchesOriginRule(origin: string, rule: string): boolean {
