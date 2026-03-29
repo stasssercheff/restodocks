@@ -1,5 +1,19 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { enforceRateLimit, hasValidApiKeyOrUser, resolveCorsHeaders } from "../_shared/security.ts"
+import {
+  enforceRateLimit,
+  enforceRateLimitByIdentity,
+  getAuthenticatedUserId,
+  hasValidApiKeyOrUser,
+  isServiceRoleBearer,
+  isServiceRoleRequest,
+  resolveCorsHeaders,
+} from "../_shared/security.ts"
+
+const MAX_SUBJECT_LEN = 900
+const MAX_HTML_LEN = 450_000
+const MAX_TO_LEN = 320
+/** Вложения: суммарно base64 не больше ~2MB на письмо (заказ PDF). */
+const MAX_ATTACHMENT_TOTAL_B64 = 2_800_000
 
 interface EmailRequest {
   to: string
@@ -26,20 +40,76 @@ serve(async (req) => {
       { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }
-  if (!enforceRateLimit(req, "send-email", { windowMs: 60_000, maxRequests: 20 })) {
-    return new Response(
-      JSON.stringify({ error: 'Too many requests' }),
-      { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-    )
+
+  const isService = isServiceRoleRequest(req) || isServiceRoleBearer(req)
+  // Вызовы с service role (другие Edge Functions, админ) — только общий лимит по IP.
+  if (isService) {
+    if (!enforceRateLimit(req, "send-email:svc", { windowMs: 60_000, maxRequests: 120 })) {
+      return new Response(
+        JSON.stringify({ error: 'Too many requests' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+  } else {
+    const uid = await getAuthenticatedUserId(req)
+    if (!uid) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+    if (
+      !enforceRateLimit(req, "send-email", { windowMs: 60_000, maxRequests: 20 }) ||
+      !enforceRateLimitByIdentity(uid, "send-email:user-hour", {
+        windowMs: 3_600_000,
+        maxRequests: 40,
+      })
+    ) {
+      return new Response(
+        JSON.stringify({ error: 'Too many requests' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
   }
 
-  // verify_jwt=false в config.toml. Проверка ключа убрана — Cloudflare build передаёт другой anon key.
-  // Защита: RESEND_API_KEY только у нас, URL функции не публичен.
   try {
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
     const RESEND_FROM = Deno.env.get('RESEND_FROM_EMAIL')?.trim() || 'Restodocks <noreply@restodocks.com>'
 
     const { to, subject, html, attachments }: EmailRequest = await req.json()
+
+    if (typeof to !== "string" || typeof subject !== "string" || typeof html !== "string") {
+      return new Response(
+        JSON.stringify({ error: 'Invalid payload' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+    const toTrim = to.trim()
+    if (!toTrim || toTrim.length > MAX_TO_LEN) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid recipient' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+    if (subject.length > MAX_SUBJECT_LEN || html.length > MAX_HTML_LEN) {
+      return new Response(
+        JSON.stringify({ error: 'Payload too large' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+    let attachB64Total = 0
+    if (attachments?.length) {
+      for (const a of attachments) {
+        const c = a?.content
+        if (typeof c === "string") attachB64Total += c.length
+      }
+      if (attachB64Total > MAX_ATTACHMENT_TOTAL_B64) {
+        return new Response(
+          JSON.stringify({ error: 'Attachments too large' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        )
+      }
+    }
 
     console.log(`send-email: request received attachments=${attachments?.length ?? 0}`)
     if (attachments?.length) {
@@ -50,7 +120,7 @@ serve(async (req) => {
 
     const payload: Record<string, unknown> = {
       from: RESEND_FROM,
-      to: [to],
+      to: [toTrim],
       subject,
       html,
     }

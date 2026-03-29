@@ -95,6 +95,27 @@ export function enforceRateLimit(
   return true;
 }
 
+/** Лимит по произвольному ключу (без IP) — например user id из JWT. */
+export function enforceRateLimitByIdentity(
+  identityKey: string,
+  bucketSuffix: string,
+  options: RateLimitOptions,
+): boolean {
+  const now = Date.now();
+  const windowStart = now - options.windowMs;
+  const key = `${bucketSuffix}:id:${identityKey}`;
+  const buckets = getBuckets();
+  const bucket = buckets.get(key) ?? { hits: [] };
+  bucket.hits = bucket.hits.filter((ts) => ts >= windowStart);
+  if (bucket.hits.length >= options.maxRequests) {
+    buckets.set(key, bucket);
+    return false;
+  }
+  bucket.hits.push(now);
+  buckets.set(key, bucket);
+  return true;
+}
+
 export function hasValidApiKey(req: Request): boolean {
   const apiKey = req.headers.get("apikey")?.trim();
   if (!apiKey) return false;
@@ -110,8 +131,21 @@ export function isServiceRoleRequest(req: Request): boolean {
   return !!service && apiKey === service;
 }
 
+/** Некоторые вызовы functions.invoke передают service JWT только в Authorization. */
+export function isServiceRoleBearer(req: Request): boolean {
+  const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
+  if (!service) return false;
+  const auth =
+    req.headers.get("authorization")?.trim() ??
+    req.headers.get("Authorization")?.trim();
+  if (!auth?.toLowerCase().startsWith("bearer ")) return false;
+  const token = auth.slice(7).trim();
+  return token === service;
+}
+
 export async function hasValidApiKeyOrUser(req: Request): Promise<boolean> {
   if (hasValidApiKey(req)) return true;
+  if (isServiceRoleBearer(req)) return true;
 
   const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) return false;
