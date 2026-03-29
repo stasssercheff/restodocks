@@ -182,6 +182,7 @@ DROP POLICY IF EXISTS "anon_update_product_nutrition_links" ON public.product_nu
 DROP POLICY IF EXISTS "auth_select_product_nutrition_links" ON public.product_nutrition_links;
 DROP POLICY IF EXISTS "auth_write_product_nutrition_links" ON public.product_nutrition_links;
 DROP POLICY IF EXISTS "auth_update_product_nutrition_links" ON public.product_nutrition_links;
+DROP POLICY IF EXISTS "auth_delete_product_nutrition_links" ON public.product_nutrition_links;
 
 CREATE POLICY "auth_select_product_nutrition_links"
 ON public.product_nutrition_links
@@ -250,6 +251,7 @@ DROP POLICY IF EXISTS "anon_update_nutrition_research_queue" ON public.nutrition
 DROP POLICY IF EXISTS "auth_select_nutrition_research_queue" ON public.nutrition_research_queue;
 DROP POLICY IF EXISTS "auth_write_nutrition_research_queue" ON public.nutrition_research_queue;
 DROP POLICY IF EXISTS "auth_update_nutrition_research_queue" ON public.nutrition_research_queue;
+DROP POLICY IF EXISTS "auth_delete_nutrition_research_queue" ON public.nutrition_research_queue;
 
 CREATE POLICY "auth_select_nutrition_research_queue"
 ON public.nutrition_research_queue
