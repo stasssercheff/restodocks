@@ -286,6 +286,45 @@ class TranslationService {
   }
 
 
+  /// Переводы названий ТТК из таблицы [translations] для целевого языка (пакетно, без N+1).
+  /// При нескольких строках на один [entity_id] берётся первая непустая [translated_text].
+  Future<Map<String, String>> fetchTechCardDishNameTranslationsForTargetLanguage({
+    required List<String> techCardIds,
+    required String targetLanguage,
+  }) async {
+    final out = <String, String>{};
+    if (techCardIds.isEmpty) return out;
+    const chunkSize = 90;
+    for (var i = 0; i < techCardIds.length; i += chunkSize) {
+      final end = (i + chunkSize > techCardIds.length)
+          ? techCardIds.length
+          : i + chunkSize;
+      final chunk = techCardIds.sublist(i, end);
+      try {
+        final rows = await _supabase.client
+            .from('translations')
+            .select('entity_id, translated_text')
+            .eq('entity_type', TranslationEntityType.techCard.name)
+            .eq('field_name', 'dish_name')
+            .eq('target_language', targetLanguage)
+            .inFilter('entity_id', chunk);
+        if (rows is! List) continue;
+        for (final raw in rows) {
+          if (raw is! Map) continue;
+          final m = Map<String, dynamic>.from(raw);
+          final id = m['entity_id']?.toString();
+          final text = m['translated_text']?.toString().trim();
+          if (id == null || id.isEmpty) continue;
+          if (text == null || text.isEmpty) continue;
+          out.putIfAbsent(id, () => text);
+        }
+      } catch (e) {
+        devLog('[TranslationService] batch tech_card dish_name: $e');
+      }
+    }
+    return out;
+  }
+
   /// Очистить кеш
   void clearCache() {
     _cache.clear();

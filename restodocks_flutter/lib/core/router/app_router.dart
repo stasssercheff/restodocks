@@ -185,7 +185,7 @@ class AppRouter {
       if (kIsWeb && loc.isNotEmpty && loc != '/' && loc != '/splash') {
         initial_loc.savePathForRefresh(loc);
       }
-      // Production: модуль POS недоступен (только Beta / IS_BETA=true)
+      // Production: POS скрыт (IS_BETA=false и/или хост restodocks.com — см. FeatureFlags.posModuleEnabled)
       if (account.isLoggedInSync && !FeatureFlags.posModuleEnabled) {
         final p = loc.split('?').first;
         if (p.startsWith('/pos') ||
@@ -446,6 +446,10 @@ class AppRouter {
           ),
           GoRoute(
             path: '/settings/system-errors',
+            redirect: (context, state) {
+              if (!FeatureFlags.showSystemErrorsJournal) return '/settings';
+              return null;
+            },
             pageBuilder: (context, state) => _slideTransitionPage(
               state,
               const SystemErrorsScreen(),
@@ -654,9 +658,16 @@ class AppRouter {
             pageBuilder: (context, state) {
               final id = state.pathParameters['orderId'] ?? '';
               final dept = state.queryParameters['dept'];
+              final guestQ = state.queryParameters['guest'];
+              final presetGuest =
+                  guestQ != null ? int.tryParse(guestQ) : null;
               return _slideTransitionPage(
                 state,
-                HallOrderDetailScreen(orderId: id, departmentContext: dept),
+                HallOrderDetailScreen(
+                  orderId: id,
+                  departmentContext: dept,
+                  presetGuestNumber: presetGuest,
+                ),
               );
             },
           ),

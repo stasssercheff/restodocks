@@ -23,6 +23,8 @@ class NotificationPreferencesService extends ChangeNotifier {
   bool _orders = true;
   bool _inventory = true;
   bool _iikoInventory = true;
+  bool _checklists = true;
+  bool _writeoffs = true;
   bool _notifications = true;
 
   NotificationDisplayType get displayType => _displayType;
@@ -30,6 +32,8 @@ class NotificationPreferencesService extends ChangeNotifier {
   bool get orders => _orders;
   bool get inventory => _inventory;
   bool get iikoInventory => _iikoInventory;
+  bool get checklists => _checklists;
+  bool get writeoffs => _writeoffs;
   bool get notifications => _notifications;
 
   bool get isEnabled => _displayType != NotificationDisplayType.disabled;
@@ -49,6 +53,8 @@ class NotificationPreferencesService extends ChangeNotifier {
           _orders = map['orders'] as bool? ?? true;
           _inventory = map['inventory'] as bool? ?? true;
           _iikoInventory = map['iikoInventory'] as bool? ?? true;
+          _checklists = map['checklists'] as bool? ?? true;
+          _writeoffs = map['writeoffs'] as bool? ?? true;
           _notifications = map['notifications'] as bool? ?? true;
           notifyListeners();
           return;
@@ -68,6 +74,8 @@ class NotificationPreferencesService extends ChangeNotifier {
     _orders = true;
     _inventory = true;
     _iikoInventory = true;
+    _checklists = true;
+    _writeoffs = true;
     _notifications = true;
   }
 
@@ -98,6 +106,8 @@ class NotificationPreferencesService extends ChangeNotifier {
         'orders': _orders,
         'inventory': _inventory,
         'iikoInventory': _iikoInventory,
+        'checklists': _checklists,
+        'writeoffs': _writeoffs,
         'notifications': _notifications,
       };
       await prefs.setString(key, jsonEncode(map));
@@ -146,6 +156,20 @@ class NotificationPreferencesService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setChecklists(bool value, String? employeeId) async {
+    if (_checklists == value) return;
+    _checklists = value;
+    await _save(employeeId);
+    notifyListeners();
+  }
+
+  Future<void> setWriteoffs(bool value, String? employeeId) async {
+    if (_writeoffs == value) return;
+    _writeoffs = value;
+    await _save(employeeId);
+    notifyListeners();
+  }
+
   /// Нужно ли показывать уведомление для данного типа
   bool shouldNotifyFor(String category) {
     if (_displayType == NotificationDisplayType.disabled) return false;
@@ -154,6 +178,8 @@ class NotificationPreferencesService extends ChangeNotifier {
       case 'orders': return _orders;
       case 'inventory': return _inventory;
       case 'iikoInventory': return _iikoInventory;
+      case 'checklists': return _checklists;
+      case 'writeoffs': return _writeoffs;
       case 'notifications': return _notifications;
       default: return true;
     }

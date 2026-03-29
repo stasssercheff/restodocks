@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import '../utils/dev_log.dart';
+import 'establishment_data_warmup_service.dart';
 import 'offline_cache_service.dart';
 import 'realtime_sync_service.dart';
 import 'pos_dining_layout_service.dart';
@@ -1071,6 +1072,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Выход из системы
   Future<void> logout() async {
+    EstablishmentDataWarmupService.instance.resetSession();
     await _realtimeSync.stop();
     await _offlineCache.clearCurrentUserCache();
     await _supabase.signOut();

@@ -831,6 +831,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
       order =
           order.where((id) => id != HomeTileId.departmentOrders).toList();
     }
+    if (!FeatureFlags.posModuleEnabled) {
+      order = order
+          .where((id) =>
+              id != HomeTileId.hallOrders &&
+              id != HomeTileId.hallCashRegister &&
+              id != HomeTileId.hallTables &&
+              id != HomeTileId.departmentOrders &&
+              id != HomeTileId.inventory)
+          .toList();
+    }
     final tileLabels = <HomeTileId, String>{
       HomeTileId.messages: loc.t('inbox_tab_messages') ?? 'Сообщения',
       HomeTileId.schedule: loc.t('schedule'),
@@ -1589,6 +1599,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 value: prefs.iikoInventory,
                 onChanged: (v) => prefs.setIikoInventory(v, empId),
               ),
+              SwitchListTile(
+                title: Text(loc.t('checklists') ?? 'Чеклисты'),
+                subtitle: Text(
+                  loc.t('notification_incoming_checklists_hint') ??
+                      'Входящие: заполненные чеклисты',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                value: prefs.checklists,
+                onChanged: (v) => prefs.setChecklists(v, empId),
+              ),
+              SwitchListTile(
+                title: Text(loc.t('writeoffs') ?? 'Списания'),
+                subtitle: Text(
+                  loc.t('notification_incoming_writeoffs_hint') ??
+                      'Входящие: документы списания',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                value: prefs.writeoffs,
+                onChanged: (v) => prefs.setWriteoffs(v, empId),
+              ),
             ],
             SwitchListTile(
               title: Text(loc.t('inbox_tab_notifications') ?? 'Уведомления'),
@@ -2168,8 +2198,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/settings/fiscal-tax'),
               ),
-            if (posCanRunWarehouseHealthCheck(currentEmployee) ||
-                _isPlatformAdminEmail(currentEmployee.email))
+            // Журнал ошибок — не в prod, не в iOS IPA; только beta web (см. FeatureFlags.showSystemErrorsJournal).
+            if (FeatureFlags.showSystemErrorsJournal &&
+                (posCanRunWarehouseHealthCheck(currentEmployee) ||
+                    _isPlatformAdminEmail(currentEmployee.email)))
               ListTile(
                 leading: const Icon(Icons.bug_report_outlined),
                 title: Text(localization.t('settings_system_errors_title') ??

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:feature_spotlight/feature_spotlight.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -29,7 +31,26 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkFirstEntry());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkFirstEntry();
+      _warmupEstablishmentDataIfNeeded();
+      unawaited(PushNotificationService.requestPermissionOnceAfterLogin());
+    });
+  }
+
+  /// Фоновая подгрузка ТТК, номенклатуры и переводов названий ТТК после входа.
+  void _warmupEstablishmentDataIfNeeded() {
+    if (!mounted) return;
+    final account = context.read<AccountManagerSupabase>();
+    final est = account.establishment;
+    if (est == null) return;
+    unawaited(EstablishmentDataWarmupService.instance.runForEstablishment(
+      dataEstablishmentId: est.dataEstablishmentId,
+      techCards: context.read<TechCardServiceSupabase>(),
+      productStore: context.read<ProductStoreSupabase>(),
+      translationService: context.read<TranslationService>(),
+      localization: context.read<LocalizationService>(),
+    ));
   }
 
   Future<void> _checkFirstEntry() async {

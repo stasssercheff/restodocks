@@ -110,6 +110,8 @@ class _HallCashRegisterScreenState extends State<HallCashRegisterScreen>
         return loc.t('pos_order_status_sent');
       case PosOrderStatus.closed:
         return loc.t('pos_order_status_closed');
+      case PosOrderStatus.cancelled:
+        return loc.t('pos_order_status_cancelled');
     }
   }
 

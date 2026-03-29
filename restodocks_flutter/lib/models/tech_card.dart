@@ -4,6 +4,17 @@ import 'tt_ingredient.dart';
 
 /// Технологическая карта (ТТК)
 class TechCard extends Equatable {
+  /// Подписи из таблицы `translations` (целевой язык) для [id] — выставляется после пакетной загрузки.
+  static Map<String, String> _translationOverlayByCardId = {};
+
+  static void setTranslationOverlay(Map<String, String> map) {
+    _translationOverlayByCardId = Map<String, String>.from(map);
+  }
+
+  static void clearTranslationOverlay() {
+    _translationOverlayByCardId = {};
+  }
+
   final String id;
   final String dishName;
   final Map<String, String>? dishNameLocalized;
@@ -179,16 +190,33 @@ class TechCard extends Equatable {
     return t['ru'] ?? t['en'] ?? '';
   }
 
-  /// Локализованное название блюда
-  String getLocalizedDishName(String languageCode) {
+  /// Порядок fallback для подписей (синхронно с [LocalizationService.productLanguageCodes]).
+  static const List<String> kDishNameFallbackLanguageOrder = [
+    'ru',
+    'en',
+    'es',
+    'it',
+    'tr',
+    'vi',
+  ];
+
+  /// Локализованное название блюда.
+  /// [translationTableOverride] — строка из таблицы `translations` (целевой язык), если JSON на карточке пуст.
+  String getLocalizedDishName(
+    String languageCode, {
+    String? translationTableOverride,
+  }) {
     final localized = dishNameLocalized;
     if (localized != null && localized.containsKey(languageCode)) {
       final exact = localized[languageCode]?.trim();
       if (exact != null && exact.isNotEmpty) return exact;
     }
+    final table = (translationTableOverride ?? _translationOverlayByCardId[id])
+        ?.trim();
+    if (table != null && table.isNotEmpty) return table;
     // Fallback to any existing translation before raw base name.
     if (localized != null && localized.isNotEmpty) {
-      for (final code in ['en', 'ru', 'es', 'tr', 'vi']) {
+      for (final code in kDishNameFallbackLanguageOrder) {
         final value = localized[code]?.trim();
         if (value != null && value.isNotEmpty) return value;
       }
@@ -202,8 +230,15 @@ class TechCard extends Equatable {
 
   /// Название для списков (инвентаризация, выбор ПФ и т.д.): для ПФ — «ПФ/Prep Название», для блюда — просто название.
   /// Если название уже начинается с префикса ПФ (ПФ , п/ф , Prep и т.д.) — не дублируем.
-  String getDisplayNameInLists(String languageCode, {String? sfPrefix}) {
-    final name = getLocalizedDishName(languageCode);
+  String getDisplayNameInLists(
+    String languageCode, {
+    String? sfPrefix,
+    String? translationTableOverride,
+  }) {
+    final name = getLocalizedDishName(
+      languageCode,
+      translationTableOverride: translationTableOverride,
+    );
     if (!isSemiFinished) return name;
     const pfPrefixes = ['пф ', 'п/ф ', 'п.ф. ', 'pf ', 'prep ', 'sf ', 'hf '];
     final nameLower = name.trim().toLowerCase();

@@ -87,6 +87,71 @@ class _HallTablesScreenState extends State<HallTablesScreen> {
     await _load();
   }
 
+  Future<void> _onTableLongPress(
+      BuildContext context, PosDiningTable table) async {
+    if (table.status == PosTableStatus.free) return;
+    final account = context.read<AccountManagerSupabase>();
+    final est = account.establishment;
+    final loc = context.read<LocalizationService>();
+    if (est == null) return;
+    final order = await PosOrderService.instance
+        .fetchActiveOrderForTable(est.id, table.id);
+    if (!context.mounted) return;
+    if (order == null) {
+      AppToastService.show(loc.t('pos_tables_sync_hint'));
+      return;
+    }
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                loc.t('pos_table_actions_title'),
+                style: Theme.of(ctx).textTheme.titleMedium,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.add_shopping_cart_outlined),
+              title: Text(loc.t('pos_table_action_reorder_same_guest')),
+              onTap: () {
+                Navigator.pop(ctx);
+                context.push('/pos/hall/orders/${order.id}?guest=1');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_add_alt_outlined),
+              title: Text(loc.t('pos_table_action_add_guest')),
+              onTap: () async {
+                Navigator.pop(ctx);
+                final newCount = order.guestCount + 1;
+                try {
+                  await PosOrderService.instance
+                      .updateGuestCount(order.id, newCount);
+                } catch (e) {
+                  if (context.mounted) {
+                    AppToastService.show('${loc.t('error')}: $e');
+                  }
+                  return;
+                }
+                if (context.mounted) {
+                  await context.push(
+                    '/pos/hall/orders/${order.id}?guest=$newCount',
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -203,6 +268,8 @@ class _HallTablesScreenState extends State<HallTablesScreen> {
 
     final floors = _buildFloorGroups(_tables, loc);
     Future<void> onTable(PosDiningTable t) => _onTableTap(t);
+    Future<void> onLong(PosDiningTable t) =>
+        _onTableLongPress(context, t);
     if (floors.length == 1 && floors.first.rooms.length == 1) {
       return RefreshIndicator(
         onRefresh: _load,
@@ -210,6 +277,7 @@ class _HallTablesScreenState extends State<HallTablesScreen> {
           tables: floors.first.rooms.first.tables,
           loc: loc,
           onTableTap: onTable,
+          onTableLongPress: onLong,
         ),
       );
     }
@@ -217,7 +285,12 @@ class _HallTablesScreenState extends State<HallTablesScreen> {
       final f = floors.first;
       return RefreshIndicator(
         onRefresh: _load,
-        child: _RoomTabsOrGrid(floor: f, loc: loc, onTableTap: onTable),
+        child: _RoomTabsOrGrid(
+          floor: f,
+          loc: loc,
+          onTableTap: onTable,
+          onTableLongPress: onLong,
+        ),
       );
     }
     return RefreshIndicator(
@@ -237,7 +310,11 @@ class _HallTablesScreenState extends State<HallTablesScreen> {
                 children: [
                   for (final f in floors)
                     _RoomTabsOrGrid(
-                        floor: f, loc: loc, onTableTap: onTable),
+                      floor: f,
+                      loc: loc,
+                      onTableTap: onTable,
+                      onTableLongPress: onLong,
+                    ),
                 ],
               ),
             ),
@@ -332,11 +409,13 @@ class _RoomTabsOrGrid extends StatelessWidget {
     required this.floor,
     required this.loc,
     required this.onTableTap,
+    required this.onTableLongPress,
   });
 
   final _FloorGroup floor;
   final LocalizationService loc;
   final Future<void> Function(PosDiningTable) onTableTap;
+  final Future<void> Function(PosDiningTable) onTableLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -345,6 +424,7 @@ class _RoomTabsOrGrid extends StatelessWidget {
         tables: floor.rooms.first.tables,
         loc: loc,
         onTableTap: onTableTap,
+        onTableLongPress: onTableLongPress,
       );
     }
     return DefaultTabController(
@@ -361,7 +441,12 @@ class _RoomTabsOrGrid extends StatelessWidget {
             child: TabBarView(
               children: [
                 for (final r in floor.rooms)
-                  _TableGrid(tables: r.tables, loc: loc, onTableTap: onTableTap),
+                  _TableGrid(
+                    tables: r.tables,
+                    loc: loc,
+                    onTableTap: onTableTap,
+                    onTableLongPress: onTableLongPress,
+                  ),
               ],
             ),
           ),
@@ -376,11 +461,13 @@ class _TableGrid extends StatelessWidget {
     required this.tables,
     required this.loc,
     required this.onTableTap,
+    required this.onTableLongPress,
   });
 
   final List<PosDiningTable> tables;
   final LocalizationService loc;
   final Future<void> Function(PosDiningTable) onTableTap;
+  final Future<void> Function(PosDiningTable) onTableLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -398,11 +485,17 @@ class _TableGrid extends StatelessWidget {
             childAspectRatio: 1.1,
           ),
           itemCount: tables.length,
-          itemBuilder: (context, i) => _TableCard(
-            table: tables[i],
-            loc: loc,
-            onTap: () => onTableTap(tables[i]),
-          ),
+          itemBuilder: (context, i) {
+            final t = tables[i];
+            return _TableCard(
+              table: t,
+              loc: loc,
+              onTap: () => onTableTap(t),
+              onLongPress: t.status == PosTableStatus.free
+                  ? null
+                  : () => onTableLongPress(t),
+            );
+          },
         );
       },
     );
@@ -414,11 +507,13 @@ class _TableCard extends StatelessWidget {
     required this.table,
     required this.loc,
     required this.onTap,
+    this.onLongPress,
   });
 
   final PosDiningTable table;
   final LocalizationService loc;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   Color _statusColor(BuildContext context) {
     switch (table.status) {
@@ -460,6 +555,7 @@ class _TableCard extends StatelessWidget {
       ),
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(

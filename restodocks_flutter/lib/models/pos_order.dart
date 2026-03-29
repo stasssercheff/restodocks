@@ -140,7 +140,9 @@ enum PosPaymentMethod {
 enum PosOrderStatus {
   draft,
   sent,
-  closed;
+  closed,
+  /// Отмена без оплаты (стол освобождён).
+  cancelled;
 
   static PosOrderStatus fromApi(String s) {
     switch (s) {
@@ -148,6 +150,8 @@ enum PosOrderStatus {
         return PosOrderStatus.sent;
       case 'closed':
         return PosOrderStatus.closed;
+      case 'cancelled':
+        return PosOrderStatus.cancelled;
       default:
         return PosOrderStatus.draft;
     }
@@ -161,6 +165,8 @@ enum PosOrderStatus {
         return 'sent';
       case PosOrderStatus.closed:
         return 'closed';
+      case PosOrderStatus.cancelled:
+        return 'cancelled';
     }
   }
 }

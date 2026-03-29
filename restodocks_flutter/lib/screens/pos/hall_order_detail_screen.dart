@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -22,12 +23,16 @@ class HallOrderDetailScreen extends StatefulWidget {
     super.key,
     required this.orderId,
     this.departmentContext,
+    this.presetGuestNumber,
   });
 
   final String orderId;
 
   /// `kitchen` | `bar` из `?dept=` — режим кухни/бара: без оплат, скидок и «Отдано» по строкам.
   final String? departmentContext;
+
+  /// Предвыбранный гость при добавлении блюд (`?guest=`).
+  final int? presetGuestNumber;
 
   @override
   State<HallOrderDetailScreen> createState() => _HallOrderDetailScreenState();
@@ -52,6 +57,7 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   bool _billing = false;
   String? _markingLineId;
   bool _markingBatch = false;
+  bool _cancelling = false;
 
   final _discountCtrl = TextEditingController();
   final _servicePctCtrl = TextEditingController();
@@ -77,6 +83,7 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
       _linesLoading ||
       _sending ||
       _closing ||
+      _cancelling ||
       _billing ||
       _markingLineId != null ||
       _markingBatch;
@@ -84,6 +91,9 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   String _readonlyHint(PosOrder o, LocalizationService loc) {
     if (o.status == PosOrderStatus.closed) {
       return loc.t('pos_order_closed_readonly_hint');
+    }
+    if (o.status == PosOrderStatus.cancelled) {
+      return loc.t('pos_order_cancelled_readonly_hint');
     }
     if (o.status == PosOrderStatus.sent) {
       return loc.t('pos_order_sent_readonly_hint');
@@ -99,6 +109,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
         return loc.t('pos_order_status_sent');
       case PosOrderStatus.closed:
         return loc.t('pos_order_status_closed');
+      case PosOrderStatus.cancelled:
+        return loc.t('pos_order_status_cancelled');
     }
   }
 
@@ -580,10 +592,52 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
       if (mounted) {
         AppToastService.show(loc.t('pos_order_payment_mismatch'));
       }
+    } on PostgrestException catch (e) {
+      if (mounted) {
+        if (e.code == '23514') {
+          AppToastService.show(loc.t('pos_order_close_payment_error'));
+        } else {
+          AppToastService.show('${loc.t('error')}: $e');
+        }
+      }
     } catch (e) {
       if (mounted) AppToastService.show('${loc.t('error')}: $e');
     } finally {
       if (mounted) setState(() => _closing = false);
+    }
+  }
+
+  Future<void> _confirmCancelOrder(LocalizationService loc) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('pos_order_cancel_order')),
+        content: Text(loc.t('pos_order_cancel_confirm')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(loc.t('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(loc.t('pos_order_cancel_order')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _cancelling = true);
+    try {
+      await PosOrderService.instance.cancelOrder(widget.orderId);
+      if (!mounted) return;
+      AppToastService.show(loc.t('pos_order_cancelled_toast'));
+      context.pop();
+    } on PosOrderNotEditableException {
+      if (mounted) AppToastService.show(loc.t('pos_order_edit_forbidden'));
+    } catch (e) {
+      if (mounted) AppToastService.show('${loc.t('error')}: $e');
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
     }
   }
 
@@ -865,6 +919,10 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
 
   void _openAddDishSheet(LocalizationService loc) {
     final guestCount = (_order?.guestCount ?? 1).clamp(1, 99);
+    final preset = widget.presetGuestNumber;
+    final initialGuest = preset != null && preset >= 1 && preset <= guestCount
+        ? preset
+        : null;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -874,6 +932,7 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
           dishes: _menuDishes,
           loading: _menuLoading,
           guestCount: guestCount,
+          initialGuestNumber: initialGuest,
           onPick: (tc, courseNumber, guestNumber) async {
             Navigator.pop(ctx);
             await _addDish(
@@ -911,6 +970,7 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
               tooltip: loc.t('pos_orders_display_settings_title'),
             ),
           if (_order != null &&
+              _order!.status != PosOrderStatus.cancelled &&
               _lines.isNotEmpty &&
               !_linesLoading &&
               !_deptStaffView)
@@ -929,8 +989,10 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
       floatingActionButton: () {
         final o = _order;
         if (_deptStaffView) return const SizedBox.shrink();
-        final draft = o?.status == PosOrderStatus.draft;
-        if (!draft || o == null) return const SizedBox.shrink();
+        final canAddDishes = o != null &&
+            (o.status == PosOrderStatus.draft ||
+                o.status == PosOrderStatus.sent);
+        if (!canAddDishes) return const SizedBox.shrink();
         return FloatingActionButton(
           onPressed: (_menuLoading && _menuDishes.isEmpty) || _sending
               ? null
@@ -974,6 +1036,9 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
         final tn = o.tableNumber ?? 0;
         final editable =
             o.status == PosOrderStatus.draft && !_deptStaffView;
+        final canVoidSentLine = o.status == PosOrderStatus.sent &&
+            !_deptStaffView &&
+            posCanCloseHallOrder(emp);
         final lineRows = _deptStaffView ? _linesVisibleInDeptView : _lines;
 
         return RefreshIndicator(
@@ -1008,7 +1073,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                 '${dateFmt.format(o.createdAt.toLocal())} ${timeFmt.format(o.createdAt.toLocal())}',
               ),
               if (!_deptStaffView &&
-                  (editable || o.status == PosOrderStatus.sent)) ...[
+                  (editable || o.status == PosOrderStatus.sent) &&
+                  o.status != PosOrderStatus.cancelled) ...[
                 const SizedBox(height: 16),
                 TextField(
                   controller: _discountCtrl,
@@ -1158,6 +1224,7 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                       line: line,
                       lang: lang,
                       editable: editable,
+                      canVoidLine: canVoidSentLine,
                       orderStatus: o.status,
                       employee: emp,
                       timeFmt: timeFmt,
@@ -1174,7 +1241,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                           ? null
                           : () => _markLineServed(line, loc),
                     )),
-              if (editable) ...[
+              if (editable ||
+                  (o.status == PosOrderStatus.sent && !_deptStaffView)) ...[
                 const SizedBox(height: 16),
                 OutlinedButton.icon(
                   onPressed: (_menuLoading && _menuDishes.isEmpty) || _sending
@@ -1200,6 +1268,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                     ),
                   ),
                 ],
+              ],
+              if (editable) ...[
                 if (!_linesLoading && _lines.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   FilledButton.icon(
@@ -1247,7 +1317,22 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                   ),
               ],
               if (posCanCloseHallOrder(emp) &&
+                  (o.status == PosOrderStatus.draft ||
+                      o.status == PosOrderStatus.sent) &&
+                  !_deptStaffView) ...[
+                const SizedBox(height: 16),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                  ),
+                  onPressed: _cancelling ? null : () => _confirmCancelOrder(loc),
+                  child: Text(loc.t('pos_order_cancel_order')),
+                ),
+                const SizedBox(height: 16),
+              ],
+              if (posCanCloseHallOrder(emp) &&
                   o.status != PosOrderStatus.closed &&
+                  o.status != PosOrderStatus.cancelled &&
                   !_deptStaffView) ...[
                 const SizedBox(height: 16),
                 if (o.tableStatus != PosTableStatus.billRequested)
@@ -1330,6 +1415,7 @@ class _LineTile extends StatelessWidget {
     required this.line,
     required this.lang,
     required this.editable,
+    this.canVoidLine = false,
     required this.orderStatus,
     required this.employee,
     required this.timeFmt,
@@ -1346,6 +1432,8 @@ class _LineTile extends StatelessWidget {
   final PosOrderLine line;
   final String lang;
   final bool editable;
+  /// Снять позицию после отправки (зал).
+  final bool canVoidLine;
   final PosOrderStatus orderStatus;
   final Employee? employee;
   final DateFormat timeFmt;
@@ -1404,12 +1492,15 @@ class _LineTile extends StatelessWidget {
                     ),
                     tooltip: loc.t('pos_order_line_comment'),
                   ),
+                ],
+                if (editable || canVoidLine)
                   IconButton(
                     onPressed: onDelete,
                     icon: const Icon(Icons.delete_outline),
-                    tooltip: loc.t('pos_order_line_delete'),
+                    tooltip: canVoidLine && !editable
+                        ? loc.t('pos_order_line_void')
+                        : loc.t('pos_order_line_delete'),
                   ),
-                ],
               ],
             ),
             const SizedBox(height: 4),
@@ -1566,6 +1657,7 @@ class _AddDishSheet extends StatefulWidget {
     required this.dishes,
     required this.loading,
     required this.guestCount,
+    this.initialGuestNumber,
     required this.onPick,
   });
 
@@ -1573,6 +1665,7 @@ class _AddDishSheet extends StatefulWidget {
   final List<TechCard> dishes;
   final bool loading;
   final int guestCount;
+  final int? initialGuestNumber;
   final Future<void> Function(TechCard tc, int courseNumber, int? guestNumber)
       onPick;
 
@@ -1585,6 +1678,15 @@ class _AddDishSheetState extends State<_AddDishSheet> {
   String _tab = 'kitchen';
   int _course = 1;
   int? _guest;
+
+  @override
+  void initState() {
+    super.initState();
+    final g = widget.initialGuestNumber;
+    if (g != null && g >= 1 && g <= widget.guestCount) {
+      _guest = g;
+    }
+  }
 
   @override
   void dispose() {

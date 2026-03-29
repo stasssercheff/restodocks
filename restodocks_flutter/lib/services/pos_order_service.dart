@@ -64,6 +64,11 @@ class PosOrderService {
 
   final SupabaseService _supabase = SupabaseService();
 
+  static final List<String> _activeOrderStatuses = [
+    PosOrderStatus.draft.toApi(),
+    PosOrderStatus.sent.toApi(),
+  ];
+
   static const _lineSelect = 'id, order_id, tech_card_id, quantity, comment, '
       'course_number, guest_number, sort_order, created_at, updated_at, served_at, '
       'tech_cards(dish_name, dish_name_localized, selling_price, department, '
@@ -125,6 +130,14 @@ class PosOrderService {
     }
   }
 
+  Future<void> _requireDraftOrSent(String orderId) async {
+    final o = await fetchById(orderId);
+    if (o == null) throw StateError('pos_order_missing');
+    if (o.status != PosOrderStatus.draft && o.status != PosOrderStatus.sent) {
+      throw PosOrderNotEditableException();
+    }
+  }
+
   Future<List<PosOrderLine>> fetchLines(String orderId) async {
     try {
       final rows = await _supabase.client
@@ -159,7 +172,7 @@ class PosOrderService {
     int? guestNumber,
   }) async {
     if (quantity <= 0) throw ArgumentError.value(quantity, 'quantity');
-    await _requireDraft(orderId);
+    await _requireDraftOrSent(orderId);
     final maxRows = await _supabase.client
         .from('pos_order_lines')
         .select('sort_order')
@@ -220,8 +233,9 @@ class PosOrderService {
     await _touchOrderUpdated(orderId);
   }
 
+  /// Удаление строки в черновике или снятие позиции после отправки на кухню.
   Future<void> deleteLine(String lineId, String orderId) async {
-    await _requireDraft(orderId);
+    await _requireDraftOrSent(orderId);
     await _supabase.client.from('pos_order_lines').delete().eq('id', lineId);
     await _touchOrderUpdated(orderId);
   }
@@ -269,7 +283,7 @@ class PosOrderService {
               '$sel, pos_order_lines(quantity, served_at, tech_cards(category, sections, selling_price))',
             )
             .eq('establishment_id', establishmentId)
-            .neq('status', 'closed')
+            .inFilter('status', _activeOrderStatuses)
             .order('created_at', ascending: false);
         return r as List<dynamic>;
       });
@@ -408,7 +422,7 @@ class PosOrderService {
             .from('pos_orders')
             .select(sel)
             .eq('establishment_id', establishmentId)
-            .neq('status', 'closed')
+            .inFilter('status', _activeOrderStatuses)
             .order('created_at', ascending: false);
         return r as List<dynamic>;
       });
@@ -441,7 +455,7 @@ class PosOrderService {
               '$sel, pos_order_lines(quantity, tech_cards(selling_price))',
             )
             .eq('establishment_id', establishmentId)
-            .neq('status', 'closed')
+            .inFilter('status', _activeOrderStatuses)
             .order('updated_at', ascending: false);
         return r as List<dynamic>;
       });
@@ -516,7 +530,7 @@ class PosOrderService {
             .select(sel)
             .eq('establishment_id', establishmentId)
             .eq('dining_table_id', diningTableId)
-            .neq('status', 'closed')
+            .inFilter('status', _activeOrderStatuses)
             .order('created_at', ascending: false)
             .limit(1);
         return r as List<dynamic>;
@@ -582,7 +596,10 @@ class PosOrderService {
   Future<void> markTableBillRequested(String orderId) async {
     final o = await fetchById(orderId);
     if (o == null) throw StateError('pos_order_missing');
-    if (o.status == PosOrderStatus.closed) return;
+    if (o.status == PosOrderStatus.closed ||
+        o.status == PosOrderStatus.cancelled) {
+      return;
+    }
     await PosDiningLayoutService.instance
         .updateTableStatus(o.diningTableId, PosTableStatus.billRequested);
   }
@@ -672,6 +689,64 @@ class PosOrderService {
     }
   }
 
+  /// Отменённые заказы за период по [updated_at] (UTC).
+  Future<List<PosOrder>> fetchCancelledOrdersUpdatedBetween({
+    required String establishmentId,
+    required DateTime fromUtc,
+    required DateTime toUtc,
+  }) async {
+    try {
+      final rows = await _selectOrdersWithPricingFallback((sel) async {
+        final r = await _supabase.client
+            .from('pos_orders')
+            .select(sel)
+            .eq('establishment_id', establishmentId)
+            .eq('status', PosOrderStatus.cancelled.toApi())
+            .gte('updated_at', fromUtc.toUtc().toIso8601String())
+            .lte('updated_at', toUtc.toUtc().toIso8601String())
+            .order('updated_at', ascending: false);
+        return r as List<dynamic>;
+      });
+      final list = <PosOrder>[];
+      for (final row in rows as List<dynamic>) {
+        if (row is! Map<String, dynamic>) continue;
+        try {
+          list.add(PosOrder.fromJson(Map<String, dynamic>.from(row)));
+        } catch (e) {
+          devLog('PosOrderService: skip cancelled row $e');
+        }
+      }
+      return list;
+    } catch (e, st) {
+      devLog('PosOrderService: fetchCancelledOrdersUpdatedBetween $e $st');
+      rethrow;
+    }
+  }
+
+  /// Отмена заказа без оплаты; стол освобождается.
+  Future<void> cancelOrder(String orderId) async {
+    final o = await fetchById(orderId);
+    if (o == null) throw StateError('pos_order_missing');
+    if (o.status == PosOrderStatus.closed ||
+        o.status == PosOrderStatus.cancelled) {
+      return;
+    }
+    if (o.status != PosOrderStatus.draft && o.status != PosOrderStatus.sent) {
+      throw PosOrderNotEditableException();
+    }
+    final now = DateTime.now().toUtc().toIso8601String();
+    await _supabase.client.from('pos_orders').update({
+      'status': PosOrderStatus.cancelled.toApi(),
+      'updated_at': now,
+    }).eq('id', orderId);
+    try {
+      await PosDiningLayoutService.instance
+          .updateTableStatus(o.diningTableId, PosTableStatus.free);
+    } catch (e, st) {
+      devLog('PosOrderService: cancelOrder table free $e $st');
+    }
+  }
+
   /// Закрыть счёт: один или несколько платежей, чаевые; стол освобождается.
   Future<void> closeOrder(
     String orderId, {
@@ -684,7 +759,10 @@ class PosOrderService {
     }
     final o = await fetchById(orderId);
     if (o == null) throw StateError('pos_order_missing');
-    if (o.status == PosOrderStatus.closed) return;
+    if (o.status == PosOrderStatus.closed ||
+        o.status == PosOrderStatus.cancelled) {
+      return;
+    }
 
     final lines = await fetchLines(orderId);
     final menuSub = _menuSubtotalFromLinesList(lines);
@@ -758,6 +836,11 @@ class PosOrderService {
 
   Future<void> updateGuestCount(String orderId, int guestCount) async {
     if (guestCount < 1) return;
+    final o = await fetchById(orderId);
+    if (o == null) throw StateError('pos_order_missing');
+    if (o.status != PosOrderStatus.draft && o.status != PosOrderStatus.sent) {
+      throw PosOrderNotEditableException();
+    }
     await _supabase.client.from('pos_orders').update({
       'guest_count': guestCount,
       'updated_at': DateTime.now().toUtc().toIso8601String(),

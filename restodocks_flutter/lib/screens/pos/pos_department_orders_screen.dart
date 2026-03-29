@@ -114,6 +114,8 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
         return loc.t('pos_order_status_sent');
       case PosOrderStatus.closed:
         return loc.t('pos_order_status_closed');
+      case PosOrderStatus.cancelled:
+        return loc.t('pos_order_status_cancelled');
     }
   }
 

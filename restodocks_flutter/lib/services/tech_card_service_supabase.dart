@@ -1153,7 +1153,6 @@ class TechCardServiceSupabase {
   /// Обновляет dishNameLocalized в БД и возвращает переведённое имя, либо null при ошибке.
   Future<String?> translateTechCardName(
       String techCardId, String dishName, String targetLang) async {
-    if (targetLang == 'ru') return null;
     try {
       final res = await _supabase.client.functions.invoke(
         'translate-text',

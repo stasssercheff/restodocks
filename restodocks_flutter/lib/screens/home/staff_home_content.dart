@@ -185,7 +185,8 @@ class StaffHomeContent extends StatelessWidget {
           (id == HomeTileId.hallOrders ||
               id == HomeTileId.hallCashRegister ||
               id == HomeTileId.hallTables ||
-              id == HomeTileId.departmentOrders)) {
+              id == HomeTileId.departmentOrders ||
+              id == HomeTileId.inventory)) {
         continue;
       }
       if ((id == HomeTileId.hallOrders ||

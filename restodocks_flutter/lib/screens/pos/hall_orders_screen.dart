@@ -119,6 +119,8 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
         return loc.t('pos_order_status_sent');
       case PosOrderStatus.closed:
         return loc.t('pos_order_status_closed');
+      case PosOrderStatus.cancelled:
+        return loc.t('pos_order_status_cancelled');
     }
   }
 
@@ -274,6 +276,11 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
               onPressed: () => context.push('/settings/orders-display'),
               tooltip: loc.t('pos_orders_display_settings_title'),
             ),
+          IconButton(
+            icon: const Icon(Icons.history),
+            onPressed: () => context.push('/pos/hall/order-history'),
+            tooltip: loc.t('pos_order_history_button'),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loading ? null : _load,

@@ -13,11 +13,13 @@ class _ShiftRow {
     required this.order,
     required this.grandTotal,
     required this.payments,
+    this.isCancelled = false,
   });
 
   final PosOrder order;
   final double grandTotal;
   final List<PosOrderPayment> payments;
+  final bool isCancelled;
 }
 
 /// Закрытые счета за выбранный период (дни по локальному календарю).
@@ -84,13 +86,19 @@ class _PosClosedOrdersReportScreenState extends State<PosClosedOrdersReportScree
     });
     try {
       final range = _fromToUtc();
-      final orders = await PosOrderService.instance.fetchClosedOrdersPaidBetween(
+      final closed = await PosOrderService.instance.fetchClosedOrdersPaidBetween(
+        establishmentId: est.id,
+        fromUtc: range.$1,
+        toUtc: range.$2,
+      );
+      final cancelled =
+          await PosOrderService.instance.fetchCancelledOrdersUpdatedBetween(
         establishmentId: est.id,
         fromUtc: range.$1,
         toUtc: range.$2,
       );
       final out = <_ShiftRow>[];
-      for (final o in orders) {
+      for (final o in closed) {
         final lines = await PosOrderService.instance.fetchLines(o.id);
         var menu = 0.0;
         for (final l in lines) {
@@ -107,6 +115,21 @@ class _PosClosedOrdersReportScreenState extends State<PosClosedOrdersReportScree
         final pays = await PosOrderService.instance.fetchPaymentsForOrder(o.id);
         out.add(_ShiftRow(order: o, grandTotal: grand, payments: pays));
       }
+      for (final o in cancelled) {
+        out.add(_ShiftRow(
+          order: o,
+          grandTotal: 0,
+          payments: const [],
+          isCancelled: true,
+        ));
+      }
+      out.sort((a, b) {
+        final ta =
+            a.isCancelled ? a.order.updatedAt : (a.order.paidAt ?? a.order.updatedAt);
+        final tb =
+            b.isCancelled ? b.order.updatedAt : (b.order.paidAt ?? b.order.updatedAt);
+        return tb.compareTo(ta);
+      });
       if (!mounted) return;
       setState(() {
         _rows = out;
@@ -146,6 +169,7 @@ class _PosClosedOrdersReportScreenState extends State<PosClosedOrdersReportScree
   Map<PosPaymentMethod, double> _sumByMethod() {
     final m = <PosPaymentMethod, double>{};
     for (final r in _rows) {
+      if (r.isCancelled) continue;
       if (r.payments.isNotEmpty) {
         for (final p in r.payments) {
           m[p.paymentMethod] = (m[p.paymentMethod] ?? 0) + p.amount;
@@ -163,6 +187,7 @@ class _PosClosedOrdersReportScreenState extends State<PosClosedOrdersReportScree
   double _sumGrand() {
     var s = 0.0;
     for (final r in _rows) {
+      if (r.isCancelled) continue;
       s += r.grandTotal;
     }
     return s;
@@ -300,12 +325,16 @@ class _PosClosedOrdersReportScreenState extends State<PosClosedOrdersReportScree
             final paid = o.paidAt != null
                 ? timeFmt.format(o.paidAt!.toLocal())
                 : '';
+            final whenCancelled =
+                timeFmt.format(o.updatedAt.toLocal());
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
                 title: Text(loc.t('pos_table_number', args: {'n': '$tn'})),
                 subtitle: Text(
-                  '${formatPosOrderMenuDue(context, r.grandTotal)} · $paid',
+                  r.isCancelled
+                      ? '${loc.t('pos_order_status_cancelled')} · $whenCancelled'
+                      : '${formatPosOrderMenuDue(context, r.grandTotal)} · $paid',
                 ),
               ),
             );

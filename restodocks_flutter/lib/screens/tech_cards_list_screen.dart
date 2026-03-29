@@ -50,6 +50,33 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   Map<String, TechCard> _techCardsById = {};
   Map<String, ({double cost, double output})> _resolvedCostMemo = {};
 
+  String? _overlayFetchedForLang;
+  int _overlayFetchedForListVersion = -1;
+
+  String _tcListName(TechCard tc, String lang) => tc.getDisplayNameInLists(lang);
+
+  Future<void> _prefetchDishNameTranslationOverlay(List<TechCard> list) async {
+    if (list.isEmpty || !mounted) return;
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    if (_overlayFetchedForLang == lang &&
+        _overlayFetchedForListVersion == _listVersion) {
+      return;
+    }
+    try {
+      final ts = context.read<TranslationService>();
+      final map = await ts.fetchTechCardDishNameTranslationsForTargetLanguage(
+        techCardIds: list.map((e) => e.id).toList(),
+        targetLanguage: lang,
+      );
+      if (!mounted) return;
+      TechCard.setTranslationOverlay(map);
+      setState(() {
+        _overlayFetchedForLang = lang;
+        _overlayFetchedForListVersion = _listVersion;
+      });
+    } catch (_) {}
+  }
+
   /// Ленивое наполнение `tc.ingredients` для отображения цен.
   /// Идея: при построении видимой строки запрашиваем ингредиенты только для нужных ТТК,
   /// а не для всего списка.
@@ -772,7 +799,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final map = <String, List<TechCard>>{};
     for (final pf in pfCards) {
       final names = <String>[
-        pf.getDisplayNameInLists(lang),
+        _tcListName(pf, lang),
         pf.getLocalizedDishName(lang),
         pf.dishName,
       ];
@@ -794,7 +821,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       final lang = loc.currentLanguageCode;
       result = result
           .where((tc) =>
-              tc.getDisplayNameInLists(lang).toLowerCase().contains(query))
+              _tcListName(tc, lang).toLowerCase().contains(query))
           .toList();
     }
     if (_filterSection != null) {
@@ -1075,7 +1102,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         itemBuilder: (ctx, i) {
           final item = list[i];
           final tc = item.tc;
-          final name = tc.getDisplayNameInLists(lang);
+          final name = _tcListName(tc, lang);
           return ListTile(
             tileColor: Theme.of(ctx).colorScheme.surfaceContainerLowest,
             shape: RoundedRectangleBorder(
@@ -1238,7 +1265,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       children: [
                         Expanded(
                           child: Text(
-                            'На проверку: ${tc.getDisplayNameInLists(lang)}',
+                            'На проверку: ${_tcListName(tc, lang)}',
                             style: Theme.of(ctx2)
                                 .textTheme
                                 .titleMedium
@@ -1309,8 +1336,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                           .map((c) => DropdownMenuItem<String>(
                                                 value: c.id,
                                                 child: Text(
-                                                    c.getDisplayNameInLists(
-                                                        lang)),
+                                                    _tcListName(c, lang)),
                                               ))
                                           .toList(),
                                       onChanged: saving
@@ -1510,7 +1536,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                                         x.id == pickedId),
                                           );
                                           final display =
-                                              pf.getDisplayNameInLists(lang);
+                                              _tcListName(pf, lang);
                                           return ing.copyWith(
                                             sourceTechCardId: pf.id,
                                             sourceTechCardName: display,
@@ -1577,7 +1603,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     showDialog<void>(
       context: ctx,
       builder: (dctx) => AlertDialog(
-        title: Text(tc.getDisplayNameInLists(lang)),
+        title: Text(_tcListName(tc, lang)),
         content: SizedBox(
           width: 520,
           child: SingleChildScrollView(
@@ -2076,6 +2102,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         _techCardsById = {for (final tc in processedAll) tc.id: tc};
         _resolvedCostMemo.clear();
         _rebuildPfCandidatesIndex(context.read<LocalizationService>());
+        unawaited(_prefetchDishNameTranslationOverlay(list));
         _ensureTechCardTranslations(svc, list);
         _warmPdfParser();
         // Предзагрузка кэша «На проверку» — чтобы при переключении вкладки данные были готовы
@@ -2140,9 +2167,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   Future<void> _ensureTechCardTranslations(
       TechCardServiceSupabase svc, List<TechCard> cards) async {
     final currentLang = context.read<LocalizationService>().currentLanguageCode;
-    final targetLanguages =
-        currentLang == 'ru' ? const <String>[] : <String>[currentLang];
-    if (targetLanguages.isEmpty) return;
+    final targetLanguages = <String>[currentLang];
     var i = 0;
     final pendingUpdates = <String, Map<String, String>>{};
     for (final tc in cards) {
@@ -2351,7 +2376,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               .toList();
           if (sameEst.length != 1) return ing; // не угадываем
           final picked = sameEst.first;
-          final display = picked.getDisplayNameInLists(lang);
+          final display = _tcListName(picked, lang);
           changed = true;
           return ing.copyWith(
             sourceTechCardId: picked.id,
@@ -3170,8 +3195,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       itemBuilder: (context, index) {
                         final techCard = _list[index];
                         return ListTile(
-                          title: Text(techCard
-                              .getDisplayNameInLists(l.currentLanguageCode)),
+                          title: Text(_tcListName(
+                              techCard, l.currentLanguageCode)),
                           subtitle: Text(techCard.isSemiFinished
                               ? l.t('ttk_semi_finished')
                               : l.t('ttk_dish_label')),
@@ -3432,7 +3457,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       final lang = loc.currentLanguageCode;
       return list
           .where((tc) =>
-              tc.getDisplayNameInLists(lang).toLowerCase().contains(query))
+              _tcListName(tc, lang).toLowerCase().contains(query))
           .toList();
     }
 
@@ -3798,9 +3823,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             final sb = _sectionOrder.indexOf(_sectionKeyForGroup(b));
             if (sa != sb) return sa.compareTo(sb);
           }
-          return (a.getDisplayNameInLists(lang))
+          return (_tcListName(a, lang))
               .toLowerCase()
-              .compareTo((b.getDisplayNameInLists(lang)).toLowerCase());
+              .compareTo((_tcListName(b, lang)).toLowerCase());
         });
     }
 
@@ -3906,7 +3931,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         est != null && est.isBranch && tc.establishmentId != est.id;
     final effectiveCanEdit = canEdit && !viewOnlyCard;
     final selected = _selectedTechCards.contains(tc.id);
-    final name = tc.getDisplayNameInLists(lang);
+    final name = _tcListName(tc, lang);
     final sectionStr = _sectionLabelForDisplay(tc, loc);
     final cat = _categoryLabel(tc.category, loc);
     return Material(
@@ -4063,7 +4088,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               return DataRow(
                 selected: _selectedTechCards.contains(tc.id),
                 cells: [
-                  DataCell(Text(tc.getDisplayNameInLists(lang))),
+                  DataCell(Text(_tcListName(tc, lang))),
                   DataCell(Text(_sectionLabelForDisplay(tc, loc))),
                   DataCell(Text(_categoryLabel(tc.category, loc))),
                   DataCell(Text(

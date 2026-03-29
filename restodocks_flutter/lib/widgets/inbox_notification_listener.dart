@@ -91,8 +91,12 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
       _channels.add(ch);
     }
 
-    // 3. Инвентаризация
-    if (prefs.shouldNotifyFor('inventory') && _hasInboxInventory(emp)) {
+    // 3. Инвентаризация и списания (одна таблица inventory_documents)
+    final needInventoryChannel = _hasInboxInventory(emp) &&
+        (prefs.shouldNotifyFor('inventory') ||
+            prefs.shouldNotifyFor('iikoInventory') ||
+            prefs.shouldNotifyFor('writeoffs'));
+    if (needInventoryChannel) {
       final ch = client.channel('inbox_notif_inv_${emp.id}').onPostgresChanges(
         event: PostgresChangeEvent.insert,
         schema: 'public',
@@ -109,7 +113,7 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
     }
 
     // 4. Чеклисты
-    if (_hasInboxChecklists(emp)) {
+    if (_hasInboxChecklists(emp) && prefs.shouldNotifyFor('checklists')) {
       final ch = client.channel('inbox_notif_checklists_${emp.id}').onPostgresChanges(
         event: PostgresChangeEvent.insert,
         schema: 'public',
@@ -296,9 +300,26 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
     if (id == null) return;
     final p = newRow['payload'];
     final pMap = p is Map ? p as Map<String, dynamic> : null;
-    final isIiko = pMap?['type'] == 'iiko_inventory';
+    final type = pMap?['type']?.toString() ?? '';
     final prefs = context.read<NotificationPreferencesService>();
+
+    if (type == 'writeoff') {
+      if (!prefs.shouldNotifyFor('writeoffs')) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _showNotification(
+          category: 'writeoffs',
+          title: 'Списание',
+          body: '',
+          onTap: () => _go('/inbox/writeoff/$id'),
+        );
+      });
+      return;
+    }
+
+    final isIiko = type == 'iiko_inventory';
     if (isIiko && !prefs.shouldNotifyFor('iikoInventory')) return;
+    if (!isIiko && !prefs.shouldNotifyFor('inventory')) return;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -313,7 +334,7 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
   }
 
   void _onNewChecklistSubmission(dynamic payload, dynamic emp, NotificationPreferencesService prefs) {
-    if (!_hasInboxChecklists(emp)) return;
+    if (!_hasInboxChecklists(emp) || !prefs.shouldNotifyFor('checklists')) return;
     final newRow = payload.newRecord;
     final id = newRow['id']?.toString();
     if (id == null) return;
@@ -321,7 +342,7 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _showNotification(
-        category: 'notifications',
+        category: 'checklists',
         title: 'Чеклист заполнен',
         body: '',
         onTap: () => _go('/inbox/checklist/$id'),
