@@ -7,8 +7,17 @@ class TechCard extends Equatable {
   /// Подписи из таблицы `translations` (целевой язык) для [id] — выставляется после пакетной загрузки.
   static Map<String, String> _translationOverlayByCardId = {};
 
-  static void setTranslationOverlay(Map<String, String> map) {
-    _translationOverlayByCardId = Map<String, String>.from(map);
+  /// Оверлей переводов из `translations` (по id ТТК).
+  /// [merge] true — дополняет и перезаписывает совпадающие id, **не удаляя** переводы
+  /// для других карточек. Иначе открытие списка ТТК после главной затирало оверлей
+  /// неполным подмножеством id и ломало названия.
+  static void setTranslationOverlay(Map<String, String> map, {bool merge = true}) {
+    if (map.isEmpty && merge) return;
+    if (merge) {
+      _translationOverlayByCardId = {..._translationOverlayByCardId, ...map};
+    } else {
+      _translationOverlayByCardId = Map<String, String>.from(map);
+    }
   }
 
   static void clearTranslationOverlay() {
@@ -265,6 +274,24 @@ class TechCard extends Equatable {
       default:
         return 'ПФ';
     }
+  }
+
+  /// Имя вложенного ПФ в составе блюда: оверлей `translations` + префикс как в [getDisplayNameInLists].
+  static String pfLinkedIngredientDisplayName(TTIngredient ing, String languageCode) {
+    final sid = ing.sourceTechCardId?.trim();
+    if (sid == null || sid.isEmpty) return ing.productName.trim();
+    final fromOverlay = _translationOverlayByCardId[sid]?.trim();
+    final base = (fromOverlay != null && fromOverlay.isNotEmpty)
+        ? fromOverlay
+        : (ing.sourceTechCardName ?? ing.productName).trim();
+    if (base.isEmpty) return '';
+    const pfPrefixes = ['пф ', 'п/ф ', 'п.ф. ', 'pf ', 'prep ', 'sf ', 'hf '];
+    final nameLower = base.toLowerCase();
+    for (final p in pfPrefixes) {
+      if (nameLower.startsWith(p)) return base;
+    }
+    final prefix = _defaultSfPrefix(languageCode);
+    return '$prefix $base';
   }
 
   /// Общий вес брутто всех ингредиентов

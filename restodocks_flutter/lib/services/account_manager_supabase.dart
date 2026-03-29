@@ -1167,6 +1167,9 @@ class AccountManagerSupabase extends ChangeNotifier {
           } else if (_isSchemaColumnError(e)) {
             employeeData = Map<String, dynamic>.from(employeeData)
               ..remove('can_edit_own_schedule');
+          } else if (_isGettingStartedShownColumnError(e)) {
+            employeeData = Map<String, dynamic>.from(employeeData)
+              ..remove('getting_started_shown');
           } else if (_isPaymentColumnError(e)) {
             employeeData = Map<String, dynamic>.from(employeeData)
               ..remove('payment_type')
@@ -1252,6 +1255,10 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   bool _isSchemaColumnError(Object e) {
     return e.toString().toLowerCase().contains('can_edit_own_schedule');
+  }
+
+  bool _isGettingStartedShownColumnError(Object e) {
+    return e.toString().toLowerCase().contains('getting_started_shown');
   }
 
   bool _isBirthdayColumnError(Object e) {

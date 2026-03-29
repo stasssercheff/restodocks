@@ -55,9 +55,27 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   String _tcListName(TechCard tc, String lang) => tc.getDisplayNameInLists(lang);
 
-  Future<void> _prefetchDishNameTranslationOverlay(List<TechCard> list) async {
-    if (list.isEmpty || !mounted) return;
+  /// Id всех ТТК заведения + вложенные ПФ по `sourceTechCardId`, чтобы оверлей покрывал состав.
+  List<String> _techCardIdsForTranslationOverlay(List<TechCard> all) {
+    final ids = <String>{};
+    for (final tc in all) {
+      ids.add(tc.id);
+      for (final ing in tc.ingredients) {
+        final sid = ing.sourceTechCardId?.trim();
+        if (sid != null && sid.isNotEmpty) ids.add(sid);
+      }
+    }
+    return ids.toList();
+  }
+
+  Future<void> _prefetchDishNameTranslationOverlay(List<TechCard> allEstablishmentCards) async {
+    if (allEstablishmentCards.isEmpty || !mounted) return;
     final lang = context.read<LocalizationService>().currentLanguageCode;
+    // Смена языка — старый оверлей несовместим; иначе merge смешивает локали.
+    if (_overlayFetchedForLang != null && _overlayFetchedForLang != lang) {
+      TechCard.clearTranslationOverlay();
+      _overlayFetchedForLang = null;
+    }
     if (_overlayFetchedForLang == lang &&
         _overlayFetchedForListVersion == _listVersion) {
       return;
@@ -65,11 +83,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     try {
       final ts = context.read<TranslationService>();
       final map = await ts.fetchTechCardDishNameTranslationsForTargetLanguage(
-        techCardIds: list.map((e) => e.id).toList(),
+        techCardIds: _techCardIdsForTranslationOverlay(allEstablishmentCards),
         targetLanguage: lang,
       );
       if (!mounted) return;
-      TechCard.setTranslationOverlay(map);
+      TechCard.setTranslationOverlay(map, merge: true);
       setState(() {
         _overlayFetchedForLang = lang;
         _overlayFetchedForListVersion = _listVersion;
@@ -2102,7 +2120,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         _techCardsById = {for (final tc in processedAll) tc.id: tc};
         _resolvedCostMemo.clear();
         _rebuildPfCandidatesIndex(context.read<LocalizationService>());
-        unawaited(_prefetchDishNameTranslationOverlay(list));
+        unawaited(_prefetchDishNameTranslationOverlay(processedAll));
         _ensureTechCardTranslations(svc, list);
         _warmPdfParser();
         // Предзагрузка кэша «На проверку» — чтобы при переключении вкладки данные были готовы

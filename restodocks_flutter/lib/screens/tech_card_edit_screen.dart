@@ -2229,7 +2229,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                       final ing = items[idx];
                       final name = ing.sourceTechCardId != null &&
                               ing.sourceTechCardId!.isNotEmpty
-                          ? (ing.sourceTechCardName ?? ing.productName)
+                          ? TechCard.pfLinkedIngredientDisplayName(ing, lang)
                           : ing.productName;
                       final w = ing.outputWeight > 0
                           ? ing.outputWeight

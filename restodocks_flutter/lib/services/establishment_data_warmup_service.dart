@@ -31,12 +31,20 @@ class EstablishmentDataWarmupService {
         includeIngredients: true,
       );
       final lang = localization.currentLanguageCode;
+      final ids = <String>{};
+      for (final tc in cards) {
+        ids.add(tc.id);
+        for (final ing in tc.ingredients) {
+          final sid = ing.sourceTechCardId?.trim();
+          if (sid != null && sid.isNotEmpty) ids.add(sid);
+        }
+      }
       final overlay = await translationService
           .fetchTechCardDishNameTranslationsForTargetLanguage(
-        techCardIds: cards.map((e) => e.id).toList(),
+        techCardIds: ids.toList(),
         targetLanguage: lang,
       );
-      TechCard.setTranslationOverlay(overlay);
+      TechCard.setTranslationOverlay(overlay, merge: true);
 
       await productStore.loadProducts().catchError((_) {});
       await productStore.loadNomenclature(dataEstablishmentId).catchError((_) {});
