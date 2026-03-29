@@ -68,7 +68,7 @@ Cloudflare Pages → проект → **Settings** → **Variables and Secrets**
 
 ## 5. Supabase: Redirect URLs + API CORS
 
-**Authentication** → **URL Configuration** → **Redirect URLs** — должны быть:
+**Authentication** → **URL Configuration** → **Redirect URLs** — должны быть (включая wildcard для Pages):
 ```
 https://restodocks.com
 https://restodocks.com/**
@@ -77,6 +77,7 @@ https://www.restodocks.com/**
 https://restodocks-2u8.pages.dev
 https://restodocks-2u8.pages.dev/**
 https://restodocks.pages.dev
+https://restodocks.pages.dev/**
 ```
 
 **Site URL** = `https://restodocks.com`
@@ -103,3 +104,18 @@ https://restodocks.pages.dev
    - **CORS error** / (blocked) — добавь restodocks.com в Auth Redirect URLs и Site URL (п. 5)
    - **400** "Invalid login credentials" — неверный пароль
 5. Пришли результат — по нему можно понять причину
+
+## 8. Статус 522 на `auth/v1/token` и «CORS» в консоли
+
+**522** (Cloudflare) = до бэкенда Auth **не дошли вовремя** или соединение оборвалось. Это **не баг Flutter** и не «исправляется» сменой таймаута на кнопке входа: запрос падает **до** успешного ответа Supabase.
+
+Браузер часто пишет ещё и **«Origin … is not allowed by Access-Control-Allow-Origin»**: при ошибочном/пустом ответе (522) заголовки CORS могут не совпасть с ожиданием — сначала устраняют **522**, а не только Redirect URLs.
+
+Что проверить:
+
+1. **Supabase Dashboard** → проект → не на паузе (free tier), нет инцидентов ([status.supabase.com](https://status.supabase.com)).
+2. С машины: `curl -sS -o /dev/null -w "%{http_code}" https://osglfptwbuqqmqunttha.supabase.co/auth/v1/health` — ожидается **200** (или хотя бы не таймаут).
+3. **Authentication** → **URL Configuration** — в Redirect URLs есть `https://restodocks.pages.dev` и `https://restodocks.pages.dev/**` (п. 5 выше).
+4. **500 на `authenticate-employee`** — **Edge Functions** → `authenticate-employee` → **Logs** по времени запроса; там будет стек/причина (БД, Auth admin API, и т.д.).
+
+Пока **522** на `…supabase.co/auth/v1/token` не исчезнет, вход с сайта не заработает — независимо от версии приложения в репозитории.

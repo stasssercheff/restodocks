@@ -2,7 +2,52 @@
 // Проверка пароля происходит на сервере — клиент никогда не видит password_hash
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import bcrypt from "npm:bcryptjs@2";
+
+// bcrypt только по dynamic import — иначе холодный старт тянет тяжёлый модуль до OPTIONS/раннего кода.
+type BcryptJs = { compare(s: string, hash: string): Promise<boolean>; hash(s: string, r: number): Promise<string> };
+let _bcrypt: BcryptJs | null = null;
+async function bcryptMod(): Promise<BcryptJs> {
+  if (!_bcrypt) _bcrypt = (await import("npm:bcryptjs@2")).default as BcryptJs;
+  return _bcrypt;
+}
+async function bcryptCompare(plain: string, hash: string): Promise<boolean> {
+  return (await bcryptMod()).compare(plain, hash);
+}
+async function bcryptHash(plain: string, rounds: number): Promise<string> {
+  return (await bcryptMod()).hash(plain, rounds);
+}
+
+/// Узкий поиск auth user по email (listUsers(1000) долго и даёт EarlyDrop при таймаутах клиента).
+async function findAuthUserIdByEmail(
+  supabaseUrl: string,
+  serviceKey: string,
+  supabase: ReturnType<typeof createClient>,
+  emailLower: string,
+): Promise<string | null> {
+  try {
+    const u = new URL(`${supabaseUrl}/auth/v1/admin/users`);
+    u.searchParams.set("email", emailLower);
+    const res = await fetch(u.toString(), {
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+      },
+    });
+    if (res.ok) {
+      const j = await res.json() as { users?: Array<{ id?: string; email?: string }> };
+      const users = j?.users;
+      if (Array.isArray(users)) {
+        const hit = users.find((x) => x.email?.toLowerCase() === emailLower);
+        if (hit?.id) return String(hit.id);
+      }
+    }
+  } catch (e) {
+    console.warn("[authenticate-employee] admin users email fetch:", e);
+  }
+  const { data: listData } = await supabase.auth.admin.listUsers({ page: 1, perPage: 200 });
+  const existingUser = listData?.users?.find((u) => u.email?.toLowerCase() === emailLower);
+  return existingUser?.id ? String(existingUser.id) : null;
+}
 
 function corsHeaders(origin: string | null): Record<string, string> {
   return {
@@ -138,12 +183,12 @@ Deno.serve(async (req: Request) => {
 
       if (hash.startsWith("$2a$") || hash.startsWith("$2b$")) {
         // BCrypt
-        passwordMatch = await bcrypt.compare(password, hash);
+        passwordMatch = await bcryptCompare(password, hash);
       } else {
         // Legacy plaintext password — hash it immediately and deny login
         // (forces the user to reset their password via the reset flow)
         console.warn(`[authenticate-employee] Employee ${emp.id} still has plaintext password_hash — forcing reset`);
-        const newHash = await bcrypt.hash(hash, 10);
+        const newHash = await bcryptHash(hash, 10);
         await supabase
           .from("employees")
           .update({ password_hash: newHash })
@@ -191,13 +236,16 @@ Deno.serve(async (req: Request) => {
             const errMsg = createErr?.message ?? "";
             const isAlreadyExists = /already|exists|registered|duplicate/i.test(errMsg);
             if (isAlreadyExists) {
-              // 2. Пользователь уже есть в Auth — ищем и привязываем
-              const { data: listData } = await supabase.auth.admin.listUsers({ perPage: 1000 });
-              const existingUser = listData?.users?.find(
-                (u) => u.email?.toLowerCase() === (emp.email as string)?.toLowerCase()
+              // 2. Пользователь уже есть в Auth — ищем и привязываем (без listUsers(1000))
+              const emailLower = (emp.email as string)?.toLowerCase() ?? "";
+              const existingId = await findAuthUserIdByEmail(
+                supabaseUrl,
+                supabaseServiceKey,
+                supabase,
+                emailLower,
               );
-              if (existingUser?.id) {
-                linkedAuthUserId = existingUser.id;
+              if (existingId) {
+                linkedAuthUserId = existingId;
                 const { error: pwdErr } = await supabase.auth.admin.updateUserById(linkedAuthUserId, {
                   password,
                 });
