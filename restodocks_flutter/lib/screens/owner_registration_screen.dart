@@ -15,6 +15,15 @@ class OwnerRegistrationScreen extends StatefulWidget {
   State<OwnerRegistrationScreen> createState() => _OwnerRegistrationScreenState();
 }
 
+String _ownerRegisterErrorMessage(Object e, LocalizationService loc) {
+  final s = e.toString();
+  if (s.contains('over_email_send_rate_limit') ||
+      s.contains('email rate limit exceeded')) {
+    return loc.t('auth_email_rate_limit');
+  }
+  return loc.t('register_error', args: {'error': s});
+}
+
 class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
@@ -127,7 +136,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
     } catch (e) {
       if (!mounted) return;
       final loc = context.read<LocalizationService>();
-      setState(() => _errorMessage = loc.t('register_error', args: {'error': e.toString()}));
+      setState(() => _errorMessage = _ownerRegisterErrorMessage(e, loc));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
