@@ -89,8 +89,11 @@ Future<void> _bootstrapApp() async {
       }
     }
   }
-  await AccountManagerSupabase().initialize();
-  await LocalizationService.initialize();
+  // Параллельно: раньше шли подряд и умножали время до первого кадра.
+  await Future.wait([
+    AccountManagerSupabase().initialize(),
+    LocalizationService.initialize(),
+  ]);
 
   // Оверлей переводов ТТК не сбрасываем при смене языка — слои по языкам копятся локально; догрузка — в onAfterLocaleChanged.
   LocalizationService.onAfterLocaleChanged = () async {
@@ -118,13 +121,16 @@ Future<void> _bootstrapApp() async {
     unawaited(LocalizationService().setLocale(Locale(langCode)));
   };
 
-  await ThemeService().initialize();
-  await HomeButtonConfigService().initialize();
-  await OwnerViewPreferenceService().initialize();
-  await TtkBranchFilterService().initialize();
-  await ScreenLayoutPreferenceService().initialize();
-  await MobileUiScaleService().initialize();
-  await PosOrdersDisplaySettingsService().initialize();
+  // Только SharedPreferences / локальные prefs — безопасно грузить параллельно.
+  await Future.wait([
+    ThemeService().initialize(),
+    HomeButtonConfigService().initialize(),
+    OwnerViewPreferenceService().initialize(),
+    TtkBranchFilterService().initialize(),
+    ScreenLayoutPreferenceService().initialize(),
+    MobileUiScaleService().initialize(),
+    PosOrdersDisplaySettingsService().initialize(),
+  ]);
   AppToastService.init(AppRouter.rootNavigatorKey);
 }
 
