@@ -15,6 +15,7 @@ import 'tech_card_translation_cache.dart';
 import 'offline_cache_service.dart';
 import 'realtime_sync_service.dart';
 import 'pos_dining_layout_service.dart';
+import 'edge_function_http.dart';
 import 'secure_storage_service.dart';
 import 'supabase_service.dart';
 
@@ -399,13 +400,15 @@ class AccountManagerSupabase extends ChangeNotifier {
   }
 
   /// IP/гео при регистрации компании (Edge register-metadata). Не блокирует UX; ошибки не пробрасываются.
+  /// HTTP POST с явным anon (как send-registration-email): invoke иногда шлёт битый JWT → 401 на Edge.
   void registerMetadataBestEffort(String establishmentId) {
     unawaited(
       (() async {
         try {
-          await _supabase.client.functions.invoke(
+          await postEdgeFunctionWithRetry(
             'register-metadata',
-            body: {'establishment_id': establishmentId},
+            {'establishment_id': establishmentId},
+            maxRetries: 1,
           );
         } catch (_) {}
       })(),

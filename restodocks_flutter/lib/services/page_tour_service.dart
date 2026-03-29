@@ -57,6 +57,7 @@ class PageTourService extends ChangeNotifier {
   /// Проверяет, видел ли сотрудник тур этой страницы.
   Future<bool> isPageTourSeen(String employeeId, String pageKey) async {
     if (employeeId.isEmpty || pageKey.isEmpty) return true;
+    if (!_supabase.isAuthenticated) return true;
     if (_seenInMemory.contains('${employeeId}_$pageKey')) return true;
     try {
       final res = await _supabase.client
@@ -74,6 +75,7 @@ class PageTourService extends ChangeNotifier {
   /// Отмечает тур страницы как показанный.
   Future<void> markPageTourSeen(String employeeId, String pageKey) async {
     if (employeeId.isEmpty || pageKey.isEmpty) return;
+    if (!_supabase.isAuthenticated) return;
     _seenInMemory.add('${employeeId}_$pageKey');
     try {
       await _supabase.client.from('employee_page_tour_seen').upsert(

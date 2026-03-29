@@ -79,6 +79,7 @@ class NutritionProfileResolver {
     required Product product,
     required String reason,
   }) async {
+    if (_client.auth.currentSession == null) return false;
     if (!needsAnyNutrition(product)) return false;
 
     final missingCalories = _needsCalories(product);

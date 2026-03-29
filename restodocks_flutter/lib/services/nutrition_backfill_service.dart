@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/product.dart';
 import 'product_store_supabase.dart';
@@ -31,6 +32,8 @@ class NutritionBackfillService {
 
   Future<void> _runBackfill(ProductStoreSupabase store) async {
     if (_running) return;
+    // Глобальный каталог продуктов может грузиться до входа; nutrition_* под RLS только для сессии.
+    if (Supabase.instance.client.auth.currentSession == null) return;
     _running = true;
     try {
       final prefs = await SharedPreferences.getInstance();
