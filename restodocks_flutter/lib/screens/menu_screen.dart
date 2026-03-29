@@ -853,13 +853,9 @@ class _MenuDishTable extends StatelessWidget {
       if (showCost) _cell(context, '${totalCost.toStringAsFixed(2)} $currencySym', bold: true),
     ];
 
-    return SingleChildScrollView(
+    final tableScroll = SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Table(
+      child: Table(
         border: TableBorder.all(width: 0.5, color: Colors.grey),
         columnWidths: {
           0: const FixedColumnWidth(220),
@@ -886,63 +882,73 @@ class _MenuDishTable extends StatelessWidget {
           ),
         ],
       ),
-          if (techCard.totalCalories > 0 || techCard.totalProtein > 0 || techCard.totalFat > 0 || techCard.totalCarbs > 0) ...[
-            const SizedBox(height: 8),
-            Builder(
-              builder: (ctx) {
-                final totalCal = techCard.totalCalories;
-                final totalProt = techCard.totalProtein;
-                final totalFat = techCard.totalFat;
-                final totalCarb = techCard.totalCarbs;
-                final allergens = <String>[];
-                final store = productStore ?? context.read<ProductStoreSupabase>();
-                for (final ing in techCard.ingredients.where((i) => i.productId != null)) {
-                  final p = store.findProductForIngredient(ing.productId, ing.productName);
-                  if (p?.containsGluten == true && !allergens.contains('глютен')) allergens.add('глютен');
-                  if (p?.containsLactose == true && !allergens.contains('лактоза')) allergens.add('лактоза');
-                }
-                final allergenStr = allergens.isEmpty ? (loc.currentLanguageCode == 'ru' ? 'нет' : 'none') : allergens.join(', ');
-                return Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.2),
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Text(
-                    loc.t('kbju_allergens_in_dish')
-                        .replaceFirst('%s', totalCal.round().toString())
-                        .replaceFirst('%s', totalProt.toStringAsFixed(1))
-                        .replaceFirst('%s', totalFat.toStringAsFixed(1))
-                        .replaceFirst('%s', totalCarb.toStringAsFixed(1))
-                        .replaceFirst('%s', allergenStr),
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                );
-              },
-            ),
-          ],
-          if (technology.trim().isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(loc.t('ttk_technology'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 8),
-                  Text(technology, style: const TextStyle(fontSize: 13, height: 1.4)),
-                ],
-              ),
-            ),
-          ],
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        tableScroll,
+        if (techCard.totalCalories > 0 || techCard.totalProtein > 0 || techCard.totalFat > 0 || techCard.totalCarbs > 0) ...[
+          const SizedBox(height: 8),
+          Builder(
+            builder: (ctx) {
+              final totalCal = techCard.totalCalories;
+              final totalProt = techCard.totalProtein;
+              final totalFat = techCard.totalFat;
+              final totalCarb = techCard.totalCarbs;
+              final allergens = <String>[];
+              final store = productStore ?? context.read<ProductStoreSupabase>();
+              for (final ing in techCard.ingredients.where((i) => i.productId != null)) {
+                final p = store.findProductForIngredient(ing.productId, ing.productName);
+                if (p?.containsGluten == true && !allergens.contains('глютен')) allergens.add('глютен');
+                if (p?.containsLactose == true && !allergens.contains('лактоза')) allergens.add('лактоза');
+              }
+              final allergenStr = allergens.isEmpty ? (loc.currentLanguageCode == 'ru' ? 'нет' : 'none') : allergens.join(', ');
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.2),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: Text(
+                  loc.t('kbju_allergens_in_dish')
+                      .replaceFirst('%s', totalCal.round().toString())
+                      .replaceFirst('%s', totalProt.toStringAsFixed(1))
+                      .replaceFirst('%s', totalFat.toStringAsFixed(1))
+                      .replaceFirst('%s', totalCarb.toStringAsFixed(1))
+                      .replaceFirst('%s', allergenStr),
+                  style: const TextStyle(fontSize: 13),
+                ),
+              );
+            },
+          ),
         ],
-      ),
+        if (technology.trim().isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(loc.t('ttk_technology'), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 8),
+                Text(
+                  technology,
+                  style: const TextStyle(fontSize: 13, height: 1.4),
+                  softWrap: true,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

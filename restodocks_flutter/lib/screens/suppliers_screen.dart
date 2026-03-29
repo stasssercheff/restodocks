@@ -232,9 +232,20 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
+  String _productLineLabel(OrderListItem item, LocalizationService loc, ProductStoreSupabase store) {
+    final lang = loc.currentLanguageCode;
+    final id = item.productId?.trim() ?? '';
+    if (id.isNotEmpty) {
+      final p = store.findProductById(id);
+      if (p != null) return p.getLocalizedName(lang);
+    }
+    return item.productName;
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final productStore = context.watch<ProductStoreSupabase>();
 
     return Scaffold(
       appBar: AppBar(
@@ -251,11 +262,11 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         ],
       ),
       body: _suppliers.isEmpty && !_loading && _error == null
-          ? _buildBody(loc)
+          ? _buildBody(loc, productStore)
           : Column(
               children: [
                 if (_suppliers.isNotEmpty) _buildSearchAndSortPanel(loc),
-                Expanded(child: _buildBody(loc)),
+                Expanded(child: _buildBody(loc, productStore)),
               ],
             ),
     );
@@ -299,7 +310,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     );
   }
 
-  Widget _buildBody(LocalizationService loc) {
+  Widget _buildBody(LocalizationService loc, ProductStoreSupabase productStore) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(
@@ -438,7 +449,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      item.productName,
+                                      _productLineLabel(item, loc, productStore),
                                       style: Theme.of(context).textTheme.bodyMedium,
                                     ),
                                   ),

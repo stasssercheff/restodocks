@@ -587,10 +587,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         border: OutlineInputBorder(),
         isDense: true,
       ),
-      hint: Text(loc.t('Выберите')),
+      hint: Text(loc.t('haccp_approval_hint')),
       items: [
-        DropdownMenuItem(value: true, child: Text(loc.t('разрешено'))),
-        DropdownMenuItem(value: false, child: Text(loc.t('запрещено'))),
+        DropdownMenuItem(
+            value: true, child: Text(loc.t('haccp_approval_allowed'))),
+        DropdownMenuItem(
+            value: false, child: Text(loc.t('haccp_approval_denied'))),
       ],
       onChanged: (v) => setState(() => _approvalToSell = v),
     );
@@ -613,7 +615,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       value: null,
       items: [
         DropdownMenuItem<Employee?>(
-            value: null, child: Text(loc.t('— Выбрать из списка —'))),
+            value: null, child: Text(loc.t('haccp_select_from_list'))),
         ...employees.map((e) => DropdownMenuItem<Employee?>(
               value: e,
               child: Text(
@@ -751,11 +753,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('Должность (свой вариант)')),
+        title: Text(loc.t('haccp_position_custom_title')),
         content: TextField(
           controller: ctrl,
           decoration: InputDecoration(
-            hintText: loc.t('Введите название должности'),
+            hintText: loc.t('haccp_position_custom_hint'),
             border: OutlineInputBorder(),
           ),
           autofocus: true,
@@ -955,7 +957,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                           value: row.statusOk,
                           onChanged: (v) =>
                               setState(() => row.statusOk = v ?? true)),
-                      Text(row.statusOk ? 'Да' : 'Нет',
+                      Text(
+                          row.statusOk
+                              ? loc.t('answer_yes')
+                              : loc.t('answer_no'),
                           style: TextStyle(
                               fontSize: 12,
                               color:
@@ -969,7 +974,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                           value: row.status2Ok,
                           onChanged: (v) =>
                               setState(() => row.status2Ok = v ?? true)),
-                      Text(row.status2Ok ? 'Да' : 'Нет',
+                      Text(
+                          row.status2Ok
+                              ? loc.t('answer_yes')
+                              : loc.t('answer_no'),
                           style: TextStyle(
                               fontSize: 12,
                               color: row.status2Ok
@@ -2090,9 +2098,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         final currentEmp =
             context.watch<AccountManagerSupabase>().currentEmployee;
         final creatorName = currentEmp != null
-            ? (currentEmp.surname != null
-                ? '${currentEmp.surname} ${currentEmp.fullName}'
-                : currentEmp.fullName)
+            ? loc.displayPersonNameForLanguage(
+                employeeFullNameRaw(currentEmp), loc.currentLanguageCode)
             : '—';
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2132,23 +2139,22 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                       const SizedBox(height: 8),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                            'Нет признаков инфекционных заболеваний (у сотрудника и семьи)'),
+                        title: Text(loc.t('haccp_tbl_sign_family_infect')),
                         value: row.statusOk,
                         onChanged: (v) => setState(() => row.statusOk = v),
                       ),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text(
-                            'Нет заболеваний ВДП и гнойничковых заболеваний кожи'),
+                        title: Text(loc.t('haccp_tbl_sign_skin_resp')),
                         value: row.status2Ok,
                         onChanged: (v) => setState(() => row.status2Ok = v),
                       ),
                       const Divider(),
                       Text(
-                          'Результат: ${row.statusOk ? 'допущен' : 'отстранён'}',
+                          '${loc.t('haccp_result_label_short')}: ${row.statusOk ? loc.t('haccp_status_admitted') : loc.t('haccp_status_suspended')}',
                           style: const TextStyle(fontSize: 12)),
-                      Text('Ответственный: $creatorName',
+                      Text(
+                          '${loc.t('haccp_responsible_person')}: $creatorName',
                           style: const TextStyle(fontSize: 12)),
                     ],
                   ),
@@ -2179,9 +2185,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: available.map((e) {
-                          final name = e.surname != null
-                              ? '${e.surname} ${e.fullName}'
-                              : e.fullName;
+                          final name = loc.displayPersonNameForLanguage(
+                              employeeFullNameRaw(e), loc.currentLanguageCode);
                           return ListTile(
                             title: Text(name),
                             subtitle: Text(
@@ -2805,9 +2810,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 (emp != null && emp.roles.isNotEmpty) ? emp.roles.first : null;
           }
         }
-        final employeeNameSnapshot = emp != null
-            ? '${emp.fullName}${emp.surname != null ? ' ${emp.surname}' : ''}'
-            : null;
+        final employeeNameSnapshot =
+            emp != null ? employeeFullNameRaw(emp) : null;
         final description = HaccpLog.buildHealthHygieneDescription(
             employeeId: row.employeeId,
             positionOverride: posOverride,
@@ -2829,15 +2833,15 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
   Future<void> _saveQuality(
       HaccpLogServiceSupabase svc, String estId, String empId) async {
+    final loc = context.read<LocalizationService>();
     final emp = context.read<AccountManagerSupabase>().currentEmployee;
-    final signatureName = emp != null
-        ? (emp.surname != null
-            ? '${emp.surname} ${emp.fullName}'
-            : emp.fullName)
-        : null;
+    final signatureName =
+        emp != null ? employeeFullNameRaw(emp) : null;
     final approvalStr = _logType == HaccpLogType.finishedProductBrakerage &&
             _approvalToSell != null
-        ? (_approvalToSell! ? 'разрешено' : 'запрещено')
+        ? (_approvalToSell!
+            ? loc.t('haccp_approval_allowed')
+            : loc.t('haccp_approval_denied'))
         : null;
     final isFryingOil = _logType == HaccpLogType.fryingOil;
     final isFinishedBrakerage =
@@ -3079,8 +3083,16 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.person),
-                  title: Text(emp.fullName),
-                  subtitle: Text(emp.roleDisplayName),
+                  title: Text(
+                    loc.displayPersonNameForLanguage(
+                        employeeFullNameRaw(emp), loc.currentLanguageCode),
+                  ),
+                  subtitle: Text(
+                    employeePositionLine(emp, loc,
+                        establishment: context
+                            .watch<AccountManagerSupabase>()
+                            .establishment),
+                  ),
                 ),
               ),
             const SizedBox(height: 16),

@@ -160,4 +160,22 @@ class InboxDocument extends Equatable {
     }
   }
 
+  InboxDocument copyWith({
+    String? title,
+    String? description,
+    String? employeeName,
+  }) {
+    return InboxDocument(
+      id: id,
+      type: type,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      createdAt: createdAt,
+      employeeId: employeeId,
+      employeeName: employeeName ?? this.employeeName,
+      department: department,
+      fileUrl: fileUrl,
+      metadata: metadata,
+    );
+  }
 }

@@ -187,8 +187,37 @@ class _InboxScreenState extends State<InboxScreen> {
 
     try {
       final currentEmployee = accountManager.currentEmployee;
+      final loc = context.read<LocalizationService>();
+      final layoutPrefs = context.read<ScreenLayoutPreferenceService>();
       final documents = await _inboxService.getInboxDocuments(
           establishment.id, currentEmployee);
+      final useTranslit = loc.currentLanguageCode != 'ru' ||
+          layoutPrefs.showNameTranslit;
+      var enrichedDocs = documents;
+      if (currentEmployee != null) {
+        final emps = await accountManager
+            .getEmployeesForEstablishment(establishment.id);
+        final byId = {for (final e in emps) e.id: e};
+        enrichedDocs = documents.map((d) {
+          if (d.type != DocumentType.writeoff) return d;
+          final e = byId[d.employeeId];
+          if (e != null) {
+            final line = employeeNameWithPositionLine(
+              e,
+              loc,
+              establishment: accountManager.establishment,
+              translit: useTranslit,
+            );
+            return d.copyWith(employeeName: line, description: line);
+          }
+          final raw = d.employeeName;
+          if (raw.isEmpty || raw == '—') return d;
+          final shown = loc.currentLanguageCode != 'ru'
+              ? loc.displayPersonNameForLanguage(raw, loc.currentLanguageCode)
+              : raw;
+          return d.copyWith(employeeName: shown, description: shown);
+        }).toList();
+      }
       List<EmployeeDeletionNotification> notifications = [];
       List<EmployeeBirthdayChangeNotification> birthdayChanges = [];
       List<({Employee emp, DateTime birthdayDate, int daysUntil})> upcoming =
@@ -235,7 +264,7 @@ class _InboxScreenState extends State<InboxScreen> {
       await context.read<InboxViewedService>().getViewedIds(establishment.id);
       if (mounted) {
         setState(() {
-          _documents = documents;
+          _documents = enrichedDocs;
           _deletionNotifications = notifications;
           _birthdayChangeNotifications = birthdayChanges;
           _upcomingBirthdays = upcoming;
@@ -1781,7 +1810,9 @@ class _MessagesContentState extends State<_MessagesContent> {
                     ),
                   ),
                   title: Text(
-                    employeeDisplayName(e, translit: showTranslit),
+                    employeeDisplayName(e,
+                        translit: showTranslit ||
+                            loc.currentLanguageCode != 'ru'),
                   ),
                   subtitle: Text(
                     [
