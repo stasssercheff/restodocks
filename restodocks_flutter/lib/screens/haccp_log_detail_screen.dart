@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 import '../models/employee.dart';
 import '../models/haccp_log.dart';
 import '../models/haccp_log_type.dart';
+import '../models/tech_card.dart';
 import '../services/services.dart';
+import '../utils/haccp_stored_field_localizer.dart';
 import '../utils/employee_display_utils.dart';
 import '../utils/translit_utils.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -237,50 +239,91 @@ class HaccpLogDetailScreen extends StatelessWidget {
   /// Приложение 4: Журнал бракеража готовой пищевой продукции.
   Widget _buildFinishedProductBrakerageTable(BuildContext context) {
     final loc = context.watch<LocalizationService>();
-    return Table(
-      columnWidths: const {
-        0: FlexColumnWidth(1.2),
-        1: FlexColumnWidth(0.8),
-        2: FlexColumnWidth(1.2),
-        3: FlexColumnWidth(1.2),
-        4: FlexColumnWidth(1),
-        5: FlexColumnWidth(1),
-        6: FlexColumnWidth(1),
-        7: FlexColumnWidth(0.8),
+    final products = context.read<ProductStoreSupabase>();
+    final techSvc = context.read<TechCardServiceSupabase>();
+    final lang = loc.currentLanguageCode;
+    final matched =
+        HaccpStoredFieldLocalizer.matchProduct(products.allProducts, log.productName);
+    return FutureBuilder<TechCard?>(
+      future: log.techCardId != null
+          ? techSvc.getTechCardById(log.techCardId!)
+          : Future<TechCard?>.value(null),
+      builder: (context, snap) {
+        final dish = HaccpStoredFieldLocalizer.displayBrakerageDishName(
+          productName: log.productName,
+          techCard: snap.data,
+          matchedProduct: matched,
+          languageCode: lang,
+          loc: loc,
+        );
+        final result =
+            HaccpStoredFieldLocalizer.localizeFreeText(log.result, loc);
+        final approval = HaccpStoredFieldLocalizer.localizeApprovalSnapshot(
+            log.approvalToSell, loc);
+        final weighing = HaccpStoredFieldLocalizer.localizeFreeText(
+            log.weighingResult, loc);
+        final note =
+            HaccpStoredFieldLocalizer.localizeFreeText(log.note, loc);
+        return Table(
+          columnWidths: const {
+            0: FlexColumnWidth(1.2),
+            1: FlexColumnWidth(0.8),
+            2: FlexColumnWidth(1.2),
+            3: FlexColumnWidth(1.2),
+            4: FlexColumnWidth(1),
+            5: FlexColumnWidth(1),
+            6: FlexColumnWidth(1),
+            7: FlexColumnWidth(0.8),
+          },
+          border: TableBorder.all(color: Colors.grey),
+          children: [
+            TableRow(
+              children: [
+                _header(loc.t('haccp_tbl_dish_made_at')),
+                _header(loc.t('haccp_tbl_brakerage_removed_at')),
+                _header(loc.t('haccp_tbl_dish_name_ready')),
+                _header(loc.t('haccp_tbl_organo_result')),
+                _header(loc.t('haccp_tbl_sale_allowed')),
+                _header(loc.t('haccp_tbl_brakerage_commission_sigs')),
+                _header(loc.t('haccp_tbl_portion_weighing')),
+                _header(loc.t('haccp_tbl_note')),
+              ],
+            ),
+            TableRow(
+              children: [
+                _cell(_dateTimeFmt.format(log.createdAt)),
+                _cell(log.timeBrakerage ?? '—'),
+                _cell(dish),
+                _cell(result),
+                _cell(approval),
+                _cell(log.commissionSignatures ?? '—'),
+                _cell(weighing),
+                _cell(note),
+              ],
+            ),
+          ],
+        );
       },
-      border: TableBorder.all(color: Colors.grey),
-      children: [
-        TableRow(
-          children: [
-            _header(loc.t('haccp_tbl_dish_made_at')),
-            _header(loc.t('haccp_tbl_brakerage_removed_at')),
-            _header(loc.t('haccp_tbl_dish_name_ready')),
-            _header(loc.t('haccp_tbl_organo_result')),
-            _header(loc.t('haccp_tbl_sale_allowed')),
-            _header(loc.t('haccp_tbl_brakerage_commission_sigs')),
-            _header(loc.t('haccp_tbl_portion_weighing')),
-            _header(loc.t('haccp_tbl_note')),
-          ],
-        ),
-        TableRow(
-          children: [
-            _cell(_dateTimeFmt.format(log.createdAt)),
-            _cell(log.timeBrakerage ?? '—'),
-            _cell(log.productName ?? '—'),
-            _cell(log.result ?? '—'),
-            _cell(log.approvalToSell ?? '—'),
-            _cell(log.commissionSignatures ?? '—'),
-            _cell(log.weighingResult ?? '—'),
-            _cell(log.note ?? '—'),
-          ],
-        ),
-      ],
     );
   }
 
   /// Приложение 5: Журнал бракеража скоропортящейся пищевой продукции.
   Widget _buildIncomingRawBrakerageTable(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final products = context.read<ProductStoreSupabase>();
+    final lang = loc.currentLanguageCode;
+    final matched =
+        HaccpStoredFieldLocalizer.matchProduct(products.allProducts, log.productName);
+    final productLabel = HaccpStoredFieldLocalizer.displayIncomingProductName(
+      productName: log.productName,
+      matchedProduct: matched,
+      languageCode: lang,
+      loc: loc,
+    );
+    final result =
+        HaccpStoredFieldLocalizer.localizeFreeText(log.result, loc);
+    final note =
+        HaccpStoredFieldLocalizer.localizeFreeText(log.note, loc);
     final translit =
         context.watch<ScreenLayoutPreferenceService>().showNameTranslit;
     final dateSoldStr =
@@ -319,20 +362,20 @@ class HaccpLogDetailScreen extends StatelessWidget {
         TableRow(
           children: [
             _cell(_dateTimeFmt.format(log.createdAt)),
-            _cell(log.productName ?? '—'),
+            _cell(productLabel),
             _cell(log.packaging ?? '—'),
             _cell(log.manufacturerSupplier ?? '—'),
             _cell(log.quantityKg != null
                 ? log.quantityKg!.toStringAsFixed(2)
                 : '—'),
             _cell(log.documentNumber ?? '—'),
-            _cell(log.result ?? '—'),
+            _cell(result),
             _cell(log.storageConditions ?? '—'),
             _cell(dateSoldStr),
             _cell(employee != null
                 ? employeeDisplayName(employee!, translit: translit)
                 : '—'),
-            _cell(log.note ?? '—'),
+            _cell(note),
           ],
         ),
       ],

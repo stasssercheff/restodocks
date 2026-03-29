@@ -6,7 +6,10 @@ import 'package:provider/provider.dart';
 import '../models/employee.dart';
 import '../models/haccp_log.dart';
 import '../models/haccp_log_type.dart';
+import '../models/tech_card.dart';
+import '../services/product_store_supabase.dart';
 import '../services/services.dart';
+import '../utils/haccp_stored_field_localizer.dart';
 import '../services/haccp_pdf_export_service.dart';
 import '../services/inventory_download.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -32,6 +35,9 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
   /// Для Приложения 3: выбранное помещение (null = «Все»).
   String? _selectedWarehousePremises;
 
+  /// Кэш ТТК для отображения локализованных названий в бракераже.
+  Map<String, TechCard?> _techCardsById = {};
+
   HaccpLogType? get _logType {
     final t = HaccpLogType.fromCode(widget.logTypeCode);
     return t != null && HaccpLogType.supportedInApp.contains(t) ? t : null;
@@ -46,6 +52,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     setState(() => _loading = true);
     try {
       final svc = context.read<HaccpLogServiceSupabase>();
+      final techSvc = context.read<TechCardServiceSupabase>();
       final emps = await acc.getEmployeesForEstablishment(est.id);
       final logs = await svc.getLogs(
         establishmentId: est.id,
@@ -53,10 +60,16 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
         from: _dateFrom,
         to: _dateTo,
       );
+      final techIds = logs.map((l) => l.techCardId).whereType<String>().toSet();
+      final techMap = <String, TechCard?>{};
+      for (final id in techIds) {
+        techMap[id] = await techSvc.getTechCardById(id);
+      }
       if (mounted)
         setState(() {
           _logs = logs;
           _employees = emps;
+          _techCardsById = techMap;
           _loading = false;
         });
     } catch (_) {
@@ -689,6 +702,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                               : _logs,
                           employees: _employees,
                           onLogTap: _openLogDetail,
+                          techCardsById: _techCardsById,
                           warehousePremisesName:
                               logType == HaccpLogType.warehouseTempHumidity
                                   ? _selectedWarehousePremises
@@ -773,6 +787,7 @@ class _JournalTableView extends StatelessWidget {
     required this.logs,
     required this.employees,
     required this.onLogTap,
+    required this.techCardsById,
     this.warehousePremisesName,
   });
 
@@ -781,6 +796,9 @@ class _JournalTableView extends StatelessWidget {
   final List<HaccpLog> logs;
   final List<Employee> employees;
   final void Function(HaccpLog log) onLogTap;
+
+  /// ТТК по id для локализованных названий блюд в бракераже готовой продукции.
+  final Map<String, TechCard?> techCardsById;
 
   /// Для Приложения 3: наименование помещения (в шапке). Если null при «Все» — в таблице колонка «Помещение».
   final String? warehousePremisesName;
@@ -896,9 +914,9 @@ class _JournalTableView extends StatelessWidget {
       case HaccpLogType.warehouseTempHumidity:
         return _buildWarehouseTable(idToEmp, idToName, loc);
       case HaccpLogType.finishedProductBrakerage:
-        return _buildBrakerageFinishedTable(idToName, loc);
+        return _buildBrakerageFinishedTable(context, idToName, loc);
       case HaccpLogType.incomingRawBrakerage:
-        return _buildBrakerageIncomingTable(idToEmp, idToName, loc);
+        return _buildBrakerageIncomingTable(context, idToEmp, idToName, loc);
       case HaccpLogType.fryingOil:
         return _buildFryingOilTable(idToName, loc);
       case HaccpLogType.medBookRegistry:
@@ -1404,8 +1422,10 @@ class _JournalTableView extends StatelessWidget {
     );
   }
 
-  Widget _buildBrakerageFinishedTable(
+  Widget _buildBrakerageFinishedTable(BuildContext context,
       Map<String, String> idToName, LocalizationService loc) {
+    final products = context.read<ProductStoreSupabase>();
+    final lang = loc.currentLanguageCode;
     final rows = <TableRow>[
       TableRow(
         children: [
@@ -1419,18 +1439,40 @@ class _JournalTableView extends StatelessWidget {
           _header(loc.t('haccp_tbl_note_short')),
         ],
       ),
-      ...logs.map((log) => TableRow(
-            children: [
-              _wrapTap(_cell(_dateTimeFmt.format(log.createdAt)), log),
-              _wrapTap(_cell(log.timeBrakerage ?? '—'), log),
-              _wrapTap(_cell(log.productName ?? '—'), log),
-              _wrapTap(_cell(log.result ?? '—'), log),
-              _wrapTap(_cell(log.approvalToSell ?? '—'), log),
-              _wrapTap(_cell(log.commissionSignatures ?? '—'), log),
-              _wrapTap(_cell(log.weighingResult ?? '—'), log),
-              _wrapTap(_cell(log.note ?? '—'), log),
-            ],
-          )),
+      ...logs.map((log) {
+        final tc = log.techCardId != null
+            ? techCardsById[log.techCardId!]
+            : null;
+        final matched = HaccpStoredFieldLocalizer.matchProduct(
+            products.allProducts, log.productName);
+        final dish = HaccpStoredFieldLocalizer.displayBrakerageDishName(
+          productName: log.productName,
+          techCard: tc,
+          matchedProduct: matched,
+          languageCode: lang,
+          loc: loc,
+        );
+        final result =
+            HaccpStoredFieldLocalizer.localizeFreeText(log.result, loc);
+        final approval = HaccpStoredFieldLocalizer.localizeApprovalSnapshot(
+            log.approvalToSell, loc);
+        final weighing = HaccpStoredFieldLocalizer.localizeFreeText(
+            log.weighingResult, loc);
+        final note =
+            HaccpStoredFieldLocalizer.localizeFreeText(log.note, loc);
+        return TableRow(
+          children: [
+            _wrapTap(_cell(_dateTimeFmt.format(log.createdAt)), log),
+            _wrapTap(_cell(log.timeBrakerage ?? '—'), log),
+            _wrapTap(_cell(dish), log),
+            _wrapTap(_cell(result), log),
+            _wrapTap(_cell(approval), log),
+            _wrapTap(_cell(log.commissionSignatures ?? '—'), log),
+            _wrapTap(_cell(weighing), log),
+            _wrapTap(_cell(note), log),
+          ],
+        );
+      }),
     ];
     return Table(
       columnWidths: const {
@@ -1448,8 +1490,11 @@ class _JournalTableView extends StatelessWidget {
     );
   }
 
-  Widget _buildBrakerageIncomingTable(Map<String, Employee> idToEmp,
+  Widget _buildBrakerageIncomingTable(BuildContext context,
+      Map<String, Employee> idToEmp,
       Map<String, String> idToName, LocalizationService loc) {
+    final products = context.read<ProductStoreSupabase>();
+    final lang = loc.currentLanguageCode;
     final rows = <TableRow>[
       TableRow(
         children: [
@@ -1470,10 +1515,20 @@ class _JournalTableView extends StatelessWidget {
         final dateSold =
             log.dateSold != null ? _dateFmt.format(log.dateSold!) : '—';
         final empName = idToName[log.createdByEmployeeId] ?? '—';
+        final matched = HaccpStoredFieldLocalizer.matchProduct(
+            products.allProducts, log.productName);
+        final name = HaccpStoredFieldLocalizer.displayIncomingProductName(
+          productName: log.productName,
+          matchedProduct: matched,
+          languageCode: lang,
+          loc: loc,
+        );
+        final result =
+            HaccpStoredFieldLocalizer.localizeFreeText(log.result, loc);
         return TableRow(
           children: [
             _wrapTap(_cell(_dateTimeFmt.format(log.createdAt)), log),
-            _wrapTap(_cell(log.productName ?? '—'), log),
+            _wrapTap(_cell(name), log),
             _wrapTap(_cell(log.packaging ?? '—'), log),
             _wrapTap(_cell(log.manufacturerSupplier ?? '—'), log),
             _wrapTap(
@@ -1482,11 +1537,14 @@ class _JournalTableView extends StatelessWidget {
                     : '—'),
                 log),
             _wrapTap(_cell(log.documentNumber ?? '—'), log),
-            _wrapTap(_cell(log.result ?? '—'), log),
+            _wrapTap(_cell(result), log),
             _wrapTap(_cell(log.storageConditions ?? '—'), log),
             _wrapTap(_cell(dateSold), log),
             _wrapTap(_cell(empName), log),
-            _wrapTap(_cell(log.note ?? '—'), log),
+            _wrapTap(
+                _cell(HaccpStoredFieldLocalizer.localizeFreeText(
+                    log.note, loc)),
+                log),
           ],
         );
       }),
