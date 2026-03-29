@@ -63,10 +63,16 @@ class EstablishmentDataWarmupService {
           if (sid != null && sid.isNotEmpty) ids.add(sid);
         }
       }
-      final overlay = await translationService
+      final fromDb = await translationService
           .fetchTechCardDishNameTranslationsForTargetLanguage(
         techCardIds: ids.toList(),
         targetLanguage: lang,
+      );
+      final overlay = await translationService
+          .ensureMissingTechCardDishNameTranslations(
+        techCards: cards,
+        targetLanguage: lang,
+        existingFromDatabase: fromDb,
       );
       TechCard.setTranslationOverlay(overlay, merge: true);
 

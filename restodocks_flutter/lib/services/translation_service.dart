@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../models/tech_card.dart';
 import '../models/translation.dart';
 import '../utils/dev_log.dart';
 import 'ai_service_supabase.dart';
@@ -321,6 +322,81 @@ class TranslationService {
       } catch (e) {
         devLog('[TranslationService] batch tech_card dish_name: $e');
       }
+    }
+    return out;
+  }
+
+  /// Карточки без строки в [translations] и без [TechCard.dishNameLocalized] для целевого языка —
+  /// переводим через [translate] (тот же Google/MyMemory/ИИ), результат попадает в БД и в возвращаемую карту.
+  ///
+  /// Без этого в UI с языком en остаётся русский `dish_name`, а префикс ПФ («Prep») уже на английском — смешение языков.
+  Future<Map<String, String>> ensureMissingTechCardDishNameTranslations({
+    required List<TechCard> techCards,
+    required String targetLanguage,
+    required Map<String, String> existingFromDatabase,
+  }) async {
+    final out = Map<String, String>.from(existingFromDatabase);
+    if (techCards.isEmpty) return out;
+    if (targetLanguage == 'ru') return out;
+
+    bool needsFill(TechCard tc) {
+      final loc = tc.dishNameLocalized;
+      if (loc != null) {
+        final direct = loc[targetLanguage]?.trim();
+        if (direct != null && direct.isNotEmpty) return false;
+      }
+      final o = out[tc.id]?.trim();
+      if (o != null && o.isNotEmpty) return false;
+      return true;
+    }
+
+    String inferSourceLang(String text) {
+      final t = text.trim();
+      if (t.isEmpty) return 'ru';
+      if (RegExp(r'[\u0400-\u04FF]').hasMatch(t)) return 'ru';
+      return 'en';
+    }
+
+    final byId = <String, TechCard>{};
+    for (final tc in techCards) {
+      if (!needsFill(tc)) continue;
+      byId[tc.id] = tc;
+    }
+    if (byId.isEmpty) return out;
+
+    const batch = 5;
+    final todo = byId.values.toList();
+    for (var i = 0; i < todo.length; i += batch) {
+      final end = (i + batch > todo.length) ? todo.length : i + batch;
+      final chunk = todo.sublist(i, end);
+      await Future.wait(chunk.map((tc) async {
+        try {
+          final rawRu = tc.dishNameLocalized?['ru']?.trim();
+          final source = (rawRu != null && rawRu.isNotEmpty)
+              ? rawRu
+              : tc.dishName.trim();
+          if (source.isEmpty) return;
+          final from = inferSourceLang(source);
+          if (from == targetLanguage) {
+            out[tc.id] = source;
+            return;
+          }
+          final translated = await translate(
+            entityType: TranslationEntityType.techCard,
+            entityId: tc.id,
+            fieldName: 'dish_name',
+            text: source,
+            from: from,
+            to: targetLanguage,
+            userId: null,
+          );
+          if (translated != null && translated.trim().isNotEmpty) {
+            out[tc.id] = translated.trim();
+          }
+        } catch (e) {
+          devLog('[TranslationService] ensureMissing TTK ${tc.id}: $e');
+        }
+      }));
     }
     return out;
   }

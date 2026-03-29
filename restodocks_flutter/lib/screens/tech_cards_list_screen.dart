@@ -82,11 +82,17 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
     try {
       final ts = context.read<TranslationService>();
-      final map = await ts.fetchTechCardDishNameTranslationsForTargetLanguage(
-        techCardIds: _techCardIdsForTranslationOverlay(allEstablishmentCards),
+      final ids = _techCardIdsForTranslationOverlay(allEstablishmentCards);
+      final fromDb = await ts.fetchTechCardDishNameTranslationsForTargetLanguage(
+        techCardIds: ids,
         targetLanguage: lang,
       );
       if (!mounted) return;
+      final map = await ts.ensureMissingTechCardDishNameTranslations(
+        techCards: allEstablishmentCards,
+        targetLanguage: lang,
+        existingFromDatabase: fromDb,
+      );
       TechCard.setTranslationOverlay(map, merge: true);
       setState(() {
         _overlayFetchedForLang = lang;
