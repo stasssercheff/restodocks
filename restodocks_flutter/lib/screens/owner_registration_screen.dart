@@ -98,10 +98,9 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         email: email,
         pinCode: estab.pinCode,
       );
-      // Отдельное письмо со ссылкой подтверждения — сразу после регистрации
-      if (!signUpResult.hasSession) {
-        await emailService.sendConfirmationEmail(to: email, password: password);
-      }
+      // Второе письмо (ссылка подтверждения) шлёт Supabase Auth: либо Send Email Hook
+      // (Edge auth-send-email → Resend, русский текст), либо шаблон из Dashboard.
+      // Не вызываем sendConfirmationEmail здесь — иначе дубль с Hook + лишний расход лимитов.
 
       if (!mounted) return;
       if (signUpResult.hasSession) {

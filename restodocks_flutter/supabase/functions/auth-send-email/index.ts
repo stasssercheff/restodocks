@@ -3,6 +3,8 @@ import { Webhook } from "https://esm.sh/standardwebhooks@1.0.0";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://osglfptwbuqqmqunttha.supabase.co";
+// Как в send-registration-email: веб открывает /auth/confirm-click → verifyOTP(token_hash), без «съедания» токена prefetch-ом.
+const CONFIRM_CLICK_URL = "https://restodocks.com/auth/confirm-click";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -46,9 +48,9 @@ Deno.serve(async (req) => {
     const html = `
 <p>Здравствуйте!</p>
 <p>Нажмите на ссылку для подтверждения:</p>
-<p><a href="${verifyUrl}" style="color:#2754C5;text-decoration:underline">Подтвердить</a></p>
+<p><a href="${confirmClickHref}" style="color:#2754C5;text-decoration:underline">Подтвердить</a></p>
 <p>Или скопируйте ссылку в браузер:</p>
-<p style="word-break:break-all;font-size:12px;color:#666">${verifyUrl}</p>
+<p style="word-break:break-all;font-size:12px;color:#666">${confirmClickHref}</p>
 <p>Если вы не регистрировались — проигнорируйте это письмо.</p>
 <p>С уважением,<br>Команда Restodocks</p>
     `.trim();
