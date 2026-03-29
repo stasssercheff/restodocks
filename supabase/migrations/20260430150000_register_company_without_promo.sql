@@ -5,8 +5,12 @@
 -- Если в SQL Editor запускать по одной команде, разбитой по «;», тело PL/pgSQL внутри $$…$$
 -- обрежется → ERROR 42601 syntax error at end of input (часто LINE 0).
 
+-- subscription_type — из 20260429120000_expenses_pro_enforcement; на части БД миграция не накатывалась.
 ALTER TABLE public.establishments
+  ADD COLUMN IF NOT EXISTS subscription_type TEXT,
   ADD COLUMN IF NOT EXISTS pro_trial_ends_at TIMESTAMPTZ;
+
+COMMENT ON COLUMN public.establishments.subscription_type IS 'free | pro | premium — доступ к Pro-функциям';
 
 COMMENT ON COLUMN public.establishments.pro_trial_ends_at IS
   'До этой даты действует пробный Pro после регистрации без промокода (72 ч с момента создания).';
