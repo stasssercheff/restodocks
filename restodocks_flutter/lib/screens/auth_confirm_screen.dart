@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/clear_hash_stub.dart'
     if (dart.library.html) '../core/clear_hash_web.dart' as clear_hash;
 import '../services/services.dart';
+import '../widgets/post_registration_trial_dialog.dart';
 
 /// Экран обработки перехода по ссылке подтверждения email.
 /// Supabase редиректит сюда с #access_token=... — восстанавливаем сессию и ведём в приложение.
@@ -73,6 +74,8 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
       if (!mounted) return;
       if (account.isLoggedInSync) {
         clear_hash.clearHashFromUrl();
+        if (!mounted) return;
+        await maybeShowPostRegistrationTrialDialogAfterEmailLink(context, account);
         if (!mounted) return;
         context.go('/home');
         return;

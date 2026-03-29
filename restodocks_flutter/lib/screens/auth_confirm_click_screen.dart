@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/redirect_to_url_stub.dart'
     if (dart.library.html) '../core/redirect_to_url_web.dart' as redirect_impl;
 import '../services/services.dart';
+import '../widgets/post_registration_trial_dialog.dart';
 
 /// Ссылка в письме ведёт сюда. Сразу вызываем verifyOTP (одноразовый токен), при успехе — /home.
 class AuthConfirmClickScreen extends StatefulWidget {
@@ -64,6 +65,8 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
           await account.initialize(forceRetryFromAuth: true);
           if (!mounted) return;
           if (account.isLoggedInSync) {
+            await maybeShowPostRegistrationTrialDialogAfterEmailLink(context, account);
+            if (!mounted) return;
             router.go('/home');
             return;
           }

@@ -1,13 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../services/account_manager_supabase.dart';
 import '../services/localization_service.dart';
 
-/// Почта поддержки (дублирует текст в локализации).
-const kRestodocksSupportEmail = 'info@restodocks.com';
+/// После входа по ссылке из письма: один раз на аккаунт, только для роли owner (не сотрудникам).
+Future<void> maybeShowPostRegistrationTrialDialogAfterEmailLink(
+  BuildContext context,
+  AccountManagerSupabase account,
+) async {
+  final userId = Supabase.instance.client.auth.currentUser?.id;
+  if (userId == null) return;
+  final emp = account.currentEmployee;
+  if (emp == null || !emp.hasRole('owner')) return;
+  final prefs = await SharedPreferences.getInstance();
+  final key = 'post_registration_trial_email_link_shown_$userId';
+  if (prefs.getBool(key) == true) return;
+  if (!context.mounted) return;
+  await showPostRegistrationTrialDialog(context);
+  if (!context.mounted) return;
+  await prefs.setBool(key, true);
+}
 
-/// После успешной регистрации: условия бесплатного периода 72 ч и Pro, оплата, поддержка.
+/// Условия бесплатного периода 72 ч и Pro, оплата, поддержка.
 Future<void> showPostRegistrationTrialDialog(BuildContext context) async {
   final loc = context.read<LocalizationService>();
   final theme = Theme.of(context);
@@ -53,23 +70,6 @@ Future<void> showPostRegistrationTrialDialog(BuildContext context) async {
             Text(
               loc.t('post_registration_trial_footer'),
               style: theme.textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 6),
-            InkWell(
-              onTap: () async {
-                final uri = Uri.parse('mailto:$kRestodocksSupportEmail');
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
-              child: Text(
-                kRestodocksSupportEmail,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.primary,
-                  decoration: TextDecoration.underline,
-                  decorationColor: theme.colorScheme.primary,
-                ),
-              ),
             ),
           ],
         ),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models/haccp_log_type.dart';
@@ -1760,53 +1761,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  void _showSupportDialog(BuildContext context, LocalizationService loc) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('contact_support')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.telegram, color: Color(0xFF2AABEE)),
-              title: const Text('Telegram'),
-              subtitle: const Text('@restodocks'),
-              onTap: () async {
-                final uri = Uri.parse('https://t.me/restodocks');
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-                if (ctx.mounted) Navigator.of(ctx).pop();
-              },
-            ),
-            ListTile(
-              leading:
-                  const Icon(Icons.email_outlined, color: Colors.redAccent),
-              title: Text(loc.t('email')),
-              subtitle: const Text('info@restodocks.com'),
-              onTap: () {
-                Navigator.of(ctx).pop();
-                _showSupportEmailForm(context, loc);
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(MaterialLocalizations.of(ctx).closeButtonLabel),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showSupportEmailForm(BuildContext context, LocalizationService loc) {
     final accountManager = context.read<AccountManagerSupabase>();
-    final userEmail = accountManager.currentEmployee?.email ?? '';
+    final authEmail =
+        Supabase.instance.client.auth.currentUser?.email?.trim() ?? '';
+    final userEmail = authEmail.isNotEmpty
+        ? authEmail
+        : (accountManager.currentEmployee?.email ?? '').trim();
 
     final categories = [
+      loc.t('support_category_pro_testing'),
       loc.t('support_category_bug'),
       loc.t('support_category_question'),
       loc.t('support_category_suggestion'),
@@ -1828,6 +1792,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text(
+                  loc.t('support_account_email'),
+                  style: Theme.of(ctx2).textTheme.labelMedium,
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Theme.of(ctx2).dividerColor,
+                    ),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: SelectableText(
+                    userEmail.isEmpty ? '—' : userEmail,
+                    style: Theme.of(ctx2).textTheme.bodyMedium,
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Text(loc.t('support_category'),
                     style: Theme.of(ctx2).textTheme.labelMedium),
                 const SizedBox(height: 6),
@@ -1867,6 +1852,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     alignLabelWithHint: true,
                   ),
                 ),
+                const SizedBox(height: 16),
+                InkWell(
+                  onTap: isSending
+                      ? null
+                      : () async {
+                          final uri = Uri.parse('https://t.me/restodocks');
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri,
+                                mode: LaunchMode.externalApplication);
+                          }
+                        },
+                  child: Row(
+                    children: [
+                      const Icon(Icons.telegram, color: Color(0xFF2AABEE)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Telegram @restodocks',
+                          style: Theme.of(ctx2).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(ctx2).colorScheme.primary,
+                                decoration: TextDecoration.underline,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -1881,6 +1893,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   : () async {
                       final subject = subjectController.text.trim();
                       final message = messageController.text.trim();
+                      if (userEmail.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text(loc.t('support_missing_account_email'))),
+                        );
+                        return;
+                      }
                       if (subject.isEmpty || message.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text(loc.t('support_fill_all'))),
@@ -2552,7 +2571,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: Text(localization.t('contact_support')),
               subtitle: Text(localization.t('contact_support_subtitle')),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => _showSupportDialog(context, localization),
+              onTap: () => _showSupportEmailForm(context, localization),
             ),
             const Divider(),
             ListTile(
