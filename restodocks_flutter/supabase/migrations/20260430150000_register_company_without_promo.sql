@@ -1,5 +1,9 @@
 -- Регистрация компании без промокода: 72 ч доступа к Pro-функциям (pro_trial_ends_at), затем free.
 -- Промокод из админки по-прежнему даёт постоянный Pro через register_company_with_promo.
+--
+-- ВАЖНО: выполняйте весь файл одним запуском (Supabase CLI, psql, «Run» без выделения куска).
+-- Если в SQL Editor запускать по одной команде, разбитой по «;», тело PL/pgSQL внутри $$…$$
+-- обрежется → ERROR 42601 syntax error at end of input (часто LINE 0).
 
 ALTER TABLE public.establishments
   ADD COLUMN IF NOT EXISTS pro_trial_ends_at TIMESTAMPTZ;
