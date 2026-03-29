@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../services/services.dart';
 import '../models/models.dart';
+import '../widgets/post_registration_trial_dialog.dart';
 
 /// Регистрация владельца после создания компании. PIN подставлен с предыдущего шага.
 class OwnerRegistrationScreen extends StatefulWidget {
@@ -99,6 +100,9 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         final result = await accSupabase.completePendingOwnerRegistration();
         if (result != null) {
           await accountManager.login(result.employee, result.establishment);
+          if (!mounted) return;
+          await showPostRegistrationTrialDialog(context);
+          if (!mounted) return;
           context.go('/home');
           if (!emailResult.ok && mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

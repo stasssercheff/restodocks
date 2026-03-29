@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config/roles_config.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/post_registration_trial_dialog.dart';
 
 /// Один раз за сессию показываем подсказку про PIN заведения при открытии экрана.
 bool _employeeRegisterPinHintShownThisSession = false;
@@ -230,6 +231,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
       if (hasSession) {
         await accountManager.login(employee, establishment);
+        if (!mounted) return;
+        await showPostRegistrationTrialDialog(context);
+        if (!mounted) return;
         context.go('/home');
       } else {
         context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
