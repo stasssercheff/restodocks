@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/feature_flags.dart';
 import '../../services/services.dart';
 import '../../services/home_layout_config_service.dart';
 import '../../services/screen_layout_preference_service.dart';
@@ -180,6 +181,13 @@ class StaffHomeContent extends StatelessWidget {
         employee.department == 'dining_room';
     final ordered = <Widget>[];
     for (final id in order) {
+      if (!FeatureFlags.posModuleEnabled &&
+          (id == HomeTileId.hallOrders ||
+              id == HomeTileId.hallCashRegister ||
+              id == HomeTileId.hallTables ||
+              id == HomeTileId.departmentOrders)) {
+        continue;
+      }
       if ((id == HomeTileId.hallOrders ||
               id == HomeTileId.hallCashRegister ||
               id == HomeTileId.hallTables) &&

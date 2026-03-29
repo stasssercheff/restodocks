@@ -16,4 +16,8 @@ class FeatureFlags {
     if (!isBeta) return true; // прод — кнопка всегда
     return const String.fromEnvironment('ENABLE_TTK_IMPORT', defaultValue: 'false') == 'true';
   }
+
+  /// POS / склад / закупка / зал (столы, касса, заказы подразделений, KDS, смена).
+  /// В **production** (`IS_BETA=false`, см. `cloudflare-build-prod.sh`) скрыто. В Beta — включено.
+  static bool get posModuleEnabled => isBeta;
 }

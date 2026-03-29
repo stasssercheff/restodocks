@@ -55,6 +55,7 @@ import '../../services/ai_service.dart';
 import '../../services/services.dart';
 import '../../widgets/app_shell.dart';
 import '../../widgets/inbox_notification_listener.dart';
+import '../feature_flags.dart';
 import '../theme/app_theme.dart';
 
 /// Emails владельцев платформы — единственные кто видит /admin
@@ -183,6 +184,16 @@ class AppRouter {
       // Web: сохраняем путь для F5 fallback
       if (kIsWeb && loc.isNotEmpty && loc != '/' && loc != '/splash') {
         initial_loc.savePathForRefresh(loc);
+      }
+      // Production: модуль POS недоступен (только Beta / IS_BETA=true)
+      if (account.isLoggedInSync && !FeatureFlags.posModuleEnabled) {
+        final p = loc.split('?').first;
+        if (p.startsWith('/pos') ||
+            p == '/settings/orders-display' ||
+            p == '/settings/fiscal-tax' ||
+            p == '/settings/fiscal-outbox') {
+          return '/';
+        }
       }
       return null;
     },

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../services/services.dart';
 import '../../services/screen_layout_preference_service.dart';
 import '../../models/models.dart';
+import '../../core/feature_flags.dart';
 import '../../utils/pos_hall_permissions.dart';
 import 'expandable_banquet_section.dart';
 
@@ -152,7 +153,7 @@ class ManagementHomeContent extends StatelessWidget {
             title: loc.t('product_order'),
             onTap: () => context.go(
                 '/product-order?department=${_deptForRoute(employee.department)}')),
-        if (dept == 'hall') ...[
+        if (FeatureFlags.posModuleEnabled && dept == 'hall') ...[
           _Tile(
             icon: Icons.receipt_long,
             title: loc.t('order_tab_orders') ?? 'Заказы',
@@ -175,7 +176,7 @@ class ManagementHomeContent extends StatelessWidget {
               onTap: () => context.push('/pos/shift-report'),
             ),
         ],
-        if (dept == 'kitchen' || dept == 'bar') ...[
+        if (FeatureFlags.posModuleEnabled && (dept == 'kitchen' || dept == 'bar')) ...[
           _Tile(
             icon: Icons.receipt_long,
             title: loc.t('order_tab_orders') ?? 'Заказы',
@@ -188,16 +189,18 @@ class ManagementHomeContent extends StatelessWidget {
             onTap: () => context.push('/pos/kds/$dept'),
           ),
         ],
-        _Tile(
-          icon: Icons.warehouse,
-          title: loc.t('pos_nav_warehouse') ?? 'Склад',
-          onTap: () => context.push('/pos/warehouse/$dept'),
-        ),
-        _Tile(
-          icon: Icons.local_shipping,
-          title: loc.t('pos_nav_procurement') ?? 'Закупка',
-          onTap: () => context.push('/pos/procurement/$dept'),
-        ),
+        if (FeatureFlags.posModuleEnabled) ...[
+          _Tile(
+            icon: Icons.warehouse,
+            title: loc.t('pos_nav_warehouse') ?? 'Склад',
+            onTap: () => context.push('/pos/warehouse/$dept'),
+          ),
+          _Tile(
+            icon: Icons.local_shipping,
+            title: loc.t('pos_nav_procurement') ?? 'Закупка',
+            onTap: () => context.push('/pos/procurement/$dept'),
+          ),
+        ],
         _Tile(
             icon: Icons.assignment,
             title: loc.t('inventory_blank'),

@@ -2142,7 +2142,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ],
             ),
-            if (posCanConfigureOrdersDisplay(currentEmployee))
+            if (FeatureFlags.posModuleEnabled &&
+                posCanConfigureOrdersDisplay(currentEmployee))
               ListTile(
                 leading: const Icon(Icons.tune),
                 title: Text(localization.t('pos_orders_display_settings_title') ??
@@ -2155,7 +2156,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/settings/orders-display'),
               ),
-            if (posCanManageFiscalTaxSettings(currentEmployee))
+            if (FeatureFlags.posModuleEnabled &&
+                posCanManageFiscalTaxSettings(currentEmployee))
               ListTile(
                 leading: const Icon(Icons.account_balance_outlined),
                 title: Text(localization.t('fiscal_settings_title')),

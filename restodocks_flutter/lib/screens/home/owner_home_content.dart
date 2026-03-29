@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/feature_flags.dart';
 import '../../services/services.dart';
 
 /// Домашняя страница владельца: график, кухня, бар, зал, менеджмент, уведомления, расходы.
@@ -170,24 +171,26 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 title: loc.t('product_order'),
                 onTap: () => context.go('/product-order?department=kitchen')),
             'home-order-kitchen'),
-        _wrap(
-            _Tile(
-                icon: Icons.receipt_long,
-                title: loc.t('order_tab_orders') ?? 'Заказы',
-                onTap: () => context.push('/pos/orders/kitchen')),
-            'home-pos-orders-kitchen'),
-        _wrap(
-            _Tile(
-                icon: Icons.warehouse,
-                title: loc.t('pos_nav_warehouse') ?? 'Склад',
-                onTap: () => context.push('/pos/warehouse/kitchen')),
-            'home-pos-wh-kitchen'),
-        _wrap(
-            _Tile(
-                icon: Icons.local_shipping,
-                title: loc.t('pos_nav_procurement') ?? 'Закупка',
-                onTap: () => context.push('/pos/procurement/kitchen')),
-            'home-pos-pr-kitchen'),
+        if (FeatureFlags.posModuleEnabled) ...[
+          _wrap(
+              _Tile(
+                  icon: Icons.receipt_long,
+                  title: loc.t('order_tab_orders') ?? 'Заказы',
+                  onTap: () => context.push('/pos/orders/kitchen')),
+              'home-pos-orders-kitchen'),
+          _wrap(
+              _Tile(
+                  icon: Icons.warehouse,
+                  title: loc.t('pos_nav_warehouse') ?? 'Склад',
+                  onTap: () => context.push('/pos/warehouse/kitchen')),
+              'home-pos-wh-kitchen'),
+          _wrap(
+              _Tile(
+                  icon: Icons.local_shipping,
+                  title: loc.t('pos_nav_procurement') ?? 'Закупка',
+                  onTap: () => context.push('/pos/procurement/kitchen')),
+              'home-pos-pr-kitchen'),
+        ],
         _wrap(
             _Tile(
                 icon: Icons.remove_circle_outline,
@@ -241,24 +244,26 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                   title: loc.t('product_order'),
                   onTap: () => context.go('/product-order?department=bar')),
               'home-order-bar'),
-          _wrap(
-              _Tile(
-                  icon: Icons.receipt_long,
-                  title: loc.t('order_tab_orders') ?? 'Заказы',
-                  onTap: () => context.push('/pos/orders/bar')),
-              'home-pos-orders-bar'),
-          _wrap(
-              _Tile(
-                  icon: Icons.warehouse,
-                  title: loc.t('pos_nav_warehouse') ?? 'Склад',
-                  onTap: () => context.push('/pos/warehouse/bar')),
-              'home-pos-wh-bar'),
-          _wrap(
-              _Tile(
-                  icon: Icons.local_shipping,
-                  title: loc.t('pos_nav_procurement') ?? 'Закупка',
-                  onTap: () => context.push('/pos/procurement/bar')),
-              'home-pos-pr-bar'),
+          if (FeatureFlags.posModuleEnabled) ...[
+            _wrap(
+                _Tile(
+                    icon: Icons.receipt_long,
+                    title: loc.t('order_tab_orders') ?? 'Заказы',
+                    onTap: () => context.push('/pos/orders/bar')),
+                'home-pos-orders-bar'),
+            _wrap(
+                _Tile(
+                    icon: Icons.warehouse,
+                    title: loc.t('pos_nav_warehouse') ?? 'Склад',
+                    onTap: () => context.push('/pos/warehouse/bar')),
+                'home-pos-wh-bar'),
+            _wrap(
+                _Tile(
+                    icon: Icons.local_shipping,
+                    title: loc.t('pos_nav_procurement') ?? 'Закупка',
+                    onTap: () => context.push('/pos/procurement/bar')),
+                'home-pos-pr-bar'),
+          ],
           _wrap(
               _Tile(
                   icon: Icons.remove_circle_outline,
@@ -307,36 +312,38 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                   title: loc.t('product_order'),
                   onTap: () => context.go('/product-order?department=hall')),
               'home-order-hall'),
-          _wrap(
-              _Tile(
-                  icon: Icons.receipt_long,
-                  title: loc.t('order_tab_orders') ?? 'Заказы',
-                  onTap: () => context.push('/pos/hall/orders')),
-              'home-pos-orders-hall'),
-          _wrap(
-              _Tile(
-                  icon: Icons.point_of_sale,
-                  title: loc.t('pos_nav_cash_register') ?? 'Касса',
-                  onTap: () => context.push('/pos/hall/cash-register')),
-              'home-pos-cash-hall'),
-          _wrap(
-              _Tile(
-                  icon: Icons.table_restaurant,
-                  title: loc.t('pos_nav_tables') ?? 'Столы',
-                  onTap: () => context.push('/pos/hall/tables')),
-              'home-pos-tables-hall'),
-          _wrap(
-              _Tile(
-                  icon: Icons.warehouse,
-                  title: loc.t('pos_nav_warehouse') ?? 'Склад',
-                  onTap: () => context.push('/pos/warehouse/hall')),
-              'home-pos-wh-hall'),
-          _wrap(
-              _Tile(
-                  icon: Icons.local_shipping,
-                  title: loc.t('pos_nav_procurement') ?? 'Закупка',
-                  onTap: () => context.push('/pos/procurement/hall')),
-              'home-pos-pr-hall'),
+          if (FeatureFlags.posModuleEnabled) ...[
+            _wrap(
+                _Tile(
+                    icon: Icons.receipt_long,
+                    title: loc.t('order_tab_orders') ?? 'Заказы',
+                    onTap: () => context.push('/pos/hall/orders')),
+                'home-pos-orders-hall'),
+            _wrap(
+                _Tile(
+                    icon: Icons.point_of_sale,
+                    title: loc.t('pos_nav_cash_register') ?? 'Касса',
+                    onTap: () => context.push('/pos/hall/cash-register')),
+                'home-pos-cash-hall'),
+            _wrap(
+                _Tile(
+                    icon: Icons.table_restaurant,
+                    title: loc.t('pos_nav_tables') ?? 'Столы',
+                    onTap: () => context.push('/pos/hall/tables')),
+                'home-pos-tables-hall'),
+            _wrap(
+                _Tile(
+                    icon: Icons.warehouse,
+                    title: loc.t('pos_nav_warehouse') ?? 'Склад',
+                    onTap: () => context.push('/pos/warehouse/hall')),
+                'home-pos-wh-hall'),
+            _wrap(
+                _Tile(
+                    icon: Icons.local_shipping,
+                    title: loc.t('pos_nav_procurement') ?? 'Закупка',
+                    onTap: () => context.push('/pos/procurement/hall')),
+                'home-pos-pr-hall'),
+          ],
           _wrap(
               _Tile(
                   icon: Icons.remove_circle_outline,
@@ -344,17 +351,19 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                   onTap: () => context.push('/writeoffs')),
               'home-writeoffs-hall'),
         ],
-        const SizedBox(height: 16),
-        _SectionTitle(
-            title: loc.t('pos_warehouse_establishment_section') ??
-                'Склад заведения'),
-        _wrap(
-            _Tile(
-                icon: Icons.warehouse,
-                title: loc.t('pos_warehouse_establishment_title') ??
-                    'Сводно по заведению',
-                onTap: () => context.push('/pos/warehouse/establishment')),
-            'home-pos-wh-est'),
+        if (FeatureFlags.posModuleEnabled) ...[
+          const SizedBox(height: 16),
+          _SectionTitle(
+              title: loc.t('pos_warehouse_establishment_section') ??
+                  'Склад заведения'),
+          _wrap(
+              _Tile(
+                  icon: Icons.warehouse,
+                  title: loc.t('pos_warehouse_establishment_title') ??
+                      'Сводно по заведению',
+                  onTap: () => context.push('/pos/warehouse/establishment')),
+              'home-pos-wh-est'),
+        ],
         if (screenPref.showBanquetCatering) ...[
           const SizedBox(height: 16),
           _ExpandableBanquetSection(loc: loc),
