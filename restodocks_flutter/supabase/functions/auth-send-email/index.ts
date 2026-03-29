@@ -37,6 +37,11 @@ Deno.serve(async (req) => {
     // Supabase GET /verify ожидает параметр "token" (значение = token_hash). token_hash= не работает.
     const verifyUrl = `${SUPABASE_URL}/auth/v1/verify?token=${encodeURIComponent(token_hash)}&type=${encodeURIComponent(email_action_type)}&redirect_to=${encodeURIComponent(redirect_to)}`;
 
+    const confirmClickHref =
+      email_action_type === "signup" || email_action_type === "magiclink"
+        ? `${CONFIRM_CLICK_URL}?token_hash=${encodeURIComponent(token_hash)}&type=${encodeURIComponent(email_action_type)}`
+        : verifyUrl;
+
     const subjectMap: Record<string, string> = {
       signup: "Подтвердите регистрацию — Restodocks",
       magiclink: "Вход по ссылке — Restodocks",
