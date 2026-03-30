@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -109,9 +111,17 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         }
       }
 
-      // Письмо подтверждения отправляет Supabase Auth (шаблон/хук auth-send-email).
-      // Не вызываем send-registration-email: при неконсистентных Edge secrets это даёт 401
-      // и путает пользователя, хотя регистрация уже успешно создана.
+      // Инфо-письмо отправляем через Resend (best-effort, не блокирует регистрацию).
+      unawaited(
+        EmailService().sendRegistrationEmail(
+          isOwner: true,
+          to: email,
+          companyName: estab.name,
+          email: email,
+          pinCode: estab.pinCode,
+          languageCode: loc.currentLanguageCode,
+        ),
+      );
 
       if (!mounted) return;
       if (signUpResult.hasSession) {

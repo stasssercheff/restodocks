@@ -40,6 +40,13 @@ function mergedAllowedOrigins(): string[] {
   return out;
 }
 
+export function isAllowedOrigin(req: Request): boolean {
+  const requestOrigin = req.headers.get("origin");
+  if (!requestOrigin) return true;
+  const allowlist = mergedAllowedOrigins();
+  return allowlist.some((rule) => matchesOriginRule(requestOrigin, rule));
+}
+
 export function resolveCorsHeaders(req: Request): Record<string, string> {
   const requestOrigin = req.headers.get("origin");
   const allowlist = mergedAllowedOrigins();

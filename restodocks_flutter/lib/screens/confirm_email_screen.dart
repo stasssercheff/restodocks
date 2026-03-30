@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/services.dart';
 
@@ -71,6 +72,28 @@ class ConfirmEmailScreen extends StatelessWidget {
                   fontStyle: FontStyle.italic,
                 ),
                 textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  try {
+                    await Supabase.instance.client.auth.resend(
+                      type: OtpType.signup,
+                      email: email,
+                    );
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(loc.t('confirmation_link_sent'))),
+                    );
+                  } catch (_) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(loc.t('confirmation_link_error'))),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.mark_email_read_outlined),
+                label: Text(loc.t('send_confirmation_link')),
               ),
             ],
           ),

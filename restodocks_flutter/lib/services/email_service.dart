@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import '../utils/dev_log.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -28,6 +27,7 @@ class EmailService {
     required String email,
     String? pinCode,
     String? passwordForConfirmation,
+    String? languageCode,
   }) async {
     try {
       final body = {
@@ -38,6 +38,8 @@ class EmailService {
         if (pinCode != null) 'pinCode': pinCode,
         if (passwordForConfirmation != null && passwordForConfirmation.isNotEmpty)
           'password': passwordForConfirmation,
+        if (languageCode != null && languageCode.trim().isNotEmpty)
+          'language': languageCode.trim().toLowerCase(),
       };
       final res = await postEdgeFunctionWithRetry('send-registration-email', body);
       if (res.status == 200) return (ok: true, error: null);

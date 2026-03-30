@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import '../utils/dev_log.dart';
 import 'package:go_router/go_router.dart';
@@ -216,8 +218,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
         birthday: _birthday,
       );
 
-      // Подтверждение отправляет Supabase Auth (mail template / auth-send-email hook).
-      // Не дублируем send-registration-email, чтобы не сыпать 401 из Edge и не ломать UX.
+      // Инфо-письмо через Resend (best-effort, не блокирует регистрацию).
+      unawaited(
+        EmailService().sendRegistrationEmail(
+          isOwner: false,
+          to: email,
+          companyName: establishment.name,
+          email: email,
+          languageCode: locUi,
+        ),
+      );
 
       if (!mounted) return;
       if (hasSession) {
