@@ -10,6 +10,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/auth_session_lifecycle.dart';
 import 'core/core.dart';
 import 'core/deep_link_bootstrap.dart';
 import 'core/mobile_deep_link_listener.dart';
@@ -237,7 +238,8 @@ class RestodocksApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // RestodocksApp.build() called
-    return MultiProvider(
+    return AuthSessionLifecycle(
+      child: MultiProvider(
       providers: AppProviders.providers,
       child: _TranslationManagerConnector(
         child: Consumer2<LocalizationService, ThemeService>(
@@ -285,6 +287,7 @@ class RestodocksApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
           );
         },
+      ),
       ),
       ),
     );
