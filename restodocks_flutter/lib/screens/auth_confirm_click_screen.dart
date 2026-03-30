@@ -17,6 +17,7 @@ class AuthConfirmClickScreen extends StatefulWidget {
     required this.redirectParam,
     this.tokenHash = '',
     this.otpType = '',
+    this.languageCode = '',
   });
 
   /// Legacy: Base64url-encoded Supabase verify URL (query param r)
@@ -24,6 +25,7 @@ class AuthConfirmClickScreen extends StatefulWidget {
   /// token_hash + type → verifyOtp (предпочтительный способ)
   final String tokenHash;
   final String otpType;
+  final String languageCode;
 
   @override
   State<AuthConfirmClickScreen> createState() => _AuthConfirmClickScreenState();
@@ -38,6 +40,15 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
   @override
   void initState() {
     super.initState();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    final lang = widget.languageCode.trim().toLowerCase();
+    if (lang.isNotEmpty && LocalizationService.isSupportedLanguageCode(lang)) {
+      await LocalizationService().setLocale(Locale(lang));
+    }
+    if (!mounted) return;
     if (_hasTokenHash) {
       _performVerify();
     } else if (widget.redirectParam.isNotEmpty) {

@@ -7,8 +7,20 @@ import {
   resolveCorsHeaders,
 } from "../_shared/security.ts";
 
-const REDIRECT_URL = "https://restodocks.com/auth/confirm";
-const CONFIRM_CLICK_URL = "https://restodocks.com/auth/confirm-click";
+function resolveAppBaseUrl(req: Request): string {
+  const origin = req.headers.get("origin")?.trim();
+  if (origin && /^https:\/\/([a-z0-9-]+\.)*restodocks\.pages\.dev$/i.test(origin)) {
+    return origin;
+  }
+  if (origin && /^https:\/\/(www\.)?restodocks\.com$/i.test(origin)) {
+    return origin;
+  }
+  const envUrl = Deno.env.get("APP_URL")?.trim();
+  if (envUrl && (envUrl.startsWith("https://") || envUrl.startsWith("http://"))) {
+    return envUrl.replace(/\/+$/, "");
+  }
+  return "https://restodocks.com";
+}
 
 function extractTokenHashFromActionLink(actionLink: string): { token_hash: string; type: string } | null {
   try {
@@ -66,6 +78,9 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     const { type, to, companyName, email, fullName, registeredAtLocal, pinCode, password } = body;
     const lang = normalizeLanguage(body.language);
+    const appBaseUrl = resolveAppBaseUrl(req);
+    const redirectUrl = `${appBaseUrl}/auth/confirm`;
+    const confirmClickUrl = `${appBaseUrl}/auth/confirm-click`;
 
     if (type === "confirmation_only" && to) {
       const supabaseUrl = Deno.env.get("SUPABASE_URL");
@@ -84,7 +99,7 @@ export async function handleRequest(req: Request): Promise<Response> {
             type: "signup",
             email: to.trim(),
             password,
-            options: { redirectTo: REDIRECT_URL },
+            options: { redirectTo: redirectUrl },
           });
           if (!r1.error && r1.data?.properties?.action_link) link = r1.data.properties.action_link;
         }
@@ -92,7 +107,7 @@ export async function handleRequest(req: Request): Promise<Response> {
           const r2 = await supabase.auth.admin.generateLink({
             type: "magiclink",
             email: to.trim(),
-            options: { redirectTo: REDIRECT_URL },
+            options: { redirectTo: redirectUrl },
           });
           if (!r2.error && r2.data?.properties?.action_link) link = r2.data.properties.action_link;
         }
@@ -104,8 +119,8 @@ export async function handleRequest(req: Request): Promise<Response> {
         }
         const extracted = extractTokenHashFromActionLink(link);
         const wrappedHref = extracted
-          ? `${CONFIRM_CLICK_URL}?token_hash=${encodeURIComponent(extracted.token_hash)}&type=${encodeURIComponent(extracted.type)}`
-          : `${CONFIRM_CLICK_URL}?r=${btoa(link).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`;
+          ? `${confirmClickUrl}?token_hash=${encodeURIComponent(extracted.token_hash)}&type=${encodeURIComponent(extracted.type)}&lang=${encodeURIComponent(lang)}`
+          : `${confirmClickUrl}?r=${btoa(link).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}&lang=${encodeURIComponent(lang)}`;
         const copy = i18nCopy(lang);
         const subject = copy.confirmSubject;
         const html = `

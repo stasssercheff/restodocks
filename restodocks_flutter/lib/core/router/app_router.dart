@@ -322,10 +322,11 @@ class AppRouter {
           final r = state.queryParameters['r'] ?? '';
           final tokenHash = state.queryParameters['token_hash'] ?? '';
           final type = state.queryParameters['type'] ?? '';
+          final lang = state.queryParameters['lang'] ?? '';
           return _slideTransitionPage(
             state,
             AuthConfirmClickScreen(
-                redirectParam: r, tokenHash: tokenHash, otpType: type),
+                redirectParam: r, tokenHash: tokenHash, otpType: type, languageCode: lang),
           );
         },
       ),
