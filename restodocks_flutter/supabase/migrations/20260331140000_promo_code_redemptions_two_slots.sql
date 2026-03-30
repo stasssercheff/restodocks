@@ -209,6 +209,13 @@ BEGIN
 END;
 $$;
 
+COMMENT ON FUNCTION public.get_establishment_promo_for_owner(uuid) IS
+  'Код и срок промокода для заведения (через погашения); только собственник.';
+
+REVOKE ALL ON FUNCTION public.get_establishment_promo_for_owner(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_establishment_promo_for_owner(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_establishment_promo_for_owner(uuid) TO service_role;
+
 CREATE OR REPLACE FUNCTION public.register_company_with_promo(
   p_code text,
   p_name text,
