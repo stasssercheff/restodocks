@@ -150,8 +150,8 @@ class ProductStoreSupabase {
             ..sort();
           _hasFullProductCatalog = true;
 
-          // Фоновая подгрузка КБЖУ для продуктов без калорий (в течение суток)
-          NutritionBackfillService().startBackgroundBackfill(this);
+          // Фоновая подгрузка КБЖУ — после текущего кадра, чтобы AccountManager успел завершить init.
+          scheduleMicrotask(() => NutritionBackfillService().startBackgroundBackfill(this));
           final cacheKey = await _offlineCache.scopedKey(
             dataset: _productsCacheDataset,
             establishmentId: 'global',
