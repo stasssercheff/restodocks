@@ -8,7 +8,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/redirect_to_url_stub.dart'
     if (dart.library.html) '../core/redirect_to_url_web.dart' as redirect_impl;
 import '../services/services.dart';
-import '../widgets/post_registration_trial_dialog.dart';
 
 /// Ссылка в письме ведёт сюда. Сразу вызываем verifyOTP (одноразовый токен), при успехе — /home.
 class AuthConfirmClickScreen extends StatefulWidget {
@@ -33,7 +32,6 @@ class AuthConfirmClickScreen extends StatefulWidget {
 
 class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
   String? _error;
-  bool _loading = false;
 
   bool get _hasTokenHash => widget.tokenHash.isNotEmpty && widget.otpType.isNotEmpty;
 
@@ -62,7 +60,6 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
     if (!_hasTokenHash) return;
     final account = context.read<AccountManagerSupabase>();
     final router = GoRouter.of(context);
-    setState(() => _loading = true);
     try {
       final otpType = widget.otpType == 'signup' ? OtpType.signup : OtpType.magiclink;
       final res = await Supabase.instance.client.auth.verifyOTP(
@@ -76,7 +73,11 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
           await account.initialize(forceRetryFromAuth: true);
           if (!mounted) return;
           if (account.isLoggedInSync) {
-            await maybeShowPostRegistrationTrialDialogAfterEmailLink(context, account);
+            final lang = widget.languageCode.trim().toLowerCase();
+            if (lang.isNotEmpty && LocalizationService.isSupportedLanguageCode(lang)) {
+              await account.savePreferredLanguage(lang);
+              await LocalizationService().setLocale(Locale(lang));
+            }
             if (!mounted) return;
             router.go('/home');
             return;
@@ -90,12 +91,9 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
       if (!mounted) return;
       setState(() {
         _error = 'Ссылка истекла или уже использована. Войдите по паролю.';
-        _loading = false;
       });
       return;
     }
-    if (!mounted) return;
-    setState(() => _loading = false);
     router.go('/login');
   }
 
