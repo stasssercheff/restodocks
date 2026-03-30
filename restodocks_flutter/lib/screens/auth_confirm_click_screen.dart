@@ -33,6 +33,21 @@ class AuthConfirmClickScreen extends StatefulWidget {
 class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
   String? _error;
 
+  Future<void> _applyLocaleAfterAuth(AccountManagerSupabase account) async {
+    final lang = widget.languageCode.trim().toLowerCase();
+    if (lang.isNotEmpty && LocalizationService.isSupportedLanguageCode(lang)) {
+      await account.savePreferredLanguage(lang);
+      await LocalizationService().setLocale(Locale(lang));
+      return;
+    }
+    final preferred = account.currentEmployee?.preferredLanguage?.trim().toLowerCase();
+    if (preferred != null &&
+        preferred.isNotEmpty &&
+        LocalizationService.isSupportedLanguageCode(preferred)) {
+      await LocalizationService().setLocale(Locale(preferred));
+    }
+  }
+
   bool get _hasTokenHash => widget.tokenHash.isNotEmpty && widget.otpType.isNotEmpty;
 
   @override
@@ -73,11 +88,7 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
           await account.initialize(forceRetryFromAuth: true);
           if (!mounted) return;
           if (account.isLoggedInSync) {
-            final lang = widget.languageCode.trim().toLowerCase();
-            if (lang.isNotEmpty && LocalizationService.isSupportedLanguageCode(lang)) {
-              await account.savePreferredLanguage(lang);
-              await LocalizationService().setLocale(Locale(lang));
-            }
+            await _applyLocaleAfterAuth(account);
             if (!mounted) return;
             router.go('/home');
             return;

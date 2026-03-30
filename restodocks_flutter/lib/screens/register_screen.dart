@@ -182,7 +182,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       bool hasSession = false;
       try {
         devLog('DEBUG: Attempting Supabase Auth signUp for email: $email');
-        final signUpRes = await accountManager.signUpToSupabaseAuth(email, password);
+        final signUpRes = await accountManager.signUpToSupabaseAuth(
+          email,
+          password,
+          interfaceLanguageCode: locUi,
+        );
         authUserId = signUpRes.userId;
         hasSession = signUpRes.hasSession;
         devLog('DEBUG: Supabase Auth signUp: userId=$authUserId, hasSession=$hasSession');

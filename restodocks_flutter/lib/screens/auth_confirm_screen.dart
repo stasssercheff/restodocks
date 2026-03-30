@@ -23,6 +23,24 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
   String _status = '';
   bool _showLoginButton = false;
 
+  Future<void> _applyLocaleAfterAuth(
+    AccountManagerSupabase account,
+    String langFromLink,
+  ) async {
+    final linkLang = langFromLink.trim().toLowerCase();
+    if (linkLang.isNotEmpty && LocalizationService.isSupportedLanguageCode(linkLang)) {
+      await account.savePreferredLanguage(linkLang);
+      await LocalizationService().setLocale(Locale(linkLang));
+      return;
+    }
+    final preferred = account.currentEmployee?.preferredLanguage?.trim().toLowerCase();
+    if (preferred != null &&
+        preferred.isNotEmpty &&
+        LocalizationService.isSupportedLanguageCode(preferred)) {
+      await LocalizationService().setLocale(Locale(preferred));
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -66,10 +84,7 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
     if (!mounted) return;
 
     if (account.isLoggedInSync) {
-      if (lang.isNotEmpty && LocalizationService.isSupportedLanguageCode(lang)) {
-        await account.savePreferredLanguage(lang);
-        await LocalizationService().setLocale(Locale(lang));
-      }
+      await _applyLocaleAfterAuth(account, lang);
       clear_hash.clearHashFromUrl();
       if (!mounted) return;
       context.go('/home');
@@ -86,10 +101,7 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
       await account.initialize(forceRetryFromAuth: true);
       if (!mounted) return;
       if (account.isLoggedInSync) {
-        if (lang.isNotEmpty && LocalizationService.isSupportedLanguageCode(lang)) {
-          await account.savePreferredLanguage(lang);
-          await LocalizationService().setLocale(Locale(lang));
-        }
+        await _applyLocaleAfterAuth(account, lang);
         clear_hash.clearHashFromUrl();
         if (!mounted) return;
         context.go('/home');

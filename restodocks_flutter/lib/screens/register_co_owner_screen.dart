@@ -68,7 +68,11 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
       final establishment = _invitationData!['establishments'] as Map<String, dynamic>;
 
       final accSupabase = accountManager as AccountManagerSupabase;
-      final signUpResult = await accSupabase.signUpWithEmailForOwner(email, password);
+      final signUpResult = await accSupabase.signUpWithEmailForOwner(
+        email,
+        password,
+        interfaceLanguageCode: context.read<LocalizationService>().currentLanguageCode,
+      );
       if (signUpResult.userId == null) throw Exception('Не удалось создать учётную запись');
 
       if (!signUpResult.hasSession) {

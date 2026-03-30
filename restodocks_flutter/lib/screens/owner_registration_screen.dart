@@ -86,7 +86,11 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       final password = _passwordController.text;
       // 1. Supabase Auth
       final accSupabase = accountManager as AccountManagerSupabase;
-      final signUpResult = await accSupabase.signUpWithEmailForOwner(email, password);
+      final signUpResult = await accSupabase.signUpWithEmailForOwner(
+        email,
+        password,
+        interfaceLanguageCode: context.read<LocalizationService>().currentLanguageCode,
+      );
       final authUserId = signUpResult.userId;
       if (authUserId == null) throw Exception('Не удалось создать учётную запись');
 

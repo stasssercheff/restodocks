@@ -615,7 +615,10 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Регистрация в Supabase Auth (для сотрудников). Возвращает (userId, hasSession).
   Future<({String? userId, bool hasSession})> signUpToSupabaseAuth(
-      String email, String password) async {
+    String email,
+    String password, {
+    String? interfaceLanguageCode,
+  }) async {
     final emailTrim = email.trim();
     devLog('DEBUG: signUpToSupabaseAuth called with email: $emailTrim');
 
@@ -639,7 +642,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     // Если вход не удался, пробуем зарегистрировать нового пользователя
     try {
       devLog('DEBUG: Attempting signUp...');
-      final redirectUrl = _getEmailRedirectUrl();
+      final redirectUrl = _getEmailRedirectUrl(interfaceLanguageCode);
       final res = await _supabase.signUpWithEmail(emailTrim, password,
           emailRedirectTo: redirectUrl);
       final uid = res.user?.id ?? _supabase.currentUser?.id;
@@ -673,19 +676,28 @@ class AccountManagerSupabase extends ChangeNotifier {
   }
 
   /// URL для редиректа после подтверждения. Всегда production — Supabase требует точного совпадения с Redirect URLs.
-  static String _getEmailRedirectUrl() {
-    return 'https://restodocks.com';
+  static String _getEmailRedirectUrl([String? languageCode]) {
+    final lang = languageCode?.trim().toLowerCase();
+    if (lang != null &&
+        lang.isNotEmpty &&
+        LocalizationService.isSupportedLanguageCode(lang)) {
+      return 'https://restodocks.com/auth/confirm?lang=$lang';
+    }
+    return 'https://restodocks.com/auth/confirm';
   }
 
   /// Регистрация владельца в Supabase Auth (employees.id = auth.users.id — создаём auth первым)
   /// Возвращает (auth user id, есть ли сессия).
   /// При Confirm Email session = null — пользователь должен подтвердить почту.
   Future<({String? userId, bool hasSession})> signUpWithEmailForOwner(
-      String email, String password) async {
+    String email,
+    String password, {
+    String? interfaceLanguageCode,
+  }) async {
     final res = await _supabase.signUpWithEmail(
       email.trim(),
       password,
-      emailRedirectTo: _getEmailRedirectUrl(),
+      emailRedirectTo: _getEmailRedirectUrl(interfaceLanguageCode),
     );
     final uid = res.user?.id ?? _supabase.currentUser?.id;
     final hasSession = res.session != null;

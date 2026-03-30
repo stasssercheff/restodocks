@@ -78,8 +78,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       if (!mounted) return;
       await GettingStartedReadService.setRead(emp.id);
-      final owner = accountManager.currentEmployee;
-      if (owner != null && owner.hasRole('owner')) {
+      if (emp.hasRole('owner')) {
         await _maybeShowOwnerTrialWelcomeDialog(context, accountManager);
       } else {
         if (!mounted) return;
