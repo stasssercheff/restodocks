@@ -107,7 +107,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     try {
       final ts = context.read<TranslationService>();
       final ids = _techCardIdsForTranslationOverlay(allEstablishmentCards);
-      const chunkSize = 90;
+      const chunkSize = 28;
       final totalChunks =
           ids.isEmpty ? 0 : (ids.length + chunkSize - 1) ~/ chunkSize;
       final preMissing =

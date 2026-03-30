@@ -327,7 +327,7 @@ class TranslationService {
   }) async {
     final out = <String, String>{};
     if (techCardIds.isEmpty) return out;
-    const chunkSize = 90;
+    const chunkSize = 28;
     final totalChunks = (techCardIds.length + chunkSize - 1) ~/ chunkSize;
     var chunkIndex = 0;
     for (var i = 0; i < techCardIds.length; i += chunkSize) {

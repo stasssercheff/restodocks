@@ -47,3 +47,11 @@ verify_jwt = false
 # auto-translate-product: вызывается из приложения и скриптов batch_translate (anon key)
 [functions.auto-translate-product]
 verify_jwt = false
+
+# translate-text: DeepL; функция сама проверяет apikey/JWT (security.ts). Иначе шлюз режет 401 до тела запроса.
+[functions.translate-text]
+verify_jwt = false
+
+# auth-password-proxy: web вход через серверный fetch к GoTrue (обход 522 на прямом auth/v1/token из браузера)
+[functions.auth-password-proxy]
+verify_jwt = false

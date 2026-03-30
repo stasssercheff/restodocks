@@ -407,15 +407,20 @@ class _LoginScreenState extends State<LoginScreen> {
           final am = context.read<AccountManagerSupabase>();
           final detail = am.lastLoginError ?? '';
           final unconfirmed = _isUnconfirmedError(detail);
+          final serviceDown = _isServiceUnavailableError(detail);
           // Не показывать технические детали для неверного пароля — только понятное сообщение
           final isInvalidCredentials = _isInvalidCredentialsError(detail);
           setState(() {
             _isUnconfirmedEmail = unconfirmed;
-            _errorMessage = unconfirmed
-                ? loc.t('email_not_confirmed_resend_prompt')
-                : (detail.isNotEmpty && !isInvalidCredentials
-                    ? '${loc.t('invalid_email_or_password')}\n\n$detail'
-                    : loc.t('invalid_email_or_password'));
+            if (serviceDown) {
+              _errorMessage = _loginServiceUnavailableMessage(loc);
+            } else {
+              _errorMessage = unconfirmed
+                  ? loc.t('email_not_confirmed_resend_prompt')
+                  : (detail.isNotEmpty && !isInvalidCredentials
+                      ? '${loc.t('invalid_email_or_password')}\n\n$detail'
+                      : loc.t('invalid_email_or_password'));
+            }
           });
         }
         return;
@@ -556,6 +561,29 @@ class _LoginScreenState extends State<LoginScreen> {
         s.contains('invalid login credentials') ||
         s.contains('legacy: 401 invalid credentials') ||
         s.contains('authapiexception');
+  }
+
+  /// 521/503/прокси — не путать с неверным паролем.
+  bool _isServiceUnavailableError(String text) {
+    final s = text.toLowerCase();
+    return text == 'login_service_unavailable' ||
+        s.contains('521') ||
+        s.contains('522') ||
+        s.contains('upstream_unavailable') ||
+        s.contains('authretryablefetchexception') ||
+        s.contains('load failed') && s.contains('auth/v1/token') ||
+        s.contains('база данных временно недоступна') ||
+        s.contains('database is temporarily unavailable');
+  }
+
+  String _loginServiceUnavailableMessage(LocalizationService loc) {
+    return loc.currentLanguageCode == 'ru'
+        ? 'Сервис входа временно недоступен (сеть или хостинг Supabase). '
+            'Подождите несколько минут или попробуйте другую сеть. '
+            'Коды 521/503 в консоли — это сбой до сервера, а не неверный пароль.'
+        : 'Sign-in is temporarily unavailable (network or Supabase hosting). '
+            'Wait a few minutes or try another connection. '
+            'Errors 521/503 mean the server could not be reached — not a wrong password.';
   }
 
   Future<void> _resendConfirmationLink() async {

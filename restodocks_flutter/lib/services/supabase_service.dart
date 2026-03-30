@@ -1,7 +1,11 @@
+import 'dart:convert';
 import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
-import '../utils/dev_log.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../utils/dev_log.dart';
+import 'edge_function_http.dart';
 
 /// Сервис для работы с Supabase
 class SupabaseService {
@@ -29,7 +33,40 @@ class SupabaseService {
   bool get isAuthenticated => currentUser != null;
 
   /// Вход по email и паролю
+  ///
+  /// На web сначала [auth-password-proxy] (серверный вызов GoTrue password grant), чтобы обойти
+  /// таймауты Cloudflare (522) и ложные CORS на прямом запросе к `auth/v1/token` из браузера.
   Future<AuthResponse> signInWithEmail(String email, String password) async {
+    if (kIsWeb) {
+      final r = await postEdgeFunctionWithRetry(
+        'auth-password-proxy',
+        {'email': email, 'password': password},
+        bearerAlwaysAnon: true,
+      );
+      if (r.status >= 200 &&
+          r.status < 300 &&
+          r.data != null &&
+          r.data!['access_token'] != null) {
+        return await client.auth.recoverSession(jsonEncode(r.data));
+      }
+      // 4xx — ответ GoTrue (неверный пароль и т.д.); можно повторить прямым вызовом.
+      if (r.status >= 400 && r.status < 500) {
+        devLog('auth-password-proxy: ${r.status}, direct signInWithPassword');
+        return await client.auth.signInWithPassword(
+          email: email,
+          password: password,
+        );
+      }
+      // 5xx/0/прочее: прямой auth/v1/token из браузера обычно даёт тот же 521/522+CORS — не дёргаем.
+      devLog(
+        'auth-password-proxy: unavailable status=${r.status}, skip browser token',
+      );
+      throw AuthException(
+        'supabase_login_unavailable',
+        statusCode: r.status > 0 ? '${r.status}' : null,
+        code: 'supabase_login_unavailable',
+      );
+    }
     return await client.auth.signInWithPassword(
       email: email,
       password: password,
@@ -38,7 +75,8 @@ class SupabaseService {
 
   /// Регистрация нового пользователя.
   /// [emailRedirectTo] — URL для редиректа после подтверждения (настройте Site URL в Supabase Dashboard).
-  Future<AuthResponse> signUpWithEmail(String email, String password, {String? emailRedirectTo}) async {
+  Future<AuthResponse> signUpWithEmail(String email, String password,
+      {String? emailRedirectTo}) async {
     if (emailRedirectTo != null) {
       return await client.auth.signUp(
         email: email,
@@ -67,13 +105,15 @@ class SupabaseService {
   }
 
   /// Вставка данных в таблицу
-  Future<Map<String, dynamic>> insertData(String tableName, Map<String, dynamic> data) async {
+  Future<Map<String, dynamic>> insertData(
+      String tableName, Map<String, dynamic> data) async {
     if (kDebugMode) {
       devLog('SupabaseService: insert $tableName');
     }
     final response = await client.from(tableName).insert(data).select();
     if (response.isEmpty) {
-      throw Exception('Insert into $tableName returned empty response — row was not saved');
+      throw Exception(
+          'Insert into $tableName returned empty response — row was not saved');
     }
     return response.first;
   }
@@ -86,15 +126,14 @@ class SupabaseService {
     dynamic value,
   ) async {
     try {
-      final response = await client
-          .from(tableName)
-          .update(data)
-          .eq(column, value)
-          .select();
+      final response =
+          await client.from(tableName).update(data).eq(column, value).select();
       final list = response is List ? response as List : <dynamic>[];
       if (list.isNotEmpty) {
         final first = list.first;
-        return first is Map<String, dynamic> ? Map<String, dynamic>.from(first) : {...data, column: value};
+        return first is Map<String, dynamic>
+            ? Map<String, dynamic>.from(first)
+            : {...data, column: value};
       }
       // 0 строк — RLS блокирует или запись не найдена. Показываем ошибку пользователю.
       throw Exception(
@@ -103,13 +142,15 @@ class SupabaseService {
       );
     } catch (e) {
       if (e is Exception) rethrow;
-      if (kDebugMode) devLog('SupabaseService: updateData error ($tableName): $e');
+      if (kDebugMode)
+        devLog('SupabaseService: updateData error ($tableName): $e');
       rethrow;
     }
   }
 
   /// Удаление данных из таблицы
-  Future<void> deleteData(String tableName, String column, dynamic value) async {
+  Future<void> deleteData(
+      String tableName, String column, dynamic value) async {
     await client.from(tableName).delete().eq(column, value);
   }
 
@@ -120,10 +161,10 @@ class SupabaseService {
     List<int> fileBytes,
   ) async {
     final response = await client.storage.from(bucketName).uploadBinary(
-      fileName,
-      Uint8List.fromList(fileBytes),
-      fileOptions: const FileOptions(upsert: true),
-    );
+          fileName,
+          Uint8List.fromList(fileBytes),
+          fileOptions: const FileOptions(upsert: true),
+        );
     return response;
   }
 

@@ -12,6 +12,25 @@ import '../models/nomenclature_item.dart';
 import 'offline_cache_service.dart';
 import 'supabase_service.dart';
 
+/// Ошибка шлюза/сети: не путать с «нет колонки department» — иначе три SELECT подряд + RPC только усугубляют шторм при 502/503.
+bool _isLikelyGatewayOrNetworkError(Object e) {
+  if (e is PostgrestException) {
+    final c = e.code;
+    if (c != null && const {'502', '503', '504', '522'}.contains(c)) return true;
+  }
+  final msg = e.toString().toLowerCase();
+  return msg.contains('502') ||
+      msg.contains('503') ||
+      msg.contains('504') ||
+      msg.contains('522') ||
+      msg.contains('network') ||
+      msg.contains('failed host lookup') ||
+      msg.contains('socketexception') ||
+      msg.contains('clientexception') ||
+      msg.contains('connection timed out') ||
+      msg.contains('origin') && msg.contains('cors');
+}
+
 /// Сервис управления продуктами с использованием Supabase
 class ProductStoreSupabase {
   static final ProductStoreSupabase _instance =
@@ -730,6 +749,10 @@ class ProductStoreSupabase {
           .eq('establishment_id', establishmentId)
           .limit(10000);
     } catch (e) {
+      if (_isLikelyGatewayOrNetworkError(e)) {
+        devLog('⚠️ ProductStore: establishment_products aborted (gateway/network), no schema fallbacks: $e');
+        rethrow;
+      }
       devLog(
           '⚠️ ProductStore: Full select failed (price/currency columns may not exist), trying product_id only: $e');
       try {
@@ -739,6 +762,7 @@ class ProductStoreSupabase {
             .eq('establishment_id', establishmentId)
             .limit(10000);
       } catch (e2) {
+        if (_isLikelyGatewayOrNetworkError(e2)) rethrow;
         devLog('⚠️ ProductStore: select without department failed: $e2');
         response = await _supabase.client
             .from('establishment_products')
@@ -774,6 +798,11 @@ class ProductStoreSupabase {
       _nomenclatureDeptByProduct.clear();
       _priceCache
           .removeWhere((key, _) => key.startsWith('${establishmentId}_'));
+      if (_isLikelyGatewayOrNetworkError(e)) {
+        devLog(
+            '⚠️ ProductStore: skip RPC/alt fallbacks while upstream is gateway/network (avoids request storm)');
+        rethrow;
+      }
       try {
         await _loadNomenclatureFallback(establishmentId);
       } catch (fallbackError) {

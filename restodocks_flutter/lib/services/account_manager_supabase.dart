@@ -3,6 +3,7 @@ import 'dart:async' show unawaited;
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show AuthException;
 import 'package:restodocks/core/supabase_env.dart';
 import 'package:restodocks/core/supabase_url_resolver_stub.dart'
     if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart'
@@ -863,6 +864,13 @@ class AccountManagerSupabase extends ChangeNotifier {
       if (authErr is Exception &&
           authErr.toString().contains('employee_not_found')) {
         rethrow;
+      }
+      if (authErr is AuthException &&
+          authErr.code == 'supabase_login_unavailable') {
+        lastLoginError = 'login_service_unavailable';
+        devLog(
+            '🔐 Login: Supabase Auth unavailable (web), skip legacy authenticate-employee');
+        return null;
       }
       // Логируем всегда — иначе в prod (kDebugMode=false) не увидим причину
       lastLoginError =

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:feature_spotlight/feature_spotlight.dart';
 import 'package:flutter/foundation.dart';
 
@@ -65,8 +67,11 @@ class PageTourService extends ChangeNotifier {
           .select('id')
           .eq('employee_id', employeeId)
           .eq('page_key', pageKey)
-          .maybeSingle();
+          .maybeSingle()
+          .timeout(const Duration(seconds: 8));
       return res != null;
+    } on TimeoutException catch (_) {
+      return true;
     } catch (_) {
       return false;
     }

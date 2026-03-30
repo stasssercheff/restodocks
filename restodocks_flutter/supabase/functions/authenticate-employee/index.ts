@@ -77,6 +77,61 @@ function checkRateLimit(ip: string): boolean {
   return true;
 }
 
+/** Cloudflare 522 / HTML-страница вместо JSON — таймаут до origin Supabase. */
+function isTransientUpstreamError(err: { message?: string; details?: string } | null): boolean {
+  if (!err) return false;
+  const m = `${err.message ?? ""}\n${err.details ?? ""}`;
+  return /522|connection timed out|<!doctype|cloudflare.*error|502|503|504/i.test(m);
+}
+
+function formatDbErrorForLog(err: { message?: string } | null): string {
+  const m = err?.message ?? "";
+  if (!m) return "(empty)";
+  if (m.includes("<!DOCTYPE") || m.length > 400) {
+    if (/522|Connection timed out/i.test(m)) return "upstream 522 (Cloudflare HTML, origin timeout)";
+    return `non-JSON/long error (${m.length} chars)`;
+  }
+  return m;
+}
+
+const DB_RETRY_MAX = 3;
+const DB_RETRY_BASE_MS = 400;
+
+async function fetchEmployeesWithRetry(
+  supabase: ReturnType<typeof createClient>,
+  email: string,
+  establishmentId: string | undefined,
+): Promise<{ data: unknown; error: { message?: string; details?: string } | null }> {
+  let last: { data: unknown; error: { message?: string; details?: string } | null } = {
+    data: null,
+    error: { message: "no attempt" },
+  };
+  for (let attempt = 0; attempt < DB_RETRY_MAX; attempt++) {
+    if (attempt > 0) {
+      const delay = DB_RETRY_BASE_MS * attempt;
+      console.warn(`[authenticate-employee] retry employee query after ${delay}ms (attempt ${attempt + 1}/${DB_RETRY_MAX})`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+    let q = supabase
+      .from("employees")
+      .select(
+        "id, auth_user_id, email, full_name, surname, roles, establishment_id, department, section, is_active, password_hash, preferred_language, data_access_enabled, can_edit_own_schedule",
+      )
+      .ilike("email", email)
+      .eq("is_active", true)
+      .limit(5);
+    if (establishmentId) {
+      q = q.eq("establishment_id", establishmentId);
+    }
+    const { data, error } = await q;
+    last = { data, error };
+    if (!error) return last;
+    if (!isTransientUpstreamError(error)) break;
+    console.warn("[authenticate-employee] transient DB error:", formatDbErrorForLog(error));
+  }
+  return last;
+}
+
 Deno.serve(async (req: Request) => {
   const cors = corsHeaders(req.headers.get("Origin"));
   if (req.method === "OPTIONS") {
@@ -133,22 +188,25 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Ищем сотрудников по email (limit 5 — один email редко в >5 заведениях)
-    let query = supabase
-      .from("employees")
-      .select("id, auth_user_id, email, full_name, surname, roles, establishment_id, department, section, is_active, password_hash, preferred_language, data_access_enabled, can_edit_own_schedule")
-      .ilike("email", email)
-      .eq("is_active", true)
-      .limit(5);
-
-    if (establishmentId) {
-      query = query.eq("establishment_id", establishmentId);
-    }
-
-    const { data: employees, error: empError } = await query;
+    const { data: employees, error: empError } = await fetchEmployeesWithRetry(
+      supabase,
+      email,
+      establishmentId,
+    );
 
     if (empError) {
-      console.error("[authenticate-employee] DB error:", empError.message);
+      const transient = isTransientUpstreamError(empError);
+      console.error("[authenticate-employee] DB error:", formatDbErrorForLog(empError));
+      if (transient) {
+        return new Response(
+          JSON.stringify({
+            error: "upstream_unavailable",
+            message:
+              "База данных временно недоступна (таймаут сети). Попробуйте через минуту или зайдите с другого устройства/сети.",
+          }),
+          { status: 503, headers: { ...cors, "Content-Type": "application/json", "Retry-After": "60" } },
+        );
+      }
       return new Response(
         JSON.stringify({ error: "Database error" }),
         { status: 500, headers: { ...cors, "Content-Type": "application/json" } }

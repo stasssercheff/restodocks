@@ -1,0 +1,31 @@
+-- Идемпотентное повторение для окружений, где старая миграция уже была; корень репо теперь тоже содержит эту схему.
+
+CREATE TABLE IF NOT EXISTS public.employee_page_tour_seen (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  employee_id UUID NOT NULL REFERENCES public.employees(id) ON DELETE CASCADE,
+  page_key TEXT NOT NULL,
+  seen_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+  UNIQUE(employee_id, page_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_employee_page_tour_seen_employee
+  ON public.employee_page_tour_seen(employee_id);
+
+ALTER TABLE public.employee_page_tour_seen ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Employee manages own tour progress" ON public.employee_page_tour_seen;
+CREATE POLICY "Employee manages own tour progress"
+  ON public.employee_page_tour_seen
+  FOR ALL
+  USING (
+    employee_id IN (
+      SELECT id FROM public.employees
+      WHERE auth_user_id = auth.uid() OR id = auth.uid()
+    )
+  )
+  WITH CHECK (
+    employee_id IN (
+      SELECT id FROM public.employees
+      WHERE auth_user_id = auth.uid() OR id = auth.uid()
+    )
+  );

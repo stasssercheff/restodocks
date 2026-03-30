@@ -14,6 +14,7 @@ import 'core/core.dart';
 import 'core/deep_link_bootstrap.dart';
 import 'core/mobile_deep_link_listener.dart';
 import 'core/supabase_env.dart';
+import 'core/supabase_retry_http_client.dart';
 import 'utils/dev_log.dart';
 import 'core/initial_location_stub.dart'
     if (dart.library.html) 'core/initial_location_web.dart' as initial_loc;
@@ -54,6 +55,7 @@ Future<void> _bootstrapApp() async {
   await Supabase.initialize(
     url: supabaseUrl,
     anonKey: kSupabaseAnonKeyFromEnvironment,
+    httpClient: createSupabaseRetryHttpClient(),
     authOptions: const FlutterAuthClientOptions(
       detectSessionInUri: true,
       authFlowType: AuthFlowType.implicit, // сессия из hash при переходе по ссылке подтверждения
