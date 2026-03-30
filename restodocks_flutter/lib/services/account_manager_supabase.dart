@@ -79,7 +79,10 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// Предпочитаемый язык пользователя
   String get preferredLanguage => _currentEmployee?.preferredLanguage ?? 'ru';
 
-  /// Pro/Premium или активные 72 ч пробного Pro (см. establishments.pro_trial_ends_at).
+  /// Подписка Pro/Premium на заведении (без учёта 72 ч trial).
+  bool get hasPaidProSubscription => _establishment?.hasPaidProAccess ?? false;
+
+  /// Pro/Premium или активное окно 72 ч (см. establishments.pro_trial_ends_at).
   bool get hasProSubscription => _establishment?.hasEffectiveProAccess ?? false;
 
   /// Co-owner с view_only: только просмотр (при >1 заведении у пригласившего)
@@ -359,7 +362,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     return createdEstablishment;
   }
 
-  /// Регистрация без промокода: 72 ч Pro (pro_trial_ends_at на сервере), затем free.
+  /// Регистрация без промокода: 72 ч trial (pro_trial_ends_at на сервере), затем free до подписки/промокода.
   Future<Establishment> registerCompanyWithoutPromo({
     required String name,
     required String address,
@@ -1099,6 +1102,13 @@ class AccountManagerSupabase extends ChangeNotifier {
       devLog('🔐 findEmployeeByEmailAndPassword error: $e');
       return null;
     }
+  }
+
+  /// Обновить текущего сотрудника в памяти после PATCH в БД (без повторной загрузки).
+  void mergeCurrentEmployeeInMemory(Employee updated) {
+    if (_currentEmployee?.id != updated.id) return;
+    _currentEmployee = updated;
+    notifyListeners();
   }
 
   /// Вход в систему

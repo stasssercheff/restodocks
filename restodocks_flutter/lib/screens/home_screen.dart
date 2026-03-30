@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:feature_spotlight/feature_spotlight.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../config/home_tour_config.dart';
@@ -59,25 +60,76 @@ class _HomeScreenState extends State<HomeScreen> {
     final emp = accountManager.currentEmployee;
     if (emp == null) return;
     _firstEntryCheckDone = true;
-    // Показываем «Начало работы» только если не было ни одной сессии.
+    // Первый заход: фиксируем first_session_at в БД и сразу в памяти — иначе при каждом
+    // новом билде HomeScreen поле в Employee остаётся null и модалка показывается снова.
     if (emp.firstSessionAt == null) {
+      final nowUtc = DateTime.now().toUtc();
       try {
-        await accountManager.supabase.client
-            .from('employees')
-            .update({'first_session_at': DateTime.now().toUtc().toIso8601String()})
-            .eq('id', emp.id);
+        await accountManager.supabase.client.from('employees').update(
+            {'first_session_at': nowUtc.toIso8601String()}).eq('id', emp.id);
       } catch (_) {
         if (!mounted) return;
         _maybeShowHomeTour(emp.id);
         return;
       }
       if (!mounted) return;
-      await GettingStartedReadService.setRead(emp.id);
+      accountManager.mergeCurrentEmployeeInMemory(
+        emp.copyWith(firstSessionAt: nowUtc),
+      );
       if (!mounted) return;
-      await _showFirstEntryDialog(context, emp.id);
+      await GettingStartedReadService.setRead(emp.id);
+      final owner = accountManager.currentEmployee;
+      if (owner != null && owner.hasRole('owner')) {
+        if (!mounted) return;
+        await _showFirstEntryDialog(context, owner.id);
+        if (!mounted) return;
+        await _maybeShowOwnerTrialWelcomeDialog(context, accountManager);
+      }
     }
     if (!mounted) return;
     _maybeShowHomeTour(emp.id);
+  }
+
+  /// Регистрация без промокода: 72 ч пробного доступа с лимитами — один раз пояснить условия.
+  Future<void> _maybeShowOwnerTrialWelcomeDialog(
+    BuildContext context,
+    AccountManagerSupabase accountManager,
+  ) async {
+    if (!context.mounted) return;
+    final emp = accountManager.currentEmployee;
+    final est = accountManager.establishment;
+    if (emp == null || est == null || !emp.hasRole('owner')) return;
+    if (await GettingStartedReadService.isOwnerTrialWelcomeSeen(emp.id)) return;
+    if (!context.mounted) return;
+
+    final st = est.subscriptionType?.toLowerCase().trim();
+    if (st == 'pro' || st == 'premium') return;
+    final trialEnd = est.proTrialEndsAt;
+    if (trialEnd == null || !DateTime.now().isBefore(trialEnd)) return;
+
+    final loc = context.read<LocalizationService>();
+    final localeTag = loc.currentLanguageCode == 'ru' ? 'ru_RU' : loc.currentLanguageCode;
+    final formattedEnd =
+        DateFormat.yMMMd(localeTag).format(trialEnd.toLocal());
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('owner_trial_welcome_title')),
+        content: SingleChildScrollView(
+          child: Text(
+            loc.t('owner_trial_welcome_body').replaceFirst('%s', formattedEnd),
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('start_work')),
+          ),
+        ],
+      ),
+    );
+    await GettingStartedReadService.setOwnerTrialWelcomeSeen(emp.id);
   }
 
   Future<void> _maybeShowHomeTour(String employeeId) async {
@@ -283,15 +335,12 @@ class _HomeScreenState extends State<HomeScreen> {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('training') ?? 'Обучение'),
-        content: Text(
-          loc.t('first_entry_training_hint') ??
-              'В настройках в разделе «Обучение» можно посмотреть видео и прочитать инструкцию.',
-        ),
+        title: Text(loc.t('training')),
+        content: Text(loc.t('first_entry_training_hint')),
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(loc.t('start_work') ?? 'Начать работу'),
+            child: Text(loc.t('start_work')),
           ),
         ],
       ),

@@ -261,7 +261,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _showPositionPicker(BuildContext context, Employee employee, LocalizationService loc, AccountManagerSupabase accountManager) {
     const visiblePositionCodes = [
-      'executive_chef', 'sous_chef', 'bar_manager', 'floor_manager', 'general_manager',
+      'executive_chef',
+      'bar_manager',
+      'floor_manager',
+      'general_manager',
     ];
     String getDisplayName(String? code) {
       if (code == null || code.isEmpty) return loc.t('no_position');

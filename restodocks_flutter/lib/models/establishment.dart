@@ -78,14 +78,21 @@ class Establishment extends Equatable {
   // Alias for subscriptionType for backward compatibility
   String? get subscriptionPlan => subscriptionType;
 
-  /// Постоянный Pro/Premium или активные 72 ч пробного Pro.
-  bool get hasEffectiveProAccess {
+  /// Оплаченный Pro/Premium или выданный промокодом (не окно 72 ч после регистрации).
+  bool get hasPaidProAccess {
     final st = subscriptionType?.toLowerCase().trim();
-    if (st == 'pro' || st == 'premium') return true;
-    final trial = proTrialEndsAt;
-    if (trial != null && DateTime.now().isBefore(trial)) return true;
-    return false;
+    return st == 'pro' || st == 'premium';
   }
+
+  /// Активны 72 ч после регистрации без промокода (`pro_trial_ends_at` в будущем).
+  bool get isProTrialWindowActive {
+    final trial = proTrialEndsAt;
+    return trial != null && DateTime.now().isBefore(trial);
+  }
+
+  /// Платный Pro/Premium или пробное окно 72 ч (для проверок «как раньше»).
+  /// Для разных лимитов trial vs paid используйте [hasPaidProAccess] и [isProTrialWindowActive].
+  bool get hasEffectiveProAccess => hasPaidProAccess || isProTrialWindowActive;
 
   /// Основное заведение (не филиал)
   bool get isMain => parentEstablishmentId == null || parentEstablishmentId!.isEmpty;

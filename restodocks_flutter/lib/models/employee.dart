@@ -340,8 +340,9 @@ class Employee extends Equatable {
     return hasRole('executive_chef') || hasRole('sous_chef');
   }
 
-  /// Создание и редактирование чеклистов, ТТК, карточек блюд: только шеф-повар и су-шеф
+  /// Создание и редактирование чеклистов, ТТК, карточек блюд: владелец (не view_only), шеф, су-шеф.
   bool get canEditChecklistsAndTechCards {
+    if (hasRole('owner') && !isViewOnlyOwner) return true;
     return hasRole('executive_chef') || hasRole('sous_chef');
   }
 
