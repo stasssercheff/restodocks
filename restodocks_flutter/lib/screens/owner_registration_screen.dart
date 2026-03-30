@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
 import '../services/services.dart';
 import '../models/models.dart';
@@ -85,15 +86,28 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
 
       // 2. Сохраняем pending — employee создадим после confirm (когда user в auth.users)
       final loc = context.read<LocalizationService>();
-      await accSupabase.savePendingOwnerRegistration(
-        authUserId: authUserId,
-        establishment: estab,
-        fullName: _nameController.text.trim(),
-        surname: _surnameController.text.trim().isEmpty ? null : _surnameController.text.trim(),
-        email: email,
-        roles: roles,
-        preferredLanguage: loc.currentLanguageCode,
-      );
+      // После signUp иногда auth.users ещё не “виден” в БД сразу (race),
+      // поэтому делаем небольшой ретрай по P0001.
+      final preferredLanguage = loc.currentLanguageCode;
+      for (var attempt = 1; attempt <= 5; attempt++) {
+        try {
+          await accSupabase.savePendingOwnerRegistration(
+            authUserId: authUserId,
+            establishment: estab,
+            fullName: _nameController.text.trim(),
+            surname: _surnameController.text.trim().isEmpty ? null : _surnameController.text.trim(),
+            email: email,
+            roles: roles,
+            preferredLanguage: preferredLanguage,
+          );
+          break;
+        } on PostgrestException catch (e) {
+          final isAuthMismatch = e.code == 'P0001' ||
+              e.message.toLowerCase().contains('auth user mismatch');
+          if (!isAuthMismatch || attempt >= 5) rethrow;
+          await Future<void>.delayed(Duration(milliseconds: 350 * attempt));
+        }
+      }
 
       // Письмо с PIN (без ссылки — чтобы не падало в спам)
       final emailService = EmailService();
