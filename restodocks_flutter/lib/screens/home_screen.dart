@@ -136,15 +136,28 @@ class _HomeScreenState extends State<HomeScreen> {
     final forceReplay = tourService.consumeReplayRequest(PageTourKeys.home);
     if (!forceReplay && await tourService.isPageTourSeen(employeeId, PageTourKeys.home)) return;
     if (!mounted) return;
-    final loc = context.read<LocalizationService>();
+
+    // Тур собирает строки один раз: дождаться языка профиля (async setLocale из main не гарантирует порядок кадров).
     final accountManager = context.read<AccountManagerSupabase>();
+    final locService = context.read<LocalizationService>();
+    final empPref = accountManager.currentEmployee?.preferredLanguage.trim().toLowerCase();
+    if (empPref != null &&
+        empPref.isNotEmpty &&
+        LocalizationService.isSupportedLanguageCode(empPref)) {
+      await locService.setLocale(Locale(empPref));
+    }
+    if (!mounted) return;
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return;
+
+    final loc = context.read<LocalizationService>();
     final emp = accountManager.currentEmployee;
     final isOwnerView = emp != null && emp.hasRole('owner') &&
         (emp.positionRole == null || context.read<OwnerViewPreferenceService>().viewAsOwner);
 
     final List<SpotlightStep> steps;
     if (isOwnerView) {
-      final ownerSteps = HomeTourConfig.ownerSteps(loc);
+      final ownerSteps = HomeTourConfig.ownerSteps();
       steps = [
         for (var i = 0; i < ownerSteps.length; i++)
           SpotlightStep(

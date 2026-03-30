@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/services.dart';
 
 /// Промежуточный экран после регистрации: «Подтвердите учётную запись».
-/// Письмо с PIN и письмо со ссылкой отправляются автоматически после регистрации.
+/// Письмо с PIN и письмо со ссылкой отправляются автоматически после регистрации (без кнопок повторной отправки).
 class ConfirmEmailScreen extends StatelessWidget {
   const ConfirmEmailScreen({super.key, required this.email});
 
@@ -71,34 +71,6 @@ class ConfirmEmailScreen extends StatelessWidget {
                   fontStyle: FontStyle.italic,
                 ),
                 textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  final result = await EmailService().sendConfirmationLinkRequest(
-                    email,
-                    languageCode: loc.currentLanguageCode,
-                  );
-                  if (!context.mounted) return;
-                  if (result.ok) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(loc.t('confirmation_link_sent'))),
-                    );
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          result.error?.isNotEmpty == true
-                              ? '${loc.t('confirmation_link_error')} (${result.error})'
-                              : loc.t('confirmation_link_error'),
-                        ),
-                      ),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.mark_email_read_outlined),
-                label: Text(loc.t('send_confirmation_link')),
               ),
             ],
           ),
