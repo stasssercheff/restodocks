@@ -44,6 +44,9 @@ class NutritionBackfillService {
     if (dataEst == null || dataEst.isEmpty) return;
     _running = true;
     try {
+      try {
+        await client.auth.refreshSession();
+      } catch (_) {}
       final prefs = await SharedPreferences.getInstance();
       final now = DateTime.now();
       final lastRunMs = prefs.getInt(_keyLastRun);

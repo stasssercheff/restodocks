@@ -44,6 +44,25 @@ class NutritionProfileResolver {
         s.contains('could not find the table');
   }
 
+  /// Anon или JWT ещё не подтянут на web: RLS не даёт SELECT → 403 / 42501.
+  /// Не трогаем [_nutritionRelationsUnavailable] — после refresh можно снова пробовать.
+  static bool _isNutritionLinksAccessDenied(Object e) {
+    if (e is PostgrestException) {
+      final code = (e.code ?? '').toUpperCase();
+      if (code == '42501') return true;
+      final blob =
+          '${e.message} ${e.details ?? ''} ${e.hint ?? ''}'.toLowerCase();
+      if (blob.contains('permission denied') ||
+          blob.contains('not authorized') ||
+          blob.contains('jwt')) {
+        return true;
+      }
+    }
+    final s = e.toString().toLowerCase();
+    return s.contains('statuscode: 403') ||
+        (s.contains('403') && s.contains('forbidden'));
+  }
+
   /// Normalize input to a deterministic key for alias/profile lookup.
   /// Keep it conservative: remove obvious noise (units/quantities/prefixes), but don't rewrite semantics.
   String normalizeNutritionKey(String input) {
@@ -121,6 +140,13 @@ class NutritionProfileResolver {
           devLog(
             'NutritionProfileResolver: product_nutrition_links unavailable, '
             'skipping nutrition backfill until reload (apply DB migration if needed)',
+          );
+          return false;
+        }
+        if (_isNutritionLinksAccessDenied(e)) {
+          devLog(
+            'NutritionProfileResolver: product_nutrition_links access denied '
+            '(anon or session not ready): $e',
           );
           return false;
         }

@@ -150,8 +150,9 @@ class ProductStoreSupabase {
             ..sort();
           _hasFullProductCatalog = true;
 
-          // Фоновая подгрузка КБЖУ — после текущего кадра, чтобы AccountManager успел завершить init.
-          scheduleMicrotask(() => NutritionBackfillService().startBackgroundBackfill(this));
+          // Фоновая подгрузка КБЖУ: на web JWT к PostgREST часто готов позже загрузки каталога;
+          // иначе product_nutrition_links уходит от anon → 403 (до политики anon SELECT).
+          unawaited(_scheduleNutritionBackfillAfterCatalogLoad());
           final cacheKey = await _offlineCache.scopedKey(
             dataset: _productsCacheDataset,
             establishmentId: 'global',
@@ -171,6 +172,16 @@ class ProductStoreSupabase {
       _isLoading = false;
       _bumpCatalogRevision();
     }
+  }
+
+  Future<void> _scheduleNutritionBackfillAfterCatalogLoad() async {
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    try {
+      final client = Supabase.instance.client;
+      if (client.auth.currentSession == null) return;
+      await client.auth.refreshSession();
+    } catch (_) {}
+    NutritionBackfillService().startBackgroundBackfill(this);
   }
 
   /// Получить продукты с фильтрами
