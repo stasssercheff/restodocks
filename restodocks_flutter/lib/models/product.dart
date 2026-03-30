@@ -35,6 +35,10 @@ class Product extends Equatable {
   @JsonKey(name: 'carbs')
   final double? carbs; // граммы
 
+  /// Пользователь подтвердил КБЖУ (в т.ч. нули); не дозаполнять автоматикой и не считать неполными.
+  @JsonKey(name: 'kbju_manually_confirmed')
+  final bool kbjuManuallyConfirmed;
+
   // Аллергены
   @JsonKey(name: 'contains_gluten')
   final bool? containsGluten;
@@ -80,6 +84,7 @@ class Product extends Equatable {
     this.protein,
     this.fat,
     this.carbs,
+    this.kbjuManuallyConfirmed = false,
     this.containsGluten,
     this.containsLactose,
     this.basePrice,
@@ -115,6 +120,7 @@ class Product extends Equatable {
     double? protein,
     double? fat,
     double? carbs,
+    bool? kbjuManuallyConfirmed,
     bool? containsGluten,
     bool? containsLactose,
     double? basePrice,
@@ -138,6 +144,8 @@ class Product extends Equatable {
       protein: protein ?? this.protein,
       fat: fat ?? this.fat,
       carbs: carbs ?? this.carbs,
+      kbjuManuallyConfirmed:
+          kbjuManuallyConfirmed ?? this.kbjuManuallyConfirmed,
       containsGluten: containsGluten ?? this.containsGluten,
       containsLactose: containsLactose ?? this.containsLactose,
       basePrice: basePrice ?? this.basePrice,
@@ -263,6 +271,7 @@ class Product extends Equatable {
     protein,
     fat,
     carbs,
+    kbjuManuallyConfirmed,
     containsGluten,
     containsLactose,
     basePrice,
@@ -284,6 +293,7 @@ class Product extends Equatable {
     double? protein,
     double? fat,
     double? carbs,
+    bool kbjuManuallyConfirmed = false,
     bool? containsGluten,
     bool? containsLactose,
     double? basePrice,
@@ -303,6 +313,7 @@ class Product extends Equatable {
       protein: protein,
       fat: fat,
       carbs: carbs,
+      kbjuManuallyConfirmed: kbjuManuallyConfirmed,
       containsGluten: containsGluten,
       containsLactose: containsLactose,
       basePrice: basePrice,

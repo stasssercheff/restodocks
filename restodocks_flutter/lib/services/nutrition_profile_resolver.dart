@@ -72,7 +72,11 @@ class NutritionProfileResolver {
   bool _needsLactose(Product p) => p.containsLactose == null;
 
   bool needsAnyNutrition(Product p) {
-    return _needsCalories(p) || _needsProtein(p) || _needsFat(p) || _needsCarbs(p);
+    if (p.kbjuManuallyConfirmed) return false;
+    return _needsCalories(p) ||
+        _needsProtein(p) ||
+        _needsFat(p) ||
+        _needsCarbs(p);
   }
 
   Future<bool> resolveAndApplyMissingNutrition({

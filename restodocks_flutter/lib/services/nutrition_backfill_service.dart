@@ -91,11 +91,13 @@ class NutritionBackfillService {
     }
   }
 
-  bool _needsKbju(Product p) =>
-      (p.calories == null || p.calories == 0) ||
-      p.protein == null ||
-      p.fat == null ||
-      p.carbs == null;
+  bool _needsKbju(Product p) {
+    if (p.kbjuManuallyConfirmed) return false;
+    return (p.calories == null || p.calories == 0) ||
+        p.protein == null ||
+        p.fat == null ||
+        p.carbs == null;
+  }
 
   /// Сбросить счётчик «за сегодня» (например, в полночь).
   static Future<void> resetDailyCount() async {

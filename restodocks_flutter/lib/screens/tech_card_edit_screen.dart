@@ -868,6 +868,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   final _compositionForHallController = TextEditingController();
   final _sellingPriceController = TextEditingController();
   final List<TTIngredient> _ingredients = [];
+
+  /// Кэш блока КБЖУ блюда (пересчёт только при изменении строк или данных продуктов в Store).
+  String? _dishKbjuDerivedKey;
+  List<String> _dishKbjuMissingNames = const [];
+  double _dishKbjuTotalCal = 0;
+  double _dishKbjuTotalProt = 0;
+  double _dishKbjuTotalFat = 0;
+  double _dishKbjuTotalCarb = 0;
+  String? _dishKbjuAllergenStr;
   List<TechCard> _pickerTechCards = [];
   List<TechCard> _semiFinishedProducts = [];
   double _portionWeight =
@@ -1914,6 +1923,78 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           _loading = false;
         });
     }
+  }
+
+  void _ensureDishKbjuDerived(
+      LocalizationService loc, ProductStoreSupabase store) {
+    final buf = StringBuffer();
+    for (final ing in _ingredients) {
+      buf.write(ing.productId);
+      buf.write('|');
+      buf.write(ing.finalCalories);
+      buf.write('|');
+      buf.write(ing.finalProtein);
+      buf.write('|');
+      buf.write(ing.finalFat);
+      buf.write('|');
+      buf.write(ing.finalCarbs);
+      buf.write('|');
+      buf.write(ing.hasData);
+      buf.write('|');
+      buf.write(ing.productName);
+      final p = store.findProductForIngredient(ing.productId, ing.productName);
+      buf.write(p?.containsGluten);
+      buf.write(p?.containsLactose);
+      buf.write(p?.kbjuManuallyConfirmed);
+    }
+    final key = buf.toString();
+    if (_dishKbjuDerivedKey == key) return;
+    _dishKbjuDerivedKey = key;
+
+    const eps = 1e-9;
+    var totalCal = 0.0;
+    var totalProt = 0.0;
+    var totalFat = 0.0;
+    var totalCarb = 0.0;
+    final missing = <String>[];
+    final seen = <String>{};
+    for (final ing in _ingredients) {
+      totalCal += ing.finalCalories;
+      totalProt += ing.finalProtein;
+      totalFat += ing.finalFat;
+      totalCarb += ing.finalCarbs;
+      if (!ing.hasData) continue;
+      final missingRow = ing.finalCalories.abs() < eps &&
+          ing.finalProtein.abs() < eps &&
+          ing.finalFat.abs() < eps &&
+          ing.finalCarbs.abs() < eps;
+      if (!missingRow) continue;
+      final name = ing.productName.trim();
+      if (name.isEmpty) continue;
+      final prod = store.findProductForIngredient(ing.productId, ing.productName);
+      if (prod != null && prod.kbjuManuallyConfirmed) continue;
+      if (seen.add(name)) missing.add(name);
+    }
+    final allergens = <String>[];
+    for (final ing in _ingredients.where((i) => i.productId != null)) {
+      final p = store.findProductForIngredient(ing.productId, ing.productName);
+      if (p?.containsGluten == true && !allergens.contains('глютен')) {
+        allergens.add('глютен');
+      }
+      if (p?.containsLactose == true && !allergens.contains('лактоза')) {
+        allergens.add('лактоза');
+      }
+    }
+    final allergenStr = allergens.isEmpty
+        ? (loc.currentLanguageCode == 'ru' ? 'нет' : 'none')
+        : allergens.join(', ');
+
+    _dishKbjuMissingNames = missing;
+    _dishKbjuTotalCal = totalCal;
+    _dishKbjuTotalProt = totalProt;
+    _dishKbjuTotalFat = totalFat;
+    _dishKbjuTotalCarb = totalCarb;
+    _dishKbjuAllergenStr = allergenStr;
   }
 
   /// Дополняет цены ингредиентов из номенклатуры (по productId или по названию).
@@ -5584,249 +5665,233 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                         ),
                         // КБЖУ и аллергены (только для блюда)
                         if (!_isSemiFinished && !tableOnlyView)
-                          Builder(
-                            builder: (ctx) {
-                              const eps = 1e-9;
-                              final totalCal = _ingredients.fold<double>(
-                                  0, (s, i) => s + i.finalCalories);
-                              final totalProt = _ingredients.fold<double>(
-                                  0, (s, i) => s + i.finalProtein);
-                              final totalFatVal = _ingredients.fold<double>(
-                                  0, (s, i) => s + i.finalFat);
-                              final totalCarbVal = _ingredients.fold<double>(
-                                  0, (s, i) => s + i.finalCarbs);
-                              final missingNutritionIngredients = <String>[];
-                              final seen = <String>{};
-                              for (final ing in _ingredients) {
-                                if (!ing.hasData) continue;
-                                final missing = ing.finalCalories.abs() < eps &&
-                                    ing.finalProtein.abs() < eps &&
-                                    ing.finalFat.abs() < eps &&
-                                    ing.finalCarbs.abs() < eps;
-                                if (!missing) continue;
-                                final name = ing.productName.trim();
-                                if (name.isEmpty) continue;
-                                if (seen.add(name))
-                                  missingNutritionIngredients.add(name);
-                              }
+                          RepaintBoundary(
+                            child: Builder(
+                              builder: (ctx) {
+                                final store =
+                                    context.read<ProductStoreSupabase>();
+                                _ensureDishKbjuDerived(loc, store);
 
-                              final showKbjuBlock = !(totalCal == 0 &&
-                                  totalProt == 0 &&
-                                  totalFatVal == 0 &&
-                                  totalCarbVal == 0);
+                                final totalCal = _dishKbjuTotalCal;
+                                final totalProt = _dishKbjuTotalProt;
+                                final totalFatVal = _dishKbjuTotalFat;
+                                final totalCarbVal = _dishKbjuTotalCarb;
+                                final missingNutritionIngredients =
+                                    _dishKbjuMissingNames;
+                                final allergenStr = _dishKbjuAllergenStr ??
+                                    (loc.currentLanguageCode == 'ru'
+                                        ? 'нет'
+                                        : 'none');
 
-                              final kbjuMarginTop =
-                                  missingNutritionIngredients.isNotEmpty
-                                      ? 8.0
-                                      : 12.0;
+                                final showKbjuBlock = !(totalCal == 0 &&
+                                    totalProt == 0 &&
+                                    totalFatVal == 0 &&
+                                    totalCarbVal == 0);
 
-                              String? warningText;
-                              if (missingNutritionIngredients.isNotEmpty) {
-                                const maxShown = 5;
-                                final shown = missingNutritionIngredients
-                                    .take(maxShown)
-                                    .join(', ');
-                                final remaining =
-                                    missingNutritionIngredients.length -
-                                        missingNutritionIngredients
-                                            .take(maxShown)
-                                            .length;
-                                final listText = remaining > 0
-                                    ? '$shown (+$remaining)'
-                                    : shown;
-                                warningText = loc
-                                    .t('kbju_incomplete_dish_nutrition_warning')
-                                    .replaceFirst('%s', listText);
-                              }
+                                final kbjuMarginTop =
+                                    missingNutritionIngredients.isNotEmpty
+                                        ? 8.0
+                                        : 12.0;
 
-                              void _showMissingNutritionDialog() {
-                                if (missingNutritionIngredients.isEmpty) return;
-                                showDialog<void>(
-                                  context: ctx,
-                                  builder: (dCtx) {
-                                    return AlertDialog(
-                                      title: Text(
-                                        loc.t(
-                                            'kbju_incomplete_dish_nutrition_title'),
-                                      ),
-                                      content: SizedBox(
-                                        width: 520,
-                                        height: 320,
-                                        child: ListView.builder(
-                                          itemCount: missingNutritionIngredients
-                                              .length,
-                                          itemBuilder: (c, idx) {
-                                            final name =
-                                                missingNutritionIngredients[
-                                                    idx];
-                                            return ListTile(
-                                              dense: true,
-                                              title: Text(
-                                                name,
-                                                maxLines: 2,
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            );
-                                          },
+                                String? warningText;
+                                if (missingNutritionIngredients.isNotEmpty) {
+                                  const maxShown = 5;
+                                  final shown = missingNutritionIngredients
+                                      .take(maxShown)
+                                      .join(', ');
+                                  final remaining =
+                                      missingNutritionIngredients.length -
+                                          missingNutritionIngredients
+                                              .take(maxShown)
+                                              .length;
+                                  final listText = remaining > 0
+                                      ? '$shown (+$remaining)'
+                                      : shown;
+                                  warningText = loc
+                                      .t(
+                                          'kbju_incomplete_dish_nutrition_warning')
+                                      .replaceFirst('%s', listText);
+                                }
+
+                                void showMissingNutritionDialog() {
+                                  if (missingNutritionIngredients.isEmpty) {
+                                    return;
+                                  }
+                                  showDialog<void>(
+                                    context: ctx,
+                                    builder: (dCtx) {
+                                      return AlertDialog(
+                                        title: Text(
+                                          loc.t(
+                                              'kbju_incomplete_dish_nutrition_title'),
+                                        ),
+                                        content: SizedBox(
+                                          width: 520,
+                                          height: 320,
+                                          child: ListView.builder(
+                                            itemCount:
+                                                missingNutritionIngredients
+                                                    .length,
+                                            itemBuilder: (c, idx) {
+                                              final name =
+                                                  missingNutritionIngredients[
+                                                      idx];
+                                              return ListTile(
+                                                dense: true,
+                                                title: Text(
+                                                  name,
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.of(dCtx).pop(),
+                                            child:
+                                                Text(loc.t('cancel') ?? 'OK'),
+                                          ),
+                                        ],
+                                      );
+                                    },
+                                  );
+                                }
+
+                                if (!showKbjuBlock) {
+                                  if (warningText == null) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
+                                      Container(
+                                        margin: const EdgeInsets.only(top: 12),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 10),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .errorContainer
+                                              .withOpacity(0.18),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .error
+                                                .withOpacity(0.35),
+                                          ),
+                                        ),
+                                        child: Text(
+                                          warningText,
+                                          style: const TextStyle(fontSize: 13),
                                         ),
                                       ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.of(dCtx).pop(),
-                                          child: Text(loc.t('cancel') ?? 'OK'),
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: TextButton(
+                                          onPressed: showMissingNutritionDialog,
+                                          child: Text(
+                                            loc.t(
+                                                    'kbju_incomplete_dish_nutrition_show_list') ??
+                                                'Показать список',
+                                          ),
                                         ),
-                                      ],
-                                    );
-                                  },
-                                );
-                              }
+                                      ),
+                                    ],
+                                  );
+                                }
 
-                              if (!showKbjuBlock) {
-                                if (warningText == null)
-                                  return const SizedBox.shrink();
                                 return Column(
                                   crossAxisAlignment:
                                       CrossAxisAlignment.stretch,
                                   children: [
+                                    if (warningText != null)
+                                      Container(
+                                        margin: const EdgeInsets.only(
+                                            top: 12, bottom: 8),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 10),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .errorContainer
+                                              .withOpacity(0.18),
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          border: Border.all(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .error
+                                                .withOpacity(0.35),
+                                          ),
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              warningText,
+                                              style: const TextStyle(
+                                                  fontSize: 13),
+                                            ),
+                                            Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: TextButton(
+                                                onPressed:
+                                                    showMissingNutritionDialog,
+                                                child: Text(
+                                                  loc.t(
+                                                          'kbju_incomplete_dish_nutrition_show_list') ??
+                                                      'Показать список',
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     Container(
-                                      margin: const EdgeInsets.only(top: 12),
+                                      margin:
+                                          EdgeInsets.only(top: kbjuMarginTop),
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 12, vertical: 10),
                                       decoration: BoxDecoration(
                                         color: Theme.of(context)
                                             .colorScheme
-                                            .errorContainer
-                                            .withOpacity(0.18),
+                                            .primaryContainer
+                                            .withOpacity(0.3),
                                         borderRadius: BorderRadius.circular(8),
                                         border: Border.all(
                                           color: Theme.of(context)
                                               .colorScheme
-                                              .error
-                                              .withOpacity(0.35),
+                                              .primary
+                                              .withOpacity(0.3),
                                         ),
                                       ),
                                       child: Text(
-                                        warningText,
+                                        loc
+                                            .t('kbju_allergens_in_dish')
+                                            .replaceFirst('%s',
+                                                totalCal.round().toString())
+                                            .replaceFirst('%s',
+                                                totalProt.toStringAsFixed(1))
+                                            .replaceFirst('%s',
+                                                totalFatVal.toStringAsFixed(1))
+                                            .replaceFirst('%s',
+                                                totalCarbVal.toStringAsFixed(1))
+                                            .replaceFirst('%s', allergenStr),
                                         style: const TextStyle(fontSize: 13),
-                                      ),
-                                    ),
-                                    Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: TextButton(
-                                        onPressed: _showMissingNutritionDialog,
-                                        child: Text(
-                                          loc.t('kbju_incomplete_dish_nutrition_show_list') ??
-                                              'Показать список',
-                                        ),
                                       ),
                                     ),
                                   ],
                                 );
-                              }
-
-                              final store =
-                                  context.read<ProductStoreSupabase>();
-                              final allergens = <String>[];
-                              for (final ing in _ingredients
-                                  .where((i) => i.productId != null)) {
-                                final p = store.findProductForIngredient(
-                                    ing.productId, ing.productName);
-                                if (p?.containsGluten == true &&
-                                    !allergens.contains('глютен')) {
-                                  allergens.add('глютен');
-                                }
-                                if (p?.containsLactose == true &&
-                                    !allergens.contains('лактоза')) {
-                                  allergens.add('лактоза');
-                                }
-                              }
-                              final allergenStr = allergens.isEmpty
-                                  ? (loc.currentLanguageCode == 'ru'
-                                      ? 'нет'
-                                      : 'none')
-                                  : allergens.join(', ');
-
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  if (warningText != null)
-                                    Container(
-                                      margin: const EdgeInsets.only(
-                                          top: 12, bottom: 8),
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 12, vertical: 10),
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .errorContainer
-                                            .withOpacity(0.18),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .error
-                                              .withOpacity(0.35),
-                                        ),
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            warningText,
-                                            style:
-                                                const TextStyle(fontSize: 13),
-                                          ),
-                                          Align(
-                                            alignment: Alignment.centerLeft,
-                                            child: TextButton(
-                                              onPressed:
-                                                  _showMissingNutritionDialog,
-                                              child: Text(
-                                                loc.t('kbju_incomplete_dish_nutrition_show_list') ??
-                                                    'Показать список',
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  Container(
-                                    margin: EdgeInsets.only(top: kbjuMarginTop),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 10),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primaryContainer
-                                          .withOpacity(0.3),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary
-                                            .withOpacity(0.3),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      loc
-                                          .t('kbju_allergens_in_dish')
-                                          .replaceFirst(
-                                              '%s', totalCal.round().toString())
-                                          .replaceFirst('%s',
-                                              totalProt.toStringAsFixed(1))
-                                          .replaceFirst('%s',
-                                              totalFatVal.toStringAsFixed(1))
-                                          .replaceFirst('%s',
-                                              totalCarbVal.toStringAsFixed(1))
-                                          .replaceFirst('%s', allergenStr),
-                                      style: const TextStyle(fontSize: 13),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
+                              },
+                            ),
                           ),
                         // Блок фото: ПФ — сетка до 10, блюдо — 1 фото
                         if (!tableOnlyView)

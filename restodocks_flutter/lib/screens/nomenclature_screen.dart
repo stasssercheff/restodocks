@@ -1339,6 +1339,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   bool _needsKbju(NomenclatureItem item) {
     if (item.isTechCard) return false; // ТТК не нуждаются в КБЖУ
     final p = item.product!;
+    if (p.kbjuManuallyConfirmed) return false;
     return (p.calories == null || p.calories == 0) &&
         p.protein == null &&
         p.fat == null &&
@@ -3826,11 +3827,13 @@ class _CatalogTab extends StatelessWidget {
     );
   }
 
-  bool _needsKbju(Product p) =>
-      (p.calories == null || p.calories == 0) &&
-      p.protein == null &&
-      p.fat == null &&
-      p.carbs == null;
+  bool _needsKbju(Product p) {
+    if (p.kbjuManuallyConfirmed) return false;
+    return (p.calories == null || p.calories == 0) &&
+        p.protein == null &&
+        p.fat == null &&
+        p.carbs == null;
+  }
 
   bool _needsTranslation(Product p) {
     final allLangs = LocalizationService.productLanguageCodes;
@@ -4214,6 +4217,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   late String _currency;
   late bool _containsGluten;
   late bool _containsLactose;
+  late bool _kbjuManuallyConfirmed;
   // true = цена за упаковку (pkg), false = цена за кг/ед
   bool _priceByPackage = false;
   List<PriceHistoryEntry> _priceHistory = [];
@@ -4259,6 +4263,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     _currency = p.currency ?? 'VND';
     _containsGluten = p.containsGluten ?? false;
     _containsLactose = p.containsLactose ?? false;
+    _kbjuManuallyConfirmed = p.kbjuManuallyConfirmed;
     if (widget.establishmentId != null && widget.establishmentId!.isNotEmpty) {
       widget.store.getPriceHistory(p.id, widget.establishmentId!).then((list) {
         if (mounted)
@@ -4382,6 +4387,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
       protein: protein,
       fat: fat,
       carbs: carbs,
+      kbjuManuallyConfirmed: _kbjuManuallyConfirmed,
       containsGluten: containsGluten,
       containsLactose: containsLactose,
     );
@@ -4571,6 +4577,12 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                     ),
                   ),
                 ],
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(widget.loc.t('product_kbju_confirmed')),
+                value: _kbjuManuallyConfirmed,
+                onChanged: (v) => setState(() => _kbjuManuallyConfirmed = v),
               ),
               const SizedBox(height: 16),
               // Переключатель: цена за кг/ед vs цена за упаковку
