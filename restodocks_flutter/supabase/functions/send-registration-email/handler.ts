@@ -106,24 +106,15 @@ export async function handleRequest(req: Request): Promise<Response> {
         const wrappedHref = extracted
           ? `${CONFIRM_CLICK_URL}?token_hash=${encodeURIComponent(extracted.token_hash)}&type=${encodeURIComponent(extracted.type)}`
           : `${CONFIRM_CLICK_URL}?r=${btoa(link).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`;
-        const isRu = lang === "ru";
-        const subject = isRu ? "Restodocks: завершите регистрацию" : "Restodocks: complete your registration";
-        const html = isRu
-          ? `
-<p>Здравствуйте!</p>
-<p>Завершите регистрацию в Restodocks — перейдите по ссылке:</p>
-<p><a href="${escapeHtml(wrappedHref)}" style="color:#2754C5;text-decoration:none">Завершить регистрацию</a></p>
-<p>С уважением,<br>Restodocks</p>
-        `.trim()
-          : `
-<p>Hello!</p>
-<p>Please complete your Restodocks registration using this link:</p>
-<p><a href="${escapeHtml(wrappedHref)}" style="color:#2754C5;text-decoration:none">Complete registration</a></p>
-<p>Best regards,<br>Restodocks</p>
+        const copy = i18nCopy(lang);
+        const subject = copy.confirmSubject;
+        const html = `
+<p>${copy.greeting}</p>
+<p>${copy.confirmIntro}</p>
+<p><a href="${escapeHtml(wrappedHref)}" style="color:#2754C5;text-decoration:none">${copy.confirmCta}</a></p>
+<p>${copy.regards}<br>Restodocks</p>
         `.trim();
-        const text = isRu
-          ? "Здравствуйте!\n\nЗавершите регистрацию в Restodocks — откройте письмо в браузере и нажмите ссылку.\n\nС уважением,\nRestodocks"
-          : "Hello!\n\nPlease complete your Restodocks registration by opening this link in your browser.\n\nBest regards,\nRestodocks";
+        const text = `${copy.greeting}\n\n${copy.confirmIntro}\n\n${copy.regards}\nRestodocks`;
         const res = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -160,23 +151,18 @@ export async function handleRequest(req: Request): Promise<Response> {
           headers: { ...cors, "Content-Type": "application/json" },
         });
       }
-      const isRu = lang === "ru";
-      const subject = isRu ? "Регистрация подтверждена — Restodocks" : "Registration confirmed — Restodocks";
+      const copy = i18nCopy(lang);
+      const subject = copy.confirmedSubject;
       const companyText = companyName
-        ? (isRu ? ` в заведении <strong>${escapeHtml(companyName)}</strong>` : ` for <strong>${escapeHtml(companyName)}</strong>`)
+        ? (lang === "ru"
+            ? ` в заведении <strong>${escapeHtml(companyName)}</strong>`
+            : ` <strong>${escapeHtml(companyName)}</strong>`)
         : "";
-      const html = isRu
-        ? `
-<p>Здравствуйте!</p>
-<p>Ваша регистрация${companyText} успешно подтверждена.</p>
-<p>Теперь вы можете войти в приложение Restodocks, используя указанный при регистрации email и пароль.</p>
-<p>С уважением,<br>Команда Restodocks</p>
-      `.trim()
-        : `
-<p>Hello!</p>
-<p>Your registration${companyText} has been confirmed.</p>
-<p>You can now sign in to Restodocks using your email and password.</p>
-<p>Best regards,<br>Restodocks team</p>
+      const html = `
+<p>${copy.greeting}</p>
+<p>${copy.confirmedIntro}${companyText}.</p>
+<p>${copy.confirmedSigninHint}</p>
+<p>${copy.regards}<br>Restodocks</p>
       `.trim();
 
       const res = await fetch("https://api.resend.com/emails", {
@@ -212,71 +198,75 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     if (type === "owner") {
       if (lang === "ru") {
-        const greeting = fullName?.trim() ? `Здравствуйте, ${escapeHtml(fullName.trim())}!` : "Здравствуйте!";
+        const copy = i18nCopy(lang);
+        const greeting = fullName?.trim() ? `${copy.greetingNamePrefix}, ${escapeHtml(fullName.trim())}!` : copy.greeting;
         const localTime = registeredAtLocal?.trim()
-          ? `<p><strong>Время регистрации:</strong> ${escapeHtml(registeredAtLocal.trim())}</p>`
+          ? `<p><strong>${copy.registrationTimeLabel}:</strong> ${escapeHtml(registeredAtLocal.trim())}</p>`
           : "";
-        subject = "Регистрация компании в системе Restodocks";
+        subject = copy.ownerSubject;
         html = `
 <p>${greeting}</p>
-<p>Регистрация вашего заведения <strong>${escapeHtml(companyName)}</strong> успешно завершена.</p>
+<p>${copy.ownerRegisteredPrefix} <strong>${escapeHtml(companyName)}</strong> ${copy.ownerRegisteredSuffix}</p>
 ${localTime}
-<p>Для доступа сотрудников к системе используйте уникальный идентификатор:</p>
-<p><strong>PIN-код компании: ${escapeHtml(pinCode || "")}</strong></p>
-<p>Ваш логин: <strong>${escapeHtml(email)}</strong></p>
-<p>Для входа используйте пароль, который вы указали при регистрации. Если вы забыли пароль — воспользуйтесь функцией восстановления в приложении.</p>
-<p><strong>Инструкция:</strong><br>Передайте PIN-код персоналу. Им потребуется ввести его один раз при регистрации в приложении для синхронизации с базой данных вашего заведения.</p>
-<p style="color:#666;font-size:14px">Отдельно придёт письмо со ссылкой для подтверждения email. Если не увидите его — проверьте папку «Спам».</p>
-<p>С уважением,<br>Команда Restodocks</p>
+<p>${copy.ownerIdentifierHint}</p>
+<p><strong>${copy.companyPinLabel}: ${escapeHtml(pinCode || "")}</strong></p>
+<p>${copy.yourLoginLabel}: <strong>${escapeHtml(email)}</strong></p>
+<p>${copy.passwordHint}</p>
+<p><strong>${copy.instructionLabel}:</strong><br>${copy.ownerInstruction}</p>
+<p style="color:#666;font-size:14px">${copy.spamHint}</p>
+<p>${copy.regards}<br>Restodocks</p>
       `.trim();
       } else {
-        const greeting = fullName?.trim() ? `Hello, ${escapeHtml(fullName.trim())}!` : "Hello!";
+        const copy = i18nCopy(lang);
+        const greeting = fullName?.trim() ? `${copy.greetingNamePrefix}, ${escapeHtml(fullName.trim())}!` : copy.greeting;
         const localTime = registeredAtLocal?.trim()
-          ? `<p><strong>Registration time:</strong> ${escapeHtml(registeredAtLocal.trim())}</p>`
+          ? `<p><strong>${copy.registrationTimeLabel}:</strong> ${escapeHtml(registeredAtLocal.trim())}</p>`
           : "";
-        subject = "Company registration in Restodocks";
+        subject = copy.ownerSubject;
         html = `
 <p>${greeting}</p>
-<p>Your establishment <strong>${escapeHtml(companyName)}</strong> has been successfully registered.</p>
+<p>${copy.ownerRegisteredPrefix} <strong>${escapeHtml(companyName)}</strong> ${copy.ownerRegisteredSuffix}</p>
 ${localTime}
-<p>Please use this identifier for your staff:</p>
-<p><strong>Company PIN: ${escapeHtml(pinCode || "")}</strong></p>
-<p>Your login: <strong>${escapeHtml(email)}</strong></p>
-<p>Please use the password you entered during registration. If needed, reset it in the app.</p>
-<p style="color:#666;font-size:14px">A separate email with confirmation link is sent by auth provider. Please check Spam if needed.</p>
-<p>Best regards,<br>Restodocks team</p>
+<p>${copy.ownerIdentifierHint}</p>
+<p><strong>${copy.companyPinLabel}: ${escapeHtml(pinCode || "")}</strong></p>
+<p>${copy.yourLoginLabel}: <strong>${escapeHtml(email)}</strong></p>
+<p>${copy.passwordHint}</p>
+<p style="color:#666;font-size:14px">${copy.spamHint}</p>
+<p>${copy.regards}<br>Restodocks</p>
       `.trim();
       }
     } else {
       if (lang === "ru") {
-        const greeting = fullName?.trim() ? `Здравствуйте, ${escapeHtml(fullName.trim())}!` : "Здравствуйте!";
+        const copy = i18nCopy(lang);
+        const greeting = fullName?.trim() ? `${copy.greetingNamePrefix}, ${escapeHtml(fullName.trim())}!` : copy.greeting;
         const localTime = registeredAtLocal?.trim()
-          ? `<p><strong>Время регистрации:</strong> ${escapeHtml(registeredAtLocal.trim())}</p>`
+          ? `<p><strong>${copy.registrationTimeLabel}:</strong> ${escapeHtml(registeredAtLocal.trim())}</p>`
           : "";
-        subject = `Доступ к корпоративному пространству ${escapeHtml(companyName)}`;
+        subject = `${copy.employeeSubjectPrefix} ${escapeHtml(companyName)}`;
         html = `
 <p>${greeting}</p>
-<p>Ваша учетная запись успешно привязана к системе управления заведением <strong>${escapeHtml(companyName)}</strong>.</p>
+<p>${copy.employeeRegisteredPrefix} <strong>${escapeHtml(companyName)}</strong>.</p>
 ${localTime}
-<p>Ваш логин: <strong>${escapeHtml(email)}</strong></p>
-<p>Для входа используйте пароль, который вы указали при регистрации. Если вы забыли пароль — воспользуйтесь функцией восстановления в приложении.</p>
-<p style="color:#666;font-size:14px">Отдельно придёт письмо со ссылкой для подтверждения email. Если не увидите его — проверьте папку «Спам».</p>
-<p>С уважением,<br>Команда Restodocks</p>
+<p>${copy.yourLoginLabel}: <strong>${escapeHtml(email)}</strong></p>
+<p>${copy.passwordHint}</p>
+<p style="color:#666;font-size:14px">${copy.spamHint}</p>
+<p>${copy.regards}<br>Restodocks</p>
       `.trim();
       } else {
-        const greeting = fullName?.trim() ? `Hello, ${escapeHtml(fullName.trim())}!` : "Hello!";
+        const copy = i18nCopy(lang);
+        const greeting = fullName?.trim() ? `${copy.greetingNamePrefix}, ${escapeHtml(fullName.trim())}!` : copy.greeting;
         const localTime = registeredAtLocal?.trim()
-          ? `<p><strong>Registration time:</strong> ${escapeHtml(registeredAtLocal.trim())}</p>`
+          ? `<p><strong>${copy.registrationTimeLabel}:</strong> ${escapeHtml(registeredAtLocal.trim())}</p>`
           : "";
-        subject = `Access to ${escapeHtml(companyName)} workspace`;
+        subject = `${copy.employeeSubjectPrefix} ${escapeHtml(companyName)}`;
         html = `
 <p>${greeting}</p>
-<p>Your account has been linked to <strong>${escapeHtml(companyName)}</strong>.</p>
+<p>${copy.employeeRegisteredPrefix} <strong>${escapeHtml(companyName)}</strong>.</p>
 ${localTime}
-<p>Your login: <strong>${escapeHtml(email)}</strong></p>
-<p>Please use the password you entered during registration. If needed, reset it in the app.</p>
-<p style="color:#666;font-size:14px">A separate email with confirmation link is sent by auth provider. Please check Spam if needed.</p>
-<p>Best regards,<br>Restodocks team</p>
+<p>${copy.yourLoginLabel}: <strong>${escapeHtml(email)}</strong></p>
+<p>${copy.passwordHint}</p>
+<p style="color:#666;font-size:14px">${copy.spamHint}</p>
+<p>${copy.regards}<br>Restodocks</p>
       `.trim();
       }
     }
@@ -328,7 +318,190 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function normalizeLanguage(input?: string): "ru" | "en" {
+function normalizeLanguage(input?: string): "ru" | "en" | "es" | "it" | "tr" | "vi" {
   const v = (input ?? "").trim().toLowerCase();
-  return v === "ru" ? "ru" : "en";
+  if (v === "ru" || v === "en" || v === "es" || v === "it" || v === "tr" || v === "vi") return v;
+  return "en";
+}
+
+type MailLanguage = "ru" | "en" | "es" | "it" | "tr" | "vi";
+type MailCopy = {
+  greeting: string;
+  greetingNamePrefix: string;
+  regards: string;
+  confirmSubject: string;
+  confirmIntro: string;
+  confirmCta: string;
+  confirmedSubject: string;
+  confirmedIntro: string;
+  confirmedSigninHint: string;
+  ownerSubject: string;
+  ownerRegisteredPrefix: string;
+  ownerRegisteredSuffix: string;
+  ownerIdentifierHint: string;
+  companyPinLabel: string;
+  yourLoginLabel: string;
+  passwordHint: string;
+  instructionLabel: string;
+  ownerInstruction: string;
+  employeeSubjectPrefix: string;
+  employeeRegisteredPrefix: string;
+  spamHint: string;
+  registrationTimeLabel: string;
+};
+
+function i18nCopy(lang: MailLanguage): MailCopy {
+  switch (lang) {
+    case "ru":
+      return {
+        greeting: "Здравствуйте!",
+        greetingNamePrefix: "Здравствуйте",
+        regards: "С уважением,",
+        confirmSubject: "Restodocks: завершите регистрацию",
+        confirmIntro: "Завершите регистрацию в Restodocks — перейдите по ссылке:",
+        confirmCta: "Завершить регистрацию",
+        confirmedSubject: "Регистрация подтверждена — Restodocks",
+        confirmedIntro: "Ваша регистрация",
+        confirmedSigninHint: "Теперь вы можете войти в приложение Restodocks, используя указанный при регистрации email и пароль.",
+        ownerSubject: "Регистрация компании в системе Restodocks",
+        ownerRegisteredPrefix: "Регистрация вашего заведения",
+        ownerRegisteredSuffix: "успешно завершена.",
+        ownerIdentifierHint: "Для доступа сотрудников к системе используйте уникальный идентификатор:",
+        companyPinLabel: "PIN-код компании",
+        yourLoginLabel: "Ваш логин",
+        passwordHint: "Для входа используйте пароль, который вы указали при регистрации. Если вы забыли пароль — воспользуйтесь функцией восстановления в приложении.",
+        instructionLabel: "Инструкция",
+        ownerInstruction: "Передайте PIN-код персоналу. Им потребуется ввести его один раз при регистрации в приложении для синхронизации с базой данных вашего заведения.",
+        employeeSubjectPrefix: "Доступ к корпоративному пространству",
+        employeeRegisteredPrefix: "Ваша учетная запись успешно привязана к системе управления заведением",
+        spamHint: "Отдельно придёт письмо со ссылкой для подтверждения email. Если не увидите его — проверьте папку «Спам».",
+        registrationTimeLabel: "Время регистрации",
+      };
+    case "es":
+      return {
+        greeting: "Hola!",
+        greetingNamePrefix: "Hola",
+        regards: "Saludos,",
+        confirmSubject: "Restodocks: complete su registro",
+        confirmIntro: "Complete su registro en Restodocks con este enlace:",
+        confirmCta: "Completar registro",
+        confirmedSubject: "Registro confirmado — Restodocks",
+        confirmedIntro: "Su registro en",
+        confirmedSigninHint: "Ahora puede iniciar sesión en Restodocks con su correo y contraseña.",
+        ownerSubject: "Registro de empresa en Restodocks",
+        ownerRegisteredPrefix: "Su establecimiento",
+        ownerRegisteredSuffix: "se ha registrado correctamente.",
+        ownerIdentifierHint: "Use este identificador para su personal:",
+        companyPinLabel: "PIN de la empresa",
+        yourLoginLabel: "Su acceso",
+        passwordHint: "Use la contraseña que indicó al registrarse. Si es necesario, restablézcala en la app.",
+        instructionLabel: "Instrucción",
+        ownerInstruction: "Comparta el PIN con el personal. Lo necesitarán una vez al registrarse en la app.",
+        employeeSubjectPrefix: "Acceso al espacio de",
+        employeeRegisteredPrefix: "Su cuenta se vinculó correctamente a",
+        spamHint: "También llegará un correo de confirmación. Revise Spam si no aparece.",
+        registrationTimeLabel: "Hora de registro",
+      };
+    case "it":
+      return {
+        greeting: "Ciao!",
+        greetingNamePrefix: "Ciao",
+        regards: "Cordiali saluti,",
+        confirmSubject: "Restodocks: completa la registrazione",
+        confirmIntro: "Completa la registrazione a Restodocks con questo link:",
+        confirmCta: "Completa registrazione",
+        confirmedSubject: "Registrazione confermata — Restodocks",
+        confirmedIntro: "La tua registrazione per",
+        confirmedSigninHint: "Ora puoi accedere a Restodocks con email e password.",
+        ownerSubject: "Registrazione azienda in Restodocks",
+        ownerRegisteredPrefix: "La tua struttura",
+        ownerRegisteredSuffix: "è stata registrata con successo.",
+        ownerIdentifierHint: "Usa questo identificatore per il personale:",
+        companyPinLabel: "PIN aziendale",
+        yourLoginLabel: "Il tuo login",
+        passwordHint: "Usa la password scelta in registrazione. Se necessario, reimpostala nell'app.",
+        instructionLabel: "Istruzioni",
+        ownerInstruction: "Condividi il PIN con il personale: servirà una sola volta in registrazione.",
+        employeeSubjectPrefix: "Accesso allo spazio di",
+        employeeRegisteredPrefix: "Il tuo account è stato collegato a",
+        spamHint: "Arriverà anche un'email di conferma. Controlla Spam se necessario.",
+        registrationTimeLabel: "Orario registrazione",
+      };
+    case "tr":
+      return {
+        greeting: "Merhaba!",
+        greetingNamePrefix: "Merhaba",
+        regards: "Saygılarımızla,",
+        confirmSubject: "Restodocks: kaydınızı tamamlayın",
+        confirmIntro: "Restodocks kaydınızı şu bağlantı ile tamamlayın:",
+        confirmCta: "Kaydı tamamla",
+        confirmedSubject: "Kayıt onaylandı — Restodocks",
+        confirmedIntro: "Şu işletme için kaydınız onaylandı:",
+        confirmedSigninHint: "Artık Restodocks'a e-posta ve şifrenizle giriş yapabilirsiniz.",
+        ownerSubject: "Restodocks işletme kaydı",
+        ownerRegisteredPrefix: "İşletmeniz",
+        ownerRegisteredSuffix: "başarıyla kaydedildi.",
+        ownerIdentifierHint: "Personel için bu tanımlayıcıyı kullanın:",
+        companyPinLabel: "Şirket PIN",
+        yourLoginLabel: "Girişiniz",
+        passwordHint: "Kayıtta belirlediğiniz şifreyi kullanın. Gerekirse uygulamadan sıfırlayın.",
+        instructionLabel: "Talimat",
+        ownerInstruction: "PIN'i personele iletin. Uygulamada ilk kayıtta bir kez gerekir.",
+        employeeSubjectPrefix: "Çalışma alanına erişim:",
+        employeeRegisteredPrefix: "Hesabınız şu işletmeye bağlandı:",
+        spamHint: "Ayrıca onay bağlantısı e-postası gelir. Gerekirse Spam'i kontrol edin.",
+        registrationTimeLabel: "Kayıt zamanı",
+      };
+    case "vi":
+      return {
+        greeting: "Xin chào!",
+        greetingNamePrefix: "Xin chào",
+        regards: "Trân trọng,",
+        confirmSubject: "Restodocks: hoàn tất đăng ký",
+        confirmIntro: "Vui lòng hoàn tất đăng ký Restodocks bằng liên kết này:",
+        confirmCta: "Hoàn tất đăng ký",
+        confirmedSubject: "Đăng ký đã xác nhận — Restodocks",
+        confirmedIntro: "Đăng ký của bạn cho",
+        confirmedSigninHint: "Bây giờ bạn có thể đăng nhập Restodocks bằng email và mật khẩu.",
+        ownerSubject: "Đăng ký cơ sở trong Restodocks",
+        ownerRegisteredPrefix: "Cơ sở của bạn",
+        ownerRegisteredSuffix: "đã được đăng ký thành công.",
+        ownerIdentifierHint: "Vui lòng dùng mã định danh này cho nhân viên:",
+        companyPinLabel: "PIN cơ sở",
+        yourLoginLabel: "Đăng nhập của bạn",
+        passwordHint: "Dùng mật khẩu đã đặt khi đăng ký. Nếu cần, đặt lại trong ứng dụng.",
+        instructionLabel: "Hướng dẫn",
+        ownerInstruction: "Chia sẻ PIN cho nhân viên. Họ chỉ cần nhập một lần khi đăng ký.",
+        employeeSubjectPrefix: "Quyền truy cập không gian của",
+        employeeRegisteredPrefix: "Tài khoản của bạn đã được liên kết với",
+        spamHint: "Một email xác nhận riêng sẽ được gửi. Hãy kiểm tra Spam nếu cần.",
+        registrationTimeLabel: "Thời gian đăng ký",
+      };
+    case "en":
+    default:
+      return {
+        greeting: "Hello!",
+        greetingNamePrefix: "Hello",
+        regards: "Best regards,",
+        confirmSubject: "Restodocks: complete your registration",
+        confirmIntro: "Please complete your Restodocks registration using this link:",
+        confirmCta: "Complete registration",
+        confirmedSubject: "Registration confirmed — Restodocks",
+        confirmedIntro: "Your registration for",
+        confirmedSigninHint: "You can now sign in to Restodocks using your email and password.",
+        ownerSubject: "Company registration in Restodocks",
+        ownerRegisteredPrefix: "Your establishment",
+        ownerRegisteredSuffix: "has been successfully registered.",
+        ownerIdentifierHint: "Please use this identifier for your staff:",
+        companyPinLabel: "Company PIN",
+        yourLoginLabel: "Your login",
+        passwordHint: "Please use the password you entered during registration. If needed, reset it in the app.",
+        instructionLabel: "Instruction",
+        ownerInstruction: "Share the PIN with your staff. They will need it once during registration in the app.",
+        employeeSubjectPrefix: "Access to",
+        employeeRegisteredPrefix: "Your account has been linked to",
+        spamHint: "A separate email with confirmation link is sent by auth provider. Please check Spam if needed.",
+        registrationTimeLabel: "Registration time",
+      };
+  }
 }
