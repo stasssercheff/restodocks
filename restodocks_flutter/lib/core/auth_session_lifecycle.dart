@@ -22,6 +22,7 @@ class AuthSessionLifecycle extends StatefulWidget {
 class _AuthSessionLifecycleState extends State<AuthSessionLifecycle>
     with WidgetsBindingObserver {
   StreamSubscription? _visibilitySub;
+  Timer? _periodicWebRefresh;
   DateTime? _lastRefreshAttempt;
 
   @override
@@ -31,11 +32,16 @@ class _AuthSessionLifecycleState extends State<AuthSessionLifecycle>
     if (kIsWeb) {
       _visibilitySub =
           auth_vis.subscribeAuthResumeOnVisibility(_tryRefreshSessionThrottled);
+      // Инкогнито и фоновые вкладки сильнее режут таймеры GoTrue — подстраховка, пока окно жило.
+      _periodicWebRefresh = Timer.periodic(const Duration(minutes: 4), (_) {
+        unawaited(_tryRefreshSession());
+      });
     }
   }
 
   @override
   void dispose() {
+    _periodicWebRefresh?.cancel();
     _visibilitySub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
