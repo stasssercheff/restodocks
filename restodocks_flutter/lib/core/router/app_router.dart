@@ -312,8 +312,10 @@ class AppRouter {
       // Редирект Supabase после подтверждения email — восстанавливаем сессию и ведём в /home
       GoRoute(
         path: '/auth/confirm',
-        pageBuilder: (context, state) =>
-            _slideTransitionPage(state, const AuthConfirmScreen()),
+        pageBuilder: (context, state) {
+          final lang = state.queryParameters['lang'] ?? '';
+          return _slideTransitionPage(state, AuthConfirmScreen(languageCode: lang));
+        },
       ),
       // Прокладка: ссылка в письме → нажать кнопку → verifyOtp или редирект на Supabase
       GoRoute(

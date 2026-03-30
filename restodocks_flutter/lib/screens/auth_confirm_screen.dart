@@ -12,7 +12,8 @@ import '../services/services.dart';
 /// Экран обработки перехода по ссылке подтверждения email.
 /// Supabase редиректит сюда с #access_token=... — восстанавливаем сессию и ведём в приложение.
 class AuthConfirmScreen extends StatefulWidget {
-  const AuthConfirmScreen({super.key});
+  const AuthConfirmScreen({super.key, this.languageCode = ''});
+  final String languageCode;
 
   @override
   State<AuthConfirmScreen> createState() => _AuthConfirmScreenState();
@@ -29,6 +30,11 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
   }
 
   Future<void> _processCallback() async {
+    if (!mounted) return;
+    final lang = widget.languageCode.trim().toLowerCase();
+    if (lang.isNotEmpty && LocalizationService.isSupportedLanguageCode(lang)) {
+      await LocalizationService().setLocale(Locale(lang));
+    }
     if (!mounted) return;
 
     final callbackUri = DeepLinkBootstrap.authCallbackUri(isWeb: kIsWeb);
@@ -60,6 +66,10 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
     if (!mounted) return;
 
     if (account.isLoggedInSync) {
+      if (lang.isNotEmpty && LocalizationService.isSupportedLanguageCode(lang)) {
+        await account.savePreferredLanguage(lang);
+        await LocalizationService().setLocale(Locale(lang));
+      }
       clear_hash.clearHashFromUrl();
       if (!mounted) return;
       context.go('/home');
@@ -76,6 +86,10 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
       await account.initialize(forceRetryFromAuth: true);
       if (!mounted) return;
       if (account.isLoggedInSync) {
+        if (lang.isNotEmpty && LocalizationService.isSupportedLanguageCode(lang)) {
+          await account.savePreferredLanguage(lang);
+          await LocalizationService().setLocale(Locale(lang));
+        }
         clear_hash.clearHashFromUrl();
         if (!mounted) return;
         context.go('/home');

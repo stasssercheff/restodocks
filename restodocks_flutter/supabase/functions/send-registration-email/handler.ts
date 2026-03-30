@@ -76,10 +76,10 @@ export async function handleRequest(req: Request): Promise<Response> {
       language?: string;
     };
 
-    const { type, to, companyName, email, fullName, registeredAtLocal, pinCode, password } = body;
+    const { type, to, companyName, email, fullName, pinCode, password } = body;
     const lang = normalizeLanguage(body.language);
     const appBaseUrl = resolveAppBaseUrl(req);
-    const redirectUrl = `${appBaseUrl}/auth/confirm`;
+    const redirectUrl = `${appBaseUrl}/auth/confirm?lang=${encodeURIComponent(lang)}`;
     const confirmClickUrl = `${appBaseUrl}/auth/confirm-click`;
 
     if (type === "confirmation_only" && to) {
@@ -215,14 +215,10 @@ export async function handleRequest(req: Request): Promise<Response> {
       if (lang === "ru") {
         const copy = i18nCopy(lang);
         const greeting = fullName?.trim() ? `${copy.greetingNamePrefix}, ${escapeHtml(fullName.trim())}!` : copy.greeting;
-        const localTime = registeredAtLocal?.trim()
-          ? `<p><strong>${copy.registrationTimeLabel}:</strong> ${escapeHtml(registeredAtLocal.trim())}</p>`
-          : "";
         subject = copy.ownerSubject;
         html = `
 <p>${greeting}</p>
 <p>${copy.ownerRegisteredPrefix} <strong>${escapeHtml(companyName)}</strong> ${copy.ownerRegisteredSuffix}</p>
-${localTime}
 <p>${copy.ownerIdentifierHint}</p>
 <p><strong>${copy.companyPinLabel}: ${escapeHtml(pinCode || "")}</strong></p>
 <p>${copy.yourLoginLabel}: <strong>${escapeHtml(email)}</strong></p>
@@ -234,14 +230,10 @@ ${localTime}
       } else {
         const copy = i18nCopy(lang);
         const greeting = fullName?.trim() ? `${copy.greetingNamePrefix}, ${escapeHtml(fullName.trim())}!` : copy.greeting;
-        const localTime = registeredAtLocal?.trim()
-          ? `<p><strong>${copy.registrationTimeLabel}:</strong> ${escapeHtml(registeredAtLocal.trim())}</p>`
-          : "";
         subject = copy.ownerSubject;
         html = `
 <p>${greeting}</p>
 <p>${copy.ownerRegisteredPrefix} <strong>${escapeHtml(companyName)}</strong> ${copy.ownerRegisteredSuffix}</p>
-${localTime}
 <p>${copy.ownerIdentifierHint}</p>
 <p><strong>${copy.companyPinLabel}: ${escapeHtml(pinCode || "")}</strong></p>
 <p>${copy.yourLoginLabel}: <strong>${escapeHtml(email)}</strong></p>
@@ -254,14 +246,10 @@ ${localTime}
       if (lang === "ru") {
         const copy = i18nCopy(lang);
         const greeting = fullName?.trim() ? `${copy.greetingNamePrefix}, ${escapeHtml(fullName.trim())}!` : copy.greeting;
-        const localTime = registeredAtLocal?.trim()
-          ? `<p><strong>${copy.registrationTimeLabel}:</strong> ${escapeHtml(registeredAtLocal.trim())}</p>`
-          : "";
         subject = `${copy.employeeSubjectPrefix} ${escapeHtml(companyName)}`;
         html = `
 <p>${greeting}</p>
 <p>${copy.employeeRegisteredPrefix} <strong>${escapeHtml(companyName)}</strong>.</p>
-${localTime}
 <p>${copy.yourLoginLabel}: <strong>${escapeHtml(email)}</strong></p>
 <p>${copy.passwordHint}</p>
 <p style="color:#666;font-size:14px">${copy.spamHint}</p>
@@ -270,14 +258,10 @@ ${localTime}
       } else {
         const copy = i18nCopy(lang);
         const greeting = fullName?.trim() ? `${copy.greetingNamePrefix}, ${escapeHtml(fullName.trim())}!` : copy.greeting;
-        const localTime = registeredAtLocal?.trim()
-          ? `<p><strong>${copy.registrationTimeLabel}:</strong> ${escapeHtml(registeredAtLocal.trim())}</p>`
-          : "";
         subject = `${copy.employeeSubjectPrefix} ${escapeHtml(companyName)}`;
         html = `
 <p>${greeting}</p>
 <p>${copy.employeeRegisteredPrefix} <strong>${escapeHtml(companyName)}</strong>.</p>
-${localTime}
 <p>${copy.yourLoginLabel}: <strong>${escapeHtml(email)}</strong></p>
 <p>${copy.passwordHint}</p>
 <p style="color:#666;font-size:14px">${copy.spamHint}</p>

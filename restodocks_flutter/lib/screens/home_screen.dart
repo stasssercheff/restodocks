@@ -104,8 +104,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final st = est.subscriptionType?.toLowerCase().trim();
     if (st == 'pro' || st == 'premium') return;
-    final trialEnd = est.proTrialEndsAt;
-    if (trialEnd == null || !DateTime.now().isBefore(trialEnd)) return;
+    final trialEnd = est.proTrialEndsAt ?? DateTime.now().add(const Duration(hours: 72));
+    if (!DateTime.now().isBefore(trialEnd)) return;
 
     final loc = context.read<LocalizationService>();
     final localeTag = loc.currentLanguageCode == 'ru' ? 'ru_RU' : loc.currentLanguageCode;
