@@ -216,17 +216,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         birthday: _birthday,
       );
 
-      final emailService = EmailService();
-      await emailService.sendRegistrationEmail(
-        isOwner: false,
-        to: email,
-        companyName: establishment.name,
-        email: email,
-      );
-      // Отдельное письмо со ссылкой подтверждения — сразу после регистрации
-      if (!hasSession) {
-        await emailService.sendConfirmationLinkRequest(email);
-      }
+      // Подтверждение отправляет Supabase Auth (mail template / auth-send-email hook).
+      // Не дублируем send-registration-email, чтобы не сыпать 401 из Edge и не ломать UX.
 
       if (!mounted) return;
       if (hasSession) {

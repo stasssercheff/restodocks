@@ -109,18 +109,9 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         }
       }
 
-      // Письмо с PIN (без ссылки — чтобы не падало в спам)
-      final emailService = EmailService();
-      final emailResult = await emailService.sendRegistrationEmail(
-        isOwner: true,
-        to: email,
-        companyName: estab.name,
-        email: email,
-        pinCode: estab.pinCode,
-      );
-      // Второе письмо (ссылка подтверждения) шлёт Supabase Auth: либо Send Email Hook
-      // (Edge auth-send-email → Resend, русский текст), либо шаблон из Dashboard.
-      // Не вызываем sendConfirmationEmail здесь — иначе дубль с Hook + лишний расход лимитов.
+      // Письмо подтверждения отправляет Supabase Auth (шаблон/хук auth-send-email).
+      // Не вызываем send-registration-email: при неконсистентных Edge secrets это даёт 401
+      // и путает пользователя, хотя регистрация уже успешно создана.
 
       if (!mounted) return;
       if (signUpResult.hasSession) {
@@ -132,29 +123,11 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
             interfaceLanguageCode: loc.currentLanguageCode,
           );
           context.go('/home');
-          if (!emailResult.ok && mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Регистрация прошла. Письмо не отправилось: ${emailResult.error ?? "ошибка"}'),
-                backgroundColor: Colors.orange,
-                duration: const Duration(seconds: 6),
-              ),
-            );
-          }
         } else {
           context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
         }
       } else {
         context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
-        if (!emailResult.ok && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Регистрация прошла. Письмо не отправилось: ${emailResult.error ?? "ошибка"}'),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 6),
-            ),
-          );
-        }
       }
     } catch (e) {
       if (!mounted) return;
