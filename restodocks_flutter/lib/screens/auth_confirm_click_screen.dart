@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/redirect_to_url_stub.dart'
     if (dart.library.html) '../core/redirect_to_url_web.dart' as redirect_impl;
 import '../services/services.dart';
+import '../widgets/branded_auth_loading.dart';
 
 /// Ссылка в письме ведёт сюда. Сразу вызываем verifyOTP (одноразовый токен), при успехе — /home.
 class AuthConfirmClickScreen extends StatefulWidget {
@@ -137,15 +138,15 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (_error != null) ...[
+    if (_error != null) {
+      return Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
                   Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
                   const SizedBox(height: 16),
                   Text(_error!, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyLarge),
@@ -154,16 +155,15 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
                     onPressed: () => context.go('/login'),
                     child: const Text('Войти'),
                   ),
-                ] else ...[
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 24),
-                  Text('Вход...', style: Theme.of(context).textTheme.bodyLarge),
                 ],
-              ],
+              ),
             ),
           ),
         ),
-      ),
+      );
+    }
+    return const Scaffold(
+      body: BrandedAuthLoading(),
     );
   }
 }

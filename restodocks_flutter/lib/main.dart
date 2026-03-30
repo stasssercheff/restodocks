@@ -173,16 +173,14 @@ class _StartupGateState extends State<_StartupGate> {
       return _BootstrapFailureApp(message: _error!);
     }
     if (!_ready) {
-      return const MaterialApp(
+      return MaterialApp(
         debugShowCheckedModeBanner: false,
-        home: Scaffold(
-          body: Center(
-            child: SizedBox(
-              width: 40,
-              height: 40,
-              child: CircularProgressIndicator(strokeWidth: 3),
-            ),
-          ),
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFAD292C)),
+          useMaterial3: true,
+        ),
+        home: const Scaffold(
+          body: BrandedAuthLoading(logoWidth: 192),
         ),
       );
     }

@@ -8,6 +8,7 @@ import '../core/clear_hash_stub.dart'
     if (dart.library.html) '../core/clear_hash_web.dart' as clear_hash;
 import '../core/deep_link_bootstrap.dart';
 import '../services/services.dart';
+import '../widgets/branded_auth_loading.dart';
 
 /// Экран обработки перехода по ссылке подтверждения email.
 /// Supabase редиректит сюда с #access_token=... — восстанавливаем сессию и ведём в приложение.
@@ -69,8 +70,6 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
       return;
     }
 
-    setState(() => _status = 'Вход в аккаунт...');
-
     final account = context.read<AccountManagerSupabase>();
 
     // Явно восстанавливаем сессию из hash/query (#access_token=... или ?access_token=...)
@@ -117,6 +116,11 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_showLoginButton) {
+      return const Scaffold(
+        body: BrandedAuthLoading(),
+      );
+    }
     return Scaffold(
       body: Center(
         child: Padding(
@@ -124,18 +128,14 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (!_showLoginButton) const CircularProgressIndicator(),
-              if (_showLoginButton)
-                Icon(Icons.info_outline, size: 48, color: Theme.of(context).colorScheme.primary),
+              Icon(Icons.info_outline, size: 48, color: Theme.of(context).colorScheme.primary),
               const SizedBox(height: 24),
               Text(_status, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyLarge),
-              if (_showLoginButton) ...[
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: () => context.go('/login'),
-                  child: const Text('Войти'),
-                ),
-              ],
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: () => context.go('/login'),
+                child: const Text('Войти'),
+              ),
             ],
           ),
         ),
