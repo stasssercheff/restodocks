@@ -66,11 +66,19 @@ class EmailService {
 
   /// Запросить ссылку подтверждения (по кнопке «Отправить ссылку»).
   /// Не требует пароль — использует magiclink.
-  Future<({bool ok, String? error})> sendConfirmationLinkRequest(String to) async {
+  Future<({bool ok, String? error})> sendConfirmationLinkRequest(
+    String to, {
+    String? languageCode,
+  }) async {
     try {
       final res = await postEdgeFunctionWithRetry(
         'send-registration-email',
-        {'type': 'confirmation_only', 'to': to.trim()},
+        {
+          'type': 'confirmation_only',
+          'to': to.trim(),
+          if (languageCode != null && languageCode.trim().isNotEmpty)
+            'language': languageCode.trim().toLowerCase(),
+        },
       );
       if (res.status == 200) return (ok: true, error: null);
       if (res.status == 0) {

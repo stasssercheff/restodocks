@@ -533,9 +533,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isSendingLink = true);
     try {
-      final result = await EmailService().sendConfirmationLinkRequest(email);
-      if (!mounted) return;
       final loc = context.read<LocalizationService>();
+      final result = await EmailService().sendConfirmationLinkRequest(
+        email,
+        languageCode: loc.currentLanguageCode,
+      );
+      if (!mounted) return;
       if (result.ok) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(loc.t('confirmation_link_sent'))),

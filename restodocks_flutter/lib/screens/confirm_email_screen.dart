@@ -75,7 +75,10 @@ class ConfirmEmailScreen extends StatelessWidget {
               const SizedBox(height: 16),
               OutlinedButton.icon(
                 onPressed: () async {
-                  final result = await EmailService().sendConfirmationLinkRequest(email);
+                  final result = await EmailService().sendConfirmationLinkRequest(
+                    email,
+                    languageCode: loc.currentLanguageCode,
+                  );
                   if (!context.mounted) return;
                   if (result.ok) {
                     if (!context.mounted) return;

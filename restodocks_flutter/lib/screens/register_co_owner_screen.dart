@@ -73,7 +73,13 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
 
       if (!signUpResult.hasSession) {
         // Автоматически дублируем ссылку подтверждения через Resend-канал.
-        unawaited(EmailService().sendConfirmationLinkRequest(email));
+        final lang = context.read<LocalizationService>().currentLanguageCode;
+        unawaited(
+          EmailService().sendConfirmationLinkRequest(
+            email,
+            languageCode: lang,
+          ),
+        );
         if (!mounted) return;
         context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
         return;

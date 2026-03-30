@@ -232,7 +232,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
       if (!hasSession) {
-        unawaited(EmailService().sendConfirmationLinkRequest(email));
+        unawaited(
+          EmailService().sendConfirmationLinkRequest(
+            email,
+            languageCode: locUi,
+          ),
+        );
       }
 
       if (!mounted) return;

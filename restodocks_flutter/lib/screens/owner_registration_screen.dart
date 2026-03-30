@@ -129,7 +129,12 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         ),
       );
       if (!signUpResult.hasSession) {
-        unawaited(EmailService().sendConfirmationLinkRequest(email));
+        unawaited(
+          EmailService().sendConfirmationLinkRequest(
+            email,
+            languageCode: loc.currentLanguageCode,
+          ),
+        );
       }
 
       if (!mounted) return;
