@@ -13,6 +13,7 @@ import 'home/management_home_content.dart';
 import '../services/services.dart';
 import '../models/models.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/branded_auth_loading.dart';
 import '../widgets/tour_tooltip.dart';
 
 /// Главный экран — контент домашней вкладки по роли.
@@ -369,7 +370,7 @@ class _HomeScreenState extends State<HomeScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) context.go('/login');
       });
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: BrandedAuthLoading());
     }
 
     return Scaffold(

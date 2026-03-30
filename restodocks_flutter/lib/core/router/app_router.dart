@@ -54,10 +54,10 @@ import '../../models/order_list.dart';
 import '../../services/ai_service.dart';
 import '../../services/services.dart';
 import '../../widgets/app_shell.dart';
+import '../../widgets/branded_auth_loading.dart';
 import '../../widgets/inbox_notification_listener.dart';
 import '../../widgets/pro_required_screen.dart';
 import '../feature_flags.dart';
-import '../theme/app_theme.dart';
 
 /// Emails владельцев платформы — единственные кто видит /admin
 const _platformAdminEmails = <String>{
@@ -1277,42 +1277,11 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Единый кадр с логотипом (в т.ч. web): без спиннеров — освежение сессии идёт в фоне.
     return Scaffold(
-      backgroundColor: kIsWeb ? Colors.white : AppTheme.primaryColor,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (!kIsWeb)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Image.asset(
-                  'assets/images/welcome_logo.png',
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.restaurant_menu,
-                    size: 88,
-                    color: Colors.white70,
-                  ),
-                ),
-              ),
-            ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 40,
-            child: Center(
-              child: SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: kIsWeb ? Colors.black38 : Colors.white70,
-                ),
-              ),
-            ),
-          ),
-        ],
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      body: BrandedAuthLoading(
+        logoWidth: kIsWeb ? 192 : 220,
       ),
     );
   }
