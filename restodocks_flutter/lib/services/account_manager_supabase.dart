@@ -1540,4 +1540,48 @@ class AccountManagerSupabase extends ChangeNotifier {
       return false;
     }
   }
+
+  /// Промокод, привязанный к заведению при регистрации (если вводили код). Только для собственника.
+  Future<EstablishmentPromoInfo> getEstablishmentPromoForOwner() async {
+    final est = _establishment;
+    final emp = _currentEmployee;
+    if (est == null || emp == null || !emp.hasRole('owner')) {
+      return const EstablishmentPromoInfo();
+    }
+    try {
+      final res = await _supabase.client.rpc(
+        'get_establishment_promo_for_owner',
+        params: {'p_establishment_id': est.id},
+      );
+      if (res == null) return const EstablishmentPromoInfo();
+      final List rows = res is List ? res as List : [res];
+      if (rows.isEmpty) return const EstablishmentPromoInfo();
+      final m = Map<String, dynamic>.from(rows.first as Map);
+      final code = m['code']?.toString();
+      DateTime? exp;
+      final rawExp = m['expires_at'];
+      if (rawExp != null) {
+        exp = DateTime.tryParse(rawExp.toString());
+      }
+      return EstablishmentPromoInfo(code: code, expiresAt: exp);
+    } catch (e, st) {
+      devLog('getEstablishmentPromoForOwner: $e $st');
+      return const EstablishmentPromoInfo(loadFailed: true);
+    }
+  }
+}
+
+/// Данные промокода, выданного заведению при регистрации с кодом из админки.
+class EstablishmentPromoInfo {
+  const EstablishmentPromoInfo({
+    this.code,
+    this.expiresAt,
+    this.loadFailed = false,
+  });
+
+  final String? code;
+  final DateTime? expiresAt;
+  final bool loadFailed;
+
+  bool get hasPromo => !loadFailed && code != null && code!.isNotEmpty;
 }

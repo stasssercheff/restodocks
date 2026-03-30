@@ -19,6 +19,7 @@ import '../widgets/app_bar_home_button.dart';
 import '../widgets/getting_started_document.dart';
 import '../widgets/long_operation_progress_dialog.dart';
 import '../widgets/post_registration_trial_dialog.dart';
+import '../widgets/pro_settings_owner_section.dart';
 
 const _adminEmails = <String>{'stasssercheff@gmail.com'};
 bool _isPlatformAdminEmail(String email) =>
@@ -2418,12 +2419,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
             ],
             if (currentEmployee.hasRole('owner')) ...[
-              ListTile(
-                leading: const Icon(Icons.workspace_premium_outlined),
-                title: Text(localization.t('pro_conditions_title')),
-                subtitle: Text(localization.t('pro_conditions_subtitle')),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => showPostRegistrationTrialDialog(context),
+              ProSettingsOwnerSection(
+                localization: localization,
+                accountManager: accountManager,
               ),
               // 1. Должность — добавляемая должность для собственника (не «собственник»)
               ListTile(
