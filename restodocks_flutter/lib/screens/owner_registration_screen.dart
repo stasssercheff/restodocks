@@ -69,6 +69,10 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
           : ['owner'];
 
       final email = _emailController.text.trim();
+      final fullName = _surnameController.text.trim().isEmpty
+          ? _nameController.text.trim()
+          : '${_nameController.text.trim()} ${_surnameController.text.trim()}';
+      final registeredAtLocal = DateTime.now().toLocal().toString();
 
       // Проверяем, занят ли email глобально (email должен быть уникальным во всех заведениях)
       final emailTakenGlobally = await accountManager.isEmailTakenGlobally(email);
@@ -118,10 +122,15 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
           to: email,
           companyName: estab.name,
           email: email,
+          fullName: fullName,
+          registeredAtLocal: registeredAtLocal,
           pinCode: estab.pinCode,
           languageCode: loc.currentLanguageCode,
         ),
       );
+      if (!signUpResult.hasSession) {
+        unawaited(EmailService().sendConfirmationLinkRequest(email));
+      }
 
       if (!mounted) return;
       if (signUpResult.hasSession) {

@@ -25,6 +25,8 @@ class EmailService {
     required String to,
     required String companyName,
     required String email,
+    String? fullName,
+    String? registeredAtLocal,
     String? pinCode,
     String? passwordForConfirmation,
     String? languageCode,
@@ -35,6 +37,9 @@ class EmailService {
         'to': to.trim(),
         'companyName': companyName,
         'email': email,
+        if (fullName != null && fullName.trim().isNotEmpty) 'fullName': fullName.trim(),
+        if (registeredAtLocal != null && registeredAtLocal.trim().isNotEmpty)
+          'registeredAtLocal': registeredAtLocal.trim(),
         if (pinCode != null) 'pinCode': pinCode,
         if (passwordForConfirmation != null && passwordForConfirmation.isNotEmpty)
           'password': passwordForConfirmation,

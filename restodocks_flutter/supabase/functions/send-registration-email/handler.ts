@@ -57,12 +57,14 @@ export async function handleRequest(req: Request): Promise<Response> {
       to: string;
       companyName?: string;
       email?: string;
+      fullName?: string;
+      registeredAtLocal?: string;
       pinCode?: string;
       password?: string;
       language?: string;
     };
 
-    const { type, to, companyName, email, pinCode, password } = body;
+    const { type, to, companyName, email, fullName, registeredAtLocal, pinCode, password } = body;
     const lang = normalizeLanguage(body.language);
 
     if (type === "confirmation_only" && to) {
@@ -210,10 +212,15 @@ export async function handleRequest(req: Request): Promise<Response> {
 
     if (type === "owner") {
       if (lang === "ru") {
+        const greeting = fullName?.trim() ? `Здравствуйте, ${escapeHtml(fullName.trim())}!` : "Здравствуйте!";
+        const localTime = registeredAtLocal?.trim()
+          ? `<p><strong>Время регистрации:</strong> ${escapeHtml(registeredAtLocal.trim())}</p>`
+          : "";
         subject = "Регистрация компании в системе Restodocks";
         html = `
-<p>Здравствуйте!</p>
+<p>${greeting}</p>
 <p>Регистрация вашего заведения <strong>${escapeHtml(companyName)}</strong> успешно завершена.</p>
+${localTime}
 <p>Для доступа сотрудников к системе используйте уникальный идентификатор:</p>
 <p><strong>PIN-код компании: ${escapeHtml(pinCode || "")}</strong></p>
 <p>Ваш логин: <strong>${escapeHtml(email)}</strong></p>
@@ -223,10 +230,15 @@ export async function handleRequest(req: Request): Promise<Response> {
 <p>С уважением,<br>Команда Restodocks</p>
       `.trim();
       } else {
+        const greeting = fullName?.trim() ? `Hello, ${escapeHtml(fullName.trim())}!` : "Hello!";
+        const localTime = registeredAtLocal?.trim()
+          ? `<p><strong>Registration time:</strong> ${escapeHtml(registeredAtLocal.trim())}</p>`
+          : "";
         subject = "Company registration in Restodocks";
         html = `
-<p>Hello!</p>
+<p>${greeting}</p>
 <p>Your establishment <strong>${escapeHtml(companyName)}</strong> has been successfully registered.</p>
+${localTime}
 <p>Please use this identifier for your staff:</p>
 <p><strong>Company PIN: ${escapeHtml(pinCode || "")}</strong></p>
 <p>Your login: <strong>${escapeHtml(email)}</strong></p>
@@ -237,20 +249,30 @@ export async function handleRequest(req: Request): Promise<Response> {
       }
     } else {
       if (lang === "ru") {
+        const greeting = fullName?.trim() ? `Здравствуйте, ${escapeHtml(fullName.trim())}!` : "Здравствуйте!";
+        const localTime = registeredAtLocal?.trim()
+          ? `<p><strong>Время регистрации:</strong> ${escapeHtml(registeredAtLocal.trim())}</p>`
+          : "";
         subject = `Доступ к корпоративному пространству ${escapeHtml(companyName)}`;
         html = `
-<p>Здравствуйте!</p>
+<p>${greeting}</p>
 <p>Ваша учетная запись успешно привязана к системе управления заведением <strong>${escapeHtml(companyName)}</strong>.</p>
+${localTime}
 <p>Ваш логин: <strong>${escapeHtml(email)}</strong></p>
 <p>Для входа используйте пароль, который вы указали при регистрации. Если вы забыли пароль — воспользуйтесь функцией восстановления в приложении.</p>
 <p style="color:#666;font-size:14px">Отдельно придёт письмо со ссылкой для подтверждения email. Если не увидите его — проверьте папку «Спам».</p>
 <p>С уважением,<br>Команда Restodocks</p>
       `.trim();
       } else {
+        const greeting = fullName?.trim() ? `Hello, ${escapeHtml(fullName.trim())}!` : "Hello!";
+        const localTime = registeredAtLocal?.trim()
+          ? `<p><strong>Registration time:</strong> ${escapeHtml(registeredAtLocal.trim())}</p>`
+          : "";
         subject = `Access to ${escapeHtml(companyName)} workspace`;
         html = `
-<p>Hello!</p>
+<p>${greeting}</p>
 <p>Your account has been linked to <strong>${escapeHtml(companyName)}</strong>.</p>
+${localTime}
 <p>Your login: <strong>${escapeHtml(email)}</strong></p>
 <p>Please use the password you entered during registration. If needed, reset it in the app.</p>
 <p style="color:#666;font-size:14px">A separate email with confirmation link is sent by auth provider. Please check Spam if needed.</p>

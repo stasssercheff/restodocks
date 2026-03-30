@@ -171,6 +171,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final name = _nameController.text.trim();
       final surname = _surnameController.text.trim();
       final fullName = surname.isEmpty ? name : '$name $surname';
+      final registeredAtLocal = DateTime.now().toLocal().toString();
 
       final section = _department == 'kitchen' ? _section : null;
 
@@ -225,9 +226,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
           to: email,
           companyName: establishment.name,
           email: email,
+          fullName: fullName,
+          registeredAtLocal: registeredAtLocal,
           languageCode: locUi,
         ),
       );
+      if (!hasSession) {
+        unawaited(EmailService().sendConfirmationLinkRequest(email));
+      }
 
       if (!mounted) return;
       if (hasSession) {
