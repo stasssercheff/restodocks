@@ -948,67 +948,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showLanguagePicker(
       BuildContext context, LocalizationService localization) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        return Center(
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 340, maxHeight: 400),
-              decoration: BoxDecoration(
-                color: Theme.of(ctx).dialogBackgroundColor,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                    child: Text(
-                      localization.t('language'),
-                      style: Theme.of(ctx).textTheme.titleMedium,
-                    ),
-                  ),
-                  Flexible(
-                    child: ListView(
-                      shrinkWrap: true,
-                      children: localization.availableLanguages.map((language) {
-                        return ListTile(
-                          leading: Text(language['flag']!,
-                              style: const TextStyle(fontSize: 24)),
-                          title: Text(language['name']!),
-                          onTap: () {
-                            final code = language['code']!;
-                            Navigator.of(ctx, rootNavigator: true).pop();
-                            scheduleMicrotask(() async {
-                              await localization.setLocale(Locale(code));
-                              if (!context.mounted) return;
-                              await context
-                                  .read<AccountManagerSupabase>()
-                                  .savePreferredLanguage(code);
-                              if (!context.mounted) return;
-                              _translateMissingForLanguage(context, code);
-                            });
-                          },
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+    unawaited(localization.showLocalePickerDialog(
+      context,
+      afterApplied: (code) async {
+        scheduleMicrotask(() async {
+          if (!context.mounted) return;
+          await context.read<AccountManagerSupabase>().savePreferredLanguage(code);
+          if (!context.mounted) return;
+          _translateMissingForLanguage(context, code);
+        });
       },
-    );
+    ));
   }
 
   /// При смене языка в настройках: в фоне добирает переводы продуктов и названий ТТК

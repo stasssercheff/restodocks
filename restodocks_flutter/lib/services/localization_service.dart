@@ -36,6 +36,44 @@ class LocalizationService extends ChangeNotifier {
     'vi'
   ];
 
+  /// Emoji для языка интерфейса (с запасными шрифтами см. [flagEmojiTextStyle]).
+  static String flagEmoji(String languageCode) {
+    switch (languageCode) {
+      case 'ru':
+        return '🇷🇺';
+      case 'en':
+        return '🇺🇸';
+      case 'es':
+        return '🇪🇸';
+      case 'it':
+        return '🇮🇹';
+      case 'tr':
+        return '🇹🇷';
+      case 'vi':
+        return '🇻🇳';
+      case 'de':
+        return '🇩🇪';
+      case 'fr':
+        return '🇫🇷';
+      default:
+        return '🌐';
+    }
+  }
+
+  static TextStyle get flagEmojiTextStyle => const TextStyle(
+        fontSize: 24,
+        height: 1,
+        fontFamilyFallback: <String>[
+          'Apple Color Emoji',
+          'Segoe UI Emoji',
+          'Noto Color Emoji',
+          'Noto Emoji',
+        ],
+      );
+
+  static bool isSupportedLanguageCode(String code) =>
+      supportedLocales.any((l) => l.languageCode == code);
+
   Locale _currentLocale = const Locale('ru', 'RU');
   Map<String, Map<String, String>> _translations = {};
   TranslationManager? _translationManager;
@@ -101,6 +139,75 @@ class LocalizationService extends ChangeNotifier {
         }
       }
     } catch (_) {}
+  }
+
+  /// Диалог выбора языка (вход, регистрация, общий UI).
+  /// После смены локали вызывается [afterApplied], если задан (например сохранить в профиль).
+  Future<void> showLocalePickerDialog(
+    BuildContext context, {
+    Future<void> Function(String languageCode)? afterApplied,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 340, maxHeight: 400),
+              decoration: BoxDecoration(
+                color: Theme.of(ctx).dialogBackgroundColor,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 16,
+                    offset: Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                    child: Text(
+                      t('language'),
+                      style: Theme.of(ctx).textTheme.titleMedium,
+                    ),
+                  ),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: supportedLocales.map((locale) {
+                        final selected =
+                            currentLocale.languageCode == locale.languageCode;
+                        return ListTile(
+                          leading: Text(
+                            flagEmoji(locale.languageCode),
+                            style: flagEmojiTextStyle,
+                          ),
+                          title: Text(getLanguageName(locale.languageCode)),
+                          selected: selected,
+                          onTap: () async {
+                            await setLocale(locale);
+                            if (ctx.mounted) Navigator.of(ctx).pop();
+                            final cb = afterApplied;
+                            if (cb != null) {
+                              await cb(locale.languageCode);
+                            }
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   /// Установка текущей локали (сохраняется в SharedPreferences)
@@ -285,32 +392,9 @@ class LocalizationService extends ChangeNotifier {
       return {
         'code': locale.languageCode,
         'name': getLanguageName(locale.languageCode),
-        'flag': _getLanguageFlag(locale.languageCode),
+        'flag': flagEmoji(locale.languageCode),
       };
     }).toList();
-  }
-
-  String _getLanguageFlag(String languageCode) {
-    switch (languageCode) {
-      case 'ru':
-        return '🇷🇺';
-      case 'en':
-        return '🇺🇸';
-      case 'es':
-        return '🇪🇸';
-      case 'tr':
-        return '🇹🇷';
-      case 'it':
-        return '🇮🇹';
-      case 'vi':
-        return '🇻🇳';
-      case 'de':
-        return '🇩🇪';
-      case 'fr':
-        return '🇫🇷';
-      default:
-        return '🏳️';
-    }
   }
 
   /// Получить локализованный текст для сущности (продукты, ТТК, чеклисты)

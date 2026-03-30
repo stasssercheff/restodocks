@@ -84,6 +84,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       if (authUserId == null) throw Exception('Не удалось создать учётную запись');
 
       // 2. Сохраняем pending — employee создадим после confirm (когда user в auth.users)
+      final loc = context.read<LocalizationService>();
       await accSupabase.savePendingOwnerRegistration(
         authUserId: authUserId,
         establishment: estab,
@@ -91,6 +92,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         surname: _surnameController.text.trim().isEmpty ? null : _surnameController.text.trim(),
         email: email,
         roles: roles,
+        preferredLanguage: loc.currentLanguageCode,
       );
 
       // Письмо с PIN (без ссылки — чтобы не падало в спам)
@@ -110,7 +112,11 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       if (signUpResult.hasSession) {
         final result = await accSupabase.completePendingOwnerRegistration();
         if (result != null) {
-          await accountManager.login(result.employee, result.establishment);
+          await accountManager.login(
+            result.employee,
+            result.establishment,
+            interfaceLanguageCode: loc.currentLanguageCode,
+          );
           context.go('/home');
           if (!emailResult.ok && mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -157,6 +163,13 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
           onPressed: () => context.pop(),
         ),
         title: Text(loc.t('register_owner')),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.language),
+            tooltip: loc.t('language'),
+            onPressed: () => loc.showLocalePickerDialog(context),
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(

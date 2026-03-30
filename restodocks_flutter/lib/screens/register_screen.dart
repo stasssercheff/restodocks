@@ -135,6 +135,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     try {
       final accountManager = context.read<AccountManagerSupabase>();
+      final locUi = context.read<LocalizationService>().currentLanguageCode;
       final pin = _pinController.text.trim().toUpperCase();
       final establishment = await accountManager.findEstablishmentByPinCode(pin);
 
@@ -229,7 +230,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (!mounted) return;
       if (hasSession) {
-        await accountManager.login(employee, establishment);
+        await accountManager.login(
+          employee,
+          establishment,
+          interfaceLanguageCode: locUi,
+        );
         context.go('/home');
       } else {
         context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
@@ -251,6 +256,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(loc.t('register_employee')),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.language),
+            tooltip: loc.t('language'),
+            onPressed: () => loc.showLocalePickerDialog(context),
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(

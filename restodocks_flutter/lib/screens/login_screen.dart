@@ -82,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.language),
-            onPressed: () => _showLanguagePicker(context, loc),
+            onPressed: () => loc.showLocalePickerDialog(context),
             tooltip: loc.t('language'),
           ),
         ],
@@ -392,6 +392,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final accountManager = context.read<AccountManagerSupabase>();
       final loc = context.read<LocalizationService>();
+      final uiLang = loc.currentLanguageCode;
 
       final result = await accountManager
           .findEmployeeByEmailAndPasswordGlobal(
@@ -432,6 +433,7 @@ class _LoginScreenState extends State<LoginScreen> {
         rememberCredentials: false,
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
+        interfaceLanguageCode: uiLang,
       );
 
       if (mounted) {
@@ -486,67 +488,6 @@ class _LoginScreenState extends State<LoginScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  }
-
-  void _showLanguagePicker(BuildContext context, LocalizationService loc) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        return Center(
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 340, maxHeight: 400),
-              decoration: BoxDecoration(
-                color: Theme.of(ctx).dialogBackgroundColor,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black26,
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                    child: Text(
-                      loc.t('language'),
-                      style: Theme.of(ctx).textTheme.titleMedium,
-                    ),
-                  ),
-                  Flexible(
-                    child: ListView(
-                      shrinkWrap: true,
-                      children:
-                          LocalizationService.supportedLocales.map((locale) {
-                        final selected = loc.currentLocale.languageCode ==
-                            locale.languageCode;
-                        return ListTile(
-                          leading: Text(
-                            _flag(locale.languageCode),
-                            style: const TextStyle(fontSize: 24),
-                          ),
-                          title: Text(loc.getLanguageName(locale.languageCode)),
-                          selected: selected,
-                          onTap: () async {
-                            await loc.setLocale(locale);
-                            if (ctx.mounted) Navigator.of(ctx).pop();
-                          },
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
   }
 
   bool _isUnconfirmedError(String text) {
@@ -640,20 +581,4 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  String _flag(String code) {
-    switch (code) {
-      case 'ru':
-        return '🇷🇺';
-      case 'en':
-        return '🇺🇸';
-      case 'es':
-        return '🇪🇸';
-      case 'de':
-        return '🇩🇪';
-      case 'fr':
-        return '🇫🇷';
-      default:
-        return '🏳️';
-    }
-  }
 }

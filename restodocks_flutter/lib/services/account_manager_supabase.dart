@@ -21,6 +21,7 @@ import 'pos_dining_layout_service.dart';
 import 'edge_function_http.dart';
 import 'secure_storage_service.dart';
 import 'supabase_service.dart';
+import 'localization_service.dart';
 
 const _keyEmployeeId = 'restodocks_employee_id';
 const _keyEstablishmentId = 'restodocks_establishment_id';
@@ -699,7 +700,10 @@ class AccountManagerSupabase extends ChangeNotifier {
     String? surname,
     required String email,
     required List<String> roles,
+    String preferredLanguage = 'ru',
   }) async {
+    var lang = preferredLanguage.trim().toLowerCase();
+    if (!LocalizationService.isSupportedLanguageCode(lang)) lang = 'ru';
     await _supabase.client.rpc(
       'save_pending_owner_registration',
       params: {
@@ -709,6 +713,7 @@ class AccountManagerSupabase extends ChangeNotifier {
         'p_surname': surname ?? '',
         'p_email': email,
         'p_roles': roles,
+        'p_preferred_language': lang,
       },
     );
   }
@@ -1120,12 +1125,26 @@ class AccountManagerSupabase extends ChangeNotifier {
     String? pin,
     String? email,
     String? password,
+    /// Язык, выбранный на экране входа/регистрации до авторизации; сохраняется в профиль.
+    String? interfaceLanguageCode,
   }) async {
     devLog(
         '🔐 AccountManager: Setting current user - employee: ${employee.id}, establishment: ${establishment.id}');
     _currentEmployee = employee;
     _establishment = establishment;
-    onPreferredLanguageLoaded?.call(employee.preferredLanguage);
+
+    final ui = interfaceLanguageCode?.trim().toLowerCase();
+    final useUiLang = ui != null &&
+        ui.isNotEmpty &&
+        LocalizationService.supportedLocales.any((l) => l.languageCode == ui);
+
+    if (useUiLang) {
+      _currentEmployee = _currentEmployee!.copyWith(preferredLanguage: ui);
+      onPreferredLanguageLoaded?.call(ui);
+      unawaited(savePreferredLanguage(ui));
+    } else {
+      onPreferredLanguageLoaded?.call(employee.preferredLanguage);
+    }
 
     devLog('🔐 AccountManager: Saving to secure storage...');
     await _secureStorage.set(_keyEmployeeId, employee.id);

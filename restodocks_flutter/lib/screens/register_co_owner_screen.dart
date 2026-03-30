@@ -98,7 +98,12 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
       );
 
       if (!mounted) return;
-      await accountManager.login(employee, estab);
+      final uiLang = context.read<LocalizationService>().currentLanguageCode;
+      await accountManager.login(
+        employee,
+        estab,
+        interfaceLanguageCode: uiLang,
+      );
       context.go('/home');
     } catch (e) {
       if (mounted) setState(() {
@@ -118,7 +123,16 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
 
     if (_error != null && _invitationData == null) {
       return Scaffold(
-        appBar: AppBar(title: Text(loc.t('register') ?? 'Регистрация')),
+        appBar: AppBar(
+          title: Text(loc.t('register') ?? 'Регистрация'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.language),
+              tooltip: loc.t('language'),
+              onPressed: () => loc.showLocalePickerDialog(context),
+            ),
+          ],
+        ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -138,7 +152,16 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
     final email = _invitationData!['invited_email'] as String;
 
     return Scaffold(
-      appBar: AppBar(title: Text(loc.t('register') ?? 'Регистрация')),
+      appBar: AppBar(
+        title: Text(loc.t('register') ?? 'Регистрация'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.language),
+            tooltip: loc.t('language'),
+            onPressed: () => loc.showLocalePickerDialog(context),
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Form(
