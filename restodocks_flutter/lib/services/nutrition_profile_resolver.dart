@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/product.dart';
+import 'account_manager_supabase.dart';
 import 'ai_service_supabase.dart';
 import 'nutrition_api_service.dart';
 import 'product_store_supabase.dart';
@@ -79,7 +80,13 @@ class NutritionProfileResolver {
     required Product product,
     required String reason,
   }) async {
-    if (_client.auth.currentSession == null) return false;
+    if (_client.auth.currentSession == null || _client.auth.currentUser == null) {
+      return false;
+    }
+    final am = AccountManagerSupabase();
+    if (!am.isLoggedInSync) return false;
+    final dataEst = am.dataEstablishmentId?.trim();
+    if (dataEst == null || dataEst.isEmpty) return false;
     if (!needsAnyNutrition(product)) return false;
 
     final missingCalories = _needsCalories(product);
