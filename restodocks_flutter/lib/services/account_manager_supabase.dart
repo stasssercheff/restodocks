@@ -1569,6 +1569,43 @@ class AccountManagerSupabase extends ChangeNotifier {
       return const EstablishmentPromoInfo(loadFailed: true);
     }
   }
+
+  /// Обновить текущее заведение из БД (после применения промокода и т.п.).
+  Future<void> refreshCurrentEstablishmentFromServer() async {
+    final id = _establishment?.id;
+    if (id == null) return;
+    try {
+      final estData = await _supabase.client
+          .from('establishments')
+          .select()
+          .eq('id', id)
+          .limit(1)
+          .single();
+      _establishment = Establishment.fromJson(estData);
+      notifyListeners();
+    } catch (e, st) {
+      devLog('refreshCurrentEstablishmentFromServer: $e $st');
+    }
+  }
+
+  /// Применить админский промокод к текущему заведению (настройки PRO). Только владелец.
+  /// Ошибки: PROMO_*, ESTABLISHMENT_HAS_PROMO (текст в сообщении исключения).
+  Future<void> applyPromoToEstablishmentForOwner(String rawCode) async {
+    final est = _establishment;
+    final emp = _currentEmployee;
+    if (est == null || emp == null || !emp.hasRole('owner')) {
+      throw Exception('apply_promo_forbidden');
+    }
+    await _supabase.client.rpc(
+      'apply_promo_to_establishment_for_owner',
+      params: {
+        'p_establishment_id': est.id,
+        'p_code': rawCode.trim().toUpperCase(),
+      },
+    );
+    await refreshCurrentEstablishmentFromServer();
+    await _checkPromoAccess();
+  }
 }
 
 /// Данные промокода, выданного заведению при регистрации с кодом из админки.

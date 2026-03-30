@@ -28,10 +28,111 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     _promoFuture = widget.accountManager.getEstablishmentPromoForOwner();
   }
 
+  void _reloadPromo() {
+    setState(() {
+      _promoFuture = widget.accountManager.getEstablishmentPromoForOwner();
+    });
+  }
+
   String _formatDate(DateTime d) {
     final loc = widget.localization;
     final tag = loc.currentLanguageCode == 'ru' ? 'ru_RU' : loc.currentLanguageCode;
     return DateFormat.yMMMd(tag).format(d.toLocal());
+  }
+
+  String? _promoErrorFromException(Object e, LocalizationService loc) {
+    final msg = e.toString();
+    if (msg.contains('PROMO_INVALID')) return loc.t('promo_code_invalid');
+    if (msg.contains('PROMO_USED')) return loc.t('promo_code_used');
+    if (msg.contains('PROMO_NOT_STARTED')) return loc.t('promo_code_not_started');
+    if (msg.contains('PROMO_EXPIRED')) return loc.t('promo_code_expired');
+    if (msg.contains('ESTABLISHMENT_HAS_PROMO')) {
+      return loc.t('establishment_has_promo');
+    }
+    return null;
+  }
+
+  Future<void> _showApplyPromoDialog() async {
+    final loc = widget.localization;
+    final controller = TextEditingController();
+    var busy = false;
+    String? dialogError;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: Text(loc.t('pro_promo_enter_title')),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.characters,
+                  decoration: InputDecoration(
+                    labelText: loc.t('promo_code'),
+                    hintText: loc.t('enter_promo_code'),
+                  ),
+                  enabled: !busy,
+                ),
+                if (dialogError != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    dialogError!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: busy ? null : () => Navigator.pop(ctx),
+                child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+              ),
+              FilledButton(
+                onPressed: busy
+                    ? null
+                    : () async {
+                        final code = controller.text.trim();
+                        if (code.isEmpty) {
+                          setDialogState(() => dialogError = loc.t('promo_code_required'));
+                          return;
+                        }
+                        setDialogState(() {
+                          busy = true;
+                          dialogError = null;
+                        });
+                        try {
+                          await widget.accountManager.applyPromoToEstablishmentForOwner(code);
+                          if (!ctx.mounted) return;
+                          Navigator.pop(ctx);
+                          if (!context.mounted) return;
+                          _reloadPromo();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(loc.t('pro_promo_applied'))),
+                          );
+                        } catch (e) {
+                          setDialogState(() {
+                            busy = false;
+                            dialogError =
+                                _promoErrorFromException(e, loc) ?? e.toString();
+                          });
+                        }
+                      },
+                child: Text(loc.t('pro_promo_apply')),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    controller.dispose();
   }
 
   @override
@@ -60,9 +161,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                 subtitle: Text(loc.t('pro_promo_load_error')),
                 trailing: IconButton(
                   icon: const Icon(Icons.refresh),
-                  onPressed: () => setState(() {
-                    _promoFuture = widget.accountManager.getEstablishmentPromoForOwner();
-                  }),
+                  onPressed: _reloadPromo,
                 ),
               );
             }
@@ -80,7 +179,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
               leading: const Icon(Icons.local_offer_outlined),
               title: Text(loc.t('pro_promo_title')),
               subtitle: Text(subtitle),
-              trailing: hasPromo ? const Icon(Icons.info_outline) : null,
+              trailing: Icon(hasPromo ? Icons.info_outline : Icons.edit_outlined),
               onTap: hasPromo
                   ? () {
                       final expText = promo.expiresAt != null
@@ -111,7 +210,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                         ),
                       );
                     }
-                  : null,
+                  : _showApplyPromoDialog,
             );
           },
         ),
