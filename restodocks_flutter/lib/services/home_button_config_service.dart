@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../core/feature_flags.dart';
 import '../models/models.dart';
 
 const _keyHomeButton = 'restodocks_home_button_action';
@@ -134,7 +133,7 @@ List<HomeButtonAction> homeButtonActionsFor(Employee? emp,
       HomeButtonAction.ttk,
       HomeButtonAction.checklists,
       HomeButtonAction.nomenclature,
-      if (FeatureFlags.posModuleEnabled) HomeButtonAction.inventory,
+      HomeButtonAction.inventory,
       if (hasProSubscription) HomeButtonAction.expenses,
     ];
   }

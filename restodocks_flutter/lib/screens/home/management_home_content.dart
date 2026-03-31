@@ -200,11 +200,11 @@ class ManagementHomeContent extends StatelessWidget {
             title: loc.t('pos_nav_procurement') ?? 'Закупка',
             onTap: () => context.push('/pos/procurement/$dept'),
           ),
-          _Tile(
-              icon: Icons.assignment,
-              title: loc.t('inventory_blank'),
-              onTap: () => context.push('/inventory')),
         ],
+        _Tile(
+            icon: Icons.assignment,
+            title: loc.t('inventory_blank'),
+            onTap: () => context.push('/inventory')),
         _Tile(
             icon: Icons.remove_circle_outline,
             title: loc.t('writeoffs') ?? 'Списания',

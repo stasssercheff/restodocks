@@ -28,7 +28,8 @@ class FeatureFlags {
     return const String.fromEnvironment('ENABLE_TTK_IMPORT', defaultValue: 'false') == 'true';
   }
 
-  /// POS / склад POS / закупка POS / зал (столы, касса, заказы подразделений, KDS), а также плитка «Склад» → `/inventory`.
+  /// POS: зал (столы, касса), заказы подразделений, KDS, склад POS, закупка POS, сводный склад.
+  /// Бланк инвентаризации (`/inventory`) — отдельно, доступен и в проде.
   /// Включается только в Beta (`IS_BETA=true`) и не на основном домене **restodocks.com**.
   static bool get posModuleEnabled => isBeta && !_isProdMarketingHost;
 
