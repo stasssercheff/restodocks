@@ -180,6 +180,7 @@ class _StartupGateState extends State<_StartupGate> {
           useMaterial3: true,
         ),
         home: const Scaffold(
+          backgroundColor: AppTheme.primaryColor,
           body: BrandedAuthLoading(fullscreenLogo: true),
         ),
       );

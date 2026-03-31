@@ -58,6 +58,7 @@ import '../../widgets/branded_auth_loading.dart';
 import '../../widgets/inbox_notification_listener.dart';
 import '../../widgets/pro_required_screen.dart';
 import '../feature_flags.dart';
+import '../theme/app_theme.dart';
 
 /// Emails владельцев платформы — единственные кто видит /admin
 const _platformAdminEmails = <String>{
@@ -1230,9 +1231,6 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _runSequence() async {
-    // Короткая задержка для отображения логотипа
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (!mounted) return;
     await _checkAuthStatus();
   }
 
@@ -1278,11 +1276,9 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     // Единый кадр с логотипом (в т.ч. web): без спиннеров — освежение сессии идёт в фоне.
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      body: BrandedAuthLoading(
-        logoWidth: kIsWeb ? 192 : 220,
-      ),
+    return const Scaffold(
+      backgroundColor: AppTheme.primaryColor,
+      body: BrandedAuthLoading(fullscreenLogo: true),
     );
   }
 }
