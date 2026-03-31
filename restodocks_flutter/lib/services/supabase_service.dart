@@ -52,7 +52,7 @@ class SupabaseService {
           r.data!['access_token'] != null) {
         return await client.auth.recoverSession(jsonEncode(r.data));
       }
-      // 4xx — ответ GoTrue (неверный пароль и т.д.); можно повторить прямым вызовом.
+      // 4xx — ответ GoTrue (неверный пароль и т.д.); повторяем прямым вызовом.
       if (r.status >= 400 && r.status < 500) {
         devLog('auth-password-proxy: ${r.status}, direct signInWithPassword');
         return await client.auth.signInWithPassword(
@@ -60,9 +60,23 @@ class SupabaseService {
           password: password,
         );
       }
-      // 5xx/0/прочее: прямой auth/v1/token из браузера обычно даёт тот же 521/522+CORS — не дёргаем.
+      // 5xx / обрыв (0): прокси или сеть; прямой signInWithPassword часто проходит, когда Edge Function
+      // недоступен или CORS на функции сломан, а у GoTrue CORS для браузера разрешён.
+      if (r.status <= 0 || r.status >= 500) {
+        try {
+          devLog(
+            'auth-password-proxy: status=${r.status}, direct signInWithPassword fallback',
+          );
+          return await client.auth.signInWithPassword(
+            email: email,
+            password: password,
+          );
+        } catch (e) {
+          devLog('web direct signInWithPassword after proxy fail: $e');
+        }
+      }
       devLog(
-        'auth-password-proxy: unavailable status=${r.status}, skip browser token',
+        'auth-password-proxy: unavailable status=${r.status}, login failed',
       );
       throw AuthException(
         'supabase_login_unavailable',
