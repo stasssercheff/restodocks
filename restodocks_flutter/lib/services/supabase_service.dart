@@ -36,6 +36,9 @@ class SupabaseService {
   ///
   /// На web сначала [auth-password-proxy] (серверный вызов GoTrue password grant), чтобы обойти
   /// таймауты Cloudflare (522) и ложные CORS на прямом запросе к `auth/v1/token` из браузера.
+  ///
+  /// На web — сначала [auth-password-proxy] (CORS/522). На native — сначала прямой
+  /// [signInWithPassword] к GoTrue (как в браузере без лишнего hop); при сетевой ошибке — proxy.
   Future<AuthResponse> signInWithEmail(String email, String password) async {
     if (kIsWeb) {
       final r = await postEdgeFunctionWithRetry(
@@ -67,8 +70,50 @@ class SupabaseService {
         code: 'supabase_login_unavailable',
       );
     }
+
+    final emailT = email.trim();
+    try {
+      return await client.auth.signInWithPassword(
+        email: emailT,
+        password: password,
+      );
+    } on AuthException catch (e) {
+      final m = (e.message ?? '').toLowerCase();
+      final badCreds = m.contains('invalid login credentials') ||
+          m.contains('invalid_credentials') ||
+          e.statusCode == '400' ||
+          e.statusCode == 'invalid_credentials';
+      if (badCreds) {
+        rethrow;
+      }
+      devLog('native signInWithPassword: $e — trying auth-password-proxy');
+    } catch (e) {
+      devLog('native signInWithPassword: $e — trying auth-password-proxy');
+    }
+
+    final r = await postEdgeFunctionWithRetry(
+      'auth-password-proxy',
+      {'email': emailT, 'password': password},
+      bearerAlwaysAnon: true,
+    );
+    if (r.status >= 200 &&
+        r.status < 300 &&
+        r.data != null &&
+        r.data!['access_token'] != null) {
+      return await client.auth.recoverSession(jsonEncode(r.data));
+    }
+    if (r.status >= 400 && r.status < 500) {
+      devLog('auth-password-proxy: ${r.status}, signInWithPassword (native)');
+      return await client.auth.signInWithPassword(
+        email: emailT,
+        password: password,
+      );
+    }
+    devLog(
+      'auth-password-proxy: status=${r.status}, fallback signInWithPassword (native)',
+    );
     return await client.auth.signInWithPassword(
-      email: email,
+      email: emailT,
       password: password,
     );
   }

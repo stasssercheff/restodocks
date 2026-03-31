@@ -343,12 +343,19 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
       }
     }
 
-    return {
+    final out = <String, dynamic>{
       'header': header,
       'rows': mergedRows.values.toList(),
       'aggregatedProducts': mergedAggregated.values.toList(),
       'sourceLang': first['sourceLang'] ?? 'ru',
     };
+    // Как у одиночного бланка: тип «выборочная» только если все исходные — выборочные.
+    final allSelective = docs.every((d) =>
+        (d.metadata as Map?)?['type']?.toString() == 'selective_inventory');
+    if (allSelective) {
+      out['type'] = 'selective_inventory';
+    }
+    return out;
   }
 
   /// Метаданные объединения для сохранения во входящих

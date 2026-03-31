@@ -195,6 +195,16 @@ class _InventoryScreenState extends State<InventoryScreen>
   bool _isLoadingProducts =
       true; // Показывать "Загрузка продуктов..." пока не завершился initScreen
 
+  /// Выборочная инвентаризация: в бланке только заранее выбранные позиции номенклатуры и ПФ.
+  bool _isSelectiveInventory = false;
+
+  @override
+  bool get restoreDraftAfterLoad => true;
+
+  @override
+  String get draftKey =>
+      _isSelectiveInventory ? 'selective_inventory' : 'inventory';
+
   /// Сохранить данные немедленно в локальное хранилище (SharedPreferences/localStorage)
   void saveNow() {
     saveImmediately(); // Немедленно, без debounce — данные не потеряются при закрытии/падении
@@ -226,11 +236,9 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   @override
-  String get draftKey => 'inventory';
-
-  @override
   Map<String, dynamic> getCurrentState() {
     return {
+      'inventoryMode': _isSelectiveInventory ? 'selective' : 'standard',
       'date': _date.toIso8601String(),
       'startTime': _startTime?.format(context) ?? '',
       'endTime': _endTime?.format(context) ?? '',
@@ -257,7 +265,10 @@ class _InventoryScreenState extends State<InventoryScreen>
   Future<void> restoreState(Map<String, dynamic> data) async {
     if (_stateRestored) return; // уже восстановлено из _initScreen
     _stateRestored = true;
+    final mode = data['inventoryMode']?.toString();
+    final isSelective = mode == 'selective' || data['isSelective'] == true;
     setState(() {
+      _isSelectiveInventory = isSelective;
       _date = DateTime.parse(data['date'] ?? DateTime.now().toIso8601String());
       _startTime = data['startTime'] != null && data['startTime'].isNotEmpty
           ? TimeOfDay.fromDateTime(
@@ -335,7 +346,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     });
 
     // Перезагрузить номенклатуру для восстановления связей с продуктами и ТТК
-    await _loadNomenclature();
+    await _loadNomenclature(fillAllProducts: !_isSelectiveInventory);
   }
 
   bool _matchesNameFilter(String name) {
@@ -402,6 +413,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     final futures = await Future.wait([
       draftStorage.loadInventoryDraft(),
       draftStorage.loadIikoInventoryDraft(),
+      draftStorage.loadSelectiveInventoryDraft(),
       if (estId != null) iikoStore.loadProducts(estId) else Future.value(null),
     ]);
     if (!mounted) return;
@@ -409,16 +421,22 @@ class _InventoryScreenState extends State<InventoryScreen>
 
     final stdDraft = futures[0] as Map<String, dynamic>?;
     final iikoDraft = futures[1] as Map<String, dynamic>?;
+    final selectiveDraft = futures[2] as Map<String, dynamic>?;
 
     final hasIikoProducts = iikoStore.hasProducts;
     final hasIikoDraft = iikoDraft != null && iikoDraft.isNotEmpty;
     final hasStdDraft = stdDraft != null && stdDraft.isNotEmpty;
+    final hasSelectiveDraft =
+        selectiveDraft != null && selectiveDraft.isNotEmpty;
 
     // Если есть iiko-продукты или iiko-черновик — показываем диалог выбора ВСЕГДА
     // (пользователь должен сам выбрать куда вернуться)
     if (hasIikoProducts || hasIikoDraft) {
       await _showModeDialog(
-          hasIikoDraft: hasIikoDraft, hasStdDraft: hasStdDraft);
+        hasIikoDraft: hasIikoDraft,
+        hasStdDraft: hasStdDraft,
+        hasSelectiveDraft: hasSelectiveDraft,
+      );
       return;
     }
 
@@ -426,14 +444,33 @@ class _InventoryScreenState extends State<InventoryScreen>
     final serverIikoDraft = await _loadIikoDraftFromServer();
     if (!mounted) return;
     if (serverIikoDraft != null) {
-      await _showModeDialog(hasIikoDraft: true, hasStdDraft: hasStdDraft);
+      await _showModeDialog(
+        hasIikoDraft: true,
+        hasStdDraft: hasStdDraft,
+        hasSelectiveDraft: hasSelectiveDraft,
+      );
       return;
     }
 
-    // iiko нет нигде — тихо восстанавливаем стандартный черновик (если есть)
+    // Оба локальных черновика (стандарт + выборочная) — пусть пользователь выберет
+    if (hasStdDraft && hasSelectiveDraft) {
+      await _showModeDialog(
+        hasStdDraft: true,
+        hasSelectiveDraft: true,
+      );
+      return;
+    }
+
+    // iiko нет — тихо восстанавливаем один из черновиков (если есть)
     if (hasStdDraft) {
       _stateRestored = false;
       await restoreState(stdDraft!);
+      return;
+    }
+
+    if (hasSelectiveDraft) {
+      _stateRestored = false;
+      await restoreState(selectiveDraft!);
       return;
     }
 
@@ -443,6 +480,14 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (serverStdDraft != null && serverStdDraft.isNotEmpty) {
       _stateRestored = false;
       await restoreState(serverStdDraft);
+      return;
+    }
+
+    final serverSelectiveDraft = await _loadSelectiveDraftFromServer();
+    if (!mounted) return;
+    if (serverSelectiveDraft != null && serverSelectiveDraft.isNotEmpty) {
+      _stateRestored = false;
+      await restoreState(serverSelectiveDraft);
       return;
     }
 
@@ -489,11 +534,34 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
   }
 
+  /// Черновик выборочной инвентаризации с Supabase.
+  Future<Map<String, dynamic>?> _loadSelectiveDraftFromServer() async {
+    try {
+      final account = context.read<AccountManagerSupabase>();
+      final estId = account.establishment?.id;
+      if (estId == null) return null;
+      final row = await Supabase.instance.client
+          .from('inventory_drafts')
+          .select('draft_data')
+          .eq('establishment_id', estId)
+          .eq('draft_type', 'selective')
+          .maybeSingle();
+      if (row == null) return null;
+      return row['draft_data'] as Map<String, dynamic>?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Диалог выбора режима инвентаризации при открытии экрана.
   /// [hasIikoDraft] — незавершённая iiko-инвентаризация сохранена.
   /// [hasStdDraft]  — незавершённая стандартная инвентаризация сохранена.
-  Future<void> _showModeDialog(
-      {bool hasIikoDraft = false, bool hasStdDraft = false}) async {
+  /// [hasSelectiveDraft] — незавершённая выборочная инвентаризация сохранена.
+  Future<void> _showModeDialog({
+    bool hasIikoDraft = false,
+    bool hasStdDraft = false,
+    bool hasSelectiveDraft = false,
+  }) async {
     if (!mounted) return;
     final iikoStore = context.read<IikoProductStore>();
     final hasIiko = iikoStore.hasProducts || hasIikoDraft;
@@ -521,55 +589,83 @@ class _InventoryScreenState extends State<InventoryScreen>
       );
     }
 
+    final loc = context.read<LocalizationService>();
     final choice = await showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
         final theme = Theme.of(ctx);
         return AlertDialog(
-          title: const Text('Тип инвентаризации'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.list_alt, color: Colors.blue),
-                title: Row(children: [
-                  const Text('Стандартный'),
-                  if (hasStdDraft) _continueBadge(ctx),
-                ]),
-                subtitle: Text(hasStdDraft
-                    ? 'Незавершённая инвентаризация сохранена'
-                    : 'Продукты из номенклатуры'),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-                tileColor: Colors.blue.withOpacity(0.05),
-                onTap: () => Navigator.of(ctx).pop('standard'),
-              ),
-              if (!isHall) ...[
+          title: Text(loc.t('inventory_mode_dialog_title') ?? 'Тип инвентаризации'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.list_alt, color: Colors.blue),
+                  title: Row(children: [
+                    Text(loc.t('inventory_mode_standard') ?? 'Стандартный'),
+                    if (hasStdDraft) _continueBadge(ctx),
+                  ]),
+                  subtitle: Text(hasStdDraft
+                      ? (loc.t('inventory_mode_saved_draft') ??
+                          'Незавершённая инвентаризация сохранена')
+                      : (loc.t('inventory_mode_standard_hint') ??
+                          'Продукты из номенклатуры')),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  tileColor: Colors.blue.withOpacity(0.05),
+                  onTap: () => Navigator.of(ctx).pop('standard'),
+                ),
                 const SizedBox(height: 8),
                 ListTile(
-                  leading: Icon(Icons.table_chart_outlined,
-                      color: hasIiko ? theme.colorScheme.primary : Colors.grey),
+                  leading: Icon(Icons.filter_alt_outlined,
+                      color: theme.colorScheme.secondary),
                   title: Row(children: [
-                    const Text('Бланк iiko'),
-                    if (hasIikoDraft) _continueBadge(ctx),
+                    Text(loc.t('inventory_selective_mode_title') ?? 'Выборочная'),
+                    if (hasSelectiveDraft) _continueBadge(ctx),
                   ]),
                   subtitle: Text(
-                    hasIikoDraft
-                        ? 'Незавершённая инвентаризация сохранена'
-                        : hasIiko
-                            ? 'Продукты из iiko-бланка · ${iikoStore.products.length} позиций'
-                            : 'Сначала загрузите бланк iiko в «Загрузка продуктов»',
+                    hasSelectiveDraft
+                        ? (loc.t('inventory_mode_saved_draft') ??
+                            'Незавершённая инвентаризация сохранена')
+                        : (loc.t('inventory_selective_mode_subtitle') ??
+                            'Только выбранные позиции из номенклатуры и ПФ'),
                   ),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8)),
-                  tileColor: hasIiko
-                      ? theme.colorScheme.primaryContainer.withOpacity(0.3)
-                      : Colors.grey.withOpacity(0.03),
-                  onTap: hasIiko ? () => Navigator.of(ctx).pop('iiko') : null,
+                  tileColor:
+                      theme.colorScheme.secondaryContainer.withOpacity(0.25),
+                  onTap: () => Navigator.of(ctx).pop('selective'),
                 ),
+                if (!isHall) ...[
+                  const SizedBox(height: 8),
+                  ListTile(
+                    leading: Icon(Icons.table_chart_outlined,
+                        color: hasIiko ? theme.colorScheme.primary : Colors.grey),
+                    title: Row(children: [
+                      Text(loc.t('inventory_mode_iiko') ?? 'Бланк iiko'),
+                      if (hasIikoDraft) _continueBadge(ctx),
+                    ]),
+                    subtitle: Text(
+                      hasIikoDraft
+                          ? (loc.t('inventory_mode_saved_draft') ??
+                              'Незавершённая инвентаризация сохранена')
+                          : hasIiko
+                              ? '${loc.t('inventory_mode_iiko_hint_products') ?? 'Продукты из iiko-бланка'} · ${iikoStore.products.length}'
+                              : (loc.t('inventory_mode_iiko_hint_upload') ??
+                                  'Сначала загрузите бланк iiko в «Загрузка продуктов»'),
+                    ),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    tileColor: hasIiko
+                        ? theme.colorScheme.primaryContainer.withOpacity(0.3)
+                        : Colors.grey.withOpacity(0.03),
+                    onTap: hasIiko ? () => Navigator.of(ctx).pop('iiko') : null,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         );
       },
@@ -580,7 +676,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (choice == 'iiko') {
       context.pushReplacement('/inventory-iiko');
     } else if (choice == 'standard') {
-      // Если есть стандартный черновик — восстанавливаем его
+      setState(() => _isSelectiveInventory = false);
       if (hasStdDraft) {
         final draftStorage = DraftStorageService();
         final savedDraft = await draftStorage.loadInventoryDraft();
@@ -592,12 +688,40 @@ class _InventoryScreenState extends State<InventoryScreen>
         }
       }
       _loadNomenclature();
+    } else if (choice == 'selective') {
+      setState(() => _isSelectiveInventory = true);
+      if (hasSelectiveDraft) {
+        final draftStorage = DraftStorageService();
+        final savedDraft = await draftStorage.loadSelectiveInventoryDraft();
+        if (!mounted) return;
+        if (savedDraft != null && savedDraft.isNotEmpty) {
+          _stateRestored = false;
+          await restoreState(savedDraft);
+          return;
+        }
+        final serverSel = await _loadSelectiveDraftFromServer();
+        if (!mounted) return;
+        if (serverSel != null && serverSel.isNotEmpty) {
+          _stateRestored = false;
+          await restoreState(serverSel);
+          return;
+        }
+      }
+      final ok = await _pickSelectivePositionsAndApply();
+      if (!ok && mounted) {
+        await _showModeDialog(
+          hasIikoDraft: hasIikoDraft,
+          hasStdDraft: hasStdDraft,
+          hasSelectiveDraft: hasSelectiveDraft,
+        );
+      }
     }
     // choice == null → пользователь не выбрал (нажал вне диалога) — ничего не делаем
   }
 
   /// Автоматическая подстановка: номенклатура заведения + полуфабрикаты (ТТК с типом ПФ).
-  Future<void> _loadNomenclature() async {
+  /// [fillAllProducts] — false для выборочной инвентаризации (только уже добавленные строки).
+  Future<void> _loadNomenclature({bool fillAllProducts = true}) async {
     if (!mounted) return;
     setState(() => _isLoadingProducts = true);
     final store = context.read<ProductStoreSupabase>();
@@ -638,23 +762,26 @@ class _InventoryScreenState extends State<InventoryScreen>
       // Все новые строки всегда начинаются с 2 колонок
       final minQtyCount = 2;
 
-      // Добавляем недостающие продукты и ПФ
-      for (final p in products) {
-        if (_rows.any((r) => r.product?.id == p.id || r.productId == p.id))
-          continue;
-        _rows.add(_InventoryRow(
-            product: p,
-            techCard: null,
-            quantities: List<double>.generate(minQtyCount, (_) => 0.0)));
-      }
-      for (final tc in pfOnly) {
-        if (_rows.any((r) => r.techCard?.id == tc.id || r.techCardId == tc.id))
-          continue;
-        _rows.add(_InventoryRow(
-            product: null,
-            techCard: tc,
-            quantities: List<double>.generate(minQtyCount, (_) => 0.0),
-            pfUnit: _pfUnitPcs));
+      if (fillAllProducts) {
+        // Добавляем недостающие продукты и ПФ
+        for (final p in products) {
+          if (_rows.any((r) => r.product?.id == p.id || r.productId == p.id))
+            continue;
+          _rows.add(_InventoryRow(
+              product: p,
+              techCard: null,
+              quantities: List<double>.generate(minQtyCount, (_) => 0.0)));
+        }
+        for (final tc in pfOnly) {
+          if (_rows.any(
+              (r) => r.techCard?.id == tc.id || r.techCardId == tc.id))
+            continue;
+          _rows.add(_InventoryRow(
+              product: null,
+              techCard: tc,
+              quantities: List<double>.generate(minQtyCount, (_) => 0.0),
+              pfUnit: _pfUnitPcs));
+        }
       }
 
       for (var i = 0; i < _rows.length; i++) {
@@ -753,7 +880,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         {
           'establishment_id': establishmentId,
           'employee_id': employeeId,
-          'draft_type': 'standard',
+          'draft_type': _isSelectiveInventory ? 'selective' : 'standard',
           'draft_data': data,
           'updated_at': DateTime.now().toIso8601String(),
         },
@@ -1091,6 +1218,7 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   /// Начать новую инвентаризацию (очистить форму после завершённой).
   void _startNewInventory() {
+    final wasSelective = _isSelectiveInventory;
     setState(() {
       _rows.clear();
       _aggregatedFromFile = null;
@@ -1100,7 +1228,14 @@ class _InventoryScreenState extends State<InventoryScreen>
       _completed = false;
     });
     clearDraft();
-    _loadNomenclature();
+    if (wasSelective) {
+      Future.microtask(() async {
+        final ok = await _pickSelectivePositionsAndApply();
+        if (!ok && mounted) await _showModeDialog();
+      });
+    } else {
+      _loadNomenclature();
+    }
   }
 
   /// Вычислить стоимость для продукта по имени (используется для листа 2 при продуктах из ПФ).
@@ -1475,7 +1610,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           ? AppBar(
               leading: appBarBackButton(context),
               title: Text(
-                loc.t('inventory_blank_title'),
+                _inventoryAppBarTitle(loc),
                 style: const TextStyle(fontSize: 16),
               ),
               toolbarHeight: 40,
@@ -1485,7 +1620,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               ? AppBar(
                   leading: appBarBackButton(context),
                   title: Text(
-                    loc.t('inventory_blank_title'),
+                    _inventoryAppBarTitle(loc),
                     style: const TextStyle(fontSize: 16),
                   ),
                   toolbarHeight: 48,
@@ -1493,7 +1628,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                 )
               : AppBar(
                   leading: appBarBackButton(context),
-                  title: Text(loc.t('inventory_blank_title')),
+                  title: Text(_inventoryAppBarTitle(loc)),
                 ),
       // Кнопка "Завершить" в bottomNavigationBar — Flutter поднимает её над клавиатурой автоматически.
       // Браузерный URL-бар (Safari/Chrome) остаётся ниже неё и не перекрывает таблицу.
@@ -1803,16 +1938,31 @@ class _InventoryScreenState extends State<InventoryScreen>
                   size: 64, color: Theme.of(context).colorScheme.outline),
               const SizedBox(height: 16),
               Text(
-                loc.t('inventory_empty_hint'),
+                _isSelectiveInventory
+                    ? (loc.t('inventory_selective_empty_hint') ??
+                        'Выберите позиции в номенклатуре для этой инвентаризации.')
+                    : loc.t('inventory_empty_hint'),
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
               FilledButton.tonalIcon(
-                onPressed: () => _showProductPicker(context, loc),
-                icon: const Icon(Icons.add),
-                label: Text(loc.t('inventory_add_product')),
+                onPressed: () async {
+                  if (_isSelectiveInventory) {
+                    final ok = await _pickSelectivePositionsAndApply();
+                    if (!ok && mounted) await _showModeDialog();
+                  } else {
+                    await _showProductPicker(context, loc);
+                  }
+                },
+                icon: Icon(_isSelectiveInventory ? Icons.filter_alt : Icons.add),
+                label: Text(
+                  _isSelectiveInventory
+                      ? (loc.t('inventory_selective_pick_again') ??
+                          'Выбрать позиции')
+                      : loc.t('inventory_add_product'),
+                ),
               ),
             ],
           ),
@@ -2349,6 +2499,7 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   Future<void> _showProductPicker(
       BuildContext context, LocalizationService loc) async {
+    if (_isSelectiveInventory) return;
     final productStore = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
     final est = account.establishment;
@@ -2552,12 +2703,324 @@ class _InventoryScreenState extends State<InventoryScreen>
       if (price != null && price > 0) map['price'] = price;
       return map;
     }).toList();
-    return {
+    final payload = <String, dynamic>{
       'header': header,
       'rows': rows,
       'aggregatedProducts': aggregatedProducts ?? [],
       'sourceLang': lang,
     };
+    if (_isSelectiveInventory) {
+      payload['type'] = 'selective_inventory';
+    }
+    return payload;
+  }
+
+  String _inventoryAppBarTitle(LocalizationService loc) {
+    if (_isSelectiveInventory) {
+      return loc.t('inventory_selective_blank_title') ??
+          'Выборочная инвентаризация';
+    }
+    return loc.t('inventory_blank_title');
+  }
+
+  /// Загрузить номенклатуру, показать выбор позиций, заполнить бланк только ими.
+  Future<bool> _pickSelectivePositionsAndApply() async {
+    final loc = context.read<LocalizationService>();
+    final store = context.read<ProductStoreSupabase>();
+    final account = context.read<AccountManagerSupabase>();
+    final techCardSvc = context.read<TechCardServiceSupabase>();
+    final est = account.establishment;
+    final estId = est?.dataEstablishmentId;
+    if (estId == null) return false;
+
+    setState(() => _isLoadingProducts = true);
+    final loadResults = await Future.wait([
+      store.loadProducts(),
+      store.loadNomenclature(estId),
+      techCardSvc.getTechCardsForEstablishment(estId),
+    ]);
+    if (!mounted) return false;
+    final products = store.getNomenclatureProducts(estId);
+    final techCards = loadResults[2] as List<TechCard>;
+    final pfOnly = techCards.where((tc) => tc.isSemiFinished).toList();
+    setState(() => _isLoadingProducts = false);
+
+    if (products.isEmpty && pfOnly.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '${loc.t('nomenclature')}: ${loc.t('no_products')}'),
+          ),
+        );
+      }
+      return false;
+    }
+
+    final result = await showModalBottomSheet<({Set<String> p, Set<String> tc})>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) => _SelectiveInventoryPickerSheet(
+        products: products,
+        semiFinished: pfOnly,
+        loc: loc,
+      ),
+    );
+    if (result == null || (!mounted)) return false;
+    if (result.p.isEmpty && result.tc.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(loc.t('inventory_selective_pick_empty') ??
+                'Отметьте хотя бы одну позицию'),
+          ),
+        );
+      }
+      return false;
+    }
+
+    setState(() {
+      _isSelectiveInventory = true;
+      _rows.clear();
+      final minQty = 2;
+      for (final id in result.p) {
+        for (final p in products) {
+          if (p.id == id) {
+            _rows.add(_InventoryRow(
+              product: p,
+              techCard: null,
+              quantities: List<double>.generate(minQty, (_) => 0.0),
+            ));
+            break;
+          }
+        }
+      }
+      for (final id in result.tc) {
+        for (final tc in pfOnly) {
+          if (tc.id == id) {
+            _rows.add(_InventoryRow(
+              product: null,
+              techCard: tc,
+              quantities: List<double>.generate(minQty, (_) => 0.0),
+              pfUnit: _pfUnitPcs,
+            ));
+            break;
+          }
+        }
+      }
+    });
+    saveNow();
+    return true;
+  }
+}
+
+/// Выбор позиций для выборочной инвентаризации (номенклатура + ПФ).
+class _SelectiveInventoryPickerSheet extends StatefulWidget {
+  const _SelectiveInventoryPickerSheet({
+    required this.products,
+    required this.semiFinished,
+    required this.loc,
+  });
+
+  final List<Product> products;
+  final List<TechCard> semiFinished;
+  final LocalizationService loc;
+
+  @override
+  State<_SelectiveInventoryPickerSheet> createState() =>
+      _SelectiveInventoryPickerSheetState();
+}
+
+class _SelectiveInventoryPickerSheetState
+    extends State<_SelectiveInventoryPickerSheet> {
+  String _query = '';
+  final Set<String> _productIds = {};
+  final Set<String> _techCardIds = {};
+
+  String _pfTitle(TechCard tc) =>
+      tc.getDisplayNameInLists(widget.loc.currentLanguageCode);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final lang = widget.loc.currentLanguageCode;
+    final q = _query.trim().toLowerCase();
+    final products = widget.products.where((p) {
+      if (q.isEmpty) return true;
+      return p.name.toLowerCase().contains(q) ||
+          p.getLocalizedName(lang).toLowerCase().contains(q);
+    }).toList();
+    final pfs = widget.semiFinished.where((tc) {
+      if (q.isEmpty) return true;
+      final n = _pfTitle(tc).toLowerCase();
+      return n.contains(q);
+    }).toList();
+
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.92,
+      minChildSize: 0.45,
+      maxChildSize: 0.96,
+      builder: (ctx, scrollCtrl) {
+        return Material(
+          color: theme.colorScheme.surface,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.loc.t('inventory_selective_pick_title') ??
+                            'Позиции для инвентаризации',
+                        style: theme.textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: TextField(
+                  decoration: InputDecoration(
+                    hintText: widget.loc.t('search') ?? 'Поиск',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onChanged: (s) => setState(() => _query = s),
+                ),
+              ),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    TextButton(
+                      onPressed: products.isEmpty
+                          ? null
+                          : () => setState(() {
+                                _productIds.addAll(products.map((p) => p.id));
+                              }),
+                      child: Text(widget.loc.t('inventory_selective_all_products') ??
+                          'Все продукты'),
+                    ),
+                    TextButton(
+                      onPressed: pfs.isEmpty
+                          ? null
+                          : () => setState(() {
+                                _techCardIds.addAll(pfs.map((tc) => tc.id));
+                              }),
+                      child: Text(widget.loc.t('inventory_selective_all_pf') ??
+                          'Все ПФ'),
+                    ),
+                    TextButton(
+                      onPressed: () => setState(() {
+                        _productIds.clear();
+                        _techCardIds.clear();
+                      }),
+                      child: Text(widget.loc.t('inventory_selective_clear') ??
+                          'Снять всё'),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView(
+                  controller: scrollCtrl,
+                  children: [
+                    if (products.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                        child: Text(
+                          widget.loc.t('inventory_block_products') ??
+                              'Продукты',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      ...products.map((p) {
+                        final sel = _productIds.contains(p.id);
+                        return CheckboxListTile(
+                          value: sel,
+                          onChanged: (v) => setState(() {
+                            if (v == true) {
+                              _productIds.add(p.id);
+                            } else {
+                              _productIds.remove(p.id);
+                            }
+                          }),
+                          title: Text(
+                            p.getLocalizedName(lang),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }),
+                    ],
+                    if (pfs.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                        child: Text(
+                          widget.loc.t('inventory_block_pf') ?? 'Полуфабрикаты',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      ...pfs.map((tc) {
+                        final sel = _techCardIds.contains(tc.id);
+                        return CheckboxListTile(
+                          value: sel,
+                          onChanged: (v) => setState(() {
+                            if (v == true) {
+                              _techCardIds.add(tc.id);
+                            } else {
+                              _techCardIds.remove(tc.id);
+                            }
+                          }),
+                          title: Text(
+                            _pfTitle(tc),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }),
+                    ],
+                  ],
+                ),
+              ),
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.of(ctx).pop(
+                        (p: Set<String>.from(_productIds),
+                            tc: Set<String>.from(_techCardIds)),
+                      );
+                    },
+                    child: Text(widget.loc.t('inventory_selective_confirm') ??
+                        'Готово'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 

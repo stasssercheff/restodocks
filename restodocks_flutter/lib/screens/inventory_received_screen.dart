@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../utils/inventory_document_labels.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -157,6 +158,7 @@ class _DocCard extends StatelessWidget {
     final date = doc['created_at']?.toString().substring(0, 10) ?? '—';
     final establishmentName = header['establishmentName'] ?? '—';
     final employeeName = header['employeeName'] ?? '—';
+    final kind = inventoryDocKindSubtitle(payload, loc);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -165,12 +167,27 @@ class _DocCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(flex: 1, child: Text(date, style: Theme.of(context).textTheme.bodyMedium)),
-              Expanded(flex: 2, child: Text(establishmentName, style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
-              Expanded(flex: 2, child: Text(employeeName, style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
-              Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.outline),
+              Row(
+                children: [
+                  Expanded(flex: 1, child: Text(date, style: Theme.of(context).textTheme.bodyMedium)),
+                  Expanded(flex: 2, child: Text(establishmentName, style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+                  Expanded(flex: 2, child: Text(employeeName, style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
+                  Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.outline),
+                ],
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  kind,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
+              ),
             ],
           ),
         ),
@@ -278,7 +295,7 @@ class _InventoryDocumentDetailScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('inventory_blank_title')),
+        title: Text(inventoryBlankTitleForPayload(payload, loc)),
         actions: [
           IconButton(
             icon: const Icon(Icons.download),

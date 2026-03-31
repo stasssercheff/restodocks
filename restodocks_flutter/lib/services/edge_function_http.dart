@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../utils/dev_log.dart';
-import 'package:restodocks/core/supabase_env.dart';
 import 'package:restodocks/core/supabase_url_resolver_stub.dart'
     if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart' as supabase_url;
 
@@ -19,15 +18,16 @@ Future<({int status, Map<String, dynamic>? data})> postEdgeFunctionWithRetry(
   bool bearerAlwaysAnon = false,
 }) async {
   final url = '${supabase_url.getSupabaseBaseUrl()}/functions/v1/$functionPath';
+  final anonKey = supabase_url.getSupabaseAnonKey();
   final sessionToken = Supabase.instance.client.auth.currentSession?.accessToken;
   final authBearer = bearerAlwaysAnon
-      ? kSupabaseAnonKeyFromEnvironment
+      ? anonKey
       : ((sessionToken != null && sessionToken.isNotEmpty)
           ? sessionToken
-          : kSupabaseAnonKeyFromEnvironment);
+          : anonKey);
   final dio = Dio(BaseOptions(
     headers: {
-      'apikey': kSupabaseAnonKeyFromEnvironment,
+      'apikey': anonKey,
       'Authorization': 'Bearer $authBearer',
       'Content-Type': 'application/json',
     },

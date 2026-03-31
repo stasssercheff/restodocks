@@ -4,13 +4,13 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthException;
-import 'package:restodocks/core/supabase_env.dart';
 import 'package:restodocks/core/supabase_url_resolver_stub.dart'
     if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart'
     as supabase_url;
 
 import '../core/clear_hash_stub.dart'
     if (dart.library.html) '../core/clear_hash_web.dart' as clear_hash;
+import '../core/public_app_origin.dart';
 import '../models/models.dart';
 import '../utils/dev_log.dart';
 import 'establishment_data_warmup_service.dart';
@@ -143,13 +143,30 @@ class AccountManagerSupabase extends ChangeNotifier {
     if (_supabase.isAuthenticated) {
       devLog(
           '🔐 AccountManager: Supabase Auth session found, loading user data...');
-      final ok = await _loadCurrentUserFromAuth();
+      var ok = await _loadCurrentUserFromAuth();
+      if (!ok) {
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        ok = await _loadCurrentUserFromAuth();
+      }
+      if (!ok) {
+        await Future<void>.delayed(const Duration(milliseconds: 600));
+        ok = await _loadCurrentUserFromAuth();
+      }
       if (ok) {
         devLog(
             '🔐 AccountManager: User data loaded from Auth, logged in: $isLoggedInSync');
         await _checkPromoAccess();
         return;
       }
+      // JWT есть в Keychain, а сотрудник/RLS не сходятся — «зомби»-сессия: мешает входу по паролю.
+      devLog(
+          '🔐 AccountManager: Auth without employee profile — signOut, clear stored ids');
+      try {
+        await _supabase.signOut();
+      } catch (e) {
+        devLog('🔐 AccountManager: signOut after failed auth load: $e');
+      }
+      await _clearStoredSession();
     }
 
     // 2. Иначе — восстановление из хранилища (legacy)
@@ -739,15 +756,16 @@ class AccountManagerSupabase extends ChangeNotifier {
     }
   }
 
-  /// URL для редиректа после подтверждения. Всегда production — Supabase требует точного совпадения с Redirect URLs.
+  /// URL для редиректа после подтверждения. Должен совпадать с Supabase Auth → Redirect URLs.
   static String _getEmailRedirectUrl([String? languageCode]) {
+    final base = publicAppOrigin;
     final lang = languageCode?.trim().toLowerCase();
     if (lang != null &&
         lang.isNotEmpty &&
         LocalizationService.isSupportedLanguageCode(lang)) {
-      return 'https://restodocks.com/auth/confirm?lang=$lang';
+      return '$base/auth/confirm?lang=$lang';
     }
-    return 'https://restodocks.com/auth/confirm';
+    return '$base/auth/confirm';
   }
 
   /// Регистрация владельца в Supabase Auth (employees.id = auth.users.id — создаём auth первым)
@@ -899,10 +917,11 @@ class AccountManagerSupabase extends ChangeNotifier {
       await _supabase.signInWithEmail(emailTrim, passwordTrimmed);
       if (_supabase.isAuthenticated) {
         final authUserId = _supabase.currentUser!.id;
+        // Как в _loadCurrentUserFromAuth: id = auth.uid() или auth_user_id (legacy→auth).
         final list = await _supabase.client
             .from('employees')
             .select()
-            .eq('id', authUserId)
+            .or('id.eq.$authUserId,auth_user_id.eq.$authUserId')
             .eq('is_active', true)
             .limit(1);
 
@@ -993,10 +1012,11 @@ class AccountManagerSupabase extends ChangeNotifier {
 
     final url =
         '${supabase_url.getSupabaseBaseUrl()}/functions/v1/authenticate-employee';
+    final anonKey = supabase_url.getSupabaseAnonKey();
     final dio = Dio(BaseOptions(
       headers: {
-        'apikey': kSupabaseAnonKeyFromEnvironment,
-        'Authorization': 'Bearer $kSupabaseAnonKeyFromEnvironment',
+        'apikey': anonKey,
+        'Authorization': 'Bearer $anonKey',
         'Content-Type': 'application/json',
       },
       validateStatus: (_) => true, // не бросать на 4xx

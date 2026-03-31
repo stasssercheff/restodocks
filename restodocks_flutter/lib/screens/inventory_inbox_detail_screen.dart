@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/inbox_viewed_service.dart';
+import '../utils/inventory_document_labels.dart';
 import '../utils/number_format_utils.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
@@ -537,7 +538,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('inventory_blank_title')),
+        title: Text(inventoryBlankTitleForPayload(payload, loc)),
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.download),

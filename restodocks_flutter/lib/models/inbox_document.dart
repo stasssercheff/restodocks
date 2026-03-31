@@ -90,6 +90,11 @@ class InboxDocument extends Equatable {
     switch (type) {
       case DocumentType.inventory:
         final date = metadata?['header']?['date']?.toString() ?? '';
+        if (metadata?['type']?.toString() == 'selective_inventory') {
+          return (loc.t('inventory_selective_inbox_title') ??
+                  'Выборочная инвентаризация %s')
+              .replaceFirst('%s', date);
+        }
         return loc.t('inbox_title_inventory').replaceFirst('%s', date);
       case DocumentType.iikoInventory:
         final date = metadata?['header']?['date']?.toString() ?? '';
@@ -126,6 +131,10 @@ class InboxDocument extends Equatable {
   String getTypeName(LocalizationService loc) {
     switch (type) {
       case DocumentType.inventory:
+        if (metadata?['type']?.toString() == 'selective_inventory') {
+          return loc.t('inventory_selective_type_name') ??
+              'Выборочная инвентаризация';
+        }
         return loc.t('doc_type_inventory');
       case DocumentType.iikoInventory:
         return loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko';

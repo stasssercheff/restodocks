@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 
 import 'core/url_strategy_stub.dart'
@@ -15,6 +17,7 @@ import 'core/core.dart';
 import 'core/deep_link_bootstrap.dart';
 import 'core/mobile_deep_link_listener.dart';
 import 'core/supabase_env.dart';
+import 'core/public_app_origin.dart';
 import 'core/supabase_retry_http_client.dart';
 import 'utils/dev_log.dart';
 import 'core/initial_location_stub.dart'
@@ -46,16 +49,43 @@ Future<void> main() async {
 }
 
 Future<void> _bootstrapApp() async {
+  // iOS / Android / macOS: config до DeepLink — иначе ссылки с зеркала (PUBLIC_APP_ORIGIN) не примутся.
+  var urlIn = kSupabaseUrlFromEnvironment;
+  var keyIn = kSupabaseAnonKeyFromEnvironment;
   if (!kIsWeb) {
+    try {
+      final raw = await rootBundle.loadString('assets/config.json');
+      final j = jsonDecode(raw);
+      if (j is Map<String, dynamic>) {
+        final u = j['SUPABASE_URL']?.toString().trim();
+        final k = j['SUPABASE_ANON_KEY']?.toString().trim();
+        if (u != null && u.isNotEmpty) urlIn = u;
+        if (k != null && k.isNotEmpty) keyIn = k;
+        final po = j['PUBLIC_APP_ORIGIN']?.toString().trim();
+        if (po != null && po.isNotEmpty) {
+          setNativePublicAppOriginFromConfig(po);
+        }
+      }
+    } catch (e) {
+      devLog('assets/config.json (native): $e');
+    }
     await DeepLinkBootstrap.captureInitial();
   }
 
-  final supabaseUrl = supabase_url.resolveSupabaseUrl(kSupabaseUrlFromEnvironment);
-  devLog('=== SUPABASE INIT: url=$supabaseUrl key=${kSupabaseAnonKeyFromEnvironment.substring(0, 15)}... ===');
+  final supabaseUrl = supabase_url.resolveSupabaseUrl(urlIn);
+  final keyPreview = keyIn.length > 15 ? '${keyIn.substring(0, 15)}...' : keyIn;
+  devLog('=== SUPABASE INIT: url=$supabaseUrl key=$keyPreview ===');
+
+  if (!kIsWeb) {
+    supabase_url.setNativeSupabaseRuntimeConfig(
+      url: supabaseUrl,
+      anonKey: keyIn,
+    );
+  }
 
   await Supabase.initialize(
     url: supabaseUrl,
-    anonKey: kSupabaseAnonKeyFromEnvironment,
+    anonKey: keyIn,
     httpClient: createSupabaseRetryHttpClient(),
     authOptions: const FlutterAuthClientOptions(
       detectSessionInUri: true,

@@ -144,6 +144,8 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
   Future<void> _saveToStorage(Map<String, dynamic> data) async {
     if (draftKey == 'inventory') {
       await _draftStorage.saveInventoryDraft(data);
+    } else if (draftKey == 'selective_inventory') {
+      await _draftStorage.saveSelectiveInventoryDraft(data);
     } else if (draftKey == 'iiko_inventory') {
       await _draftStorage.saveIikoInventoryDraft(data);
     } else if (draftKey == 'checklist') {
@@ -165,6 +167,8 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
   Future<Map<String, dynamic>?> _loadFromStorage() async {
     if (draftKey == 'inventory') {
       return await _draftStorage.loadInventoryDraft();
+    } else if (draftKey == 'selective_inventory') {
+      return await _draftStorage.loadSelectiveInventoryDraft();
     } else if (draftKey == 'iiko_inventory') {
       return await _draftStorage.loadIikoInventoryDraft();
     } else if (draftKey == 'checklist') {
@@ -187,6 +191,8 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
   Future<void> _clearFromStorage() async {
     if (draftKey == 'inventory') {
       await _draftStorage.clearInventoryDraft();
+    } else if (draftKey == 'selective_inventory') {
+      await _draftStorage.clearSelectiveInventoryDraft();
     } else if (draftKey == 'iiko_inventory') {
       await _draftStorage.clearIikoInventoryDraft();
     } else if (draftKey == 'checklist') {
@@ -208,6 +214,8 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
   Future<bool> _hasInStorage() async {
     if (draftKey == 'inventory') {
       return await _draftStorage.hasInventoryDraft();
+    } else if (draftKey == 'selective_inventory') {
+      return await _draftStorage.hasSelectiveInventoryDraft();
     } else if (draftKey == 'iiko_inventory') {
       return await _draftStorage.hasIikoInventoryDraft();
     } else if (draftKey == 'checklist') {

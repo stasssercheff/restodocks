@@ -1,7 +1,8 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
@@ -374,6 +375,19 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (_isLoading) return;
+
+    // Native: сначала снять фокус и подождать — иначе validate() и запрос уходят с паролем,
+    // который Keychain ещё не записал в TextEditingController (ложный «неверный пароль»).
+    if (!kIsWeb) {
+      FocusScope.of(context).unfocus();
+      TextInput.finishAutofillContext(shouldSave: false);
+      await Future<void>.delayed(const Duration(milliseconds: 220));
+      if (!mounted) return;
+    } else {
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      if (!mounted) return;
+    }
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -383,13 +397,6 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // На web: дать браузеру время дописать автозаполнение в поля.
-      // Иначе первый запрос может уйти с пустым/устаревшим паролем → 401.
-      if (kIsWeb) {
-        await Future<void>.delayed(const Duration(milliseconds: 150));
-        if (!mounted) return;
-      }
-
       final accountManager = context.read<AccountManagerSupabase>();
       final loc = context.read<LocalizationService>();
       final uiLang = loc.currentLanguageCode;

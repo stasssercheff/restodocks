@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../core/supabase_env.dart';
+import '../core/public_app_origin.dart';
 import '../models/models.dart';
 import '../services/countries_cities_data.dart';
 import '../services/services.dart';
@@ -153,8 +153,7 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
       final token = result['token'] as String?;
       if (token == null || token.isEmpty) throw Exception('no_token');
 
-      final origin =
-          kPublicAppOriginFromEnvironment.replaceAll(RegExp(r'/$'), '');
+      final origin = publicAppOrigin;
       final link =
           '$origin/confirm-establishment-clone?token=${Uri.encodeComponent(token)}';
       final html = loc.t('clone_email_html', args: {'link': link}) ?? '';

@@ -264,6 +264,46 @@ class DraftStorageService {
     }
   }
 
+  // ── Выборочная инвентаризация (подмножество номенклатуры) ───────────────────
+
+  static const String _selectiveInventoryKey = 'draft_selective_inventory';
+
+  Future<void> saveSelectiveInventoryDraft(Map<String, dynamic> data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_selectiveInventoryKey, jsonEncode(data));
+    } catch (e) {
+      devLog('Failed to save selective inventory draft: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>?> loadSelectiveInventoryDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final s = prefs.getString(_selectiveInventoryKey);
+      return s != null ? jsonDecode(s) as Map<String, dynamic> : null;
+    } catch (e) {
+      devLog('Failed to load selective inventory draft: $e');
+      return null;
+    }
+  }
+
+  Future<void> clearSelectiveInventoryDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_selectiveInventoryKey);
+    } catch (_) {}
+  }
+
+  Future<bool> hasSelectiveInventoryDraft() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.containsKey(_selectiveInventoryKey);
+    } catch (_) {
+      return false;
+    }
+  }
+
   // ────────────────────────────────────────────────────────────────────────────
 
   /// Удалить черновик чек-листа (общий)

@@ -1,6 +1,8 @@
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 
+import 'public_app_origin.dart';
+
 /// Cold start и поток ссылок с https-хоста приложения (Universal Links / App Links).
 class DeepLinkBootstrap {
   DeepLinkBootstrap._();
@@ -11,10 +13,7 @@ class DeepLinkBootstrap {
 
   static AppLinks? _appLinks;
 
-  static bool _isOurHost(String host) {
-    final h = host.toLowerCase();
-    return h == 'restodocks.com' || h == 'www.restodocks.com';
-  }
+  static bool _isOurHost(String host) => isPublicAppHost(host);
 
   static bool isOurHttpsLink(Uri? u) {
     if (u == null) return false;

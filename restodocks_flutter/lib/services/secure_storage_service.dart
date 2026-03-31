@@ -1,4 +1,5 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -29,7 +30,14 @@ class SecureStorageService {
   /// Инициализация. Вызвать до использования (например, из [AccountManagerSupabase.initialize]).
   Future<void> initialize() async {
     if (_useSecure) {
-      _secure = const FlutterSecureStorage();
+      // macOS Release / hardened runtime: kSecUseDataProtectionKeychain без лишних entitlements даёт -34018.
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+        _secure = const FlutterSecureStorage(
+          mOptions: MacOsOptions(useDataProtectionKeyChain: false),
+        );
+      } else {
+        _secure = const FlutterSecureStorage();
+      }
     } else {
       _secure = null;
       _prefs = await SharedPreferences.getInstance();

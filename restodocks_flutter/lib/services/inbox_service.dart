@@ -103,7 +103,11 @@ class InboxService {
           docTitle = 'Инвентаризация iiko $dateStr';
         } else {
           docType = DocumentType.inventory;
-          docTitle = 'Инвентаризация $dateStr';
+          if (payloadType == 'selective_inventory') {
+            docTitle = 'Выборочная инвентаризация $dateStr';
+          } else {
+            docTitle = 'Инвентаризация $dateStr';
+          }
         }
 
         documents.add(InboxDocument(

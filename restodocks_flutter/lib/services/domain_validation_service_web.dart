@@ -9,6 +9,8 @@ class DomainValidationService {
     'restodocks.vercel.app',
     'restodocks.com',
     'www.restodocks.com',
+    'restodocks.pages.dev',
+    'www.restodocks.pages.dev',
   ];
 
   static bool _isVercelDomain(String domain) => domain.endsWith('.vercel.app');
