@@ -206,7 +206,12 @@ function EstablishmentsTab() {
     <>
       {error && (
         <div className="mb-4 p-4 bg-red-900/30 border border-red-700 rounded-lg text-red-200 text-sm">
-          {error} — проверь GitHub Secrets: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+          {error}
+          <span className="block mt-2 text-gray-500 text-xs">
+            Нет колонки или схема старая — открой Supabase → SQL Editor и выполни миграцию из{' '}
+            <code className="text-gray-400">supabase/migrations/20260430230000_establishments_max_additional_override.sql</code>
+            . Ошибка входа/401 — тогда проверь Secrets (SUPABASE_URL, SERVICE_ROLE_KEY).
+          </span>
         </div>
       )}
       <div className="grid grid-cols-3 gap-2 mb-4 sm:gap-3 sm:mb-8">

@@ -18,10 +18,30 @@ export async function GET() {
   if (!config) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
   const supabase = createClient(config.url, config.serviceRoleKey)
 
-  const { data: establishments, error } = await supabase
+  const selectBase =
+    'id, name, address, created_at, default_currency, owner_id, registration_ip, registration_country, registration_city'
+
+  let { data: establishments, error } = await supabase
     .from('establishments')
-    .select('id, name, address, created_at, default_currency, owner_id, registration_ip, registration_country, registration_city, max_additional_establishments_override')
+    .select(`${selectBase}, max_additional_establishments_override`)
     .order('created_at', { ascending: false })
+
+  // Пока миграция не применена на БД, колонки нет — читаем без неё (лимит доп. в UI будет «платформа»).
+  if (
+    error &&
+    /max_additional_establishments_override|does not exist/i.test(error.message)
+  ) {
+    const retry = await supabase
+      .from('establishments')
+      .select(selectBase)
+      .order('created_at', { ascending: false })
+    establishments =
+      retry.data?.map(row => ({
+        ...row,
+        max_additional_establishments_override: null,
+      })) ?? null
+    error = retry.error
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   const list = establishments ?? []
