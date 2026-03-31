@@ -8,6 +8,8 @@ type RateLimitOptions = {
 const defaultAllowedOrigins = [
   "https://restodocks.com",
   "https://www.restodocks.com",
+  "https://www.restodocks.ru",
+  "https://restodocks.ru",
   "https://restodocks.pages.dev",
   "*.restodocks.pages.dev",
 ];

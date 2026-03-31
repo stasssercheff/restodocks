@@ -46,6 +46,7 @@ import '../../screens/order_create_screen.dart';
 import '../../screens/accept_co_owner_invitation_screen.dart';
 import '../../screens/register_co_owner_screen.dart';
 import '../../screens/add_establishment_screen.dart';
+import '../../screens/confirm_establishment_clone_screen.dart';
 import '../../screens/auth_confirm_click_screen.dart';
 import '../../screens/auth_confirm_screen.dart';
 import '../../screens/confirm_email_screen.dart';
@@ -79,7 +80,8 @@ bool _isPublicPath(String loc) {
       loc.startsWith('/reset-password') ||
       loc.startsWith('/accept-co-owner-invitation') ||
       loc.startsWith('/confirm-email') ||
-      loc.startsWith('/auth/confirm')) return true;
+      loc.startsWith('/auth/confirm') ||
+      loc.startsWith('/confirm-establishment-clone')) return true;
   return false;
 }
 
@@ -468,6 +470,16 @@ class AppRouter {
             path: '/add-establishment',
             pageBuilder: (context, state) =>
                 _slideTransitionPage(state, const AddEstablishmentScreen()),
+          ),
+          GoRoute(
+            path: '/confirm-establishment-clone',
+            pageBuilder: (context, state) {
+              final token = state.queryParameters['token'];
+              return _slideTransitionPage(
+                state,
+                ConfirmEstablishmentCloneScreen(token: token),
+              );
+            },
           ),
 
           GoRoute(

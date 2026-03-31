@@ -303,6 +303,59 @@ class AccountManagerSupabase extends ChangeNotifier {
     return created;
   }
 
+  /// Заявка на копирование данных между заведениями владельца (см. письмо со ссылкой).
+  Future<Map<String, dynamic>> requestEstablishmentDataClone({
+    required String sourceEstablishmentId,
+    required String targetEstablishmentId,
+    required String sourcePin,
+    required String targetPin,
+    required bool copyNomenclature,
+    required bool copyTechCards,
+    required bool copyOrderLists,
+  }) async {
+    final raw = await _supabase.client.rpc(
+      'request_establishment_data_clone',
+      params: {
+        'p_source_establishment_id': sourceEstablishmentId,
+        'p_target_establishment_id': targetEstablishmentId,
+        'p_source_pin': sourcePin,
+        'p_target_pin': targetPin,
+        'p_options': {
+          'nomenclature': copyNomenclature,
+          'tech_cards': copyTechCards,
+          'order_lists': copyOrderLists,
+        },
+      },
+    );
+    return Map<String, dynamic>.from(raw as Map);
+  }
+
+  /// Подтверждение копирования по токену из письма (допускается без сессии).
+  Future<Map<String, dynamic>> confirmEstablishmentDataClone(String token) async {
+    final raw = await _supabase.client.rpc(
+      'confirm_establishment_data_clone',
+      params: {'p_token': token.trim()},
+    );
+    return Map<String, dynamic>.from(raw as Map);
+  }
+
+  /// Отправка письма через Edge Function [send-email] (после [requestEstablishmentDataClone]).
+  Future<void> sendEstablishmentCloneConfirmationEmail({
+    required String to,
+    required String subject,
+    required String htmlBody,
+  }) async {
+    final res = await postEdgeFunctionWithRetry(
+      'send-email',
+      {'to': to, 'subject': subject, 'html': htmlBody},
+    );
+    if (res.status < 200 || res.status >= 300) {
+      throw Exception(
+        res.data?['error']?.toString() ?? 'send_email_failed',
+      );
+    }
+  }
+
   /// Филиалы заведения (для шефа — фильтр ТТК по филиалам)
   Future<List<Establishment>> getBranchesForEstablishment(
       String establishmentId) async {

@@ -5,6 +5,8 @@
 const defaultRules = [
   "https://restodocks.com",
   "https://www.restodocks.com",
+  "https://www.restodocks.ru",
+  "https://restodocks.ru",
   "https://restodocks.pages.dev",
   "*.restodocks.pages.dev",
 ];
