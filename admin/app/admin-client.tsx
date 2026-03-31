@@ -16,6 +16,8 @@ type Establishment = {
   registration_ip?: string | null
   registration_country?: string | null
   registration_city?: string | null
+  /** Админ: лимит доп. заведений для владельца; null = общая настройка «Настройки» */
+  max_additional_establishments_override?: number | null
 }
 
 function formatDate(iso: string | null) {
@@ -153,6 +155,32 @@ function EstablishmentsTab() {
     }
   }
 
+  async function setMaxAdditionalOverride(row: Establishment) {
+    const current = row.max_additional_establishments_override
+    const val = prompt(
+      'Макс. дополнительных заведений для аккаунта этого владельца (как общая настройка). Пусто — брать лимит из вкладки «Настройки»:',
+      current != null ? String(current) : '',
+    )
+    if (val === null) return
+    const trimmed = val.trim()
+    const parsed = trimmed === '' ? null : parseInt(trimmed, 10)
+    if (trimmed !== '' && (Number.isNaN(parsed!) || parsed! < 0 || parsed! > 999)) {
+      alert('Введи целое от 0 до 999 или оставь пустым')
+      return
+    }
+    const res = await fetch(`/api/establishments/${row.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ max_additional_establishments_override: parsed }),
+    })
+    const json = await res.json()
+    if (!res.ok) {
+      setError(typeof json?.error === 'string' ? json.error : 'Ошибка сохранения')
+      return
+    }
+    await load()
+  }
+
   async function handleDelete(row: Establishment) {
     if (!confirm(`Удалить заведение «${row.name}»?\n\nБудут удалены все данные: номенклатура, ТТК, чеклисты, сотрудники и т.д. Действие необратимо.`)) return
     const typed = prompt(`Для подтверждения введите "${CONFIRM_DELETE_TEXT}":`)
@@ -223,6 +251,9 @@ function EstablishmentsTab() {
                   <th className="px-4 py-3 text-left">Владелец</th>
                   <th className="px-4 py-3 text-left">Email</th>
                   <th className="px-4 py-3 text-center">Сотр.</th>
+                  <th className="px-4 py-3 text-center" title="Переопределение лимита доп. заведений для владельца; при нескольких — минимум">
+                    Лимит доп.
+                  </th>
                   <th className="px-4 py-3 text-left">Дата</th>
                   <th className="px-4 py-3 text-left">IP регистрации</th>
                   <th className="px-4 py-3 text-right w-20"></th>
@@ -236,6 +267,22 @@ function EstablishmentsTab() {
                     <td className="px-4 py-3 text-gray-400 text-xs">{row.owner_email}</td>
                     <td className="px-4 py-3 text-center">
                       <span className="bg-gray-800 px-2 py-0.5 rounded text-xs font-mono">{row.employee_count}</span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        type="button"
+                        onClick={() => setMaxAdditionalOverride(row)}
+                        className="text-xs font-mono hover:text-indigo-400 transition"
+                        title="Переопределить лимит доп. заведений для этого владельца"
+                      >
+                        {row.max_additional_establishments_override != null ? (
+                          <span className="bg-indigo-900/40 text-indigo-300 px-2 py-0.5 rounded">
+                            {row.max_additional_establishments_override}
+                          </span>
+                        ) : (
+                          <span className="text-gray-600">платформа</span>
+                        )}
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(row.created_at)}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs font-mono">{regInfo(row)}</td>
@@ -281,6 +328,22 @@ function EstablishmentsTab() {
                 {row.registration_ip && (
                   <div className="text-gray-500 text-xs mt-1 font-mono">{regInfo(row)}</div>
                 )}
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-gray-600 text-xs">Лимит доп.:</span>
+                  <button
+                    type="button"
+                    onClick={() => setMaxAdditionalOverride(row)}
+                    className="text-xs font-mono hover:text-indigo-400"
+                  >
+                    {row.max_additional_establishments_override != null ? (
+                      <span className="bg-indigo-900/40 text-indigo-300 px-2 py-0.5 rounded">
+                        {row.max_additional_establishments_override}
+                      </span>
+                    ) : (
+                      <span className="text-gray-600">платформа</span>
+                    )}
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -694,6 +757,7 @@ function PlatformSettingsTab() {
         <h2 className="text-base font-medium text-white mb-4">Лимит заведений на одного владельца</h2>
         <p className="text-gray-400 text-sm mb-4">
           Максимум дополнительных заведений (первое не в счёт). Владелец может добавить до этого числа дополнительных заведений.
+          Для отдельных аккаунтов лимит можно переопределить на вкладке «Заведения» (колонка «Лимит доп.»); если задано на нескольких заведениях одного владельца, действует минимальное значение.
         </p>
         <div className="flex items-center gap-3">
           <input

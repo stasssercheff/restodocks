@@ -226,21 +226,32 @@ class AccountManagerSupabase extends ChangeNotifier {
     await _secureStorage.remove(_keyEstablishmentId);
   }
 
-  /// Максимум дополнительных заведений на владельца (из platform_config)
+  /// Максимум дополнительных заведений на владельца (глобальная настройка ± переопределения по заведениям в БД).
   Future<int> getMaxEstablishmentsPerOwner() async {
     try {
       final v = await _supabase.client.rpc(
-        'get_platform_config',
-        params: {'p_key': 'max_establishments_per_owner'},
+        'get_effective_max_additional_establishments_for_owner',
       );
       if (v == null) return 999;
       if (v is int) return v > 0 ? v : 999;
       if (v is double) return v.toInt() > 0 ? v.toInt() : 999;
-      final s = v.toString();
-      final n = int.tryParse(s);
+      final n = int.tryParse(v.toString());
       return (n != null && n > 0) ? n : 999;
     } catch (_) {
-      return 999;
+      try {
+        final v = await _supabase.client.rpc(
+          'get_platform_config',
+          params: {'p_key': 'max_establishments_per_owner'},
+        );
+        if (v == null) return 999;
+        if (v is int) return v > 0 ? v : 999;
+        if (v is double) return v.toInt() > 0 ? v.toInt() : 999;
+        final s = v.toString();
+        final n = int.tryParse(s);
+        return (n != null && n > 0) ? n : 999;
+      } catch (_) {
+        return 999;
+      }
     }
   }
 
