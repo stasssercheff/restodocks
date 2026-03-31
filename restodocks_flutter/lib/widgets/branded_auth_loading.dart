@@ -2,12 +2,30 @@ import 'package:flutter/material.dart';
 
 /// Экран ожидания при переходе по ссылке подтверждения и т.п.: только логотип, без подписи «Вход».
 class BrandedAuthLoading extends StatelessWidget {
-  const BrandedAuthLoading({super.key, this.logoWidth = 168});
+  const BrandedAuthLoading({
+    super.key,
+    this.logoWidth = 168,
+    this.fullscreenLogo = false,
+  });
 
   final double logoWidth;
+  final bool fullscreenLogo;
 
   @override
   Widget build(BuildContext context) {
+    if (fullscreenLogo) {
+      return Semantics(
+        label: 'Restodocks',
+        child: SizedBox.expand(
+          child: Image.asset(
+            'assets/images/welcome_logo.png',
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.medium,
+          ),
+        ),
+      );
+    }
+
     return ColoredBox(
       color: Theme.of(context).colorScheme.surface,
       child: Center(
