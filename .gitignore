@@ -12,3 +12,4 @@ beta-admin/node_modules/
 beta-admin/.next/
 node_modules
 docs/ttk_sample_extract.txt
+scripts/.it_locale_checkpoint.json
