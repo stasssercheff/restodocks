@@ -137,7 +137,6 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
 
   Future<void> _save() async {
     final acc = context.read<AccountManagerSupabase>();
-    final loc = context.read<LocalizationService>();
     final estId = acc.establishment?.id;
     if (estId == null) return;
     final dept = _list.department;
@@ -151,9 +150,6 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
     }
     await saveOrderLists(estId, merged, department: dept);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${loc.t('save')} ✓')),
-      );
       // По умолчанию попаем 2 раза (create flow). Для редактирования можно popCountOnSave=1.
       for (var i = 0; i < widget.popCountOnSave; i++) {
         if (!context.canPop()) break;

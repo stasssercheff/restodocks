@@ -118,6 +118,12 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final sid = widget.supplierOrderListId?.trim();
+      if (sid != null && sid.isNotEmpty) {
+        final acc = context.read<AccountManagerSupabase>();
+        if (!acc.hasPaidProSubscription) return;
+      }
       final m = (widget.initialMethod ?? '').trim().toLowerCase();
       if (m == 'text') {
         await _showTextUploadDialog();
@@ -255,6 +261,28 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       if (establishmentId == null) {
         _addDebugLog('No establishment');
         return _buildErrorScreen(loc.t('Не найдено заведение'));
+      }
+
+      final supplierId = widget.supplierOrderListId?.trim();
+      if (supplierId != null &&
+          supplierId.isNotEmpty &&
+          !account.hasPaidProSubscription) {
+        return Scaffold(
+          appBar: AppBar(
+            title: Text(loc.t('upload_products')),
+            leading: appBarBackButton(context),
+          ),
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                loc.t('supplier_upload_requires_pro'),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+            ),
+          ),
+        );
       }
 
       _addDebugLog(

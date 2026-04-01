@@ -62,6 +62,30 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     }
   }
 
+  /// Загрузка списка к поставщику — тариф Pro / Premium или промокод ([hasPaidProAccess]), не окно 72ч trial.
+  bool _canUploadSupplierProductList(AccountManagerSupabase acc) =>
+      acc.hasPaidProSubscription;
+
+  OrderList _draftFromSupplierFields(
+    OrderList s,
+    TextEditingController nameCtrl,
+    TextEditingController contactCtrl,
+    TextEditingController emailCtrl,
+    TextEditingController phoneCtrl,
+  ) {
+    final supplierName = nameCtrl.text.trim();
+    return (supplierName.isEmpty
+            ? s
+            : s.copyWith(name: supplierName, supplierName: supplierName))
+        .copyWith(
+      contactPerson: contactCtrl.text.trim().isEmpty
+          ? null
+          : contactCtrl.text.trim(),
+      email: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
+      phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
+    );
+  }
+
   Future<void> _load() async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
@@ -126,6 +150,12 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       required BuildContext dialogContext,
       required bool uploadFlow,
     }) async {
+      if (uploadFlow && !_canUploadSupplierProductList(acc)) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(loc.t('supplier_upload_requires_pro'))),
+        );
+        return;
+      }
       final name = nameCtrl.text.trim();
       if (name.isEmpty) {
         messenger.showSnackBar(
@@ -171,7 +201,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        loc.t('supplier_external_title'),
+                        loc.t('supplier_create_title'),
                         style: theme.textTheme.titleLarge,
                       ),
                       const SizedBox(height: 8),
@@ -274,124 +304,184 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
 
   Future<void> _editSupplier(OrderList s) async {
     final loc = context.read<LocalizationService>();
+    final acc = context.read<AccountManagerSupabase>();
+    final messenger = ScaffoldMessenger.of(context);
     final nameCtrl = TextEditingController(text: s.supplierName);
     final contactCtrl = TextEditingController(text: s.contactPerson ?? '');
     final emailCtrl = TextEditingController(text: s.email ?? '');
     final phoneCtrl = TextEditingController(text: s.phone ?? '');
 
     OrderList? result;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) {
-        final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
-        return Padding(
-          padding: EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 16 + bottomInset),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(loc.t('order_tab_suppliers') ?? 'Поставщик', style: Theme.of(ctx).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              TextField(
-                controller: nameCtrl,
-                decoration: InputDecoration(
-                  labelText: loc.t('order_list_supplier_name') ?? 'Поставщик',
-                  border: const OutlineInputBorder(),
-                ),
-                textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: contactCtrl,
-                decoration: InputDecoration(
-                  labelText: loc.t('supplier_contact_person') ?? 'Контактное лицо',
-                  border: const OutlineInputBorder(),
-                ),
-                textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: emailCtrl,
-                decoration: InputDecoration(
-                  labelText: loc.t('order_list_contact_email') ?? 'Email',
-                  border: const OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: phoneCtrl,
-                decoration: InputDecoration(
-                  labelText: loc.t('order_list_contact_phone') ?? 'Телефон',
-                  border: const OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
-                      child: Text(loc.t('cancel') ?? 'Отмена'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () {
-                        final supplierName = nameCtrl.text.trim();
-                        if (supplierName.isEmpty) return;
-                        result = s.copyWith(
-                          name: supplierName,
-                          supplierName: supplierName,
-                          contactPerson: contactCtrl.text.trim().isEmpty
-                              ? null
-                              : contactCtrl.text.trim(),
-                          email: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
-                          phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
-                        );
-                        Navigator.of(ctx).pop();
-                      },
-                      child: Text(loc.t('save') ?? 'Сохранить'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () {
-                  final supplierName = nameCtrl.text.trim();
-                  final draft = (supplierName.isEmpty ? s : s.copyWith(name: supplierName, supplierName: supplierName)).copyWith(
-                    contactPerson: contactCtrl.text.trim().isEmpty
-                        ? null
-                        : contactCtrl.text.trim(),
-                    email: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
-                    phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
-                  );
-                  result = draft;
-                  Navigator.of(ctx).pop();
-                  context.push('/product-order/new/products?pop=1', extra: draft);
-                },
-                icon: const Icon(Icons.edit),
-                label: Text(loc.t('order_list_add_products') ?? 'Редактировать продукты'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
 
-    nameCtrl.dispose();
-    contactCtrl.dispose();
-    emailCtrl.dispose();
-    phoneCtrl.dispose();
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) {
+          final theme = Theme.of(dialogContext);
+          return Dialog(
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        loc.t('order_tab_suppliers'),
+                        style: theme.textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: nameCtrl,
+                        decoration: InputDecoration(
+                          labelText: loc.t('order_list_supplier_name'),
+                          border: const OutlineInputBorder(),
+                        ),
+                        textCapitalization: TextCapitalization.words,
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: contactCtrl,
+                        decoration: InputDecoration(
+                          labelText: loc.t('supplier_contact_person'),
+                          border: const OutlineInputBorder(),
+                        ),
+                        textCapitalization: TextCapitalization.words,
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: emailCtrl,
+                        decoration: InputDecoration(
+                          labelText: loc.t('order_list_contact_email'),
+                          border: const OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: phoneCtrl,
+                        decoration: InputDecoration(
+                          labelText: loc.t('order_list_contact_phone'),
+                          border: const OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () =>
+                                  Navigator.of(dialogContext).pop(),
+                              child: Text(loc.t('cancel')),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: () {
+                                final supplierName = nameCtrl.text.trim();
+                                if (supplierName.isEmpty) return;
+                                result = s.copyWith(
+                                  name: supplierName,
+                                  supplierName: supplierName,
+                                  contactPerson: contactCtrl.text.trim().isEmpty
+                                      ? null
+                                      : contactCtrl.text.trim(),
+                                  email: emailCtrl.text.trim().isEmpty
+                                      ? null
+                                      : emailCtrl.text.trim(),
+                                  phone: phoneCtrl.text.trim().isEmpty
+                                      ? null
+                                      : phoneCtrl.text.trim(),
+                                );
+                                Navigator.of(dialogContext).pop();
+                              },
+                              child: Text(loc.t('save')),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          loc.t('order_list_add_products'),
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      FilledButton.tonalIcon(
+                        onPressed: () {
+                          final draft = _draftFromSupplierFields(
+                            s,
+                            nameCtrl,
+                            contactCtrl,
+                            emailCtrl,
+                            phoneCtrl,
+                          );
+                          result = draft;
+                          Navigator.of(dialogContext).pop();
+                          context.push('/product-order/new/products?pop=1',
+                              extra: draft);
+                        },
+                        icon: const Icon(Icons.playlist_add_check_outlined),
+                        label: Text(loc.t('supplier_products_from_nomenclature')),
+                      ),
+                      const SizedBox(height: 8),
+                      FilledButton.icon(
+                        onPressed: () {
+                          if (!_canUploadSupplierProductList(acc)) {
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                    loc.t('supplier_upload_requires_pro')),
+                              ),
+                            );
+                            return;
+                          }
+                          final draft = _draftFromSupplierFields(
+                            s,
+                            nameCtrl,
+                            contactCtrl,
+                            emailCtrl,
+                            phoneCtrl,
+                          );
+                          result = draft;
+                          Navigator.of(dialogContext).pop();
+                          final encName =
+                              Uri.encodeComponent(draft.supplierName);
+                          context.push(
+                            '/products/upload?supplierListId=${draft.id}&department=${widget.department}&supplierName=$encName',
+                          );
+                        },
+                        icon: const Icon(Icons.upload_file),
+                        label: Text(loc.t('upload_products')),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    } finally {
+      nameCtrl.dispose();
+      contactCtrl.dispose();
+      emailCtrl.dispose();
+      phoneCtrl.dispose();
+    }
 
     if (result == null) return;
     final updated = result!;
-    // Сохраняем и локально обновляем список
     try {
       await _saveSupplierEdits(updated);
       if (!mounted) return;
@@ -399,10 +489,10 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         final idx = _suppliers.indexWhere((x) => x.id == updated.id);
         if (idx >= 0) _suppliers[idx] = updated;
       });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('save')} ✓')));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${loc.t('error_short') ?? 'Ошибка'}: $e')));
+      messenger.showSnackBar(
+          SnackBar(content: Text('${loc.t('error_short')}: $e')));
     }
   }
 
@@ -446,7 +536,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           ? FloatingActionButton.extended(
               onPressed: _openExternalSupplierSheet,
               icon: const Icon(Icons.add_business_outlined),
-              label: Text(loc.t('supplier_external_title') ?? 'Поставщик извне'),
+              label: Text(loc.t('supplier_create_title')),
             )
           : null,
       body: _suppliers.isEmpty && !_loading && _error == null
@@ -548,7 +638,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
               OutlinedButton.icon(
                 onPressed: _openExternalSupplierSheet,
                 icon: const Icon(Icons.add_business_outlined),
-                label: Text(loc.t('supplier_external_title') ?? 'Поставщик извне'),
+                label: Text(loc.t('supplier_create_title')),
               ),
             ],
           ),
