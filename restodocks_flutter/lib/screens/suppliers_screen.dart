@@ -147,174 +147,126 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     final estId = acc.establishment?.id;
     if (estId == null) return;
 
-    final messenger = ScaffoldMessenger.of(context);
+    final step1 = await showDialog<_SupplierStep1Result>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => _SupplierStep1Dialog(loc: loc),
+    );
+    if (step1 == null || !mounted) return;
 
-    final nameCtrl = TextEditingController();
-    final contactCtrl = TextEditingController();
-    final emailCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
+    await _showSupplierAddProductsStep(
+      establishmentId: estId,
+      loc: loc,
+      acc: acc,
+      step1: step1,
+    );
+  }
 
-    OrderList buildDraft() {
-      final name = nameCtrl.text.trim();
-      return OrderList(
-        id: const Uuid().v4(),
-        name: name,
-        supplierName: name,
-        contactPerson: contactCtrl.text.trim().isEmpty
-            ? null
-            : contactCtrl.text.trim(),
-        email: normalizedSupplierEmailOrNull(emailCtrl.text),
-        phone: normalizedSupplierPhoneOrNull(phoneCtrl.text),
-        department: widget.department,
-      );
-    }
+  Future<void> _showSupplierAddProductsStep({
+    required String establishmentId,
+    required LocalizationService loc,
+    required AccountManagerSupabase acc,
+    required _SupplierStep1Result step1,
+  }) async {
+    final draft = OrderList(
+      id: const Uuid().v4(),
+      name: step1.name,
+      supplierName: step1.name,
+      contactPerson: step1.contactPerson,
+      email: step1.email,
+      phone: step1.phone,
+      department: widget.department,
+    );
 
-    Future<void> saveDraftAndGo({
-      required BuildContext dialogContext,
-      required bool uploadFlow,
-    }) async {
-      if (uploadFlow && !_canUploadSupplierProductList(acc)) {
-        messenger.showSnackBar(
-          SnackBar(content: Text(loc.t('supplier_upload_requires_pro'))),
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        final cs = Theme.of(dialogContext).colorScheme;
+        final onPrimaryStyle = FilledButton.styleFrom(
+          foregroundColor: cs.onPrimary,
+          backgroundColor: cs.primary,
         );
-        return;
-      }
-      final name = nameCtrl.text.trim();
-      if (name.isEmpty) {
-        messenger.showSnackBar(
-          SnackBar(content: Text(loc.t('order_list_supplier_name'))),
-        );
-        return;
-      }
-      if (!_validateSupplierContacts(loc, messenger, emailCtrl, phoneCtrl)) {
-        return;
-      }
-      final draft = buildDraft();
-      final lists =
-          await loadOrderLists(estId, department: widget.department);
-      await saveOrderLists(estId, [...lists, draft],
-          department: widget.department);
-      if (!dialogContext.mounted) return;
-      Navigator.of(dialogContext).pop();
-      if (!mounted) return;
-      if (uploadFlow) {
-        final encName = Uri.encodeComponent(draft.supplierName);
-        await context.push(
-          '/products/upload?supplierListId=${draft.id}&department=${widget.department}&supplierName=$encName',
-        );
-      } else {
-        await context.push('/product-order/new/products?pop=1', extra: draft);
-      }
-      if (mounted) _load();
-    }
-
-    try {
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: true,
-        builder: (dialogContext) {
-          final theme = Theme.of(dialogContext);
-          return Dialog(
-            insetPadding:
-                const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 440),
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        loc.t('supplier_create_title'),
-                        style: theme.textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        loc.t('supplier_external_subtitle'),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: nameCtrl,
-                        decoration: InputDecoration(
-                          labelText: loc.t('order_list_supplier_name'),
-                          border: const OutlineInputBorder(),
-                        ),
-                        textCapitalization: TextCapitalization.words,
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: contactCtrl,
-                        decoration: InputDecoration(
-                          labelText: loc.t('supplier_contact_person'),
-                          border: const OutlineInputBorder(),
-                        ),
-                        textCapitalization: TextCapitalization.words,
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: emailCtrl,
-                        decoration: InputDecoration(
-                          labelText: loc.t('order_list_contact_email'),
-                          border: const OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: phoneCtrl,
-                        decoration: InputDecoration(
-                          labelText: loc.t('order_list_contact_phone'),
-                          border: const OutlineInputBorder(),
-                          counterText: '',
-                        ),
-                        keyboardType: TextInputType.phone,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        maxLength: 15,
-                      ),
-                      const SizedBox(height: 20),
-                      FilledButton.tonalIcon(
-                        onPressed: () => saveDraftAndGo(
-                          dialogContext: dialogContext,
-                          uploadFlow: false,
-                        ),
-                        icon: const Icon(Icons.playlist_add_check_outlined),
-                        label: Text(loc.t('supplier_products_from_nomenclature')),
-                      ),
-                      const SizedBox(height: 8),
-                      FilledButton.icon(
-                        onPressed: () => saveDraftAndGo(
-                          dialogContext: dialogContext,
-                          uploadFlow: true,
-                        ),
-                        icon: const Icon(Icons.upload_file),
-                        label: Text(loc.t('upload_products')),
-                      ),
-                      const SizedBox(height: 8),
-                      TextButton(
-                        onPressed: () => Navigator.of(dialogContext).pop(),
-                        child: Text(loc.t('cancel')),
-                      ),
-                    ],
-                  ),
+        return AlertDialog(
+          title: Text(loc.t('supplier_choose_add_products')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                FilledButton.icon(
+                  style: onPrimaryStyle,
+                  onPressed: () async {
+                    Navigator.of(dialogContext).pop();
+                    await _persistNewSupplierAndNavigate(
+                      establishmentId: establishmentId,
+                      draft: draft,
+                      uploadFlow: false,
+                      loc: loc,
+                      acc: acc,
+                    );
+                  },
+                  icon: const Icon(Icons.playlist_add_check_outlined),
+                  label: Text(loc.t('supplier_products_from_nomenclature')),
                 ),
-              ),
+                const SizedBox(height: 10),
+                FilledButton.icon(
+                  style: onPrimaryStyle,
+                  onPressed: () async {
+                    Navigator.of(dialogContext).pop();
+                    await _persistNewSupplierAndNavigate(
+                      establishmentId: establishmentId,
+                      draft: draft,
+                      uploadFlow: true,
+                      loc: loc,
+                      acc: acc,
+                    );
+                  },
+                  icon: const Icon(Icons.upload_file),
+                  label: Text(loc.t('upload_products')),
+                ),
+              ],
             ),
-          );
-        },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(loc.t('cancel')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _persistNewSupplierAndNavigate({
+    required String establishmentId,
+    required OrderList draft,
+    required bool uploadFlow,
+    required LocalizationService loc,
+    required AccountManagerSupabase acc,
+  }) async {
+    if (uploadFlow && !_canUploadSupplierProductList(acc)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('supplier_upload_requires_pro'))),
       );
-    } finally {
-      nameCtrl.dispose();
-      contactCtrl.dispose();
-      emailCtrl.dispose();
-      phoneCtrl.dispose();
+      return;
     }
+    final lists =
+        await loadOrderLists(establishmentId, department: widget.department);
+    await saveOrderLists(establishmentId, [...lists, draft],
+        department: widget.department);
+    if (!mounted) return;
+    if (uploadFlow) {
+      final encName = Uri.encodeComponent(draft.supplierName);
+      await context.push(
+        '/products/upload?supplierListId=${draft.id}&department=${widget.department}&supplierName=$encName',
+      );
+    } else {
+      await context.push('/product-order/new/products?pop=1', extra: draft);
+    }
+    if (mounted) _load();
   }
 
   Future<void> _saveSupplierEdits(OrderList updated) async {
@@ -594,7 +546,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           ),
         ],
       ),
-      floatingActionButton: !_loading && _error == null
+      // Одна кнопка «Создать» в пустом состоянии; FAB — только когда список не пуст
+      floatingActionButton: !_loading && _error == null && _suppliers.isNotEmpty
           ? FloatingActionButton.extended(
               onPressed: _openExternalSupplierSheet,
               icon: const Icon(Icons.add_business_outlined),
@@ -841,3 +794,268 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     );
   }
 }
+
+/// Шаг 1 мастера «Создать поставщика» — только реквизиты; продукты на следующих шагах.
+class _SupplierStep1Result {
+  const _SupplierStep1Result({
+    required this.name,
+    this.contactPerson,
+    this.email,
+    this.phone,
+  });
+
+  final String name;
+  final String? contactPerson;
+  final String? email;
+  final String? phone;
+}
+
+class _SupplierStep1Dialog extends StatefulWidget {
+  const _SupplierStep1Dialog({required this.loc});
+
+  final LocalizationService loc;
+
+  @override
+  State<_SupplierStep1Dialog> createState() => _SupplierStep1DialogState();
+}
+
+class _SupplierStep1DialogState extends State<_SupplierStep1Dialog> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _contactCtrl;
+  late final TextEditingController _emailCtrl;
+  late final TextEditingController _phoneCtrl;
+
+  bool _includeEmail = false;
+  bool _includePhone = false;
+  String? _nameError;
+  String? _emailError;
+  String? _phoneError;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController();
+    _contactCtrl = TextEditingController();
+    _emailCtrl = TextEditingController();
+    _phoneCtrl = TextEditingController();
+    _emailCtrl.addListener(_onEmailChanged);
+    _phoneCtrl.addListener(_onPhoneChanged);
+  }
+
+  void _onEmailChanged() {
+    if (_emailCtrl.text.isNotEmpty && !_includeEmail) {
+      setState(() => _includeEmail = true);
+    }
+  }
+
+  void _onPhoneChanged() {
+    if (_phoneCtrl.text.isNotEmpty && !_includePhone) {
+      setState(() => _includePhone = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailCtrl.removeListener(_onEmailChanged);
+    _phoneCtrl.removeListener(_onPhoneChanged);
+    _nameCtrl.dispose();
+    _contactCtrl.dispose();
+    _emailCtrl.dispose();
+    _phoneCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final loc = widget.loc;
+    setState(() {
+      _nameError = null;
+      _emailError = null;
+      _phoneError = null;
+    });
+
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) {
+      setState(() {
+        _nameError = loc.t('supplier_name_required');
+      });
+      return;
+    }
+
+    if (_includeEmail &&
+        _emailCtrl.text.trim().isNotEmpty &&
+        !isValidSupplierEmail(_emailCtrl.text)) {
+      setState(() {
+        _emailError = loc.t('supplier_invalid_email');
+      });
+      return;
+    }
+    if (_includePhone &&
+        _phoneCtrl.text.trim().isNotEmpty &&
+        !isValidSupplierPhone(_phoneCtrl.text)) {
+      setState(() {
+        _phoneError = loc.t('supplier_invalid_phone');
+      });
+      return;
+    }
+
+    final email =
+        _includeEmail ? normalizedSupplierEmailOrNull(_emailCtrl.text) : null;
+    final phone =
+        _includePhone ? normalizedSupplierPhoneOrNull(_phoneCtrl.text) : null;
+    final contact = _contactCtrl.text.trim().isEmpty
+        ? null
+        : _contactCtrl.text.trim();
+
+    Navigator.of(context).pop(
+      _SupplierStep1Result(
+        name: name,
+        contactPerson: contact,
+        email: email,
+        phone: phone,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = widget.loc;
+    final theme = Theme.of(context);
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Padding(
+          padding: EdgeInsets.only(bottom: bottomInset),
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    loc.t('supplier_create_title'),
+                    style: theme.textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    loc.t('supplier_create_step1_hint'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _nameCtrl,
+                    decoration: InputDecoration(
+                      labelText: loc.t('order_list_supplier_name'),
+                      border: const OutlineInputBorder(),
+                      errorText: _nameError,
+                    ),
+                    textCapitalization: TextCapitalization.words,
+                    onChanged: (_) {
+                      if (_nameError != null) {
+                        setState(() => _nameError = null);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _contactCtrl,
+                    decoration: InputDecoration(
+                      labelText: loc.t('supplier_contact_person'),
+                      border: const OutlineInputBorder(),
+                    ),
+                    textCapitalization: TextCapitalization.words,
+                  ),
+                  const SizedBox(height: 8),
+                  CheckboxListTile(
+                    value: _includeEmail,
+                    onChanged: (v) {
+                      setState(() {
+                        _includeEmail = v ?? false;
+                        _emailError = null;
+                        if (!_includeEmail) {
+                          _emailCtrl.clear();
+                        }
+                      });
+                    },
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(loc.t('supplier_include_email')),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                  TextField(
+                    controller: _emailCtrl,
+                    enabled: _includeEmail,
+                    decoration: InputDecoration(
+                      labelText: loc.t('order_list_contact_email'),
+                      border: const OutlineInputBorder(),
+                      errorText: _emailError,
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                    onChanged: (_) {
+                      if (_emailError != null) {
+                        setState(() => _emailError = null);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  CheckboxListTile(
+                    value: _includePhone,
+                    onChanged: (v) {
+                      setState(() {
+                        _includePhone = v ?? false;
+                        _phoneError = null;
+                        if (!_includePhone) {
+                          _phoneCtrl.clear();
+                        }
+                      });
+                    },
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(loc.t('supplier_include_phone')),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                  TextField(
+                    controller: _phoneCtrl,
+                    enabled: _includePhone,
+                    decoration: InputDecoration(
+                      labelText: loc.t('order_list_contact_phone'),
+                      border: const OutlineInputBorder(),
+                      counterText: '',
+                      errorText: _phoneError,
+                    ),
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
+                    maxLength: 15,
+                    onChanged: (_) {
+                      if (_phoneError != null) {
+                        setState(() => _phoneError = null);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  FilledButton(
+                    onPressed: _submit,
+                    child: Text(loc.t('order_list_next')),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(loc.t('cancel')),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
