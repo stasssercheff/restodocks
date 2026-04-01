@@ -150,11 +150,18 @@ class StaffHomeContent extends StatelessWidget {
         onTap: () =>
             context.push('/pos/orders/${_deptForRoute(employee.department)}'),
       ),
+      HomeTileId.departmentSales: _Tile(
+        icon: Icons.point_of_sale_outlined,
+        title: loc.t('sales_title') ?? 'Продажи',
+        onTap: () =>
+            context.push('/sales/${_deptForRoute(employee.department)}'),
+      ),
     };
     final showHallPos =
         employee.department == 'hall' || employee.department == 'dining_room';
     final showDeptOrdersTile =
         employee.department == 'kitchen' || employee.department == 'bar';
+    final showDeptSalesTile = showDeptOrdersTile;
     final showChecklists = employee.department == 'kitchen' ||
         employee.department == 'bar' ||
         employee.department == 'dining_room';
@@ -185,7 +192,8 @@ class StaffHomeContent extends StatelessWidget {
           (id == HomeTileId.hallOrders ||
               id == HomeTileId.hallCashRegister ||
               id == HomeTileId.hallTables ||
-              id == HomeTileId.departmentOrders)) {
+              id == HomeTileId.departmentOrders ||
+              id == HomeTileId.departmentSales)) {
         continue;
       }
       if ((id == HomeTileId.hallOrders ||
@@ -195,6 +203,7 @@ class StaffHomeContent extends StatelessWidget {
         continue;
       }
       if (id == HomeTileId.departmentOrders && !showDeptOrdersTile) continue;
+      if (id == HomeTileId.departmentSales && !showDeptSalesTile) continue;
       if (id == HomeTileId.checklists && !showChecklists) continue;
       if (id == HomeTileId.suppliers && !showSuppliers) continue;
       if (id == HomeTileId.menu && !showMenu) continue;

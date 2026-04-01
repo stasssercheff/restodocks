@@ -22,6 +22,7 @@ enum HomeTileId {
   hallCashRegister,
   hallTables,
   departmentOrders,
+  departmentSales,
 }
 
 extension HomeTileIdExt on HomeTileId {

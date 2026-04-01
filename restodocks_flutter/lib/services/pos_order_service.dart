@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/pos_cash_register_row.dart';
 import '../models/pos_dining_table.dart';
+import '../models/pos_closed_order_sales_bundle.dart';
 import '../models/pos_order.dart';
 import '../models/pos_order_line.dart';
 import '../models/pos_order_payment.dart';
@@ -71,6 +72,11 @@ class PosOrderService {
 
   static const _lineSelect = 'id, order_id, tech_card_id, quantity, comment, '
       'course_number, guest_number, sort_order, created_at, updated_at, served_at, '
+      'tech_cards(dish_name, dish_name_localized, selling_price, department, '
+      'category, sections)';
+
+  /// Упрощённый select строк для аналитики продаж (без course/guest).
+  static const _lineSelectSales = 'id, order_id, tech_card_id, quantity, '
       'tech_cards(dish_name, dish_name_localized, selling_price, department, '
       'category, sections)';
 
@@ -685,6 +691,55 @@ class PosOrderService {
       return list;
     } catch (e, st) {
       devLog('PosOrderService: fetchClosedOrdersPaidBetween $e $st');
+      rethrow;
+    }
+  }
+
+  /// Закрытые заказы за период с позициями и embed ТТК (для отчёта «Продажи»).
+  Future<List<PosClosedOrderSalesBundle>> fetchClosedOrdersWithSalesLines({
+    required String establishmentId,
+    required DateTime fromUtc,
+    required DateTime toUtc,
+  }) async {
+    try {
+      final rows = await _selectOrdersWithPricingFallback((sel) async {
+        final r = await _supabase.client
+            .from('pos_orders')
+            .select('$sel, pos_order_lines($_lineSelectSales)')
+            .eq('establishment_id', establishmentId)
+            .eq('status', PosOrderStatus.closed.toApi())
+            .gte('paid_at', fromUtc.toUtc().toIso8601String())
+            .lte('paid_at', toUtc.toUtc().toIso8601String())
+            .order('paid_at', ascending: false);
+        return r as List<dynamic>;
+      });
+
+      final out = <PosClosedOrderSalesBundle>[];
+      for (final row in rows) {
+        if (row is! Map<String, dynamic>) continue;
+        try {
+          final m = Map<String, dynamic>.from(row);
+          final linesRaw = m.remove('pos_order_lines');
+          final o = PosOrder.fromJson(m);
+          final lines = <PosOrderLine>[];
+          if (linesRaw is List) {
+            for (final item in linesRaw) {
+              if (item is! Map<String, dynamic>) continue;
+              try {
+                lines.add(PosOrderLine.fromJson(Map<String, dynamic>.from(item)));
+              } catch (e) {
+                devLog('PosOrderService: skip sales line $e');
+              }
+            }
+          }
+          out.add(PosClosedOrderSalesBundle(order: o, lines: lines));
+        } catch (e) {
+          devLog('PosOrderService: skip closed bundle $e');
+        }
+      }
+      return out;
+    } catch (e, st) {
+      devLog('PosOrderService: fetchClosedOrdersWithSalesLines $e $st');
       rethrow;
     }
   }

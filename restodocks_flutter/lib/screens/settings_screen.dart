@@ -20,6 +20,7 @@ import '../widgets/getting_started_document.dart';
 import '../widgets/long_operation_progress_dialog.dart';
 import '../widgets/post_registration_trial_dialog.dart';
 import '../widgets/pro_settings_owner_section.dart';
+import '../widgets/sales_financials_management_tile.dart';
 
 const _adminEmails = <String>{'stasssercheff@gmail.com'};
 bool _isPlatformAdminEmail(String email) =>
@@ -2159,6 +2160,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/settings/orders-display'),
               ),
+            if (FeatureFlags.posModuleEnabled)
+              SalesFinancialsManagementTile(employee: currentEmployee),
             if (FeatureFlags.posModuleEnabled &&
                 posCanManageFiscalTaxSettings(currentEmployee))
               ListTile(

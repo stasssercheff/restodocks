@@ -787,6 +787,56 @@ class AppRouter {
           ),
 
           GoRoute(
+            path: '/sales/:department',
+            pageBuilder: (context, state) {
+              final dept = state.pathParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(
+                state,
+                KitchenBarSalesHubScreen(department: dept),
+              );
+            },
+            routes: [
+              GoRoute(
+                path: 'statistics',
+                pageBuilder: (context, state) {
+                  final dept = state.pathParameters['department'] ?? 'kitchen';
+                  return _slideTransitionPage(
+                    state,
+                    KitchenBarSalesStatisticsScreen(department: dept),
+                  );
+                },
+              ),
+              GoRoute(
+                path: 'plan',
+                pageBuilder: (context, state) {
+                  final dept = state.pathParameters['department'] ?? 'kitchen';
+                  return _slideTransitionPage(
+                    state,
+                    KitchenBarSalesPlanScreen(department: dept),
+                  );
+                },
+                routes: [
+                  GoRoute(
+                    path: 'form',
+                    pageBuilder: (context, state) {
+                      final dept =
+                          state.pathParameters['department'] ?? 'kitchen';
+                      final id = state.queryParameters['id'];
+                      return _slideTransitionPage(
+                        state,
+                        KitchenBarSalesPlanFormScreen(
+                          department: dept,
+                          planId: id,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          GoRoute(
             path: '/products',
             pageBuilder: (context, state) =>
                 _slideTransitionPage(state, const ProductsScreen()),
