@@ -198,6 +198,10 @@ class _InventoryScreenState extends State<InventoryScreen>
   /// Выборочная инвентаризация: в бланке только заранее выбранные позиции номенклатуры и ПФ.
   bool _isSelectiveInventory = false;
 
+  /// Открыт диалог «Тип инвентаризации» — кнопка «Назад» в шапке закрывает его (root Navigator),
+  /// затем при отмене выполняется выход с экрана (см. [_showModeDialog]).
+  bool _inventoryModePickerOpen = false;
+
   @override
   bool get restoreDraftAfterLoad => true;
 
@@ -590,88 +594,107 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
 
     final loc = context.read<LocalizationService>();
-    final choice = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        final theme = Theme.of(ctx);
-        return AlertDialog(
-          title: Text(loc.t('inventory_mode_dialog_title') ?? 'Тип инвентаризации'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.list_alt, color: Colors.blue),
-                  title: Row(children: [
-                    Text(loc.t('inventory_mode_standard') ?? 'Стандартный'),
-                    if (hasStdDraft) _continueBadge(ctx),
-                  ]),
-                  subtitle: Text(hasStdDraft
-                      ? (loc.t('inventory_mode_saved_draft') ??
-                          'Незавершённая инвентаризация сохранена')
-                      : (loc.t('inventory_mode_standard_hint') ??
-                          'Продукты из номенклатуры')),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                  tileColor: Colors.blue.withOpacity(0.05),
-                  onTap: () => Navigator.of(ctx).pop('standard'),
-                ),
-                const SizedBox(height: 8),
-                ListTile(
-                  leading: Icon(Icons.filter_alt_outlined,
-                      color: theme.colorScheme.secondary),
-                  title: Row(children: [
-                    Text(loc.t('inventory_selective_mode_title') ?? 'Выборочная'),
-                    if (hasSelectiveDraft) _continueBadge(ctx),
-                  ]),
-                  subtitle: Text(
-                    hasSelectiveDraft
+    if (mounted) setState(() => _inventoryModePickerOpen = true);
+    String? choice;
+    try {
+      choice = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) {
+          final theme = Theme.of(ctx);
+          return AlertDialog(
+            title: Text(
+                loc.t('inventory_mode_dialog_title') ?? 'Тип инвентаризации'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.list_alt, color: Colors.blue),
+                    title: Row(children: [
+                      Text(loc.t('inventory_mode_standard') ?? 'Стандартный'),
+                      if (hasStdDraft) _continueBadge(ctx),
+                    ]),
+                    subtitle: Text(hasStdDraft
                         ? (loc.t('inventory_mode_saved_draft') ??
                             'Незавершённая инвентаризация сохранена')
-                        : (loc.t('inventory_selective_mode_subtitle') ??
-                            'Только выбранные позиции из номенклатуры и ПФ'),
+                        : (loc.t('inventory_mode_standard_hint') ??
+                            'Продукты из номенклатуры')),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    tileColor: Colors.blue.withOpacity(0.05),
+                    onTap: () => Navigator.of(ctx).pop('standard'),
                   ),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                  tileColor:
-                      theme.colorScheme.secondaryContainer.withOpacity(0.25),
-                  onTap: () => Navigator.of(ctx).pop('selective'),
-                ),
-                if (!isHall) ...[
                   const SizedBox(height: 8),
                   ListTile(
-                    leading: Icon(Icons.table_chart_outlined,
-                        color: hasIiko ? theme.colorScheme.primary : Colors.grey),
+                    leading: Icon(Icons.filter_alt_outlined,
+                        color: theme.colorScheme.secondary),
                     title: Row(children: [
-                      Text(loc.t('inventory_mode_iiko') ?? 'Бланк iiko'),
-                      if (hasIikoDraft) _continueBadge(ctx),
+                      Text(loc.t('inventory_selective_mode_title') ??
+                          'Выборочная'),
+                      if (hasSelectiveDraft) _continueBadge(ctx),
                     ]),
                     subtitle: Text(
-                      hasIikoDraft
+                      hasSelectiveDraft
                           ? (loc.t('inventory_mode_saved_draft') ??
                               'Незавершённая инвентаризация сохранена')
-                          : hasIiko
-                              ? '${loc.t('inventory_mode_iiko_hint_products') ?? 'Продукты из iiko-бланка'} · ${iikoStore.products.length}'
-                              : (loc.t('inventory_mode_iiko_hint_upload') ??
-                                  'Сначала загрузите бланк iiko в «Загрузка продуктов»'),
+                          : (loc.t('inventory_selective_mode_subtitle') ??
+                              'Только выбранные позиции из номенклатуры и ПФ'),
                     ),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
-                    tileColor: hasIiko
-                        ? theme.colorScheme.primaryContainer.withOpacity(0.3)
-                        : Colors.grey.withOpacity(0.03),
-                    onTap: hasIiko ? () => Navigator.of(ctx).pop('iiko') : null,
+                    tileColor: theme.colorScheme.secondaryContainer
+                        .withOpacity(0.25),
+                    onTap: () => Navigator.of(ctx).pop('selective'),
                   ),
+                  if (!isHall) ...[
+                    const SizedBox(height: 8),
+                    ListTile(
+                      leading: Icon(Icons.table_chart_outlined,
+                          color:
+                              hasIiko ? theme.colorScheme.primary : Colors.grey),
+                      title: Row(children: [
+                        Text(loc.t('inventory_mode_iiko') ?? 'Бланк iiko'),
+                        if (hasIikoDraft) _continueBadge(ctx),
+                      ]),
+                      subtitle: Text(
+                        hasIikoDraft
+                            ? (loc.t('inventory_mode_saved_draft') ??
+                                'Незавершённая инвентаризация сохранена')
+                            : hasIiko
+                                ? '${loc.t('inventory_mode_iiko_hint_products') ?? 'Продукты из iiko-бланка'} · ${iikoStore.products.length}'
+                                : (loc.t('inventory_mode_iiko_hint_upload') ??
+                                    'Сначала загрузите бланк iiko в «Загрузка продуктов»'),
+                      ),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      tileColor: hasIiko
+                          ? theme.colorScheme.primaryContainer.withOpacity(0.3)
+                          : Colors.grey.withOpacity(0.03),
+                      onTap:
+                          hasIiko ? () => Navigator.of(ctx).pop('iiko') : null,
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        );
-      },
-    );
+          );
+        },
+      );
+    } finally {
+      if (mounted) setState(() => _inventoryModePickerOpen = false);
+    }
 
     if (!mounted) return;
+
+    if (choice == null) {
+      if (GoRouter.of(context).canPop()) {
+        context.pop();
+      } else {
+        context.go('/home', extra: {'back': true});
+      }
+      return;
+    }
 
     if (choice == 'iiko') {
       context.pushReplacement('/inventory-iiko');
@@ -716,7 +739,6 @@ class _InventoryScreenState extends State<InventoryScreen>
         );
       }
     }
-    // choice == null → пользователь не выбрал (нажал вне диалога) — ничего не делаем
   }
 
   /// Автоматическая подстановка: номенклатура заведения + полуфабрикаты (ТТК с типом ПФ).
@@ -1567,6 +1589,19 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
   }
 
+  /// Пока открыт диалог «Тип инвентаризации» — «Назад» снимает overlay (root Navigator);
+  /// после закрытия диалога без выбора выполняется выход с экрана в [_showModeDialog].
+  Widget _inventoryAppBarLeading(BuildContext context) {
+    if (!_inventoryModePickerOpen) return appBarBackButton(context);
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () {
+        Navigator.of(context, rootNavigator: true).maybePop();
+      },
+      tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -1605,10 +1640,17 @@ class _InventoryScreenState extends State<InventoryScreen>
     // но оставляем строку с фильтром — это делается без setState через isKeyboardOpen.
     final mobileKeyboardOpen = isNarrow && isKeyboardOpen;
 
-    return Scaffold(
+    return PopScope(
+      canPop: !_inventoryModePickerOpen,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (!didPop && _inventoryModePickerOpen) {
+          Navigator.of(context, rootNavigator: true).maybePop();
+        }
+      },
+      child: Scaffold(
       appBar: (isNarrow && isKeyboardOpen)
           ? AppBar(
-              leading: appBarBackButton(context),
+              leading: _inventoryAppBarLeading(context),
               title: Text(
                 _inventoryAppBarTitle(loc),
                 style: const TextStyle(fontSize: 16),
@@ -1618,7 +1660,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             )
           : _isInputMode
               ? AppBar(
-                  leading: appBarBackButton(context),
+                  leading: _inventoryAppBarLeading(context),
                   title: Text(
                     _inventoryAppBarTitle(loc),
                     style: const TextStyle(fontSize: 16),
@@ -1627,7 +1669,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                   elevation: 0,
                 )
               : AppBar(
-                  leading: appBarBackButton(context),
+                  leading: _inventoryAppBarLeading(context),
                   title: Text(_inventoryAppBarTitle(loc)),
                 ),
       // Кнопка "Завершить" в bottomNavigationBar — Flutter поднимает её над клавиатурой автоматически.
@@ -1660,6 +1702,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             DataSafetyIndicator(isVisible: true),
         ],
       ),
+    ),
     );
   }
 
