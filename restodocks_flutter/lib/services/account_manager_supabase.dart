@@ -1350,10 +1350,11 @@ class AccountManagerSupabase extends ChangeNotifier {
     }
   }
 
-  /// RLS: UPDATE по id; если 0 строк (часто auth_user_id NULL в старых данных) — повтор по auth_user_id.
+  /// RLS: UPDATE по id; если 0 строк — цепочка fallback (см. [_employeesUpdateWithRlsFallback]).
   static bool _isEmployeesZeroRowSaveError(Object e) {
-    final s = e.toString();
-    return s.contains('таблица employees') && s.contains('не удалось сохранить');
+    final s = e.toString().toLowerCase();
+    return s.contains('employees') &&
+        (s.contains('не удалось сохранить') || s.contains('нет доступа'));
   }
 
   /// Обновить данные сотрудника (пароль не обновляется — используйте отдельный поток смены пароля).
@@ -1416,12 +1417,19 @@ class AccountManagerSupabase extends ChangeNotifier {
     }
   }
 
-  /// Сначала UPDATE … WHERE id = …; при 0 строк (RLS) — WHERE auth_user_id = JWT (миграция 20260401140000).
+  /// Сначала UPDATE … WHERE id = …; при 0 строк — RPC link, затем auth_user_id, id=JWT, or-фильтр.
   Future<void> _employeesUpdateWithRlsFallback(
     String employeeId,
     Map<String, dynamic> employeeData,
   ) async {
     final uid = _supabase.currentUser?.id;
+
+    try {
+      await _supabase.client.rpc('ensure_employee_auth_link');
+    } catch (e) {
+      devLog('ensure_employee_auth_link: $e (игнор если функция ещё не в БД)');
+    }
+
     try {
       await _supabase.updateData(
         'employees',
@@ -1433,19 +1441,46 @@ class AccountManagerSupabase extends ChangeNotifier {
     } catch (e) {
       if (uid == null || !_isEmployeesZeroRowSaveError(e)) rethrow;
     }
-    final resp = await _supabase.client
+
+    Future<bool> runUpdate(Future<dynamic> Function() run) async {
+      final resp = await run();
+      final list = resp is List ? resp : <dynamic>[];
+      return list.isNotEmpty;
+    }
+
+    final authId = uid;
+
+    if (await runUpdate(() => _supabase.client
         .from('employees')
         .update(employeeData)
-        .eq('auth_user_id', uid)
-        .select();
-    final list = resp is List ? resp : <dynamic>[];
-    if (list.isEmpty) {
-      throw Exception(
-        'Не удалось сохранить профиль сотрудника (RLS). '
-        'Выполните в Supabase SQL миграцию 20260401140000_employees_backfill_auth_user_id.sql '
-        '(поле auth_user_id для вашей строки в employees).',
-      );
+        .eq('auth_user_id', authId)
+        .select())) {
+      return;
     }
+
+    if (employeeId != authId &&
+        await runUpdate(() => _supabase.client
+            .from('employees')
+            .update(employeeData)
+            .eq('id', authId)
+            .select())) {
+      return;
+    }
+
+    final orFilter = 'id.eq.$employeeId,auth_user_id.eq.$authId';
+    if (await runUpdate(() => _supabase.client
+        .from('employees')
+        .update(employeeData)
+        .or(orFilter)
+        .select())) {
+      return;
+    }
+
+    throw Exception(
+      'Не удалось сохранить профиль (employees). '
+      'Обновите приложение и попросите администратора применить миграции Supabase '
+      '(20260401140000_employees_backfill_auth_user_id, 20260401160000_ensure_employee_auth_link_rpc).',
+    );
   }
 
   /// Удаление сотрудника (прямой DELETE — оставляет auth.users, email нельзя переиспользовать)
