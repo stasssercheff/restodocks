@@ -758,7 +758,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// URL для редиректа после подтверждения. Должен совпадать с Supabase Auth → Redirect URLs.
   static String _getEmailRedirectUrl([String? languageCode]) {
-    final base = publicAppOrigin;
+    final base = publicAppOriginForEmailRedirect;
     final lang = languageCode?.trim().toLowerCase();
     if (lang != null &&
         lang.isNotEmpty &&

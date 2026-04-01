@@ -100,132 +100,160 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     final estId = acc.establishment?.id;
     if (estId == null) return;
 
+    final messenger = ScaffoldMessenger.of(context);
+
     final nameCtrl = TextEditingController();
     final contactCtrl = TextEditingController();
     final emailCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
 
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) {
-        final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
-        return Padding(
-          padding: EdgeInsets.only(
-              left: 16, right: 16, top: 8, bottom: 16 + bottomInset),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                loc.t('supplier_external_title') ?? 'Поставщик извне',
-                style: Theme.of(ctx).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                loc.t('supplier_external_subtitle') ??
-                    'Укажите данные и загрузите список продуктов — позиции попадут в номенклатуру и в карточку поставщика.',
-                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: nameCtrl,
-                decoration: InputDecoration(
-                  labelText: loc.t('order_list_supplier_name') ?? 'Название',
-                  border: const OutlineInputBorder(),
-                ),
-                textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: contactCtrl,
-                decoration: InputDecoration(
-                  labelText:
-                      loc.t('supplier_contact_person') ?? 'Контактное лицо',
-                  border: const OutlineInputBorder(),
-                ),
-                textCapitalization: TextCapitalization.words,
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: emailCtrl,
-                decoration: InputDecoration(
-                  labelText: loc.t('order_list_contact_email') ?? 'Email',
-                  border: const OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: phoneCtrl,
-                decoration: InputDecoration(
-                  labelText: loc.t('order_list_contact_phone') ?? 'Телефон',
-                  border: const OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.phone,
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: () async {
-                  final name = nameCtrl.text.trim();
-                  if (name.isEmpty) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      SnackBar(
-                          content: Text(loc.t('order_list_supplier_name') ??
-                              'Укажите название')),
-                    );
-                    return;
-                  }
-                  final id = const Uuid().v4();
-                  final draft = OrderList(
-                    id: id,
-                    name: name,
-                    supplierName: name,
-                    contactPerson: contactCtrl.text.trim().isEmpty
-                        ? null
-                        : contactCtrl.text.trim(),
-                    email: emailCtrl.text.trim().isEmpty
-                        ? null
-                        : emailCtrl.text.trim(),
-                    phone: phoneCtrl.text.trim().isEmpty
-                        ? null
-                        : phoneCtrl.text.trim(),
-                    department: widget.department,
-                  );
-                  final lists = await loadOrderLists(estId,
-                      department: widget.department);
-                  await saveOrderLists(estId, [...lists, draft],
-                      department: widget.department);
-                  if (!ctx.mounted) return;
-                  Navigator.of(ctx).pop();
-                  if (!mounted) return;
-                  final encName = Uri.encodeComponent(name);
-                  await context.push(
-                    '/products/upload?supplierListId=$id&department=${widget.department}&supplierName=$encName',
-                  );
-                  if (mounted) _load();
-                },
-                icon: const Icon(Icons.upload_file),
-                label: Text(loc.t('upload_products') ?? 'Загрузить продукты'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text(loc.t('cancel') ?? 'Отмена'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+    OrderList buildDraft() {
+      final name = nameCtrl.text.trim();
+      return OrderList(
+        id: const Uuid().v4(),
+        name: name,
+        supplierName: name,
+        contactPerson: contactCtrl.text.trim().isEmpty
+            ? null
+            : contactCtrl.text.trim(),
+        email: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
+        phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
+        department: widget.department,
+      );
+    }
 
-    nameCtrl.dispose();
-    contactCtrl.dispose();
-    emailCtrl.dispose();
-    phoneCtrl.dispose();
+    Future<void> saveDraftAndGo({
+      required BuildContext dialogContext,
+      required bool uploadFlow,
+    }) async {
+      final name = nameCtrl.text.trim();
+      if (name.isEmpty) {
+        messenger.showSnackBar(
+          SnackBar(content: Text(loc.t('order_list_supplier_name'))),
+        );
+        return;
+      }
+      final draft = buildDraft();
+      final lists =
+          await loadOrderLists(estId, department: widget.department);
+      await saveOrderLists(estId, [...lists, draft],
+          department: widget.department);
+      if (!dialogContext.mounted) return;
+      Navigator.of(dialogContext).pop();
+      if (!mounted) return;
+      if (uploadFlow) {
+        final encName = Uri.encodeComponent(draft.supplierName);
+        await context.push(
+          '/products/upload?supplierListId=${draft.id}&department=${widget.department}&supplierName=$encName',
+        );
+      } else {
+        await context.push('/product-order/new/products?pop=1', extra: draft);
+      }
+      if (mounted) _load();
+    }
+
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) {
+          final theme = Theme.of(dialogContext);
+          return Dialog(
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        loc.t('supplier_external_title'),
+                        style: theme.textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        loc.t('supplier_external_subtitle'),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: nameCtrl,
+                        decoration: InputDecoration(
+                          labelText: loc.t('order_list_supplier_name'),
+                          border: const OutlineInputBorder(),
+                        ),
+                        textCapitalization: TextCapitalization.words,
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: contactCtrl,
+                        decoration: InputDecoration(
+                          labelText: loc.t('supplier_contact_person'),
+                          border: const OutlineInputBorder(),
+                        ),
+                        textCapitalization: TextCapitalization.words,
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: emailCtrl,
+                        decoration: InputDecoration(
+                          labelText: loc.t('order_list_contact_email'),
+                          border: const OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: phoneCtrl,
+                        decoration: InputDecoration(
+                          labelText: loc.t('order_list_contact_phone'),
+                          border: const OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.phone,
+                      ),
+                      const SizedBox(height: 20),
+                      FilledButton.tonalIcon(
+                        onPressed: () => saveDraftAndGo(
+                          dialogContext: dialogContext,
+                          uploadFlow: false,
+                        ),
+                        icon: const Icon(Icons.playlist_add_check_outlined),
+                        label: Text(loc.t('supplier_products_from_nomenclature')),
+                      ),
+                      const SizedBox(height: 8),
+                      FilledButton.icon(
+                        onPressed: () => saveDraftAndGo(
+                          dialogContext: dialogContext,
+                          uploadFlow: true,
+                        ),
+                        icon: const Icon(Icons.upload_file),
+                        label: Text(loc.t('upload_products')),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        child: Text(loc.t('cancel')),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    } finally {
+      nameCtrl.dispose();
+      contactCtrl.dispose();
+      emailCtrl.dispose();
+      phoneCtrl.dispose();
+    }
   }
 
   Future<void> _saveSupplierEdits(OrderList updated) async {
