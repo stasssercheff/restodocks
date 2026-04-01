@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../utils/supplier_contact_validation.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Создание поставщика: наименование поставщика, контакты (почта, телефон).
@@ -34,10 +36,24 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
   }
 
   void _next() {
+    final loc = context.read<LocalizationService>();
+    final messenger = ScaffoldMessenger.of(context);
     final supplier = _supplierCtrl.text.trim();
     if (supplier.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.read<LocalizationService>().t('order_list_supplier_name'))),
+      messenger.showSnackBar(
+        SnackBar(content: Text(loc.t('order_list_supplier_name'))),
+      );
+      return;
+    }
+    if (!isValidSupplierEmail(_emailCtrl.text)) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(loc.t('supplier_invalid_email'))),
+      );
+      return;
+    }
+    if (!isValidSupplierPhone(_phoneCtrl.text)) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(loc.t('supplier_invalid_phone'))),
       );
       return;
     }
@@ -48,8 +64,8 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
       contactPerson: _contactPersonCtrl.text.trim().isEmpty
           ? null
           : _contactPersonCtrl.text.trim(),
-      email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
-      phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+      email: normalizedSupplierEmailOrNull(_emailCtrl.text),
+      phone: normalizedSupplierPhoneOrNull(_phoneCtrl.text),
       department: widget.department,
     );
     context.push('/product-order/new/products', extra: draft);
@@ -110,8 +126,13 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
                 labelText: loc.t('order_list_contact_phone'),
                 border: const OutlineInputBorder(),
                 filled: true,
+                counterText: '',
               ),
               keyboardType: TextInputType.phone,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+              ],
+              maxLength: 15,
             ),
             const SizedBox(height: 32),
             FilledButton(

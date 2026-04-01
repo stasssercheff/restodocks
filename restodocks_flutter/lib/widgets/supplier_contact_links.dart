@@ -27,8 +27,9 @@ class SupplierContactLinks extends StatelessWidget {
   }
 
   static Future<void> launchPhone(String phone) async {
-    final tel = phone.replaceAll(RegExp(r'[\s\-\(\)]'), '');
-    final uri = Uri.parse('tel:$tel');
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return;
+    final uri = Uri.parse('tel:$digits');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
@@ -7,6 +8,7 @@ import '../models/models.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/scroll_to_top_app_bar_title.dart';
+import '../utils/supplier_contact_validation.dart';
 import '../widgets/supplier_contact_links.dart';
 
 /// Экран «Поставщики» — только карточки поставщиков со списком продуктов, без заказов.
@@ -81,9 +83,30 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       contactPerson: contactCtrl.text.trim().isEmpty
           ? null
           : contactCtrl.text.trim(),
-      email: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
-      phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
+      email: normalizedSupplierEmailOrNull(emailCtrl.text),
+      phone: normalizedSupplierPhoneOrNull(phoneCtrl.text),
     );
+  }
+
+  bool _validateSupplierContacts(
+    LocalizationService loc,
+    ScaffoldMessengerState messenger,
+    TextEditingController emailCtrl,
+    TextEditingController phoneCtrl,
+  ) {
+    if (!isValidSupplierEmail(emailCtrl.text)) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(loc.t('supplier_invalid_email'))),
+      );
+      return false;
+    }
+    if (!isValidSupplierPhone(phoneCtrl.text)) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(loc.t('supplier_invalid_phone'))),
+      );
+      return false;
+    }
+    return true;
   }
 
   Future<void> _load() async {
@@ -140,8 +163,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         contactPerson: contactCtrl.text.trim().isEmpty
             ? null
             : contactCtrl.text.trim(),
-        email: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
-        phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
+        email: normalizedSupplierEmailOrNull(emailCtrl.text),
+        phone: normalizedSupplierPhoneOrNull(phoneCtrl.text),
         department: widget.department,
       );
     }
@@ -161,6 +184,9 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
         messenger.showSnackBar(
           SnackBar(content: Text(loc.t('order_list_supplier_name'))),
         );
+        return;
+      }
+      if (!_validateSupplierContacts(loc, messenger, emailCtrl, phoneCtrl)) {
         return;
       }
       final draft = buildDraft();
@@ -244,8 +270,13 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                         decoration: InputDecoration(
                           labelText: loc.t('order_list_contact_phone'),
                           border: const OutlineInputBorder(),
+                          counterText: '',
                         ),
                         keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        maxLength: 15,
                       ),
                       const SizedBox(height: 20),
                       FilledButton.tonalIcon(
@@ -309,7 +340,9 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     final nameCtrl = TextEditingController(text: s.supplierName);
     final contactCtrl = TextEditingController(text: s.contactPerson ?? '');
     final emailCtrl = TextEditingController(text: s.email ?? '');
-    final phoneCtrl = TextEditingController(text: s.phone ?? '');
+    final phoneCtrl = TextEditingController(
+      text: supplierPhoneDigitsOnly(s.phone ?? ''),
+    );
 
     OrderList? result;
 
@@ -368,8 +401,13 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                         decoration: InputDecoration(
                           labelText: loc.t('order_list_contact_phone'),
                           border: const OutlineInputBorder(),
+                          counterText: '',
                         ),
                         keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        maxLength: 15,
                       ),
                       const SizedBox(height: 16),
                       Row(
@@ -387,18 +425,26 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                               onPressed: () {
                                 final supplierName = nameCtrl.text.trim();
                                 if (supplierName.isEmpty) return;
+                                if (!_validateSupplierContacts(
+                                  loc,
+                                  messenger,
+                                  emailCtrl,
+                                  phoneCtrl,
+                                )) {
+                                  return;
+                                }
                                 result = s.copyWith(
                                   name: supplierName,
                                   supplierName: supplierName,
                                   contactPerson: contactCtrl.text.trim().isEmpty
                                       ? null
                                       : contactCtrl.text.trim(),
-                                  email: emailCtrl.text.trim().isEmpty
-                                      ? null
-                                      : emailCtrl.text.trim(),
-                                  phone: phoneCtrl.text.trim().isEmpty
-                                      ? null
-                                      : phoneCtrl.text.trim(),
+                                  email: normalizedSupplierEmailOrNull(
+                                    emailCtrl.text,
+                                  ),
+                                  phone: normalizedSupplierPhoneOrNull(
+                                    phoneCtrl.text,
+                                  ),
                                 );
                                 Navigator.of(dialogContext).pop();
                               },
@@ -420,6 +466,14 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                       const SizedBox(height: 8),
                       FilledButton.tonalIcon(
                         onPressed: () {
+                          if (!_validateSupplierContacts(
+                            loc,
+                            messenger,
+                            emailCtrl,
+                            phoneCtrl,
+                          )) {
+                            return;
+                          }
                           final draft = _draftFromSupplierFields(
                             s,
                             nameCtrl,
@@ -445,6 +499,14 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                                     loc.t('supplier_upload_requires_pro')),
                               ),
                             );
+                            return;
+                          }
+                          if (!_validateSupplierContacts(
+                            loc,
+                            messenger,
+                            emailCtrl,
+                            phoneCtrl,
+                          )) {
                             return;
                           }
                           final draft = _draftFromSupplierFields(
