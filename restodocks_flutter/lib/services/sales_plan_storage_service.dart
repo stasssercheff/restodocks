@@ -4,70 +4,145 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/models.dart';
+import '../utils/dev_log.dart';
+import 'supabase_service.dart';
 
-/// Локальное хранение планов продаж (как на экране — на устройстве).
+/// Планы продаж POS в Supabase (`pos_sales_plans`), общие для web и приложения.
+/// Однократный перенос из старых локальных prefs при пустой таблице.
 class SalesPlanStorageService {
   SalesPlanStorageService._();
   static final SalesPlanStorageService instance = SalesPlanStorageService._();
 
   static const _uuid = Uuid();
+  static const _legacyKeyPrefix = 'restodocks_sales_plans_';
 
-  String _key(String establishmentId) =>
-      'restodocks_sales_plans_$establishmentId';
+  final SupabaseService _supabase = SupabaseService();
+
+  String newId() => _uuid.v4();
 
   Future<List<SalesPlan>> loadAll(String establishmentId) async {
     if (establishmentId.isEmpty) return [];
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_key(establishmentId));
-      if (raw == null || raw.isEmpty) return [];
-      final list = jsonDecode(raw) as List<dynamic>;
-      return list
-          .map((e) => SalesPlan.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList();
-    } catch (_) {
+      var list = await _fetchFromServer(establishmentId);
+      if (list.isEmpty) {
+        await _migrateLegacySharedPreferencesOnce(establishmentId);
+        list = await _fetchFromServer(establishmentId);
+      }
+      return list;
+    } catch (e, st) {
+      devLog('SalesPlanStorageService: loadAll $e $st');
       return [];
     }
   }
 
-  Future<void> saveAll(String establishmentId, List<SalesPlan> plans) async {
-    if (establishmentId.isEmpty) return;
+  Future<List<SalesPlan>> _fetchFromServer(String establishmentId) async {
+    final rows = await _supabase.client
+        .from('pos_sales_plans')
+        .select()
+        .eq('establishment_id', establishmentId)
+        .order('updated_at', ascending: false);
+    final out = <SalesPlan>[];
+    for (final row in rows as List<dynamic>) {
+      if (row is! Map<String, dynamic>) continue;
+      try {
+        out.add(SalesPlan.fromJson(Map<String, dynamic>.from(row)));
+      } catch (e) {
+        devLog('SalesPlanStorageService: skip row $e');
+      }
+    }
+    return out;
+  }
+
+  Future<void> _migrateLegacySharedPreferencesOnce(String establishmentId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = jsonEncode(plans.map((e) => e.toJson()).toList());
-      await prefs.setString(_key(establishmentId), raw);
-    } catch (_) {}
+      final raw = prefs.getString('$_legacyKeyPrefix$establishmentId');
+      if (raw == null || raw.isEmpty) return;
+      final decoded = jsonDecode(raw) as List<dynamic>;
+      for (final e in decoded) {
+        if (e is! Map) continue;
+        final plan = SalesPlan.fromJson(Map<String, dynamic>.from(e));
+        await upsert(establishmentId, plan);
+      }
+      await prefs.remove('$_legacyKeyPrefix$establishmentId');
+    } catch (e, st) {
+      devLog('SalesPlanStorageService: legacy migrate $e $st');
+    }
   }
 
   Future<SalesPlan?> getById(String establishmentId, String id) async {
-    final all = await loadAll(establishmentId);
+    if (establishmentId.isEmpty || id.isEmpty) return null;
     try {
-      return all.firstWhere((p) => p.id == id);
-    } catch (_) {
+      final row = await _supabase.client
+          .from('pos_sales_plans')
+          .select()
+          .eq('establishment_id', establishmentId)
+          .eq('id', id)
+          .maybeSingle();
+      if (row == null) return null;
+      return SalesPlan.fromJson(Map<String, dynamic>.from(row));
+    } catch (e, st) {
+      devLog('SalesPlanStorageService: getById $e $st');
       return null;
     }
   }
 
-  Future<void> upsert(String establishmentId, SalesPlan plan) async {
-    final all = await loadAll(establishmentId);
-    final i = all.indexWhere((p) => p.id == plan.id);
-    if (i >= 0) {
-      all[i] = plan;
-    } else {
-      all.add(plan);
+  /// [createdByEmployeeId] сохраняется только при первой вставке строки.
+  Future<void> upsert(
+    String establishmentId,
+    SalesPlan plan, {
+    String? createdByEmployeeId,
+  }) async {
+    if (establishmentId.isEmpty) return;
+    final now = DateTime.now().toUtc().toIso8601String();
+    final base = <String, dynamic>{
+      'establishment_id': establishmentId,
+      'department': plan.department,
+      'period_kind': plan.periodKind.name,
+      'period_start': plan.periodStart.toUtc().toIso8601String(),
+      'period_end': plan.periodEnd.toUtc().toIso8601String(),
+      'target_cash_amount': plan.targetCashAmount,
+      'lines': plan.lines.map((e) => e.toJson()).toList(),
+      'updated_at': now,
+    };
+    try {
+      final existing = await _supabase.client
+          .from('pos_sales_plans')
+          .select('id')
+          .eq('id', plan.id)
+          .eq('establishment_id', establishmentId)
+          .maybeSingle();
+      if (existing == null) {
+        await _supabase.client.from('pos_sales_plans').insert({
+          ...base,
+          'id': plan.id,
+          'created_at': plan.createdAt.toUtc().toIso8601String(),
+          if (createdByEmployeeId != null && createdByEmployeeId.isNotEmpty)
+            'created_by': createdByEmployeeId,
+        });
+      } else {
+        await _supabase.client.from('pos_sales_plans').update(base).eq('id', plan.id);
+      }
+    } catch (e, st) {
+      devLog('SalesPlanStorageService: upsert $e $st');
+      rethrow;
     }
-    await saveAll(establishmentId, all);
   }
 
   Future<void> delete(String establishmentId, String id) async {
-    final all = await loadAll(establishmentId);
-    all.removeWhere((p) => p.id == id);
-    await saveAll(establishmentId, all);
+    if (establishmentId.isEmpty) return;
+    try {
+      await _supabase.client
+          .from('pos_sales_plans')
+          .delete()
+          .eq('establishment_id', establishmentId)
+          .eq('id', id);
+    } catch (e, st) {
+      devLog('SalesPlanStorageService: delete $e $st');
+      rethrow;
+    }
   }
 
-  String newId() => _uuid.v4();
-
-  /// План, действующий на дату (последний по созданию, чей период покрывает день).
   Future<SalesPlan?> activePlanForDay({
     required String establishmentId,
     required String department,
@@ -84,7 +159,11 @@ class SalesPlanStorageService {
       return !d.isBefore(ds) && !d.isAfter(de);
     }).toList();
     if (candidates.isEmpty) return null;
-    candidates.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    candidates.sort((a, b) {
+      final ua = a.updatedAt ?? a.createdAt;
+      final ub = b.updatedAt ?? b.createdAt;
+      return ub.compareTo(ua);
+    });
     return candidates.first;
   }
 }

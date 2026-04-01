@@ -36,10 +36,7 @@ class _KitchenBarSalesPlanScreenState extends State<KitchenBarSalesPlanScreen> {
   }
 
   Future<void> _loadPrefs() async {
-    final est = context
-        .read<AccountManagerSupabase>()
-        .establishment
-        ?.dataEstablishmentId;
+    final est = context.read<AccountManagerSupabase>().establishment?.id;
     if (est == null || est.isEmpty) return;
     final m = await SalesPlanCalendarPrefsService.getMode(est);
     if (!mounted) return;
@@ -50,20 +47,14 @@ class _KitchenBarSalesPlanScreenState extends State<KitchenBarSalesPlanScreen> {
   }
 
   Future<void> _setMode(SalesPlanCalendarDisplayMode m) async {
-    final est = context
-        .read<AccountManagerSupabase>()
-        .establishment
-        ?.dataEstablishmentId;
+    final est = context.read<AccountManagerSupabase>().establishment?.id;
     if (est == null || est.isEmpty) return;
     setState(() => _displayMode = m);
     await SalesPlanCalendarPrefsService.setMode(est, m);
   }
 
   Future<double> _factForDay(DateTime day) async {
-    final est = context
-        .read<AccountManagerSupabase>()
-        .establishment
-        ?.dataEstablishmentId;
+    final est = context.read<AccountManagerSupabase>().establishment?.id;
     if (est == null || est.isEmpty) return 0;
     return KitchenBarSalesService.instance.factSellingTotalForLocalDay(
       establishmentId: est,
@@ -90,7 +81,7 @@ class _KitchenBarSalesPlanScreenState extends State<KitchenBarSalesPlanScreen> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final acc = context.watch<AccountManagerSupabase>();
-    final est = acc.establishment?.dataEstablishmentId ?? '';
+    final est = acc.establishment?.id ?? '';
     final dept = widget.department == 'bar' ? 'bar' : 'kitchen';
     final titleKey = posDepartmentLabelKeyForRoute(dept);
     final deptTitle = titleKey != null ? loc.t(titleKey) : dept;

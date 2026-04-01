@@ -144,19 +144,29 @@ class SalesPlan {
         (e) => e.name == j['period_kind'],
         orElse: () => SalesPlanPeriodKind.month,
       ),
-      periodStart: DateTime.parse(j['period_start'] as String),
-      periodEnd: DateTime.parse(j['period_end'] as String),
+      periodStart: DateTime.parse(j['period_start'].toString()),
+      periodEnd: DateTime.parse(j['period_end'].toString()),
       targetCashAmount: (j['target_cash_amount'] as num?)?.toDouble() ?? 0,
-      lines: (j['lines'] as List<dynamic>?)
-              ?.map((e) => SalesPlanLine.fromJson(Map<String, dynamic>.from(e as Map)))
-              .toList() ??
-          [],
-      createdAt: DateTime.parse(j['created_at'] as String),
+      lines: _parseSalesPlanLines(j['lines']),
+      createdAt: DateTime.parse(j['created_at'].toString()),
       updatedAt: j['updated_at'] != null
           ? DateTime.tryParse(j['updated_at'].toString())
           : null,
     );
   }
+}
+
+List<SalesPlanLine> _parseSalesPlanLines(dynamic raw) {
+  if (raw == null) return [];
+  if (raw is! List) return [];
+  final out = <SalesPlanLine>[];
+  for (final e in raw) {
+    if (e is! Map) continue;
+    try {
+      out.add(SalesPlanLine.fromJson(Map<String, dynamic>.from(e)));
+    } catch (_) {}
+  }
+  return out;
 }
 
 /// Режим отображения календаря плана.

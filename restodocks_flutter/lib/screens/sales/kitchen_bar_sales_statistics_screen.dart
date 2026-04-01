@@ -69,7 +69,7 @@ class _KitchenBarSalesStatisticsScreenState
 
   Future<void> _bootstrap() async {
     final acc = context.read<AccountManagerSupabase>();
-    final est = acc.establishment?.dataEstablishmentId ?? '';
+    final est = acc.establishment?.id ?? '';
     if (est.isNotEmpty) {
       await SalesFinancialVisibilityService.instance.initializeForEstablishment(est);
       try {
@@ -91,7 +91,7 @@ class _KitchenBarSalesStatisticsScreenState
 
   Future<void> _saveColumnPrefs() async {
     final est =
-        context.read<AccountManagerSupabase>().establishment?.dataEstablishmentId;
+        context.read<AccountManagerSupabase>().establishment?.id;
     if (est == null || est.isEmpty) return;
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -109,7 +109,7 @@ class _KitchenBarSalesStatisticsScreenState
 
   Future<void> _reload() async {
     final acc = context.read<AccountManagerSupabase>();
-    final est = acc.establishment?.dataEstablishmentId;
+    final est = acc.establishment?.id;
     final lang = Localizations.localeOf(context).languageCode;
     if (est == null || est.isEmpty) {
       setState(() => _error = 'Нет заведения');
@@ -193,7 +193,7 @@ class _KitchenBarSalesStatisticsScreenState
     final loc = context.read<LocalizationService>();
     final acc = context.read<AccountManagerSupabase>();
     final emp = acc.currentEmployee;
-    final est = acc.establishment?.dataEstablishmentId ?? '';
+    final est = acc.establishment?.id ?? '';
     if (emp == null || est.isEmpty) return;
     final seeFin = salesStatisticsCanSeeFinancials(emp, est);
     final showCost = seeFin && _showCost;
@@ -300,7 +300,7 @@ class _KitchenBarSalesStatisticsScreenState
     final loc = context.watch<LocalizationService>();
     final acc = context.watch<AccountManagerSupabase>();
     final emp = acc.currentEmployee;
-    final est = acc.establishment?.dataEstablishmentId ?? '';
+    final est = acc.establishment?.id ?? '';
     final seeFin = emp != null && salesStatisticsCanSeeFinancials(emp, est);
     final dept = widget.department == 'bar' ? 'bar' : 'kitchen';
     final titleKey = posDepartmentLabelKeyForRoute(dept);

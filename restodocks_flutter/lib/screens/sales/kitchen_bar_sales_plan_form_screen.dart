@@ -10,7 +10,7 @@ import '../../services/tech_card_service_supabase.dart';
 import '../../utils/pos_order_department.dart';
 import '../../widgets/app_bar_home_button.dart';
 
-/// Создание и правка плана продаж (локально на устройстве).
+/// Создание и правка плана продаж POS (Supabase `pos_sales_plans`).
 class KitchenBarSalesPlanFormScreen extends StatefulWidget {
   const KitchenBarSalesPlanFormScreen({
     super.key,
@@ -44,10 +44,12 @@ class _KitchenBarSalesPlanFormScreenState
 
   Future<void> _load() async {
     final acc = context.read<AccountManagerSupabase>();
-    final est = acc.establishment?.dataEstablishmentId;
-    if (est == null || est.isEmpty) return;
+    final establishment = acc.establishment;
+    if (establishment == null) return;
+    final posId = establishment.id;
+    final dataId = establishment.dataEstablishmentId;
     final tech = TechCardServiceSupabase();
-    final all = await tech.getTechCardsForEstablishment(est);
+    final all = await tech.getTechCardsForEstablishment(dataId);
     final bar = widget.department == 'bar';
     _techCards = all.where((tc) {
       final cat = tc.category;
@@ -60,7 +62,7 @@ class _KitchenBarSalesPlanFormScreenState
 
     if (widget.planId != null) {
       final existing =
-          await SalesPlanStorageService.instance.getById(est, widget.planId!);
+          await SalesPlanStorageService.instance.getById(posId, widget.planId!);
       if (existing != null) {
         _createdAt = existing.createdAt;
         _kind = existing.periodKind;
@@ -83,8 +85,9 @@ class _KitchenBarSalesPlanFormScreenState
 
   Future<void> _save() async {
     final acc = context.read<AccountManagerSupabase>();
-    final est = acc.establishment?.dataEstablishmentId;
-    if (est == null || est.isEmpty) return;
+    final establishment = acc.establishment;
+    if (establishment == null) return;
+    final posId = establishment.id;
     final cash = double.tryParse(_cashCtrl.text.replaceAll(',', '.')) ?? 0;
     final (start, end) = salesPlanResolvePeriodBounds(
       kind: _kind,
@@ -94,7 +97,7 @@ class _KitchenBarSalesPlanFormScreenState
     final now = DateTime.now();
     final plan = SalesPlan(
       id: id,
-      establishmentId: est,
+      establishmentId: posId,
       department: widget.department == 'bar' ? 'bar' : 'kitchen',
       periodKind: _kind,
       periodStart: start,
@@ -112,7 +115,12 @@ class _KitchenBarSalesPlanFormScreenState
       createdAt: _createdAt ?? now,
       updatedAt: now,
     );
-    await SalesPlanStorageService.instance.upsert(est, plan);
+    await SalesPlanStorageService.instance.upsert(
+      posId,
+      plan,
+      createdByEmployeeId:
+          widget.planId == null ? acc.currentEmployee?.id : null,
+    );
     if (!mounted) return;
     final loc = context.read<LocalizationService>();
     ScaffoldMessenger.of(context).showSnackBar(

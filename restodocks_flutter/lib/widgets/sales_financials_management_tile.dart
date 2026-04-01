@@ -31,8 +31,7 @@ class _SalesFinancialsManagementTileState
   }
 
   Future<void> _load() async {
-    final est =
-        context.read<AccountManagerSupabase>().establishment?.dataEstablishmentId;
+    final est = context.read<AccountManagerSupabase>().establishment?.id;
     if (est == null || est.isEmpty) return;
     _establishmentId = est;
     await SalesFinancialVisibilityService.instance.initializeForEstablishment(est);
