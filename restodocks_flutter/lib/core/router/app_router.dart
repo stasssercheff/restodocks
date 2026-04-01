@@ -879,12 +879,19 @@ class AppRouter {
               final addToNom = state.queryParameters['addToNomenclature'];
               final defaultAddToNomenclature = addToNom != 'false';
               final method = state.queryParameters['method'];
+              final supplierListId = state.queryParameters['supplierListId'];
+              final supplierDept =
+                  state.queryParameters['department'] ?? 'kitchen';
+              final supplierNameHint = state.queryParameters['supplierName'];
               try {
                 return _slideTransitionPage(
                   state,
                   ProductUploadScreen(
                     defaultAddToNomenclature: defaultAddToNomenclature,
                     initialMethod: method,
+                    supplierOrderListId: supplierListId,
+                    supplierDepartment: supplierDept,
+                    linkedSupplierName: supplierNameHint,
                   ),
                 );
               } catch (e) {
@@ -905,11 +912,15 @@ class AppRouter {
               List<ModerationItem>? items;
               var generateTranslationsForNewProducts = false;
               String? importSourceLanguage;
+              String? supplierOrderListId;
+              String? supplierDepartment;
               if (extra is ImportReviewPayload) {
                 items = extra.items;
                 generateTranslationsForNewProducts =
                     extra.generateTranslationsForNewProducts;
                 importSourceLanguage = extra.importSourceLanguage;
+                supplierOrderListId = extra.supplierOrderListId;
+                supplierDepartment = extra.supplierDepartment;
               } else if (extra is List<ModerationItem>) {
                 items = extra;
               }
@@ -924,6 +935,8 @@ class AppRouter {
                   generateTranslationsForNewProducts:
                       generateTranslationsForNewProducts,
                   importSourceLanguage: importSourceLanguage,
+                  supplierOrderListId: supplierOrderListId,
+                  supplierDepartment: supplierDepartment,
                 ),
               );
             },

@@ -141,6 +141,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
         id: const Uuid().v4(),
         name: _nameCtrl.text.trim(),
         supplierName: _selectedSupplier!.supplierName,
+        contactPerson: _selectedSupplier!.contactPerson,
         email: _selectedSupplier!.email,
         phone: _selectedSupplier!.phone,
         telegram: _selectedSupplier!.telegram,
@@ -306,6 +307,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
           ? _nameCtrl.text.trim()
           : _selectedSupplier!.supplierName,
       supplierName: _selectedSupplier!.supplierName,
+      contactPerson: _selectedSupplier!.contactPerson,
       email: _selectedSupplier!.email,
       phone: _selectedSupplier!.phone,
       telegram: _selectedSupplier!.telegram,

@@ -6,6 +6,8 @@ class ImportReviewPayload {
     required this.items,
     this.generateTranslationsForNewProducts = false,
     this.importSourceLanguage,
+    this.supplierOrderListId,
+    this.supplierDepartment,
   });
 
   final List<ModerationItem> items;
@@ -13,4 +15,8 @@ class ImportReviewPayload {
   final bool generateTranslationsForNewProducts;
   /// Язык исходных названий (код листа Excel и т.п.), по умолчанию в экране — `en`.
   final String? importSourceLanguage;
+  /// Если задан — после сохранения продукты добавляются в карточку поставщика.
+  final String? supplierOrderListId;
+  /// Подразделение списка поставщика (`kitchen` / `bar` / `hall`).
+  final String? supplierDepartment;
 }

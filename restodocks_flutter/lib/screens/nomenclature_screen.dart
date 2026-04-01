@@ -1637,47 +1637,42 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                   _showCreateProductDialog(loc);
                   return;
                 }
-                if (v == 'upload_text') {
-                  context.push('/products/upload?method=text');
-                  return;
-                }
-                if (v == 'upload_file') {
-                  context.push('/products/upload?method=file');
+                if (v == 'upload') {
+                  context.push('/products/upload');
                   return;
                 }
               },
-              itemBuilder: (_) => [
-                PopupMenuItem(
-                  value: 'create',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.add_box_outlined, size: 20),
-                      const SizedBox(width: 10),
-                      Text(loc.t('create_product') ?? 'Создать новый'),
-                    ],
+              itemBuilder: (ctx) {
+                final accent = Theme.of(ctx).colorScheme.primary;
+                return [
+                  PopupMenuItem(
+                    value: 'create',
+                    child: Row(
+                      children: [
+                        Icon(Icons.add_box_outlined, size: 20, color: accent),
+                        const SizedBox(width: 10),
+                        Text(
+                          loc.t('create_product') ?? 'Создать новый',
+                          style: TextStyle(color: accent, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                PopupMenuItem(
-                  value: 'upload_file',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.upload_file, size: 20),
-                      const SizedBox(width: 10),
-                      Text(loc.t('upload_products') ?? 'Загрузить из файла'),
-                    ],
+                  PopupMenuItem(
+                    value: 'upload',
+                    child: Row(
+                      children: [
+                        Icon(Icons.upload_file, size: 20, color: accent),
+                        const SizedBox(width: 10),
+                        Text(
+                          loc.t('upload_products') ?? 'Загрузить продукты',
+                          style: TextStyle(color: accent, fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                PopupMenuItem(
-                  value: 'upload_text',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.text_snippet_outlined, size: 20),
-                      const SizedBox(width: 10),
-                      Text(loc.t('upload_from_text') ?? 'Загрузить из текста'),
-                    ],
-                  ),
-                ),
-              ],
+                ];
+              },
             ),
             IconButton(
               icon: const Icon(Icons.attach_money),

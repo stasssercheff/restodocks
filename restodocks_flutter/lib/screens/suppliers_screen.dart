@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
+
 import '../models/models.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -92,6 +94,140 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     }
   }
 
+  Future<void> _openExternalSupplierSheet() async {
+    final loc = context.read<LocalizationService>();
+    final acc = context.read<AccountManagerSupabase>();
+    final estId = acc.establishment?.id;
+    if (estId == null) return;
+
+    final nameCtrl = TextEditingController();
+    final contactCtrl = TextEditingController();
+    final emailCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) {
+        final bottomInset = MediaQuery.of(ctx).viewInsets.bottom;
+        return Padding(
+          padding: EdgeInsets.only(
+              left: 16, right: 16, top: 8, bottom: 16 + bottomInset),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                loc.t('supplier_external_title') ?? 'Поставщик извне',
+                style: Theme.of(ctx).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                loc.t('supplier_external_subtitle') ??
+                    'Укажите данные и загрузите список продуктов — позиции попадут в номенклатуру и в карточку поставщика.',
+                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: loc.t('order_list_supplier_name') ?? 'Название',
+                  border: const OutlineInputBorder(),
+                ),
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: contactCtrl,
+                decoration: InputDecoration(
+                  labelText:
+                      loc.t('supplier_contact_person') ?? 'Контактное лицо',
+                  border: const OutlineInputBorder(),
+                ),
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: emailCtrl,
+                decoration: InputDecoration(
+                  labelText: loc.t('order_list_contact_email') ?? 'Email',
+                  border: const OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: phoneCtrl,
+                decoration: InputDecoration(
+                  labelText: loc.t('order_list_contact_phone') ?? 'Телефон',
+                  border: const OutlineInputBorder(),
+                ),
+                keyboardType: TextInputType.phone,
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () async {
+                  final name = nameCtrl.text.trim();
+                  if (name.isEmpty) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(
+                          content: Text(loc.t('order_list_supplier_name') ??
+                              'Укажите название')),
+                    );
+                    return;
+                  }
+                  final id = const Uuid().v4();
+                  final draft = OrderList(
+                    id: id,
+                    name: name,
+                    supplierName: name,
+                    contactPerson: contactCtrl.text.trim().isEmpty
+                        ? null
+                        : contactCtrl.text.trim(),
+                    email: emailCtrl.text.trim().isEmpty
+                        ? null
+                        : emailCtrl.text.trim(),
+                    phone: phoneCtrl.text.trim().isEmpty
+                        ? null
+                        : phoneCtrl.text.trim(),
+                    department: widget.department,
+                  );
+                  final lists = await loadOrderLists(estId,
+                      department: widget.department);
+                  await saveOrderLists(estId, [...lists, draft],
+                      department: widget.department);
+                  if (!ctx.mounted) return;
+                  Navigator.of(ctx).pop();
+                  if (!mounted) return;
+                  final encName = Uri.encodeComponent(name);
+                  await context.push(
+                    '/products/upload?supplierListId=$id&department=${widget.department}&supplierName=$encName',
+                  );
+                  if (mounted) _load();
+                },
+                icon: const Icon(Icons.upload_file),
+                label: Text(loc.t('upload_products') ?? 'Загрузить продукты'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(loc.t('cancel') ?? 'Отмена'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    nameCtrl.dispose();
+    contactCtrl.dispose();
+    emailCtrl.dispose();
+    phoneCtrl.dispose();
+  }
+
   Future<void> _saveSupplierEdits(OrderList updated) async {
     final acc = context.read<AccountManagerSupabase>();
     final estId = acc.establishment?.id;
@@ -111,6 +247,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
   Future<void> _editSupplier(OrderList s) async {
     final loc = context.read<LocalizationService>();
     final nameCtrl = TextEditingController(text: s.supplierName);
+    final contactCtrl = TextEditingController(text: s.contactPerson ?? '');
     final emailCtrl = TextEditingController(text: s.email ?? '');
     final phoneCtrl = TextEditingController(text: s.phone ?? '');
 
@@ -133,6 +270,15 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                 controller: nameCtrl,
                 decoration: InputDecoration(
                   labelText: loc.t('order_list_supplier_name') ?? 'Поставщик',
+                  border: const OutlineInputBorder(),
+                ),
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: contactCtrl,
+                decoration: InputDecoration(
+                  labelText: loc.t('supplier_contact_person') ?? 'Контактное лицо',
                   border: const OutlineInputBorder(),
                 ),
                 textCapitalization: TextCapitalization.words,
@@ -173,6 +319,9 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                         result = s.copyWith(
                           name: supplierName,
                           supplierName: supplierName,
+                          contactPerson: contactCtrl.text.trim().isEmpty
+                              ? null
+                              : contactCtrl.text.trim(),
                           email: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
                           phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
                         );
@@ -188,6 +337,9 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                 onPressed: () {
                   final supplierName = nameCtrl.text.trim();
                   final draft = (supplierName.isEmpty ? s : s.copyWith(name: supplierName, supplierName: supplierName)).copyWith(
+                    contactPerson: contactCtrl.text.trim().isEmpty
+                        ? null
+                        : contactCtrl.text.trim(),
                     email: emailCtrl.text.trim().isEmpty ? null : emailCtrl.text.trim(),
                     phone: phoneCtrl.text.trim().isEmpty ? null : phoneCtrl.text.trim(),
                   );
@@ -205,6 +357,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     );
 
     nameCtrl.dispose();
+    contactCtrl.dispose();
     emailCtrl.dispose();
     phoneCtrl.dispose();
 
@@ -261,6 +414,13 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           ),
         ],
       ),
+      floatingActionButton: !_loading && _error == null
+          ? FloatingActionButton.extended(
+              onPressed: _openExternalSupplierSheet,
+              icon: const Icon(Icons.add_business_outlined),
+              label: Text(loc.t('supplier_external_title') ?? 'Поставщик извне'),
+            )
+          : null,
       body: _suppliers.isEmpty && !_loading && _error == null
           ? _buildBody(loc, productStore)
           : Column(
@@ -356,6 +516,12 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                 label: Text(loc.t('product_order') ?? 'Заказ продуктов'),
                 onPressed: () => context.go('/product-order?department=${widget.department}'),
               ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _openExternalSupplierSheet,
+                icon: const Icon(Icons.add_business_outlined),
+                label: Text(loc.t('supplier_external_title') ?? 'Поставщик извне'),
+              ),
             ],
           ),
         ),
@@ -386,6 +552,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           final s = filtered[i];
           final hasEmail = (s.email ?? '').trim().isNotEmpty;
           final hasPhone = (s.phone ?? '').trim().isNotEmpty;
+          final hasContactPerson = (s.contactPerson ?? '').trim().isNotEmpty;
           return Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ExpansionTile(
@@ -414,6 +581,16 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                     style: const TextStyle(fontWeight: FontWeight.w500),
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (hasContactPerson)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        '${loc.t('supplier_contact_person') ?? 'Контакт'}: ${s.contactPerson}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ),
                   if (hasEmail || hasPhone)
                     Padding(
                       padding: const EdgeInsets.only(top: 2),

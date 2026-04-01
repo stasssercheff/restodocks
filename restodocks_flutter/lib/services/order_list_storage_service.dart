@@ -109,6 +109,31 @@ Future<void> saveOrderLists(String establishmentId, List<OrderList> lists, {Stri
   }
 }
 
+/// Добавить продукт в карточку поставщика (шаблон заказа), без дубликатов по [productId].
+Future<void> appendProductToSupplierOrderList({
+  required String establishmentId,
+  required String department,
+  required String supplierListId,
+  required String productId,
+  required String productName,
+  String unit = 'g',
+}) async {
+  if (productId.trim().isEmpty) return;
+  final lists = await loadOrderLists(establishmentId, department: department);
+  final idx = lists.indexWhere((l) => l.id == supplierListId);
+  if (idx < 0) return;
+  final list = lists[idx];
+  if (list.items.any((i) => i.productId == productId)) return;
+  final newItem = OrderListItem(
+    productId: productId,
+    productName: productName,
+    unit: unit,
+    quantity: 0,
+  );
+  lists[idx] = list.copyWith(items: [...list.items, newItem]);
+  await saveOrderLists(establishmentId, lists, department: department);
+}
+
 Future<void> _migrateToSupabase(String establishmentId, List<OrderList> lists) async {
   try {
     final data = lists.map((e) => e.toJson()).toList();

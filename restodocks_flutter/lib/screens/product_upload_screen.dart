@@ -49,6 +49,9 @@ class ProductUploadScreen extends StatefulWidget {
     super.key,
     this.defaultAddToNomenclature = true,
     this.initialMethod,
+    this.supplierOrderListId,
+    this.supplierDepartment,
+    this.linkedSupplierName,
   });
 
   /// По умолчанию true — добавлять в номенклатуру. false — только пополнение базы.
@@ -57,6 +60,11 @@ class ProductUploadScreen extends StatefulWidget {
   /// Опционально: авто-запуск метода при открытии (beta UX).
   /// 'text' | 'file'
   final String? initialMethod;
+
+  /// Импорт в карточку поставщика (шаблон из [order_list_storage_service]).
+  final String? supplierOrderListId;
+  final String? supplierDepartment;
+  final String? linkedSupplierName;
 
   @override
   State<ProductUploadScreen> createState() => _ProductUploadScreenState();
@@ -123,6 +131,31 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   void dispose() {
     _cancelLoadingTimeout(); // Отменяем таймер при уничтожении виджета
     super.dispose();
+  }
+
+  Future<void> _appendProductToSupplierList({
+    required String productId,
+    required String productName,
+    required String unit,
+  }) async {
+    final sid = widget.supplierOrderListId?.trim();
+    if (sid == null || sid.isEmpty) return;
+    final acc = context.read<AccountManagerSupabase>();
+    final estId = acc.establishment?.id;
+    if (estId == null) return;
+    final dept = widget.supplierDepartment ?? 'kitchen';
+    try {
+      await appendProductToSupplierOrderList(
+        establishmentId: estId,
+        department: dept,
+        supplierListId: sid,
+        productId: productId,
+        productName: productName,
+        unit: unit,
+      );
+    } catch (e) {
+      _addDebugLog('appendProductToSupplierList: $e');
+    }
   }
 
   Widget _buildErrorScreen(String message) {
@@ -240,10 +273,10 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     AiService aiService,
     String establishmentId,
   ) {
+    final primary = Theme.of(context).colorScheme.primary;
     return Scaffold(
       appBar: AppBar(
         title: Text(loc.t('upload_products')),
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
         actions: [
           if (kDebugMode) ...[
             IconButton(
@@ -277,6 +310,23 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if ((widget.linkedSupplierName ?? '').trim().isNotEmpty) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: primary.withValues(alpha: 0.35)),
+                ),
+                child: Text(
+                  'Поставщик: ${widget.linkedSupplierName!.trim()}. '
+                  'Загруженные позиции будут добавлены в номенклатуру и в карточку этого поставщика.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+            ],
             // Индикатор загрузки
             if (_isLoading) ...[
               Container(
@@ -360,7 +410,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               description:
                   'Вставьте список продуктов из Excel, мессенджера или заметок. '
                   'Формат распознаётся автоматически, дубликаты и сверка цен.',
-              color: Colors.green,
+              color: primary,
               onTap: _isLoading ? null : () => _showTextUploadDialog(),
             ),
             const SizedBox(height: 12),
@@ -371,7 +421,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               title: '2. Загрузить из файла',
               description:
                   'Excel (.xls, .xlsx). Модерация, поиск дубликатов, сверка цен.',
-              color: Colors.blue,
+              color: primary,
               onTap: _isLoading ? null : () => _uploadFromFileUnified(),
             ),
 
@@ -1238,7 +1288,14 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
       if (!mounted) return;
       _cancelLoadingTimeout();
-      context.push('/import-review', extra: moderationItems);
+      context.push(
+        '/import-review',
+        extra: ImportReviewPayload(
+          items: moderationItems,
+          supplierOrderListId: widget.supplierOrderListId,
+          supplierDepartment: widget.supplierDepartment,
+        ),
+      );
     } catch (e) {
       if (mounted) {
         _cancelLoadingTimeout();
@@ -1687,6 +1744,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           items: moderationItems,
           generateTranslationsForNewProducts: true,
           importSourceLanguage: sheetLang,
+          supplierOrderListId: widget.supplierOrderListId,
+          supplierDepartment: widget.supplierDepartment,
         ),
       );
     } catch (e) {
@@ -2349,6 +2408,12 @@ ${text}
                   if (addToNomenclature) {
                     await store.addToNomenclature(estId, existingProduct.id,
                         price: newPrice, currency: defCur);
+                    await _appendProductToSupplierList(
+                      productId: existingProduct.id,
+                      productName: existingProduct
+                          .getLocalizedName(loc.currentLanguageCode),
+                      unit: existingProduct.unit ?? 'g',
+                    );
                   }
 
                   skipped++;
@@ -2384,6 +2449,12 @@ ${text}
                   try {
                     await store.addToNomenclature(estId, existingProduct.id,
                         price: oldPrice, currency: defCur);
+                    await _appendProductToSupplierList(
+                      productId: existingProduct.id,
+                      productName: existingProduct
+                          .getLocalizedName(loc.currentLanguageCode),
+                      unit: existingProduct.unit ?? 'g',
+                    );
                   } catch (e) {
                     _addDebugLog('Failed to add to nomenclature: $e');
                   }
@@ -2527,6 +2598,12 @@ ${text}
                 price: verification?.suggestedPrice ?? item.price,
                 currency: defCur,
               );
+              await _appendProductToSupplierList(
+                productId: savedProduct.id,
+                productName:
+                    savedProduct.getLocalizedName(loc.currentLanguageCode),
+                unit: verification?.suggestedUnit ?? savedProduct.unit ?? 'g',
+              );
               added++;
               devLog(
                   'DEBUG: Successfully added "${product.name}" to nomenclature');
@@ -2553,6 +2630,12 @@ ${text}
                   e.toString().contains('unique constraint')) {
                 devLog(
                     'DEBUG: Product "${product.name}" already in nomenclature, skipping');
+                await _appendProductToSupplierList(
+                  productId: savedProduct.id,
+                  productName:
+                      savedProduct.getLocalizedName(loc.currentLanguageCode),
+                  unit: verification?.suggestedUnit ?? savedProduct.unit ?? 'g',
+                );
                 skipped++;
                 // Обновляем статус продукта в результатах
                 final existingResult = processingResults.firstWhere(
@@ -3666,6 +3749,7 @@ class _UploadMethodCard extends StatelessWidget {
                       title,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
+                            color: color,
                           ),
                     ),
                     const SizedBox(height: 4),

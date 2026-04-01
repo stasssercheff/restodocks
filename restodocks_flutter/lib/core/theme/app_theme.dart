@@ -317,7 +317,7 @@ class AppTheme {
     ),
   );
 
-  // Классическая тема без glass-эффектов (для web/desktop/android).
+  // Классическая тема без glass-эффектов (web, Windows/Linux desktop, Android).
   static ThemeData classicLightTheme = ThemeData(
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(

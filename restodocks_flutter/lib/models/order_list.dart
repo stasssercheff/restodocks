@@ -5,6 +5,8 @@ class OrderList {
   final String name;
   /// Наименование поставщика.
   final String supplierName;
+  /// Контактное лицо (ФИО или должность).
+  final String? contactPerson;
   final String? email;
   final String? phone;
   final String? telegram;
@@ -25,6 +27,7 @@ class OrderList {
     required this.id,
     required this.name,
     required this.supplierName,
+    this.contactPerson,
     this.email,
     this.phone,
     this.telegram,
@@ -43,6 +46,7 @@ class OrderList {
         'id': id,
         'name': name,
         'supplierName': supplierName,
+        'contactPerson': contactPerson,
         'email': email,
         'phone': phone,
         'telegram': telegram,
@@ -61,6 +65,7 @@ class OrderList {
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       supplierName: json['supplierName'] as String? ?? '',
+      contactPerson: json['contactPerson'] as String?,
       email: json['email'] as String?,
       phone: json['phone'] as String?,
       telegram: json['telegram'] as String?,
@@ -81,6 +86,7 @@ class OrderList {
     String? id,
     String? name,
     String? supplierName,
+    String? contactPerson,
     String? email,
     String? phone,
     String? telegram,
@@ -96,6 +102,7 @@ class OrderList {
         id: id ?? this.id,
         name: name ?? this.name,
         supplierName: supplierName ?? this.supplierName,
+        contactPerson: contactPerson ?? this.contactPerson,
         email: email ?? this.email,
         phone: phone ?? this.phone,
         telegram: telegram ?? this.telegram,

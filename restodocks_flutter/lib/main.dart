@@ -274,8 +274,10 @@ class RestodocksApp extends StatelessWidget {
         child: Consumer2<LocalizationService, ThemeService>(
         builder: (context, localization, themeService, child) {
           final uiScale = context.watch<MobileUiScaleService>();
-          final useIosGlassTheme =
-              !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+          // iOS + macOS: одна «стеклянная» тема; web/Android/desktop (кроме macOS) — classic.
+          final useIosGlassTheme = !kIsWeb &&
+              (defaultTargetPlatform == TargetPlatform.iOS ||
+                  defaultTargetPlatform == TargetPlatform.macOS);
           return MaterialApp.router(
             title: localization.t('app_name'),
             theme: useIosGlassTheme
@@ -298,9 +300,13 @@ class RestodocksApp extends StatelessWidget {
               final raw = child ?? const SizedBox.shrink();
               final c = kIsWeb ? raw : MobileDeepLinkListener(child: raw);
               final media = MediaQuery.of(context);
-              final isPhone = media.size.shortestSide < 600;
+              // Узкое окно на macOS/Windows не должно включать «телефонный» масштаб текста.
+              final applyMobileUiScale = !kIsWeb &&
+                  (defaultTargetPlatform == TargetPlatform.iOS ||
+                      defaultTargetPlatform == TargetPlatform.android) &&
+                  media.size.shortestSide < 600;
               Widget content = c;
-              if (isPhone) {
+              if (applyMobileUiScale) {
                 final factor = uiScale.scaleFactor;
                 content = MediaQuery(
                   data: media.copyWith(

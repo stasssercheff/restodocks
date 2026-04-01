@@ -495,6 +495,13 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                     '${loc.t('order_list_supplier_name')}: ${list.supplierName}',
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
+                  if ((list.contactPerson ?? '').trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${loc.t('supplier_contact_person') ?? 'Контактное лицо'}: ${list.contactPerson}',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   Row(
                     children: [

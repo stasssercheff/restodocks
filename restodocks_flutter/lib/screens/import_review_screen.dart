@@ -17,12 +17,16 @@ class ImportReviewScreen extends StatefulWidget {
     required this.items,
     this.generateTranslationsForNewProducts = false,
     this.importSourceLanguage,
+    this.supplierOrderListId,
+    this.supplierDepartment,
   });
 
   final List<ModerationItem> items;
   /// Как при интеллектуальном импорте Excel: переводы для новых продуктов.
   final bool generateTranslationsForNewProducts;
   final String? importSourceLanguage;
+  final String? supplierOrderListId;
+  final String? supplierDepartment;
 
   @override
   State<ImportReviewScreen> createState() => _ImportReviewScreenState();
@@ -82,6 +86,35 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     });
   }
 
+  Future<void> _appendToSupplierIfNeeded({
+    required ProductStoreSupabase store,
+    required LocalizationService loc,
+    required String productId,
+    required String fallbackName,
+    String? unit,
+  }) async {
+    final sid = widget.supplierOrderListId?.trim();
+    if (sid == null || sid.isEmpty) return;
+    final dept = (widget.supplierDepartment ?? 'kitchen').trim();
+    final estId = context.read<AccountManagerSupabase>().establishment?.id;
+    if (estId == null) return;
+    final p = store.findProductById(productId);
+    final name = p?.getLocalizedName(loc.currentLanguageCode) ?? fallbackName;
+    final u = unit ?? p?.unit ?? 'g';
+    try {
+      await appendProductToSupplierOrderList(
+        establishmentId: estId,
+        department: dept,
+        supplierListId: sid,
+        productId: productId,
+        productName: name,
+        unit: u,
+      );
+    } catch (e, st) {
+      devLog('ImportReview: append to supplier failed: $e\n$st');
+    }
+  }
+
   /// Сохранить только продукты, которых ещё нет в номенклатуре (новые).
   void _saveOnlyNew() => _save(onlyNew: true);
 
@@ -137,6 +170,13 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
               );
             }
           }
+          await _appendToSupplierIfNeeded(
+            store: store,
+            loc: loc,
+            productId: item.existingProductId!,
+            fallbackName: item.existingProductName ?? item.name,
+            unit: item.unit,
+          );
           if (newPrice != null) updated++;
         } else {
           final cur = item.currency ?? defCur;
@@ -197,6 +237,13 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
           }
           devLog('💾 ImportReview: ✅ saved "${item.displayName}"');
           created++;
+          await _appendToSupplierIfNeeded(
+            store: store,
+            loc: loc,
+            productId: savedProduct.id,
+            fallbackName: item.displayName,
+            unit: item.unit ?? savedProduct.unit,
+          );
         }
 
         if (mounted) setState(() => _saveProgress++);
@@ -222,7 +269,13 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
             ),
           ),
         );
-        context.go('/nomenclature?refresh=1');
+        if (widget.supplierOrderListId != null &&
+            widget.supplierOrderListId!.trim().isNotEmpty) {
+          final d = widget.supplierDepartment ?? 'kitchen';
+          context.go('/suppliers/$d');
+        } else {
+          context.go('/nomenclature?refresh=1');
+        }
       }
     } catch (e, st) {
       devLog('❌ ImportReview: save error: $e\n$st');

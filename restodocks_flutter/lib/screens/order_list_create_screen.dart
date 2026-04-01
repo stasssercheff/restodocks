@@ -20,12 +20,14 @@ class OrderListCreateScreen extends StatefulWidget {
 
 class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
   final _supplierCtrl = TextEditingController();
+  final _contactPersonCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
 
   @override
   void dispose() {
     _supplierCtrl.dispose();
+    _contactPersonCtrl.dispose();
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
     super.dispose();
@@ -43,6 +45,9 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
       id: const Uuid().v4(),
       name: supplier,
       supplierName: supplier,
+      contactPerson: _contactPersonCtrl.text.trim().isEmpty
+          ? null
+          : _contactPersonCtrl.text.trim(),
       email: _emailCtrl.text.trim().isEmpty ? null : _emailCtrl.text.trim(),
       phone: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
       department: widget.department,
@@ -72,6 +77,16 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
               ),
               textCapitalization: TextCapitalization.words,
               autofocus: true,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _contactPersonCtrl,
+              decoration: InputDecoration(
+                labelText: loc.t('supplier_contact_person') ?? 'Контактное лицо',
+                border: const OutlineInputBorder(),
+                filled: true,
+              ),
+              textCapitalization: TextCapitalization.words,
             ),
             const SizedBox(height: 20),
             Text(

@@ -183,9 +183,24 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Text(
-              '${_list.name} · ${_list.supplierName}',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${_list.name} · ${_list.supplierName}',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                ),
+                if ((_list.contactPerson ?? '').trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '${loc.t('supplier_contact_person') ?? 'Контактное лицо'}: ${_list.contactPerson}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ),
+              ],
             ),
           ),
           Expanded(
