@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,29 @@ import '../widgets/app_bar_home_button.dart';
 import '../widgets/scroll_to_top_app_bar_title.dart';
 import '../utils/supplier_contact_validation.dart';
 import '../widgets/supplier_contact_links.dart';
+
+/// Высота области диалога «поставщик»: между safe area и клавиатурой (iOS / web mobile).
+double _supplierSheetMaxHeight(BuildContext context) {
+  final mq = MediaQuery.of(context);
+  return math.max(
+    200.0,
+    mq.size.height -
+        mq.padding.top -
+        mq.padding.bottom -
+        mq.viewInsets.bottom -
+        20,
+  );
+}
+
+EdgeInsets _supplierDialogOuterInsets(BuildContext context) {
+  final mq = MediaQuery.of(context);
+  return EdgeInsets.only(
+    left: 16,
+    right: 16,
+    top: mq.padding.top + 8,
+    bottom: 12 + mq.viewInsets.bottom,
+  );
+}
 
 /// Экран «Поставщики» — только карточки поставщиков со списком продуктов, без заказов.
 /// Для каждого подразделения (кухня, бар, зал) свои поставщики.
@@ -182,58 +207,76 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       context: context,
       barrierDismissible: true,
       builder: (dialogContext) {
-        final cs = Theme.of(dialogContext).colorScheme;
+        final theme = Theme.of(dialogContext);
+        final cs = theme.colorScheme;
         final onPrimaryStyle = FilledButton.styleFrom(
           foregroundColor: cs.onPrimary,
           backgroundColor: cs.primary,
         );
-        return AlertDialog(
-          title: Text(loc.t('supplier_choose_add_products')),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                FilledButton.icon(
-                  style: onPrimaryStyle,
-                  onPressed: () async {
-                    Navigator.of(dialogContext).pop();
-                    await _persistNewSupplierAndNavigate(
-                      establishmentId: establishmentId,
-                      draft: draft,
-                      uploadFlow: false,
-                      loc: loc,
-                      acc: acc,
-                    );
-                  },
-                  icon: const Icon(Icons.playlist_add_check_outlined),
-                  label: Text(loc.t('supplier_products_from_nomenclature')),
-                ),
-                const SizedBox(height: 10),
-                FilledButton.icon(
-                  style: onPrimaryStyle,
-                  onPressed: () async {
-                    Navigator.of(dialogContext).pop();
-                    await _persistNewSupplierAndNavigate(
-                      establishmentId: establishmentId,
-                      draft: draft,
-                      uploadFlow: true,
-                      loc: loc,
-                      acc: acc,
-                    );
-                  },
-                  icon: const Icon(Icons.upload_file),
-                  label: Text(loc.t('upload_products')),
-                ),
-              ],
+        return Dialog(
+          alignment: Alignment.topCenter,
+          insetPadding: _supplierDialogOuterInsets(dialogContext),
+          backgroundColor: cs.surfaceContainerHigh,
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 440,
+              maxHeight: _supplierSheetMaxHeight(dialogContext),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    loc.t('supplier_choose_add_products'),
+                    style: theme.textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 14),
+                  FilledButton.icon(
+                    style: onPrimaryStyle,
+                    onPressed: () async {
+                      Navigator.of(dialogContext).pop();
+                      await _persistNewSupplierAndNavigate(
+                        establishmentId: establishmentId,
+                        draft: draft,
+                        uploadFlow: false,
+                        loc: loc,
+                        acc: acc,
+                      );
+                    },
+                    icon: const Icon(Icons.playlist_add_check_outlined),
+                    label: Text(loc.t('supplier_products_from_nomenclature')),
+                  ),
+                  const SizedBox(height: 10),
+                  FilledButton.icon(
+                    style: onPrimaryStyle,
+                    onPressed: () async {
+                      Navigator.of(dialogContext).pop();
+                      await _persistNewSupplierAndNavigate(
+                        establishmentId: establishmentId,
+                        draft: draft,
+                        uploadFlow: true,
+                        loc: loc,
+                        acc: acc,
+                      );
+                    },
+                    icon: const Icon(Icons.upload_file),
+                    label: Text(loc.t('upload_products')),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    child: Text(loc.t('cancel')),
+                  ),
+                ],
+              ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(loc.t('cancel')),
-            ),
-          ],
         );
       },
     );
@@ -920,141 +963,152 @@ class _SupplierStep1DialogState extends State<_SupplierStep1Dialog> {
   Widget build(BuildContext context) {
     final loc = widget.loc;
     final theme = Theme.of(context);
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final cs = theme.colorScheme;
+    final maxH = _supplierSheetMaxHeight(context);
 
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      alignment: Alignment.topCenter,
+      insetPadding: _supplierDialogOuterInsets(context),
+      backgroundColor: cs.surfaceContainerHigh,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 440),
-        child: Padding(
-          padding: EdgeInsets.only(bottom: bottomInset),
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    loc.t('supplier_create_title'),
-                    style: theme.textTheme.titleLarge,
+        constraints: BoxConstraints(
+          maxWidth: 440,
+          maxHeight: maxH,
+        ),
+        child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          physics: const ClampingScrollPhysics(),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  loc.t('supplier_create_title'),
+                  style: theme.textTheme.titleLarge,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  loc.t('supplier_create_step1_hint'),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    loc.t('supplier_create_step1_hint'),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _nameCtrl,
+                  decoration: InputDecoration(
+                    labelText: loc.t('order_list_supplier_name'),
+                    border: const OutlineInputBorder(),
+                    errorText: _nameError,
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _nameCtrl,
-                    decoration: InputDecoration(
-                      labelText: loc.t('order_list_supplier_name'),
-                      border: const OutlineInputBorder(),
-                      errorText: _nameError,
-                    ),
-                    textCapitalization: TextCapitalization.words,
-                    onChanged: (_) {
-                      if (_nameError != null) {
-                        setState(() => _nameError = null);
+                  textCapitalization: TextCapitalization.words,
+                  onChanged: (_) {
+                    if (_nameError != null) {
+                      setState(() => _nameError = null);
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _contactCtrl,
+                  decoration: InputDecoration(
+                    labelText: loc.t('supplier_contact_person'),
+                    border: const OutlineInputBorder(),
+                  ),
+                  textCapitalization: TextCapitalization.words,
+                ),
+                const SizedBox(height: 6),
+                CheckboxListTile(
+                  value: _includeEmail,
+                  onChanged: (v) {
+                    setState(() {
+                      _includeEmail = v ?? false;
+                      _emailError = null;
+                      if (!_includeEmail) {
+                        _emailCtrl.clear();
                       }
-                    },
+                    });
+                  },
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(loc.t('supplier_include_email')),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+                TextField(
+                  controller: _emailCtrl,
+                  enabled: _includeEmail,
+                  decoration: InputDecoration(
+                    labelText: loc.t('order_list_contact_email'),
+                    border: const OutlineInputBorder(),
+                    errorText: _emailError,
                   ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _contactCtrl,
-                    decoration: InputDecoration(
-                      labelText: loc.t('supplier_contact_person'),
-                      border: const OutlineInputBorder(),
-                    ),
-                    textCapitalization: TextCapitalization.words,
-                  ),
-                  const SizedBox(height: 8),
-                  CheckboxListTile(
-                    value: _includeEmail,
-                    onChanged: (v) {
-                      setState(() {
-                        _includeEmail = v ?? false;
-                        _emailError = null;
-                        if (!_includeEmail) {
-                          _emailCtrl.clear();
-                        }
-                      });
-                    },
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(loc.t('supplier_include_email')),
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
-                  TextField(
-                    controller: _emailCtrl,
-                    enabled: _includeEmail,
-                    decoration: InputDecoration(
-                      labelText: loc.t('order_list_contact_email'),
-                      border: const OutlineInputBorder(),
-                      errorText: _emailError,
-                    ),
-                    keyboardType: TextInputType.emailAddress,
-                    onChanged: (_) {
-                      if (_emailError != null) {
-                        setState(() => _emailError = null);
+                  keyboardType: TextInputType.emailAddress,
+                  onChanged: (_) {
+                    if (_emailError != null) {
+                      setState(() => _emailError = null);
+                    }
+                  },
+                ),
+                const SizedBox(height: 6),
+                CheckboxListTile(
+                  value: _includePhone,
+                  onChanged: (v) {
+                    setState(() {
+                      _includePhone = v ?? false;
+                      _phoneError = null;
+                      if (!_includePhone) {
+                        _phoneCtrl.clear();
                       }
-                    },
+                    });
+                  },
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(loc.t('supplier_include_phone')),
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+                TextField(
+                  controller: _phoneCtrl,
+                  enabled: _includePhone,
+                  decoration: InputDecoration(
+                    labelText: loc.t('order_list_contact_phone'),
+                    border: const OutlineInputBorder(),
+                    counterText: '',
+                    errorText: _phoneError,
                   ),
-                  const SizedBox(height: 8),
-                  CheckboxListTile(
-                    value: _includePhone,
-                    onChanged: (v) {
-                      setState(() {
-                        _includePhone = v ?? false;
-                        _phoneError = null;
-                        if (!_includePhone) {
-                          _phoneCtrl.clear();
-                        }
-                      });
-                    },
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(loc.t('supplier_include_phone')),
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
-                  TextField(
-                    controller: _phoneCtrl,
-                    enabled: _includePhone,
-                    decoration: InputDecoration(
-                      labelText: loc.t('order_list_contact_phone'),
-                      border: const OutlineInputBorder(),
-                      counterText: '',
-                      errorText: _phoneError,
-                    ),
-                    keyboardType: TextInputType.phone,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
-                    maxLength: 15,
-                    onChanged: (_) {
-                      if (_phoneError != null) {
-                        setState(() => _phoneError = null);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: _submit,
-                    child: Text(loc.t('order_list_next')),
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(loc.t('cancel')),
-                  ),
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                  ],
+                  maxLength: 15,
+                  onChanged: (_) {
+                    if (_phoneError != null) {
+                      setState(() => _phoneError = null);
+                    }
+                  },
+                ),
+                const SizedBox(height: 14),
+                FilledButton(
+                  onPressed: _submit,
+                  child: Text(loc.t('order_list_next')),
+                ),
+                const SizedBox(height: 6),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(loc.t('cancel')),
+                ),
                 ],
               ),
             ),
           ),
         ),
-      ),
     );
   }
 }

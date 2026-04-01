@@ -1476,13 +1476,24 @@ class AccountManagerSupabase extends ChangeNotifier {
       return;
     }
 
+    // Последний шаг: RPC SECURITY DEFINER — только для своей строки сотрудника (сессия).
+    if (_currentEmployee?.id == employeeId) {
+      try {
+        await _supabase.client.rpc(
+          'patch_my_employee_profile',
+          params: {'p_patch': employeeData},
+        );
+        return;
+      } catch (e, st) {
+        devLog('patch_my_employee_profile: $e $st');
+      }
+    }
+
     throw Exception(
       'Не удалось сохранить профиль (employees). '
-      'Попросите администратора применить миграции Supabase: '
-      '20260401140000_employees_backfill_auth_user_id, '
-      '20260401160000_ensure_employee_auth_link_rpc, '
-      '20260430260000_employees_select_align_with_update_rls '
-      '(частая причина — политика SELECT на employees не совпадала с UPDATE).',
+      'Попросите администратора применить миграцию '
+      '20260430261000_patch_my_employee_profile_rpc '
+      '(RPC patch_my_employee_profile) и предыдущие миграции по employees.',
     );
   }
 
