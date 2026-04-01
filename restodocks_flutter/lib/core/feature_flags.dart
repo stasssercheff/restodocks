@@ -1,5 +1,4 @@
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kIsWeb, TargetPlatform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 /// Feature flags.
 /// Prod (IS_BETA=false): кнопка импорта ТТК всегда. Beta: по --dart-define=ENABLE_TTK_IMPORT=true.
@@ -33,11 +32,9 @@ class FeatureFlags {
   /// В прод-сборках (`IS_BETA=false`) POS выключен; в бете (`IS_BETA=true`) — включён на любом хосте.
   static bool get posModuleEnabled => isBeta;
 
-  /// Экран «Журнал ошибок»: только в beta, не на основном прод-домене **restodocks.com**
-  /// (даже если в сборке ошибочно передан `IS_BETA=true`), и не в нативном iOS (IPA).
-  /// В веб-бете (например Pages) остаётся для отладки.
+  /// Экран «Журнал ошибок»: только в beta и не на основном прод-домене **restodocks.com**
+  /// (даже если в сборке ошибочно передан `IS_BETA=true`).
+  /// iOS / Android / web — одни и те же правила, чтобы не было «на сайте есть, в приложении нет».
   static bool get showSystemErrorsJournal =>
-      isBeta &&
-      !_isProdMarketingHost &&
-      (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS);
+      isBeta && !_isProdMarketingHost;
 }

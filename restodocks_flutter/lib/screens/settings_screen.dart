@@ -2174,7 +2174,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/settings/fiscal-tax'),
               ),
-            // Журнал ошибок — не в prod, не в iOS IPA; только beta web (см. FeatureFlags.showSystemErrorsJournal).
+            // Журнал ошибок — см. FeatureFlags.showSystemErrorsJournal (beta, не restodocks.com; все платформы).
             if (FeatureFlags.showSystemErrorsJournal &&
                 (posCanRunWarehouseHealthCheck(currentEmployee) ||
                     _isPlatformAdminEmail(currentEmployee.email)))
