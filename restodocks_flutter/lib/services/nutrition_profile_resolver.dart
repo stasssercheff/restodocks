@@ -126,31 +126,41 @@ class NutritionProfileResolver {
 
     try {
       // 1) Existing link -> profile -> apply.
-      final dynamic linkRow;
-      try {
-        linkRow = await _client
-            .from('product_nutrition_links')
-            .select(
-                'nutrition_profile_id, match_type, match_confidence, match_source')
-            .eq('product_id', product.id)
-            .limit(1);
-      } catch (e) {
-        if (_isMissingNutritionRelationError(e)) {
-          _nutritionRelationsUnavailable = true;
-          devLog(
-            'NutritionProfileResolver: product_nutrition_links unavailable, '
-            'skipping nutrition backfill until reload (apply DB migration if needed)',
-          );
-          return false;
+      dynamic linkRow;
+      for (var attempt = 0; attempt < 2; attempt++) {
+        try {
+          linkRow = await _client
+              .from('product_nutrition_links')
+              .select(
+                  'nutrition_profile_id, match_type, match_confidence, match_source')
+              .eq('product_id', product.id)
+              .limit(1);
+          break;
+        } catch (e) {
+          if (_isMissingNutritionRelationError(e)) {
+            _nutritionRelationsUnavailable = true;
+            devLog(
+              'NutritionProfileResolver: product_nutrition_links unavailable, '
+              'skipping nutrition backfill until reload (apply DB migration if needed)',
+            );
+            return false;
+          }
+          if (_isNutritionLinksAccessDenied(e)) {
+            if (attempt == 0) {
+              try {
+                await _client.auth.refreshSession();
+                await Future<void>.delayed(const Duration(milliseconds: 450));
+              } catch (_) {}
+              continue;
+            }
+            devLog(
+              'NutritionProfileResolver: product_nutrition_links access denied '
+              '(anon or session not ready): $e',
+            );
+            return false;
+          }
+          rethrow;
         }
-        if (_isNutritionLinksAccessDenied(e)) {
-          devLog(
-            'NutritionProfileResolver: product_nutrition_links access denied '
-            '(anon or session not ready): $e',
-          );
-          return false;
-        }
-        rethrow;
       }
       if (linkRow is List && linkRow.isNotEmpty) {
         final m = Map<String, dynamic>.from(linkRow.first as Map);

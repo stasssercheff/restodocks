@@ -175,7 +175,7 @@ class ProductStoreSupabase {
   }
 
   Future<void> _scheduleNutritionBackfillAfterCatalogLoad() async {
-    await Future<void>.delayed(const Duration(milliseconds: 600));
+    await Future<void>.delayed(const Duration(milliseconds: 900));
     try {
       final client = Supabase.instance.client;
       if (client.auth.currentSession == null) return;
