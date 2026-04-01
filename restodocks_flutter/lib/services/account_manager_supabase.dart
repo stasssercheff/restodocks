@@ -1478,8 +1478,11 @@ class AccountManagerSupabase extends ChangeNotifier {
 
     throw Exception(
       'Не удалось сохранить профиль (employees). '
-      'Обновите приложение и попросите администратора применить миграции Supabase '
-      '(20260401140000_employees_backfill_auth_user_id, 20260401160000_ensure_employee_auth_link_rpc).',
+      'Попросите администратора применить миграции Supabase: '
+      '20260401140000_employees_backfill_auth_user_id, '
+      '20260401160000_ensure_employee_auth_link_rpc, '
+      '20260430260000_employees_select_align_with_update_rls '
+      '(частая причина — политика SELECT на employees не совпадала с UPDATE).',
     );
   }
 
