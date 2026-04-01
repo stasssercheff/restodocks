@@ -568,10 +568,175 @@ class OrderListExportService {
     return Uint8List.fromList(out ?? []);
   }
 
+  /// Слияние строк заказов за период по выбранным позициям номенклатуры (сумма количеств и сумм по productId).
+  /// [selectedProductIds] — обязательно непустой набор id продуктов из номенклатуры.
+  static Future<Uint8List> buildProductOrdersMergedByProductsExcelBytes({
+    required List<Map<String, dynamic>> orders,
+    required DateTime dateStart,
+    required DateTime dateEnd,
+    required Set<String> selectedSupplierNames,
+    required Set<String> selectedProductIds,
+    required String Function(String) t,
+    required String currency,
+  }) async {
+    if (selectedProductIds.isEmpty) {
+      throw ArgumentError('selectedProductIds must not be empty');
+    }
+    final dayStart = DateTime(dateStart.year, dateStart.month, dateStart.day);
+    final dayEnd = DateTime(dateEnd.year, dateEnd.month, dateEnd.day, 23, 59, 59);
+    final filtered = orders.where((d) {
+      final createdAt = DateTime.tryParse(d['created_at']?.toString() ?? '');
+      if (createdAt == null) return false;
+      if (createdAt.isBefore(dayStart) || createdAt.isAfter(dayEnd)) return false;
+      if (selectedSupplierNames.isNotEmpty) {
+        final payload = d['payload'] as Map<String, dynamic>? ?? {};
+        final header = payload['header'] as Map<String, dynamic>? ?? {};
+        final supplier = (header['supplierName'] as String? ?? '').trim();
+        if (!selectedSupplierNames.contains(supplier)) return false;
+      }
+      return true;
+    }).toList();
+
+    final agg = <String, _MergedOrderLine>{};
+    var hasMoney = false;
+
+    for (final doc in filtered) {
+      final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+      final items = payload['items'] as List<dynamic>? ??
+          payload['rows'] as List<dynamic>? ??
+          const [];
+      for (final raw in items) {
+        if (raw is! Map) continue;
+        final item = Map<String, dynamic>.from(raw);
+        final pid = (item['productId'] as String?)?.trim() ?? '';
+        if (pid.isEmpty || !selectedProductIds.contains(pid)) continue;
+        final qty = (item['quantity'] as num?)?.toDouble() ?? 0;
+        final name = (item['productName'] as String?)?.trim() ?? pid;
+        final unit = (item['unit'] as String?)?.toString() ?? '';
+        final lineTotal = (item['lineTotal'] as num?)?.toDouble();
+        if (lineTotal != null) hasMoney = true;
+
+        final cur = agg[pid];
+        if (cur == null) {
+          agg[pid] = _MergedOrderLine(
+            productId: pid,
+            productName: name,
+            unit: unit,
+            quantity: qty,
+            lineTotal: lineTotal,
+          );
+        } else {
+          cur.quantity += qty;
+          if (lineTotal != null) {
+            cur.lineTotal = (cur.lineTotal ?? 0) + lineTotal;
+            hasMoney = true;
+          }
+        }
+      }
+    }
+
+    final excel = Excel.createExcel();
+    final sheet = excel[excel.getDefaultSheet()!];
+    final dateFormat = DateFormat('dd.MM.yyyy');
+
+    sheet.appendRow([TextCellValue(t('expenses_tab_product_orders'))]);
+    sheet.appendRow([
+      TextCellValue(
+          '${t('expenses_orders_date_range')}: ${dateFormat.format(dateStart)} — ${dateFormat.format(dateEnd)}'),
+    ]);
+    sheet.appendRow([
+      TextCellValue(
+          '${t('inventory_selective_mode_title')} (${selectedProductIds.length})',
+      ),
+    ]);
+    if (selectedSupplierNames.isNotEmpty) {
+      sheet.appendRow([
+        TextCellValue(
+            '${t('order_tab_suppliers')}: ${selectedSupplierNames.join(', ')}'),
+      ]);
+    }
+    sheet.appendRow([]);
+
+    final sorted = agg.values.toList()
+      ..sort((a, b) => a.productName.toLowerCase().compareTo(b.productName.toLowerCase()));
+
+    if (sorted.isEmpty) {
+      sheet.appendRow([TextCellValue(t('inventory_merge_empty'))]);
+    } else if (hasMoney) {
+      sheet.appendRow([
+        TextCellValue(t('order_export_no')),
+        TextCellValue(t('inventory_item_name')),
+        TextCellValue(t('order_list_unit')),
+        TextCellValue(t('order_list_quantity')),
+        TextCellValue(
+            (t('order_list_line_total_currency') ?? 'Сумма %s').replaceFirst('%s', currency)),
+      ]);
+      var i = 0;
+      double grand = 0;
+      for (final row in sorted) {
+        i++;
+        final lt = row.lineTotal;
+        if (lt != null) grand += lt;
+        sheet.appendRow([
+          IntCellValue(i),
+          TextCellValue(row.productName),
+          TextCellValue(row.unit),
+          TextCellValue(NumberFormatUtils.formatDecimal(row.quantity)),
+          TextCellValue(
+              lt != null ? NumberFormatUtils.formatSum(lt, currency) : '—'),
+        ]);
+      }
+      sheet.appendRow([]);
+      sheet.appendRow([
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(''),
+        TextCellValue(t('order_list_grand_total')),
+        TextCellValue(NumberFormatUtils.formatSum(grand, currency)),
+      ]);
+    } else {
+      sheet.appendRow([
+        TextCellValue(t('order_export_no')),
+        TextCellValue(t('inventory_item_name')),
+        TextCellValue(t('order_list_unit')),
+        TextCellValue(t('order_list_quantity')),
+      ]);
+      var i = 0;
+      for (final row in sorted) {
+        i++;
+        sheet.appendRow([
+          IntCellValue(i),
+          TextCellValue(row.productName),
+          TextCellValue(row.unit),
+          TextCellValue(NumberFormatUtils.formatDecimal(row.quantity)),
+        ]);
+      }
+    }
+
+    final out = excel.encode();
+    return Uint8List.fromList(out ?? []);
+  }
+
   /// URL для Email: mailto:EMAIL?subject=...&body=...
   static String? mailToUrl(String? email, String subject, String body) {
     final e = email?.trim();
     if (e == null || e.isEmpty) return null;
     return 'mailto:$e?subject=${Uri.encodeComponent(subject)}&body=${Uri.encodeComponent(body)}';
   }
+}
+
+class _MergedOrderLine {
+  _MergedOrderLine({
+    required this.productId,
+    required this.productName,
+    required this.unit,
+    required this.quantity,
+    this.lineTotal,
+  });
+
+  final String productId;
+  final String productName;
+  final String unit;
+  double quantity;
+  double? lineTotal;
 }

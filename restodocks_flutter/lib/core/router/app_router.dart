@@ -192,7 +192,7 @@ class AppRouter {
       if (kIsWeb && loc.isNotEmpty && loc != '/' && loc != '/splash') {
         initial_loc.savePathForRefresh(loc);
       }
-      // Production: POS скрыт (IS_BETA=false и/или хост restodocks.com — см. FeatureFlags.posModuleEnabled)
+      // Production: POS скрыт при IS_BETA=false (см. FeatureFlags.posModuleEnabled)
       if (account.isLoggedInSync && !FeatureFlags.posModuleEnabled) {
         final p = loc.split('?').first;
         if (p.startsWith('/pos') ||

@@ -9,7 +9,7 @@ class FeatureFlags {
   /// Маркер беты. По умолчанию считаем, что это **prod**, если флаг не задан явно.
   static bool get isBeta => const bool.fromEnvironment('IS_BETA', defaultValue: false);
 
-  /// Основной прод-домен (не Preview на Pages). На нём POS выключен даже если в сборке ошибочно передан IS_BETA=true.
+  /// Основной прод-домен: для журнала ошибок (не смешивать с POS).
   static bool get _isProdMarketingHost {
     if (!kIsWeb) return false;
     final h = Uri.base.host.toLowerCase();
@@ -30,8 +30,8 @@ class FeatureFlags {
 
   /// POS: зал (столы, касса), заказы подразделений, KDS, склад POS, закупка POS, сводный склад.
   /// Бланк инвентаризации (`/inventory`) — отдельно, доступен и в проде.
-  /// Включается только в Beta (`IS_BETA=true`) и не на основном домене **restodocks.com**.
-  static bool get posModuleEnabled => isBeta && !_isProdMarketingHost;
+  /// В прод-сборках (`IS_BETA=false`) POS выключен; в бете (`IS_BETA=true`) — включён на любом хосте.
+  static bool get posModuleEnabled => isBeta;
 
   /// Экран «Журнал ошибок»: только в beta, не на основном прод-домене **restodocks.com**
   /// (даже если в сборке ошибочно передан `IS_BETA=true`), и не в нативном iOS (IPA).

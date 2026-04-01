@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -308,6 +309,22 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
     }
   }
 
+  /// Мульти-выбор продуктов номенклатуры для слияния строк заказов в Excel.
+  Future<Set<String>?> _showProductIdsPickerForMergeExport(LocalizationService loc) async {
+    final store = context.read<ProductStoreSupabase>();
+    await store.loadProducts();
+    final products = List<Product>.from(store.allProducts)
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    if (!mounted) return null;
+    return showDialog<Set<String>>(
+      context: context,
+      builder: (ctx) => _ProductIdsMergeExportPickerDialog(
+        loc: loc,
+        products: products,
+      ),
+    );
+  }
+
   /// Диалог выбора поставщиков для экспорта (не меняет состояние фильтра).
   Future<Set<String>?> _showSupplierPickerForExport(LocalizationService loc) async {
     final suppliers = _uniqueSupplierNames.toList()..sort();
@@ -378,6 +395,40 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
     final currency = account.establishment?.defaultCurrency ?? 'VND';
     final dateFormat = DateFormat('dd.MM.yyyy');
 
+    final mode = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('expenses_orders_export_dialog_title') ?? 'Выгрузить заказы продуктов'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(loc.t('expenses_orders_export_mode_hint') ??
+                'Сводная по заказам — одна строка на заказ. Слияние по позициям — суммы количеств и сумм только по выбранным продуктам номенклатуры за период.'),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.table_rows_outlined),
+              title: Text(loc.t('expenses_orders_export_mode_summary') ?? 'Сводная по заказам'),
+              onTap: () => Navigator.of(ctx).pop('summary'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.merge_type_outlined),
+              title: Text(loc.t('expenses_orders_export_mode_merge') ?? 'Слияние по выбранным позициям'),
+              subtitle: Text(loc.t('expenses_orders_export_mode_merge_sub') ?? 'Как при объединении инвентаризаций: выбор продуктов из номенклатуры'),
+              onTap: () => Navigator.of(ctx).pop('merge'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('cancel') ?? 'Отмена'),
+          ),
+        ],
+      ),
+    );
+    if (mode == null || !mounted) return;
+
     // 1. Выбор диапазона дат
     final range = await showDateRangePicker(
       context: context,
@@ -393,6 +444,12 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
     // 2. Выбор поставщиков
     final exportSuppliers = await _showSupplierPickerForExport(loc);
     if (exportSuppliers == null || !mounted) return;
+
+    Set<String> mergeProductIds = {};
+    if (mode == 'merge') {
+      mergeProductIds = await _showProductIdsPickerForMergeExport(loc) ?? {};
+      if (mergeProductIds.isEmpty || !mounted) return;
+    }
 
     // 3. Выбор языка
     final selectedLang = await showDialog<String>(
@@ -424,15 +481,32 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
 
     try {
       final t = (String key) => loc.tForLanguage(selectedLang, key);
-      final bytes = await OrderListExportService.buildProductOrdersExpenseExcelBytes(
-        orders: _allOrders,
-        dateStart: exportStart,
-        dateEnd: exportEnd,
-        selectedSupplierNames: exportSuppliers,
-        t: t,
-        currency: currency,
-      );
-      final fileName = 'product_orders_${dateFormat.format(exportStart)}_${dateFormat.format(exportEnd)}.xlsx';
+      final Uint8List bytes;
+      final String fileName;
+      if (mode == 'merge') {
+        bytes = await OrderListExportService.buildProductOrdersMergedByProductsExcelBytes(
+          orders: _allOrders,
+          dateStart: exportStart,
+          dateEnd: exportEnd,
+          selectedSupplierNames: exportSuppliers,
+          selectedProductIds: mergeProductIds,
+          t: t,
+          currency: currency,
+        );
+        fileName =
+            'product_orders_merged_${dateFormat.format(exportStart)}_${dateFormat.format(exportEnd)}.xlsx';
+      } else {
+        bytes = await OrderListExportService.buildProductOrdersExpenseExcelBytes(
+          orders: _allOrders,
+          dateStart: exportStart,
+          dateEnd: exportEnd,
+          selectedSupplierNames: exportSuppliers,
+          t: t,
+          currency: currency,
+        );
+        fileName =
+            'product_orders_${dateFormat.format(exportStart)}_${dateFormat.format(exportEnd)}.xlsx';
+      }
       await saveFileBytes(fileName, bytes);
 
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
@@ -1098,6 +1172,119 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Мульти-выбор позиций номенклатуры для слияния заказов в Excel.
+class _ProductIdsMergeExportPickerDialog extends StatefulWidget {
+  const _ProductIdsMergeExportPickerDialog({
+    required this.loc,
+    required this.products,
+  });
+
+  final LocalizationService loc;
+  final List<Product> products;
+
+  @override
+  State<_ProductIdsMergeExportPickerDialog> createState() =>
+      _ProductIdsMergeExportPickerDialogState();
+}
+
+class _ProductIdsMergeExportPickerDialogState
+    extends State<_ProductIdsMergeExportPickerDialog> {
+  final _search = TextEditingController();
+  final Set<String> _selected = {};
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  List<Product> get _filtered {
+    final q = _search.text.trim().toLowerCase();
+    if (q.isEmpty) return widget.products;
+    return widget.products
+        .where((p) => p.name.toLowerCase().contains(q))
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = widget.loc;
+    final filtered = _filtered;
+    return AlertDialog(
+      title: Text(loc.t('expenses_orders_export_merge_pick_title') ??
+          'Позиции для слияния'),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 420,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _search,
+              decoration: InputDecoration(
+                hintText: loc.t('search') ?? 'Поиск',
+                prefixIcon: const Icon(Icons.search),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _selected.addAll(filtered.map((p) => p.id));
+                    });
+                  },
+                  child: Text(loc.t('inventory_merge_select_all') ?? 'Выбрать видимые'),
+                ),
+                TextButton(
+                  onPressed: () => setState(_selected.clear),
+                  child: Text(loc.t('inventory_selective_clear') ?? 'Снять выбор'),
+                ),
+              ],
+            ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: filtered.length,
+                itemBuilder: (_, i) {
+                  final p = filtered[i];
+                  return CheckboxListTile(
+                    dense: true,
+                    value: _selected.contains(p.id),
+                    onChanged: (v) {
+                      setState(() {
+                        if (v == true) {
+                          _selected.add(p.id);
+                        } else {
+                          _selected.remove(p.id);
+                        }
+                      });
+                    },
+                    title: Text(p.name, overflow: TextOverflow.ellipsis),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(loc.t('cancel') ?? 'Отмена'),
+        ),
+        FilledButton(
+          onPressed: _selected.isEmpty
+              ? null
+              : () => Navigator.of(context).pop(Set<String>.from(_selected)),
+          child: Text(loc.t('apply') ?? 'Далее'),
+        ),
+      ],
     );
   }
 }
