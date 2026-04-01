@@ -1350,13 +1350,22 @@ class AccountManagerSupabase extends ChangeNotifier {
     }
   }
 
+  /// RLS: UPDATE по id; если 0 строк (часто auth_user_id NULL в старых данных) — повтор по auth_user_id.
+  static bool _isEmployeesZeroRowSaveError(Object e) {
+    final s = e.toString();
+    return s.contains('таблица employees') && s.contains('не удалось сохранить');
+  }
+
   /// Обновить данные сотрудника (пароль не обновляется — используйте отдельный поток смены пароля).
   /// avatar_url сохраняется в Supabase Storage (bucket avatars) — данные не зависят от деплоя.
   Future<void> updateEmployee(Employee employee) async {
     try {
-      var employeeData = employee.toJson()
+      var employeeData = Map<String, dynamic>.from(employee.toJson())
         ..remove('password')
-        ..remove('password_hash');
+        ..remove('password_hash')
+        ..remove('id')
+        ..remove('created_at');
+      // id / created_at не PATCH — только WHERE; иначе PostgREST обновляет по id в URL.
       // avatar_url сохраняем — колонка добавлена миграцией supabase_migration_employee_avatar.sql
 
       // В Beta схема БД может отставать (часть колонок отсутствует).
@@ -1364,12 +1373,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       // чтобы базовые данные сотрудника всё равно сохранялись.
       for (var attempt = 0; attempt < 6; attempt++) {
         try {
-          await _supabase.updateData(
-            'employees',
-            employeeData,
-            'id',
-            employee.id,
-          );
+          await _employeesUpdateWithRlsFallback(employee.id, employeeData);
           break;
         } catch (e) {
           final before = employeeData.length;
@@ -1409,6 +1413,38 @@ class AccountManagerSupabase extends ChangeNotifier {
     } catch (e) {
       devLog('Ошибка обновления сотрудника: $e');
       rethrow;
+    }
+  }
+
+  /// Сначала UPDATE … WHERE id = …; при 0 строк (RLS) — WHERE auth_user_id = JWT (миграция 20260401140000).
+  Future<void> _employeesUpdateWithRlsFallback(
+    String employeeId,
+    Map<String, dynamic> employeeData,
+  ) async {
+    final uid = _supabase.currentUser?.id;
+    try {
+      await _supabase.updateData(
+        'employees',
+        employeeData,
+        'id',
+        employeeId,
+      );
+      return;
+    } catch (e) {
+      if (uid == null || !_isEmployeesZeroRowSaveError(e)) rethrow;
+    }
+    final resp = await _supabase.client
+        .from('employees')
+        .update(employeeData)
+        .eq('auth_user_id', uid)
+        .select();
+    final list = resp is List ? resp : <dynamic>[];
+    if (list.isEmpty) {
+      throw Exception(
+        'Не удалось сохранить профиль сотрудника (RLS). '
+        'Выполните в Supabase SQL миграцию 20260401140000_employees_backfill_auth_user_id.sql '
+        '(поле auth_user_id для вашей строки в employees).',
+      );
     }
   }
 
@@ -1559,14 +1595,14 @@ class AccountManagerSupabase extends ChangeNotifier {
       if (authUserId == null) return false;
 
       // employees.id = auth.uid() (owners) или employees.auth_user_id = auth.uid() (legacy→auth)
-      var list = await _supabase.client
+      final rawList = await _supabase.client
           .from('employees')
           .select()
           .or('id.eq.$authUserId,auth_user_id.eq.$authUserId')
-          .eq('is_active', true)
-          .limit(1);
+          .eq('is_active', true);
 
-      if (list == null || (list as List).isEmpty) {
+      final rows = rawList is List ? rawList : <dynamic>[];
+      if (rows.isEmpty) {
         var completed = await completePendingOwnerRegistration();
         if (completed == null) {
           completed = await _tryFixOwnerWithoutEmployee();
@@ -1583,7 +1619,24 @@ class AccountManagerSupabase extends ChangeNotifier {
         return false;
       }
 
-      final employeeData = Map<String, dynamic>.from((list as List).first);
+      Map<String, dynamic> picked;
+      if (rows.length == 1) {
+        picked = Map<String, dynamic>.from(rows.first as Map);
+      } else {
+        final preferred = rows
+            .map((e) => Map<String, dynamic>.from(e as Map))
+            .where((m) => m['id']?.toString() == authUserId)
+            .toList();
+        picked = preferred.isNotEmpty
+            ? preferred.first
+            : Map<String, dynamic>.from(rows.first as Map);
+        devLog(
+          '🔐 AccountManager: ${rows.length} employee rows for auth user — '
+          'using id=${picked['id']}',
+        );
+      }
+
+      final employeeData = picked;
       employeeData['password'] = employeeData['password_hash'] ?? '';
       _currentEmployee = Employee.fromJson(employeeData);
       onPreferredLanguageLoaded?.call(_currentEmployee!.preferredLanguage);

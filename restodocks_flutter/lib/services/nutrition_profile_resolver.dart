@@ -45,7 +45,7 @@ class NutritionProfileResolver {
   }
 
   /// Anon или JWT ещё не подтянут на web: RLS не даёт SELECT → 403 / 42501.
-  /// Не трогаем [_nutritionRelationsUnavailable] — после refresh можно снова пробовать.
+  /// После неудачного refresh выставляем [_nutritionRelationsUnavailable], чтобы не спамить 403.
   static bool _isNutritionLinksAccessDenied(Object e) {
     if (e is PostgrestException) {
       final code = (e.code ?? '').toUpperCase();
@@ -157,6 +157,8 @@ class NutritionProfileResolver {
               'NutritionProfileResolver: product_nutrition_links access denied '
               '(anon or session not ready): $e',
             );
+            // Один раз на сессию: иначе десятки 403 в консоли на web (RLS / миграция anon SELECT).
+            _nutritionRelationsUnavailable = true;
             return false;
           }
           rethrow;
