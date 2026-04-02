@@ -27,10 +27,34 @@ class FeatureFlags {
     return const String.fromEnvironment('ENABLE_TTK_IMPORT', defaultValue: 'false') == 'true';
   }
 
-  /// POS: зал (столы, касса), заказы подразделений, KDS, склад POS, закупка POS, сводный склад.
+  /// Web: бета/превью без `--dart-define=IS_BETA=true` (часто Cloudflare Pages).
+  /// Прод-витрина restodocks.com — POS не включаем по хосту (только через IS_BETA при необходимости).
+  static bool get _posModuleEnabledWebNonProdHost {
+    if (!kIsWeb) return false;
+    try {
+      final h = Uri.base.host.toLowerCase();
+      if (h == 'localhost' || h == '127.0.0.1') return true;
+      if (h == 'restodocks.pages.dev' || h == 'www.restodocks.pages.dev') {
+        return true;
+      }
+      if (h.endsWith('.restodocks.pages.dev')) return true;
+      if (h == 'restodocks.vercel.app') return true;
+      if (h.contains('staging') && h.contains('restodocks')) return true;
+    } catch (_) {}
+    return false;
+  }
+
+  /// POS: зал (столы, касса), заказы подразделений, KDS, склад POS, закупка POS, сводный склад, «Продажи».
   /// Бланк инвентаризации (`/inventory`) — отдельно, доступен и в проде.
-  /// В прод-сборках (`IS_BETA=false`) POS выключен; в бете (`IS_BETA=true`) — включён на любом хосте.
-  static bool get posModuleEnabled => isBeta;
+  ///
+  /// Явно: `--dart-define=ENABLE_POS=true` (если бета на своём домене без шаблона ниже).
+  static bool get _posModuleEnabledFromDefine =>
+      const String.fromEnvironment('ENABLE_POS', defaultValue: 'false') == 'true';
+
+  /// Включается если: `IS_BETA=true`, или `ENABLE_POS=true`, или открыт известный не-прод веб-хост (Cloudflare Pages и т.д.).
+  /// На **restodocks.com** / **www** POS остаётся выключенным без `IS_BETA` / `ENABLE_POS`.
+  static bool get posModuleEnabled =>
+      isBeta || _posModuleEnabledFromDefine || _posModuleEnabledWebNonProdHost;
 
   /// Экран «Журнал ошибок»: только в beta и не на основном прод-домене **restodocks.com**
   /// (даже если в сборке ошибочно передан `IS_BETA=true`).
