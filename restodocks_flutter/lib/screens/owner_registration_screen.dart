@@ -70,7 +70,11 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
           : ['owner'];
 
       final email = _emailController.text.trim();
-      await PendingOwnerRole.saveForEmail(email, _selectedRole);
+      await PendingOwnerRole.saveForOwner(
+        email: email,
+        establishmentId: estab.id,
+        role: _selectedRole,
+      );
       final fullName = _surnameController.text.trim().isEmpty
           ? _nameController.text.trim()
           : '${_nameController.text.trim()} ${_surnameController.text.trim()}';
