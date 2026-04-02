@@ -21,6 +21,7 @@ import 'pos_dining_layout_service.dart';
 import 'edge_function_http.dart';
 import 'secure_storage_service.dart';
 import 'supabase_service.dart';
+import 'fcm_push_service.dart';
 import 'localization_service.dart';
 
 const _keyEmployeeId = 'restodocks_employee_id';
@@ -1275,6 +1276,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Выход из системы
   Future<void> logout() async {
+    await FcmPushService.unregisterBeforeLogout();
     final est = _establishment;
     if (est != null) {
       await TechCardTranslationCache.clearForEstablishment(est.dataEstablishmentId);

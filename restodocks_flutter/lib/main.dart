@@ -24,6 +24,7 @@ import 'core/initial_location_stub.dart'
     if (dart.library.html) 'core/initial_location_web.dart' as initial_loc;
 import 'core/supabase_url_resolver_stub.dart'
     if (dart.library.html) 'core/supabase_url_resolver_web.dart' as supabase_url;
+import 'services/fcm_push_service.dart';
 import 'services/services.dart';
 import 'services/translation_manager.dart';
 import 'widgets/widgets.dart';
@@ -92,6 +93,7 @@ Future<void> _bootstrapApp() async {
       authFlowType: AuthFlowType.implicit, // сессия из hash при переходе по ссылке подтверждения
     ),
   );
+  await FcmPushService.setup();
   // Сразу обрабатываем токены из URL (Supabase redirect после confirm) — до роутера и AccountManager
   if (kIsWeb) {
     final uri = Uri.base;

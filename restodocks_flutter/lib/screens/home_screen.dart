@@ -10,6 +10,7 @@ import '../config/home_tour_config.dart';
 import 'home/owner_home_content.dart';
 import 'home/staff_home_content.dart';
 import 'home/management_home_content.dart';
+import '../services/fcm_push_service.dart';
 import '../services/services.dart';
 import '../models/models.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -37,6 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _checkFirstEntry();
       _warmupEstablishmentDataIfNeeded();
       unawaited(PushNotificationService.requestPermissionOnceAfterLogin());
+      unawaited(FcmPushService.syncRegistrationAfterLogin());
     });
   }
 

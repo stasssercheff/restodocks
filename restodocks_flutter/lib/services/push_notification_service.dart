@@ -6,18 +6,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/dev_log.dart';
 
-/// Подготовка к push (iOS/Android): запрос разрешения на показ уведомлений.
+/// Локальный диалог разрешений (iOS/Android) до первого FCM-запроса.
 ///
-/// **Сейчас:** входящие и сообщения показываются как in-app (плашка/модал) в
-/// `InboxNotificationListener`, тексты — с типом данных и «от кого»; для сообщений
-/// учитывается настройка «показывать текст сообщения» в уведомлениях.
+/// **In-app:** входящие и сообщения — плашки в `InboxNotificationListener`; для
+/// сообщений учитывается настройка «показывать текст сообщения».
 ///
-/// **Системные push (свёрнуто/закрыто):** нужны FCM (или прямой APNs) + хранение
-/// токена устройства в БД + Edge Function/cron, который шлёт уведомление при INSERT
-/// во входящие таблицы / `employee_direct_messages`. Полезный payload для паритета
-/// с UI: `category` (messages|orders|inventory|…), `type_label`, `from_name`,
-/// `body` (только для сообщений и только если пользователь не отключил превью текста),
-/// `deep_link` (например `/inbox/chat/{senderId}`).
+/// **Фоновые push (FCM):** при настроенном Firebase — `FcmPushService` регистрирует
+/// токен в `register_push_token`, сервер шлёт уведомления через Edge Function
+/// `push-inbox-dispatch`; в data есть `route` для перехода (например `/inbox/chat/...`).
 class PushNotificationService {
   PushNotificationService._();
 

@@ -55,3 +55,7 @@ verify_jwt = false
 # auth-password-proxy: web вход через серверный fetch к GoTrue (обход 522 на прямом auth/v1/token из браузера)
 [functions.auth-password-proxy]
 verify_jwt = false
+
+# push-inbox-dispatch: Database Webhook → FCM; авторизация через PUSH_WEBHOOK_SECRET в заголовке
+[functions.push-inbox-dispatch]
+verify_jwt = false
