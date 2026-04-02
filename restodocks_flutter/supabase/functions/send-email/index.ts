@@ -3,7 +3,6 @@ import {
   enforceRateLimit,
   enforceRateLimitByIdentity,
   getAuthenticatedUserId,
-  hasValidApiKeyOrUser,
   isServiceRoleBearer,
   isServiceRoleRequest,
   resolveCorsHeaders,
@@ -34,14 +33,15 @@ serve(async (req) => {
       { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }
-  if (!(await hasValidApiKeyOrUser(req))) {
+  const uid = await getAuthenticatedUserId(req)
+  const isService = isServiceRoleRequest(req) || isServiceRoleBearer(req)
+  if (!isService && !uid) {
     return new Response(
       JSON.stringify({ error: 'Unauthorized' }),
       { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }
 
-  const isService = isServiceRoleRequest(req) || isServiceRoleBearer(req)
   // Вызовы с service role (другие Edge Functions, админ) — только общий лимит по IP.
   if (isService) {
     if (!enforceRateLimit(req, "send-email:svc", { windowMs: 60_000, maxRequests: 120 })) {
@@ -51,13 +51,6 @@ serve(async (req) => {
       )
     }
   } else {
-    const uid = await getAuthenticatedUserId(req)
-    if (!uid) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      )
-    }
     if (
       !enforceRateLimit(req, "send-email", { windowMs: 60_000, maxRequests: 20 }) ||
       !enforceRateLimitByIdentity(uid, "send-email:user-hour", {
