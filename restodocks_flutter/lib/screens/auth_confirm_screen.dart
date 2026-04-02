@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/clear_hash_stub.dart'
     if (dart.library.html) '../core/clear_hash_web.dart' as clear_hash;
 import '../core/deep_link_bootstrap.dart';
+import '../core/pending_owner_role.dart';
 import '../services/services.dart';
 import '../widgets/branded_auth_loading.dart';
 
@@ -83,6 +84,7 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
     if (!mounted) return;
 
     if (account.isLoggedInSync) {
+      await PendingOwnerRole.applyIfNeeded(account);
       await _applyLocaleAfterAuth(account, lang);
       clear_hash.clearHashFromUrl();
       if (!mounted) return;
@@ -100,6 +102,7 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
       await account.initialize(forceRetryFromAuth: true);
       if (!mounted) return;
       if (account.isLoggedInSync) {
+        await PendingOwnerRole.applyIfNeeded(account);
         await _applyLocaleAfterAuth(account, lang);
         clear_hash.clearHashFromUrl();
         if (!mounted) return;
@@ -118,7 +121,7 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
   Widget build(BuildContext context) {
     if (!_showLoginButton) {
       return const Scaffold(
-        body: BrandedAuthLoading(),
+        body: BrandedAuthLoading(fullscreenLogo: true),
       );
     }
     return Scaffold(

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/pending_owner_role.dart';
 import '../core/redirect_to_url_stub.dart'
     if (dart.library.html) '../core/redirect_to_url_web.dart' as redirect_impl;
 import '../services/services.dart';
@@ -89,6 +90,7 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
           await account.initialize(forceRetryFromAuth: true);
           if (!mounted) return;
           if (account.isLoggedInSync) {
+            await PendingOwnerRole.applyIfNeeded(account);
             await _applyLocaleAfterAuth(account);
             if (!mounted) return;
             router.go('/home');
@@ -163,7 +165,7 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
       );
     }
     return const Scaffold(
-      body: BrandedAuthLoading(),
+      body: BrandedAuthLoading(fullscreenLogo: true),
     );
   }
 }

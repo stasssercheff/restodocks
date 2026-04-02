@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
+import '../core/pending_owner_role.dart';
 import '../services/services.dart';
 import '../models/models.dart';
 
@@ -69,6 +70,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
           : ['owner'];
 
       final email = _emailController.text.trim();
+      await PendingOwnerRole.saveForEmail(email, _selectedRole);
       final fullName = _surnameController.text.trim().isEmpty
           ? _nameController.text.trim()
           : '${_nameController.text.trim()} ${_surnameController.text.trim()}';

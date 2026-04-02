@@ -372,7 +372,7 @@ class _HomeScreenState extends State<HomeScreen> {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (context.mounted) context.go('/login');
       });
-      return const Scaffold(body: BrandedAuthLoading());
+      return const Scaffold(body: BrandedAuthLoading(fullscreenLogo: true));
     }
 
     return Scaffold(
