@@ -3,6 +3,13 @@
 // Не использует AI, без лимитов.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { tryParseByStoredTemplates } from "../_shared/try_stored_ttk_templates.ts";
+import {
+  enforceRateLimit,
+  getAuthenticatedUserId,
+  isServiceRoleBearer,
+  isServiceRoleRequest,
+  resolveCorsHeaders,
+} from "../_shared/security.ts";
 
 function corsHeaders(origin: string | null) {
   return {
@@ -13,6 +20,7 @@ function corsHeaders(origin: string | null) {
 }
 
 Deno.serve(async (req: Request) => {
+  const cors = resolveCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders(req.headers.get("Origin")) });
   }
@@ -20,6 +28,21 @@ Deno.serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
       headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+    });
+  }
+
+  const uid = await getAuthenticatedUserId(req);
+  const isService = isServiceRoleRequest(req) || isServiceRoleBearer(req);
+  if (!isService && !uid) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+  if (!enforceRateLimit(req, "parse-ttk-by-templates", { windowMs: 60_000, maxRequests: 60 })) {
+    return new Response(JSON.stringify({ error: "Too many requests" }), {
+      status: 429,
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   }
 
