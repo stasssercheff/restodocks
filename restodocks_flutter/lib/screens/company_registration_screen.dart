@@ -275,6 +275,12 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
                   compareFn: (a, b) => a?.code == b?.code,
                   popupProps: PopupProps.menu(
                     showSearchBox: true,
+                    emptyBuilder: (context, searchEntry) => Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Center(
+                        child: Text(loc.t('nothing_found')),
+                      ),
+                    ),
                     searchFieldProps: TextFieldProps(
                       autofocus: true,
                       decoration: InputDecoration(hintText: searchHint),
