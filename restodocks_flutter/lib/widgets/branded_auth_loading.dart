@@ -16,11 +16,16 @@ class BrandedAuthLoading extends StatelessWidget {
     if (fullscreenLogo) {
       return Semantics(
         label: 'Restodocks',
-        child: SizedBox.expand(
-          child: Image.asset(
-            'assets/images/welcome_logo.png',
-            fit: BoxFit.cover,
-            filterQuality: FilterQuality.medium,
+        child: ColoredBox(
+          // Match the red splash background from `web/index.html` so the transition
+          // doesn't look like a "second logo".
+          color: Theme.of(context).colorScheme.primary,
+          child: SizedBox.expand(
+            child: Image.asset(
+              'assets/images/welcome_logo.png',
+              fit: BoxFit.cover,
+              filterQuality: FilterQuality.medium,
+            ),
           ),
         ),
       );
