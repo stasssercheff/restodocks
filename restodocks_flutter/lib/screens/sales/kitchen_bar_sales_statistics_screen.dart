@@ -45,9 +45,9 @@ class _KitchenBarSalesStatisticsScreenState
   TimeOfDay _timeStart = const TimeOfDay(hour: 10, minute: 0);
   TimeOfDay _timeEnd = const TimeOfDay(hour: 22, minute: 0);
 
-  final _filterSub = TextEditingController();
-  final _filterType = TextEditingController();
-  final _filterName = TextEditingController();
+  String? _filterSubValue;
+  String? _filterTypeValue;
+  String? _filterNameValue;
   _QtySort _qtySort = _QtySort.none;
 
   List<KitchenBarSalesRow> _raw = [];
@@ -150,6 +150,7 @@ class _KitchenBarSalesStatisticsScreenState
       setState(() {
         _raw = rows;
         _loading = false;
+        _pruneFiltersToAvailableData();
       });
     } catch (e) {
       if (!mounted) return;
@@ -160,18 +161,49 @@ class _KitchenBarSalesStatisticsScreenState
     }
   }
 
+  void _pruneFiltersToAvailableData() {
+    final subs = _uniqueSubdivisions().toSet();
+    final types = _uniqueDishTypes().toSet();
+    final names = _uniqueDishNames().toSet();
+    if (_filterSubValue != null && !subs.contains(_filterSubValue)) {
+      _filterSubValue = null;
+    }
+    if (_filterTypeValue != null && !types.contains(_filterTypeValue)) {
+      _filterTypeValue = null;
+    }
+    if (_filterNameValue != null && !names.contains(_filterNameValue)) {
+      _filterNameValue = null;
+    }
+  }
+
+  List<String> _uniqueSubdivisions() {
+    final s = _raw.map((r) => r.subdivisionLabel).toSet().toList();
+    s.sort();
+    return s;
+  }
+
+  List<String> _uniqueDishTypes() {
+    final s = _raw.map((r) => r.dishTypeLabel).toSet().toList();
+    s.sort();
+    return s;
+  }
+
+  List<String> _uniqueDishNames() {
+    final s = _raw.map((r) => r.dishName).toSet().toList();
+    s.sort();
+    return s;
+  }
+
   List<KitchenBarSalesRow> get _filtered {
-    final subQ = _filterSub.text.trim().toLowerCase();
-    final typeQ = _filterType.text.trim().toLowerCase();
-    final nameQ = _filterName.text.trim().toLowerCase();
     var list = _raw.where((r) {
-      if (subQ.isNotEmpty && !r.subdivisionLabel.toLowerCase().contains(subQ)) {
+      if (_filterSubValue != null &&
+          r.subdivisionLabel != _filterSubValue) {
         return false;
       }
-      if (typeQ.isNotEmpty && !r.dishTypeLabel.toLowerCase().contains(typeQ)) {
+      if (_filterTypeValue != null && r.dishTypeLabel != _filterTypeValue) {
         return false;
       }
-      if (nameQ.isNotEmpty && !r.dishName.toLowerCase().contains(nameQ)) {
+      if (_filterNameValue != null && r.dishName != _filterNameValue) {
         return false;
       }
       return true;
@@ -289,9 +321,6 @@ class _KitchenBarSalesStatisticsScreenState
 
   @override
   void dispose() {
-    _filterSub.dispose();
-    _filterType.dispose();
-    _filterName.dispose();
     super.dispose();
   }
 
@@ -331,7 +360,7 @@ class _KitchenBarSalesStatisticsScreenState
                 children: [
                   if (_error != null) Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
                   Text(
-                    'Период',
+                    loc.t('sales_period_label') ?? 'Период',
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   Wrap(
@@ -342,7 +371,8 @@ class _KitchenBarSalesStatisticsScreenState
                         ChoiceChip(
                           label: Text(_periodLabel(loc, k)),
                           selected: _periodKind == k,
-                          onSelected: (_) {
+                          onSelected: (selected) {
+                            if (!selected) return;
                             setState(() => _periodKind = k);
                             _reload();
                           },
@@ -452,7 +482,7 @@ class _KitchenBarSalesStatisticsScreenState
                       ],
                     ),
                   ExpansionTile(
-                    title: Text('Колонки таблицы'),
+                    title: Text(loc.t('sales_columns_expand') ?? 'Колонки таблицы'),
                     children: [
                       CheckboxListTile(
                         title: Text(loc.t('sales_filter_subdivision') ?? ''),
@@ -490,26 +520,83 @@ class _KitchenBarSalesStatisticsScreenState
                       ],
                     ],
                   ),
-                  TextField(
-                    controller: _filterSub,
+                  DropdownButtonFormField<String?>(
+                    isExpanded: true,
+                    value: _filterSubValue,
                     decoration: InputDecoration(
                       labelText: loc.t('sales_filter_subdivision'),
                     ),
-                    onChanged: (_) => setState(() {}),
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text(loc.t('sales_filter_all') ?? 'Все'),
+                      ),
+                      ..._uniqueSubdivisions().map(
+                        (e) => DropdownMenuItem(
+                          value: e,
+                          child: Text(
+                            e,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: _raw.isEmpty
+                        ? null
+                        : (v) => setState(() => _filterSubValue = v),
                   ),
-                  TextField(
-                    controller: _filterType,
+                  DropdownButtonFormField<String?>(
+                    isExpanded: true,
+                    value: _filterTypeValue,
                     decoration: InputDecoration(
                       labelText: loc.t('sales_filter_dish_type'),
                     ),
-                    onChanged: (_) => setState(() {}),
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text(loc.t('sales_filter_all') ?? 'Все'),
+                      ),
+                      ..._uniqueDishTypes().map(
+                        (e) => DropdownMenuItem(
+                          value: e,
+                          child: Text(
+                            e,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: _raw.isEmpty
+                        ? null
+                        : (v) => setState(() => _filterTypeValue = v),
                   ),
-                  TextField(
-                    controller: _filterName,
+                  DropdownButtonFormField<String?>(
+                    isExpanded: true,
+                    value: _filterNameValue,
                     decoration: InputDecoration(
                       labelText: loc.t('sales_filter_dish_name'),
                     ),
-                    onChanged: (_) => setState(() {}),
+                    items: [
+                      DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text(loc.t('sales_filter_all') ?? 'Все'),
+                      ),
+                      ..._uniqueDishNames().map(
+                        (e) => DropdownMenuItem(
+                          value: e,
+                          child: Text(
+                            e,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: _raw.isEmpty
+                        ? null
+                        : (v) => setState(() => _filterNameValue = v),
                   ),
                   Row(
                     children: [

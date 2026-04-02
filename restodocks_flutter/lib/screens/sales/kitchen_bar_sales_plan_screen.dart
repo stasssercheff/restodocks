@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -112,101 +114,150 @@ class _KitchenBarSalesPlanScreenState extends State<KitchenBarSalesPlanScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final hPad = 12.0;
+          const minCell = 40.0;
+          const gap = 4.0;
+          final gridMinW = 7 * minCell + 6 * gap + hPad * 2;
+          final viewportW = constraints.maxWidth;
+          final gridW = math.max(viewportW, gridMinW);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left),
-                onPressed: () {
-                  setState(() {
-                    _month = DateTime(_month.year, _month.month - 1, 1);
-                  });
-                },
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chevron_left),
+                      onPressed: () {
+                        setState(() {
+                          _month = DateTime(_month.year, _month.month - 1, 1);
+                        });
+                      },
+                    ),
+                    Flexible(
+                      child: Text(
+                        DateFormat.yMMMM(Localizations.localeOf(context).toString())
+                            .format(_month),
+                        style: Theme.of(context).textTheme.titleMedium,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right),
+                      onPressed: () {
+                        setState(() {
+                          _month = DateTime(_month.year, _month.month + 1, 1);
+                        });
+                      },
+                    ),
+                  ],
+                ),
               ),
-              Text(
-                DateFormat.yMMMM(Localizations.localeOf(context).toString())
-                    .format(_month),
-                style: Theme.of(context).textTheme.titleMedium,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minWidth: math.max(0, constraints.maxWidth - 16),
+                    ),
+                    child: SegmentedButton<SalesPlanCalendarDisplayMode>(
+                      segments: [
+                        ButtonSegment(
+                          value: SalesPlanCalendarDisplayMode.percent,
+                          label: Text(loc.t('sales_plan_display_percent') ?? '%'),
+                        ),
+                        ButtonSegment(
+                          value: SalesPlanCalendarDisplayMode.amountFraction,
+                          label: Text(
+                            loc.t('sales_plan_display_amount') ?? 'Σ',
+                            maxLines: 2,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                      selected: {_displayMode},
+                      onSelectionChanged: (s) {
+                        if (s.isNotEmpty) _setMode(s.first);
+                      },
+                    ),
+                  ),
+                ),
               ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right),
-                onPressed: () {
-                  setState(() {
-                    _month = DateTime(_month.year, _month.month + 1, 1);
-                  });
-                },
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: FilledButton.tonal(
+                  onPressed: () async {
+                    final plans =
+                        await SalesPlanStorageService.instance.loadAll(est);
+                    final active =
+                        plans.where((p) => p.department == dept).toList();
+                    if (!context.mounted) return;
+                    if (active.isEmpty) {
+                      context.push('/sales/$dept/plan/form');
+                      return;
+                    }
+                    active.sort((a, b) {
+                      final ua = a.updatedAt ?? a.createdAt;
+                      final ub = b.updatedAt ?? b.createdAt;
+                      return ub.compareTo(ua);
+                    });
+                    context.push('/sales/$dept/plan/form?id=${active.first.id}');
+                  },
+                  child: Text(loc.t('sales_plan_adjust') ?? ''),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Expanded(
+                child: Scrollbar(
+                  thumbVisibility: viewportW < gridMinW,
+                  child: SingleChildScrollView(
+                    primary: false,
+                    scrollDirection: Axis.vertical,
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.paddingOf(context).bottom,
+                    ),
+                    child: SingleChildScrollView(
+                      primary: false,
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(
+                        width: gridW,
+                        child: GridView.builder(
+                          padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 12),
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 7,
+                            childAspectRatio: 1.0,
+                            crossAxisSpacing: gap,
+                            mainAxisSpacing: gap,
+                          ),
+                          itemCount: lead + lastDay,
+                          itemBuilder: (context, i) {
+                            if (i < lead) return const SizedBox.shrink();
+                            final d = i - lead + 1;
+                            final day = DateTime(_month.year, _month.month, d);
+                            return _MonthDayCell(
+                              day: day,
+                              future: _dayCellModel(day, est, dept),
+                              displayMode: _displayMode,
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SegmentedButton<SalesPlanCalendarDisplayMode>(
-              segments: [
-                ButtonSegment(
-                  value: SalesPlanCalendarDisplayMode.percent,
-                  label: Text(loc.t('sales_plan_display_percent') ?? '%'),
-                ),
-                ButtonSegment(
-                  value: SalesPlanCalendarDisplayMode.amountFraction,
-                  label: Text(loc.t('sales_plan_display_amount') ?? 'Σ'),
-                ),
-              ],
-              selected: {_displayMode},
-              onSelectionChanged: (s) {
-                if (s.isNotEmpty) _setMode(s.first);
-              },
-            ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: FilledButton.tonal(
-              onPressed: () async {
-                final plans =
-                    await SalesPlanStorageService.instance.loadAll(est);
-                final active =
-                    plans.where((p) => p.department == dept).toList();
-                if (!context.mounted) return;
-                if (active.isEmpty) {
-                  context.push('/sales/$dept/plan/form');
-                  return;
-                }
-                active.sort((a, b) {
-                  final ua = a.updatedAt ?? a.createdAt;
-                  final ub = b.updatedAt ?? b.createdAt;
-                  return ub.compareTo(ua);
-                });
-                context.push('/sales/$dept/plan/form?id=${active.first.id}');
-              },
-              child: Text(loc.t('sales_plan_adjust') ?? ''),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Expanded(
-            child: GridView.builder(
-              padding: const EdgeInsets.all(12),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 7,
-                childAspectRatio: 1.05,
-                crossAxisSpacing: 4,
-                mainAxisSpacing: 4,
-              ),
-              itemCount: lead + lastDay,
-              itemBuilder: (context, i) {
-                if (i < lead) return const SizedBox.shrink();
-                final d = i - lead + 1;
-                final day = DateTime(_month.year, _month.month, d);
-                return _MonthDayCell(
-                  day: day,
-                  future: _dayCellModel(day, est, dept),
-                  displayMode: _displayMode,
-                );
-              },
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
