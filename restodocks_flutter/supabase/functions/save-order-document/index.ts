@@ -5,7 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   enforceRateLimit,
   getAuthenticatedUserId,
-  hasValidApiKeyOrUser,
+  isServiceRoleBearer,
   isServiceRoleRequest,
   resolveCorsHeaders,
 } from "../_shared/security.ts";
@@ -37,7 +37,9 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-  if (!(await hasValidApiKeyOrUser(req))) {
+  const authUid = await getAuthenticatedUserId(req);
+  const isService = isServiceRoleRequest(req) || isServiceRoleBearer(req);
+  if (!isService && !authUid) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -73,15 +75,14 @@ Deno.serve(async (req: Request) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    if (!isServiceRoleRequest(req)) {
-      const userId = await getAuthenticatedUserId(req);
-      if (!userId) {
+    if (!isService) {
+      if (!authUid) {
         return new Response(
           JSON.stringify({ error: "Authenticated user required" }),
           { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (createdByEmployeeId !== userId) {
+      if (createdByEmployeeId !== authUid) {
         return new Response(
           JSON.stringify({ error: "createdByEmployeeId must match authenticated user" }),
           { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -1,6 +1,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { enforceRateLimit, hasValidApiKeyOrUser, resolveCorsHeaders } from "../_shared/security.ts";
+import {
+  enforceRateLimit,
+  getAuthenticatedUserId,
+  isServiceRoleBearer,
+  isServiceRoleRequest,
+  resolveCorsHeaders,
+} from "../_shared/security.ts";
 
 const DEEPL_URL = "https://api-free.deepl.com/v2/translate";
 const DEEPL_USAGE_URL = "https://api-free.deepl.com/v2/usage";
@@ -33,7 +39,9 @@ Deno.serve(async (req: Request) => {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   }
-  if (!(await hasValidApiKeyOrUser(req))) {
+  const uid = await getAuthenticatedUserId(req);
+  const isService = isServiceRoleRequest(req) || isServiceRoleBearer(req);
+  if (!isService && !uid) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...cors, "Content-Type": "application/json" },

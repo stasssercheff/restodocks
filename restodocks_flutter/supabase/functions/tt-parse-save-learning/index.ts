@@ -4,7 +4,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   enforceRateLimit,
-  hasValidApiKeyOrUser,
+  getAuthenticatedUserId,
+  isServiceRoleBearer,
+  isServiceRoleRequest,
   resolveCorsHeaders,
 } from "../_shared/security.ts";
 
@@ -19,7 +21,9 @@ Deno.serve(async (req: Request) => {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   }
-  if (!(await hasValidApiKeyOrUser(req))) {
+  const uid = await getAuthenticatedUserId(req);
+  const isService = isServiceRoleRequest(req) || isServiceRoleBearer(req);
+  if (!isService && !uid) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...cors, "Content-Type": "application/json" },

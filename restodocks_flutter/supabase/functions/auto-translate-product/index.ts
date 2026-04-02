@@ -1,6 +1,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { enforceRateLimit, hasValidApiKeyOrUser, resolveCorsHeaders } from "../_shared/security.ts";
+import {
+  enforceRateLimit,
+  getAuthenticatedUserId,
+  isServiceRoleBearer,
+  isServiceRoleRequest,
+  resolveCorsHeaders,
+} from "../_shared/security.ts";
 
 const DEEPL_URL = "https://api-free.deepl.com/v2/translate";
 const SUPPORTED_LANGS = ["ru", "en", "es", "tr", "vi"];
@@ -106,7 +112,11 @@ Deno.serve(async (req: Request) => {
 
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405, origin);
-  if (!(await hasValidApiKeyOrUser(req))) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
+  const uid = await getAuthenticatedUserId(req);
+  const isService = isServiceRoleRequest(req) || isServiceRoleBearer(req);
+  if (!isService && !uid) {
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...cors, "Content-Type": "application/json" } });
+  }
   if (!enforceRateLimit(req, "auto-translate-product", { windowMs: 60_000, maxRequests: 40 })) {
     return new Response(JSON.stringify({ error: "Too many requests" }), { status: 429, headers: { ...cors, "Content-Type": "application/json" } });
   }
