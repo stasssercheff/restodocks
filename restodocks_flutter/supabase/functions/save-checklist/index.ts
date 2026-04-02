@@ -68,6 +68,7 @@ Deno.serve(async (req: Request) => {
       assigned_employee_ids?: string[];
       deadline_at?: string | null;
       scheduled_for_at?: string | null;
+      reminder_config?: Record<string, unknown> | null;
       additional_name?: string | null;
       type?: string | null;
       items?: ChecklistItemInput[];
@@ -84,6 +85,7 @@ Deno.serve(async (req: Request) => {
       assigned_employee_ids,
       deadline_at,
       scheduled_for_at,
+      reminder_config,
       additional_name,
       type,
       items = [],
@@ -169,6 +171,7 @@ Deno.serve(async (req: Request) => {
         assigned_employee_ids: assigned_employee_ids ?? [],
         deadline_at: deadline_at || null,
         scheduled_for_at: scheduled_for_at || null,
+        reminder_config: reminder_config ?? null,
         additional_name: additional_name || null,
         type: type || null,
       })

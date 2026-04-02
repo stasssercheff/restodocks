@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
@@ -262,7 +261,6 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final emp = context.watch<AccountManagerSupabase>().currentEmployee;
-    final timeFmt = DateFormat.Hm(Localizations.localeOf(context).toString());
     final canDisplaySettings = posCanConfigureOrdersDisplay(emp);
 
     return Scaffold(
@@ -293,15 +291,14 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
         tooltip: loc.t('pos_orders_fab_new'),
         child: const Icon(Icons.add),
       ),
-      body: _body(context, loc, timeFmt),
+      body: _body(context, loc),
     );
   }
 
   List<PosOrder> get _visibleOrders =>
       _bucket == _HallBucket.active ? _buckets.active : _buckets.served;
 
-  Widget _body(
-      BuildContext context, LocalizationService loc, DateFormat timeFmt) {
+  Widget _body(BuildContext context, LocalizationService loc) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -387,7 +384,10 @@ class _HallOrdersScreenState extends State<HallOrdersScreen> {
                     final sub = [
                       '${loc.t('pos_orders_guests_short')}: ${o.guestCount}',
                       _statusLabel(loc, o.status),
-                      timeFmt.format(o.createdAt.toLocal()),
+                      formatPosOrderListCreatedAt(
+                        o.createdAt,
+                        Localizations.localeOf(context).toString(),
+                      ),
                       loc.t('pos_order_list_timer', args: {
                         'time': formatPosOrderLiveDuration(o.createdAt),
                       }),

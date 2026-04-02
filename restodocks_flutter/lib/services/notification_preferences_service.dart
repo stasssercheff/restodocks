@@ -26,6 +26,8 @@ class NotificationPreferencesService extends ChangeNotifier {
   bool _checklists = true;
   bool _writeoffs = true;
   bool _notifications = true;
+  /// Только для «Сообщения»: показывать фрагмент текста в плашке/модалке (можно отключить из соображений приватности).
+  bool _showMessageBodyInNotifications = true;
 
   NotificationDisplayType get displayType => _displayType;
   bool get messages => _messages;
@@ -35,6 +37,7 @@ class NotificationPreferencesService extends ChangeNotifier {
   bool get checklists => _checklists;
   bool get writeoffs => _writeoffs;
   bool get notifications => _notifications;
+  bool get showMessageBodyInNotifications => _showMessageBodyInNotifications;
 
   bool get isEnabled => _displayType != NotificationDisplayType.disabled;
 
@@ -56,6 +59,7 @@ class NotificationPreferencesService extends ChangeNotifier {
           _checklists = map['checklists'] as bool? ?? true;
           _writeoffs = map['writeoffs'] as bool? ?? true;
           _notifications = map['notifications'] as bool? ?? true;
+          _showMessageBodyInNotifications = map['showMessageBodyInNotifications'] as bool? ?? true;
           notifyListeners();
           return;
         }
@@ -77,6 +81,7 @@ class NotificationPreferencesService extends ChangeNotifier {
     _checklists = true;
     _writeoffs = true;
     _notifications = true;
+    _showMessageBodyInNotifications = true;
   }
 
   NotificationDisplayType _parseDisplayType(dynamic v) {
@@ -109,6 +114,7 @@ class NotificationPreferencesService extends ChangeNotifier {
         'checklists': _checklists,
         'writeoffs': _writeoffs,
         'notifications': _notifications,
+        'showMessageBodyInNotifications': _showMessageBodyInNotifications,
       };
       await prefs.setString(key, jsonEncode(map));
     } catch (_) {}
@@ -166,6 +172,13 @@ class NotificationPreferencesService extends ChangeNotifier {
   Future<void> setWriteoffs(bool value, String? employeeId) async {
     if (_writeoffs == value) return;
     _writeoffs = value;
+    await _save(employeeId);
+    notifyListeners();
+  }
+
+  Future<void> setShowMessageBodyInNotifications(bool value, String? employeeId) async {
+    if (_showMessageBodyInNotifications == value) return;
+    _showMessageBodyInNotifications = value;
     await _save(employeeId);
     notifyListeners();
   }

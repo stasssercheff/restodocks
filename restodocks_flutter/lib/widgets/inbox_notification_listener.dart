@@ -254,6 +254,21 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
       emp.hasRole('bar_manager') ||
       emp.hasRole('floor_manager');
 
+  Future<String> _resolveEmployeeName(String? employeeId, AccountManagerSupabase acc) async {
+    if (employeeId == null || employeeId.isEmpty) return '';
+    final est = acc.establishment;
+    if (est == null) return '';
+    try {
+      final emps = await acc.getEmployeesForEstablishment(est.id);
+      final e = emps.where((x) => x.id == employeeId).firstOrNull;
+      final n = e?.fullName.trim();
+      if (n != null && n.isNotEmpty) return n;
+      final em = e?.email.trim();
+      if (em != null && em.isNotEmpty) return em;
+    } catch (_) {}
+    return '';
+  }
+
   void _onNewMessage(dynamic payload, String myId) {
     final newRow = payload.newRecord;
     final senderId = newRow['sender_employee_id']?.toString();
@@ -261,16 +276,33 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
     final hasImage = newRow['image_url'] != null && (newRow['image_url'] as String).isNotEmpty;
     if (senderId == null || senderId.isEmpty) return;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final location = GoRouterState.of(context).matchedLocation;
       if (location.contains('/inbox/chat/$senderId')) return;
-      _showNotification(
+      final loc = context.read<LocalizationService>();
+      final prefs = context.read<NotificationPreferencesService>();
+      final acc = context.read<AccountManagerSupabase>();
+      final typeLabel = loc.t('inbox_notif_type_message');
+      final who = await _resolveEmployeeName(senderId, acc);
+      final from = who.isNotEmpty ? who : loc.t('employee');
+      String display;
+      if (hasImage) {
+        display = prefs.showMessageBodyInNotifications
+            ? '$typeLabel · $from · ${loc.t('inbox_notif_photo')}'
+            : '$typeLabel · $from · ${loc.t('inbox_notif_message_text_hidden')}';
+      } else if (!prefs.showMessageBodyInNotifications) {
+        display = '$typeLabel · $from · ${loc.t('inbox_notif_message_text_hidden')}';
+      } else if (content.isEmpty) {
+        display = '$typeLabel · $from · ${loc.t('inbox_notif_empty_message')}';
+      } else {
+        final preview = content.length > 120 ? '${content.substring(0, 120)}…' : content;
+        display = '$typeLabel · $from: $preview';
+      }
+      await _presentInAppNotification(
         category: 'messages',
-        title: '',
-        body: hasImage ? '[фото]' : (content.isNotEmpty ? (content.length > 40 ? '${content.substring(0, 40)}…' : content) : ''),
+        displayText: display,
         onTap: () => _go('/inbox/chat/$senderId'),
-        extra: senderId,
       );
     });
   }
@@ -282,13 +314,20 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
     final pl = newRow['payload'];
     final header = pl is Map ? pl['header'] : null;
     final supplier = (header is Map ? header['supplierName'] : null)?.toString() ?? '—';
+    final createdBy = newRow['created_by_employee_id']?.toString();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      _showNotification(
+      final loc = context.read<LocalizationService>();
+      final acc = context.read<AccountManagerSupabase>();
+      final typeLabel = loc.t('inbox_notif_type_order');
+      final who = await _resolveEmployeeName(createdBy, acc);
+      final display = who.isNotEmpty
+          ? loc.t('inbox_notif_order_line', args: {'type': typeLabel, 'supplier': supplier, 'who': who})
+          : '$typeLabel · $supplier';
+      await _presentInAppNotification(
         category: 'orders',
-        title: 'Заказ $supplier',
-        body: '',
+        displayText: display,
         onTap: () => _go('/inbox/order/$id'),
       );
     });
@@ -305,12 +344,19 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
 
     if (type == 'writeoff') {
       if (!prefs.shouldNotifyFor('writeoffs')) return;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
-        _showNotification(
+        final loc = context.read<LocalizationService>();
+        final acc = context.read<AccountManagerSupabase>();
+        final createdBy = newRow['created_by_employee_id']?.toString();
+        final who = await _resolveEmployeeName(createdBy, acc);
+        final typeLabel = loc.t('inbox_notif_type_writeoff');
+        final display = who.isNotEmpty
+            ? loc.t('inbox_notif_typed_author_line', args: {'type': typeLabel, 'who': who})
+            : typeLabel;
+        await _presentInAppNotification(
           category: 'writeoffs',
-          title: 'Списание',
-          body: '',
+          displayText: display,
           onTap: () => _go('/inbox/writeoff/$id'),
         );
       });
@@ -321,13 +367,21 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
     if (isIiko && !prefs.shouldNotifyFor('iikoInventory')) return;
     if (!isIiko && !prefs.shouldNotifyFor('inventory')) return;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      final loc = context.read<LocalizationService>();
+      final acc = context.read<AccountManagerSupabase>();
       final route = isIiko ? '/inbox/iiko/$id' : '/inbox/inventory/$id';
-      _showNotification(
+      final createdBy = newRow['created_by_employee_id']?.toString();
+      final who = await _resolveEmployeeName(createdBy, acc);
+      final typeLabel =
+          isIiko ? loc.t('inbox_notif_type_iiko_inventory') : loc.t('inbox_notif_type_inventory');
+      final display = who.isNotEmpty
+          ? loc.t('inbox_notif_typed_author_line', args: {'type': typeLabel, 'who': who})
+          : typeLabel;
+      await _presentInAppNotification(
         category: isIiko ? 'iikoInventory' : 'inventory',
-        title: isIiko ? 'Инвентаризация iiko' : 'Инвентаризация',
-        body: '',
+        displayText: display,
         onTap: () => _go(route),
       );
     });
@@ -339,12 +393,30 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
     final id = newRow['id']?.toString();
     if (id == null) return;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      _showNotification(
+      final loc = context.read<LocalizationService>();
+      final acc = context.read<AccountManagerSupabase>();
+      final checklistName = newRow['checklist_name']?.toString().trim() ?? '';
+      final payloadMap = newRow['payload'];
+      String who = '';
+      if (payloadMap is Map) {
+        who = payloadMap['submittedByName']?.toString().trim() ?? '';
+      }
+      if (who.isEmpty) {
+        who = await _resolveEmployeeName(newRow['submitted_by_employee_id']?.toString(), acc);
+      }
+      if (who.isEmpty) {
+        who = await _resolveEmployeeName(newRow['filled_by_employee_id']?.toString(), acc);
+      }
+      final typeLabel = loc.t('inbox_notif_type_checklist');
+      final namePart = checklistName.isEmpty ? '—' : checklistName;
+      final display = who.isNotEmpty
+          ? loc.t('inbox_notif_checklist_line', args: {'type': typeLabel, 'name': namePart, 'who': who})
+          : '$typeLabel · $namePart';
+      await _presentInAppNotification(
         category: 'checklists',
-        title: 'Чеклист заполнен',
-        body: '',
+        displayText: display,
         onTap: () => _go('/inbox/checklist/$id'),
       );
     });
@@ -354,44 +426,30 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
     final newRow = payload.newRecord;
     final name = newRow['deleted_employee_name']?.toString() ?? '';
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      _showNotification(
+      final loc = context.read<LocalizationService>();
+      final typeLabel = loc.t('inbox_notif_type_staff');
+      final display = loc.t('inbox_notif_deletion_line', args: {
+        'type': typeLabel,
+        'name': name.isEmpty ? '—' : name,
+      });
+      await _presentInAppNotification(
         category: 'notifications',
-        title: 'Удаление сотрудника',
-        body: name,
+        displayText: display,
         onTap: () => _go('/inbox?tab=notifications'),
       );
     });
   }
 
-  Future<void> _showNotification({
+  Future<void> _presentInAppNotification({
     required String category,
-    required String title,
-    required String body,
+    required String displayText,
     required VoidCallback onTap,
-    String? extra,
   }) async {
     final prefs = context.read<NotificationPreferencesService>();
     if (prefs.displayType == NotificationDisplayType.disabled) return;
     if (!prefs.shouldNotifyFor(category)) return;
-
-    final acc = context.read<AccountManagerSupabase>();
-    final loc = context.read<LocalizationService>();
-
-    String displayText = title;
-    if (category == 'messages' && extra != null) {
-      try {
-        final emps = await acc.getEmployeesForEstablishment(acc.establishment!.id);
-        final sender = emps.where((e) => e.id == extra).firstOrNull;
-        displayText = '${sender?.fullName ?? sender?.email ?? 'Сотрудник'}: ${body.isEmpty ? (loc.t('new_message') ?? 'новое сообщение') : body}';
-      } catch (_) {
-        displayText = '${loc.t('new_message') ?? 'Новое сообщение'}: ${body.isEmpty ? '' : body}';
-      }
-    } else if (body.isNotEmpty) {
-      displayText = title.isEmpty ? body : '$title — $body';
-    }
-
     if (!mounted) return;
 
     if (prefs.displayType == NotificationDisplayType.banner) {

@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../utils/checklist_reminder_summary.dart';
 import '../utils/employee_display_utils.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
@@ -462,6 +463,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
       final local = d.toLocal();
       return hasTime ? '${formatTime(local)} ${formatDate(local)}' : formatDate(utc);
     };
+    final reminderLine = formatChecklistReminderSubtitle(checklist.reminderConfig, loc, loc.currentLanguageCode);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -485,10 +487,10 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
             ),
             if (emp?.department == 'kitchen' && emp?.section != null)
               Text('${loc.t('kitchen_section') ?? 'Цех'}: ${KitchenSection.fromCode(emp!.section!)?.displayName ?? emp.section}', style: Theme.of(context).textTheme.bodySmall),
-            if (checklist.deadlineAt != null || checklist.scheduledForAt != null) ...[
+            if (checklist.deadlineAt != null || reminderLine != null) ...[
               const SizedBox(height: 6),
-              if (checklist.scheduledForAt != null)
-                Text('${loc.t('checklist_scheduled_for') ?? 'На когда'}: ${formatDateTime(checklist.scheduledForAt!)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+              if (reminderLine != null)
+                Text(reminderLine, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
               if (checklist.deadlineAt != null)
                 Text('${loc.t('checklist_complete_by') ?? 'Завершить до'}: ${formatDateTime(checklist.deadlineAt!)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
             ],

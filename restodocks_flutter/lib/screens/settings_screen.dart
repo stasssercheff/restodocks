@@ -1538,6 +1538,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: prefs.messages,
               onChanged: (v) => prefs.setMessages(v, empId),
             ),
+            if (prefs.messages) ...[
+              Padding(
+                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
+                child: SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(loc.t('notification_show_message_text')),
+                  subtitle: Text(
+                    loc.t('notification_show_message_text_hint'),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  value: prefs.showMessageBodyInNotifications,
+                  onChanged: (v) => prefs.setShowMessageBodyInNotifications(v, empId),
+                ),
+              ),
+            ],
             SwitchListTile(
               title: Text(loc.t('inbox_tab_order') ?? 'Заказы'),
               value: prefs.orders,

@@ -8,6 +8,7 @@ export 'tt_ingredient.dart';
 export 'tech_card.dart';
 export 'menu_item.dart';
 export 'checklist.dart';
+export 'checklist_reminder_config.dart';
 export 'checklist_submission.dart';
 export 'schedule_model.dart';
 export 'order_list.dart';

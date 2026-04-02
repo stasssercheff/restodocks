@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/models.dart';
@@ -123,7 +122,6 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final emp = context.watch<AccountManagerSupabase>().currentEmployee;
-    final timeFmt = DateFormat.Hm(Localizations.localeOf(context).toString());
     final deptKey = posDepartmentLabelKeyForRoute(widget.department);
     final deptLabel =
         deptKey != null ? loc.t(deptKey) : widget.department;
@@ -132,18 +130,10 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(loc.t('pos_department_orders_title')),
-            Text(
-              deptLabel,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ],
+        title: Text(
+          '${loc.t('pos_department_orders_title')} $deptLabel',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
         actions: [
           if (canDisplaySettings)
@@ -159,15 +149,14 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
           ),
         ],
       ),
-      body: _body(context, loc, timeFmt),
+      body: _body(context, loc),
     );
   }
 
   List<PosOrder> get _visibleOrders =>
       _bucket == _DeptBucket.active ? _buckets.active : _buckets.served;
 
-  Widget _body(
-      BuildContext context, LocalizationService loc, DateFormat timeFmt) {
+  Widget _body(BuildContext context, LocalizationService loc) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -253,7 +242,10 @@ class _PosDepartmentOrdersScreenState extends State<PosDepartmentOrdersScreen> {
                     final sub = [
                       '${loc.t('pos_orders_guests_short')}: ${o.guestCount}',
                       _statusLabel(loc, o.status),
-                      timeFmt.format(o.createdAt.toLocal()),
+                      formatPosOrderListCreatedAt(
+                        o.createdAt,
+                        Localizations.localeOf(context).toString(),
+                      ),
                       loc.t('pos_order_list_timer', args: {
                         'time': formatPosOrderLiveDuration(o.createdAt),
                       }),

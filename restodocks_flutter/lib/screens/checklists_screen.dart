@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/app_toast_service.dart';
 import '../services/services.dart';
+import '../utils/checklist_reminder_summary.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Список чеклистов-шаблонов. Шеф может править и создавать по аналогии.
@@ -217,7 +218,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
 
   /// Чеклист просрочен, если deadlineAt задан и истёк.
   bool _isOverdue(Checklist c) {
-    final deadline = c.deadlineAt ?? c.scheduledForAt;
+    final deadline = c.deadlineAt;
     if (deadline == null) return false;
     return DateTime.now().toUtc().isAfter(deadline.toUtc());
   }
@@ -256,7 +257,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
           ? (KitchenSection.fromCode(sectionKey)?.getLocalizedName(lang) ?? sectionKey)
           : noSection;
 
-      final deadlineDt = c.deadlineAt ?? c.scheduledForAt;
+      final deadlineDt = c.deadlineAt;
       final deadlineKey = deadlineDt?.toIso8601String() ?? '';
       final deadlineLabel = deadlineDt != null ? formatDateTime(deadlineDt) : noDeadline;
 
@@ -414,8 +415,9 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
             return fmtDate(utc);
           };
           final isOverdue = _isOverdue(c);
+          final reminderLine = formatChecklistReminderSubtitle(c.reminderConfig, loc, lang);
           final datePartsData = <String>[
-            if (c.scheduledForAt != null) '${loc.t('checklist_scheduled_for') ?? 'На когда'}: ${formatDateTime(c.scheduledForAt!)}',
+            if (reminderLine != null && reminderLine.isNotEmpty) reminderLine,
             if (c.deadlineAt != null) '${loc.t('checklist_complete_by') ?? 'Завершить до'}: ${formatDateTime(c.deadlineAt!)}',
           ];
           return Card(

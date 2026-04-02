@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
@@ -52,10 +53,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   DateTime? _deadline;
   /// Тумблер «указать время» для срока выполнения (по умолчанию выключен — только дата).
   bool _deadlineWithTime = false;
-  bool _scheduledForEnabled = false;
-  DateTime? _scheduledFor;
-  /// Тумблер «указать время» для «На когда» (по умолчанию выключен — только дата).
-  bool _scheduledForWithTime = false;
+  ChecklistReminderConfig _reminderConfig = const ChecklistReminderConfig();
 
   bool get _isNew => widget.checklistId == 'new';
 
@@ -138,10 +136,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           _deadline = c.deadlineAt;
           final dt = c.deadlineAt;
           _deadlineWithTime = dt != null && (dt.hour != 0 || dt.minute != 0);
-          _scheduledForEnabled = c.scheduledForAt != null;
-          _scheduledFor = c.scheduledForAt;
-          final sf = c.scheduledForAt;
-          _scheduledForWithTime = sf != null && (sf.hour != 0 || sf.minute != 0);
+          _reminderConfig = c.reminderConfig ?? const ChecklistReminderConfig();
         }
       });
       _ensureTechCardTranslations(techSvc, techs);
@@ -214,9 +209,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       'deadlineEnabled': _deadlineEnabled,
       'deadline': _deadline?.toIso8601String(),
       'deadlineWithTime': _deadlineWithTime,
-      'scheduledForEnabled': _scheduledForEnabled,
-      'scheduledFor': _scheduledFor?.toIso8601String(),
-      'scheduledForWithTime': _scheduledForWithTime,
+      'reminderConfig': _reminderConfig.toJson(),
       'items': _items.map((item) => {
         'id': item.id,
         'title': item.title,
@@ -242,9 +235,10 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       _deadlineEnabled = data['deadlineEnabled'] == true;
       _deadline = data['deadline'] != null ? DateTime.tryParse(data['deadline'] as String) : null;
       _deadlineWithTime = data['deadlineWithTime'] == true;
-      _scheduledForEnabled = data['scheduledForEnabled'] == true;
-      _scheduledFor = data['scheduledFor'] != null ? DateTime.tryParse(data['scheduledFor'] as String) : null;
-      _scheduledForWithTime = data['scheduledForWithTime'] == true;
+      final rc = data['reminderConfig'];
+      _reminderConfig = rc is Map
+          ? ChecklistReminderConfig.fromJson(Map<String, dynamic>.from(rc))
+          : const ChecklistReminderConfig();
       final itemsData = data['items'] as List<dynamic>? ?? [];
       _items.clear();
       for (final itemData in itemsData) {
@@ -305,9 +299,18 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     final deadlineVal = _deadlineEnabled && _deadline != null
         ? (_deadlineWithTime ? _deadline : DateTime.utc(_deadline!.year, _deadline!.month, _deadline!.day))
         : null;
-    final scheduledForVal = _scheduledForEnabled && _scheduledFor != null
-        ? (_scheduledForWithTime ? _scheduledFor : DateTime.utc(_scheduledFor!.year, _scheduledFor!.month, _scheduledFor!.day))
-        : null;
+    if (_reminderConfig.enabled &&
+        _reminderConfig.recurrenceKind == ChecklistRecurrenceKind.weekdays &&
+        _reminderConfig.weekdays.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.read<LocalizationService>().t('checklist_weekdays_required'))),
+        );
+      }
+      setState(() => _saving = false);
+      return;
+    }
+    final reminderToSave = _normalizeReminderForSave();
     final itemsForSave = _items
         .map((e) => ChecklistItem.template(
               title: e.title,
@@ -334,7 +337,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           assignedEmployeeId: empIds?.length == 1 ? empIds!.first : null,
           assignedEmployeeIds: empIds,
           deadlineAt: deadlineVal,
-          scheduledForAt: scheduledForVal,
+          scheduledForAt: null,
+          reminderConfig: reminderToSave,
           type: _type,
           actionConfig: actionConfig,
           assignedDepartment: c.assignedDepartment,
@@ -351,7 +355,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           assignedEmployeeIds: empIds,
           assignedEmployeeId: empIds?.length == 1 ? empIds!.first : null,
           deadlineAt: deadlineVal,
-          scheduledForAt: scheduledForVal,
+          scheduledForAt: null,
+          reminderConfig: reminderToSave,
           items: _items
               .map((e) => ChecklistItem(
                     id: e.id,
@@ -782,6 +787,37 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     }
   }
 
+  ChecklistReminderConfig? _normalizeReminderForSave() {
+    if (!_reminderConfig.enabled) return null;
+    var r = _reminderConfig;
+    if (r.recurrenceKind == ChecklistRecurrenceKind.multiDaily) {
+      var times = List<String>.from(r.dailyTimes);
+      if (times.isEmpty) times = ['09:00'];
+      times.sort();
+      return r.copyWith(dailyTimes: times, useSpecificTime: false);
+    }
+    return r;
+  }
+
+  String _weekdayLetter(int iso, String lang) =>
+      DateFormat.E(lang == 'ru' ? 'ru' : 'en').format(DateTime(2024, 1, iso));
+
+  Future<void> _addMultiDailyTime() async {
+    final t = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: _reminderConfig.hour, minute: _reminderConfig.minute),
+    );
+    if (t == null || !mounted) return;
+    final s = '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    setState(() {
+      final list = List<String>.from(_reminderConfig.dailyTimes);
+      if (!list.contains(s)) list.add(s);
+      list.sort();
+      _reminderConfig = _reminderConfig.copyWith(dailyTimes: list);
+      scheduleSave();
+    });
+  }
+
   Widget _buildDeadlineRow(LocalizationService loc, String lang, bool canEdit) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -881,100 +917,189 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     );
   }
 
-  Widget _buildScheduledForRow(LocalizationService loc, String lang, bool canEdit) {
+  Widget _buildReminderRow(LocalizationService loc, String lang, bool canEdit) {
+    final rk = _reminderConfig.recurrenceKind;
+    final showSingleTime = rk != ChecklistRecurrenceKind.multiDaily;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Switch(
-              value: _scheduledForEnabled,
-              onChanged: canEdit ? (v) => setState(() {
-                _scheduledForEnabled = v;
-                if (v && _scheduledFor == null) _scheduledFor = DateTime.now();
-                scheduleSave();
-              }) : null,
+              value: _reminderConfig.enabled,
+              onChanged: canEdit
+                  ? (v) => setState(() {
+                        _reminderConfig = v
+                            ? _reminderConfig.copyWith(enabled: true)
+                            : const ChecklistReminderConfig();
+                        scheduleSave();
+                      })
+                  : null,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             const SizedBox(width: 16),
-            Expanded(
-              child: Text(loc.t('checklist_scheduled_for') ?? 'На когда'),
-            ),
+            Expanded(child: Text(loc.t('checklist_reminder'))),
           ],
         ),
-        if (_scheduledForEnabled && canEdit) ...[
+        if (_reminderConfig.enabled && canEdit) ...[
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: InkWell(
-                  onTap: () async {
-                    final loc = context.read<LocalizationService>();
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: _scheduledFor ?? DateTime.now(),
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2030),
-                      locale: Locale(loc.currentLanguageCode == 'en' ? 'en_GB' : loc.currentLanguageCode),
-                    );
-                    if (date != null && mounted) {
-                      setState(() {
-                        final d = _scheduledFor ?? DateTime.now();
-                        _scheduledFor = DateTime(date.year, date.month, date.day, d.hour, d.minute);
-                        scheduleSave();
-                      });
-                    }
-                  },
-                  child: InputDecorator(
-                    decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
-                    child: Text(_scheduledFor != null ? '${_scheduledFor!.day.toString().padLeft(2, '0')}.${_scheduledFor!.month.toString().padLeft(2, '0')}.${_scheduledFor!.year}' : '—'),
-                  ),
-                ),
-              ),
-              if (_scheduledForWithTime) ...[
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TimePickerField(
-                    label: loc.t('time') ?? 'Время',
-                    value: _scheduledFor != null
-                        ? '${_scheduledFor!.hour.toString().padLeft(2, '0')}:${_scheduledFor!.minute.toString().padLeft(2, '0')}'
-                        : '00:00',
-                    onChanged: (s) {
-                      final parts = s.split(':');
-                      if (parts.length >= 2 && mounted) {
-                        final h = int.tryParse(parts[0]) ?? 0;
-                        final m = int.tryParse(parts[1]) ?? 0;
-                        setState(() {
-                          final d = _scheduledFor ?? DateTime.now();
-                          _scheduledFor = DateTime(d.year, d.month, d.day, h.clamp(0, 23), m.clamp(0, 59));
-                          scheduleSave();
-                        });
+          DropdownButtonFormField<ChecklistRecurrenceKind>(
+            value: rk,
+            decoration: InputDecoration(
+              labelText: loc.t('checklist_recurrence'),
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: [
+              DropdownMenuItem(value: ChecklistRecurrenceKind.none, child: Text(loc.t('checklist_recurrence_none'))),
+              DropdownMenuItem(value: ChecklistRecurrenceKind.multiDaily, child: Text(loc.t('checklist_recurrence_multi_daily'))),
+              DropdownMenuItem(value: ChecklistRecurrenceKind.weekdays, child: Text(loc.t('checklist_recurrence_weekdays'))),
+            ],
+            onChanged: canEdit
+                ? (v) {
+                    if (v == null) return;
+                    setState(() {
+                      var next = _reminderConfig.copyWith(recurrenceKind: v);
+                      if (v == ChecklistRecurrenceKind.multiDaily && next.dailyTimes.isEmpty) {
+                        next = next.copyWith(dailyTimes: ['09:00']);
                       }
-                    },
-                    enabled: canEdit,
-                  ),
+                      _reminderConfig = next;
+                      scheduleSave();
+                    });
+                  }
+                : null,
+          ),
+          const SizedBox(height: 8),
+          if (showSingleTime) ...[
+            Row(
+              children: [
+                Switch(
+                  value: _reminderConfig.useSpecificTime,
+                  onChanged: canEdit
+                      ? (on) => setState(() {
+                            _reminderConfig = _reminderConfig.copyWith(useSpecificTime: on);
+                            scheduleSave();
+                          })
+                      : null,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                const SizedBox(width: 16),
+                Expanded(child: Text(loc.t('checklist_reminder_use_time'))),
+              ],
+            ),
+            if (_reminderConfig.useSpecificTime) ...[
+              const SizedBox(height: 8),
+              TimePickerField(
+                label: loc.t('time'),
+                value:
+                    '${_reminderConfig.hour.toString().padLeft(2, '0')}:${_reminderConfig.minute.toString().padLeft(2, '0')}',
+                onChanged: (s) {
+                  final parts = s.split(':');
+                  if (parts.length >= 2 && mounted) {
+                    final h = int.tryParse(parts[0]) ?? 0;
+                    final m = int.tryParse(parts[1]) ?? 0;
+                    setState(() {
+                      _reminderConfig = _reminderConfig.copyWith(
+                        hour: h.clamp(0, 23),
+                        minute: m.clamp(0, 59),
+                      );
+                      scheduleSave();
+                    });
+                  }
+                },
+                enabled: canEdit,
+              ),
+            ] else ...[
+              const SizedBox(height: 4),
+              Text(
+                loc.t('checklist_reminder_shift_hint'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ] else ...[
+            Text(loc.t('checklist_recurrence_multi_daily'), style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ..._reminderConfig.dailyTimes.map((t) {
+                  return InputChip(
+                    label: Text(t),
+                    deleteIcon: const Icon(Icons.close, size: 18),
+                    onDeleted: canEdit
+                        ? () {
+                            setState(() {
+                              final list = List<String>.from(_reminderConfig.dailyTimes)..remove(t);
+                              _reminderConfig = _reminderConfig.copyWith(dailyTimes: list);
+                              scheduleSave();
+                            });
+                          }
+                        : null,
+                  );
+                }),
+                ActionChip(
+                  avatar: const Icon(Icons.add, size: 18),
+                  label: Text(loc.t('checklist_add_time')),
+                  onPressed: canEdit ? _addMultiDailyTime : null,
                 ),
               ],
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Switch(
-                value: _scheduledForWithTime,
-                onChanged: canEdit ? (v) => setState(() {
-                  _scheduledForWithTime = v;
-                  if (!v && _scheduledFor != null) {
-                    _scheduledFor = DateTime(_scheduledFor!.year, _scheduledFor!.month, _scheduledFor!.day);
-                  }
-                  scheduleSave();
-                }) : null,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              const SizedBox(width: 16),
-              Expanded(child: Text(loc.t('checklist_include_time') ?? 'Указать время')),
-            ],
-          ),
+            ),
+          ],
+          if (rk == ChecklistRecurrenceKind.weekdays) ...[
+            const SizedBox(height: 12),
+            Text(loc.t('checklist_weekdays_pick'), style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: List.generate(7, (i) {
+                final day = i + 1;
+                final sel = _reminderConfig.weekdays.contains(day);
+                return FilterChip(
+                  label: Text(_weekdayLetter(day, lang)),
+                  selected: sel,
+                  onSelected: canEdit
+                      ? (v) {
+                          setState(() {
+                            final w = List<int>.from(_reminderConfig.weekdays);
+                            if (v) {
+                              if (!w.contains(day)) w.add(day);
+                            } else {
+                              w.remove(day);
+                            }
+                            w.sort();
+                            _reminderConfig = _reminderConfig.copyWith(weekdays: w);
+                            scheduleSave();
+                          });
+                        }
+                      : null,
+                );
+              }),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(child: Text(loc.t('checklist_every_n_weeks'))),
+                DropdownButton<int>(
+                  value: _reminderConfig.everyNWeeks.clamp(1, 8),
+                  items: List.generate(
+                    8,
+                    (i) => DropdownMenuItem(value: i + 1, child: Text('${i + 1}')),
+                  ),
+                  onChanged: canEdit
+                      ? (n) {
+                          if (n == null) return;
+                          setState(() {
+                            _reminderConfig = _reminderConfig.copyWith(everyNWeeks: n);
+                            scheduleSave();
+                          });
+                        }
+                      : null,
+                ),
+              ],
+            ),
+          ],
         ],
       ],
     );
@@ -1128,7 +1253,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             const SizedBox(height: 16),
             _buildDeadlineRow(loc, lang, canEdit),
             const SizedBox(height: 12),
-            _buildScheduledForRow(loc, lang, canEdit),
+            _buildReminderRow(loc, lang, canEdit),
             const SizedBox(height: 16),
             DropdownButtonFormField<String?>(
               value: _checklist?.assignedSection?.isNotEmpty == true ? _checklist!.assignedSection : null,

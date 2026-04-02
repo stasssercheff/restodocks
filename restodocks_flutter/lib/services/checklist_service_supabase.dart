@@ -100,6 +100,7 @@ class ChecklistServiceSupabase {
     List<String>? assignedEmployeeIds,
     DateTime? deadlineAt,
     DateTime? scheduledForAt,
+    ChecklistReminderConfig? reminderConfig,
     String? additionalName,
     ChecklistType? type,
     ChecklistActionConfig? actionConfig,
@@ -120,6 +121,9 @@ class ChecklistServiceSupabase {
     if (assignedEmployeeId != null) data['assigned_employee_id'] = assignedEmployeeId;
     if (deadlineAt != null) data['deadline_at'] = deadlineAt.toIso8601String();
     if (scheduledForAt != null) data['scheduled_for_at'] = scheduledForAt.toIso8601String();
+    if (reminderConfig != null && reminderConfig.enabled) {
+      data['reminder_config'] = reminderConfig.toJson();
+    }
     if (additionalName != null) data['additional_name'] = additionalName;
     data['assigned_department'] = assignedDepartment;
     if (type != null) data['type'] = type.code;
@@ -198,7 +202,17 @@ class ChecklistServiceSupabase {
     } catch (e) {
       if (!_isColumnNotFoundError(e)) rethrow;
     }
-    const optionalKeys = ['deadline_at', 'scheduled_for_at', 'assigned_section', 'assigned_employee_id', 'assigned_employee_ids', 'additional_name', 'type', 'action_config'];
+    const optionalKeys = [
+      'deadline_at',
+      'scheduled_for_at',
+      'assigned_section',
+      'assigned_employee_id',
+      'assigned_employee_ids',
+      'additional_name',
+      'type',
+      'action_config',
+      'reminder_config',
+    ];
     final stripped = Map<String, dynamic>.from(fullUpd);
     for (final k in optionalKeys) stripped.remove(k);
     try {
@@ -262,6 +276,9 @@ class ChecklistServiceSupabase {
       'additional_name': checklist.additionalName,
       'type': checklist.type?.code,
       'items': itemsPayload,
+      'reminder_config': checklist.reminderConfig != null && checklist.reminderConfig!.enabled
+          ? checklist.reminderConfig!.toJson()
+          : null,
     };
 
     // 1. Пробуем Edge Function (с retry при 5xx/сети)
@@ -286,6 +303,9 @@ class ChecklistServiceSupabase {
         'p_additional_name': checklist.additionalName,
         'p_type': checklist.type?.code,
         'p_items': itemsPayload,
+        'p_reminder_config': checklist.reminderConfig != null && checklist.reminderConfig!.enabled
+            ? checklist.reminderConfig!.toJson()
+            : null,
       });
       return;
     } catch (_) { /* пробуем прямой UPDATE */ }
@@ -303,6 +323,9 @@ class ChecklistServiceSupabase {
       'scheduled_for_at': checklist.scheduledForAt?.toUtc().toIso8601String(),
       'additional_name': checklist.additionalName,
       'type': checklist.type?.code,
+      'reminder_config': checklist.reminderConfig != null && checklist.reminderConfig!.enabled
+          ? checklist.reminderConfig!.toJson()
+          : null,
     };
     await _updateChecklistWithRetry(checklist.id, fullUpd);
     await _supabase.client.from('checklist_items').delete().eq('checklist_id', checklist.id);
@@ -338,7 +361,8 @@ class ChecklistServiceSupabase {
       assignedEmployeeId: source.assignedEmployeeId,
       assignedEmployeeIds: source.assignedEmployeeIds,
       deadlineAt: source.deadlineAt,
-      scheduledForAt: source.scheduledForAt,
+      scheduledForAt: null,
+      reminderConfig: source.reminderConfig,
       items: source.items
           .map((e) => ChecklistItem.template(
                 title: e.title,

@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import 'checklist_reminder_config.dart';
+
 const _sentinel = Object();
 
 /// Тип чеклиста: Заготовки (ТТК ПФ + своё) или Задачи (своё).
@@ -79,8 +81,10 @@ class Checklist extends Equatable {
   final List<String>? assignedEmployeeIds;
   /// Срок выполнения (опционально)
   final DateTime? deadlineAt;
-  /// На когда назначен чеклист (опционально)
+  /// На когда назначен чеклист (опционально; устарело — UI снят, при сохранении обнуляется)
   final DateTime? scheduledForAt;
+  /// Напоминания и повторение (JSON в БД `reminder_config`).
+  final ChecklistReminderConfig? reminderConfig;
 
   const Checklist({
     required this.id,
@@ -99,6 +103,7 @@ class Checklist extends Equatable {
     this.assignedEmployeeIds,
     this.deadlineAt,
     this.scheduledForAt,
+    this.reminderConfig,
   });
 
   factory Checklist.fromJson(Map<String, dynamic> json) {
@@ -127,6 +132,9 @@ class Checklist extends Equatable {
       scheduledForAt: json['scheduled_for_at'] != null
           ? DateTime.parse(json['scheduled_for_at'] as String)
           : null,
+      reminderConfig: json['reminder_config'] is Map
+          ? ChecklistReminderConfig.fromJson(Map<String, dynamic>.from(json['reminder_config'] as Map))
+          : null,
     );
   }
 
@@ -147,6 +155,7 @@ class Checklist extends Equatable {
         'assigned_employee_ids': assignedEmployeeIds,
       if (deadlineAt != null) 'deadline_at': deadlineAt!.toIso8601String(),
       if (scheduledForAt != null) 'scheduled_for_at': scheduledForAt!.toIso8601String(),
+      if (reminderConfig != null) 'reminder_config': reminderConfig!.toJson(),
     };
   }
 
@@ -167,6 +176,7 @@ class Checklist extends Equatable {
     List<String>? assignedEmployeeIds,
     DateTime? deadlineAt,
     DateTime? scheduledForAt,
+    ChecklistReminderConfig? reminderConfig,
   }) {
     return Checklist(
       id: id ?? this.id,
@@ -185,6 +195,7 @@ class Checklist extends Equatable {
       assignedEmployeeIds: assignedEmployeeIds ?? this.assignedEmployeeIds,
       deadlineAt: deadlineAt ?? this.deadlineAt,
       scheduledForAt: scheduledForAt ?? this.scheduledForAt,
+      reminderConfig: reminderConfig ?? this.reminderConfig,
     );
   }
 

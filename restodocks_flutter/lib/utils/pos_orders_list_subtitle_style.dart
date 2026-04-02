@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../services/pos_orders_display_settings_service.dart';
@@ -12,4 +13,12 @@ TextStyle? posOrderListSubtitleStyle(BuildContext context) {
   if (base == null) return null;
   final fs = base.fontSize ?? 13;
   return base.copyWith(fontSize: fs * scale);
+}
+
+/// Дата и время создания заказа в списках POS (локаль пользователя).
+String formatPosOrderListCreatedAt(DateTime createdAt, String localeName) {
+  final local = createdAt.toLocal();
+  final d = DateFormat.yMd(localeName).format(local);
+  final t = DateFormat.Hm(localeName).format(local);
+  return '$d $t';
 }

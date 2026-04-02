@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/services.dart';
 import '../../utils/pos_floor_room_label.dart';
 import '../../utils/pos_order_live_duration.dart';
 import '../../utils/pos_order_menu_due_format.dart';
+import '../../utils/pos_orders_list_subtitle_style.dart';
 import '../../widgets/app_bar_home_button.dart';
 
 /// Крупный список заказов подразделения для монитора (KDS).
@@ -97,7 +97,6 @@ class _PosKitchenDisplayScreenState extends State<PosKitchenDisplayScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
-    final timeFmt = DateFormat.Hm(Localizations.localeOf(context).toString());
     final baseStyle = Theme.of(context).textTheme.titleLarge!;
     final bigStyle = baseStyle.copyWith(fontSize: (baseStyle.fontSize ?? 20) + 6);
 
@@ -115,14 +114,14 @@ class _PosKitchenDisplayScreenState extends State<PosKitchenDisplayScreen> {
             ),
           ],
         ),
-        body: _body(loc, timeFmt, bigStyle),
+        body: _body(context, loc, bigStyle),
       ),
     );
   }
 
   Widget _body(
+    BuildContext context,
     LocalizationService loc,
-    DateFormat timeFmt,
     TextStyle bigStyle,
   ) {
     if (_loading) {
@@ -198,7 +197,10 @@ class _PosKitchenDisplayScreenState extends State<PosKitchenDisplayScreen> {
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),
                     Text(
-                      '${timeFmt.format(o.createdAt.toLocal())}',
+                      formatPosOrderListCreatedAt(
+                        o.createdAt,
+                        Localizations.localeOf(context).toString(),
+                      ),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],
