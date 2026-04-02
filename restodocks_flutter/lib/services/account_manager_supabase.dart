@@ -809,6 +809,9 @@ class AccountManagerSupabase extends ChangeNotifier {
         'p_email': email,
         'p_roles': roles,
         'p_preferred_language': lang,
+        'p_position_role': roles
+            .map((r) => r.trim().toLowerCase())
+            .firstWhere((r) => r.isNotEmpty && r != 'owner', orElse: () => ''),
       },
     );
   }
