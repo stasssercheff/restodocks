@@ -17,9 +17,8 @@ class BrandedAuthLoading extends StatelessWidget {
       return Semantics(
         label: 'Restodocks',
         child: ColoredBox(
-          // Match the red splash background from `web/index.html` so the transition
-          // doesn't look like a "second logo".
-          color: Theme.of(context).colorScheme.primary,
+          // Keep exactly the same splash color as web/index.html to avoid visible flicker.
+          color: const Color(0xFFAD292C),
           child: SizedBox.expand(
             child: Image.asset(
               'assets/images/welcome_logo.png',
