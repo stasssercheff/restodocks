@@ -18,6 +18,7 @@ class PosOrderLine {
     this.techCardCategory,
     this.techCardSections = const [],
     this.servedAt,
+    this.markingCodes = const [],
   });
 
   final String id;
@@ -43,6 +44,9 @@ class PosOrderLine {
 
   /// Когда блюдо отдано гостю (после отправки заказа).
   final DateTime? servedAt;
+
+  /// Сканированные коды маркировки (ЧЗ Data Matrix, QR и т.д.) — учёт в счёте.
+  final List<String> markingCodes;
 
   factory PosOrderLine.fromJson(Map<String, dynamic> json) {
     Map<String, dynamic>? tc;
@@ -70,6 +74,15 @@ class PosOrderLine {
       servedAt = DateTime.tryParse(servedRaw.toString());
     }
 
+    List<String> markingCodes = const [];
+    final mc = json['marking_codes'];
+    if (mc is List) {
+      markingCodes = mc
+          .map((e) => e.toString().trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+    }
+
     return PosOrderLine(
       id: json['id'] as String,
       orderId: json['order_id'] as String,
@@ -88,6 +101,7 @@ class PosOrderLine {
       techCardCategory: tc?['category'] as String?,
       techCardSections: sections,
       servedAt: servedAt,
+      markingCodes: markingCodes,
     );
   }
 

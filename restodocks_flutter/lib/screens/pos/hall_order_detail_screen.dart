@@ -14,6 +14,7 @@ import '../../utils/pos_order_department.dart';
 import '../../utils/pos_order_receipt_pdf.dart';
 import '../../utils/pos_order_totals.dart';
 import '../../widgets/app_bar_home_button.dart';
+import '../../widgets/pos_marking_scanner_screen.dart';
 
 bool _isBarDish(TechCard tc) => posLineIsBarDish(tc.category, tc.sections);
 
@@ -57,6 +58,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
   bool _billing = false;
   String? _markingLineId;
   bool _markingBatch = false;
+  /// Загрузка сканера маркировки для строки (отличается от «отдано» [_markingLineId]).
+  String? _markingScanLineId;
   bool _cancelling = false;
 
   final _discountCtrl = TextEditingController();
@@ -86,7 +89,8 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
       _cancelling ||
       _billing ||
       _markingLineId != null ||
-      _markingBatch;
+      _markingBatch ||
+      _markingScanLineId != null;
 
   String _readonlyHint(PosOrder o, LocalizationService loc) {
     if (o.status == PosOrderStatus.closed) {
@@ -741,6 +745,57 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
     }
   }
 
+  Future<void> _openMarkingScan(PosOrderLine line, LocalizationService loc) async {
+    final nav = Navigator.of(context);
+    setState(() => _markingScanLineId = line.id);
+    try {
+      final code = await nav.push<String>(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (ctx) => const PosMarkingScannerScreen(),
+        ),
+      );
+      if (!mounted || code == null || code.isEmpty) return;
+      await PosOrderService.instance.appendLineMarkingCode(
+        line.id,
+        widget.orderId,
+        code,
+      );
+      if (mounted) await _refreshLines();
+    } on PosOrderLineMarkingDuplicateException {
+      if (mounted) {
+        AppToastService.show(loc.t('pos_marking_duplicate'));
+      }
+    } on PosOrderLineMarkingLimitException {
+      if (mounted) {
+        AppToastService.show(loc.t('pos_marking_limit'));
+      }
+    } catch (e) {
+      if (mounted) AppToastService.show('${loc.t('error')}: $e');
+    } finally {
+      if (mounted) setState(() => _markingScanLineId = null);
+    }
+  }
+
+  Future<void> _removeMarkingAt(
+    PosOrderLine line,
+    int index,
+    LocalizationService loc,
+  ) async {
+    try {
+      await PosOrderService.instance.removeLineMarkingCodeAt(
+        line.id,
+        widget.orderId,
+        index,
+      );
+      if (mounted) await _refreshLines();
+    } on PosOrderNotEditableException {
+      if (mounted) AppToastService.show(loc.t('pos_order_edit_forbidden'));
+    } catch (e) {
+      if (mounted) AppToastService.show('${loc.t('error')}: $e');
+    }
+  }
+
   Future<void> _markLineServed(PosOrderLine line, LocalizationService loc) async {
     setState(() => _markingLineId = line.id);
     try {
@@ -1220,27 +1275,40 @@ class _HallOrderDetailScreenState extends State<HallOrderDetailScreen> {
                   style: Theme.of(context).textTheme.bodyLarge,
                 )
               else
-                ...lineRows.map((line) => _LineTile(
-                      line: line,
-                      lang: lang,
-                      editable: editable,
-                      canVoidLine: canVoidSentLine,
-                      orderStatus: o.status,
-                      employee: emp,
-                      timeFmt: timeFmt,
-                      markingLine: _markingLineId == line.id,
-                      loc: loc,
-                      compactDeptStaff: _deptStaffView,
-                      onQty: (q) => _setQty(line, q, loc),
-                      onDelete: () => _removeLine(line, loc),
-                      onComment: () => _editLineComment(line, loc),
-                      onEditCourseGuest: editable
-                          ? () => _editLineCourseGuest(line, loc)
-                          : null,
-                      onMarkServed: _deptStaffView
-                          ? null
-                          : () => _markLineServed(line, loc),
-                    )),
+                ...lineRows.map((line) {
+                  final canEditMarking = !_deptStaffView &&
+                      (o.status == PosOrderStatus.draft ||
+                          o.status == PosOrderStatus.sent);
+                  return _LineTile(
+                    line: line,
+                    lang: lang,
+                    editable: editable,
+                    canVoidLine: canVoidSentLine,
+                    orderStatus: o.status,
+                    employee: emp,
+                    timeFmt: timeFmt,
+                    markingLine: _markingLineId == line.id,
+                    scanningMarking: _markingScanLineId == line.id,
+                    canEditMarking: canEditMarking,
+                    onScanMarking: canEditMarking
+                        ? () => _openMarkingScan(line, loc)
+                        : null,
+                    onRemoveMarking: canEditMarking
+                        ? (i) => _removeMarkingAt(line, i, loc)
+                        : null,
+                    loc: loc,
+                    compactDeptStaff: _deptStaffView,
+                    onQty: (q) => _setQty(line, q, loc),
+                    onDelete: () => _removeLine(line, loc),
+                    onComment: () => _editLineComment(line, loc),
+                    onEditCourseGuest: editable
+                        ? () => _editLineCourseGuest(line, loc)
+                        : null,
+                    onMarkServed: _deptStaffView
+                        ? null
+                        : () => _markLineServed(line, loc),
+                  );
+                }),
               if (editable ||
                   (o.status == PosOrderStatus.sent && !_deptStaffView)) ...[
                 const SizedBox(height: 16),
@@ -1420,6 +1488,10 @@ class _LineTile extends StatelessWidget {
     required this.employee,
     required this.timeFmt,
     required this.markingLine,
+    this.scanningMarking = false,
+    this.canEditMarking = false,
+    this.onScanMarking,
+    this.onRemoveMarking,
     required this.loc,
     this.compactDeptStaff = false,
     required this.onQty,
@@ -1438,6 +1510,10 @@ class _LineTile extends StatelessWidget {
   final Employee? employee;
   final DateFormat timeFmt;
   final bool markingLine;
+  final bool scanningMarking;
+  final bool canEditMarking;
+  final VoidCallback? onScanMarking;
+  final void Function(int index)? onRemoveMarking;
   final LocalizationService loc;
   /// Без цен и «отдано» по строке (экран кухни/бара).
   final bool compactDeptStaff;
@@ -1524,6 +1600,65 @@ class _LineTile extends StatelessWidget {
                       ),
                 ),
               ),
+            ],
+            if (!compactDeptStaff &&
+                (line.markingCodes.isNotEmpty ||
+                    onScanMarking != null)) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  loc.t('pos_order_line_marking_codes'),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (var i = 0; i < line.markingCodes.length; i++)
+                    InputChip(
+                      label: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 220),
+                        child: Text(
+                          line.markingCodes[i],
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                      onDeleted: onRemoveMarking != null
+                          ? () => onRemoveMarking!(i)
+                          : null,
+                    ),
+                  if (onScanMarking != null)
+                    ActionChip(
+                      avatar: scanningMarking
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.qr_code_scanner, size: 20),
+                      label: Text(loc.t('pos_order_line_scan_marking')),
+                      onPressed: scanningMarking ? null : onScanMarking,
+                    ),
+                ],
+              ),
+              if (canEditMarking)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    loc.t('pos_order_line_marking_hint'),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ),
             ],
             if (!compactDeptStaff && line.servedAt != null) ...[
               const SizedBox(height: 8),

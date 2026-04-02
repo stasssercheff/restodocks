@@ -34,6 +34,16 @@ class PosOrderLineMarkServedException implements Exception {
   PosOrderLineMarkServedException();
 }
 
+/// Код маркировки уже есть в этой позиции.
+class PosOrderLineMarkingDuplicateException implements Exception {
+  PosOrderLineMarkingDuplicateException();
+}
+
+/// Слишком много кодов на одну позицию.
+class PosOrderLineMarkingLimitException implements Exception {
+  PosOrderLineMarkingLimitException();
+}
+
 /// Сумма платежей не совпадает с итогом счёта.
 class PosOrderPaymentMismatchException implements Exception {
   PosOrderPaymentMismatchException();
@@ -72,6 +82,7 @@ class PosOrderService {
 
   static const _lineSelect = 'id, order_id, tech_card_id, quantity, comment, '
       'course_number, guest_number, sort_order, created_at, updated_at, served_at, '
+      'marking_codes, '
       'tech_cards(dish_name, dish_name_localized, selling_price, department, '
       'category, sections)';
 
@@ -243,6 +254,68 @@ class PosOrderService {
   Future<void> deleteLine(String lineId, String orderId) async {
     await _requireDraftOrSent(orderId);
     await _supabase.client.from('pos_order_lines').delete().eq('id', lineId);
+    await _touchOrderUpdated(orderId);
+  }
+
+  /// Добавить сканированный код маркировки к строке (ЧЗ / QR / Data Matrix).
+  Future<void> appendLineMarkingCode(
+    String lineId,
+    String orderId,
+    String rawCode,
+  ) async {
+    await _requireDraftOrSent(orderId);
+    var code = rawCode.trim();
+    if (code.isEmpty) return;
+    if (code.length > 8192) code = code.substring(0, 8192);
+    final row = await _supabase.client
+        .from('pos_order_lines')
+        .select('marking_codes')
+        .eq('id', lineId)
+        .eq('order_id', orderId)
+        .maybeSingle();
+    if (row == null) throw StateError('pos_order_line_missing');
+    final existing = (row['marking_codes'] as List?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        <String>[];
+    if (existing.contains(code)) {
+      throw PosOrderLineMarkingDuplicateException();
+    }
+    if (existing.length >= 64) {
+      throw PosOrderLineMarkingLimitException();
+    }
+    final next = [...existing, code];
+    await _supabase.client.from('pos_order_lines').update({
+      'marking_codes': next,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', lineId).eq('order_id', orderId);
+    await _touchOrderUpdated(orderId);
+  }
+
+  /// Удалить код маркировки по индексу (исправление ошибки скана).
+  Future<void> removeLineMarkingCodeAt(
+    String lineId,
+    String orderId,
+    int index,
+  ) async {
+    await _requireDraftOrSent(orderId);
+    final row = await _supabase.client
+        .from('pos_order_lines')
+        .select('marking_codes')
+        .eq('id', lineId)
+        .eq('order_id', orderId)
+        .maybeSingle();
+    if (row == null) throw StateError('pos_order_line_missing');
+    final existing = (row['marking_codes'] as List?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        <String>[];
+    if (index < 0 || index >= existing.length) return;
+    final next = List<String>.from(existing)..removeAt(index);
+    await _supabase.client.from('pos_order_lines').update({
+      'marking_codes': next,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }).eq('id', lineId).eq('order_id', orderId);
     await _touchOrderUpdated(orderId);
   }
 

@@ -27,7 +27,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Camera access is used to capture photos for products, documents, and employee profiles.</string>
+	<string>Camera access is used for product photos, documents, employee profiles, and scanning marking codes (QR / Data Matrix) on receipts.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Photo library write access is used to save generated or processed images when requested.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

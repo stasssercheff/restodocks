@@ -93,18 +93,37 @@ Future<void> sharePosOrderPreReceiptPdf({
           final lineSum = l.sellingPrice != null
               ? fmtMoney(l.quantity * l.sellingPrice!)
               : '—';
+          final markingLines = l.markingCodes.isEmpty
+              ? <pw.Widget>[]
+              : [
+                  for (final c in l.markingCodes)
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.only(left: 8, top: 2),
+                      child: pw.Text(
+                        '· ${c.length > 120 ? '${c.substring(0, 120)}…' : c}',
+                        style: const pw.TextStyle(fontSize: 8),
+                        maxLines: 2,
+                      ),
+                    ),
+                ];
           return pw.Padding(
-            padding: const pw.EdgeInsets.only(bottom: 4),
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            padding: const pw.EdgeInsets.only(bottom: 6),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.stretch,
               children: [
-                pw.Expanded(
-                  child: pw.Text(
-                    '${_formatQty(l.quantity)} × $title',
-                    maxLines: 3,
-                  ),
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  children: [
+                    pw.Expanded(
+                      child: pw.Text(
+                        '${_formatQty(l.quantity)} × $title',
+                        maxLines: 3,
+                      ),
+                    ),
+                    pw.Text(lineSum),
+                  ],
                 ),
-                pw.Text(lineSum),
+                ...markingLines,
               ],
             ),
           );
