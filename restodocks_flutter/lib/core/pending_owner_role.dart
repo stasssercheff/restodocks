@@ -52,6 +52,8 @@ class PendingOwnerRole {
             },
           },
         );
+        // Pull fresh profile so Settings/Home reflect the newly persisted role immediately.
+        await account.initialize(forceRetryFromAuth: true);
         await clearForEmail(email);
       } catch (e2) {
         devLog('PendingOwnerRole.applyIfNeeded: $e / rpc fallback: $e2');
