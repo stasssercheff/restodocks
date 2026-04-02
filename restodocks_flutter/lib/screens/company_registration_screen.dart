@@ -276,6 +276,7 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
                   popupProps: PopupProps.menu(
                     showSearchBox: true,
                     searchFieldProps: TextFieldProps(
+                      autofocus: true,
                       decoration: InputDecoration(hintText: searchHint),
                     ),
                   ),

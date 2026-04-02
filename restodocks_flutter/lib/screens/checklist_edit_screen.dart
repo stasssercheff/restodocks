@@ -1063,24 +1063,35 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               }),
             ),
             const SizedBox(height: 8),
-            Row(
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Expanded(child: Text(loc.t('checklist_every_n_weeks'))),
-                DropdownButton<int>(
-                  value: _reminderConfig.everyNWeeks.clamp(1, 8),
-                  items: List.generate(
-                    8,
-                    (i) => DropdownMenuItem(value: i + 1, child: Text('${i + 1}')),
+                Text(loc.t('checklist_every_n_weeks')),
+                SizedBox(
+                  width: 92,
+                  child: DropdownButtonFormField<int>(
+                    value: _reminderConfig.everyNWeeks.clamp(1, 8),
+                    isDense: true,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    ),
+                    items: List.generate(
+                      8,
+                      (i) => DropdownMenuItem(value: i + 1, child: Text('${i + 1}')),
+                    ),
+                    onChanged: canEdit
+                        ? (n) {
+                            if (n == null) return;
+                            setState(() {
+                              _reminderConfig = _reminderConfig.copyWith(everyNWeeks: n);
+                              scheduleSave();
+                            });
+                          }
+                        : null,
                   ),
-                  onChanged: canEdit
-                      ? (n) {
-                          if (n == null) return;
-                          setState(() {
-                            _reminderConfig = _reminderConfig.copyWith(everyNWeeks: n);
-                            scheduleSave();
-                          });
-                        }
-                      : null,
                 ),
               ],
             ),
@@ -1337,7 +1348,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                   child: DropdownButtonFormField<String?>(
                     value: _checklist?.assignedSection?.isNotEmpty == true ? _checklist!.assignedSection : null,
                     decoration: InputDecoration(
-                      labelText: loc.t('checklist_section') ?? 'Цех/отдел',
+                      labelText: lang == 'ru' ? 'Цех' : 'Section',
                     ),
                     items: [
                       DropdownMenuItem(value: null, child: Text(loc.t('not_specified') ?? 'Не указан')),
@@ -1355,35 +1366,47 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 ),
               ],
             ),
-            Wrap(
-              spacing: 16,
-              runSpacing: 8,
-              children: [
-                if (canEdit)
-                  FilterChip(
-                    label: Text(loc.t('checklist_action_numeric') ?? 'Цифра'),
-                    selected: _actionHasNumeric,
-                    onSelected: (v) {
-                      setState(() {
-                        _actionHasNumeric = v;
-                        scheduleSave();
-                      });
-                    },
-                  ),
-                if (canEdit)
-                  FilterChip(
-                    label: Text(loc.t('checklist_action_toggle') ?? 'Сделано/не сделано'),
-                    selected: _actionHasToggle,
-                    onSelected: (v) {
-                      setState(() {
-                        _actionHasToggle = v;
-                        scheduleSave();
-                      });
-                    },
-                  ),
-              ],
-            ),
-            if (canEdit) const SizedBox(height: 8),
+            if (canEdit) const SizedBox(height: 12),
+            if (canEdit)
+              InputDecorator(
+                decoration: InputDecoration(
+                  labelText: lang == 'ru' ? 'Формат отметки' : 'Checklist item format',
+                  border: const OutlineInputBorder(),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      title: Text(loc.t('checklist_action_numeric') ?? 'Цифра'),
+                      value: _actionHasNumeric,
+                      onChanged: (v) {
+                        setState(() {
+                          _actionHasNumeric = v;
+                          scheduleSave();
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 4),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      title: Text(loc.t('checklist_action_toggle') ?? 'Сделано/не сделано'),
+                      value: _actionHasToggle,
+                      onChanged: (v) {
+                        setState(() {
+                          _actionHasToggle = v;
+                          scheduleSave();
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            if (canEdit) const SizedBox(height: 10),
             if (canEdit)
               TextField(
                 controller: _dropdownOptionsController,
