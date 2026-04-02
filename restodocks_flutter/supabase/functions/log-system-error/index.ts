@@ -3,7 +3,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   enforceRateLimit,
-  hasValidApiKeyOrUser,
+  getAuthenticatedUserId,
+  isServiceRoleBearer,
+  isServiceRoleRequest,
   resolveCorsHeaders,
 } from "../_shared/security.ts";
 
@@ -18,7 +20,9 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-  if (!(await hasValidApiKeyOrUser(req))) {
+  const userId = await getAuthenticatedUserId(req);
+  const isService = isServiceRoleRequest(req) || isServiceRoleBearer(req);
+  if (!isService && !userId) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -62,12 +66,31 @@ Deno.serve(async (req: Request) => {
     const src = (body.source && body.source.length > 0) ? body.source : "edge";
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { data: est } = await supabase.from("establishments").select("id").eq("id", establishmentId).maybeSingle();
+    const { data: est } = await supabase
+      .from("establishments")
+      .select("id, owner_id")
+      .eq("id", establishmentId)
+      .maybeSingle();
     if (!est?.id) {
       return new Response(JSON.stringify({ error: "Invalid establishment" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+    if (!isService && userId) {
+      const { data: emp } = await supabase
+        .from("employees")
+        .select("id")
+        .eq("id", userId)
+        .eq("establishment_id", establishmentId)
+        .maybeSingle();
+      const isOwner = String(est.owner_id ?? "") === userId;
+      if (!emp?.id && !isOwner) {
+        return new Response(JSON.stringify({ error: "Forbidden for establishment" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
 
     const row: Record<string, unknown> = {
