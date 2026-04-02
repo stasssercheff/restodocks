@@ -831,8 +831,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           .toList();
     }
     if (!isKitchenOrBar) {
-      order =
-          order.where((id) => id != HomeTileId.departmentOrders).toList();
+      order = order
+          .where((id) =>
+              id != HomeTileId.departmentOrders &&
+              id != HomeTileId.departmentSales)
+          .toList();
     }
     if (!FeatureFlags.posModuleEnabled) {
       order = order
@@ -841,6 +844,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               id != HomeTileId.hallCashRegister &&
               id != HomeTileId.hallTables &&
               id != HomeTileId.departmentOrders &&
+              id != HomeTileId.departmentSales &&
               id != HomeTileId.inventory)
           .toList();
     }
@@ -866,6 +870,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       HomeTileId.hallCashRegister: loc.t('pos_nav_cash_register'),
       HomeTileId.hallTables: loc.t('pos_nav_tables'),
       HomeTileId.departmentOrders: loc.t('order_tab_orders'),
+      HomeTileId.departmentSales: loc.t('sales_title') ?? 'Продажи',
     };
     showDialog<void>(
       context: context,

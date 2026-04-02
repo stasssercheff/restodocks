@@ -183,6 +183,11 @@ class ManagementHomeContent extends StatelessWidget {
             onTap: () => context.push('/pos/orders/$dept'),
           ),
           _Tile(
+            icon: Icons.point_of_sale_outlined,
+            title: loc.t('sales_title') ?? 'Продажи',
+            onTap: () => context.push('/sales/$dept'),
+          ),
+          _Tile(
             icon: Icons.tv_outlined,
             title: loc.t('pos_kds_title'),
             subtitle: loc.t('pos_kds_hint'),

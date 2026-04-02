@@ -180,6 +180,12 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
               'home-pos-orders-kitchen'),
           _wrap(
               _Tile(
+                  icon: Icons.point_of_sale_outlined,
+                  title: loc.t('sales_title') ?? 'Продажи',
+                  onTap: () => context.push('/sales/kitchen')),
+              'home-pos-sales-kitchen'),
+          _wrap(
+              _Tile(
                   icon: Icons.warehouse,
                   title: loc.t('pos_nav_warehouse') ?? 'Склад',
                   onTap: () => context.push('/pos/warehouse/kitchen')),
@@ -251,6 +257,12 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                     title: loc.t('order_tab_orders') ?? 'Заказы',
                     onTap: () => context.push('/pos/orders/bar')),
                 'home-pos-orders-bar'),
+            _wrap(
+                _Tile(
+                    icon: Icons.point_of_sale_outlined,
+                    title: loc.t('sales_title') ?? 'Продажи',
+                    onTap: () => context.push('/sales/bar')),
+                'home-pos-sales-bar'),
             _wrap(
                 _Tile(
                     icon: Icons.warehouse,
