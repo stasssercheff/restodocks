@@ -21,7 +21,7 @@ class BrandedAuthLoading extends StatelessWidget {
           color: const Color(0xFFAD292C),
           child: SizedBox.expand(
             child: Image.asset(
-              'assets/images/app_icon.png',
+              'assets/images/welcome_logo.png',
               fit: BoxFit.cover,
               filterQuality: FilterQuality.medium,
             ),
@@ -36,7 +36,7 @@ class BrandedAuthLoading extends StatelessWidget {
         child: Semantics(
           label: 'Restodocks',
           child: Image.asset(
-            'assets/images/app_icon.png',
+            'assets/images/welcome_logo.png',
             width: logoWidth,
             fit: BoxFit.contain,
             filterQuality: FilterQuality.medium,
