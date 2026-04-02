@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'legal_document_screen.dart';
+import '../core/pending_owner_role.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../services/services.dart';
 
@@ -442,6 +443,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text.trim(),
         interfaceLanguageCode: uiLang,
       );
+      await PendingOwnerRole.applyIfNeeded(accountManager);
 
       if (mounted) {
         // Возврат на страницу, где был пользователь до выхода (после F5)
