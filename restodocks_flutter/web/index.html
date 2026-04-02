@@ -129,14 +129,7 @@
       if (el) el.remove();
     }
     window.addEventListener('flutter-first-frame', hideLoadingScreen);
-    // Fallback: detect when Flutter adds its canvas (flt-scene-host) to DOM
-    var obs = new MutationObserver(function(mutations, observer) {
-      if (document.querySelector('flt-scene-host') || document.querySelector('canvas')) {
-        observer.disconnect();
-        hideLoadingScreen();
-      }
-    });
-    obs.observe(document.body, { childList: true, subtree: true });
+    // Do not hide by canvas mutation: it may fire before first painted frame and causes white flash.
     // Last resort: remove after 20s
     setTimeout(hideLoadingScreen, 20000);
   </script>

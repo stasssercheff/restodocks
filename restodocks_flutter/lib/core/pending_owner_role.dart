@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/employee.dart';
 import '../services/account_manager_supabase.dart';
@@ -41,7 +42,20 @@ class PendingOwnerRole {
       await account.updateEmployee(updated);
       await clearForEmail(email);
     } catch (e) {
-      devLog('PendingOwnerRole.applyIfNeeded: $e');
+      try {
+        final roles = <String>[...emp.roles, pending];
+        await Supabase.instance.client.rpc(
+          'patch_my_employee_profile',
+          params: {
+            'p_patch': {
+              'roles': roles,
+            },
+          },
+        );
+        await clearForEmail(email);
+      } catch (e2) {
+        devLog('PendingOwnerRole.applyIfNeeded: $e / rpc fallback: $e2');
+      }
     }
   }
 }
