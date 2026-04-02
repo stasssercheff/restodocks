@@ -96,6 +96,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         email,
         password,
         interfaceLanguageCode: context.read<LocalizationService>().currentLanguageCode,
+        positionRole: _selectedRole,
       );
       final authUserId = signUpResult.userId;
       if (authUserId == null) throw Exception('Не удалось создать учётную запись');

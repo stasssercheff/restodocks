@@ -134,16 +134,21 @@ class SupabaseService {
 
   /// Регистрация нового пользователя.
   /// [emailRedirectTo] — URL для редиректа после подтверждения (настройте Site URL в Supabase Dashboard).
-  Future<AuthResponse> signUpWithEmail(String email, String password,
-      {String? emailRedirectTo}) async {
+  Future<AuthResponse> signUpWithEmail(
+    String email,
+    String password, {
+    String? emailRedirectTo,
+    Map<String, dynamic>? data,
+  }) async {
     if (emailRedirectTo != null) {
       return await client.auth.signUp(
         email: email,
         password: password,
         emailRedirectTo: emailRedirectTo,
+        data: data,
       );
     }
-    return await client.auth.signUp(email: email, password: password);
+    return await client.auth.signUp(email: email, password: password, data: data);
   }
 
   /// Выход из системы

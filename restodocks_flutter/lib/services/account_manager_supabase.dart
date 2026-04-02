@@ -776,11 +776,19 @@ class AccountManagerSupabase extends ChangeNotifier {
     String email,
     String password, {
     String? interfaceLanguageCode,
+    String? positionRole,
   }) async {
+    final normalizedPosition = positionRole?.trim().toLowerCase();
     final res = await _supabase.signUpWithEmail(
       email.trim(),
       password,
       emailRedirectTo: _getEmailRedirectUrl(interfaceLanguageCode),
+      data: {
+        if (normalizedPosition != null &&
+            normalizedPosition.isNotEmpty &&
+            normalizedPosition != 'owner')
+          'position_role': normalizedPosition,
+      },
     );
     final uid = res.user?.id ?? _supabase.currentUser?.id;
     final hasSession = res.session != null;
