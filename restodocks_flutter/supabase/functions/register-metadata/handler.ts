@@ -3,7 +3,6 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   enforceRateLimit,
   getAuthenticatedUserId,
-  hasValidApiKeyOrUser,
   isServiceRoleRequest,
   resolveCorsHeaders,
 } from "../_shared/security.ts";
@@ -53,7 +52,9 @@ export async function handleRequest(req: Request): Promise<Response> {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   }
-  if (!(await hasValidApiKeyOrUser(req))) {
+  const userId = await getAuthenticatedUserId(req);
+  const isService = isServiceRoleRequest(req);
+  if (!isService && !userId) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...cors, "Content-Type": "application/json" },
@@ -86,11 +87,9 @@ export async function handleRequest(req: Request): Promise<Response> {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const userId = await getAuthenticatedUserId(req);
-
     let allowed = false;
 
-    if (isServiceRoleRequest(req)) {
+    if (isService) {
       allowed = true;
     } else if (userId) {
       const { data: allowedEmployee } = await supabase
