@@ -9,15 +9,27 @@ String? formatChecklistReminderSubtitle(
   LocalizationService loc,
   String lang,
 ) {
-  if (cfg == null || !cfg.enabled) return null;
+  if (cfg == null || !cfg.hasAny) return null;
   final localeTag = lang == 'ru' ? 'ru' : 'en';
-  return cfg.buildSummary(
-    reminderLabel: loc.t('checklist_reminder_short'),
-    atShiftStart: loc.t('checklist_reminder_shift_start'),
+  if (cfg.enabled) {
+    return cfg.buildSummary(
+      reminderLabel: loc.t('checklist_reminder_short'),
+      atShiftStart: loc.t('checklist_reminder_shift_start'),
+      recurrenceNone: loc.t('checklist_recurrence_none'),
+      recurrenceMulti: loc.t('checklist_recurrence_multi_daily'),
+      recurrenceWeekdays: loc.t('checklist_recurrence_weekdays'),
+      everyNWeeksLabel: loc.t('checklist_every_n_weeks_short'),
+      formatWeekdayShort: (iso) => DateFormat.E(localeTag).format(DateTime(2024, 1, iso)),
+    );
+  }
+  // Повторение без уведомлений
+  final s = cfg.buildRecurrenceOnlySummary(
+    recurrenceLabel: loc.t('checklist_recurrence_short') ?? loc.t('checklist_recurrence'),
     recurrenceNone: loc.t('checklist_recurrence_none'),
     recurrenceMulti: loc.t('checklist_recurrence_multi_daily'),
     recurrenceWeekdays: loc.t('checklist_recurrence_weekdays'),
     everyNWeeksLabel: loc.t('checklist_every_n_weeks_short'),
     formatWeekdayShort: (iso) => DateFormat.E(localeTag).format(DateTime(2024, 1, iso)),
   );
+  return s.isEmpty ? null : s;
 }

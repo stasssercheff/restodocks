@@ -121,7 +121,7 @@ class ChecklistServiceSupabase {
     if (assignedEmployeeId != null) data['assigned_employee_id'] = assignedEmployeeId;
     if (deadlineAt != null) data['deadline_at'] = deadlineAt.toIso8601String();
     if (scheduledForAt != null) data['scheduled_for_at'] = scheduledForAt.toIso8601String();
-    if (reminderConfig != null && reminderConfig.enabled) {
+    if (reminderConfig != null && reminderConfig.hasAny) {
       data['reminder_config'] = reminderConfig.toJson();
     }
     if (additionalName != null) data['additional_name'] = additionalName;
@@ -276,7 +276,7 @@ class ChecklistServiceSupabase {
       'additional_name': checklist.additionalName,
       'type': checklist.type?.code,
       'items': itemsPayload,
-      'reminder_config': checklist.reminderConfig != null && checklist.reminderConfig!.enabled
+      'reminder_config': checklist.reminderConfig != null && checklist.reminderConfig!.hasAny
           ? checklist.reminderConfig!.toJson()
           : null,
     };
@@ -303,7 +303,7 @@ class ChecklistServiceSupabase {
         'p_additional_name': checklist.additionalName,
         'p_type': checklist.type?.code,
         'p_items': itemsPayload,
-        'p_reminder_config': checklist.reminderConfig != null && checklist.reminderConfig!.enabled
+        'p_reminder_config': checklist.reminderConfig != null && checklist.reminderConfig!.hasAny
             ? checklist.reminderConfig!.toJson()
             : null,
       });
@@ -323,7 +323,7 @@ class ChecklistServiceSupabase {
       'scheduled_for_at': checklist.scheduledForAt?.toUtc().toIso8601String(),
       'additional_name': checklist.additionalName,
       'type': checklist.type?.code,
-      'reminder_config': checklist.reminderConfig != null && checklist.reminderConfig!.enabled
+      'reminder_config': checklist.reminderConfig != null && checklist.reminderConfig!.hasAny
           ? checklist.reminderConfig!.toJson()
           : null,
     };

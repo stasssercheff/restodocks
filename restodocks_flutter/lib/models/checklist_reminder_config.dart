@@ -25,7 +25,13 @@ class ChecklistReminderConfig extends Equatable {
   static const defaultShiftHour = 9;
   static const defaultShiftMinute = 0;
 
+  /// Включено ли системное уведомление (notification time / начало смены).
   final bool enabled;
+  /// Включено ли повторение (расписание повторов чеклиста).
+  final bool recurrenceEnabled;
+  /// Дата завершения повторения (если null — повторение бессрочно).
+  /// Храним как дату (без времени); в JSON — ISO `YYYY-MM-DD`.
+  final DateTime? recurrenceEndDate;
   /// Если true — использовать [hour]/[minute]; иначе «начало смены» ([defaultShiftHour]:[defaultShiftMinute] до появления графика в продукте).
   final bool useSpecificTime;
   final int hour;
@@ -41,6 +47,8 @@ class ChecklistReminderConfig extends Equatable {
 
   const ChecklistReminderConfig({
     this.enabled = false,
+    this.recurrenceEnabled = false,
+    this.recurrenceEndDate,
     this.useSpecificTime = false,
     this.hour = defaultShiftHour,
     this.minute = defaultShiftMinute,
@@ -50,12 +58,12 @@ class ChecklistReminderConfig extends Equatable {
     this.everyNWeeks = 1,
   });
 
-  bool get isEmpty => !enabled;
+  bool get hasAny => enabled || recurrenceEnabled;
+  bool get isEmpty => !hasAny;
 
   factory ChecklistReminderConfig.fromJson(Map<String, dynamic>? json) {
     if (json == null || json.isEmpty) return const ChecklistReminderConfig();
-    final enabled = json['enabled'] == true;
-    if (!enabled) return const ChecklistReminderConfig();
+    final enabled = json['notify_enabled'] == true || json['enabled'] == true;
     final useSpecificTime = json['use_specific_time'] == true;
     final hour = (json['hour'] as num?)?.clamp(0, 23).toInt() ?? defaultShiftHour;
     final minute = (json['minute'] as num?)?.clamp(0, 59).toInt() ?? defaultShiftMinute;
@@ -78,8 +86,21 @@ class ChecklistReminderConfig extends Equatable {
       weekdays.sort();
     }
     final every = (json['every_n_weeks'] as num?)?.clamp(1, 8).toInt() ?? 1;
+    final recurrenceEnabled = json.containsKey('recurrence_enabled')
+        ? json['recurrence_enabled'] == true
+        : kind != ChecklistRecurrenceKind.none;
+    DateTime? endDate;
+    final endRaw = json['recurrence_end_date'];
+    if (endRaw is String && endRaw.trim().isNotEmpty) {
+      // ISO date: YYYY-MM-DD (или полноценный ISO datetime — берём дату).
+      final p = DateTime.tryParse(endRaw.trim());
+      if (p != null) endDate = DateTime(p.year, p.month, p.day);
+    }
+    if (!enabled && !recurrenceEnabled) return const ChecklistReminderConfig();
     return ChecklistReminderConfig(
-      enabled: true,
+      enabled: enabled,
+      recurrenceEnabled: recurrenceEnabled,
+      recurrenceEndDate: endDate,
       useSpecificTime: useSpecificTime,
       hour: hour,
       minute: minute,
@@ -91,18 +112,24 @@ class ChecklistReminderConfig extends Equatable {
   }
 
   Map<String, dynamic> toJson() {
-    if (!enabled) {
+    if (!hasAny) {
       return {'enabled': false};
     }
     return {
-      'enabled': true,
-      'use_specific_time': useSpecificTime,
-      'hour': hour,
-      'minute': minute,
-      'recurrence_kind': recurrenceKind.jsonValue,
-      'daily_times': recurrenceKind == ChecklistRecurrenceKind.multiDaily ? dailyTimes : <String>[],
-      'weekdays': recurrenceKind == ChecklistRecurrenceKind.weekdays ? weekdays : <int>[],
-      'every_n_weeks': recurrenceKind == ChecklistRecurrenceKind.weekdays ? everyNWeeks.clamp(1, 8) : 1,
+      // legacy key used by existing SQL/functions
+      'enabled': enabled,
+      'notify_enabled': enabled,
+      'recurrence_enabled': recurrenceEnabled,
+      'use_specific_time': enabled ? useSpecificTime : false,
+      'hour': enabled ? hour : defaultShiftHour,
+      'minute': enabled ? minute : defaultShiftMinute,
+      'recurrence_kind': recurrenceEnabled ? recurrenceKind.jsonValue : ChecklistRecurrenceKind.none.jsonValue,
+      'daily_times': recurrenceEnabled && recurrenceKind == ChecklistRecurrenceKind.multiDaily ? dailyTimes : <String>[],
+      'weekdays': recurrenceEnabled && recurrenceKind == ChecklistRecurrenceKind.weekdays ? weekdays : <int>[],
+      'every_n_weeks': recurrenceEnabled && recurrenceKind == ChecklistRecurrenceKind.weekdays ? everyNWeeks.clamp(1, 8) : 1,
+      'recurrence_end_date': recurrenceEnabled && recurrenceEndDate != null
+          ? '${recurrenceEndDate!.year.toString().padLeft(4, '0')}-${recurrenceEndDate!.month.toString().padLeft(2, '0')}-${recurrenceEndDate!.day.toString().padLeft(2, '0')}'
+          : null,
     };
   }
 
@@ -157,8 +184,43 @@ class ChecklistReminderConfig extends Equatable {
     return buf.toString();
   }
 
+  /// Краткая строка, когда повторение включено, а уведомление — нет.
+  String buildRecurrenceOnlySummary({
+    required String recurrenceLabel,
+    required String recurrenceNone,
+    required String recurrenceMulti,
+    required String recurrenceWeekdays,
+    required String everyNWeeksLabel,
+    required String Function(int isoWeekday) formatWeekdayShort,
+  }) {
+    if (!recurrenceEnabled) return '';
+    final buf = StringBuffer(recurrenceLabel);
+    switch (recurrenceKind) {
+      case ChecklistRecurrenceKind.none:
+        buf.write(': $recurrenceNone');
+        break;
+      case ChecklistRecurrenceKind.multiDaily:
+        buf.write(': $recurrenceMulti');
+        if (dailyTimes.isNotEmpty) buf.write(' (${dailyTimes.join(', ')})');
+        break;
+      case ChecklistRecurrenceKind.weekdays:
+        if (weekdays.isEmpty) {
+          buf.write(': $recurrenceWeekdays');
+        } else {
+          final wd = weekdays.map(formatWeekdayShort).join(', ');
+          final n = everyNWeeks.clamp(1, 8);
+          buf.write(': $recurrenceWeekdays: $wd');
+          buf.write(' · $everyNWeeksLabel: $n');
+        }
+        break;
+    }
+    return buf.toString();
+  }
+
   ChecklistReminderConfig copyWith({
     bool? enabled,
+    bool? recurrenceEnabled,
+    DateTime? recurrenceEndDate,
     bool? useSpecificTime,
     int? hour,
     int? minute,
@@ -169,6 +231,8 @@ class ChecklistReminderConfig extends Equatable {
   }) {
     return ChecklistReminderConfig(
       enabled: enabled ?? this.enabled,
+      recurrenceEnabled: recurrenceEnabled ?? this.recurrenceEnabled,
+      recurrenceEndDate: recurrenceEndDate ?? this.recurrenceEndDate,
       useSpecificTime: useSpecificTime ?? this.useSpecificTime,
       hour: hour ?? this.hour,
       minute: minute ?? this.minute,
@@ -182,6 +246,10 @@ class ChecklistReminderConfig extends Equatable {
   @override
   List<Object?> get props => [
         enabled,
+        recurrenceEnabled,
+        recurrenceEndDate?.year,
+        recurrenceEndDate?.month,
+        recurrenceEndDate?.day,
         useSpecificTime,
         hour,
         minute,

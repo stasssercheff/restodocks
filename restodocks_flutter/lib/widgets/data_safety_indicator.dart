@@ -15,7 +15,7 @@ class DataSafetyIndicator extends StatelessWidget {
 
     return Positioned(
       top: 8, // В пустой области между датой и строкой поиска
-      left: 16,
+      right: 16,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
