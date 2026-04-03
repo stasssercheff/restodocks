@@ -1,6 +1,9 @@
 -- get_establishment_promo_for_owner: отдать is_disabled для UI (промокод отключён в админке).
+-- Смена RETURNS TABLE требует DROP, иначе ERROR: cannot change return type of existing function.
 
-CREATE OR REPLACE FUNCTION public.get_establishment_promo_for_owner(p_establishment_id uuid)
+DROP FUNCTION IF EXISTS public.get_establishment_promo_for_owner(uuid);
+
+CREATE FUNCTION public.get_establishment_promo_for_owner(p_establishment_id uuid)
 RETURNS TABLE (code text, expires_at timestamptz, is_disabled boolean)
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -41,3 +44,7 @@ $$;
 
 COMMENT ON FUNCTION public.get_establishment_promo_for_owner(uuid) IS
   'Код, срок и флаг отключения промокода для заведения; только собственник.';
+
+REVOKE ALL ON FUNCTION public.get_establishment_promo_for_owner(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_establishment_promo_for_owner(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_establishment_promo_for_owner(uuid) TO service_role;
