@@ -17,6 +17,7 @@ import 'offline_cache_service.dart';
 import 'realtime_sync_service.dart';
 import 'pos_dining_layout_service.dart';
 import 'edge_function_http.dart';
+import 'email_service.dart';
 import 'secure_storage_service.dart';
 import 'supabase_service.dart';
 import 'fcm_push_service.dart';
@@ -594,12 +595,23 @@ class AccountManagerSupabase extends ChangeNotifier {
       throw Exception('create_co_owner_invitation: no token in response');
     }
 
-    // Отправка email с ссылкой (здесь должна быть интеграция с email сервисом)
     final invitationLink =
         '$publicAppOrigin/accept-co-owner-invitation?token=${Uri.encodeComponent(token)}';
-    devLog('Invitation link: $invitationLink'); // Временно выводим в консоль
+    devLog('Invitation link: $invitationLink');
 
-    // TODO: Интегрировать с email сервисом для отправки приглашения
+    final estName = _establishment?.id == establishmentId
+        ? _establishment?.name
+        : null;
+    final emailResult = await EmailService().sendCoOwnerInvitationEmail(
+      to: email.trim(),
+      invitationLink: invitationLink,
+      establishmentName: estName,
+    );
+    if (!emailResult.ok) {
+      throw Exception(
+        emailResult.error ?? 'Не удалось отправить письмо с приглашением',
+      );
+    }
   }
 
   /// Удалить тестовые записи сотрудников (использовать только для разработки!)

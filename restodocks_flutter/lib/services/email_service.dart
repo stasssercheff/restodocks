@@ -215,6 +215,55 @@ class EmailService {
     }
   }
 
+  /// Приглашение соучредителя: ссылка на accept-co-owner-invitation.
+  Future<({bool ok, String? error})> sendCoOwnerInvitationEmail({
+    required String to,
+    required String invitationLink,
+    String? establishmentName,
+  }) async {
+    try {
+      final displayName =
+          (establishmentName != null && establishmentName.trim().isNotEmpty)
+              ? establishmentName.trim()
+              : 'Restodocks';
+      final safeName = _escapeHtml(displayName);
+      final safeLink = _escapeHtml(invitationLink);
+      final html = '''
+<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+  <h2 style="color:#333">Приглашение соучредителя</h2>
+  <p>Вас пригласили стать соучредителем заведения <strong>$safeName</strong> в Restodocks.</p>
+  <p><a href="$safeLink" style="display:inline-block;padding:12px 24px;background:#1976d2;color:#fff;text-decoration:none;border-radius:8px">Принять приглашение</a></p>
+  <p style="color:#666;font-size:14px">Если кнопка не открывается, скопируйте ссылку в браузер:</p>
+  <p style="word-break:break-all;font-size:13px;color:#333">$safeLink</p>
+</div>
+''';
+      final res = await _invokeSendEmailHttp({
+        'to': to.trim(),
+        'subject': 'Приглашение соучредителя Restodocks — $displayName',
+        'html': html,
+      });
+      if (res.status == 200) {
+        final bodyError = res.data?['error']?.toString();
+        if (bodyError != null && bodyError.isNotEmpty) {
+          return (ok: false, error: bodyError);
+        }
+        return (ok: true, error: null);
+      }
+      final msg = res.data?['error']?.toString() ?? 'HTTP ${res.status}';
+      return (ok: false, error: msg);
+    } catch (e) {
+      return (ok: false, error: e.toString());
+    }
+  }
+
+  static String _escapeHtml(String s) {
+    return s
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
+  }
+
   /// Отправить заказ продуктов на email через Resend (с вложением PDF).
   /// [pdfBytes] — сгенерированный PDF заказа (если null, письмо уходит только с html).
   Future<({bool ok, String? error})> sendOrderEmail({
