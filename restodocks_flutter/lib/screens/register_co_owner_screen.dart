@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../core/pending_co_owner_registration.dart';
 import '../models/models.dart';
 import '../services/services.dart';
+import '../utils/dev_log.dart';
 import '../utils/person_name_format.dart';
 
 /// Регистрация соучредителя после принятия приглашения (employees.id = auth.users.id)
@@ -106,12 +107,22 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
           birthday: _birthday,
           languageCode: interfaceLang,
         );
+        var resendFailed = false;
+        final confirmMail = await EmailService().sendConfirmationLinkRequest(
+          email,
+          languageCode: interfaceLang,
+          password: password,
+        );
+        if (!confirmMail.ok) {
+          devLog('RegisterCoOwner: sendConfirmationLinkRequest failed: ${confirmMail.error}');
+          resendFailed = true;
+        }
         if (!mounted) {
           return;
         }
         setState(() => _isLoading = false);
-        // Подтверждение email уже уходит Supabase Auth при signUp.
-        final q = 'email=${Uri.encodeComponent(email)}&resendFailed=0';
+        final q =
+            'email=${Uri.encodeComponent(email)}&resendFailed=${resendFailed ? '1' : '0'}';
         context.go('/confirm-email?$q');
         return;
       }

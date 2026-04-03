@@ -104,8 +104,7 @@ class PendingCoOwnerRegistration {
         Map<String, dynamic>.from(estData as Map),
       );
 
-      // После успешного создания co-owner отправляем "данные" письмо.
-      // Подтверждение email уже присылает Supabase Auth на этапе signUp.
+      // После подтверждения почты и RPC — письмо с данными co-owner (ссылка уже использована ранее).
       try {
         final fullName = surname.trim().isEmpty
             ? firstName.trim()
