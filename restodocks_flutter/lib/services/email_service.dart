@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../core/public_app_origin.dart';
 import '../utils/dev_log.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -28,6 +29,35 @@ class EmailService {
       body,
       bearerAlwaysAnon: true,
     );
+  }
+
+  /// Если Edge (Resend) недоступен или отвечает 401 — стандартное письмо подтверждения через Auth API (тот же anon).
+  Future<({bool ok, String? error})> _tryAuthResendSignupConfirmation(
+    String email,
+    String? languageCode,
+  ) async {
+    try {
+      final lang = (languageCode ?? 'en').trim().toLowerCase();
+      final redirect =
+          '$publicAppOriginForEmailRedirect/auth/confirm?lang=${Uri.encodeComponent(lang)}';
+      await _client.auth.resend(
+        email: email.trim(),
+        type: OtpType.signup,
+        emailRedirectTo: redirect,
+      );
+      devLog('EmailService: auth.resend(signup) ok fallback for ${email.trim()}');
+      return (ok: true, error: null);
+    } catch (e, st) {
+      devLog('EmailService: auth.resend(signup) fallback failed: $e\n$st');
+      return (ok: false, error: e.toString());
+    }
+  }
+
+  bool _shouldFallbackToAuthResend(int status) {
+    return status == 0 ||
+        status == 401 ||
+        status == 403 ||
+        (status >= 500 && status < 600);
   }
 
   /// Отправить письмо при регистрации (владелец или сотрудник).
@@ -92,6 +122,10 @@ class EmailService {
         if (password != null && password.isNotEmpty) 'password': password,
       });
       if (res.status == 200) return (ok: true, error: null);
+      if (_shouldFallbackToAuthResend(res.status)) {
+        final fb = await _tryAuthResendSignupConfirmation(to, languageCode);
+        if (fb.ok) return fb;
+      }
       if (res.status == 0) {
         return (
           ok: false,
@@ -120,6 +154,10 @@ class EmailService {
         'password': password,
       });
       if (res.status == 200) return (ok: true, error: null);
+      if (_shouldFallbackToAuthResend(res.status)) {
+        final fb = await _tryAuthResendSignupConfirmation(to, null);
+        if (fb.ok) return fb;
+      }
       if (res.status == 0) {
         return (
           ok: false,
