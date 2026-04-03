@@ -5,9 +5,7 @@
       {
         "appID": "G53JSVB22Q.com.stassser.restodocks.dev.srebrikov",
         "paths": [
-          "/auth/*",
-          "/accept-co-owner-invitation*",
-          "/register-co-owner*"
+          "/auth/*"
         ]
       }
     ]

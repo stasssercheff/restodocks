@@ -89,24 +89,26 @@ class _AcceptCoOwnerInvitationScreenState
     }
   }
 
+  /// Центр по вертикали и горизонтали: SliverFillRemaining даёт конечную высоту под body,
+  /// в отличие от SingleChildScrollView + minHeight (там maxHeight по оси скролла бесконечен).
   Widget _bodyWithScroll(Widget child) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SafeArea(
-          child: SingleChildScrollView(
+    return SafeArea(
+      child: CustomScrollView(
+        slivers: [
+          SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: constraints.maxHeight -
-                    MediaQuery.of(context).padding.vertical -
-                    48,
-                maxWidth: 440,
+            sliver: SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: child,
+                ),
               ),
-              child: Center(child: child),
             ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -155,8 +157,7 @@ class _AcceptCoOwnerInvitationScreenState
             const Icon(Icons.person_add, size: 64, color: Colors.blue),
             const SizedBox(height: 24),
             Text(
-              loc.t('co_owner_invitation_title') ??
-                  'Приглашение стать соучредителем',
+              loc.t('co_owner_invitation_title'),
               style: Theme.of(context).textTheme.headlineSmall,
               textAlign: TextAlign.center,
             ),
@@ -168,14 +169,13 @@ class _AcceptCoOwnerInvitationScreenState
             ),
             const SizedBox(height: 8),
             Text(
-              loc.t('co_owner_invitation_description') ??
-                  'Вы были приглашены стать соучредителем этого заведения. Примите приглашение, чтобы продолжить регистрацию.',
+              loc.t('co_owner_invitation_description'),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
             ElevatedButton(
               onPressed: _acceptInvitation,
-              child: Text(loc.t('accept_invitation') ?? 'Принять приглашение'),
+              child: Text(loc.t('accept_invitation')),
             ),
             const SizedBox(height: 16),
             TextButton(

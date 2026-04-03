@@ -172,27 +172,30 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
     }
   }
 
-  Widget _scrollableCenteredBody(Widget child) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minHeight: constraints.maxHeight -
-                    MediaQuery.of(context).padding.vertical -
-                    48,
-                maxWidth: 440,
+  /// [scrollForm]: true — внутри скролл (клавиатура, длинная форма); false — блок по центру экрана.
+  Widget _centeredBody(Widget child, {required bool scrollForm}) {
+    final padded = SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      sliver: SliverFillRemaining(
+        hasScrollBody: scrollForm,
+        child: scrollForm
+            ? SingleChildScrollView(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 440),
+                    child: child,
+                  ),
+                ),
+              )
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: child,
+                ),
               ),
-              child: Center(
-                child: child,
-              ),
-            ),
-          ),
-        );
-      },
+      ),
     );
+    return SafeArea(child: CustomScrollView(slivers: [padded]));
   }
 
   @override
@@ -215,7 +218,7 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
             ),
           ],
         ),
-        body: _scrollableCenteredBody(
+        body: _centeredBody(
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -227,6 +230,7 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
               ),
             ],
           ),
+          scrollForm: false,
         ),
       );
     }
@@ -244,7 +248,7 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
           ),
         ],
       ),
-      body: _scrollableCenteredBody(
+      body: _centeredBody(
         Form(
           key: _formKey,
           child: Column(
@@ -337,6 +341,7 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
             ],
           ),
         ),
+        scrollForm: true,
       ),
     );
   }
