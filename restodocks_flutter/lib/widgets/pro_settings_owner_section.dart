@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -24,11 +26,22 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
   late Future<EstablishmentPromoInfo> _promoFuture;
   AppleIapService? _iap;
   int _lastIapSuccessToken = 0;
+  Timer? _promoReloadDebounce;
 
   @override
   void initState() {
     super.initState();
     _promoFuture = widget.accountManager.getEstablishmentPromoForOwner();
+    widget.accountManager.addListener(_onAccountChanged);
+  }
+
+  void _onAccountChanged() {
+    if (!mounted) return;
+    _promoReloadDebounce?.cancel();
+    _promoReloadDebounce = Timer(const Duration(milliseconds: 350), () {
+      if (!mounted) return;
+      _reloadPromo();
+    });
   }
 
   @override
@@ -44,6 +57,8 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
 
   @override
   void dispose() {
+    _promoReloadDebounce?.cancel();
+    widget.accountManager.removeListener(_onAccountChanged);
     _iap?.removeListener(_onIapChanged);
     super.dispose();
   }
@@ -255,16 +270,25 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
             String subtitle;
             if (!hasPromo) {
               subtitle = loc.t('pro_promo_subtitle_none');
+            } else if (promo.isDisabled) {
+              subtitle = loc.t('pro_promo_subtitle_disabled');
             } else if (promo.expiresAt != null) {
               subtitle = loc.t('pro_promo_subtitle_until',
                   args: {'date': _formatDate(promo.expiresAt!)});
             } else {
               subtitle = loc.t('pro_promo_subtitle_no_expiry');
             }
+            final subtitleStyle = hasPromo && promo.isDisabled
+                ? TextStyle(color: Theme.of(context).colorScheme.error)
+                : null;
             return ListTile(
-              leading: const Icon(Icons.local_offer_outlined),
+              leading: Icon(
+                hasPromo && promo.isDisabled
+                    ? Icons.block_flipped
+                    : Icons.local_offer_outlined,
+              ),
               title: Text(loc.t('pro_promo_title')),
-              subtitle: Text(subtitle),
+              subtitle: Text(subtitle, style: subtitleStyle),
               trailing: Icon(hasPromo ? Icons.info_outline : Icons.edit_outlined),
               onTap: hasPromo
                   ? () {
@@ -282,6 +306,15 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                               Text(
                                   '${loc.t('pro_promo_code_label')}: ${promo.code}'),
                               const SizedBox(height: 12),
+                              if (promo.isDisabled) ...[
+                                Text(
+                                  loc.t('promo_code_disabled'),
+                                  style: TextStyle(
+                                    color: Theme.of(ctx).colorScheme.error,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                              ],
                               Text(
                                   '${loc.t('pro_promo_valid_until_label')}: $expText'),
                             ],

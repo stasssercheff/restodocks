@@ -1,6 +1,7 @@
 // Экспорт всех сервисов
 export 'account_manager.dart';
 export 'account_manager_supabase.dart';
+export 'apple_iap_service.dart';
 export 'product_store.dart';
 export 'product_store_supabase.dart';
 export 'localization_service.dart';

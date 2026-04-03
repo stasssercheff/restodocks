@@ -57,6 +57,11 @@ class AppProviders {
         ChangeNotifierProvider<AccountManagerSupabase>(
           create: (_) => AccountManagerSupabase(),
         ),
+        ChangeNotifierProvider<AppleIapService>(
+          create: (context) => AppleIapService(
+            accountManager: context.read<AccountManagerSupabase>(),
+          ),
+        ),
         Provider<ProductStoreSupabase>(
           create: (_) => ProductStoreSupabase(),
         ),

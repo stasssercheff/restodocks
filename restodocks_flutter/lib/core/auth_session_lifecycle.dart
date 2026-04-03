@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'auth_visibility_resume_stub.dart'
     if (dart.library.html) 'auth_visibility_resume_web.dart' as auth_vis;
+import '../services/account_manager_supabase.dart';
 import '../utils/dev_log.dart';
 
 /// На вебе при простое истекает access_token; без refresh роль становится anon, RLS на
@@ -66,12 +67,15 @@ class _AuthSessionLifecycleState extends State<AuthSessionLifecycle>
 
   Future<void> _tryRefreshSession() async {
     final client = Supabase.instance.client;
-    if (client.auth.currentSession == null) return;
-    try {
-      await client.auth.refreshSession();
-    } catch (e, st) {
-      devLog('[Auth] refreshSession after resume/visible: $e\n$st');
+    if (client.auth.currentSession != null) {
+      try {
+        await client.auth.refreshSession();
+      } catch (e, st) {
+        devLog('[Auth] refreshSession after resume/visible: $e\n$st');
+      }
     }
+    // В т.ч. legacy-вход без JWT: проверка промо/Pro на сервере при возврате в приложение.
+    unawaited(AccountManagerSupabase().syncEstablishmentAccessFromServer());
   }
 
   @override

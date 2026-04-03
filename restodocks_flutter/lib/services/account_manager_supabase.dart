@@ -149,7 +149,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       if (ok) {
         devLog(
             '🔐 AccountManager: User data loaded from Auth, logged in: $isLoggedInSync');
-        await _checkPromoAccess();
+        await syncEstablishmentAccessFromServer();
         return;
       }
       // JWT есть в Keychain, а сотрудник/RLS не сходятся — «зомби»-сессия: мешает входу по паролю.
@@ -168,12 +168,14 @@ class AccountManagerSupabase extends ChangeNotifier {
       devLog('🔐 AccountManager: Restoring session from storage...');
       await _restoreSession(employeeId, establishmentId);
       devLog('🔐 AccountManager: Session restored, logged in: $isLoggedInSync');
-      await _checkPromoAccess();
+      await syncEstablishmentAccessFromServer();
     }
   }
 
-  /// Проверяет не истёк ли промокод заведения. Если истёк — разлогинивает.
-  Future<void> _checkPromoAccess() async {
+  /// Проверка доступа заведения (промо/отключение/срок) и актуализация Pro с сервера.
+  /// При `expired` (истёк или отключён промокод) — [logout].
+  /// Вызывать после входа, при возврате приложения на передний план и после применения промокода.
+  Future<void> syncEstablishmentAccessFromServer() async {
     final estId = _establishment?.id;
     if (estId == null) return;
     try {
@@ -183,12 +185,13 @@ class AccountManagerSupabase extends ChangeNotifier {
       );
       if (result == 'expired') {
         devLog(
-            '🔐 AccountManager: Promo code expired for establishment $estId — logging out');
+            '🔐 AccountManager: Establishment access revoked (promo expired/disabled) $estId — logging out');
         await logout();
+        return;
       }
+      await refreshCurrentEstablishmentFromServer();
     } catch (e) {
-      devLog('🔐 AccountManager: _checkPromoAccess error (ignored): $e');
-      // Не блокируем доступ при ошибке сети
+      devLog('🔐 AccountManager: syncEstablishmentAccessFromServer error (ignored): $e');
     }
   }
 
@@ -1281,6 +1284,10 @@ class AccountManagerSupabase extends ChangeNotifier {
       await _secureStorage.remove(_keyRememberEmail);
       await _secureStorage.remove(_keyRememberPassword);
     }
+    await syncEstablishmentAccessFromServer();
+    if (!isLoggedInSync) {
+      return;
+    }
     notifyListeners();
   }
 
@@ -1770,7 +1777,13 @@ class AccountManagerSupabase extends ChangeNotifier {
       if (rawExp != null) {
         exp = DateTime.tryParse(rawExp.toString());
       }
-      return EstablishmentPromoInfo(code: code, expiresAt: exp);
+      final rawDis = m['is_disabled'];
+      final isDisabled = rawDis == true || rawDis == 1;
+      return EstablishmentPromoInfo(
+        code: code,
+        expiresAt: exp,
+        isDisabled: isDisabled,
+      );
     } catch (e, st) {
       devLog('getEstablishmentPromoForOwner: $e $st');
       return const EstablishmentPromoInfo(loadFailed: true);
@@ -1811,7 +1824,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       },
     );
     await refreshCurrentEstablishmentFromServer();
-    await _checkPromoAccess();
+    await syncEstablishmentAccessFromServer();
   }
 }
 
@@ -1821,11 +1834,15 @@ class EstablishmentPromoInfo {
     this.code,
     this.expiresAt,
     this.loadFailed = false,
+    this.isDisabled = false,
   });
 
   final String? code;
   final DateTime? expiresAt;
   final bool loadFailed;
+
+  /// Промокод отключён в админке ([is_disabled]); доступ блокируется на сервере.
+  final bool isDisabled;
 
   bool get hasPromo => !loadFailed && code != null && code!.isNotEmpty;
 }

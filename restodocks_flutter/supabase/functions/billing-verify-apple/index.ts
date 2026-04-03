@@ -134,8 +134,8 @@ Deno.serve(async (req: Request) => {
       const { data: caller, error: callerError } = await supabase
         .from("employees")
         .select("id, roles, establishment_id")
-        .eq("id", authUid)
         .eq("establishment_id", establishmentId)
+        .or(`id.eq.${authUid},auth_user_id.eq.${authUid}`)
         .maybeSingle();
       if (callerError || !caller?.id) {
         return new Response(JSON.stringify({ error: "Forbidden for establishment" }), {

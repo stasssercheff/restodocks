@@ -656,10 +656,13 @@ function PromoTab() {
                     expired: { label: 'Истёк', cls: 'bg-red-900/40 text-red-300' },
                     free: { label: 'Свободен', cls: 'bg-emerald-900/40 text-emerald-300' },
                   }[status]
+                  const codeBtnClass = row.is_disabled
+                    ? 'font-mono font-bold text-red-400 hover:text-red-300 transition'
+                    : 'font-mono font-bold text-white hover:text-indigo-400 transition'
                   return (
                     <tr key={row.id} className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition ${i === filtered.length - 1 ? 'border-0' : ''}`}>
                       <td className="px-4 py-3">
-                        <button onClick={() => navigator.clipboard.writeText(row.code)} className="font-mono font-bold text-white hover:text-indigo-400 transition">
+                        <button type="button" onClick={() => navigator.clipboard.writeText(row.code)} className={codeBtnClass}>
                           {row.code}
                         </button>
                       </td>
@@ -718,12 +721,16 @@ function PromoTab() {
                 expired: { label: 'Истёк', cls: 'bg-red-900/40 text-red-300' },
                 free: { label: 'Свободен', cls: 'bg-emerald-900/40 text-emerald-300' },
               }[status]
+              const codeBtnClassMobile = row.is_disabled
+                ? 'font-mono font-bold text-red-400 text-base active:text-red-300'
+                : 'font-mono font-bold text-white text-base active:text-indigo-400'
               return (
                 <div key={row.id} className="bg-gray-900 rounded-xl border border-gray-800 p-4">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <button
+                      type="button"
                       onClick={() => navigator.clipboard.writeText(row.code)}
-                      className="font-mono font-bold text-white text-base active:text-indigo-400"
+                      className={codeBtnClassMobile}
                     >
                       {row.code}
                     </button>
