@@ -108,6 +108,19 @@ function EstablishmentsTab() {
     }
   }
 
+  /** Плашка «Тип» на тёмном фоне админки: филиал / отдельное / основное */
+  function establishmentTypeBadgeClass(row: Establishment): string {
+    const base = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border'
+    switch (row.establishment_type) {
+      case 'branch':
+        return `${base} bg-amber-950/70 text-amber-100 border-amber-600/45`
+      case 'separate':
+        return `${base} bg-violet-950/70 text-violet-100 border-violet-600/45`
+      default:
+        return `${base} bg-emerald-950/70 text-emerald-100 border-emerald-600/45`
+    }
+  }
+
   const [data, setData] = useState<Establishment[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -282,7 +295,7 @@ function EstablishmentsTab() {
                   <tr key={row.id} className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition ${i === filtered.length - 1 ? 'border-0' : ''}`}>
                     <td className="px-4 py-3 font-medium text-white">{row.name}</td>
                     <td className="px-4 py-3 text-xs">
-                      <span className="bg-gray-800 px-2 py-0.5 rounded text-gray-300">
+                      <span className={establishmentTypeBadgeClass(row)}>
                         {establishmentTypeLabel(row)}
                       </span>
                     </td>
@@ -346,7 +359,9 @@ function EstablishmentsTab() {
                   </span>
                 </div>
                 <div className="text-gray-400 text-xs">{row.owner_name}</div>
-                <div className="text-gray-500 text-xs">{establishmentTypeLabel(row)}</div>
+                <div className="mt-1">
+                  <span className={establishmentTypeBadgeClass(row)}>{establishmentTypeLabel(row)}</span>
+                </div>
                 <div className="text-gray-500 text-xs">{row.owner_email}</div>
                 <div className="text-gray-600 text-xs mt-1">{formatDate(row.created_at)}</div>
                 {row.registration_ip && (
