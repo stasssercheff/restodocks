@@ -858,7 +858,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final headerCellBg = dayIsToday
           ? todayHighlightBg
           : (weekend ? weekendHeaderBg : headerBg);
-      final headerCellFg = weekend ? weekendHeaderFg : headerFg;
+      final headerCellFg = dayIsToday
+          ? theme.colorScheme.onSurface
+          : (weekend ? weekendHeaderFg : headerFg);
 
       columnChildren.add(rightCell(
         Text(DateFormat('dd.MM', localeStr).format(d),
