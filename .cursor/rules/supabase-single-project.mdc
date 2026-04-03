@@ -1,0 +1,23 @@
+---
+description: Один проект Supabase, проверка RPC co-owner и диагностика писем подтверждения
+alwaysApply: true
+---
+
+# Supabase: один проект
+
+- У проекта **один** экземпляр Supabase на бэту и в клиенте: не подразумевать «отдельный прод-Auth» без явных слов пользователя. Общие настройки SMTP/Resend **одни**, но разные **цепочки** писем.
+
+## Проверка миграции `create_co_owner_from_invitation` с `p_birthday`
+
+- Выполнить запросы из [scripts/verify-create-co-owner-from-invitation.sql](scripts/verify-create-co-owner-from-invitation.sql) в **SQL Editor** того же проекта.
+- В `identity_args` должны быть четыре аргумента, последний — **`p_birthday date`**.
+- Если аргументов только три — применить миграцию [supabase/migrations/20260504140000_co_owner_from_invitation_birthday.sql](supabase/migrations/20260504140000_co_owner_from_invitation_birthday.sql) (копия в `restodocks_flutter/supabase/migrations/`).
+
+## Письмо подтверждения регистрации (co-owner и др.)
+
+«Resend в целом работает» (например для приглашений) **не исключает** отсутствие письма подтверждения:
+
+- **Supabase Auth** при `signUp` может слать своё письмо (если включён Confirm email) — настройки **Authentication → Providers → Email**, шаблоны.
+- **Дубль через Edge** — функция `send-registration-email` с `type: confirmation_only`: сначала `auth.admin.generateLink`, затем Resend. Если `generateLink` или Edge возвращает 4xx, письмо через Resend **не уходит**.
+
+Диагностика: логи Edge **send-registration-email** (200 vs 401/400/429; текст `Could not generate confirmation link`); в UI `/confirm-email` параметр `resendFailed=1` или SnackBar после регистрации co-owner.
