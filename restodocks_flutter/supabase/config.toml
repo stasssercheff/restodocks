@@ -20,6 +20,10 @@ verify_jwt = false
 [functions.send-registration-email]
 verify_jwt = false
 
+# register-metadata: только anon до входа владельца; проверка доступа к establishment в handler
+[functions.register-metadata]
+verify_jwt = false
+
 # auth-send-email: Auth Hook, вызывается Supabase Auth
 [functions.auth-send-email]
 verify_jwt = false

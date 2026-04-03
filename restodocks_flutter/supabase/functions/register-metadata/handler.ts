@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   enforceRateLimit,
   getAuthenticatedUserId,
+  hasValidApiKeyOrUser,
   isServiceRoleRequest,
   resolveCorsHeaders,
 } from "../_shared/security.ts";
@@ -52,14 +53,16 @@ export async function handleRequest(req: Request): Promise<Response> {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   }
-  const userId = await getAuthenticatedUserId(req);
-  const isService = isServiceRoleRequest(req);
-  if (!isService && !userId) {
+  // Как send-registration-email: браузер шлёт anon (bearerAlwaysAnon), пользователь ещё не вошёл.
+  // Раньше требовали JWT пользователя — до проверки «сиротского» заведения не доходили → 401.
+  if (!(await hasValidApiKeyOrUser(req))) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...cors, "Content-Type": "application/json" },
     });
   }
+  const userId = await getAuthenticatedUserId(req);
+  const isService = isServiceRoleRequest(req);
   if (!enforceRateLimit(req, "register-metadata", { windowMs: 60_000, maxRequests: 20 })) {
     return new Response(JSON.stringify({ error: "Too many requests" }), {
       status: 429,
