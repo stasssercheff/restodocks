@@ -598,8 +598,9 @@ class AccountManagerSupabase extends ChangeNotifier {
       throw Exception('create_co_owner_invitation: no token in response');
     }
 
+    // Тот же origin, что и для emailRedirect: на вебе — текущий хост (бэта vs прод), иначе define/config.
     final invitationLink =
-        '$publicAppOrigin/accept-co-owner-invitation?token=${Uri.encodeComponent(token)}';
+        '$publicAppOriginForEmailRedirect/accept-co-owner-invitation?token=${Uri.encodeComponent(token)}';
     devLog('Invitation link: $invitationLink');
 
     final estName = _establishment?.id == establishmentId

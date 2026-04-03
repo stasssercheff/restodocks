@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'supabase_env.dart';
 
-/// Базовый URL веб-приложения: письма (confirm), ссылки «открыть на сайте».
+/// Базовый URL веб-приложения: письма (confirm), ссылки «открыть на сайте», приглашения соучредителя.
 ///
 /// Web: `--dart-define=PUBLIC_APP_ORIGIN=...` (см. [kPublicAppOriginFromEnvironment]).
 /// Native: опционально `PUBLIC_APP_ORIGIN` в `assets/config.json` — например
@@ -43,7 +43,10 @@ bool isPublicAppHost(String host) {
   final h = host.toLowerCase();
   if (h == 'restodocks.com' || h == 'www.restodocks.com') return true;
   if (h == 'restodocks.ru' || h == 'www.restodocks.ru') return true;
-  if (h == 'restodocks.pages.dev' || h == 'www.restodocks.pages.dev') {
+  // Cloudflare Pages: прод-ветка и превью — часто *.restodocks.pages.dev
+  if (h == 'restodocks.pages.dev' ||
+      h == 'www.restodocks.pages.dev' ||
+      h.endsWith('.restodocks.pages.dev')) {
     return true;
   }
   try {
