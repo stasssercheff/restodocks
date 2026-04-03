@@ -44,7 +44,21 @@ export async function GET() {
   }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  const list = establishments ?? []
+  type EstablishmentRow = {
+    id: string
+    parent_establishment_id: string | null
+    // Остальные поля не нужны для расчётов, но оставляем тип как неизвестный.
+    [key: string]: unknown
+  }
+  type EmployeeRow = {
+    id?: string | null
+    full_name?: string | null
+    email?: string | null
+    roles?: string[] | null
+    establishment_id: string
+  }
+
+  const list = (establishments ?? []) as EstablishmentRow[]
 
   // Для каждого заведения считаем сотрудников и находим владельца.
   // Для филиалов: если в employees по самому филиалу владелец не найден,
@@ -56,24 +70,24 @@ export async function GET() {
     .select('id, full_name, email, roles, establishment_id')
     .in('establishment_id', ids)
 
-  const employeesByEstId = new Map<string, any[]>()
-  for (const emp of employees ?? []) {
-    const key = emp.establishment_id as string
+  const employeesByEstId = new Map<string, EmployeeRow[]>()
+  for (const emp of (employees ?? []) as EmployeeRow[]) {
+    const key = emp.establishment_id
     const arr = employeesByEstId.get(key) ?? []
     arr.push(emp)
     employeesByEstId.set(key, arr)
   }
 
   const parentById = new Map<string, string | null | undefined>()
-  for (const est of list as any[]) {
-    parentById.set(est.id as string, est.parent_establishment_id as string | null | undefined)
+  for (const est of list) {
+    parentById.set(est.id, est.parent_establishment_id)
   }
   const childrenByParent = new Map<string, string[]>()
-  for (const est of list as any[]) {
-    const parentId = est.parent_establishment_id as string | null | undefined
+  for (const est of list) {
+    const parentId = est.parent_establishment_id
     if (!parentId) continue
     const arr = childrenByParent.get(parentId) ?? []
-    arr.push(est.id as string)
+    arr.push(est.id)
     childrenByParent.set(parentId, arr)
   }
 
@@ -107,8 +121,8 @@ export async function GET() {
   }
 
   const result = list.map(est => {
-    const estId = est.id as string
-    const isMain = !(est.parent_establishment_id as string | null | undefined)
+    const estId = est.id
+    const isMain = !est.parent_establishment_id
     const scopeIds = isMain ? [estId, ...collectDescendants(estId)] : [estId]
     const estEmployees = scopeIds.flatMap(id => employeesByEstId.get(id) ?? [])
     const owner = estEmployees.find(e => e.roles?.includes('owner'))
@@ -123,7 +137,7 @@ export async function GET() {
     }
 
     // Если владелец не найден по самому филиалу, пробуем найти его у root parent.
-    const rootId = getRootParentId(est.id as string)
+    const rootId = getRootParentId(estId)
     const rootEmployees = employeesByEstId.get(rootId) ?? []
     const rootOwner = rootEmployees.find(e => e.roles?.includes('owner'))
 
