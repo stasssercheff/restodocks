@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
 import '../services/services.dart';
 import 'post_registration_trial_dialog.dart';
 
-/// Блок настроек PRO для собственника: промокод, оплата (заглушка), условия.
+/// Блок настроек PRO для собственника: промокод, оплата (iOS IAP), условия.
 class ProSettingsOwnerSection extends StatefulWidget {
   const ProSettingsOwnerSection({
     super.key,
@@ -21,11 +22,42 @@ class ProSettingsOwnerSection extends StatefulWidget {
 
 class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
   late Future<EstablishmentPromoInfo> _promoFuture;
+  AppleIapService? _iap;
+  int _lastIapSuccessToken = 0;
 
   @override
   void initState() {
     super.initState();
     _promoFuture = widget.accountManager.getEstablishmentPromoForOwner();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final iap = context.read<AppleIapService>();
+    if (!identical(_iap, iap)) {
+      _iap?.removeListener(_onIapChanged);
+      _iap = iap;
+      _iap?.addListener(_onIapChanged);
+    }
+  }
+
+  @override
+  void dispose() {
+    _iap?.removeListener(_onIapChanged);
+    super.dispose();
+  }
+
+  void _onIapChanged() {
+    final iap = _iap;
+    if (iap == null || !mounted) return;
+    if (iap.successToken != _lastIapSuccessToken && iap.successToken > 0) {
+      _lastIapSuccessToken = iap.successToken;
+      final loc = widget.localization;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('pro_iap_activated'))),
+      );
+    }
   }
 
   void _reloadPromo() {
@@ -46,6 +78,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     if (msg.contains('PROMO_USED')) return loc.t('promo_code_used');
     if (msg.contains('PROMO_NOT_STARTED')) return loc.t('promo_code_not_started');
     if (msg.contains('PROMO_EXPIRED')) return loc.t('promo_code_expired');
+    if (msg.contains('PROMO_DISABLED')) return loc.t('promo_code_disabled');
     if (msg.contains('ESTABLISHMENT_HAS_PROMO')) {
       return loc.t('establishment_has_promo');
     }
@@ -135,6 +168,59 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     controller.dispose();
   }
 
+  Future<void> _onPaymentTap(AppleIapService iap, LocalizationService loc) async {
+    if (!AppleIapService.isIOSPlatform) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('pro_iap_ios_only'))),
+      );
+      return;
+    }
+    if (widget.accountManager.hasPaidProSubscription) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('pro_iap_paid_already'))),
+      );
+      return;
+    }
+    await iap.init();
+    if (!mounted) return;
+    if (!iap.ready || iap.product == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('pro_iap_error'))),
+      );
+      return;
+    }
+    final price = iap.product!.price;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('pro_payment_title')),
+        content: Text(
+          '${loc.t('pro_payment_body')}\n\n$price',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx, false);
+              await iap.restorePurchases();
+            },
+            child: Text(loc.t('pro_iap_restore')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(loc.t('pro_purchase')),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      await iap.purchasePro();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = widget.localization;
@@ -214,12 +300,23 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
             );
           },
         ),
-        ListTile(
-          leading: const Icon(Icons.payment_outlined),
-          title: Text(loc.t('pro_payment_title')),
-          subtitle: Text(loc.t('pro_payment_subtitle')),
-          trailing: const Icon(Icons.schedule_outlined),
-          onTap: null,
+        Consumer<AppleIapService>(
+          builder: (context, iap, _) {
+            final busy = iap.busy;
+            return ListTile(
+              leading: const Icon(Icons.payment_outlined),
+              title: Text(loc.t('pro_payment_title')),
+              subtitle: Text(loc.t('pro_payment_subtitle')),
+              trailing: busy
+                  ? const SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.apple),
+              onTap: busy ? null : () => _onPaymentTap(iap, loc),
+            );
+          },
         ),
         ListTile(
           leading: const Icon(Icons.description_outlined),

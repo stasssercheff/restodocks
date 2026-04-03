@@ -21,6 +21,8 @@ export type PromoCode = {
   id: number
   code: string
   is_used: boolean
+  /** Вручную отключён в админке: нельзя применить; у погасивших — блок доступа. */
+  is_disabled?: boolean
   used_by_establishment_id: string | null
   used_at: string | null
   created_at: string

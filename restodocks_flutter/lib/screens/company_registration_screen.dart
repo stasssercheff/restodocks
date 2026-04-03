@@ -76,6 +76,7 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
     if (msg.contains('PROMO_USED')) return loc.t('promo_code_used');
     if (msg.contains('PROMO_NOT_STARTED')) return loc.t('promo_code_not_started');
     if (msg.contains('PROMO_EXPIRED')) return loc.t('promo_code_expired');
+    if (msg.contains('PROMO_DISABLED')) return loc.t('promo_code_disabled');
     return null;
   }
 

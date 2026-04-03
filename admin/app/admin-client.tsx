@@ -38,6 +38,14 @@ function isValidNow(startsAt: string | null, expiresAt: string | null) {
   return true
 }
 
+/** Статус строки: отключение вручную важнее остального. */
+function promoRowStatus(row: PromoCode): 'disabled' | 'used' | 'expired' | 'free' {
+  if (row.is_disabled) return 'disabled'
+  if (row.is_used) return 'used'
+  if (!isValidNow(row.starts_at, row.expires_at)) return 'expired'
+  return 'free'
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function AdminClient() {
@@ -405,7 +413,7 @@ function PromoTab() {
   const [newEndDate, setNewEndDate] = useState('')
   const [newMaxEmployees, setNewMaxEmployees] = useState('')
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState<'all' | 'free' | 'used' | 'expired'>('all')
+  const [filter, setFilter] = useState<'all' | 'free' | 'used' | 'expired' | 'disabled'>('all')
 
   const loadCodes = useCallback(async () => {
     setLoading(true)
@@ -490,19 +498,40 @@ function PromoTab() {
     await loadCodes()
   }
 
+  async function toggleDisabled(row: PromoCode) {
+    const next = !row.is_disabled
+    if (next && row.is_used) {
+      const ok = confirm(
+        'Отключить промокод? У заведений, которые уже его применили, доступ будет заблокирован (как при истечении срока).',
+      )
+      if (!ok) return
+    }
+    setSaving(true)
+    await fetch('/api/promo', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: row.id, is_disabled: next }),
+    })
+    await loadCodes()
+    setSaving(false)
+  }
+
   const filtered = codes.filter(c => {
     const match = c.code.includes(search.toUpperCase()) || (c.note ?? '').toLowerCase().includes(search.toLowerCase())
     if (!match) return false
-    if (filter === 'free') return !c.is_used && isValidNow(c.starts_at, c.expires_at)
+    const st = promoRowStatus(c)
+    if (filter === 'free') return st === 'free'
     if (filter === 'used') return c.is_used
-    if (filter === 'expired') return !c.is_used && !isValidNow(c.starts_at, c.expires_at)
+    if (filter === 'expired') return st === 'expired'
+    if (filter === 'disabled') return c.is_disabled === true
     return true
   })
 
   const total = codes.length
   const usedCount = codes.filter(c => c.is_used).length
-  const freeCount = codes.filter(c => !c.is_used && isValidNow(c.starts_at, c.expires_at)).length
-  const expiredCount = codes.filter(c => !c.is_used && !isValidNow(c.starts_at, c.expires_at)).length
+  const freeCount = codes.filter(c => promoRowStatus(c) === 'free').length
+  const expiredCount = codes.filter(c => promoRowStatus(c) === 'expired').length
+  const disabledCount = codes.filter(c => c.is_disabled === true).length
 
   return (
     <>
@@ -511,11 +540,12 @@ function PromoTab() {
           {error}
         </div>
       )}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4 sm:gap-3 sm:mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-4 sm:gap-3 sm:mb-6">
         <StatCard label="Всего" value={total} />
         <StatCard label="Свободно" value={freeCount} />
         <StatCard label="Использовано" value={usedCount} />
         <StatCard label="Истекло" value={expiredCount} />
+        <StatCard label="Отключено" value={disabledCount} />
       </div>
 
       {/* Add form */}
@@ -585,13 +615,13 @@ function PromoTab() {
           className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 flex-1 min-w-32 text-sm"
         />
         <div className="flex gap-1 flex-wrap">
-          {(['all', 'free', 'used', 'expired'] as const).map(f => (
+          {(['all', 'free', 'used', 'expired', 'disabled'] as const).map(f => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={`px-2.5 py-1.5 rounded-lg text-xs transition ${filter === f ? 'bg-indigo-600 text-white' : 'bg-gray-900 border border-gray-800 text-gray-400 hover:text-white'}`}
             >
-              {{ all: 'Все', free: 'Своб.', used: 'Исп.', expired: 'Истёк' }[f]}
+              {{ all: 'Все', free: 'Своб.', used: 'Исп.', expired: 'Истёк', disabled: 'Выкл.' }[f]}
             </button>
           ))}
         </div>
@@ -619,8 +649,9 @@ function PromoTab() {
               </thead>
               <tbody>
                 {filtered.map((row, i) => {
-                  const status = row.is_used ? 'used' : !isValidNow(row.starts_at, row.expires_at) ? 'expired' : 'free'
+                  const status = promoRowStatus(row)
                   const statusCfg = {
+                    disabled: { label: 'Отключён', cls: 'bg-amber-900/40 text-amber-200' },
                     used: { label: 'Использован', cls: 'bg-blue-900/40 text-blue-300' },
                     expired: { label: 'Истёк', cls: 'bg-red-900/40 text-red-300' },
                     free: { label: 'Свободен', cls: 'bg-emerald-900/40 text-emerald-300' },
@@ -652,7 +683,16 @@ function PromoTab() {
                       </td>
                       <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(row.created_at)}</td>
                       <td className="px-4 py-3">
-                        <div className="flex gap-2 justify-end">
+                        <div className="flex gap-2 justify-end flex-wrap">
+                          <button
+                            type="button"
+                            title={row.is_disabled ? 'Включить промокод' : 'Отключить промокод'}
+                            onClick={() => toggleDisabled(row)}
+                            disabled={saving}
+                            className={`text-xs px-2 py-1 rounded border transition ${row.is_disabled ? 'border-amber-700 text-amber-300 hover:bg-amber-900/30' : 'border-gray-700 text-gray-500 hover:text-amber-200 hover:border-amber-800'}`}
+                          >
+                            ⏻
+                          </button>
                           <button onClick={() => toggleUsed(row)} className="text-gray-500 hover:text-white transition text-xs px-2 py-1 rounded border border-gray-700 hover:border-gray-500">
                             {row.is_used ? '↩' : '✓'}
                           </button>
@@ -671,8 +711,9 @@ function PromoTab() {
           {/* Mobile cards */}
           <div className="md:hidden space-y-2">
             {filtered.map(row => {
-              const status = row.is_used ? 'used' : !isValidNow(row.starts_at, row.expires_at) ? 'expired' : 'free'
+              const status = promoRowStatus(row)
               const statusCfg = {
+                disabled: { label: 'Отключён', cls: 'bg-amber-900/40 text-amber-200' },
                 used: { label: 'Использован', cls: 'bg-blue-900/40 text-blue-300' },
                 expired: { label: 'Истёк', cls: 'bg-red-900/40 text-red-300' },
                 free: { label: 'Свободен', cls: 'bg-emerald-900/40 text-emerald-300' },
@@ -709,10 +750,19 @@ function PromoTab() {
                     <span>создан {formatDate(row.created_at)}</span>
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => toggleDisabled(row)}
+                      disabled={saving}
+                      className={`px-3 py-2 rounded-lg border text-sm ${row.is_disabled ? 'border-amber-700 text-amber-300' : 'border-gray-700 text-gray-400 hover:text-amber-200'}`}
+                      title={row.is_disabled ? 'Включить' : 'Отключить'}
+                    >
+                      ⏻
+                    </button>
                     <button
                       onClick={() => toggleUsed(row)}
-                      className="flex-1 text-center text-gray-400 hover:text-white active:text-white transition text-sm py-2 rounded-lg border border-gray-700 active:border-gray-500"
+                      className="flex-1 min-w-[8rem] text-center text-gray-400 hover:text-white active:text-white transition text-sm py-2 rounded-lg border border-gray-700 active:border-gray-500"
                     >
                       {row.is_used ? '↩ Сбросить' : '✓ Отметить исп.'}
                     </button>

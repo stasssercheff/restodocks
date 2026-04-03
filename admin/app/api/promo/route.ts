@@ -78,7 +78,7 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json()
   const { id, ...updates } = body
-  const allowed = ['code', 'note', 'starts_at', 'expires_at', 'is_used', 'used_at', 'used_by_establishment_id', 'max_employees'] as const
+  const allowed = ['code', 'note', 'starts_at', 'expires_at', 'is_used', 'used_at', 'used_by_establishment_id', 'max_employees', 'is_disabled'] as const
   const patch = Object.fromEntries(
     Object.entries(updates).filter(([k]) => allowed.includes(k as typeof allowed[number]))
   )
