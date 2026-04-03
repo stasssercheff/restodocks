@@ -149,12 +149,13 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
             sur.isEmpty ? first.trim() : '${first.trim()} ${sur.trim()}';
         await EmailService().sendRegistrationEmail(
           isOwner: false,
+          isCoOwner: true,
           to: email,
           companyName: estab.name,
           email: email,
           fullName: fullName.trim().isEmpty ? null : fullName,
           registeredAtLocal: DateTime.now().toLocal().toString(),
-          pinCode: null,
+          pinCode: estab.pinCode,
           languageCode: interfaceLang,
         );
       } catch (_) {

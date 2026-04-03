@@ -66,18 +66,23 @@ class _AcceptCoOwnerInvitationScreenState
     try {
       final accountManager = context.read<AccountManagerSupabase>();
 
-      // Принимаем приглашение через защищенный RPC (без прямого UPDATE таблицы).
-      await accountManager.supabase.client.rpc(
+      final accepted = await accountManager.supabase.client.rpc(
         'accept_co_owner_invitation',
         params: {'p_token': widget.token},
       );
+      final acceptedMap = accepted is Map ? Map<String, dynamic>.from(accepted) : <String, dynamic>{};
+      final registrationToken = acceptedMap['registration_token']?.toString();
 
       if (mounted) {
         final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(loc.t('invitation_accepted'))),
         );
-        context.go('/register-co-owner?token=${widget.token}');
+        final tokenForRegistration =
+            (registrationToken != null && registrationToken.isNotEmpty)
+                ? registrationToken
+                : widget.token;
+        context.go('/register-co-owner?token=${Uri.encodeComponent(tokenForRegistration)}');
       }
     } catch (e) {
       if (!mounted) return;
@@ -126,6 +131,13 @@ class _AcceptCoOwnerInvitationScreenState
       return Scaffold(
         appBar: AppBar(
           title: Text(loc.t('invitation')),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.language),
+              tooltip: loc.t('language'),
+              onPressed: () => loc.showLocalePickerDialog(context),
+            ),
+          ],
         ),
         body: _bodyWithScroll(
           Column(
@@ -148,7 +160,16 @@ class _AcceptCoOwnerInvitationScreenState
     final establishmentName = _invitationData!['establishments']['name'];
 
     return Scaffold(
-      appBar: AppBar(title: Text(loc.t('invitation'))),
+      appBar: AppBar(
+        title: Text(loc.t('invitation')),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.language),
+            tooltip: loc.t('language'),
+            onPressed: () => loc.showLocalePickerDialog(context),
+          ),
+        ],
+      ),
       body: _bodyWithScroll(
         Column(
           mainAxisSize: MainAxisSize.min,

@@ -112,12 +112,13 @@ class PendingCoOwnerRegistration {
             : '${firstName.trim()} ${surname.trim()}';
         await EmailService().sendRegistrationEmail(
           isOwner: false,
+          isCoOwner: true,
           to: email,
           companyName: establishment.name,
           email: email,
           fullName: fullName.trim().isEmpty ? null : fullName,
           registeredAtLocal: DateTime.now().toLocal().toString(),
-          pinCode: null,
+          pinCode: establishment.pinCode,
           languageCode: languageCode,
         );
       } catch (e) {

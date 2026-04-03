@@ -98,6 +98,7 @@ class EmailService {
   /// [passwordForConfirmation] — если передан и Confirm Email включён, в письмо добавляется ссылка подтверждения.
   Future<({bool ok, String? error})> sendRegistrationEmail({
     required bool isOwner,
+    bool isCoOwner = false,
     required String to,
     required String companyName,
     required String email,
@@ -109,7 +110,7 @@ class EmailService {
   }) async {
     try {
       final body = {
-        'type': isOwner ? 'owner' : 'employee',
+        'type': isCoOwner ? 'co_owner' : (isOwner ? 'owner' : 'employee'),
         'to': to.trim(),
         'companyName': companyName,
         'email': email,

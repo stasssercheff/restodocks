@@ -79,7 +79,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   try {
     const body = (await req.json()) as {
-      type: "owner" | "employee" | "registration_confirmed" | "confirmation_only";
+      type: "owner" | "employee" | "co_owner" | "registration_confirmed" | "confirmation_only";
       to: string;
       companyName?: string;
       email?: string;
@@ -137,13 +137,16 @@ export async function handleRequest(req: Request): Promise<Response> {
           : `${confirmClickUrl}?r=${btoa(link).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}&lang=${encodeURIComponent(lang)}`;
         const copy = i18nCopy(lang);
         const subject = copy.confirmSubject;
+        const greeting = fullName?.trim()
+          ? `${copy.greetingNamePrefix}, ${escapeHtml(fullName.trim())}!`
+          : copy.greeting;
         const html = `
-<p>${copy.greeting}</p>
+<p>${greeting}</p>
 <p>${copy.confirmIntro}</p>
 <p><a href="${escapeHtml(wrappedHref)}" style="color:#2754C5;text-decoration:none">${copy.confirmCta}</a></p>
 <p>${copy.regards}<br>Restodocks</p>
         `.trim();
-        const text = `${copy.greeting}\n\n${copy.confirmIntro}\n\n${copy.regards}\nRestodocks`;
+        const text = `${greeting}\n\n${copy.confirmIntro}\n\n${copy.regards}\nRestodocks`;
         const res = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -270,6 +273,21 @@ export async function handleRequest(req: Request): Promise<Response> {
 <p>${copy.regards}<br>Restodocks</p>
       `.trim();
       }
+    } else if (type === "co_owner") {
+      const copy = i18nCopy(lang);
+      const greeting = fullName?.trim() ? `${copy.greetingNamePrefix}, ${escapeHtml(fullName.trim())}!` : copy.greeting;
+      subject = copy.coOwnerSubject;
+      html = `
+<p>${greeting}</p>
+<p>${copy.coOwnerRegisteredPrefix} <strong>${escapeHtml(companyName)}</strong> ${copy.coOwnerRegisteredSuffix}</p>
+<p>${copy.ownerIdentifierHint}</p>
+<p><strong>${copy.companyPinLabel}: ${escapeHtml(pinCode || "")}</strong></p>
+<p>${copy.yourLoginLabel}: <strong>${escapeHtml(email)}</strong></p>
+<p>${copy.passwordHint}</p>
+<p><strong>${copy.instructionLabel}:</strong><br>${copy.coOwnerInstruction}</p>
+<p style="color:#666;font-size:14px">${copy.spamHint}</p>
+<p>${copy.regards}<br>Restodocks</p>
+      `.trim();
     } else {
       if (lang === "ru") {
         const copy = i18nCopy(lang);
@@ -379,6 +397,10 @@ type MailCopy = {
   passwordHint: string;
   instructionLabel: string;
   ownerInstruction: string;
+  coOwnerSubject: string;
+  coOwnerRegisteredPrefix: string;
+  coOwnerRegisteredSuffix: string;
+  coOwnerInstruction: string;
   employeeSubjectPrefix: string;
   employeeRegisteredPrefix: string;
   spamHint: string;
@@ -407,6 +429,10 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         passwordHint: "Для входа используйте пароль, который вы указали при регистрации. Если вы забыли пароль — воспользуйтесь функцией восстановления в системе.",
         instructionLabel: "Инструкция",
         ownerInstruction: "Передайте PIN-код персоналу. Им потребуется ввести его один раз при регистрации в системе для синхронизации с базой данных вашего заведения.",
+        coOwnerSubject: "Регистрация доп. собственника в системе Restodocks",
+        coOwnerRegisteredPrefix: "Регистрация дополнительного собственника в заведении",
+        coOwnerRegisteredSuffix: "успешно завершена.",
+        coOwnerInstruction: "Используйте PIN-код заведения при работе команды. Для входа в систему используйте email и пароль, указанные при регистрации.",
         employeeSubjectPrefix: "Доступ к корпоративному пространству",
         employeeRegisteredPrefix: "Ваша учетная запись успешно привязана к системе управления заведением",
         spamHint: "Отдельно придёт письмо со ссылкой для подтверждения email. Если не увидите его — проверьте папку «Спам».",
@@ -432,6 +458,10 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         passwordHint: "Use la contraseña que indicó al registrarse. Si es necesario, restablézcala en el sistema.",
         instructionLabel: "Instrucción",
         ownerInstruction: "Comparta el PIN con el personal. Lo necesitarán una vez al registrarse en el sistema.",
+        coOwnerSubject: "Registro de copropietario en Restodocks",
+        coOwnerRegisteredPrefix: "Su acceso de copropietario para",
+        coOwnerRegisteredSuffix: "ha sido activado.",
+        coOwnerInstruction: "Comparta el PIN del establecimiento con su equipo. Para iniciar sesión use su correo y contraseña.",
         employeeSubjectPrefix: "Acceso al espacio de",
         employeeRegisteredPrefix: "Su cuenta se vinculó correctamente a",
         spamHint: "También llegará un correo de confirmación. Revise Spam si no aparece.",
@@ -457,6 +487,10 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         passwordHint: "Usa la password scelta in registrazione. Se necessario, reimpostala nel sistema.",
         instructionLabel: "Istruzioni",
         ownerInstruction: "Condividi il PIN con il personale: servirà una sola volta alla registrazione nel sistema.",
+        coOwnerSubject: "Registrazione co-proprietario in Restodocks",
+        coOwnerRegisteredPrefix: "Il tuo accesso come co-proprietario a",
+        coOwnerRegisteredSuffix: "è stato attivato.",
+        coOwnerInstruction: "Condividi il PIN della struttura con il team. Per accedere usa email e password.",
         employeeSubjectPrefix: "Accesso allo spazio di",
         employeeRegisteredPrefix: "Il tuo account è stato collegato a",
         spamHint: "Arriverà anche un'email di conferma. Controlla Spam se necessario.",
@@ -482,6 +516,10 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         passwordHint: "Kayıtta belirlediğiniz şifreyi kullanın. Gerekirse sistemde sıfırlayın.",
         instructionLabel: "Talimat",
         ownerInstruction: "PIN'i personele iletin. Sistemde ilk kayıtta bir kez gerekir.",
+        coOwnerSubject: "Restodocks ortak sahip kaydı",
+        coOwnerRegisteredPrefix: "Şu işletme için ortak sahip erişiminiz",
+        coOwnerRegisteredSuffix: "etkinleştirildi.",
+        coOwnerInstruction: "İşletme PIN kodunu ekiple paylaşın. Giriş için e-posta ve şifrenizi kullanın.",
         employeeSubjectPrefix: "Çalışma alanına erişim:",
         employeeRegisteredPrefix: "Hesabınız şu işletmeye bağlandı:",
         spamHint: "Ayrıca onay bağlantısı e-postası gelir. Gerekirse Spam'i kontrol edin.",
@@ -507,6 +545,10 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         passwordHint: "Dùng mật khẩu đã đặt khi đăng ký. Nếu cần, đặt lại trong hệ thống.",
         instructionLabel: "Hướng dẫn",
         ownerInstruction: "Chia sẻ PIN cho nhân viên. Họ chỉ cần nhập một lần khi đăng ký trong hệ thống.",
+        coOwnerSubject: "Đăng ký đồng sở hữu trong Restodocks",
+        coOwnerRegisteredPrefix: "Quyền truy cập đồng sở hữu của bạn cho",
+        coOwnerRegisteredSuffix: "đã được kích hoạt.",
+        coOwnerInstruction: "Chia sẻ mã PIN cơ sở với đội ngũ. Đăng nhập bằng email và mật khẩu đã đăng ký.",
         employeeSubjectPrefix: "Quyền truy cập không gian của",
         employeeRegisteredPrefix: "Tài khoản của bạn đã được liên kết với",
         spamHint: "Một email xác nhận riêng sẽ được gửi. Hãy kiểm tra Spam nếu cần.",
@@ -533,6 +575,10 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         passwordHint: "Please use the password you entered during registration. If needed, reset it in Restodocks (sign-in / recovery).",
         instructionLabel: "Instruction",
         ownerInstruction: "Share the PIN with your staff. They will need it once when registering in the system.",
+        coOwnerSubject: "Co-owner registration in Restodocks",
+        coOwnerRegisteredPrefix: "Your co-owner access for",
+        coOwnerRegisteredSuffix: "has been activated.",
+        coOwnerInstruction: "Share the establishment PIN with your team. Sign in using your email and password.",
         employeeSubjectPrefix: "Access to",
         employeeRegisteredPrefix: "Your account has been linked to",
         spamHint: "A separate email with confirmation link is sent by auth provider. Please check Spam if needed.",
