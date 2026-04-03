@@ -1,5 +1,3 @@
-import 'dart:async' show unawaited;
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
 import '../core/pending_owner_role.dart';
 import '../services/services.dart';
+import '../utils/dev_log.dart';
 import '../utils/person_name_format.dart';
 import '../models/models.dart';
 
@@ -128,19 +127,20 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         }
       }
 
-      // Инфо-письмо отправляем через Resend (best-effort, не блокирует регистрацию).
-      unawaited(
-        EmailService().sendRegistrationEmail(
-          isOwner: true,
-          to: email,
-          companyName: estab.name,
-          email: email,
-          fullName: fullName,
-          registeredAtLocal: registeredAtLocal,
-          pinCode: estab.pinCode,
-          languageCode: loc.currentLanguageCode,
-        ),
+      // Как и для confirmation_only: на web нельзя fire-and-forget — навигация рвёт Dio до Edge.
+      final infoMail = await EmailService().sendRegistrationEmail(
+        isOwner: true,
+        to: email,
+        companyName: estab.name,
+        email: email,
+        fullName: fullName,
+        registeredAtLocal: registeredAtLocal,
+        pinCode: estab.pinCode,
+        languageCode: loc.currentLanguageCode,
       );
+      if (!infoMail.ok) {
+        devLog('OwnerRegistration: sendRegistrationEmail failed: ${infoMail.error}');
+      }
       var resendFailed = false;
       if (!signUpResult.hasSession) {
         // Нельзя unawaited: на web переход на /confirm-email рвёт запрос к Edge до отправки письма.

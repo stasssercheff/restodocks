@@ -21,6 +21,21 @@ function resolveAppBaseUrl(req: Request): string {
   return "https://restodocks.com";
 }
 
+/** Resend POST /emails возвращает `{ data: { id } }`; старые ответы могли отдавать `id` наверху. */
+function resendMessageId(json: unknown): string | undefined {
+  if (json && typeof json === "object") {
+    const o = json as Record<string, unknown>;
+    const inner = o["data"];
+    if (inner && typeof inner === "object") {
+      const id = (inner as Record<string, unknown>)["id"];
+      if (typeof id === "string" && id.length > 0) return id;
+    }
+    const top = o["id"];
+    if (typeof top === "string" && top.length > 0) return top;
+  }
+  return undefined;
+}
+
 function extractTokenHashFromActionLink(actionLink: string): { token_hash: string; type: string } | null {
   try {
     const u = new URL(actionLink);
@@ -140,14 +155,21 @@ export async function handleRequest(req: Request): Promise<Response> {
             text,
           }),
         });
-        const data = await res.json();
+        const payload = await res.json();
         if (!res.ok) {
-          return new Response(JSON.stringify({ error: data?.message || res.statusText }), {
+          return new Response(JSON.stringify({ error: payload?.message || res.statusText }), {
             status: res.status,
             headers: { ...cors, "Content-Type": "application/json" },
           });
         }
-        return new Response(JSON.stringify({ id: data?.id, ok: true }), {
+        const msgId = resendMessageId(payload);
+        if (!msgId) {
+          return new Response(JSON.stringify({ error: "Resend OK but no message id in response" }), {
+            status: 502,
+            headers: { ...cors, "Content-Type": "application/json" },
+          });
+        }
+        return new Response(JSON.stringify({ id: msgId, ok: true }), {
           headers: { ...cors, "Content-Type": "application/json" },
         });
       } catch (e) {
@@ -188,14 +210,21 @@ export async function handleRequest(req: Request): Promise<Response> {
         body: JSON.stringify({ from, to: [to], subject, html }),
       });
 
-      const data = await res.json();
+      const payload = await res.json();
       if (!res.ok) {
-        return new Response(JSON.stringify({ error: data?.message || res.statusText }), {
+        return new Response(JSON.stringify({ error: payload?.message || res.statusText }), {
           status: res.status,
           headers: { ...cors, "Content-Type": "application/json" },
         });
       }
-      return new Response(JSON.stringify({ id: data?.id, ok: true }), {
+      const msgId = resendMessageId(payload);
+      if (!msgId) {
+        return new Response(JSON.stringify({ error: "Resend OK but no message id in response" }), {
+          status: 502,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ id: msgId, ok: true }), {
         headers: { ...cors, "Content-Type": "application/json" },
       });
     }
@@ -288,16 +317,24 @@ export async function handleRequest(req: Request): Promise<Response> {
       body: JSON.stringify({ from, to: [to], subject, html, text }),
     });
 
-    const data = await res.json();
+    const payload = await res.json();
 
     if (!res.ok) {
-      return new Response(JSON.stringify({ error: data?.message || res.statusText }), {
+      return new Response(JSON.stringify({ error: payload?.message || res.statusText }), {
         status: res.status,
         headers: { ...cors, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ id: data?.id, ok: true }), {
+    const msgId = resendMessageId(payload);
+    if (!msgId) {
+      return new Response(JSON.stringify({ error: "Resend OK but no message id in response" }), {
+        status: 502,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({ id: msgId, ok: true }), {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (e) {

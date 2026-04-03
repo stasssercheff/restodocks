@@ -1,5 +1,3 @@
-import 'dart:async' show unawaited;
-
 import 'package:flutter/material.dart';
 import '../utils/dev_log.dart';
 import 'package:go_router/go_router.dart';
@@ -224,18 +222,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
         birthday: _birthday,
       );
 
-      // Инфо-письмо через Resend (best-effort, не блокирует регистрацию).
-      unawaited(
-        EmailService().sendRegistrationEmail(
-          isOwner: false,
-          to: email,
-          companyName: establishment.name,
-          email: email,
-          fullName: fullName,
-          registeredAtLocal: registeredAtLocal,
-          languageCode: locUi,
-        ),
+      final infoMail = await EmailService().sendRegistrationEmail(
+        isOwner: false,
+        to: email,
+        companyName: establishment.name,
+        email: email,
+        fullName: fullName,
+        registeredAtLocal: registeredAtLocal,
+        languageCode: locUi,
       );
+      if (!infoMail.ok) {
+        devLog('RegisterEmployee: sendRegistrationEmail failed: ${infoMail.error}');
+      }
       var resendFailed = false;
       if (!hasSession) {
         final dup = await EmailService().sendConfirmationLinkRequest(

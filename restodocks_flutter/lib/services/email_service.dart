@@ -88,6 +88,12 @@ class EmailService {
     }
   }
 
+  static bool _edgeRegistrationMailOk(int status, Map<String, dynamic>? data) {
+    if (status != 200) return false;
+    final id = data?['id']?.toString();
+    return id != null && id.isNotEmpty;
+  }
+
   /// Отправить письмо при регистрации (владелец или сотрудник).
   /// [passwordForConfirmation] — если передан и Confirm Email включён, в письмо добавляется ссылка подтверждения.
   Future<({bool ok, String? error})> sendRegistrationEmail({
@@ -117,7 +123,14 @@ class EmailService {
           'language': languageCode.trim().toLowerCase(),
       };
       final res = await _invokeSendRegistrationEmail(body);
-      if (res.status == 200) return (ok: true, error: null);
+      if (_edgeRegistrationMailOk(res.status, res.data)) return (ok: true, error: null);
+      if (res.status == 200 && res.data != null) {
+        return (
+          ok: false,
+          error:
+              'Ответ send-registration-email без id письма (Resend). Проверьте логи Edge и ключ API.',
+        );
+      }
       if (res.status == 0) {
         return (
           ok: false,
@@ -150,7 +163,7 @@ class EmailService {
           'language': languageCode.trim().toLowerCase(),
         if (password != null && password.isNotEmpty) 'password': password,
       });
-      if (res.status == 200) {
+      if (_edgeRegistrationMailOk(res.status, res.data)) {
         devLog('EmailService: confirmation_only via Resend/Edge ok');
         return (ok: true, error: null);
       }
@@ -192,7 +205,7 @@ class EmailService {
         'to': to.trim(),
         'password': password,
       });
-      if (res.status == 200) {
+      if (_edgeRegistrationMailOk(res.status, res.data)) {
         devLog('EmailService: sendConfirmationEmail via Resend/Edge ok');
         return (ok: true, error: null);
       }
