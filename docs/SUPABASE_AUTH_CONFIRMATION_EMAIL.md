@@ -3,11 +3,9 @@
 ## Два письма (как задумано)
 
 1. **Данные (PIN, логин, заведение)** — Edge Function `send-registration-email`, тип `owner`, через Resend. Вызывается из приложения после `signUp`.
-2. **Ссылка подтверждения email** — отправляет **Supabase Auth** при включённом Confirm email:
-   - **Рекомендуется:** [Send Email Hook](AUTH_SEND_EMAIL_HOOK_SETUP.md) → функция `auth-send-email` → то же Resend, русский текст, ссылка на `https://restodocks.com/auth/confirm-click?...` (как раньше во втором письме из `send-registration-email`).
-   - Если Hook **не** подключён — используется шаблон из **Authentication → Email Templates** (часто английский от `mail.app.supabase.io`). Настройте шаблон **Confirm signup** под Restodocks или подключите Hook.
+2. **Ссылка подтверждения email** — приложение после `signUp` (если нет сессии) вызывает Edge **`send-registration-email`** с типом `confirmation_only` через **`EmailService.sendConfirmationLinkRequest`** (Resend, `generateLink` + запас `auth.resend`). Иначе пользователь часто получает только письмо с данными, а письмо от Auth/Hook не приходит.
 
-Дублирующий вызов `confirmation_only` из Flutter сразу после `signUp` **не делаем** — иначе два одинаковых письма с ссылкой (Hook + Edge). Повторная отправка — экран подтверждения и вход: `sendConfirmationLinkRequest` (см. `ConfirmEmailScreen`, `login_screen`).
+Дополнительно Auth может слать своё письмо (Hook или шаблоны). Если настроены и Hook, и вызов из приложения, теоретически возможны **два** письма со ссылкой — это компромисс ради гарантированной доставки; при желании отключите дубль на стороне Auth или оставьте только один канал после проверки логов.
 
 ## Обязательно
 
