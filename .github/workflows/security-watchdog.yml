@@ -1,0 +1,77 @@
+name: Security Watchdog
+
+on:
+  schedule:
+    # Every 2 hours
+    - cron: "0 */2 * * *"
+  workflow_dispatch:
+
+jobs:
+  edge-anon-watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Run edge anon registration smoke
+        id: smoke
+        continue-on-error: true
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "Missing SUPABASE_ANON_KEY secret" >&2
+            exit 1
+          fi
+          chmod +x scripts/smoke_edge_anon_registration.sh
+          ./scripts/smoke_edge_anon_registration.sh
+
+      - name: Open incident issue on failure
+        if: steps.smoke.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = "Security Watchdog alert: anon registration chain failed";
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = [
+              "Automated watchdog detected a failure in the edge anon registration smoke.",
+              "",
+              `- Workflow run: ${runUrl}`,
+              `- Branch/ref: ${context.ref}`,
+              `- Commit: ${context.sha}`,
+              "",
+              "Please investigate before next production release."
+            ].join("\n");
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: "security-watchdog",
+              per_page: 50
+            });
+            const existing = issues.find(i => i.title === title);
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ["security-watchdog", "security", "incident"]
+              });
+            }
+
+      - name: Fail job if smoke failed
+        if: steps.smoke.outcome == 'failure'
+        run: |
+          echo "Security watchdog smoke failed."
+          exit 1
