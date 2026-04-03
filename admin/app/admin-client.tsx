@@ -18,6 +18,7 @@ type Establishment = {
   registration_city?: string | null
   /** Админ: лимит доп. заведений для владельца; null = общая настройка «Настройки» */
   max_additional_establishments_override?: number | null
+  establishment_type?: 'main' | 'branch' | 'separate'
 }
 
 function formatDate(iso: string | null) {
@@ -96,6 +97,17 @@ export default function AdminClient() {
 const CONFIRM_DELETE_TEXT = 'УДАЛИТЬ'
 
 function EstablishmentsTab() {
+  function establishmentTypeLabel(row: Establishment) {
+    switch (row.establishment_type) {
+      case 'branch':
+        return 'Филиал'
+      case 'separate':
+        return 'Отдельное заведение'
+      default:
+        return 'Основное'
+    }
+  }
+
   const [data, setData] = useState<Establishment[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -253,6 +265,7 @@ function EstablishmentsTab() {
               <thead>
                 <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
                   <th className="px-4 py-3 text-left">Заведение</th>
+                  <th className="px-4 py-3 text-left">Тип</th>
                   <th className="px-4 py-3 text-left">Владелец</th>
                   <th className="px-4 py-3 text-left">Email</th>
                   <th className="px-4 py-3 text-center">Сотр.</th>
@@ -268,6 +281,11 @@ function EstablishmentsTab() {
                 {filtered.map((row, i) => (
                   <tr key={row.id} className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition ${i === filtered.length - 1 ? 'border-0' : ''}`}>
                     <td className="px-4 py-3 font-medium text-white">{row.name}</td>
+                    <td className="px-4 py-3 text-xs">
+                      <span className="bg-gray-800 px-2 py-0.5 rounded text-gray-300">
+                        {establishmentTypeLabel(row)}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-gray-300">{row.owner_name}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs">{row.owner_email}</td>
                     <td className="px-4 py-3 text-center">
@@ -328,6 +346,7 @@ function EstablishmentsTab() {
                   </span>
                 </div>
                 <div className="text-gray-400 text-xs">{row.owner_name}</div>
+                <div className="text-gray-500 text-xs">{establishmentTypeLabel(row)}</div>
                 <div className="text-gray-500 text-xs">{row.owner_email}</div>
                 <div className="text-gray-600 text-xs mt-1">{formatDate(row.created_at)}</div>
                 {row.registration_ip && (

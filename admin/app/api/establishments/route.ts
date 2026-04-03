@@ -47,6 +47,7 @@ export async function GET() {
   type EstablishmentRow = {
     id: string
     parent_establishment_id: string | null
+    owner_id: string | null
     // Остальные поля не нужны для расчётов, но оставляем тип как неизвестный.
     [key: string]: unknown
   }
@@ -59,6 +60,12 @@ export async function GET() {
   }
 
   const list = (establishments ?? []) as EstablishmentRow[]
+  const mainCountByOwner = new Map<string, number>()
+  for (const est of list) {
+    const ownerId = est.owner_id ?? ''
+    if (!ownerId || est.parent_establishment_id) continue
+    mainCountByOwner.set(ownerId, (mainCountByOwner.get(ownerId) ?? 0) + 1)
+  }
 
   // Для каждого заведения считаем сотрудников и находим владельца.
   // Для филиалов: если в employees по самому филиалу владелец не найден,
@@ -128,11 +135,19 @@ export async function GET() {
     const owner = estEmployees.find(e => e.roles?.includes('owner'))
 
     if (owner) {
+      const ownerId = est.owner_id ?? ''
+      const ownerMainCount = ownerId ? (mainCountByOwner.get(ownerId) ?? 0) : 0
+      const establishment_type = est.parent_establishment_id
+        ? 'branch'
+        : ownerMainCount > 1
+          ? 'separate'
+          : 'main'
       return {
         ...est,
         employee_count: estEmployees.length,
         owner_name: owner?.full_name ?? '—',
         owner_email: owner?.email ?? '—',
+        establishment_type,
       }
     }
 
@@ -141,11 +156,19 @@ export async function GET() {
     const rootEmployees = employeesByEstId.get(rootId) ?? []
     const rootOwner = rootEmployees.find(e => e.roles?.includes('owner'))
 
+    const ownerId = est.owner_id ?? ''
+    const ownerMainCount = ownerId ? (mainCountByOwner.get(ownerId) ?? 0) : 0
+    const establishment_type = est.parent_establishment_id
+      ? 'branch'
+      : ownerMainCount > 1
+        ? 'separate'
+        : 'main'
     return {
       ...est,
       employee_count: estEmployees.length,
       owner_name: rootOwner?.full_name ?? '—',
       owner_email: rootOwner?.email ?? '—',
+      establishment_type,
     }
   })
 
