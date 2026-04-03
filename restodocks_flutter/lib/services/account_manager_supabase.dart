@@ -1,7 +1,5 @@
 import 'package:dio/dio.dart';
 import 'dart:async' show unawaited;
-import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthException;
 import 'package:restodocks/core/supabase_url_resolver_stub.dart'
@@ -38,13 +36,6 @@ String _dateOnly(DateTime d) =>
 
 /// Сервис управления аккаунтами с использованием Supabase
 class AccountManagerSupabase extends ChangeNotifier {
-  static final Random _secureRandom = Random.secure();
-
-  static String _generateSecureInvitationToken() {
-    final bytes = List<int>.generate(32, (_) => _secureRandom.nextInt(256));
-    return base64UrlEncode(bytes).replaceAll('=', '');
-  }
-
   static final AccountManagerSupabase _instance =
       AccountManagerSupabase._internal();
   factory AccountManagerSupabase() => _instance;
@@ -590,24 +581,22 @@ class AccountManagerSupabase extends ChangeNotifier {
       throw Exception('Only owners can send co-owner invitations');
     }
 
-    final establishmentsCount = await getEstablishmentsForOwner();
-    final isViewOnlyOwner = establishmentsCount.length > 1;
-
-    final token = _generateSecureInvitationToken();
-    final invitationData = {
-      'establishment_id': establishmentId,
-      'invited_email': email,
-      'invited_by': currentEmployee.id,
-      'invitation_token': token,
-      'status': 'pending',
-      'is_view_only_owner': isViewOnlyOwner,
-    };
-
-    await _supabase.insertData('co_owner_invitations', invitationData);
+    final raw = await _supabase.client.rpc(
+      'create_co_owner_invitation',
+      params: {
+        'p_establishment_id': establishmentId,
+        'p_invited_email': email.trim(),
+      },
+    );
+    final map = Map<String, dynamic>.from(raw as Map);
+    final token = map['invitation_token'] as String?;
+    if (token == null || token.isEmpty) {
+      throw Exception('create_co_owner_invitation: no token in response');
+    }
 
     // Отправка email с ссылкой (здесь должна быть интеграция с email сервисом)
     final invitationLink =
-        'https://yourapp.com/accept-co-owner-invitation?token=$token';
+        '$publicAppOrigin/accept-co-owner-invitation?token=${Uri.encodeComponent(token)}';
     devLog('Invitation link: $invitationLink'); // Временно выводим в консоль
 
     // TODO: Интегрировать с email сервисом для отправки приглашения
