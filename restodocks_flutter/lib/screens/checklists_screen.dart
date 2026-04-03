@@ -6,6 +6,8 @@ import '../models/models.dart';
 import '../services/app_toast_service.dart';
 import '../services/services.dart';
 import '../utils/checklist_reminder_summary.dart';
+import '../utils/employee_display_utils.dart';
+import '../utils/translit_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Список чеклистов-шаблонов. Шеф может править и создавать по аналогии.
@@ -57,11 +59,32 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     } catch (_) {}
   }
 
-  String _displayName(Checklist c, LocalizationService loc) {
+  String _displayName(Checklist c, LocalizationService loc, bool useTranslit) {
     final base = c.name.trim().isNotEmpty
         ? c.name
         : (c.additionalName?.trim().isNotEmpty == true ? c.additionalName! : (loc.t('checklist_no_name') ?? 'Без названия'));
-    return _translatedNames[c.id] ?? base;
+    var text = _translatedNames[c.id] ?? base;
+    if (useTranslit) {
+      text = cyrillicToLatin(text);
+    }
+    return text;
+  }
+
+  /// Совпадение поиска по исходному названию, переводу и (при транслите) латинице.
+  List<Checklist> _filterChecklists(bool useTranslit) {
+    if (_searchQuery.isEmpty) return _list;
+    final q = _searchQuery;
+    return _list.where((c) {
+      final raw = (c.name.trim().isNotEmpty ? c.name : c.additionalName ?? '').toLowerCase();
+      if (raw.contains(q)) return true;
+      final tr = _translatedNames[c.id]?.toLowerCase();
+      if (tr != null && tr.contains(q)) return true;
+      if (useTranslit) {
+        final lit = cyrillicToLatin(raw).toLowerCase();
+        if (lit.contains(q)) return true;
+      }
+      return false;
+    }).toList();
   }
 
   Future<void> _load() async {
@@ -203,7 +226,16 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
               onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
             ),
           ),
-          Expanded(child: _body(loc, canEdit, canAccessChecklists, _scrollController)),
+          Expanded(
+            child: Builder(
+              builder: (context) {
+                final layoutPrefs = context.watch<ScreenLayoutPreferenceService>();
+                final useTranslit =
+                    loc.currentLanguageCode != 'ru' || layoutPrefs.showNameTranslit;
+                return _body(loc, canEdit, canAccessChecklists, _scrollController, useTranslit);
+              },
+            ),
+          ),
         ],
       ),
       floatingActionButton: canAccessChecklists
@@ -223,17 +255,11 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     return DateTime.now().toUtc().isAfter(deadline.toUtc());
   }
 
-  List<Checklist> get _filteredList {
-    if (_searchQuery.isEmpty) return _list;
-    return _list.where((c) {
-      final name = (c.name.trim().isNotEmpty ? c.name : c.additionalName ?? '').toLowerCase();
-      return name.contains(_searchQuery);
-    }).toList();
-  }
-
   /// Build grouped list: section → deadline → employee. Returns list of (isHeader, headerLevel, label, checklist?).
   List<({bool isHeader, int level, String label, Checklist? checklist})> _buildGroupedItems(
     LocalizationService loc,
+    List<Checklist> checklists,
+    bool useEmployeeTranslit,
   ) {
     final lang = loc.currentLanguageCode;
     final fmtDate = (DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
@@ -247,11 +273,13 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     final noDeadline = loc.t('checklist_no_deadline') ?? 'Без срока';
     final allEmployees = loc.t('checklist_all_employees') ?? 'Всем';
 
-    final empMap = {for (final e in _employees) e.id: e.fullName};
+    final empMap = {
+      for (final e in _employees) e.id: employeeDisplayName(e, translit: useEmployeeTranslit),
+    };
 
     // Group: section -> deadline -> employee -> [Checklist]
     final grouped = <String, Map<String, Map<String, List<Checklist>>>>{};
-    for (final c in _filteredList) {
+    for (final c in checklists) {
       final sectionKey = c.assignedSection?.isNotEmpty == true ? c.assignedSection! : '';
       final sectionLabel = sectionKey.isNotEmpty
           ? (KitchenSection.fromCode(sectionKey)?.getLocalizedName(lang) ?? sectionKey)
@@ -307,7 +335,13 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     return result;
   }
 
-  Widget _body(LocalizationService loc, bool canEdit, bool canAccessChecklists, ScrollController scrollController) {
+  Widget _body(
+    LocalizationService loc,
+    bool canEdit,
+    bool canAccessChecklists,
+    ScrollController scrollController,
+    bool useTranslit,
+  ) {
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -364,7 +398,8 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
         ),
       );
     }
-    final grouped = _buildGroupedItems(loc);
+    final filtered = _filterChecklists(useTranslit);
+    final grouped = _buildGroupedItems(loc, filtered, useTranslit);
     if (grouped.isEmpty) {
       return Center(
         child: Text(
@@ -448,7 +483,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                   ],
                 ],
               ),
-              title: Text(_displayName(c, loc)),
+              title: Text(_displayName(c, loc, useTranslit)),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -515,7 +550,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                                 context: context,
                                 builder: (ctx) => AlertDialog(
                                   title: Text(loc.t('checklist_delete_confirm') ?? 'Удалить чеклист?'),
-                                  content: Text(_displayName(c, loc)),
+                                  content: Text(_displayName(c, loc, useTranslit)),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.of(ctx).pop(false),

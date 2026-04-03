@@ -1310,13 +1310,16 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         title: Text(loc.t('checklists')),
         actions: const [],
       ),
-      body: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final narrow = constraints.maxWidth < 560;
+          return Stack(
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
             TextField(
               controller: _nameController,
               readOnly: !canEdit,
@@ -1341,31 +1344,50 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 }),
               ),
             if (canEdit) const SizedBox(height: 16),
-            // Цех/отдел и сотрудники — сразу после типа, в одну строку.
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String?>(
-                    value: _checklist?.assignedSection?.isNotEmpty == true ? _checklist!.assignedSection : null,
-                    decoration: InputDecoration(
-                      labelText: lang == 'ru' ? 'Цех' : 'Section',
+            // Цех и сотрудники — на узком экране столбиком, на широком — в одну строку.
+            if (narrow) ...[
+              DropdownButtonFormField<String?>(
+                value: _checklist?.assignedSection?.isNotEmpty == true ? _checklist!.assignedSection : null,
+                decoration: InputDecoration(
+                  labelText: lang == 'ru' ? 'Цех' : 'Section',
+                ),
+                items: [
+                  DropdownMenuItem(value: null, child: Text(loc.t('not_specified') ?? 'Не указан')),
+                  ...KitchenSection.values.map((s) => DropdownMenuItem(value: s.code, child: Text(s.getLocalizedName(lang)))),
+                ],
+                onChanged: canEdit ? (v) {
+                  setState(() => _checklist = _checklist?.copyWith(assignedSection: v));
+                  scheduleSave();
+                } : null,
+              ),
+              const SizedBox(height: 12),
+              _buildEmployeeSelector(loc, lang, canEdit),
+            ] else ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String?>(
+                      value: _checklist?.assignedSection?.isNotEmpty == true ? _checklist!.assignedSection : null,
+                      decoration: InputDecoration(
+                        labelText: lang == 'ru' ? 'Цех' : 'Section',
+                      ),
+                      items: [
+                        DropdownMenuItem(value: null, child: Text(loc.t('not_specified') ?? 'Не указан')),
+                        ...KitchenSection.values.map((s) => DropdownMenuItem(value: s.code, child: Text(s.getLocalizedName(lang)))),
+                      ],
+                      onChanged: canEdit ? (v) {
+                        setState(() => _checklist = _checklist?.copyWith(assignedSection: v));
+                        scheduleSave();
+                      } : null,
                     ),
-                    items: [
-                      DropdownMenuItem(value: null, child: Text(loc.t('not_specified') ?? 'Не указан')),
-                      ...KitchenSection.values.map((s) => DropdownMenuItem(value: s.code, child: Text(s.getLocalizedName(lang)))),
-                    ],
-                    onChanged: canEdit ? (v) {
-                      setState(() => _checklist = _checklist?.copyWith(assignedSection: v));
-                      scheduleSave();
-                    } : null,
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildEmployeeSelector(loc, lang, canEdit),
-                ),
-              ],
-            ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildEmployeeSelector(loc, lang, canEdit),
+                  ),
+                ],
+              ),
+            ],
             if (canEdit) const SizedBox(height: 12),
             if (canEdit)
               InputDecorator(
@@ -1425,59 +1447,113 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             const SizedBox(height: 16),
             if (canEdit) ...[
               const SizedBox(height: 24),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (_type == ChecklistType.prep)
-                    SizedBox(
-                      width: 160,
-                      child: InkWell(
-                        onTap: _showSelectPfDropdown,
-                        borderRadius: BorderRadius.circular(4),
-                        child: InputDecorator(
-                          decoration: InputDecoration(
-                            labelText: loc.t('select_pf') ?? 'Выбрать ПФ',
-                            suffixIcon: Icon(Icons.keyboard_arrow_down, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                            border: const OutlineInputBorder(),
-                          ),
-                          isEmpty: true,
-                          child: const SizedBox.shrink(),
+              if (narrow) ...[
+                if (_type == ChecklistType.prep) ...[
+                  InkWell(
+                    onTap: _showSelectPfDropdown,
+                    borderRadius: BorderRadius.circular(4),
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: loc.t('select_pf') ?? 'Выбрать ПФ',
+                        suffixIcon: Icon(Icons.keyboard_arrow_down, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                        border: const OutlineInputBorder(),
+                      ),
+                      isEmpty: true,
+                      child: const SizedBox.shrink(),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _newItemController,
+                        decoration: InputDecoration(
+                          labelText: loc.t('add_item'),
+                          hintText: _type == ChecklistType.tasks
+                              ? (loc.t('checklist_item_hint') ?? 'Введите наименование')
+                              : (loc.t('checklist_item_prep_hint') ?? 'Введите своё или выберите ПФ'),
                         ),
+                        onSubmitted: (_) {
+                          if (_type == ChecklistType.prep && _newItemController.text.trim().isNotEmpty) {
+                            _showQuantityDialog(title: _newItemController.text.trim());
+                          } else {
+                            _addItem();
+                          }
+                        },
                       ),
                     ),
-                  if (_type == ChecklistType.prep) const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _newItemController,
-                      decoration: InputDecoration(
-                        labelText: loc.t('add_item'),
-                        hintText: _type == ChecklistType.tasks
-                            ? (loc.t('checklist_item_hint') ?? 'Введите наименование')
-                            : (loc.t('checklist_item_prep_hint') ?? 'Введите своё или выберите ПФ'),
-                      ),
-                      onSubmitted: (_) {
+                    const SizedBox(width: 8),
+                    IconButton.filled(
+                      onPressed: () {
                         if (_type == ChecklistType.prep && _newItemController.text.trim().isNotEmpty) {
                           _showQuantityDialog(title: _newItemController.text.trim());
                         } else {
                           _addItem();
                         }
                       },
+                      icon: const Icon(Icons.add),
+                      tooltip: loc.t('add_item'),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: () {
-                      if (_type == ChecklistType.prep && _newItemController.text.trim().isNotEmpty) {
-                        _showQuantityDialog(title: _newItemController.text.trim());
-                      } else {
-                        _addItem();
-                      }
-                    },
-                    icon: const Icon(Icons.add),
-                    tooltip: loc.t('add_item'),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ] else ...[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_type == ChecklistType.prep)
+                      SizedBox(
+                        width: 160,
+                        child: InkWell(
+                          onTap: _showSelectPfDropdown,
+                          borderRadius: BorderRadius.circular(4),
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: loc.t('select_pf') ?? 'Выбрать ПФ',
+                              suffixIcon: Icon(Icons.keyboard_arrow_down, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              border: const OutlineInputBorder(),
+                            ),
+                            isEmpty: true,
+                            child: const SizedBox.shrink(),
+                          ),
+                        ),
+                      ),
+                    if (_type == ChecklistType.prep) const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _newItemController,
+                        decoration: InputDecoration(
+                          labelText: loc.t('add_item'),
+                          hintText: _type == ChecklistType.tasks
+                              ? (loc.t('checklist_item_hint') ?? 'Введите наименование')
+                              : (loc.t('checklist_item_prep_hint') ?? 'Введите своё или выберите ПФ'),
+                        ),
+                        onSubmitted: (_) {
+                          if (_type == ChecklistType.prep && _newItemController.text.trim().isNotEmpty) {
+                            _showQuantityDialog(title: _newItemController.text.trim());
+                          } else {
+                            _addItem();
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton.filled(
+                      onPressed: () {
+                        if (_type == ChecklistType.prep && _newItemController.text.trim().isNotEmpty) {
+                          _showQuantityDialog(title: _newItemController.text.trim());
+                        } else {
+                          _addItem();
+                        }
+                      },
+                      icon: const Icon(Icons.add),
+                      tooltip: loc.t('add_item'),
+                    ),
+                  ],
+                ),
+              ],
             ],
             const SizedBox(height: 16),
             ...List.generate(_items.length, (i) {
@@ -1574,8 +1650,10 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         ),
       ),
       DataSafetyIndicator(isVisible: true),
-    ],
-  ),
-);
+            ],
+          );
+        },
+      ),
+    );
   }
 }
