@@ -19,6 +19,41 @@ class EmailService {
     return postEdgeFunctionWithRetry('send-email', body);
   }
 
+  /// Разбор ответа Edge `send-email`: успех только если Resend вернул [id] (иначе был бы ложный «успех»).
+  static ({bool ok, String? resendId, String? error}) _parseSendEmailResponse(
+    int status,
+    Map<String, dynamic>? data,
+  ) {
+    if (status != 200) {
+      return (
+        ok: false,
+        resendId: null,
+        error: data?['error']?.toString() ?? 'HTTP $status',
+      );
+    }
+    final topErr = data?['error']?.toString();
+    if (topErr != null && topErr.isNotEmpty) {
+      return (ok: false, resendId: null, error: topErr);
+    }
+    final inner = data?['data'];
+    if (inner is Map) {
+      final id = inner['id'];
+      if (id is String && id.isNotEmpty) {
+        return (ok: true, resendId: id, error: null);
+      }
+    }
+    final directId = data?['id'];
+    if (directId is String && directId.isNotEmpty) {
+      return (ok: true, resendId: directId, error: null);
+    }
+    return (
+      ok: false,
+      resendId: null,
+      error:
+          'Почтовый сервер не подтвердил отправку (нет id в ответе Resend). Смотрите логи Edge send-email и RESEND_API_KEY.',
+    );
+  }
+
   /// send-registration-email: прямой POST через Dio ([postEdgeFunctionWithRetry]), не [FunctionsClient] + [AuthHttpClient].
   /// [bearerAlwaysAnon: true] — после signUp сессия иначе подставляет user JWT; Edge ждёт anon или валидный user JWT.
   Future<({int status, Map<String, dynamic>? data})> _invokeSendRegistrationEmail(
@@ -256,9 +291,9 @@ class EmailService {
         'subject': '[Поддержка] $category — $subject',
         'html': html,
       });
-      if (res.status == 200) return (ok: true, error: null);
-      final msg = res.data?['error']?.toString() ?? 'Unknown error';
-      return (ok: false, error: msg);
+      final parsed = EmailService._parseSendEmailResponse(res.status, res.data);
+      if (parsed.ok) return (ok: true, error: null);
+      return (ok: false, error: parsed.error);
     } catch (e) {
       return (ok: false, error: e.toString());
     }
@@ -296,15 +331,12 @@ class EmailService {
         'html': html,
         'text': text,
       });
-      if (res.status == 200) {
-        final bodyError = res.data?['error']?.toString();
-        if (bodyError != null && bodyError.isNotEmpty) {
-          return (ok: false, error: bodyError);
-        }
+      final parsed = EmailService._parseSendEmailResponse(res.status, res.data);
+      if (parsed.ok) {
+        devLog('EmailService: invitation sent, resend_id=${parsed.resendId}');
         return (ok: true, error: null);
       }
-      final msg = res.data?['error']?.toString() ?? 'HTTP ${res.status}';
-      return (ok: false, error: msg);
+      return (ok: false, error: parsed.error);
     } catch (e) {
       return (ok: false, error: e.toString());
     }
@@ -348,16 +380,12 @@ class EmailService {
       devLog('EmailService: invoking send-email (HTTP), body keys=${body.keys.toList()}');
       final res = await _invokeSendEmailHttp(body);
       devLog('EmailService: send-email response status=${res.status} data=${res.data}');
-      if (res.status != 200) {
-        final msg = res.data?['error']?.toString() ?? 'HTTP ${res.status}';
-        return (ok: false, error: msg);
+      final parsed = EmailService._parseSendEmailResponse(res.status, res.data);
+      if (parsed.ok) {
+        devLog('EmailService: send-email ok resend_id=${parsed.resendId}');
+        return (ok: true, error: null);
       }
-      // Даже при 200 проверяем body — функция может вернуть { error: '...' }
-      final bodyError = res.data?['error']?.toString();
-      if (bodyError != null && bodyError.isNotEmpty) {
-        return (ok: false, error: bodyError);
-      }
-      return (ok: true, error: null);
+      return (ok: false, error: parsed.error);
     } catch (e) {
       devLog('EmailService: sendOrderEmail exception: $e');
       return (ok: false, error: e.toString());
