@@ -19,6 +19,36 @@ async function isValidSupabaseAnonJwt(
   }
 }
 
+/**
+ * В Edge часто нет JWT_SECRET — локальная проверка подписи невозможна.
+ * Тот же anon, что принимает PostgREST для этого проекта, считаем валидным
+ * (проверка через шлюз API, без секрета в функции).
+ */
+async function isJwtAcceptedByPostgrestGateway(token: string): Promise<boolean> {
+  const t = token?.trim();
+  if (!t || !t.includes(".")) return false;
+  const base = Deno.env.get("SUPABASE_URL")?.trim()?.replace(/\/+$/, "");
+  if (!base) return false;
+  const headers: Record<string, string> = {
+    apikey: t,
+    Authorization: `Bearer ${t}`,
+  };
+  const signal = AbortSignal.timeout(8_000);
+  try {
+    let res = await fetch(`${base}/rest/v1/`, { method: "HEAD", headers, signal });
+    if (res.status === 405) {
+      res = await fetch(`${base}/rest/v1/`, {
+        method: "GET",
+        headers: { ...headers, Accept: "application/openapi+json" },
+        signal,
+      });
+    }
+    return res.status !== 401 && res.status !== 403;
+  } catch {
+    return false;
+  }
+}
+
 type RateLimitOptions = {
   windowMs: number;
   maxRequests: number;
@@ -213,6 +243,14 @@ export async function hasValidApiKeyOrUser(req: Request): Promise<boolean> {
     req.headers.get("authorization") ?? req.headers.get("Authorization"),
   );
   if (await isValidSupabaseAnonJwt(token)) return true;
+
+  const seen = new Set<string>();
+  for (const cand of [apiKeyHeader, token]) {
+    const c = cand?.trim();
+    if (!c || seen.has(c)) continue;
+    seen.add(c);
+    if (await isJwtAcceptedByPostgrestGateway(c)) return true;
+  }
 
   if (!token) return false;
 
