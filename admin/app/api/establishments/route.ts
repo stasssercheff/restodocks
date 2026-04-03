@@ -19,7 +19,7 @@ export async function GET() {
   const supabase = createClient(config.url, config.serviceRoleKey)
 
   const selectBase =
-    'id, name, address, created_at, default_currency, owner_id, registration_ip, registration_country, registration_city'
+    'id, name, address, created_at, default_currency, owner_id, parent_establishment_id, registration_ip, registration_country, registration_city'
 
   let { data: establishments, error } = await supabase
     .from('establishments')
@@ -46,7 +46,9 @@ export async function GET() {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   const list = establishments ?? []
 
-  // Для каждого заведения считаем сотрудников и находим владельца
+  // Для каждого заведения считаем сотрудников и находим владельца.
+  // Для филиалов: если в employees по самому филиалу владелец не найден,
+  // показываем владельца основного (root parent establishment).
   const ids = list.map(e => e.id)
 
   const { data: employees } = await supabase
@@ -54,14 +56,56 @@ export async function GET() {
     .select('id, full_name, email, roles, establishment_id')
     .in('establishment_id', ids)
 
+  const employeesByEstId = new Map<string, any[]>()
+  for (const emp of employees ?? []) {
+    const key = emp.establishment_id as string
+    const arr = employeesByEstId.get(key) ?? []
+    arr.push(emp)
+    employeesByEstId.set(key, arr)
+  }
+
+  const parentById = new Map<string, string | null | undefined>()
+  for (const est of list as any[]) {
+    parentById.set(est.id as string, est.parent_establishment_id as string | null | undefined)
+  }
+
+  function getRootParentId(startId: string): string {
+    // parent_establishment_id может указывать на main (NULL/empty) напрямую.
+    // Если дерево глубже — поднимаемся пока можем.
+    let cur: string | null | undefined = startId
+    // Защита от циклов: максимум 10 шагов.
+    for (let i = 0; i < 10; i++) {
+      if (!cur) break
+      const parent = parentById.get(cur)
+      if (!parent) return cur
+      cur = parent
+    }
+    return startId
+  }
+
   const result = list.map(est => {
-    const estEmployees = employees?.filter(e => e.establishment_id === est.id) ?? []
+    const estEmployees = employeesByEstId.get(est.id as string) ?? []
     const owner = estEmployees.find(e => e.roles?.includes('owner'))
+
+    if (owner) {
+      return {
+        ...est,
+        employee_count: estEmployees.length,
+        owner_name: owner?.full_name ?? '—',
+        owner_email: owner?.email ?? '—',
+      }
+    }
+
+    // Если владелец не найден по самому филиалу, пробуем найти его у root parent.
+    const rootId = getRootParentId(est.id as string)
+    const rootEmployees = employeesByEstId.get(rootId) ?? []
+    const rootOwner = rootEmployees.find(e => e.roles?.includes('owner'))
+
     return {
       ...est,
       employee_count: estEmployees.length,
-      owner_name: owner?.full_name ?? '—',
-      owner_email: owner?.email ?? '—',
+      owner_name: rootOwner?.full_name ?? '—',
+      owner_email: rootOwner?.email ?? '—',
     }
   })
 
