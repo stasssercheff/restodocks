@@ -32,13 +32,23 @@ jobs:
       - name: Open incident issue on failure
         if: steps.smoke.outcome == 'failure'
         uses: actions/github-script@v7
+        env:
+          SECURITY_ALERT_MENTIONS: ${{ secrets.SECURITY_ALERT_MENTIONS }}
         with:
           script: |
             const title = "Security Watchdog alert: anon registration chain failed";
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const mentionsRaw = (process.env.SECURITY_ALERT_MENTIONS || "").trim();
+            const mentions = mentionsRaw
+              .split(/[,\s]+/)
+              .map(s => s.trim())
+              .filter(Boolean)
+              .map(s => s.startsWith("@") ? s : `@${s}`);
+            const mentionsLine = mentions.length > 0 ? mentions.join(" ") : "_No SECURITY_ALERT_MENTIONS configured_";
             const body = [
               "Automated watchdog detected a failure in the edge anon registration smoke.",
               "",
+              `- Responsible: ${mentionsLine}`,
               `- Workflow run: ${runUrl}`,
               `- Branch/ref: ${context.ref}`,
               `- Commit: ${context.sha}`,
