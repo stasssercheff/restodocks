@@ -35,6 +35,7 @@
 5. **Cloudflare**: WAF, rate limiting, список разрешённых origin для чувствительных зон.
 6. **Сканирование**: Dependabot / `dart pub outdated` / аудит npm в admin.
 7. **CI smoke gate**: workflow `.github/workflows/security-smoke-gate.yml` должен быть зелёным на `staging/main` (проверяет anon-цепочку `register-metadata` + `send-registration-email`).
+8. **Pre-release gate в `main`**: workflow `.github/workflows/pre-release-security-checklist.yml` валидирует обязательный security-checklist в PR и прогоняет edge anon smoke.
 
 ## 5. Аудит RLS вручную
 

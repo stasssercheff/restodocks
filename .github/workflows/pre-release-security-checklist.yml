@@ -1,0 +1,74 @@
+name: Pre-Release Security Checklist
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  checklist:
+    name: Checklist In PR Body
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate required checklist items
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import sys
+
+          body = os.environ.get("PR_BODY") or ""
+          required = [
+              "[x] security smoke gate is green on staging",
+              "[x] no client-side service role keys or secrets were added",
+              "[x] rollback plan is prepared (revert commit or feature flag)",
+              "[x] registration flows were tested (owner, employee, co-owner)",
+          ]
+
+          body_norm = body.lower()
+          missing = [item for item in required if item not in body_norm]
+          if missing:
+              print("Missing required checked checklist items in PR body:")
+              for item in missing:
+                  print(f" - {item}")
+              print("")
+              print("Add these lines to PR description and mark with [x].")
+              sys.exit(1)
+
+          print("Checklist validation passed.")
+          PY
+
+  edge-anon-smoke:
+    name: Edge Anon Smoke On PR
+    runs-on: ubuntu-latest
+    # Secrets are unavailable for forks; skip there.
+    if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Validate required secrets
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "Missing repository secret: SUPABASE_ANON_KEY" >&2
+            exit 1
+          fi
+          if [ -z "${SUPABASE_URL:-}" ]; then
+            echo "SUPABASE_URL not set, using default from smoke script."
+          fi
+
+      - name: Run edge anon registration smoke
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/smoke_edge_anon_registration.sh
+          ./scripts/smoke_edge_anon_registration.sh
