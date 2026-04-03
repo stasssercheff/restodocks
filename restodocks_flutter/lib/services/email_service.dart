@@ -135,17 +135,14 @@ class EmailService {
   }
 
   /// Запросить ссылку подтверждения (по кнопке «Отправить ссылку»).
-  /// Сначала GoTrue [auth.resend] — тот же anon, без Edge (нет 401 в консоли, стабильнее на web).
-  /// Если не вышло — запасной путь через Edge + Resend (в т.ч. с [password] для signup-link).
+  /// Сначала Edge [send-registration-email] → **Resend** (как приглашение; письмо видно в Resend).
+  /// Если Edge не сработал — запасной [auth.resend] (GoTrue / SMTP Supabase, в Resend не отображается).
   Future<({bool ok, String? error})> sendConfirmationLinkRequest(
     String to, {
     String? languageCode,
     String? password,
   }) async {
     try {
-      final viaAuth = await _tryAuthResendSignupConfirmation(to, languageCode);
-      if (viaAuth.ok) return viaAuth;
-
       final res = await _invokeSendRegistrationEmail({
         'type': 'confirmation_only',
         'to': to.trim(),
@@ -153,12 +150,22 @@ class EmailService {
           'language': languageCode.trim().toLowerCase(),
         if (password != null && password.isNotEmpty) 'password': password,
       });
-      if (res.status == 200) return (ok: true, error: null);
+      if (res.status == 200) {
+        devLog('EmailService: confirmation_only via Resend/Edge ok');
+        return (ok: true, error: null);
+      }
+
+      final viaAuth = await _tryAuthResendSignupConfirmation(to, languageCode);
+      if (viaAuth.ok) {
+        devLog('EmailService: confirmation fallback via auth.resend (не в списке Resend)');
+        return viaAuth;
+      }
+
       if (res.status == 0) {
         return (
           ok: false,
           error: viaAuth.error ??
-              'Сеть или CORS: запрос к send-registration-email не дошёл (проверьте сайт и Edge Functions).',
+              'Сеть или CORS: send-registration-email не дошёл; auth.resend тоже не удался.',
         );
       }
       final msg = res.data is Map
@@ -166,7 +173,7 @@ class EmailService {
           : res.status;
       return (
         ok: false,
-        error: '${viaAuth.error ?? 'Auth resend failed'}. Edge: $msg',
+        error: 'Edge: $msg. Auth: ${viaAuth.error ?? "—"}',
       );
     } catch (e) {
       return (ok: false, error: e.toString());
@@ -174,35 +181,39 @@ class EmailService {
   }
 
   /// Отправить только письмо с ссылкой подтверждения (для co-owner и др.).
-  /// Порядок как в [sendConfirmationLinkRequest]: сначала Auth resend, потом Edge.
+  /// Порядок как в [sendConfirmationLinkRequest]: сначала Resend (Edge), потом auth.resend.
   Future<({bool ok, String? error})> sendConfirmationEmail({
     required String to,
     required String password,
   }) async {
     try {
-      final viaAuth = await _tryAuthResendSignupConfirmation(to, null);
-      if (viaAuth.ok) return viaAuth;
-
       final res = await _invokeSendRegistrationEmail({
         'type': 'confirmation_only',
         'to': to.trim(),
         'password': password,
       });
-      if (res.status == 200) return (ok: true, error: null);
+      if (res.status == 200) {
+        devLog('EmailService: sendConfirmationEmail via Resend/Edge ok');
+        return (ok: true, error: null);
+      }
+
+      final viaAuth = await _tryAuthResendSignupConfirmation(to, null);
+      if (viaAuth.ok) {
+        devLog('EmailService: sendConfirmationEmail fallback auth.resend');
+        return viaAuth;
+      }
+
       if (res.status == 0) {
         return (
           ok: false,
           error: viaAuth.error ??
-              'Сеть или CORS: запрос к send-registration-email не дошёл (проверьте сайт и Edge Functions).',
+              'Сеть или CORS: send-registration-email; auth.resend тоже не удался.',
         );
       }
       final msg = res.data is Map
           ? (res.data!['error'] ?? res.data!['message'] ?? res.status)
           : res.status;
-      return (
-        ok: false,
-        error: '${viaAuth.error ?? 'Auth resend failed'}. Edge: $msg',
-      );
+      return (ok: false, error: 'Edge: $msg. Auth: ${viaAuth.error ?? "—"}');
     } catch (e) {
       return (ok: false, error: e.toString());
     }
