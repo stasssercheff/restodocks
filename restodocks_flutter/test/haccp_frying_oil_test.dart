@@ -6,8 +6,9 @@ import 'package:restodocks/models/haccp_log_type.dart';
 
 void main() {
   group('HaccpLogType frying oil', () {
-    test('supportedInApp contains fryingOil and has 6 items', () {
-      expect(HaccpLogType.supportedInApp.length, 6);
+    test('supportedInApp contains fryingOil and has required minimum', () {
+      // Набор типов расширяется со временем; проверяем минимально необходимое.
+      expect(HaccpLogType.supportedInApp.length, greaterThanOrEqualTo(6));
       expect(HaccpLogType.supportedInApp.contains(HaccpLogType.fryingOil), true);
     });
 

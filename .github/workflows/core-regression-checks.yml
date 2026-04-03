@@ -1,0 +1,29 @@
+name: Core Regression Checks
+
+on:
+  push:
+    branches: [staging, main]
+  pull_request:
+    branches: [staging, main]
+  workflow_dispatch:
+
+jobs:
+  core-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Flutter pub get
+        working-directory: restodocks_flutter
+        run: flutter pub get
+
+      - name: Run core regression script
+        run: ./scripts/regression_core_checks.sh
