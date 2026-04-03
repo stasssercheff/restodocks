@@ -1,6 +1,9 @@
 import 'dart:convert';
 
 import '../utils/dev_log.dart';
+import 'package:restodocks/core/supabase_url_resolver_stub.dart'
+    if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart'
+    as supabase_url;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'edge_function_http.dart';
@@ -16,6 +19,49 @@ class EmailService {
   /// Прямой HTTP POST к Edge Function send-email (retry при 5xx/сети).
   Future<({int status, Map<String, dynamic>? data})> _invokeSendEmailHttp(Map<String, dynamic> body) async {
     return postEdgeFunctionWithRetry('send-email', body);
+  }
+
+  /// send-registration-email: через SDK + явные apikey/Bearer=anon (тот же ключ, что у [Supabase.initialize]).
+  /// Raw Dio давал 401 на web при живой сессии после signUp; [functions.invoke] с override заголовков — надёжнее.
+  Future<({int status, Map<String, dynamic>? data})> _invokeSendRegistrationEmail(
+    Map<String, dynamic> body,
+  ) async {
+    final anon = supabase_url.getSupabaseAnonKey();
+    final headers = <String, String>{
+      'Authorization': 'Bearer $anon',
+      'apikey': anon,
+    };
+    const maxAttempts = 3;
+    const retryDelays = [500, 1000];
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(Duration(milliseconds: retryDelays[attempt - 1]));
+      }
+      try {
+        final res = await _client.functions.invoke(
+          'send-registration-email',
+          body: body,
+          headers: headers,
+        );
+        final data = res.data;
+        Map<String, dynamic>? map;
+        if (data is Map) {
+          map = Map<String, dynamic>.from(data);
+        }
+        return (status: res.status, data: map);
+      } on FunctionException catch (e) {
+        Map<String, dynamic>? map;
+        if (e.details is Map) {
+          map = Map<String, dynamic>.from(e.details! as Map);
+        }
+        final retryable = e.status >= 500 && e.status < 600 && attempt < maxAttempts - 1;
+        if (retryable) continue;
+        return (status: e.status, data: map);
+      } catch (_) {
+        if (attempt == maxAttempts - 1) return (status: 0, data: null);
+      }
+    }
+    return (status: 0, data: null);
   }
 
   /// Отправить письмо при регистрации (владелец или сотрудник).
@@ -46,11 +92,7 @@ class EmailService {
         if (languageCode != null && languageCode.trim().isNotEmpty)
           'language': languageCode.trim().toLowerCase(),
       };
-      final res = await postEdgeFunctionWithRetry(
-        'send-registration-email',
-        body,
-        bearerAlwaysAnon: true,
-      );
+      final res = await _invokeSendRegistrationEmail(body);
       if (res.status == 200) return (ok: true, error: null);
       if (res.status == 0) {
         return (
@@ -70,24 +112,19 @@ class EmailService {
 
   /// Запросить ссылку подтверждения (по кнопке «Отправить ссылку»).
   /// Без пароля — magiclink; с паролем — Edge генерирует signup-link (надёжнее для только что созданного пользователя).
-  /// Всегда Bearer=anon: после signUp сессия может дать JWT, из‑за которого Edge отвечает 401 (см. register-metadata).
   Future<({bool ok, String? error})> sendConfirmationLinkRequest(
     String to, {
     String? languageCode,
     String? password,
   }) async {
     try {
-      final res = await postEdgeFunctionWithRetry(
-        'send-registration-email',
-        {
-          'type': 'confirmation_only',
-          'to': to.trim(),
-          if (languageCode != null && languageCode.trim().isNotEmpty)
-            'language': languageCode.trim().toLowerCase(),
-          if (password != null && password.isNotEmpty) 'password': password,
-        },
-        bearerAlwaysAnon: true,
-      );
+      final res = await _invokeSendRegistrationEmail({
+        'type': 'confirmation_only',
+        'to': to.trim(),
+        if (languageCode != null && languageCode.trim().isNotEmpty)
+          'language': languageCode.trim().toLowerCase(),
+        if (password != null && password.isNotEmpty) 'password': password,
+      });
       if (res.status == 200) return (ok: true, error: null);
       if (res.status == 0) {
         return (
@@ -111,11 +148,11 @@ class EmailService {
     required String password,
   }) async {
     try {
-      final res = await postEdgeFunctionWithRetry(
-        'send-registration-email',
-        {'type': 'confirmation_only', 'to': to.trim(), 'password': password},
-        bearerAlwaysAnon: true,
-      );
+      final res = await _invokeSendRegistrationEmail({
+        'type': 'confirmation_only',
+        'to': to.trim(),
+        'password': password,
+      });
       if (res.status == 200) return (ok: true, error: null);
       if (res.status == 0) {
         return (
