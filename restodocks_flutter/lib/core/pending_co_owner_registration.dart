@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/models.dart';
 import '../services/account_manager_supabase.dart';
+import '../services/email_service.dart';
 import '../utils/dev_log.dart';
 import '../utils/person_name_format.dart';
 
@@ -20,6 +21,7 @@ class PendingCoOwnerRegistration {
     required String firstName,
     required String surname,
     DateTime? birthday,
+    String? languageCode,
   }) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
@@ -31,6 +33,8 @@ class PendingCoOwnerRegistration {
         'surname': formatPersonNameField(surname),
         if (birthday != null)
           'birthday': '${birthday.year.toString().padLeft(4, '0')}-${birthday.month.toString().padLeft(2, '0')}-${birthday.day.toString().padLeft(2, '0')}',
+        if (languageCode != null && languageCode.trim().isNotEmpty)
+          'languageCode': languageCode.trim().toLowerCase(),
       }),
     );
   }
@@ -64,6 +68,7 @@ class PendingCoOwnerRegistration {
     final token = map['token'] as String?;
     final firstName = map['firstName'] as String? ?? '';
     final surname = map['surname'] as String? ?? '';
+    final languageCode = map['languageCode'] as String?;
     final birthdayStr = map['birthday'] as String?;
 
     if (token == null || token.trim().isEmpty || firstName.trim().isEmpty) {
@@ -84,7 +89,6 @@ class PendingCoOwnerRegistration {
         'create_co_owner_from_invitation',
         params: params,
       );
-      await clear();
 
       final empMap = Map<String, dynamic>.from(empRaw as Map)..['password'] = '';
       final employee = Employee.fromJson(empMap);
@@ -96,10 +100,32 @@ class PendingCoOwnerRegistration {
           .limit(1)
           .single();
 
-      return (
-        employee: employee,
-        establishment: Establishment.fromJson(Map<String, dynamic>.from(estData as Map)),
+      final establishment = Establishment.fromJson(
+        Map<String, dynamic>.from(estData as Map),
       );
+
+      // После успешного создания co-owner отправляем "данные" письмо.
+      // Подтверждение email уже присылает Supabase Auth на этапе signUp.
+      try {
+        final fullName = surname.trim().isEmpty
+            ? firstName.trim()
+            : '${firstName.trim()} ${surname.trim()}';
+        await EmailService().sendRegistrationEmail(
+          isOwner: false,
+          to: email,
+          companyName: establishment.name,
+          email: email,
+          fullName: fullName.trim().isEmpty ? null : fullName,
+          registeredAtLocal: DateTime.now().toLocal().toString(),
+          pinCode: null,
+          languageCode: languageCode,
+        );
+      } catch (e) {
+        devLog('PendingCoOwnerRegistration: sendRegistrationEmail failed: $e');
+      }
+
+      await clear();
+      return (employee: employee, establishment: establishment);
     } catch (e, st) {
       devLog('PendingCoOwnerRegistration.tryComplete: $e\n$st');
       return null;

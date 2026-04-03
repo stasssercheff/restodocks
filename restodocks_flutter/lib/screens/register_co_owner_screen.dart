@@ -104,29 +104,15 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
           firstName: formatPersonNameField(_firstNameController.text),
           surname: formatPersonNameField(_surnameController.text),
           birthday: _birthday,
-        );
-        final dup = await EmailService().sendConfirmationLinkRequest(
-          email,
           languageCode: interfaceLang,
-          password: password,
         );
         if (!mounted) {
           return;
         }
         setState(() => _isLoading = false);
-        final q =
-            'email=${Uri.encodeComponent(email)}&resendFailed=${dup.ok ? '0' : '1'}';
+        // Подтверждение email уже уходит Supabase Auth при signUp.
+        final q = 'email=${Uri.encodeComponent(email)}&resendFailed=0';
         context.go('/confirm-email?$q');
-        if (!dup.ok) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                dup.error ??
-                    'Не удалось отправить дублирующее письмо. Проверьте настройки почты.',
-              ),
-            ),
-          );
-        }
         return;
       }
 
@@ -154,6 +140,27 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
       if (!mounted) {
         return;
       }
+
+      // "Данные" письмо для co-owner.
+      try {
+        final first = formatPersonNameField(_firstNameController.text);
+        final sur = formatPersonNameField(_surnameController.text);
+        final fullName =
+            sur.isEmpty ? first.trim() : '${first.trim()} ${sur.trim()}';
+        await EmailService().sendRegistrationEmail(
+          isOwner: false,
+          to: email,
+          companyName: estab.name,
+          email: email,
+          fullName: fullName.trim().isEmpty ? null : fullName,
+          registeredAtLocal: DateTime.now().toLocal().toString(),
+          pinCode: null,
+          languageCode: interfaceLang,
+        );
+      } catch (_) {
+        // Не блокируем регистрацию, если письмо не отправилось.
+      }
+
       await accountManager.login(
         employee,
         estab,
