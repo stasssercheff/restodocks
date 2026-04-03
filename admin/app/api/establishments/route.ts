@@ -68,6 +68,14 @@ export async function GET() {
   for (const est of list as any[]) {
     parentById.set(est.id as string, est.parent_establishment_id as string | null | undefined)
   }
+  const childrenByParent = new Map<string, string[]>()
+  for (const est of list as any[]) {
+    const parentId = est.parent_establishment_id as string | null | undefined
+    if (!parentId) continue
+    const arr = childrenByParent.get(parentId) ?? []
+    arr.push(est.id as string)
+    childrenByParent.set(parentId, arr)
+  }
 
   function getRootParentId(startId: string): string {
     // parent_establishment_id может указывать на main (NULL/empty) напрямую.
@@ -83,8 +91,26 @@ export async function GET() {
     return startId
   }
 
+  function collectDescendants(rootId: string): string[] {
+    const out: string[] = []
+    const stack = [...(childrenByParent.get(rootId) ?? [])]
+    const seen = new Set<string>()
+    while (stack.length > 0) {
+      const cur = stack.pop()!
+      if (seen.has(cur)) continue
+      seen.add(cur)
+      out.push(cur)
+      const next = childrenByParent.get(cur) ?? []
+      for (const n of next) stack.push(n)
+    }
+    return out
+  }
+
   const result = list.map(est => {
-    const estEmployees = employeesByEstId.get(est.id as string) ?? []
+    const estId = est.id as string
+    const isMain = !(est.parent_establishment_id as string | null | undefined)
+    const scopeIds = isMain ? [estId, ...collectDescendants(estId)] : [estId]
+    const estEmployees = scopeIds.flatMap(id => employeesByEstId.get(id) ?? [])
     const owner = estEmployees.find(e => e.roles?.includes('owner'))
 
     if (owner) {
