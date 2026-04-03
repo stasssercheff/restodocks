@@ -1,4 +1,23 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { jwtVerify } from "npm:jose@5";
+
+/** Anon-ключ в билде (Cloudflare) может отличаться строкой от SUPABASE_ANON_KEY в рантайме после ротации — оба валидны. */
+async function isValidSupabaseAnonJwt(
+  token: string | null | undefined,
+): Promise<boolean> {
+  const t = token?.trim();
+  if (!t) return false;
+  const jwtSecret = Deno.env.get("SUPABASE_JWT_SECRET")?.trim() ??
+    Deno.env.get("JWT_SECRET")?.trim();
+  if (!jwtSecret) return false;
+  try {
+    const key = new TextEncoder().encode(jwtSecret);
+    const { payload } = await jwtVerify(t, key, { algorithms: ["HS256"] });
+    return payload.role === "anon";
+  } catch {
+    return false;
+  }
+}
 
 type RateLimitOptions = {
   windowMs: number;
@@ -187,13 +206,17 @@ export async function hasValidApiKeyOrUser(req: Request): Promise<boolean> {
   if (hasValidApiKey(req)) return true;
   if (isServiceRoleBearer(req)) return true;
 
-  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
+  const apiKeyHeader = req.headers.get("apikey")?.trim();
+  if (await isValidSupabaseAnonJwt(apiKeyHeader)) return true;
+
   const token = parseBearerToken(
     req.headers.get("authorization") ?? req.headers.get("Authorization"),
   );
-  if (!token) return false;
-  if (anonKey && token === anonKey) return true;
+  if (await isValidSupabaseAnonJwt(token)) return true;
 
+  if (!token) return false;
+
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
   const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
   if (!supabaseUrl || !anonKey) return false;
 

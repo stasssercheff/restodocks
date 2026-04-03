@@ -18,7 +18,7 @@ Future<({int status, Map<String, dynamic>? data})> postEdgeFunctionWithRetry(
   bool bearerAlwaysAnon = false,
 }) async {
   final url = '${supabase_url.getSupabaseBaseUrl()}/functions/v1/$functionPath';
-  final anonKey = supabase_url.getSupabaseAnonKey();
+  final anonKey = supabase_url.getSupabaseAnonKey().trim();
   final sessionToken = Supabase.instance.client.auth.currentSession?.accessToken;
   final authBearer = bearerAlwaysAnon
       ? anonKey
