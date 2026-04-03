@@ -141,9 +141,18 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       if (!infoMail.ok) {
         devLog('OwnerRegistration: sendRegistrationEmail failed: ${infoMail.error}');
       }
-      // Confirmation email is sent by Supabase Auth hook.
-      // We keep only one confirmation channel to avoid duplicates.
       var resendFailed = false;
+      if (!signUpResult.hasSession) {
+        final confirmMail = await EmailService().sendConfirmationEmail(
+          to: email,
+          password: password,
+          languageCode: loc.currentLanguageCode,
+        );
+        if (!confirmMail.ok) {
+          devLog('OwnerRegistration: sendConfirmationEmail failed: ${confirmMail.error}');
+          resendFailed = true;
+        }
+      }
 
       if (!mounted) return;
       if (signUpResult.hasSession) {

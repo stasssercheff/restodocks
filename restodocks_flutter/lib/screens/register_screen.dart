@@ -234,9 +234,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!infoMail.ok) {
         devLog('RegisterEmployee: sendRegistrationEmail failed: ${infoMail.error}');
       }
-      // Confirmation email is sent by Supabase Auth hook.
-      // Keep a single confirmation channel to avoid duplicate letters.
+      // Письмо «вы зарегистрированы» — Resend; со ссылкой — Edge confirmation_only (+ запас auth.resend).
+      // Только Supabase Auth часто не шлёт второе письмо при том же Resend в проекте — дублируем явно.
       var resendFailed = false;
+      if (!hasSession) {
+        final confirmMail = await EmailService().sendConfirmationEmail(
+          to: email,
+          password: password,
+          languageCode: locUi,
+        );
+        if (!confirmMail.ok) {
+          devLog('RegisterEmployee: sendConfirmationEmail failed: ${confirmMail.error}');
+          resendFailed = true;
+        }
+      }
 
       if (!mounted) return;
       if (hasSession) {

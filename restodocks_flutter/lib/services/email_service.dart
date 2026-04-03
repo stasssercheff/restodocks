@@ -199,12 +199,15 @@ class EmailService {
   Future<({bool ok, String? error})> sendConfirmationEmail({
     required String to,
     required String password,
+    String? languageCode,
   }) async {
     try {
       final res = await _invokeSendRegistrationEmail({
         'type': 'confirmation_only',
         'to': to.trim(),
         'password': password,
+        if (languageCode != null && languageCode.trim().isNotEmpty)
+          'language': languageCode.trim().toLowerCase(),
       });
       if (_edgeRegistrationMailOk(res.status, res.data)) {
         devLog('EmailService: sendConfirmationEmail via Resend/Edge ok');
