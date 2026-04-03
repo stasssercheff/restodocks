@@ -218,25 +218,8 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
           leading: const Icon(Icons.payment_outlined),
           title: Text(loc.t('pro_payment_title')),
           subtitle: Text(loc.t('pro_payment_subtitle')),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            showDialog<void>(
-              context: context,
-              builder: (ctx) => AlertDialog(
-                title: Text(loc.t('pro_payment_title')),
-                content: SingleChildScrollView(
-                  child: Text(loc.t('pro_payment_body')),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child:
-                        Text(MaterialLocalizations.of(ctx).okButtonLabel),
-                  ),
-                ],
-              ),
-            );
-          },
+          trailing: const Icon(Icons.schedule_outlined),
+          onTap: null,
         ),
         ListTile(
           leading: const Icon(Icons.description_outlined),

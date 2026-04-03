@@ -1,9 +1,6 @@
 import 'dart:convert';
 
 import '../utils/dev_log.dart';
-import 'package:restodocks/core/supabase_url_resolver_stub.dart'
-    if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart'
-    as supabase_url;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'edge_function_http.dart';
@@ -21,47 +18,16 @@ class EmailService {
     return postEdgeFunctionWithRetry('send-email', body);
   }
 
-  /// send-registration-email: через SDK + явные apikey/Bearer=anon (тот же ключ, что у [Supabase.initialize]).
-  /// Raw Dio давал 401 на web при живой сессии после signUp; [functions.invoke] с override заголовков — надёжнее.
+  /// send-registration-email: прямой POST через Dio ([postEdgeFunctionWithRetry]), не [FunctionsClient] + [AuthHttpClient].
+  /// [bearerAlwaysAnon: true] — после signUp сессия иначе подставляет user JWT; Edge ждёт anon или валидный user JWT.
   Future<({int status, Map<String, dynamic>? data})> _invokeSendRegistrationEmail(
     Map<String, dynamic> body,
   ) async {
-    final anon = supabase_url.getSupabaseAnonKey();
-    final headers = <String, String>{
-      'Authorization': 'Bearer $anon',
-      'apikey': anon,
-    };
-    const maxAttempts = 3;
-    const retryDelays = [500, 1000];
-    for (var attempt = 0; attempt < maxAttempts; attempt++) {
-      if (attempt > 0) {
-        await Future<void>.delayed(Duration(milliseconds: retryDelays[attempt - 1]));
-      }
-      try {
-        final res = await _client.functions.invoke(
-          'send-registration-email',
-          body: body,
-          headers: headers,
-        );
-        final data = res.data;
-        Map<String, dynamic>? map;
-        if (data is Map) {
-          map = Map<String, dynamic>.from(data);
-        }
-        return (status: res.status, data: map);
-      } on FunctionException catch (e) {
-        Map<String, dynamic>? map;
-        if (e.details is Map) {
-          map = Map<String, dynamic>.from(e.details! as Map);
-        }
-        final retryable = e.status >= 500 && e.status < 600 && attempt < maxAttempts - 1;
-        if (retryable) continue;
-        return (status: e.status, data: map);
-      } catch (_) {
-        if (attempt == maxAttempts - 1) return (status: 0, data: null);
-      }
-    }
-    return (status: 0, data: null);
+    return postEdgeFunctionWithRetry(
+      'send-registration-email',
+      body,
+      bearerAlwaysAnon: true,
+    );
   }
 
   /// Отправить письмо при регистрации (владелец или сотрудник).

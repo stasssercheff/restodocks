@@ -1,5 +1,6 @@
 -- Запуск в SQL Editor (Supabase) или psql: обзор RLS-политик для ручного аудита.
 -- Ищите строки с roles = {anon} и qual = true — кандидаты на ужесточение.
+-- Список SECURITY DEFINER: см. scripts/security_audit_definer_functions.sql
 
 SELECT
   schemaname,

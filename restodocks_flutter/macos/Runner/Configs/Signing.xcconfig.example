@@ -1,0 +1,7 @@
+// Скопируйте в Signing.xcconfig (рядом с этим файлом) и подставьте Team ID из:
+// https://developer.apple.com/account → Membership details → Team ID (10 символов)
+//
+// cp Signing.xcconfig.example Signing.xcconfig
+// затем отредактируйте строку ниже:
+
+DEVELOPMENT_TEAM = XXXXXXXXXX

@@ -71,6 +71,11 @@ class Establishment extends Equatable {
   @JsonKey(name: 'pro_trial_ends_at')
   final DateTime? proTrialEndsAt;
 
+  /// Оплаченный Pro до этой даты (для auto-downgrade после окончания подписки).
+  /// NULL означает бессрочный Pro из промокода/ручного источника.
+  @JsonKey(name: 'pro_paid_until')
+  final DateTime? proPaidUntil;
+
   /// ID родительского заведения (для филиалов). NULL = основное заведение.
   @JsonKey(name: 'parent_establishment_id')
   final String? parentEstablishmentId;
@@ -81,7 +86,9 @@ class Establishment extends Equatable {
   /// Оплаченный Pro/Premium или выданный промокодом (не окно 72 ч после регистрации).
   bool get hasPaidProAccess {
     final st = subscriptionType?.toLowerCase().trim();
-    return st == 'pro' || st == 'premium';
+    if (st != 'pro' && st != 'premium') return false;
+    final paidUntil = proPaidUntil;
+    return paidUntil == null || DateTime.now().isBefore(paidUntil);
   }
 
   /// Активны 72 ч после регистрации без промокода (`pro_trial_ends_at` в будущем).
@@ -131,6 +138,7 @@ class Establishment extends Equatable {
     this.defaultCurrency = 'RUB',
     this.subscriptionType,
     this.proTrialEndsAt,
+    this.proPaidUntil,
     this.parentEstablishmentId,
     required this.createdAt,
     required this.updatedAt,
@@ -157,6 +165,7 @@ class Establishment extends Equatable {
     String? defaultCurrency,
     String? subscriptionType,
     DateTime? proTrialEndsAt,
+    DateTime? proPaidUntil,
     String? parentEstablishmentId,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -181,6 +190,7 @@ class Establishment extends Equatable {
       defaultCurrency: defaultCurrency ?? this.defaultCurrency,
       subscriptionType: subscriptionType ?? this.subscriptionType,
       proTrialEndsAt: proTrialEndsAt ?? this.proTrialEndsAt,
+      proPaidUntil: proPaidUntil ?? this.proPaidUntil,
       parentEstablishmentId: parentEstablishmentId ?? this.parentEstablishmentId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -261,6 +271,7 @@ class Establishment extends Equatable {
     defaultCurrency,
     subscriptionType,
     proTrialEndsAt,
+    proPaidUntil,
     parentEstablishmentId,
     createdAt,
     updatedAt,

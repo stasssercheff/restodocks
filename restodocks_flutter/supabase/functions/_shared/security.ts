@@ -138,14 +138,31 @@ export function enforceRateLimitByIdentity(
   return true;
 }
 
+/** RFC 7235: схема Bearer без учёта регистра; токен — остаток после первого пробела. */
+function parseBearerToken(header: string | null | undefined): string | null {
+  const h = header?.trim();
+  if (!h) return null;
+  const m = /^Bearer\s+(.+)$/i.exec(h);
+  return m ? m[1].trim() : null;
+}
+
 export function hasValidApiKey(req: Request): boolean {
-  const apiKey = req.headers.get("apikey")?.trim();
-  if (!apiKey) return false;
   const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
-  if (service && apiKey === service) return true;
-  // Стандартный клиент Supabase всегда шлёт публичный anon key в apikey (не JWT пользователя).
   const anon = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
-  if (anon && apiKey === anon) return true;
+
+  const apiKey = req.headers.get("apikey")?.trim();
+  if (apiKey) {
+    if (service && apiKey === service) return true;
+    // Стандартный клиент Supabase шлёт публичный anon key в apikey (не JWT пользователя).
+    if (anon && apiKey === anon) return true;
+  }
+
+  // Только Authorization: Bearer <anon> (редко, но без дубля apikey в заголовке).
+  const bearerOnly = parseBearerToken(
+    req.headers.get("authorization") ?? req.headers.get("Authorization"),
+  );
+  if (anon && bearerOnly === anon) return true;
+
   return false;
 }
 
@@ -160,30 +177,22 @@ export function isServiceRoleRequest(req: Request): boolean {
 export function isServiceRoleBearer(req: Request): boolean {
   const service = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
   if (!service) return false;
-  const auth =
-    req.headers.get("authorization")?.trim() ??
-    req.headers.get("Authorization")?.trim();
-  if (!auth?.toLowerCase().startsWith("bearer ")) return false;
-  const token = auth.slice(7).trim();
-  return token === service;
+  const token = parseBearerToken(
+    req.headers.get("authorization") ?? req.headers.get("Authorization"),
+  );
+  return !!token && token === service;
 }
 
 export async function hasValidApiKeyOrUser(req: Request): Promise<boolean> {
   if (hasValidApiKey(req)) return true;
   if (isServiceRoleBearer(req)) return true;
 
-  // postEdgeFunctionWithRetry без сессии: Bearer = anon key — getUser(anon) не работает.
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
-  const authHeaderEarly = req.headers.get("authorization") ?? req.headers.get("Authorization");
-  if (anonKey && authHeaderEarly?.startsWith("Bearer ")) {
-    const t = authHeaderEarly.slice("Bearer ".length).trim();
-    if (t === anonKey) return true;
-  }
-
-  const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) return false;
-  const token = authHeader.slice("Bearer ".length).trim();
+  const token = parseBearerToken(
+    req.headers.get("authorization") ?? req.headers.get("Authorization"),
+  );
   if (!token) return false;
+  if (anonKey && token === anonKey) return true;
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
   if (!supabaseUrl || !anonKey) return false;
@@ -200,9 +209,9 @@ export async function hasValidApiKeyOrUser(req: Request): Promise<boolean> {
 }
 
 export async function getAuthenticatedUserId(req: Request): Promise<string | null> {
-  const authHeader = req.headers.get("authorization") ?? req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
-  const token = authHeader.slice("Bearer ".length).trim();
+  const token = parseBearerToken(
+    req.headers.get("authorization") ?? req.headers.get("Authorization"),
+  );
   if (!token) return null;
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();

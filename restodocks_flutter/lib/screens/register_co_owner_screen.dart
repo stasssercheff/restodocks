@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../core/pending_co_owner_registration.dart';
 import '../models/models.dart';
 import '../services/services.dart';
+import '../utils/person_name_format.dart';
 
 /// Регистрация соучредителя после принятия приглашения (employees.id = auth.users.id)
 class RegisterCoOwnerScreen extends StatefulWidget {
@@ -58,12 +59,12 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
   }
 
   Map<String, dynamic> _rpcParams(String token) {
+    final first = formatPersonNameField(_firstNameController.text);
+    final sur = formatPersonNameField(_surnameController.text);
     final params = <String, dynamic>{
       'p_invitation_token': token,
-      'p_full_name': _firstNameController.text.trim(),
-      'p_surname': _surnameController.text.trim().isEmpty
-          ? null
-          : _surnameController.text.trim(),
+      'p_full_name': first,
+      'p_surname': sur.isEmpty ? null : sur,
     };
     if (_birthday != null) {
       final d = _birthday!;
@@ -100,8 +101,8 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
         await PendingCoOwnerRegistration.save(
           email: email,
           token: token,
-          firstName: _firstNameController.text.trim(),
-          surname: _surnameController.text.trim(),
+          firstName: formatPersonNameField(_firstNameController.text),
+          surname: formatPersonNameField(_surnameController.text),
           birthday: _birthday,
         );
         final dup = await EmailService().sendConfirmationLinkRequest(

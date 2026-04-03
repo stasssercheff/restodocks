@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/roles_config.dart';
 import '../services/services.dart';
+import '../utils/person_name_format.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Один раз за сессию показываем подсказку про PIN заведения при открытии экрана.
@@ -168,8 +169,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         return;
       }
 
-      final name = _nameController.text.trim();
-      final surname = _surnameController.text.trim();
+      final name = formatPersonNameField(_nameController.text);
+      final surname = formatPersonNameField(_surnameController.text);
       final fullName = surname.isEmpty ? name : '$name $surname';
       final registeredAtLocal = DateTime.now().toLocal().toString();
 
@@ -213,7 +214,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final employee = await accountManager.createEmployeeForCompany(
         company: establishment,
         fullName: fullName,
-        surname: _surnameController.text.trim().isEmpty ? null : _surnameController.text.trim(),
+        surname: surname.isEmpty ? null : surname,
         email: email,
         password: password,
         department: _department,

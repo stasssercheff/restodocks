@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
 import '../core/pending_owner_role.dart';
 import '../services/services.dart';
+import '../utils/person_name_format.dart';
 import '../models/models.dart';
 
 /// Регистрация владельца после создания компании. PIN подставлен с предыдущего шага.
@@ -75,9 +76,10 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         establishmentId: estab.id,
         role: _selectedRole,
       );
-      final fullName = _surnameController.text.trim().isEmpty
-          ? _nameController.text.trim()
-          : '${_nameController.text.trim()} ${_surnameController.text.trim()}';
+      final nameStr = formatPersonNameField(_nameController.text);
+      final surnameStr = formatPersonNameField(_surnameController.text);
+      final fullName =
+          surnameStr.isEmpty ? nameStr : '$nameStr $surnameStr';
       final registeredAtLocal = DateTime.now().toLocal().toString();
 
       // Проверяем, занят ли email глобально (email должен быть уникальным во всех заведениях)
@@ -111,8 +113,8 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
           await accSupabase.savePendingOwnerRegistration(
             authUserId: authUserId,
             establishment: estab,
-            fullName: _nameController.text.trim(),
-            surname: _surnameController.text.trim().isEmpty ? null : _surnameController.text.trim(),
+            fullName: nameStr,
+            surname: surnameStr.isEmpty ? null : surnameStr,
             email: email,
             roles: roles,
             preferredLanguage: preferredLanguage,

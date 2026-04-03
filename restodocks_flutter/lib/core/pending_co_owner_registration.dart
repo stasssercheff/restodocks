@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/account_manager_supabase.dart';
 import '../utils/dev_log.dart';
+import '../utils/person_name_format.dart';
 
 /// После signUp без сессии (Confirm email) создаём employee только после подтверждения почты.
 /// Данные формы сохраняются здесь и применяются в [tryComplete] после входа.
@@ -26,8 +27,8 @@ class PendingCoOwnerRegistration {
       jsonEncode({
         'email': email.trim().toLowerCase(),
         'token': token,
-        'firstName': firstName.trim(),
-        'surname': surname.trim(),
+        'firstName': formatPersonNameField(firstName),
+        'surname': formatPersonNameField(surname),
         if (birthday != null)
           'birthday': '${birthday.year.toString().padLeft(4, '0')}-${birthday.month.toString().padLeft(2, '0')}-${birthday.day.toString().padLeft(2, '0')}',
       }),
@@ -72,8 +73,8 @@ class PendingCoOwnerRegistration {
     try {
       final params = <String, dynamic>{
         'p_invitation_token': token.trim(),
-        'p_full_name': firstName.trim(),
-        'p_surname': surname.trim().isEmpty ? null : surname.trim(),
+        'p_full_name': formatPersonNameField(firstName),
+        'p_surname': surname.trim().isEmpty ? null : formatPersonNameField(surname),
       };
       if (birthdayStr != null && birthdayStr.trim().isNotEmpty) {
         params['p_birthday'] = birthdayStr.trim();

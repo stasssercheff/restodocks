@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!-- Без App Sandbox: распространение вне Mac App Store; полный сетевой доступ (Supabase). -->
+<!-- Keychain: см. MacOsOptions(useDataProtectionKeyChain: false) в secure_storage_service — иначе -34018 в release. -->
+<dict/>
+</plist>
