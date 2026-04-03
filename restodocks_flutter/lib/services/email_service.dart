@@ -286,10 +286,15 @@ class EmailService {
   <p style="word-break:break-all;font-size:13px;color:#333">$safeLink</p>
 </div>
 ''';
+      // Plain text + HTML снижает риск «спама» у части фильтров; основная доставляемость — DNS (SPF/DKIM/DMARC) в Resend.
+      final text = 'Приглашение соучредителя Restodocks\n\n'
+          'Вас пригласили стать соучредителем заведения «$displayName».\n\n'
+          'Открыть приглашение: $invitationLink\n';
       final res = await _invokeSendEmailHttp({
         'to': to.trim(),
-        'subject': 'Приглашение соучредителя Restodocks — $displayName',
+        'subject': 'Restodocks: приглашение соучредителя — $displayName',
         'html': html,
+        'text': text,
       });
       if (res.status == 200) {
         final bodyError = res.data?['error']?.toString();

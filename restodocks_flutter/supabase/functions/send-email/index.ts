@@ -18,6 +18,8 @@ interface EmailRequest {
   to: string
   subject: string
   html: string
+  /** Plain text (рекомендуется для доставляемости: multipart/alternative у Resend). */
+  text?: string
   /** Optional: attachments — content as base64 string */
   attachments?: Array<{ filename: string; content: string }>
 }
@@ -68,8 +70,9 @@ serve(async (req) => {
   try {
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
     const RESEND_FROM = Deno.env.get('RESEND_FROM_EMAIL')?.trim() || 'Restodocks <noreply@restodocks.com>'
+    const RESEND_REPLY_TO = Deno.env.get('RESEND_REPLY_TO')?.trim()
 
-    const { to, subject, html, attachments }: EmailRequest = await req.json()
+    const { to, subject, html, text, attachments }: EmailRequest = await req.json()
 
     if (typeof to !== "string" || typeof subject !== "string" || typeof html !== "string") {
       return new Response(
@@ -116,6 +119,12 @@ serve(async (req) => {
       to: [toTrim],
       subject,
       html,
+    }
+    if (typeof text === "string" && text.trim().length > 0) {
+      payload.text = text.trim()
+    }
+    if (RESEND_REPLY_TO) {
+      payload.reply_to = RESEND_REPLY_TO
     }
 
     if (attachments?.length) {
