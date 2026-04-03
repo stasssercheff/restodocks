@@ -153,8 +153,6 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       }
 
       if (!mounted) return;
-      final confirmQ =
-          'email=${Uri.encodeComponent(email)}&resendFailed=${resendFailed ? '1' : '0'}';
       if (signUpResult.hasSession) {
         final result = await accSupabase.completePendingOwnerRegistration();
         if (result != null) {
@@ -165,9 +163,21 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
           );
           context.go('/home');
         } else {
+          // Без сессии после signUp письмо уже запросили выше; здесь — сессия есть, но pending
+          // не завершился: на экран подтверждения всё равно нужна ссылка из письма.
+          final dup = await EmailService().sendConfirmationLinkRequest(
+            email,
+            languageCode: loc.currentLanguageCode,
+            password: password,
+          );
+          resendFailed = !dup.ok;
+          final confirmQ =
+              'email=${Uri.encodeComponent(email)}&resendFailed=${resendFailed ? '1' : '0'}';
           context.go('/confirm-email?$confirmQ');
         }
       } else {
+        final confirmQ =
+            'email=${Uri.encodeComponent(email)}&resendFailed=${resendFailed ? '1' : '0'}';
         context.go('/confirm-email?$confirmQ');
       }
     } catch (e) {
