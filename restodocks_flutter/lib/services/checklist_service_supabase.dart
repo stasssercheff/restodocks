@@ -96,6 +96,7 @@ class ChecklistServiceSupabase {
     required String name,
     List<ChecklistItem> items = const [],
     String? assignedSection,
+    List<String> assignedSectionIds = const [],
     String? assignedEmployeeId,
     List<String>? assignedEmployeeIds,
     DateTime? deadlineAt,
@@ -117,7 +118,11 @@ class ChecklistServiceSupabase {
       'created_at': now.toIso8601String(),
       'updated_at': now.toIso8601String(),
     };
-    if (assignedSection != null) data['assigned_section'] = assignedSection;
+    final secIds = assignedSectionIds.isNotEmpty
+        ? List<String>.from(assignedSectionIds)
+        : (assignedSection != null && assignedSection.trim().isNotEmpty ? [assignedSection.trim()] : <String>[]);
+    data['assigned_section_ids'] = secIds;
+    if (secIds.isNotEmpty) data['assigned_section'] = secIds.first;
     if (assignedEmployeeId != null) data['assigned_employee_id'] = assignedEmployeeId;
     if (deadlineAt != null) data['deadline_at'] = deadlineAt.toIso8601String();
     if (scheduledForAt != null) data['scheduled_for_at'] = scheduledForAt.toIso8601String();
@@ -206,6 +211,7 @@ class ChecklistServiceSupabase {
       'deadline_at',
       'scheduled_for_at',
       'assigned_section',
+      'assigned_section_ids',
       'assigned_employee_id',
       'assigned_employee_ids',
       'additional_name',
@@ -249,6 +255,10 @@ class ChecklistServiceSupabase {
 
   Future<void> saveChecklist(Checklist checklist) async {
     final now = DateTime.now().toUtc().toIso8601String();
+    final sectionIds = checklist.assignedSectionIds.isNotEmpty
+        ? List<String>.from(checklist.assignedSectionIds)
+        : checklist.effectiveSectionIds;
+    final sectionFirst = sectionIds.isEmpty ? null : sectionIds.first;
     final empIds = checklist.assignedEmployeeIds ?? [];
     final rawEmpId = empIds.isNotEmpty ? empIds.first : checklist.assignedEmployeeId;
     final empId = rawEmpId != null && rawEmpId.trim().isNotEmpty ? rawEmpId : null;
@@ -268,7 +278,8 @@ class ChecklistServiceSupabase {
       'updated_at': now,
       'action_config': checklist.actionConfig.toJson(),
       'assigned_department': checklist.assignedDepartment,
-      'assigned_section': checklist.assignedSection,
+      'assigned_section': sectionFirst,
+      'assigned_section_ids': sectionIds,
       'assigned_employee_id': empId,
       'assigned_employee_ids': empIds,
       'deadline_at': checklist.deadlineAt?.toUtc().toIso8601String(),
@@ -295,7 +306,8 @@ class ChecklistServiceSupabase {
         'p_updated_at': now,
         'p_action_config': checklist.actionConfig.toJson(),
         'p_assigned_department': checklist.assignedDepartment,
-        'p_assigned_section': checklist.assignedSection,
+        'p_assigned_section': sectionFirst,
+        'p_assigned_section_ids': sectionIds,
         'p_assigned_employee_id': empId,
         'p_assigned_employee_ids': empIds,
         'p_deadline_at': checklist.deadlineAt?.toUtc().toIso8601String(),
@@ -316,7 +328,8 @@ class ChecklistServiceSupabase {
       'updated_at': now,
       'action_config': checklist.actionConfig.toJson(),
       'assigned_department': checklist.assignedDepartment,
-      'assigned_section': checklist.assignedSection,
+      'assigned_section': sectionFirst,
+      'assigned_section_ids': sectionIds,
       'assigned_employee_id': empId,
       'assigned_employee_ids': empIds,
       'deadline_at': checklist.deadlineAt?.toUtc().toIso8601String(),
@@ -358,6 +371,7 @@ class ChecklistServiceSupabase {
       actionConfig: source.actionConfig,
       assignedDepartment: source.assignedDepartment,
       assignedSection: source.assignedSection,
+      assignedSectionIds: source.assignedSectionIds,
       assignedEmployeeId: source.assignedEmployeeId,
       assignedEmployeeIds: source.assignedEmployeeIds,
       deadlineAt: source.deadlineAt,

@@ -293,7 +293,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
         submittedByName: emp.fullName,
         checklistName: c.name,
         additionalName: c.additionalName,
-        section: c.assignedSection,
+        section: c.effectiveSectionIds.isEmpty ? null : c.effectiveSectionIds.first,
         recipientChefIds: chefIds,
         startTime: _startTime,
         endTime: _endTime,

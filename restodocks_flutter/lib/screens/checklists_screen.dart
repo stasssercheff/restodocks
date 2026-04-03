@@ -269,7 +269,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       final local = d.toLocal();
       return hasTime ? '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')} ${fmtDate(local)}' : fmtDate(utc);
     };
-    final noSection = loc.t('checklist_no_section') ?? 'Без цеха';
+    final noSection = loc.t('checklist_section_all') ?? 'Все цеха';
     final noDeadline = loc.t('checklist_no_deadline') ?? 'Без срока';
     final allEmployees = loc.t('checklist_all_employees') ?? 'Всем';
 
@@ -280,10 +280,11 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
     // Group: section -> deadline -> employee -> [Checklist]
     final grouped = <String, Map<String, Map<String, List<Checklist>>>>{};
     for (final c in checklists) {
-      final sectionKey = c.assignedSection?.isNotEmpty == true ? c.assignedSection! : '';
-      final sectionLabel = sectionKey.isNotEmpty
-          ? (KitchenSection.fromCode(sectionKey)?.getLocalizedName(lang) ?? sectionKey)
-          : noSection;
+      final secIds = c.effectiveSectionIds;
+      final sectionKey = secIds.isEmpty ? '' : secIds.join('|');
+      final sectionLabel = secIds.isEmpty
+          ? noSection
+          : secIds.map((code) => KitchenSection.fromCode(code)?.getLocalizedName(lang) ?? code).join(', ');
 
       final deadlineDt = c.deadlineAt;
       final deadlineKey = deadlineDt?.toIso8601String() ?? '';
@@ -299,7 +300,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       grouped[sectionLabel]![deadlineLabel]![empLabel]!.add(c);
     }
 
-    // Sort sections: "Без цеха" last, rest alphabetically
+    // Sort sections: «Все цеха» last, rest alphabetically
     final sectionOrder = grouped.keys.toList()
       ..sort((a, b) {
         if (a == noSection) return 1;
@@ -436,9 +437,10 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
           }
           final c = item.checklist!;
           final lang = loc.currentLanguageCode;
-          final sectionLabel = c.assignedSection != null
-              ? (KitchenSection.fromCode(c.assignedSection!)?.getLocalizedName(lang) ?? c.assignedSection)
-              : null;
+          final secIds = c.effectiveSectionIds;
+          final sectionLine = secIds.isEmpty
+              ? (loc.t('checklist_section_all') ?? 'Все цеха')
+              : secIds.map((code) => KitchenSection.fromCode(code)?.getLocalizedName(lang) ?? code).join(', ');
           final fmtDate = (DateTime d) => '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
           final formatDateTime = (DateTime d) {
             final utc = d.toUtc();
@@ -474,10 +476,10 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                     isOverdue ? Icons.warning_amber_rounded : Icons.checklist,
                     color: isOverdue ? Theme.of(context).colorScheme.error : null,
                   ),
-                  if (sectionLabel != null) ...[
+                  if (secIds.isNotEmpty) ...[
                     const SizedBox(width: 8),
                     Tooltip(
-                      message: sectionLabel,
+                      message: sectionLine,
                       child: Icon(Icons.store, size: 18, color: Theme.of(context).colorScheme.outline),
                     ),
                   ],
@@ -489,7 +491,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text([
-                    if (sectionLabel != null) sectionLabel,
+                    sectionLine,
                     '${c.items.length} ${loc.t('items_count')}',
                   ].join(' • ')),
                   if (datePartsData.isNotEmpty) ...[

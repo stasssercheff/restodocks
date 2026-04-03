@@ -334,6 +334,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           name: name,
           items: itemsForSave,
           assignedSection: c.assignedSection,
+          assignedSectionIds: c.effectiveSectionIds,
           assignedEmployeeId: empIds?.length == 1 ? empIds!.first : null,
           assignedEmployeeIds: empIds,
           deadlineAt: deadlineVal,
@@ -352,6 +353,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           type: _type,
           actionConfig: actionConfig,
           assignedSection: c.assignedSection,
+          assignedSectionIds: c.assignedSectionIds,
           assignedEmployeeIds: empIds,
           assignedEmployeeId: empIds?.length == 1 ? empIds!.first : null,
           deadlineAt: deadlineVal,
@@ -704,6 +706,89 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     );
   }
 
+  Widget _buildSectionSelector(LocalizationService loc, String lang, bool canEdit) {
+    final ids = _checklist?.effectiveSectionIds ?? const <String>[];
+    final label = ids.isEmpty
+        ? (loc.t('checklist_section_all') ?? 'Все цеха')
+        : '${ids.length} ${loc.t('checklist_section') ?? 'Цех'}';
+    return InkWell(
+      onTap: canEdit ? () => _showSectionPicker(loc, lang, canEdit) : null,
+      borderRadius: BorderRadius.circular(12),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: lang == 'ru' ? 'Цех' : 'Section',
+          hintText: loc.t('checklist_section_select') ?? 'Выбрать цеха',
+          border: const OutlineInputBorder(),
+          suffixIcon: canEdit ? Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.onSurfaceVariant) : null,
+        ),
+        child: Text(label),
+      ),
+    );
+  }
+
+  Future<void> _showSectionPicker(LocalizationService loc, String lang, bool canEdit) async {
+    final selected = List<String>.from(_checklist?.effectiveSectionIds ?? []);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) {
+          return AlertDialog(
+            title: Text(lang == 'ru' ? 'Цех' : 'Section'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ListTile(
+                    leading: Radio<bool>(
+                      value: true,
+                      groupValue: selected.isEmpty,
+                      onChanged: (_) => setInner(() => selected.clear()),
+                    ),
+                    title: Text(loc.t('checklist_section_all') ?? 'Все цеха'),
+                    onTap: () => setInner(() => selected.clear()),
+                  ),
+                  ...KitchenSection.values.map((s) {
+                    final isSelected = selected.contains(s.code);
+                    return CheckboxListTile(
+                      value: isSelected,
+                      onChanged: canEdit
+                          ? (v) {
+                              setInner(() {
+                                if (v == true) {
+                                  selected.add(s.code);
+                                } else {
+                                  selected.remove(s.code);
+                                }
+                              });
+                            }
+                          : null,
+                      title: Text(s.getLocalizedName(lang)),
+                    );
+                  }),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(loc.t('cancel'))),
+              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(loc.t('save'))),
+            ],
+          );
+        },
+      ),
+    );
+    if (ok == true && mounted) {
+      setState(() {
+        final sorted = List<String>.from(selected)..sort();
+        _checklist = _checklist?.copyWith(
+          assignedSectionIds: sorted,
+          assignedSection: sorted.isEmpty ? null : sorted.first,
+        );
+        scheduleSave();
+      });
+    }
+  }
+
   Widget _buildEmployeeSelector(LocalizationService loc, String lang, bool canEdit) {
     final label = _selectedEmployeeIds.isEmpty
         ? loc.t('checklist_employee_all') ?? 'Все'
@@ -1035,32 +1120,41 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             const SizedBox(height: 12),
             Text(loc.t('checklist_weekdays_pick'), style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: List.generate(7, (i) {
-                final day = i + 1;
-                final sel = _reminderConfig.weekdays.contains(day);
-                return FilterChip(
-                  label: Text(_weekdayLetter(day, lang)),
-                  selected: sel,
-                  onSelected: canEdit
-                      ? (v) {
-                          setState(() {
-                            final w = List<int>.from(_reminderConfig.weekdays);
-                            if (v) {
-                              if (!w.contains(day)) w.add(day);
-                            } else {
-                              w.remove(day);
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(7, (i) {
+                  final day = i + 1;
+                  final sel = _reminderConfig.weekdays.contains(day);
+                  return Padding(
+                    padding: EdgeInsets.only(right: i < 6 ? 4 : 0),
+                    child: FilterChip(
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                      label: Text(_weekdayLetter(day, lang), style: const TextStyle(fontSize: 12)),
+                      selected: sel,
+                      onSelected: canEdit
+                          ? (v) {
+                              setState(() {
+                                final w = List<int>.from(_reminderConfig.weekdays);
+                                if (v) {
+                                  if (!w.contains(day)) w.add(day);
+                                } else {
+                                  w.remove(day);
+                                }
+                                w.sort();
+                                _reminderConfig = _reminderConfig.copyWith(weekdays: w);
+                                scheduleSave();
+                              });
                             }
-                            w.sort();
-                            _reminderConfig = _reminderConfig.copyWith(weekdays: w);
-                            scheduleSave();
-                          });
-                        }
-                      : null,
-                );
-              }),
+                          : null,
+                    ),
+                  );
+                }),
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -1346,40 +1440,14 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             if (canEdit) const SizedBox(height: 16),
             // Цех и сотрудники — на узком экране столбиком, на широком — в одну строку.
             if (narrow) ...[
-              DropdownButtonFormField<String?>(
-                value: _checklist?.assignedSection?.isNotEmpty == true ? _checklist!.assignedSection : null,
-                decoration: InputDecoration(
-                  labelText: lang == 'ru' ? 'Цех' : 'Section',
-                ),
-                items: [
-                  DropdownMenuItem(value: null, child: Text(loc.t('not_specified') ?? 'Не указан')),
-                  ...KitchenSection.values.map((s) => DropdownMenuItem(value: s.code, child: Text(s.getLocalizedName(lang)))),
-                ],
-                onChanged: canEdit ? (v) {
-                  setState(() => _checklist = _checklist?.copyWith(assignedSection: v));
-                  scheduleSave();
-                } : null,
-              ),
+              _buildSectionSelector(loc, lang, canEdit),
               const SizedBox(height: 12),
               _buildEmployeeSelector(loc, lang, canEdit),
             ] else ...[
               Row(
                 children: [
                   Expanded(
-                    child: DropdownButtonFormField<String?>(
-                      value: _checklist?.assignedSection?.isNotEmpty == true ? _checklist!.assignedSection : null,
-                      decoration: InputDecoration(
-                        labelText: lang == 'ru' ? 'Цех' : 'Section',
-                      ),
-                      items: [
-                        DropdownMenuItem(value: null, child: Text(loc.t('not_specified') ?? 'Не указан')),
-                        ...KitchenSection.values.map((s) => DropdownMenuItem(value: s.code, child: Text(s.getLocalizedName(lang)))),
-                      ],
-                      onChanged: canEdit ? (v) {
-                        setState(() => _checklist = _checklist?.copyWith(assignedSection: v));
-                        scheduleSave();
-                      } : null,
-                    ),
+                    child: _buildSectionSelector(loc, lang, canEdit),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1394,12 +1462,12 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 decoration: InputDecoration(
                   labelText: lang == 'ru' ? 'Формат отметки' : 'Checklist item format',
                   border: const OutlineInputBorder(),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                 ),
                 child: Column(
                   children: [
                     SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 4),
                       dense: true,
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       title: Text(loc.t('checklist_action_numeric') ?? 'Цифра'),
@@ -1411,9 +1479,9 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                         });
                       },
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 4),
                       dense: true,
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       title: Text(loc.t('checklist_action_toggle') ?? 'Сделано/не сделано'),

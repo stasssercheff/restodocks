@@ -4,6 +4,22 @@ import 'checklist_reminder_config.dart';
 
 const _sentinel = Object();
 
+List<String> _parseAssignedSectionIds(Map<String, dynamic> json) {
+  final raw = json['assigned_section_ids'];
+  final out = <String>[];
+  if (raw is List) {
+    for (final e in raw) {
+      final s = e.toString().trim();
+      if (s.isNotEmpty) out.add(s);
+    }
+  }
+  if (out.isEmpty) {
+    final leg = json['assigned_section'] as String?;
+    if (leg != null && leg.trim().isNotEmpty) out.add(leg.trim());
+  }
+  return out;
+}
+
 /// Тип чеклиста: Заготовки (ТТК ПФ + своё) или Задачи (своё).
 enum ChecklistType {
   prep('prep', 'Заготовки'),
@@ -72,7 +88,10 @@ class Checklist extends Equatable {
   final DateTime createdAt;
   final DateTime updatedAt;
   /// Цех/отдел, где отображается чеклист (горячий цех, холодный цех и т.д.)
+  /// Дублирует первый элемент [assignedSectionIds] для совместимости с API и старыми клиентами.
   final String? assignedSection;
+  /// Коды цехов (KitchenSection). Пустой список = все цеха.
+  final List<String> assignedSectionIds;
   /// Подразделение: kitchen, bar, hall (default kitchen)
   final String assignedDepartment;
   /// Сотрудник, которому назначен чеклист (опционально, для обратной совместимости)
@@ -98,6 +117,7 @@ class Checklist extends Equatable {
     required this.createdAt,
     required this.updatedAt,
     this.assignedSection,
+    this.assignedSectionIds = const [],
     this.assignedDepartment = 'kitchen',
     this.assignedEmployeeId,
     this.assignedEmployeeIds,
@@ -122,6 +142,7 @@ class Checklist extends Equatable {
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       assignedSection: json['assigned_section'] as String?,
+      assignedSectionIds: _parseAssignedSectionIds(json),
       assignedDepartment: json['assigned_department'] as String? ?? 'kitchen',
       assignedEmployeeId: json['assigned_employee_id'] as String?,
       assignedEmployeeIds: (json['assigned_employee_ids'] as List<dynamic>?)
@@ -148,7 +169,11 @@ class Checklist extends Equatable {
       'updated_at': updatedAt.toIso8601String(),
       if (additionalName != null) 'additional_name': additionalName,
       if (type != null) 'type': type!.code,
-      if (assignedSection != null) 'assigned_section': assignedSection,
+      'assigned_section_ids': assignedSectionIds,
+      if (assignedSectionIds.isNotEmpty)
+        'assigned_section': assignedSection ?? assignedSectionIds.first
+      else if (assignedSection != null)
+        'assigned_section': assignedSection,
       'assigned_department': assignedDepartment,
       if (assignedEmployeeId != null) 'assigned_employee_id': assignedEmployeeId,
       if (assignedEmployeeIds != null && assignedEmployeeIds!.isNotEmpty)
@@ -157,6 +182,15 @@ class Checklist extends Equatable {
       if (scheduledForAt != null) 'scheduled_for_at': scheduledForAt!.toIso8601String(),
       if (reminderConfig != null) 'reminder_config': reminderConfig!.toJson(),
     };
+  }
+
+  /// Нормализованные коды цехов; пусто = все цеха.
+  List<String> get effectiveSectionIds {
+    if (assignedSectionIds.isNotEmpty) return List<String>.from(assignedSectionIds);
+    if (assignedSection != null && assignedSection!.trim().isNotEmpty) {
+      return [assignedSection!.trim()];
+    }
+    return const [];
   }
 
   Checklist copyWith({
@@ -171,6 +205,7 @@ class Checklist extends Equatable {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? assignedSection,
+    Object? assignedSectionIds = _sentinel,
     String? assignedDepartment,
     String? assignedEmployeeId,
     List<String>? assignedEmployeeIds,
@@ -190,6 +225,9 @@ class Checklist extends Equatable {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       assignedSection: assignedSection ?? this.assignedSection,
+      assignedSectionIds: assignedSectionIds == _sentinel
+          ? this.assignedSectionIds
+          : (assignedSectionIds as List<String>? ?? const []),
       assignedDepartment: assignedDepartment ?? this.assignedDepartment,
       assignedEmployeeId: assignedEmployeeId ?? this.assignedEmployeeId,
       assignedEmployeeIds: assignedEmployeeIds ?? this.assignedEmployeeIds,
@@ -200,7 +238,8 @@ class Checklist extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, establishmentId, createdBy, name, items, createdAt, updatedAt];
+  List<Object?> get props =>
+      [id, establishmentId, createdBy, name, items, createdAt, updatedAt, assignedSectionIds];
 }
 
 /// Пункт чеклиста-шаблона.

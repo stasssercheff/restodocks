@@ -66,6 +66,7 @@ Deno.serve(async (req: Request) => {
       action_config?: Record<string, unknown>;
       assigned_department?: string;
       assigned_section?: string | null;
+      assigned_section_ids?: string[];
       assigned_employee_id?: string | null;
       assigned_employee_ids?: string[];
       deadline_at?: string | null;
@@ -83,6 +84,7 @@ Deno.serve(async (req: Request) => {
       action_config,
       assigned_department,
       assigned_section,
+      assigned_section_ids,
       assigned_employee_id,
       assigned_employee_ids,
       deadline_at,
@@ -145,6 +147,14 @@ Deno.serve(async (req: Request) => {
         });
       }
     }
+    let sectionIds: string[] = Array.isArray(assigned_section_ids)
+      ? assigned_section_ids.map((x) => String(x).trim()).filter((x) => x.length > 0)
+      : [];
+    if (sectionIds.length === 0 && assigned_section && String(assigned_section).trim()) {
+      sectionIds = [String(assigned_section).trim()];
+    }
+    const assigned_section_out = sectionIds.length > 0 ? sectionIds[0] : null;
+
     if (Array.isArray(assigned_employee_ids) && assigned_employee_ids.length > 0) {
       const { data: assignees } = await supabase
         .from("employees")
@@ -167,7 +177,8 @@ Deno.serve(async (req: Request) => {
         updated_at: updated_at,
         action_config: action_config ?? { has_numeric: false, has_toggle: true },
         assigned_department: assigned_department?.trim() || "kitchen",
-        assigned_section: assigned_section || null,
+        assigned_section: assigned_section_out,
+        assigned_section_ids: sectionIds,
         assigned_employee_id: assigned_employee_id || null,
         assigned_employee_ids: assigned_employee_ids ?? [],
         deadline_at: deadline_at || null,
