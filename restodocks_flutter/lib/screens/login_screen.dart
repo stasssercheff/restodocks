@@ -94,11 +94,9 @@ class _LoginScreenState extends State<LoginScreen> {
           padding: const EdgeInsets.all(24.0),
           child: Form(
             key: _formKey,
-            child: AutofillGroup(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: _buildFormChildren(loc),
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: _buildFormChildren(loc),
             ),
           ),
         ),
@@ -120,52 +118,68 @@ class _LoginScreenState extends State<LoginScreen> {
         textAlign: TextAlign.center,
       ),
       const SizedBox(height: 32),
-      TextFormField(
-        controller: _emailController,
-        autofillHints: const [AutofillHints.email],
-        decoration: InputDecoration(
-          labelText: loc.t('email'),
-          hintText: loc.t('enter_email'),
-          prefixIcon: const Icon(Icons.email),
+      // Только поля входа: так Safari/Chrome на телефоне связывают username+password (как на десктопе).
+      AutofillGroup(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextFormField(
+              controller: _emailController,
+              // username обязателен для связки с паролем в менеджерах паролей (не только email).
+              autofillHints: const [
+                AutofillHints.username,
+                AutofillHints.email
+              ],
+              decoration: InputDecoration(
+                labelText: loc.t('email'),
+                hintText: loc.t('enter_email'),
+                prefixIcon: const Icon(Icons.email),
+              ),
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autocorrect: false,
+              onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
+              validator: (value) {
+                if (value == null || value.isEmpty)
+                  return loc.t('email_required');
+                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$')
+                    .hasMatch(value)) {
+                  return loc.t('invalid_email');
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _passwordController,
+              focusNode: _passwordFocusNode,
+              autofillHints: const [AutofillHints.password],
+              decoration: InputDecoration(
+                labelText: loc.t('password'),
+                hintText: loc.t('enter_password'),
+                prefixIcon: const Icon(Icons.lock),
+              ),
+              obscureText: true,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) {
+                if (_isLoading) return;
+                // Вход только если пользователь сам нажал Enter: не сразу после фокуса (автозаполнение браузера вызывает submit без Enter).
+                final focusedAt = _passwordFieldFocusedAt;
+                if (focusedAt == null)
+                  return; // поле не получало фокус — скорее всего submit от автозаполнения
+                if (DateTime.now().difference(focusedAt).inMilliseconds < 500)
+                  return;
+                _login();
+              },
+              validator: (value) {
+                if (value == null || value.isEmpty)
+                  return loc.t('password_required');
+                if (value.length < 6) return loc.t('password_too_short');
+                return null;
+              },
+            ),
+          ],
         ),
-        keyboardType: TextInputType.emailAddress,
-        textInputAction: TextInputAction.next,
-        autocorrect: false,
-        onFieldSubmitted: (_) => FocusScope.of(context).nextFocus(),
-        validator: (value) {
-          if (value == null || value.isEmpty) return loc.t('email_required');
-          if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-            return loc.t('invalid_email');
-          }
-          return null;
-        },
-      ),
-      const SizedBox(height: 16),
-      TextFormField(
-        controller: _passwordController,
-        focusNode: _passwordFocusNode,
-        autofillHints: const [AutofillHints.password],
-        decoration: InputDecoration(
-          labelText: loc.t('password'),
-          hintText: loc.t('enter_password'),
-          prefixIcon: const Icon(Icons.lock),
-        ),
-        obscureText: true,
-        textInputAction: TextInputAction.done,
-        onFieldSubmitted: (_) {
-          if (_isLoading) return;
-          // Вход только если пользователь сам нажал Enter: не сразу после фокуса (автозаполнение браузера вызывает submit без Enter).
-          final focusedAt = _passwordFieldFocusedAt;
-          if (focusedAt == null)
-            return; // поле не получало фокус — скорее всего submit от автозаполнения
-          if (DateTime.now().difference(focusedAt).inMilliseconds < 500) return;
-          _login();
-        },
-        validator: (value) {
-          if (value == null || value.isEmpty) return loc.t('password_required');
-          if (value.length < 6) return loc.t('password_too_short');
-          return null;
-        },
       ),
       const SizedBox(height: 4),
       Align(
@@ -404,12 +418,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final result = await accountManager
           .findEmployeeByEmailAndPasswordGlobal(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      ).timeout(
-        const Duration(seconds: 60),
-        onTimeout: () => throw TimeoutException('login'),
-      );
+            email: _emailController.text.trim(),
+            password: _passwordController.text.trim(),
+          )
+          .timeout(
+            const Duration(seconds: 60),
+            onTimeout: () => throw TimeoutException('login'),
+          );
 
       if (result == null) {
         if (mounted) {
@@ -592,5 +607,4 @@ class _LoginScreenState extends State<LoginScreen> {
       return authErrorFallback;
     }
   }
-
 }
