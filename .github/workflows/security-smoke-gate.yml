@@ -1,0 +1,46 @@
+name: Security Smoke Gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - staging
+      - main
+    paths:
+      - "scripts/smoke_edge_anon_registration.sh"
+      - "restodocks_flutter/supabase/functions/**"
+      - "supabase/functions/**"
+      - "restodocks_flutter/supabase/config.toml"
+      - "supabase/config.toml"
+      - ".github/workflows/security-smoke-gate.yml"
+
+jobs:
+  edge-anon-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "Missing repository secret: SUPABASE_ANON_KEY" >&2
+            exit 1
+          fi
+          if [ -z "${SUPABASE_URL:-}" ]; then
+            echo "SUPABASE_URL not set, using default from smoke script."
+          fi
+
+      - name: Run edge anon registration smoke
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/smoke_edge_anon_registration.sh
+          ./scripts/smoke_edge_anon_registration.sh

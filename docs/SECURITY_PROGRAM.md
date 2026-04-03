@@ -34,6 +34,7 @@
 4. **Бэкапы** Supabase (план проекта) и проверка восстановления.
 5. **Cloudflare**: WAF, rate limiting, список разрешённых origin для чувствительных зон.
 6. **Сканирование**: Dependabot / `dart pub outdated` / аудит npm в admin.
+7. **CI smoke gate**: workflow `.github/workflows/security-smoke-gate.yml` должен быть зелёным на `staging/main` (проверяет anon-цепочку `register-metadata` + `send-registration-email`).
 
 ## 5. Аудит RLS вручную
 
