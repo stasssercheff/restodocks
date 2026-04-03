@@ -21,6 +21,8 @@ class SalaryExportService {
     required String currency,
     required String Function(String) t,
     required String lang,
+    /// Имя сотрудника в колонке экспорта (перевод под [lang]); иначе [Employee.fullName].
+    Map<String, String>? employeeDisplayNameById,
   }) async {
     final dateFormat = DateFormat('dd.MM.yyyy');
     final periodStr = '${dateFormat.format(periodStart)}–${dateFormat.format(periodEnd)}';
@@ -111,7 +113,7 @@ class SalaryExportService {
       TextCellValue(deptNames[deptCode] ?? deptCode),
       TextCellValue(sectionName),
       TextCellValue(positionName),
-      TextCellValue(e.fullName),
+      TextCellValue(employeeDisplayNameById?[e.id] ?? e.fullName),
       TextCellValue(calcMode),
       DoubleCellValue(rate),
       DoubleCellValue(val),

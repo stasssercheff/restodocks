@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,8 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/schedule_storage_service.dart';
+import '../utils/employee_display_utils.dart';
+import '../utils/employee_name_translation_utils.dart';
 import '../utils/number_format_utils.dart';
 import '../services/salary_export_service.dart';
 import '../services/inventory_download.dart';
@@ -89,6 +92,7 @@ class _SalaryTableHeader extends StatelessWidget {
 class _SalaryEmployeeCard extends StatelessWidget {
   const _SalaryEmployeeCard({
     required this.employee,
+    required this.displayName,
     required this.loc,
     required this.theme,
     required this.currency,
@@ -108,6 +112,8 @@ class _SalaryEmployeeCard extends StatelessWidget {
   });
 
   final Employee employee;
+  /// ФИО для UI (перевод при нерусском языке интерфейса).
+  final String displayName;
   final LocalizationService loc;
   final ThemeData theme;
   final String currency;
@@ -165,7 +171,7 @@ class _SalaryEmployeeCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        employee.fullName,
+                        displayName,
                         style: theme.textTheme.bodyMedium
                             ?.copyWith(fontWeight: FontWeight.w600),
                         maxLines: 1,
@@ -302,7 +308,7 @@ class _SalaryEmployeeCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(employee.fullName, style: theme.textTheme.titleMedium),
+                  Text(displayName, style: theme.textTheme.titleMedium),
                   Builder(
                     builder: (_) {
                       final roleCode = employee.positionRole ??
@@ -532,6 +538,9 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
   /// Раскрыта ли панель удержаний/поощрений по каждому сотруднику.
   final Map<String, bool> _adjustmentsExpanded = {};
 
+  /// Переведённые ФИО для текущего языка UI (параллельно после загрузки списка).
+  final Map<String, String> _employeeUiNames = {};
+
   @override
   void initState() {
     super.initState();
@@ -606,16 +615,35 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
         _employees = withPosition;
         _schedule = schedule;
         _loading = false;
+        _employeeUiNames.clear();
         for (final e in withPosition) {
           _includeInTotal.putIfAbsent(e.id, () => true);
         }
       });
+      unawaited(_warmEmployeeUiNames(withPosition));
     } catch (e) {
       setState(() {
         _error = e.toString();
         _loading = false;
       });
     }
+  }
+
+  Future<void> _warmEmployeeUiNames(List<Employee> list) async {
+    if (!mounted || list.isEmpty) return;
+    final loc = context.read<LocalizationService>();
+    final ts = context.read<TranslationService>();
+    final lang = loc.currentLanguageCode;
+    try {
+      final map = await translatePersonNamesForEmployees(ts, list, lang);
+      if (mounted) setState(() => _employeeUiNames.addAll(map));
+    } catch (_) {}
+  }
+
+  String _displayNameFor(Employee e) {
+    final o = _employeeUiNames[e.id];
+    if (o != null && o.isNotEmpty) return o;
+    return employeeFullNameRaw(e);
   }
 
   /// Смены или часы по сотруднику за период из графика.
@@ -834,6 +862,10 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
       final t = (String key) => loc.tForLanguage(selectedLang, key);
       final dateFormat = DateFormat('dd.MM.yyyy');
 
+      final ts = context.read<TranslationService>();
+      final exportNames =
+          await translatePersonNamesForEmployees(ts, _employees!, selectedLang);
+
       final fileName = await SalaryExportService.buildAndSaveExcel(
         employees: _employees!,
         schedule: _schedule!,
@@ -845,6 +877,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
         currency: currency,
         t: t,
         lang: selectedLang,
+        employeeDisplayNameById: exportNames,
       );
 
       final pngFiles = <String>[];
@@ -862,6 +895,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
           periodStart: exportPeriodStart,
           periodEnd: exportPeriodEnd,
           exportLang: selectedLang,
+          employeeNameOverrides: exportNames,
         );
         if (pngBytes != null && pngBytes.isNotEmpty) {
           final deptName = dept == 'kitchen'
@@ -906,6 +940,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
     required DateTime periodStart,
     required DateTime periodEnd,
     required String exportLang,
+    Map<String, String>? employeeNameOverrides,
   }) async {
     final loc = context.read<LocalizationService>();
     return Navigator.of(context).push<Uint8List?>(
@@ -920,6 +955,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
           periodStart: periodStart,
           periodEnd: periodEnd,
           exportLang: exportLang,
+          employeeNameOverrides: employeeNameOverrides,
         ),
       ),
     );
@@ -1049,6 +1085,7 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                                 final e = _employees![idx];
                                 return _SalaryEmployeeCard(
                                   employee: e,
+                                  displayName: _displayNameFor(e),
                                   loc: loc,
                                   theme: theme,
                                   currency: currency,
@@ -1197,6 +1234,7 @@ class _ScheduleCapturePage extends StatefulWidget {
     required this.periodStart,
     required this.periodEnd,
     required this.exportLang,
+    this.employeeNameOverrides,
   });
 
   final ScheduleModel schedule;
@@ -1207,6 +1245,7 @@ class _ScheduleCapturePage extends StatefulWidget {
   final DateTime periodStart;
   final DateTime periodEnd;
   final String exportLang;
+  final Map<String, String>? employeeNameOverrides;
 
   @override
   State<_ScheduleCapturePage> createState() => _ScheduleCapturePageState();
@@ -1243,6 +1282,7 @@ class _ScheduleCapturePageState extends State<_ScheduleCapturePage> {
           loc: widget.loc,
           boundaryKey: widget.boundaryKey,
           exportLang: widget.exportLang,
+          employeeNameOverrides: widget.employeeNameOverrides,
         ),
       ),
     );

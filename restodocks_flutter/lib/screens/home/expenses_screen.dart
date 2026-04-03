@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -10,7 +11,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/models.dart';
 import '../../services/inventory_download.dart';
 import '../../services/services.dart';
+import '../../utils/employee_display_utils.dart';
+import '../../utils/employee_name_translation_utils.dart';
 import '../../utils/number_format_utils.dart';
+import '../../utils/translit_utils.dart';
 import '../../widgets/app_bar_home_button.dart';
 import '../../widgets/scroll_to_top_app_bar_title.dart';
 import '../salary_expense_screen.dart';
@@ -833,6 +837,7 @@ class _WriteoffsTab extends StatefulWidget {
 
 class _WriteoffsTabState extends State<_WriteoffsTab> {
   List<Map<String, dynamic>> _allDocs = [];
+  final Map<String, String> _resolvedEmployeeLabels = {};
   bool _loading = true;
   String? _error;
   late DateTime _dateStart;
@@ -871,13 +876,19 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
         final p = d['payload'] as Map<String, dynamic>?;
         return p?['type']?.toString() == 'writeoff';
       }).toList();
+      List<Employee>? emps;
+      try {
+        emps = await account.getEmployeesForEstablishment(establishmentId);
+      } catch (_) {}
       if (mounted) {
         final excluded = await _loadExcludedIds(establishmentId);
         setState(() {
           _allDocs = docs;
+          _resolvedEmployeeLabels.clear();
           _excludedFromTotalIds = excluded;
           _loading = false;
         });
+        unawaited(_warmWriteoffEmployeeLabels(docs, emps));
       }
     } catch (e) {
       if (mounted) {
@@ -918,6 +929,55 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('$_prefsKeyPrefix$establishmentId', jsonEncode(_excludedFromTotalIds.toList()));
     } catch (_) {}
+  }
+
+  Future<void> _warmWriteoffEmployeeLabels(
+    List<Map<String, dynamic>> docs,
+    List<Employee>? employees,
+  ) async {
+    if (!mounted || employees == null || employees.isEmpty) return;
+    final ts = context.read<TranslationService>();
+    final loc = context.read<LocalizationService>();
+    final acc = context.read<AccountManagerSupabase>();
+    final lang = loc.currentLanguageCode;
+    final emById = {for (final e in employees) e.id: e};
+    final futures = <Future<MapEntry<String, String>?>>[];
+    for (final doc in docs) {
+      final id = doc['id']?.toString() ?? '';
+      if (id.isEmpty) continue;
+      final empId = doc['created_by_employee_id']?.toString();
+      final e = empId != null ? emById[empId] : null;
+      if (e == null) continue;
+      final emp = e;
+      futures.add(() async {
+        final name = await translatePersonName(ts, emp, lang);
+        final pos =
+            employeePositionLine(emp, loc, establishment: acc.establishment);
+        final line = pos == '—' ? name : '$name · $pos';
+        return MapEntry(id, line);
+      }());
+    }
+    final pairs = await Future.wait(futures);
+    final out = Map<String, String>.fromEntries(
+        pairs.whereType<MapEntry<String, String>>());
+    if (mounted) setState(() => _resolvedEmployeeLabels.addAll(out));
+  }
+
+  String _employeeLineForDoc(
+    BuildContext context,
+    Map<String, dynamic> doc,
+    LocalizationService loc,
+  ) {
+    final docId = doc['id']?.toString() ?? '';
+    final resolved = _resolvedEmployeeLabels[docId];
+    if (resolved != null && resolved.isNotEmpty) return resolved;
+    final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    var s = header['employeeName']?.toString() ?? '—';
+    final useTranslit = loc.currentLanguageCode != 'ru' ||
+        context.read<ScreenLayoutPreferenceService>().showNameTranslit;
+    if (s != '—' && useTranslit) s = cyrillicToLatin(s);
+    return s;
   }
 
   List<Map<String, dynamic>> get _filteredDocs {
@@ -1068,10 +1128,10 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
                       final doc = filtered[i];
                       final docId = doc['id']?.toString() ?? '';
                       final payload = doc['payload'] as Map<String, dynamic>? ?? {};
-                      final header = payload['header'] as Map<String, dynamic>? ?? {};
                       final createdAt = DateTime.tryParse(doc['created_at']?.toString() ?? '') ?? DateTime.now();
                       final category = _categoryName(loc, payload['category']?.toString());
-                      final employeeName = header['employeeName'] ?? '—';
+                      final employeeName =
+                          _employeeLineForDoc(context, doc, loc);
                       final cost = (payload['costTotal'] as num?)?.toDouble();
                       final costStr = cost != null && cost > 0
                           ? NumberFormatUtils.formatSum(cost, payload['costCurrency']?.toString() ?? currency)

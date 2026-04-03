@@ -21,6 +21,7 @@ class ScheduleExportWidget extends StatelessWidget {
     required this.loc,
     required this.boundaryKey,
     required this.exportLang,
+    this.employeeNameOverrides,
   });
 
   final ScheduleModel schedule;
@@ -31,8 +32,10 @@ class ScheduleExportWidget extends StatelessWidget {
   final DateTime periodEnd;
   final LocalizationService loc;
   final GlobalKey boundaryKey;
-  /// Язык экспорта (ru/en/es): подписи и имена транслитом при en/es
+  /// Язык экспорта (ru/en/es): подписи и имена (перевод или транслит)
   final String exportLang;
+  /// id сотрудника → подпись в PNG (перевод ФИО под [exportLang])
+  final Map<String, String>? employeeNameOverrides;
 
   String _t(String key) => loc.tForLanguage(exportLang, key);
   bool get _translitNames => exportLang == 'en' || exportLang == 'es';
@@ -154,6 +157,13 @@ class ScheduleExportWidget extends StatelessWidget {
   String _slotDisplayName(ScheduleSlot slot) {
     final emp = _employeeForSlot(slot);
     if (emp == null) return slot.name;
+    final override = employeeNameOverrides?[emp.id];
+    if (override != null && override.trim().isNotEmpty) {
+      final parts = override.trim().split(RegExp(r'\s+'));
+      final first = parts.isNotEmpty ? parts.first : override;
+      final surnameLetter = parts.length > 1 ? ' ${parts.last[0].toUpperCase()}.' : '';
+      return '$first$surnameLetter'.trim();
+    }
     final parts = emp.fullName.trim().split(RegExp(r'\s+'));
     final first = parts.isNotEmpty ? parts.first : emp.fullName;
     final surnameLetter = emp.surname?.trim().isNotEmpty == true

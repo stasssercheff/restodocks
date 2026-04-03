@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:excel/excel.dart' hide TextSpan;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -6,8 +8,8 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 import '../services/inventory_download.dart';
-import '../services/screen_layout_preference_service.dart';
 import '../utils/employee_display_utils.dart';
+import '../utils/employee_name_translation_utils.dart';
 import '../utils/translit_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 
@@ -27,6 +29,12 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
   Employee? _authorEmployee;
   bool _loading = true;
   String? _error;
+  List<TechCard> _techCards = [];
+  final Map<String, String> _localizedRowNames = {};
+  String? _translatedComment;
+  /// Строка «сотрудник» после перевода ФИО (без «транслита вместо перевода»).
+  String? _authorHeaderResolved;
+  String? _rawAuthorHeaderResolved;
 
   @override
   void initState() {
@@ -38,18 +46,43 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
     });
   }
 
-  String _localizedRowProductName(
+  String _localizedRowProductNameSync(
     Map<String, dynamic> r,
     String lang,
     ProductStoreSupabase store,
+    List<TechCard> techCards,
   ) {
     final pid = r['productId']?.toString() ?? '';
     final fallback = r['productName']?.toString() ?? '';
-    if (pid.isEmpty || pid.startsWith('pf_')) return fallback;
+    if (pid.isEmpty) return fallback;
+    if (pid.startsWith('pf_')) {
+      final tcId = pid.length > 3 ? pid.substring(3) : '';
+      if (tcId.isEmpty) return fallback;
+      for (final tc in techCards) {
+        if (tc.id == tcId) return tc.getDisplayNameInLists(lang);
+      }
+      return fallback;
+    }
     for (final p in store.allProducts) {
       if (p.id == pid) return p.getLocalizedName(lang);
     }
     return fallback;
+  }
+
+  String _rowDisplayName(
+    Map<String, dynamic> r,
+    String lang,
+    ProductStoreSupabase store,
+  ) {
+    final pid = (r['productId']?.toString() ?? '').trim();
+    final pname = (r['productName']?.toString() ?? '').trim();
+    if (pid.isNotEmpty && _localizedRowNames.containsKey(pid)) {
+      return _localizedRowNames[pid]!;
+    }
+    if (pname.isNotEmpty && _localizedRowNames.containsKey(pname)) {
+      return _localizedRowNames[pname]!;
+    }
+    return _localizedRowProductNameSync(r, lang, store, _techCards);
   }
 
   Future<void> _load() async {
@@ -86,7 +119,186 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
     if (doc != null) {
       final estId = context.read<AccountManagerSupabase>().establishment?.id;
       context.read<InboxViewedService>().addViewed(estId, widget.documentId);
+      unawaited(_afterDocLoaded(doc));
     }
+  }
+
+  Future<void> _afterDocLoaded(Map<String, dynamic> doc) async {
+    final acc = context.read<AccountManagerSupabase>();
+    final est = acc.establishment;
+    final dataEstId = est?.dataEstablishmentId ?? est?.id;
+    var cards = <TechCard>[];
+    if (dataEstId != null) {
+      try {
+        cards = await TechCardServiceSupabase()
+            .getTechCardsForEstablishment(dataEstId);
+      } catch (_) {}
+    }
+    if (mounted) setState(() => _techCards = cards);
+    await _resolveAuthorHeader();
+    await _loadRowLocalizedNames(doc, cards);
+    await _translateWriteoffComment(doc);
+  }
+
+  Future<void> _resolveAuthorHeader() async {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    final ts = context.read<TranslationService>();
+    final acc = context.read<AccountManagerSupabase>();
+    final lang = loc.currentLanguageCode;
+    final payload = _doc?['payload'] as Map<String, dynamic>? ?? {};
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    final rawEmp = header['employeeName']?.toString() ?? '—';
+
+    if (_authorEmployee != null) {
+      final name = await translatePersonName(ts, _authorEmployee!, lang);
+      final pos = employeePositionLine(
+        _authorEmployee!,
+        loc,
+        establishment: acc.establishment,
+      );
+      final line = pos == '—' ? name : '$name · $pos';
+      if (mounted) setState(() => _authorHeaderResolved = line);
+      return;
+    }
+    if (rawEmp.isNotEmpty && rawEmp != '—') {
+      final t = await translateAdHocPersonName(ts, rawEmp, lang);
+      if (mounted) setState(() => _rawAuthorHeaderResolved = t);
+    }
+  }
+
+  Future<void> _translateWriteoffComment(Map<String, dynamic> doc) async {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    final targetLang = loc.currentLanguageCode;
+    final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final comment = (payload['comment'] as String?)?.trim() ?? '';
+    if (comment.isEmpty) return;
+    final sourceLangRaw = (payload['sourceLang'] as String?)?.trim() ?? '';
+    final sourceLang = sourceLangRaw.isNotEmpty ? sourceLangRaw : 'ru';
+    if (sourceLang == targetLang) return;
+    try {
+      final translationSvc = context.read<TranslationService>();
+      final commentHash = comment.hashCode.toRadixString(16);
+      final translated = await translationSvc.translate(
+        entityType: TranslationEntityType.ui,
+        entityId:
+            'writeoff_comment_${doc['id'] ?? commentHash}_$commentHash',
+        fieldName: 'comment',
+        text: comment,
+        from: sourceLang,
+        to: targetLang,
+      );
+      if (translated != null &&
+          translated.trim().isNotEmpty &&
+          translated != comment &&
+          mounted) {
+        setState(() => _translatedComment = translated);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadRowLocalizedNames(
+    Map<String, dynamic> doc,
+    List<TechCard> techCards,
+  ) async {
+    if (!mounted) return;
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final sourceLangRaw = (payload['sourceLang'] as String?)?.trim() ?? '';
+    final sourceLang = sourceLangRaw.isNotEmpty ? sourceLangRaw : 'ru';
+    final rows = payload['rows'] as List<dynamic>? ?? [];
+    if (rows.isEmpty) return;
+
+    final store = context.read<ProductStoreSupabase>();
+    if (store.allProducts.isEmpty) await store.loadProducts();
+
+    final updated = <String, String>{};
+    final needDeepL = <Map<String, dynamic>>[];
+
+    for (final raw in rows) {
+      final item = raw as Map<String, dynamic>;
+      final productId = item['productId']?.toString() ?? '';
+      final productName = (item['productName'] as String?)?.trim() ?? '';
+      if (productName.isEmpty) continue;
+
+      if (sourceLang == lang) continue;
+
+      if (productId.startsWith('pf_')) {
+        final tcId = productId.length > 3 ? productId.substring(3) : '';
+        TechCard? tc;
+        for (final x in techCards) {
+          if (x.id == tcId) {
+            tc = x;
+            break;
+          }
+        }
+        if (tc != null) {
+          final locName = tc.getDisplayNameInLists(lang);
+          if (locName != productName) updated[productId] = locName;
+        } else {
+          needDeepL.add(item);
+        }
+        continue;
+      }
+
+      if (productId.isNotEmpty) {
+        Product? product;
+        for (final p in store.allProducts) {
+          if (p.id == productId) {
+            product = p;
+            break;
+          }
+        }
+        if (product != null) {
+          final locName = product.getLocalizedName(lang);
+          if (locName != productName) {
+            updated[productId] = locName;
+          } else {
+            final updatedNames = await store.translateProductAwait(productId);
+            final translated = updatedNames?[lang];
+            if (translated != null && translated != productName) {
+              updated[productId] = translated;
+            }
+          }
+          continue;
+        }
+      }
+      needDeepL.add(item);
+    }
+
+    if (mounted && updated.isNotEmpty) {
+      setState(() => _localizedRowNames.addAll(updated));
+    }
+
+    if (needDeepL.isEmpty || sourceLang == lang) return;
+    if (!mounted) return;
+
+    try {
+      final translationSvc = context.read<TranslationService>();
+      final seen = <String>{};
+      for (final item in needDeepL) {
+        final productName = (item['productName'] as String?)?.trim() ?? '';
+        final productId = (item['productId'] as String?)?.trim() ?? '';
+        if (productName.isEmpty || seen.contains(productName)) continue;
+        seen.add(productName);
+        final entityId = productId.isNotEmpty ? productId : productName;
+        final translated = await translationSvc.translate(
+          entityType: TranslationEntityType.product,
+          entityId: entityId,
+          fieldName: 'name',
+          text: productName,
+          from: sourceLang,
+          to: lang,
+        );
+        if (translated != null &&
+            translated != productName &&
+            mounted) {
+          final key = productId.isNotEmpty ? productId : productName;
+          setState(() => _localizedRowNames[key] = translated);
+        }
+      }
+    } catch (_) {}
   }
 
   String _categoryName(LocalizationService loc, String? code) {
@@ -192,16 +404,16 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
       ]);
       rows = rows.map((e) => e as Map<String, dynamic>).toList();
       final store = context.read<ProductStoreSupabase>();
-      rows.sort((a, b) => _localizedRowProductName(a, saveLang, store)
+      rows.sort((a, b) => _localizedRowProductNameSync(a, saveLang, store, _techCards)
           .toLowerCase()
           .compareTo(
-              _localizedRowProductName(b, saveLang, store).toLowerCase()));
+              _localizedRowProductNameSync(b, saveLang, store, _techCards).toLowerCase()));
       for (var i = 0; i < rows.length; i++) {
         final r = rows[i];
         final unitRaw = (r['unit']?.toString() ?? 'g').trim().toLowerCase();
         sheet.appendRow([
           IntCellValue(i + 1),
-          TextCellValue(_localizedRowProductName(r, saveLang, store)),
+          TextCellValue(_localizedRowProductNameSync(r, saveLang, store, _techCards)),
           TextCellValue(CulinaryUnits.displayName(unitRaw, saveLang)),
           DoubleCellValue((r['total'] as num?)?.toDouble() ?? 0),
         ]);
@@ -263,13 +475,17 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
     final useTranslit =
         loc.currentLanguageCode != 'ru' || layoutPrefs.showNameTranslit;
     final lang = loc.currentLanguageCode;
-    rows.sort((a, b) => _localizedRowProductName(a, lang, store)
+    rows.sort((a, b) => _rowDisplayName(a, lang, store)
         .toLowerCase()
-        .compareTo(_localizedRowProductName(b, lang, store).toLowerCase()));
+        .compareTo(_rowDisplayName(b, lang, store).toLowerCase()));
     final comment = payload['comment']?.toString();
     final rawEmp = header['employeeName']?.toString() ?? '—';
     final String empHeader;
-    if (_authorEmployee != null) {
+    if (_authorHeaderResolved != null) {
+      empHeader = _authorHeaderResolved!;
+    } else if (_rawAuthorHeaderResolved != null && rawEmp != '—') {
+      empHeader = _rawAuthorHeaderResolved!;
+    } else if (_authorEmployee != null) {
       empHeader = employeeNameWithPositionLine(
         _authorEmployee!,
         loc,
@@ -314,6 +530,18 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
               ),
               const SizedBox(height: 4),
               Text(comment, style: theme.textTheme.bodyMedium),
+              if (_translatedComment != null &&
+                  _translatedComment!.trim().isNotEmpty &&
+                  _translatedComment != comment) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _translatedComment!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
             ],
             const SizedBox(height: 24),
             Text(
@@ -347,7 +575,7 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
                   return TableRow(
                     children: [
                       _cell(theme, '${e.key + 1}'),
-                      _cell(theme, _localizedRowProductName(r, lang, store)),
+                      _cell(theme, _rowDisplayName(r, lang, store)),
                       _cell(theme, CulinaryUnits.displayName(unitRaw, lang)),
                       _cell(theme, _fmt(r['total'])),
                     ],
