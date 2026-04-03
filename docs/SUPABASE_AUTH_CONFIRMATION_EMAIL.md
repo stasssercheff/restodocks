@@ -7,7 +7,7 @@
    - **Рекомендуется:** [Send Email Hook](AUTH_SEND_EMAIL_HOOK_SETUP.md) → функция `auth-send-email` → то же Resend, русский текст, ссылка на `https://restodocks.com/auth/confirm-click?...` (как раньше во втором письме из `send-registration-email`).
    - Если Hook **не** подключён — используется шаблон из **Authentication → Email Templates** (часто английский от `mail.app.supabase.io`). Настройте шаблон **Confirm signup** под Restodocks или подключите Hook.
 
-Дублирующий вызов `sendConfirmationEmail` из Flutter **убран**, чтобы не слать второе такое же письмо с Resend поверх Auth и не тратить лимиты.
+Дублирующий вызов `confirmation_only` из Flutter сразу после `signUp` **не делаем** — иначе два одинаковых письма с ссылкой (Hook + Edge). Повторная отправка — экран подтверждения и вход: `sendConfirmationLinkRequest` (см. `ConfirmEmailScreen`, `login_screen`).
 
 ## Обязательно
 

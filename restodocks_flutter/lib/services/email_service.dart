@@ -194,48 +194,6 @@ class EmailService {
     }
   }
 
-  /// Отправить только письмо с ссылкой подтверждения (для co-owner и др.).
-  /// Порядок как в [sendConfirmationLinkRequest]: сначала Resend (Edge), потом auth.resend.
-  Future<({bool ok, String? error})> sendConfirmationEmail({
-    required String to,
-    required String password,
-    String? languageCode,
-  }) async {
-    try {
-      final res = await _invokeSendRegistrationEmail({
-        'type': 'confirmation_only',
-        'to': to.trim(),
-        'password': password,
-        if (languageCode != null && languageCode.trim().isNotEmpty)
-          'language': languageCode.trim().toLowerCase(),
-      });
-      if (_edgeRegistrationMailOk(res.status, res.data)) {
-        devLog('EmailService: sendConfirmationEmail via Resend/Edge ok');
-        return (ok: true, error: null);
-      }
-
-      final viaAuth = await _tryAuthResendSignupConfirmation(to, null);
-      if (viaAuth.ok) {
-        devLog('EmailService: sendConfirmationEmail fallback auth.resend');
-        return viaAuth;
-      }
-
-      if (res.status == 0) {
-        return (
-          ok: false,
-          error: viaAuth.error ??
-              'Сеть или CORS: send-registration-email; auth.resend тоже не удался.',
-        );
-      }
-      final msg = res.data is Map
-          ? (res.data!['error'] ?? res.data!['message'] ?? res.status)
-          : res.status;
-      return (ok: false, error: 'Edge: $msg. Auth: ${viaAuth.error ?? "—"}');
-    } catch (e) {
-      return (ok: false, error: e.toString());
-    }
-  }
-
   /// Запросить сброс пароля. Отправляет письмо со ссылкой.
   Future<({bool ok, String? error})> requestPasswordReset(String email) async {
     try {

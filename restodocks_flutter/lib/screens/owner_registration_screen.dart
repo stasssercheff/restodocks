@@ -141,18 +141,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       if (!infoMail.ok) {
         devLog('OwnerRegistration: sendRegistrationEmail failed: ${infoMail.error}');
       }
-      var resendFailed = false;
-      if (!signUpResult.hasSession) {
-        final confirmMail = await EmailService().sendConfirmationEmail(
-          to: email,
-          password: password,
-          languageCode: loc.currentLanguageCode,
-        );
-        if (!confirmMail.ok) {
-          devLog('OwnerRegistration: sendConfirmationEmail failed: ${confirmMail.error}');
-          resendFailed = true;
-        }
-      }
+      // Ссылка подтверждения — только Auth Hook (auth-send-email), без дубля из Flutter.
 
       if (!mounted) return;
       if (signUpResult.hasSession) {
@@ -165,14 +154,14 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
           );
           context.go('/home');
         } else {
-          final confirmQ =
-              'email=${Uri.encodeComponent(email)}&resendFailed=${resendFailed ? '1' : '0'}';
-          context.go('/confirm-email?$confirmQ');
+          context.go(
+            '/confirm-email?email=${Uri.encodeComponent(email)}&resendFailed=0',
+          );
         }
       } else {
-        final confirmQ =
-            'email=${Uri.encodeComponent(email)}&resendFailed=${resendFailed ? '1' : '0'}';
-        context.go('/confirm-email?$confirmQ');
+        context.go(
+          '/confirm-email?email=${Uri.encodeComponent(email)}&resendFailed=0',
+        );
       }
     } catch (e) {
       if (!mounted) return;
