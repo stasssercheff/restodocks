@@ -29,15 +29,36 @@ jobs:
           chmod +x scripts/smoke_edge_anon_registration.sh
           ./scripts/smoke_edge_anon_registration.sh
 
+      - name: Run edge status spike watchdog (401/429/5xx)
+        id: spikes
+        continue-on-error: true
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "Missing SUPABASE_ANON_KEY secret" >&2
+            exit 1
+          fi
+          chmod +x scripts/watch_edge_status_spikes.sh
+          ./scripts/watch_edge_status_spikes.sh
+
       - name: Open incident issue on failure
-        if: steps.smoke.outcome == 'failure'
+        if: steps.smoke.outcome == 'failure' || steps.spikes.outcome == 'failure'
         uses: actions/github-script@v7
         env:
           SECURITY_ALERT_MENTIONS: ${{ secrets.SECURITY_ALERT_MENTIONS }}
         with:
           script: |
-            const title = "Security Watchdog alert: anon registration chain failed";
+            const title = "Security Watchdog alert: anon registration chain degraded";
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const smokeFailed = "${{ steps.smoke.outcome }}" === "failure";
+            const spikesFailed = "${{ steps.spikes.outcome }}" === "failure";
+            const failedChecks = [
+              smokeFailed ? "edge anon smoke" : null,
+              spikesFailed ? "edge status spikes (401/429/5xx)" : null
+            ].filter(Boolean).join(", ");
             const mentionsRaw = (process.env.SECURITY_ALERT_MENTIONS || "").trim();
             const mentions = mentionsRaw
               .split(/[,\s]+/)
@@ -46,8 +67,9 @@ jobs:
               .map(s => s.startsWith("@") ? s : `@${s}`);
             const mentionsLine = mentions.length > 0 ? mentions.join(" ") : "_No SECURITY_ALERT_MENTIONS configured_";
             const body = [
-              "Automated watchdog detected a failure in the edge anon registration smoke.",
+              "Automated watchdog detected a degradation in the edge anon registration chain.",
               "",
+              `- Failed checks: ${failedChecks || "unknown"}`,
               `- Responsible: ${mentionsLine}`,
               `- Workflow run: ${runUrl}`,
               `- Branch/ref: ${context.ref}`,
@@ -81,7 +103,7 @@ jobs:
             }
 
       - name: Fail job if smoke failed
-        if: steps.smoke.outcome == 'failure'
+        if: steps.smoke.outcome == 'failure' || steps.spikes.outcome == 'failure'
         run: |
-          echo "Security watchdog smoke failed."
+          echo "Security watchdog checks failed."
           exit 1
