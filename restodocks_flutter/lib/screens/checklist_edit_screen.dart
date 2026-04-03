@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -16,11 +17,17 @@ import '../widgets/time_picker_field.dart';
 
 /// Редактирование чеклиста-шаблона. Сохранить, создать по аналогии, удалить.
 class ChecklistEditScreen extends StatefulWidget {
-  const ChecklistEditScreen({super.key, required this.checklistId, this.viewOnly = false, this.initialDepartment = 'kitchen'});
+  const ChecklistEditScreen(
+      {super.key,
+      required this.checklistId,
+      this.viewOnly = false,
+      this.initialDepartment = 'kitchen'});
 
   final String checklistId;
+
   /// Режим только просмотра (например по ссылке из входящих «чеклист не выполнен»).
   final bool viewOnly;
+
   /// Для checklistId='new' — подразделение при создании.
   final String initialDepartment;
 
@@ -29,7 +36,9 @@ class ChecklistEditScreen extends StatefulWidget {
 }
 
 class _ChecklistEditScreenState extends State<ChecklistEditScreen>
-    with AutoSaveMixin<ChecklistEditScreen>, InputChangeListenerMixin<ChecklistEditScreen> {
+    with
+        AutoSaveMixin<ChecklistEditScreen>,
+        InputChangeListenerMixin<ChecklistEditScreen> {
   Checklist? _checklist;
   bool _loading = true;
   bool _saving = false;
@@ -44,13 +53,16 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   bool _actionHasNumeric = false;
   bool _actionHasToggle = true;
   List<String> _actionDropdownOptions = [];
+
   /// Единица для нового пункта
   String _newItemUnit = 'kg';
   List<Employee> _employees = [];
+
   /// null или пусто = всем
   List<String> _selectedEmployeeIds = [];
   bool _deadlineEnabled = false;
   DateTime? _deadline;
+
   /// Тумблер «указать время» для срока выполнения (по умолчанию выключен — только дата).
   bool _deadlineWithTime = false;
   ChecklistReminderConfig _reminderConfig = const ChecklistReminderConfig();
@@ -87,22 +99,40 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       List<TechCard> techs = [];
       List<Employee> emps = [];
       if (est != null) {
-        techs = await techSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
+        techs =
+            await techSvc.getTechCardsForEstablishment(est.dataEstablishmentId);
         emps = await acc.getEmployeesForEstablishment(est.id);
       }
       if (!mounted) return;
       // Персонал и ТТК — только по подразделению чеклиста
       final dept = c?.assignedDepartment ?? widget.initialDepartment;
       final filteredEmps = emps.where((e) {
-        if (dept == 'hall') return e.department == 'hall' || e.department == 'dining_room';
+        if (dept == 'hall')
+          return e.department == 'hall' || e.department == 'dining_room';
         return e.department == dept;
       }).toList();
-      const barCats = {'beverages', 'alcoholic_cocktails', 'non_alcoholic_drinks', 'hot_drinks', 'drinks_pure', 'snacks'};
+      const barCats = {
+        'beverages',
+        'alcoholic_cocktails',
+        'non_alcoholic_drinks',
+        'hot_drinks',
+        'drinks_pure',
+        'snacks'
+      };
       final filteredTechs = dept == 'bar'
-          ? techs.where((t) => barCats.contains(t.category) || t.sections.contains('bar') || t.sections.contains('all')).toList()
+          ? techs
+              .where((t) =>
+                  barCats.contains(t.category) ||
+                  t.sections.contains('bar') ||
+                  t.sections.contains('all'))
+              .toList()
           : dept == 'hall' || dept == 'dining_room'
               ? techs
-              : techs.where((t) => !barCats.contains(t.category) || t.sections.contains('all')).toList();
+              : techs
+                  .where((t) =>
+                      !barCats.contains(t.category) ||
+                      t.sections.contains('all'))
+                  .toList();
       if (widget.viewOnly && c != null && mounted) {
         final estId = context.read<AccountManagerSupabase>().establishment?.id;
         context.read<InboxViewedService>().addViewed(estId, widget.checklistId);
@@ -117,7 +147,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           _type = c.type ?? ChecklistType.tasks;
           _actionHasNumeric = c.actionConfig.hasNumeric;
           _actionHasToggle = c.actionConfig.hasToggle;
-          _actionDropdownOptions = List.from(c.actionConfig.dropdownOptions ?? []);
+          _actionDropdownOptions =
+              List.from(c.actionConfig.dropdownOptions ?? []);
           _dropdownOptionsController.text = _actionDropdownOptions.join(', ');
           if (_items.length <= c.items.length) {
             _items
@@ -127,7 +158,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           final ids = c.assignedEmployeeIds;
           if (ids != null && ids.isNotEmpty) {
             _selectedEmployeeIds = List.from(ids);
-          } else if (c.assignedEmployeeId != null && c.assignedEmployeeId!.isNotEmpty) {
+          } else if (c.assignedEmployeeId != null &&
+              c.assignedEmployeeId!.isNotEmpty) {
             _selectedEmployeeIds = [c.assignedEmployeeId!];
           } else {
             _selectedEmployeeIds = [];
@@ -142,31 +174,39 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       _ensureTechCardTranslations(techSvc, techs);
       if (mounted) await restoreDraftNow();
     } catch (e) {
-      if (mounted) setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
+      if (mounted)
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
     }
   }
 
-  Future<void> _ensureTechCardTranslations(TechCardServiceSupabase svc, List<TechCard> cards) async {
+  Future<void> _ensureTechCardTranslations(
+      TechCardServiceSupabase svc, List<TechCard> cards) async {
     if (!mounted) return;
     final lang = context.read<LocalizationService>().currentLanguageCode;
     if (lang == 'ru') return;
-    final missing = cards.where(
-      (tc) => !(tc.dishNameLocalized?.containsKey(lang) == true &&
-               (tc.dishNameLocalized![lang]?.trim().isNotEmpty ?? false)),
-    ).toList();
+    final missing = cards
+        .where(
+          (tc) => !(tc.dishNameLocalized?.containsKey(lang) == true &&
+              (tc.dishNameLocalized![lang]?.trim().isNotEmpty ?? false)),
+        )
+        .toList();
     for (final tc in missing) {
       if (!mounted) break;
       try {
-        final translated = await svc.translateTechCardName(tc.id, tc.dishName, lang)
+        final translated = await svc
+            .translateTechCardName(tc.id, tc.dishName, lang)
             .timeout(const Duration(seconds: 5), onTimeout: () => null);
         if (translated != null && mounted) {
           final idx = _techCards.indexWhere((c) => c.id == tc.id);
           if (idx >= 0) {
             final updated = _techCards[idx].copyWith(
-              dishNameLocalized: {...(_techCards[idx].dishNameLocalized ?? {}), lang: translated},
+              dishNameLocalized: {
+                ...(_techCards[idx].dishNameLocalized ?? {}),
+                lang: translated
+              },
             );
             setState(() => _techCards[idx] = updated);
           }
@@ -210,14 +250,16 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       'deadline': _deadline?.toIso8601String(),
       'deadlineWithTime': _deadlineWithTime,
       'reminderConfig': _reminderConfig.toJson(),
-      'items': _items.map((item) => {
-        'id': item.id,
-        'title': item.title,
-        'sortOrder': item.sortOrder,
-        'techCardId': item.techCardId,
-        'targetQuantity': item.targetQuantity,
-        'targetUnit': item.targetUnit,
-      }).toList(),
+      'items': _items
+          .map((item) => {
+                'id': item.id,
+                'title': item.title,
+                'sortOrder': item.sortOrder,
+                'techCardId': item.techCardId,
+                'targetQuantity': item.targetQuantity,
+                'targetUnit': item.targetUnit,
+              })
+          .toList(),
     };
   }
 
@@ -227,13 +269,18 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
 
     setState(() {
       _nameController.text = data['name'] ?? '';
-      _type = ChecklistType.fromCode(data['type'] as String?) ?? ChecklistType.tasks;
+      _type = ChecklistType.fromCode(data['type'] as String?) ??
+          ChecklistType.tasks;
       _actionHasNumeric = data['actionHasNumeric'] == true;
       _actionHasToggle = data['actionHasToggle'] != false;
-      _actionDropdownOptions = List<String>.from(data['actionDropdownOptions'] as List<dynamic>? ?? []);
-      _selectedEmployeeIds = List<String>.from(data['selectedEmployeeIds'] as List<dynamic>? ?? []);
+      _actionDropdownOptions = List<String>.from(
+          data['actionDropdownOptions'] as List<dynamic>? ?? []);
+      _selectedEmployeeIds = List<String>.from(
+          data['selectedEmployeeIds'] as List<dynamic>? ?? []);
       _deadlineEnabled = data['deadlineEnabled'] == true;
-      _deadline = data['deadline'] != null ? DateTime.tryParse(data['deadline'] as String) : null;
+      _deadline = data['deadline'] != null
+          ? DateTime.tryParse(data['deadline'] as String)
+          : null;
       _deadlineWithTime = data['deadlineWithTime'] == true;
       final rc = data['reminderConfig'];
       _reminderConfig = rc is Map
@@ -270,7 +317,11 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     if (c == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.read<LocalizationService>().t('checklist_not_found') ?? 'Чеклист не найден')),
+          SnackBar(
+              content: Text(context
+                      .read<LocalizationService>()
+                      .t('checklist_not_found') ??
+                  'Чеклист не найден')),
         );
       }
       return;
@@ -278,7 +329,10 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.read<LocalizationService>().t('checklist_name_required'))),
+        SnackBar(
+            content: Text(context
+                .read<LocalizationService>()
+                .t('checklist_name_required'))),
       );
       return;
     }
@@ -297,14 +351,17 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     final empIds = _selectedEmployeeIds.isEmpty ? null : _selectedEmployeeIds;
     // Дата без времени — сохраняем как UTC-полночь, чтобы при парсинге hour/minute были 0
     final deadlineVal = _deadlineEnabled && _deadline != null
-        ? (_deadlineWithTime ? _deadline : DateTime.utc(_deadline!.year, _deadline!.month, _deadline!.day))
+        ? (_deadlineWithTime
+            ? _deadline
+            : DateTime.utc(_deadline!.year, _deadline!.month, _deadline!.day))
         : null;
-    if (_reminderConfig.recurrenceEnabled &&
-        _reminderConfig.recurrenceKind == ChecklistRecurrenceKind.weekdays &&
-        _reminderConfig.weekdays.isEmpty) {
+    if (_reminderConfig.recurrenceEnabled && _reminderConfig.weekdays.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.read<LocalizationService>().t('checklist_weekdays_required'))),
+          SnackBar(
+              content: Text(context
+                  .read<LocalizationService>()
+                  .t('checklist_weekdays_required'))),
         );
       }
       setState(() => _saving = false);
@@ -411,7 +468,11 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.read<LocalizationService>().t('error_with_message').replaceAll('%s', e.toString()))),
+          SnackBar(
+              content: Text(context
+                  .read<LocalizationService>()
+                  .t('error_with_message')
+                  .replaceAll('%s', e.toString()))),
         );
       }
     } finally {
@@ -428,13 +489,19 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       final svc = context.read<ChecklistServiceSupabase>();
       final created = await svc.duplicateChecklist(c, emp.id);
       if (mounted) {
-        AppToastService.show(context.read<LocalizationService>().t('checklist_created_duplicate'));
+        AppToastService.show(context
+            .read<LocalizationService>()
+            .t('checklist_created_duplicate'));
         context.pushReplacement('/checklists/${created.id}');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.read<LocalizationService>().t('error_with_message').replaceAll('%s', e.toString()))),
+          SnackBar(
+              content: Text(context
+                  .read<LocalizationService>()
+                  .t('error_with_message')
+                  .replaceAll('%s', e.toString()))),
         );
       }
     }
@@ -447,7 +514,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(loc.t('delete')),
-        content: Text(context.read<LocalizationService>().t('checklist_delete_confirm')),
+        content: Text(
+            context.read<LocalizationService>().t('checklist_delete_confirm')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -469,17 +537,27 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.read<LocalizationService>().t('error_with_message').replaceAll('%s', e.toString()))),
+          SnackBar(
+              content: Text(context
+                  .read<LocalizationService>()
+                  .t('error_with_message')
+                  .replaceAll('%s', e.toString()))),
         );
       }
     }
   }
 
-  void _addItem({String? title, String? techCardId, double? targetQuantity, String? targetUnit}) {
+  void _addItem(
+      {String? title,
+      String? techCardId,
+      double? targetQuantity,
+      String? targetUnit}) {
     final t = title ?? _newItemController.text.trim();
     if (t.isEmpty) return;
-    final qty = targetQuantity ?? double.tryParse(_newItemQtyController.text.trim().replaceAll(',', '.'));
-    final unit = targetUnit ?? (_newItemQtyController.text.trim().isNotEmpty ? _newItemUnit : null);
+    final qty = targetQuantity ??
+        double.tryParse(_newItemQtyController.text.trim().replaceAll(',', '.'));
+    final unit = targetUnit ??
+        (_newItemQtyController.text.trim().isNotEmpty ? _newItemUnit : null);
     setState(() {
       _items.add(ChecklistItem.template(
         title: t,
@@ -512,7 +590,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 children: [
                   Padding(
                     padding: const EdgeInsets.all(12),
-                    child: Text(loc.t('select_pf') ?? 'Выбрать ПФ', style: Theme.of(context).textTheme.titleMedium),
+                    child: Text(loc.t('select_pf') ?? 'Выбрать ПФ',
+                        style: Theme.of(context).textTheme.titleMedium),
                   ),
                   Flexible(
                     child: ListView.builder(
@@ -559,7 +638,11 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(loc.t('checklist_item_quantity_hint') ?? 'Укажите количество (необязательно)', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+              Text(
+                  loc.t('checklist_item_quantity_hint') ??
+                      'Укажите количество (необязательно)',
+                  style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -567,7 +650,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                     flex: 2,
                     child: TextField(
                       controller: qtyCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
                         labelText: loc.t('checklist_quantity') ?? 'Количество',
                         isDense: true,
@@ -585,7 +669,11 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                         isDense: true,
                         border: const OutlineInputBorder(),
                       ),
-                      items: units.map((u) => DropdownMenuItem(value: u, child: Text(CulinaryUnits.displayName(u, lang)))).toList(),
+                      items: units
+                          .map((u) => DropdownMenuItem(
+                              value: u,
+                              child: Text(CulinaryUnits.displayName(u, lang))))
+                          .toList(),
                       onChanged: (v) {
                         if (v != null) setInner(() => selectedUnit = v);
                       },
@@ -605,9 +693,14 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             ),
             FilledButton(
               onPressed: () {
-                final qty = double.tryParse(qtyCtrl.text.trim().replaceAll(',', '.'));
+                final qty =
+                    double.tryParse(qtyCtrl.text.trim().replaceAll(',', '.'));
                 Navigator.of(ctx).pop();
-                _addItem(title: title, techCardId: techCardId, targetQuantity: qty, targetUnit: qty != null ? selectedUnit : null);
+                _addItem(
+                    title: title,
+                    techCardId: techCardId,
+                    targetQuantity: qty,
+                    targetUnit: qty != null ? selectedUnit : null);
               },
               child: Text(loc.t('add_item') ?? 'Добавить'),
             ),
@@ -627,7 +720,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     final loc = context.read<LocalizationService>();
     final lang = loc.currentLanguageCode;
     final item = _items[index];
-    final qtyCtrl = TextEditingController(text: item.targetQuantity?.toString() ?? '');
+    final qtyCtrl =
+        TextEditingController(text: item.targetQuantity?.toString() ?? '');
     final units = CulinaryUnits.all.map((u) => u.id).toList();
     String selectedUnit = item.targetUnit ?? 'kg';
     if (!units.contains(selectedUnit)) selectedUnit = 'kg';
@@ -646,7 +740,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                     flex: 2,
                     child: TextField(
                       controller: qtyCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
                         labelText: loc.t('checklist_quantity') ?? 'Количество',
                         isDense: true,
@@ -664,7 +759,11 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                         isDense: true,
                         border: const OutlineInputBorder(),
                       ),
-                      items: units.map((u) => DropdownMenuItem(value: u, child: Text(CulinaryUnits.displayName(u, lang)))).toList(),
+                      items: units
+                          .map((u) => DropdownMenuItem(
+                              value: u,
+                              child: Text(CulinaryUnits.displayName(u, lang))))
+                          .toList(),
                       onChanged: (v) {
                         if (v != null) setInner(() => selectedUnit = v);
                       },
@@ -679,7 +778,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               TextButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  setState(() => _items[index] = item.copyWith(targetQuantity: null, targetUnit: null));
+                  setState(() => _items[index] =
+                      item.copyWith(targetQuantity: null, targetUnit: null));
                   scheduleSave();
                 },
                 child: Text(loc.t('delete') ?? 'Удалить'),
@@ -690,12 +790,13 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             ),
             FilledButton(
               onPressed: () {
-                final qty = double.tryParse(qtyCtrl.text.trim().replaceAll(',', '.'));
+                final qty =
+                    double.tryParse(qtyCtrl.text.trim().replaceAll(',', '.'));
                 Navigator.of(ctx).pop();
                 setState(() => _items[index] = item.copyWith(
-                  targetQuantity: qty,
-                  targetUnit: qty != null ? selectedUnit : null,
-                ));
+                      targetQuantity: qty,
+                      targetUnit: qty != null ? selectedUnit : null,
+                    ));
                 scheduleSave();
               },
               child: Text(loc.t('save') ?? 'Сохранить'),
@@ -706,7 +807,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     );
   }
 
-  Widget _buildSectionSelector(LocalizationService loc, String lang, bool canEdit) {
+  Widget _buildSectionSelector(
+      LocalizationService loc, String lang, bool canEdit) {
     final ids = _checklist?.effectiveSectionIds ?? const <String>[];
     final label = ids.isEmpty
         ? (loc.t('checklist_section_all') ?? 'Все цеха')
@@ -719,14 +821,18 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           labelText: lang == 'ru' ? 'Цех' : 'Section',
           hintText: loc.t('checklist_section_select') ?? 'Выбрать цеха',
           border: const OutlineInputBorder(),
-          suffixIcon: canEdit ? Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.onSurfaceVariant) : null,
+          suffixIcon: canEdit
+              ? Icon(Icons.arrow_drop_down,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)
+              : null,
         ),
         child: Text(label),
       ),
     );
   }
 
-  Future<void> _showSectionPicker(LocalizationService loc, String lang, bool canEdit) async {
+  Future<void> _showSectionPicker(
+      LocalizationService loc, String lang, bool canEdit) async {
     final selected = List<String>.from(_checklist?.effectiveSectionIds ?? []);
     final ok = await showDialog<bool>(
       context: context,
@@ -770,8 +876,12 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(loc.t('cancel'))),
-              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(loc.t('save'))),
+              TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: Text(loc.t('cancel'))),
+              FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  child: Text(loc.t('save'))),
             ],
           );
         },
@@ -789,7 +899,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     }
   }
 
-  Widget _buildEmployeeSelector(LocalizationService loc, String lang, bool canEdit) {
+  Widget _buildEmployeeSelector(
+      LocalizationService loc, String lang, bool canEdit) {
     final label = _selectedEmployeeIds.isEmpty
         ? loc.t('checklist_employee_all') ?? 'Все'
         : '${_selectedEmployeeIds.length} ${loc.t('checklist_employee')}';
@@ -801,14 +912,18 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           labelText: loc.t('checklist_employee') ?? 'Сотрудник',
           hintText: loc.t('checklist_employee_select') ?? 'Выбрать сотрудников',
           border: const OutlineInputBorder(),
-          suffixIcon: canEdit ? Icon(Icons.arrow_drop_down, color: Theme.of(context).colorScheme.onSurfaceVariant) : null,
+          suffixIcon: canEdit
+              ? Icon(Icons.arrow_drop_down,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant)
+              : null,
         ),
         child: Text(label),
       ),
     );
   }
 
-  Future<void> _showEmployeePicker(LocalizationService loc, String lang, bool canEdit) async {
+  Future<void> _showEmployeePicker(
+      LocalizationService loc, String lang, bool canEdit) async {
     final selected = List<String>.from(_selectedEmployeeIds);
     final ok = await showDialog<bool>(
       context: context,
@@ -832,23 +947,31 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                   ),
                   ..._employees.map((e) {
                     final isSelected = selected.contains(e.id);
-                    final rolesDisplay = e.roles
-                        .map((r) => loc.roleDisplayName(r))
-                        .join(', ');
-                    final displayName = ctx.read<ScreenLayoutPreferenceService>().showNameTranslit
+                    final rolesDisplay =
+                        e.roles.map((r) => loc.roleDisplayName(r)).join(', ');
+                    final displayName = ctx
+                            .read<ScreenLayoutPreferenceService>()
+                            .showNameTranslit
                         ? cyrillicToLatin(e.fullName)
                         : e.fullName;
                     return CheckboxListTile(
                       value: isSelected,
-                      onChanged: canEdit ? (v) {
-                        setInner(() {
-                          if (v == true) selected.add(e.id);
-                          else selected.remove(e.id);
-                        });
-                      } : null,
-                      title: Text(displayName, style: Theme.of(ctx).textTheme.bodyMedium),
+                      onChanged: canEdit
+                          ? (v) {
+                              setInner(() {
+                                if (v == true)
+                                  selected.add(e.id);
+                                else
+                                  selected.remove(e.id);
+                              });
+                            }
+                          : null,
+                      title: Text(displayName,
+                          style: Theme.of(ctx).textTheme.bodyMedium),
                       subtitle: Text(
-                        rolesDisplay.isNotEmpty ? rolesDisplay : (loc.t('employee') ?? 'Сотрудник'),
+                        rolesDisplay.isNotEmpty
+                            ? rolesDisplay
+                            : (loc.t('employee') ?? 'Сотрудник'),
                         style: Theme.of(ctx).textTheme.bodySmall,
                       ),
                     );
@@ -857,8 +980,12 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text(loc.t('cancel'))),
-              FilledButton(onPressed: () => Navigator.of(ctx).pop(true), child: Text(loc.t('save'))),
+              TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: Text(loc.t('cancel'))),
+              FilledButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  child: Text(loc.t('save'))),
             ],
           );
         },
@@ -886,13 +1013,27 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         recurrenceEndDate: null,
       );
     } else {
-      // Нормализация повтора: multiDaily должен иметь хотя бы одно время.
-      if (r.recurrenceKind == ChecklistRecurrenceKind.multiDaily) {
-        var times = List<String>.from(r.dailyTimes);
-        if (times.isEmpty) times = ['09:00'];
-        times.sort();
-        r = r.copyWith(dailyTimes: times, useSpecificTime: false);
+      var times = List<String>.from(r.dailyTimes)
+          .map((t) => t.trim())
+          .where((t) => RegExp(r'^\d{2}:\d{2}$').hasMatch(t))
+          .toSet()
+          .toList()
+        ..sort();
+      if (r.recurrenceKind == ChecklistRecurrenceKind.multiDaily &&
+          times.isEmpty) {
+        times = ['09:00'];
       }
+      var kind = ChecklistRecurrenceKind.none;
+      if (r.weekdays.isNotEmpty) {
+        kind = ChecklistRecurrenceKind.weekdays;
+      } else if (times.isNotEmpty) {
+        kind = ChecklistRecurrenceKind.multiDaily;
+      }
+      r = r.copyWith(
+        recurrenceKind: kind,
+        dailyTimes: times,
+        useSpecificTime: times.isNotEmpty ? false : r.useSpecificTime,
+      );
     }
     // Если уведомления выключены — не держим специфичное время.
     if (!r.enabled) {
@@ -905,12 +1046,13 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       DateFormat.E(lang == 'ru' ? 'ru' : 'en').format(DateTime(2024, 1, iso));
 
   Future<void> _addMultiDailyTime() async {
-    final t = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(hour: _reminderConfig.hour, minute: _reminderConfig.minute),
+    final t = await _pickTimeLikeIos(
+      initialHour: _reminderConfig.hour,
+      initialMinute: _reminderConfig.minute,
     );
     if (t == null || !mounted) return;
-    final s = '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    final s =
+        '${t.$1.toString().padLeft(2, '0')}:${t.$2.toString().padLeft(2, '0')}';
     setState(() {
       final list = List<String>.from(_reminderConfig.dailyTimes);
       if (!list.contains(s)) list.add(s);
@@ -918,6 +1060,57 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       _reminderConfig = _reminderConfig.copyWith(dailyTimes: list);
       scheduleSave();
     });
+  }
+
+  Future<(int, int)?> _pickTimeLikeIos({
+    required int initialHour,
+    required int initialMinute,
+  }) async {
+    DateTime selected = DateTime(
+        2024, 1, 1, initialHour.clamp(0, 23), initialMinute.clamp(0, 59));
+    final result = await showModalBottomSheet<DateTime>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: SizedBox(
+          height: 320,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: 240,
+                child: CupertinoDatePicker(
+                  mode: CupertinoDatePickerMode.time,
+                  use24hFormat: true,
+                  initialDateTime: selected,
+                  onDateTimeChanged: (d) => selected = d,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child:
+                          Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: () => Navigator.of(ctx).pop(selected),
+                      child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (result == null) return null;
+    return (result.hour, result.minute);
   }
 
   Widget _buildDeadlineRow(LocalizationService loc, String lang, bool canEdit) {
@@ -928,11 +1121,13 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           children: [
             Switch(
               value: _deadlineEnabled,
-              onChanged: canEdit ? (v) => setState(() {
-                _deadlineEnabled = v;
-                if (v && _deadline == null) _deadline = DateTime.now();
-                scheduleSave();
-              }) : null,
+              onChanged: canEdit
+                  ? (v) => setState(() {
+                        _deadlineEnabled = v;
+                        if (v && _deadline == null) _deadline = DateTime.now();
+                        scheduleSave();
+                      })
+                  : null,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
             const SizedBox(width: 16),
@@ -954,19 +1149,25 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                       initialDate: _deadline ?? DateTime.now(),
                       firstDate: DateTime(2020),
                       lastDate: DateTime(2030),
-                      locale: Locale(loc.currentLanguageCode == 'en' ? 'en_GB' : loc.currentLanguageCode),
+                      locale: Locale(loc.currentLanguageCode == 'en'
+                          ? 'en_GB'
+                          : loc.currentLanguageCode),
                     );
                     if (date != null && mounted) {
                       setState(() {
                         final d = _deadline ?? DateTime.now();
-                        _deadline = DateTime(date.year, date.month, date.day, d.hour, d.minute);
+                        _deadline = DateTime(
+                            date.year, date.month, date.day, d.hour, d.minute);
                         scheduleSave();
                       });
                     }
                   },
                   child: InputDecorator(
-                    decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true),
-                    child: Text(_deadline != null ? '${_deadline!.day.toString().padLeft(2, '0')}.${_deadline!.month.toString().padLeft(2, '0')}.${_deadline!.year}' : '—'),
+                    decoration: const InputDecoration(
+                        border: OutlineInputBorder(), isDense: true),
+                    child: Text(_deadline != null
+                        ? '${_deadline!.day.toString().padLeft(2, '0')}.${_deadline!.month.toString().padLeft(2, '0')}.${_deadline!.year}'
+                        : '—'),
                   ),
                 ),
               ),
@@ -985,7 +1186,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                         final m = int.tryParse(parts[1]) ?? 0;
                         setState(() {
                           final d = _deadline ?? DateTime.now();
-                          _deadline = DateTime(d.year, d.month, d.day, h.clamp(0, 23), m.clamp(0, 59));
+                          _deadline = DateTime(d.year, d.month, d.day,
+                              h.clamp(0, 23), m.clamp(0, 59));
                           scheduleSave();
                         });
                       }
@@ -1001,17 +1203,22 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             children: [
               Switch(
                 value: _deadlineWithTime,
-                onChanged: canEdit ? (v) => setState(() {
-                  _deadlineWithTime = v;
-                  if (!v && _deadline != null) {
-                    _deadline = DateTime(_deadline!.year, _deadline!.month, _deadline!.day);
-                  }
-                  scheduleSave();
-                }) : null,
+                onChanged: canEdit
+                    ? (v) => setState(() {
+                          _deadlineWithTime = v;
+                          if (!v && _deadline != null) {
+                            _deadline = DateTime(_deadline!.year,
+                                _deadline!.month, _deadline!.day);
+                          }
+                          scheduleSave();
+                        })
+                    : null,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               const SizedBox(width: 16),
-              Expanded(child: Text(loc.t('checklist_include_time') ?? 'Указать время')),
+              Expanded(
+                  child:
+                      Text(loc.t('checklist_include_time') ?? 'Указать время')),
             ],
           ),
         ],
@@ -1019,8 +1226,9 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     );
   }
 
-  Widget _buildRecurrenceRow(LocalizationService loc, String lang, bool canEdit) {
-    final rk = _reminderConfig.recurrenceKind;
+  Widget _buildRecurrenceRow(
+      LocalizationService loc, String lang, bool canEdit) {
+    final hasMultiDaily = _reminderConfig.dailyTimes.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1031,11 +1239,18 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               onChanged: canEdit
                   ? (v) => setState(() {
                         // Повторение отдельно от уведомления: выключение не сбрасывает настройки уведомления.
-                        var next = _reminderConfig.copyWith(recurrenceEnabled: v);
-                        if (v && next.recurrenceKind == ChecklistRecurrenceKind.none) {
-                          next = next.copyWith(recurrenceKind: ChecklistRecurrenceKind.weekdays);
+                        var next =
+                            _reminderConfig.copyWith(recurrenceEnabled: v);
+                        if (v &&
+                            next.recurrenceKind ==
+                                ChecklistRecurrenceKind.none) {
+                          next = next.copyWith(
+                              recurrenceKind: ChecklistRecurrenceKind.weekdays);
                         }
-                        if (v && next.recurrenceKind == ChecklistRecurrenceKind.multiDaily && next.dailyTimes.isEmpty) {
+                        if (v &&
+                            next.recurrenceKind ==
+                                ChecklistRecurrenceKind.multiDaily &&
+                            next.dailyTimes.isEmpty) {
                           next = next.copyWith(dailyTimes: ['09:00']);
                         }
                         if (!v) {
@@ -1059,35 +1274,114 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         ),
         if (_reminderConfig.recurrenceEnabled && canEdit) ...[
           const SizedBox(height: 8),
-          DropdownButtonFormField<ChecklistRecurrenceKind>(
-            value: rk,
-            decoration: InputDecoration(
-              labelText: loc.t('checklist_recurrence'),
-              border: const OutlineInputBorder(),
-              isDense: true,
-            ),
-            items: [
-              DropdownMenuItem(value: ChecklistRecurrenceKind.none, child: Text(loc.t('checklist_recurrence_none'))),
-              DropdownMenuItem(value: ChecklistRecurrenceKind.multiDaily, child: Text(loc.t('checklist_recurrence_multi_daily'))),
-              DropdownMenuItem(value: ChecklistRecurrenceKind.weekdays, child: Text(loc.t('checklist_recurrence_weekdays'))),
-            ],
-            onChanged: canEdit
-                ? (v) {
-                    if (v == null) return;
-                    setState(() {
-                      var next = _reminderConfig.copyWith(recurrenceKind: v);
-                      if (v == ChecklistRecurrenceKind.multiDaily && next.dailyTimes.isEmpty) {
-                        next = next.copyWith(dailyTimes: ['09:00']);
-                      }
-                      _reminderConfig = next;
-                      scheduleSave();
-                    });
-                  }
-                : null,
+          Text(loc.t('checklist_weekdays_pick'),
+              style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 8),
+          Row(
+            children: List.generate(7, (i) {
+              final day = i + 1;
+              final sel = _reminderConfig.weekdays.contains(day);
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: i < 6 ? 4 : 0),
+                  child: FilterChip(
+                    showCheckmark: false,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    labelPadding: EdgeInsets.zero,
+                    label: SizedBox(
+                      height: 30,
+                      child: Center(
+                        child: Text(
+                          _weekdayLetter(day, lang),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ),
+                    selected: sel,
+                    onSelected: canEdit
+                        ? (v) {
+                            setState(() {
+                              final w =
+                                  List<int>.from(_reminderConfig.weekdays);
+                              if (v) {
+                                if (!w.contains(day)) w.add(day);
+                              } else {
+                                w.remove(day);
+                              }
+                              w.sort();
+                              _reminderConfig =
+                                  _reminderConfig.copyWith(weekdays: w);
+                              scheduleSave();
+                            });
+                          }
+                        : null,
+                  ),
+                ),
+              );
+            }),
           ),
           const SizedBox(height: 8),
-          if (rk == ChecklistRecurrenceKind.multiDaily) ...[
-            Text(loc.t('checklist_recurrence_multi_daily'), style: Theme.of(context).textTheme.labelLarge),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(loc.t('checklist_every_n_weeks')),
+              SizedBox(
+                width: 92,
+                child: DropdownButtonFormField<int>(
+                  value: _reminderConfig.everyNWeeks.clamp(1, 8),
+                  isDense: true,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  items: List.generate(
+                    8,
+                    (i) =>
+                        DropdownMenuItem(value: i + 1, child: Text('${i + 1}')),
+                  ),
+                  onChanged: canEdit
+                      ? (n) {
+                          if (n == null) return;
+                          setState(() {
+                            _reminderConfig =
+                                _reminderConfig.copyWith(everyNWeeks: n);
+                            scheduleSave();
+                          });
+                        }
+                      : null,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Switch(
+                value: hasMultiDaily,
+                onChanged: canEdit
+                    ? (v) => setState(() {
+                          _reminderConfig = _reminderConfig.copyWith(
+                            dailyTimes: v
+                                ? (_reminderConfig.dailyTimes.isEmpty
+                                    ? ['09:00']
+                                    : List<String>.from(
+                                        _reminderConfig.dailyTimes))
+                                : const [],
+                          );
+                          scheduleSave();
+                        })
+                    : null,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              const SizedBox(width: 16),
+              Expanded(child: Text(loc.t('checklist_recurrence_multi_daily'))),
+            ],
+          ),
+          if (hasMultiDaily) ...[
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -1100,8 +1394,11 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                     onDeleted: canEdit
                         ? () {
                             setState(() {
-                              final list = List<String>.from(_reminderConfig.dailyTimes)..remove(t);
-                              _reminderConfig = _reminderConfig.copyWith(dailyTimes: list);
+                              final list =
+                                  List<String>.from(_reminderConfig.dailyTimes)
+                                    ..remove(t);
+                              _reminderConfig =
+                                  _reminderConfig.copyWith(dailyTimes: list);
                               scheduleSave();
                             });
                           }
@@ -1116,102 +1413,35 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               ],
             ),
           ],
-          if (rk == ChecklistRecurrenceKind.weekdays) ...[
-            const SizedBox(height: 12),
-            Text(loc.t('checklist_weekdays_pick'), style: Theme.of(context).textTheme.labelLarge),
-            const SizedBox(height: 8),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: List.generate(7, (i) {
-                  final day = i + 1;
-                  final sel = _reminderConfig.weekdays.contains(day);
-                  return Padding(
-                    padding: EdgeInsets.only(right: i < 6 ? 4 : 0),
-                    child: FilterChip(
-                      visualDensity: VisualDensity.compact,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      labelPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                      label: Text(_weekdayLetter(day, lang), style: const TextStyle(fontSize: 12)),
-                      selected: sel,
-                      onSelected: canEdit
-                          ? (v) {
-                              setState(() {
-                                final w = List<int>.from(_reminderConfig.weekdays);
-                                if (v) {
-                                  if (!w.contains(day)) w.add(day);
-                                } else {
-                                  w.remove(day);
-                                }
-                                w.sort();
-                                _reminderConfig = _reminderConfig.copyWith(weekdays: w);
-                                scheduleSave();
-                              });
-                            }
-                          : null,
-                    ),
-                  );
-                }),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 10,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(loc.t('checklist_every_n_weeks')),
-                SizedBox(
-                  width: 92,
-                  child: DropdownButtonFormField<int>(
-                    value: _reminderConfig.everyNWeeks.clamp(1, 8),
-                    isDense: true,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                    ),
-                    items: List.generate(
-                      8,
-                      (i) => DropdownMenuItem(value: i + 1, child: Text('${i + 1}')),
-                    ),
-                    onChanged: canEdit
-                        ? (n) {
-                            if (n == null) return;
-                            setState(() {
-                              _reminderConfig = _reminderConfig.copyWith(everyNWeeks: n);
-                              scheduleSave();
-                            });
-                          }
-                        : null,
-                  ),
-                ),
-              ],
-            ),
-          ],
           const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
                 child: InkWell(
-                  onTap: canEdit ? () async {
-                    final l = context.read<LocalizationService>();
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: _reminderConfig.recurrenceEndDate ?? DateTime.now(),
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2035),
-                      locale: Locale(l.currentLanguageCode == 'en' ? 'en_GB' : l.currentLanguageCode),
-                    );
-                    if (!mounted) return;
-                    setState(() {
-                      _reminderConfig = _reminderConfig.copyWith(
-                        recurrenceEndDate: date != null ? DateTime(date.year, date.month, date.day) : _reminderConfig.recurrenceEndDate,
-                      );
-                      scheduleSave();
-                    });
-                  } : null,
+                  onTap: canEdit
+                      ? () async {
+                          final l = context.read<LocalizationService>();
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: _reminderConfig.recurrenceEndDate ??
+                                DateTime.now(),
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2035),
+                            locale: Locale(l.currentLanguageCode == 'en'
+                                ? 'en_GB'
+                                : l.currentLanguageCode),
+                          );
+                          if (!mounted) return;
+                          setState(() {
+                            _reminderConfig = _reminderConfig.copyWith(
+                              recurrenceEndDate: date != null
+                                  ? DateTime(date.year, date.month, date.day)
+                                  : _reminderConfig.recurrenceEndDate,
+                            );
+                            scheduleSave();
+                          });
+                        }
+                      : null,
                   child: InputDecorator(
                     decoration: InputDecoration(
                       labelText: loc.t('checklist_recurrence_end_date'),
@@ -1231,9 +1461,10 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 tooltip: loc.t('clear') ?? 'Очистить',
                 onPressed: canEdit && _reminderConfig.recurrenceEndDate != null
                     ? () => setState(() {
-                        _reminderConfig = _reminderConfig.copyWith(recurrenceEndDate: null);
-                        scheduleSave();
-                      })
+                          _reminderConfig =
+                              _reminderConfig.copyWith(recurrenceEndDate: null);
+                          scheduleSave();
+                        })
                     : null,
                 icon: const Icon(Icons.close),
               ),
@@ -1244,8 +1475,9 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     );
   }
 
-  Widget _buildNotificationRow(LocalizationService loc, String lang, bool canEdit) {
-    final showSingleTime = _reminderConfig.recurrenceKind != ChecklistRecurrenceKind.multiDaily;
+  Widget _buildNotificationRow(
+      LocalizationService loc, String lang, bool canEdit) {
+    final showSingleTime = _reminderConfig.dailyTimes.isEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1275,7 +1507,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                   value: _reminderConfig.useSpecificTime,
                   onChanged: canEdit
                       ? (on) => setState(() {
-                            _reminderConfig = _reminderConfig.copyWith(useSpecificTime: on);
+                            _reminderConfig =
+                                _reminderConfig.copyWith(useSpecificTime: on);
                             scheduleSave();
                           })
                       : null,
@@ -1311,7 +1544,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               const SizedBox(height: 4),
               Text(
                 loc.t('checklist_reminder_shift_hint'),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
             ],
           ] else ...[
@@ -1321,8 +1555,10 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             ),
             const SizedBox(height: 4),
             Text(
-              loc.t('checklist_reminder_multi_daily_hint') ?? loc.t('checklist_reminder_shift_hint'),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              loc.t('checklist_reminder_multi_daily_hint') ??
+                  loc.t('checklist_reminder_shift_hint'),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ],
         ],
@@ -1354,9 +1590,14 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               children: [
                 Icon(Icons.lock_outline, size: 64, color: Colors.grey[400]),
                 const SizedBox(height: 16),
-                Text(loc.t('checklists_kitchen_only'), style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center),
+                Text(loc.t('checklists_kitchen_only'),
+                    style: Theme.of(context).textTheme.titleMedium,
+                    textAlign: TextAlign.center),
                 const SizedBox(height: 24),
-                FilledButton.icon(onPressed: () => context.go('/home'), icon: const Icon(Icons.home), label: Text(loc.t('home'))),
+                FilledButton.icon(
+                    onPressed: () => context.go('/home'),
+                    icon: const Icon(Icons.home),
+                    label: Text(loc.t('home'))),
               ],
             ),
           ),
@@ -1385,7 +1626,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(_error ?? 'Чеклист не найден', textAlign: TextAlign.center),
+                Text(_error ?? 'Чеклист не найден',
+                    textAlign: TextAlign.center),
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: () => context.pop(),
@@ -1414,310 +1656,382 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-            TextField(
-              controller: _nameController,
-              readOnly: !canEdit,
-              decoration: InputDecoration(
-                labelText: loc.t('checklist_name'),
-                hintText: loc.t('checklist_name_hint'),
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (canEdit)
-              DropdownButtonFormField<ChecklistType>(
-                value: _type,
-                decoration: InputDecoration(
-                  labelText: loc.t('checklist_type') ?? 'Тип чеклиста',
-                ),
-                items: ChecklistType.values
-                    .map((t) => DropdownMenuItem(value: t, child: Text(t.getLocalizedName(lang))))
-                    .toList(),
-                onChanged: (v) => setState(() {
-                  if (v != null) _type = v;
-                  scheduleSave();
-                }),
-              ),
-            if (canEdit) const SizedBox(height: 16),
-            // Цех и сотрудники — на узком экране столбиком, на широком — в одну строку.
-            if (narrow) ...[
-              _buildSectionSelector(loc, lang, canEdit),
-              const SizedBox(height: 12),
-              _buildEmployeeSelector(loc, lang, canEdit),
-            ] else ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildSectionSelector(loc, lang, canEdit),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildEmployeeSelector(loc, lang, canEdit),
-                  ),
-                ],
-              ),
-            ],
-            if (canEdit) const SizedBox(height: 12),
-            if (canEdit)
-              InputDecorator(
-                decoration: InputDecoration(
-                  labelText: lang == 'ru' ? 'Формат отметки' : 'Checklist item format',
-                  border: const OutlineInputBorder(),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                ),
-                child: Column(
-                  children: [
-                    SwitchListTile(
-                      contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                      dense: true,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      title: Text(loc.t('checklist_action_numeric') ?? 'Цифра'),
-                      value: _actionHasNumeric,
-                      onChanged: (v) {
-                        setState(() {
-                          _actionHasNumeric = v;
-                          scheduleSave();
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    SwitchListTile(
-                      contentPadding: const EdgeInsets.symmetric(vertical: 4),
-                      dense: true,
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      title: Text(loc.t('checklist_action_toggle') ?? 'Сделано/не сделано'),
-                      value: _actionHasToggle,
-                      onChanged: (v) {
-                        setState(() {
-                          _actionHasToggle = v;
-                          scheduleSave();
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            if (canEdit) const SizedBox(height: 10),
-            if (canEdit)
-              TextField(
-                controller: _dropdownOptionsController,
-                decoration: InputDecoration(
-                  labelText: loc.t('checklist_dropdown_options') ?? 'Варианты выбора (через запятую)',
-                  hintText: 'Вариант 1, Вариант 2, Вариант 3',
-                ),
-                onChanged: (_) => scheduleSave(),
-              ),
-            const SizedBox(height: 16),
-            _buildDeadlineRow(loc, lang, canEdit),
-            const SizedBox(height: 12),
-            _buildRecurrenceRow(loc, lang, canEdit),
-            const SizedBox(height: 12),
-            _buildNotificationRow(loc, lang, canEdit),
-            const SizedBox(height: 16),
-            if (canEdit) ...[
-              const SizedBox(height: 24),
-              if (narrow) ...[
-                if (_type == ChecklistType.prep) ...[
-                  InkWell(
-                    onTap: _showSelectPfDropdown,
-                    borderRadius: BorderRadius.circular(4),
-                    child: InputDecorator(
+                    TextField(
+                      controller: _nameController,
+                      readOnly: !canEdit,
                       decoration: InputDecoration(
-                        labelText: loc.t('select_pf') ?? 'Выбрать ПФ',
-                        suffixIcon: Icon(Icons.keyboard_arrow_down, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                        border: const OutlineInputBorder(),
+                        labelText: loc.t('checklist_name'),
+                        hintText: loc.t('checklist_name_hint'),
                       ),
-                      isEmpty: true,
-                      child: const SizedBox.shrink(),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _newItemController,
+                    const SizedBox(height: 12),
+                    if (canEdit)
+                      DropdownButtonFormField<ChecklistType>(
+                        value: _type,
                         decoration: InputDecoration(
-                          labelText: loc.t('add_item'),
-                          hintText: _type == ChecklistType.tasks
-                              ? (loc.t('checklist_item_hint') ?? 'Введите наименование')
-                              : (loc.t('checklist_item_prep_hint') ?? 'Введите своё или выберите ПФ'),
+                          labelText: loc.t('checklist_type') ?? 'Тип чеклиста',
                         ),
-                        onSubmitted: (_) {
-                          if (_type == ChecklistType.prep && _newItemController.text.trim().isNotEmpty) {
-                            _showQuantityDialog(title: _newItemController.text.trim());
-                          } else {
-                            _addItem();
-                          }
-                        },
+                        items: ChecklistType.values
+                            .map((t) => DropdownMenuItem(
+                                value: t,
+                                child: Text(t.getLocalizedName(lang))))
+                            .toList(),
+                        onChanged: (v) => setState(() {
+                          if (v != null) _type = v;
+                          scheduleSave();
+                        }),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filled(
-                      onPressed: () {
-                        if (_type == ChecklistType.prep && _newItemController.text.trim().isNotEmpty) {
-                          _showQuantityDialog(title: _newItemController.text.trim());
-                        } else {
-                          _addItem();
-                        }
-                      },
-                      icon: const Icon(Icons.add),
-                      tooltip: loc.t('add_item'),
-                    ),
-                  ],
-                ),
-              ] else ...[
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_type == ChecklistType.prep)
-                      SizedBox(
-                        width: 160,
-                        child: InkWell(
-                          onTap: _showSelectPfDropdown,
-                          borderRadius: BorderRadius.circular(4),
-                          child: InputDecorator(
-                            decoration: InputDecoration(
-                              labelText: loc.t('select_pf') ?? 'Выбрать ПФ',
-                              suffixIcon: Icon(Icons.keyboard_arrow_down, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                              border: const OutlineInputBorder(),
-                            ),
-                            isEmpty: true,
-                            child: const SizedBox.shrink(),
+                    if (canEdit) const SizedBox(height: 16),
+                    // Цех и сотрудники — на узком экране столбиком, на широком — в одну строку.
+                    if (narrow) ...[
+                      _buildSectionSelector(loc, lang, canEdit),
+                      const SizedBox(height: 12),
+                      _buildEmployeeSelector(loc, lang, canEdit),
+                    ] else ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildSectionSelector(loc, lang, canEdit),
                           ),
-                        ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildEmployeeSelector(loc, lang, canEdit),
+                          ),
+                        ],
                       ),
-                    if (_type == ChecklistType.prep) const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _newItemController,
-                        decoration: InputDecoration(
-                          labelText: loc.t('add_item'),
-                          hintText: _type == ChecklistType.tasks
-                              ? (loc.t('checklist_item_hint') ?? 'Введите наименование')
-                              : (loc.t('checklist_item_prep_hint') ?? 'Введите своё или выберите ПФ'),
-                        ),
-                        onSubmitted: (_) {
-                          if (_type == ChecklistType.prep && _newItemController.text.trim().isNotEmpty) {
-                            _showQuantityDialog(title: _newItemController.text.trim());
-                          } else {
-                            _addItem();
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filled(
-                      onPressed: () {
-                        if (_type == ChecklistType.prep && _newItemController.text.trim().isNotEmpty) {
-                          _showQuantityDialog(title: _newItemController.text.trim());
-                        } else {
-                          _addItem();
-                        }
-                      },
-                      icon: const Icon(Icons.add),
-                      tooltip: loc.t('add_item'),
-                    ),
-                  ],
-                ),
-              ],
-            ],
-            const SizedBox(height: 16),
-            ...List.generate(_items.length, (i) {
-              final it = _items[i];
-              final lang = loc.currentLanguageCode;
-              // Resolve PF display name from tech cards list if available
-              final techCard = it.techCardId != null
-                  ? _techCards.where((tc) => tc.id == it.techCardId).firstOrNull
-                  : null;
-              final displayTitle = techCard != null
-                  ? techCard.getDisplayNameInLists(lang)
-                  : it.title;
-              // Build localized quantity label
-              String? localizedQuantityLabel;
-              if (it.targetQuantity != null) {
-                final qty = it.targetQuantity! == it.targetQuantity!.truncateToDouble()
-                    ? it.targetQuantity!.toInt().toString()
-                    : it.targetQuantity!.toStringAsFixed(1);
-                final unit = it.targetUnit?.isNotEmpty == true
-                    ? ' ${CulinaryUnits.displayName(it.targetUnit!, lang)}'
-                    : '';
-                localizedQuantityLabel = '$qty$unit';
-              }
-              return Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  leading: it.techCardId != null
-                      ? Icon(Icons.link, size: 20, color: Theme.of(context).colorScheme.primary)
-                      : null,
-                  title: Text(displayTitle),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (it.techCardId != null)
-                        Text(loc.t('ttk_pf') ?? 'ТТК ПФ', style: Theme.of(context).textTheme.labelSmall),
-                      if (localizedQuantityLabel != null)
-                        GestureDetector(
-                          onTap: canEdit ? () => _editItemQuantity(i) : null,
-                          child: Container(
-                            margin: const EdgeInsets.only(top: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.secondaryContainer,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              localizedQuantityLabel,
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: Theme.of(context).colorScheme.onSecondaryContainer,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                            ),
-                          ),
-                        )
-                      else if (canEdit && (it.techCardId != null || _type == ChecklistType.prep))
-                        GestureDetector(
-                          onTap: () => _editItemQuantity(i),
-                          child: Container(
-                            margin: const EdgeInsets.only(top: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Theme.of(context).colorScheme.outline),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              loc.t('checklist_add_quantity') ?? '+ кол-во',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                  ),
-                            ),
-                          ),
-                        ),
                     ],
-                  ),
-                  trailing: canEdit
-                      ? IconButton(
-                          icon: const Icon(Icons.remove_circle_outline),
-                          onPressed: () => _removeItem(i),
-                          tooltip: loc.t('delete'),
-                        )
-                      : null,
+                    if (canEdit) const SizedBox(height: 12),
+                    if (canEdit)
+                      InputDecorator(
+                        decoration: InputDecoration(
+                          labelText: lang == 'ru'
+                              ? 'Формат отметки'
+                              : 'Checklist item format',
+                          border: const OutlineInputBorder(),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 14),
+                        ),
+                        child: Column(
+                          children: [
+                            SwitchListTile(
+                              contentPadding:
+                                  const EdgeInsets.symmetric(vertical: 4),
+                              dense: true,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              title: Text(
+                                  loc.t('checklist_action_numeric') ?? 'Цифра'),
+                              value: _actionHasNumeric,
+                              onChanged: (v) {
+                                setState(() {
+                                  _actionHasNumeric = v;
+                                  scheduleSave();
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 8),
+                            SwitchListTile(
+                              contentPadding:
+                                  const EdgeInsets.symmetric(vertical: 4),
+                              dense: true,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              title: Text(loc.t('checklist_action_toggle') ??
+                                  'Сделано/не сделано'),
+                              value: _actionHasToggle,
+                              onChanged: (v) {
+                                setState(() {
+                                  _actionHasToggle = v;
+                                  scheduleSave();
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (canEdit) const SizedBox(height: 10),
+                    if (canEdit)
+                      TextField(
+                        controller: _dropdownOptionsController,
+                        decoration: InputDecoration(
+                          labelText: loc.t('checklist_dropdown_options') ??
+                              'Варианты выбора (через запятую)',
+                          hintText: 'Вариант 1, Вариант 2, Вариант 3',
+                        ),
+                        onChanged: (_) => scheduleSave(),
+                      ),
+                    const SizedBox(height: 16),
+                    _buildDeadlineRow(loc, lang, canEdit),
+                    const SizedBox(height: 12),
+                    _buildRecurrenceRow(loc, lang, canEdit),
+                    const SizedBox(height: 12),
+                    _buildNotificationRow(loc, lang, canEdit),
+                    const SizedBox(height: 16),
+                    if (canEdit) ...[
+                      const SizedBox(height: 24),
+                      if (narrow) ...[
+                        if (_type == ChecklistType.prep) ...[
+                          InkWell(
+                            onTap: _showSelectPfDropdown,
+                            borderRadius: BorderRadius.circular(4),
+                            child: InputDecorator(
+                              decoration: InputDecoration(
+                                labelText: loc.t('select_pf') ?? 'Выбрать ПФ',
+                                suffixIcon: Icon(Icons.keyboard_arrow_down,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant),
+                                border: const OutlineInputBorder(),
+                              ),
+                              isEmpty: true,
+                              child: const SizedBox.shrink(),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _newItemController,
+                                decoration: InputDecoration(
+                                  labelText: loc.t('add_item'),
+                                  hintText: _type == ChecklistType.tasks
+                                      ? (loc.t('checklist_item_hint') ??
+                                          'Введите наименование')
+                                      : (loc.t('checklist_item_prep_hint') ??
+                                          'Введите своё или выберите ПФ'),
+                                ),
+                                onSubmitted: (_) {
+                                  if (_type == ChecklistType.prep &&
+                                      _newItemController.text
+                                          .trim()
+                                          .isNotEmpty) {
+                                    _showQuantityDialog(
+                                        title: _newItemController.text.trim());
+                                  } else {
+                                    _addItem();
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton.filled(
+                              onPressed: () {
+                                if (_type == ChecklistType.prep &&
+                                    _newItemController.text.trim().isNotEmpty) {
+                                  _showQuantityDialog(
+                                      title: _newItemController.text.trim());
+                                } else {
+                                  _addItem();
+                                }
+                              },
+                              icon: const Icon(Icons.add),
+                              tooltip: loc.t('add_item'),
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (_type == ChecklistType.prep)
+                              SizedBox(
+                                width: 160,
+                                child: InkWell(
+                                  onTap: _showSelectPfDropdown,
+                                  borderRadius: BorderRadius.circular(4),
+                                  child: InputDecorator(
+                                    decoration: InputDecoration(
+                                      labelText:
+                                          loc.t('select_pf') ?? 'Выбрать ПФ',
+                                      suffixIcon: Icon(
+                                          Icons.keyboard_arrow_down,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurfaceVariant),
+                                      border: const OutlineInputBorder(),
+                                    ),
+                                    isEmpty: true,
+                                    child: const SizedBox.shrink(),
+                                  ),
+                                ),
+                              ),
+                            if (_type == ChecklistType.prep)
+                              const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: _newItemController,
+                                decoration: InputDecoration(
+                                  labelText: loc.t('add_item'),
+                                  hintText: _type == ChecklistType.tasks
+                                      ? (loc.t('checklist_item_hint') ??
+                                          'Введите наименование')
+                                      : (loc.t('checklist_item_prep_hint') ??
+                                          'Введите своё или выберите ПФ'),
+                                ),
+                                onSubmitted: (_) {
+                                  if (_type == ChecklistType.prep &&
+                                      _newItemController.text
+                                          .trim()
+                                          .isNotEmpty) {
+                                    _showQuantityDialog(
+                                        title: _newItemController.text.trim());
+                                  } else {
+                                    _addItem();
+                                  }
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton.filled(
+                              onPressed: () {
+                                if (_type == ChecklistType.prep &&
+                                    _newItemController.text.trim().isNotEmpty) {
+                                  _showQuantityDialog(
+                                      title: _newItemController.text.trim());
+                                } else {
+                                  _addItem();
+                                }
+                              },
+                              icon: const Icon(Icons.add),
+                              tooltip: loc.t('add_item'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                    const SizedBox(height: 16),
+                    ...List.generate(_items.length, (i) {
+                      final it = _items[i];
+                      final lang = loc.currentLanguageCode;
+                      // Resolve PF display name from tech cards list if available
+                      final techCard = it.techCardId != null
+                          ? _techCards
+                              .where((tc) => tc.id == it.techCardId)
+                              .firstOrNull
+                          : null;
+                      final displayTitle = techCard != null
+                          ? techCard.getDisplayNameInLists(lang)
+                          : it.title;
+                      // Build localized quantity label
+                      String? localizedQuantityLabel;
+                      if (it.targetQuantity != null) {
+                        final qty = it.targetQuantity! ==
+                                it.targetQuantity!.truncateToDouble()
+                            ? it.targetQuantity!.toInt().toString()
+                            : it.targetQuantity!.toStringAsFixed(1);
+                        final unit = it.targetUnit?.isNotEmpty == true
+                            ? ' ${CulinaryUnits.displayName(it.targetUnit!, lang)}'
+                            : '';
+                        localizedQuantityLabel = '$qty$unit';
+                      }
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: it.techCardId != null
+                              ? Icon(Icons.link,
+                                  size: 20,
+                                  color: Theme.of(context).colorScheme.primary)
+                              : null,
+                          title: Text(displayTitle),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (it.techCardId != null)
+                                Text(loc.t('ttk_pf') ?? 'ТТК ПФ',
+                                    style:
+                                        Theme.of(context).textTheme.labelSmall),
+                              if (localizedQuantityLabel != null)
+                                GestureDetector(
+                                  onTap: canEdit
+                                      ? () => _editItemQuantity(i)
+                                      : null,
+                                  child: Container(
+                                    margin: const EdgeInsets.only(top: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .secondaryContainer,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      localizedQuantityLabel,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSecondaryContainer,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                  ),
+                                )
+                              else if (canEdit &&
+                                  (it.techCardId != null ||
+                                      _type == ChecklistType.prep))
+                                GestureDetector(
+                                  onTap: () => _editItemQuantity(i),
+                                  child: Container(
+                                    margin: const EdgeInsets.only(top: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .outline),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      loc.t('checklist_add_quantity') ??
+                                          '+ кол-во',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          trailing: canEdit
+                              ? IconButton(
+                                  icon: const Icon(Icons.remove_circle_outline),
+                                  onPressed: () => _removeItem(i),
+                                  tooltip: loc.t('delete'),
+                                )
+                              : null,
+                        ),
+                      );
+                    }),
+                    if (canEdit) ...[
+                      const SizedBox(height: 24),
+                      FilledButton(
+                        onPressed: _saving ? null : _save,
+                        child: _saving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2))
+                            : Text(loc.t('save')),
+                      ),
+                    ],
+                  ],
                 ),
-              );
-            }),
-            if (canEdit) ...[
-              const SizedBox(height: 24),
-              FilledButton(
-                onPressed: _saving ? null : _save,
-                child: _saving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : Text(loc.t('save')),
               ),
-            ],
-          ],
-        ),
-      ),
-      DataSafetyIndicator(isVisible: true),
+              DataSafetyIndicator(isVisible: true),
             ],
           );
         },

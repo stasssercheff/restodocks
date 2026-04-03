@@ -4,8 +4,10 @@ import 'package:equatable/equatable.dart';
 enum ChecklistRecurrenceKind {
   /// Одно правило времени/начала смены без отдельного расписания повторов.
   none('none'),
+
   /// Несколько фиксированных времён в течение дня.
   multiDaily('multi_daily'),
+
   /// Выбранные дни недели; [everyNWeeks] — каждые 1–8 недель.
   weekdays('weekdays');
 
@@ -27,21 +29,27 @@ class ChecklistReminderConfig extends Equatable {
 
   /// Включено ли системное уведомление (notification time / начало смены).
   final bool enabled;
+
   /// Включено ли повторение (расписание повторов чеклиста).
   final bool recurrenceEnabled;
+
   /// Дата завершения повторения (если null — повторение бессрочно).
   /// Храним как дату (без времени); в JSON — ISO `YYYY-MM-DD`.
   final DateTime? recurrenceEndDate;
+
   /// Если true — использовать [hour]/[minute]; иначе «начало смены» ([defaultShiftHour]:[defaultShiftMinute] до появления графика в продукте).
   final bool useSpecificTime;
   final int hour;
   final int minute;
 
   final ChecklistRecurrenceKind recurrenceKind;
+
   /// Для [ChecklistRecurrenceKind.multiDaily] — списки «HH:mm».
   final List<String> dailyTimes;
+
   /// ISO weekday 1=Пн … 7=Вс
   final List<int> weekdays;
+
   /// 1–8, для [ChecklistRecurrenceKind.weekdays].
   final int everyNWeeks;
 
@@ -65,9 +73,12 @@ class ChecklistReminderConfig extends Equatable {
     if (json == null || json.isEmpty) return const ChecklistReminderConfig();
     final enabled = json['notify_enabled'] == true || json['enabled'] == true;
     final useSpecificTime = json['use_specific_time'] == true;
-    final hour = (json['hour'] as num?)?.clamp(0, 23).toInt() ?? defaultShiftHour;
-    final minute = (json['minute'] as num?)?.clamp(0, 59).toInt() ?? defaultShiftMinute;
-    final kind = ChecklistRecurrenceKind.fromJson(json['recurrence_kind'] as String?);
+    final hour =
+        (json['hour'] as num?)?.clamp(0, 23).toInt() ?? defaultShiftHour;
+    final minute =
+        (json['minute'] as num?)?.clamp(0, 59).toInt() ?? defaultShiftMinute;
+    final kind =
+        ChecklistRecurrenceKind.fromJson(json['recurrence_kind'] as String?);
     final timesRaw = json['daily_times'];
     final dailyTimes = <String>[];
     if (timesRaw is List) {
@@ -123,10 +134,13 @@ class ChecklistReminderConfig extends Equatable {
       'use_specific_time': enabled ? useSpecificTime : false,
       'hour': enabled ? hour : defaultShiftHour,
       'minute': enabled ? minute : defaultShiftMinute,
-      'recurrence_kind': recurrenceEnabled ? recurrenceKind.jsonValue : ChecklistRecurrenceKind.none.jsonValue,
-      'daily_times': recurrenceEnabled && recurrenceKind == ChecklistRecurrenceKind.multiDaily ? dailyTimes : <String>[],
-      'weekdays': recurrenceEnabled && recurrenceKind == ChecklistRecurrenceKind.weekdays ? weekdays : <int>[],
-      'every_n_weeks': recurrenceEnabled && recurrenceKind == ChecklistRecurrenceKind.weekdays ? everyNWeeks.clamp(1, 8) : 1,
+      'recurrence_kind': recurrenceEnabled
+          ? recurrenceKind.jsonValue
+          : ChecklistRecurrenceKind.none.jsonValue,
+      // Одновременно поддерживаем дни недели + несколько времен в день.
+      'daily_times': recurrenceEnabled ? dailyTimes : <String>[],
+      'weekdays': recurrenceEnabled ? weekdays : <int>[],
+      'every_n_weeks': recurrenceEnabled ? everyNWeeks.clamp(1, 8) : 1,
       'recurrence_end_date': recurrenceEnabled && recurrenceEndDate != null
           ? '${recurrenceEndDate!.year.toString().padLeft(4, '0')}-${recurrenceEndDate!.month.toString().padLeft(2, '0')}-${recurrenceEndDate!.day.toString().padLeft(2, '0')}'
           : null,
@@ -154,32 +168,30 @@ class ChecklistReminderConfig extends Equatable {
   }) {
     if (!enabled) return '';
     final buf = StringBuffer(reminderLabel);
-    if (recurrenceKind == ChecklistRecurrenceKind.multiDaily && dailyTimes.isNotEmpty) {
+    if (dailyTimes.isNotEmpty) {
       buf.write(': ${dailyTimes.join(', ')}');
     } else if (useSpecificTime) {
-      buf.write(': ${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}');
+      buf.write(
+          ': ${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}');
     } else {
       buf.write(': $atShiftStart');
     }
-    switch (recurrenceKind) {
-      case ChecklistRecurrenceKind.none:
-        buf.write(' · $recurrenceNone');
-        break;
-      case ChecklistRecurrenceKind.multiDaily:
-        buf.write(' · $recurrenceMulti');
-        break;
-      case ChecklistRecurrenceKind.weekdays:
-        if (weekdays.isEmpty) {
-          buf.write(' · $recurrenceWeekdays');
-        } else {
-          final wd = weekdays.map(formatWeekdayShort).join(', ');
-          final n = everyNWeeks.clamp(1, 8);
-          buf.write(' · $recurrenceWeekdays: $wd');
-          if (n > 1) {
-            buf.write(' ($everyNWeeksLabel: $n)');
-          }
-        }
-        break;
+    if (!recurrenceEnabled || recurrenceKind == ChecklistRecurrenceKind.none) {
+      buf.write(' · $recurrenceNone');
+      return buf.toString();
+    }
+    if (weekdays.isEmpty) {
+      buf.write(' · $recurrenceWeekdays');
+    } else {
+      final wd = weekdays.map(formatWeekdayShort).join(', ');
+      final n = everyNWeeks.clamp(1, 8);
+      buf.write(' · $recurrenceWeekdays: $wd');
+      if (n > 1) {
+        buf.write(' ($everyNWeeksLabel: $n)');
+      }
+    }
+    if (dailyTimes.isNotEmpty) {
+      buf.write(' · $recurrenceMulti: ${dailyTimes.join(', ')}');
     }
     return buf.toString();
   }
@@ -195,24 +207,20 @@ class ChecklistReminderConfig extends Equatable {
   }) {
     if (!recurrenceEnabled) return '';
     final buf = StringBuffer(recurrenceLabel);
-    switch (recurrenceKind) {
-      case ChecklistRecurrenceKind.none:
-        buf.write(': $recurrenceNone');
-        break;
-      case ChecklistRecurrenceKind.multiDaily:
-        buf.write(': $recurrenceMulti');
-        if (dailyTimes.isNotEmpty) buf.write(' (${dailyTimes.join(', ')})');
-        break;
-      case ChecklistRecurrenceKind.weekdays:
-        if (weekdays.isEmpty) {
-          buf.write(': $recurrenceWeekdays');
-        } else {
-          final wd = weekdays.map(formatWeekdayShort).join(', ');
-          final n = everyNWeeks.clamp(1, 8);
-          buf.write(': $recurrenceWeekdays: $wd');
-          buf.write(' · $everyNWeeksLabel: $n');
-        }
-        break;
+    if (recurrenceKind == ChecklistRecurrenceKind.none) {
+      buf.write(': $recurrenceNone');
+      return buf.toString();
+    }
+    if (weekdays.isEmpty) {
+      buf.write(': $recurrenceWeekdays');
+    } else {
+      final wd = weekdays.map(formatWeekdayShort).join(', ');
+      final n = everyNWeeks.clamp(1, 8);
+      buf.write(': $recurrenceWeekdays: $wd');
+      buf.write(' · $everyNWeeksLabel: $n');
+    }
+    if (dailyTimes.isNotEmpty) {
+      buf.write(' · $recurrenceMulti (${dailyTimes.join(', ')})');
     }
     return buf.toString();
   }
