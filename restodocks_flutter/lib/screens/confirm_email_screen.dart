@@ -6,9 +6,15 @@ import '../services/services.dart';
 /// Промежуточный экран после регистрации: «Подтвердите учётную запись».
 /// Письмо с PIN и письмо со ссылкой отправляются автоматически после регистрации (без кнопок повторной отправки).
 class ConfirmEmailScreen extends StatelessWidget {
-  const ConfirmEmailScreen({super.key, required this.email});
+  const ConfirmEmailScreen({
+    super.key,
+    required this.email,
+    this.resendFailed = false,
+  });
 
   final String email;
+  /// Дублирующее письмо через Resend не ушло (сеть / Edge / API).
+  final bool resendFailed;
 
   @override
   Widget build(BuildContext context) {
@@ -42,11 +48,26 @@ class ConfirmEmailScreen extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyLarge,
                 textAlign: TextAlign.center,
               ),
+              if (resendFailed) ...[
+                const SizedBox(height: 16),
+                Material(
+                  color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      loc.t('confirm_email_resend_failed'),
+                      style: Theme.of(context).textTheme.bodySmall,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(

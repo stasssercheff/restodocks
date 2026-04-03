@@ -8,6 +8,7 @@ import 'package:restodocks/core/supabase_url_resolver_stub.dart'
 
 import '../core/clear_hash_stub.dart'
     if (dart.library.html) '../core/clear_hash_web.dart' as clear_hash;
+import '../core/pending_co_owner_registration.dart';
 import '../core/public_app_origin.dart';
 import '../models/models.dart';
 import '../utils/dev_log.dart';
@@ -1669,9 +1670,8 @@ class AccountManagerSupabase extends ChangeNotifier {
       final rows = rawList is List ? rawList : <dynamic>[];
       if (rows.isEmpty) {
         var completed = await completePendingOwnerRegistration();
-        if (completed == null) {
-          completed = await _tryFixOwnerWithoutEmployee();
-        }
+        completed ??= await PendingCoOwnerRegistration.tryComplete(this);
+        completed ??= await _tryFixOwnerWithoutEmployee();
         if (completed != null) {
           _currentEmployee = completed.employee;
           _establishment = completed.establishment;

@@ -35,6 +35,7 @@ class _AcceptCoOwnerInvitationScreenState
         params: {'p_token': widget.token},
       );
 
+      if (!mounted) return;
       if (invitation == null) {
         final loc = context.read<LocalizationService>();
         setState(() {
@@ -49,6 +50,7 @@ class _AcceptCoOwnerInvitationScreenState
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = 'Ошибка загрузки приглашения: $e';
         _isLoading = false;
@@ -78,12 +80,34 @@ class _AcceptCoOwnerInvitationScreenState
         context.go('/register-co-owner?token=${widget.token}');
       }
     } catch (e) {
+      if (!mounted) return;
       final loc = context.read<LocalizationService>();
       setState(() {
         _error = '${loc.t('error')}: $e';
         _isLoading = false;
       });
     }
+  }
+
+  Widget _bodyWithScroll(Widget child) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: constraints.maxHeight -
+                    MediaQuery.of(context).padding.vertical -
+                    48,
+                maxWidth: 440,
+              ),
+              child: Center(child: child),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -101,22 +125,19 @@ class _AcceptCoOwnerInvitationScreenState
         appBar: AppBar(
           title: Text(loc.t('invitation')),
         ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error, size: 64, color: Colors.red),
-                const SizedBox(height: 16),
-                Text(_error!, textAlign: TextAlign.center),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () => context.go('/login'),
-                  child: Text(loc.t('back_to_login')),
-                ),
-              ],
-            ),
+        body: _bodyWithScroll(
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error, size: 64, color: Colors.red),
+              const SizedBox(height: 16),
+              Text(_error!, textAlign: TextAlign.center),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () => context.go('/login'),
+                child: Text(loc.t('back_to_login')),
+              ),
+            ],
           ),
         ),
       );
@@ -126,10 +147,10 @@ class _AcceptCoOwnerInvitationScreenState
 
     return Scaffold(
       appBar: AppBar(title: Text(loc.t('invitation'))),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      body: _bodyWithScroll(
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const Icon(Icons.person_add, size: 64, color: Colors.blue),
             const SizedBox(height: 24),

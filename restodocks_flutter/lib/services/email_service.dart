@@ -65,10 +65,11 @@ class EmailService {
   }
 
   /// Запросить ссылку подтверждения (по кнопке «Отправить ссылку»).
-  /// Не требует пароль — использует magiclink.
+  /// Без пароля — magiclink; с паролем — Edge генерирует signup-link (надёжнее для только что созданного пользователя).
   Future<({bool ok, String? error})> sendConfirmationLinkRequest(
     String to, {
     String? languageCode,
+    String? password,
   }) async {
     try {
       final res = await postEdgeFunctionWithRetry(
@@ -78,6 +79,7 @@ class EmailService {
           'to': to.trim(),
           if (languageCode != null && languageCode.trim().isNotEmpty)
             'language': languageCode.trim().toLowerCase(),
+          if (password != null && password.isNotEmpty) 'password': password,
         },
       );
       if (res.status == 200) return (ok: true, error: null);

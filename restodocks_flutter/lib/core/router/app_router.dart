@@ -281,7 +281,11 @@ class AppRouter {
         path: '/confirm-email',
         pageBuilder: (context, state) {
           final email = state.queryParameters['email'] ?? '';
-          return _slideTransitionPage(state, ConfirmEmailScreen(email: email));
+          final resendFailed = state.queryParameters['resendFailed'] == '1';
+          return _slideTransitionPage(
+            state,
+            ConfirmEmailScreen(email: email, resendFailed: resendFailed),
+          );
         },
       ),
       GoRoute(
