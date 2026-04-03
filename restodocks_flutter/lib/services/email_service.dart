@@ -53,13 +53,6 @@ class EmailService {
     }
   }
 
-  bool _shouldFallbackToAuthResend(int status) {
-    return status == 0 ||
-        status == 401 ||
-        status == 403 ||
-        (status >= 500 && status < 600);
-  }
-
   /// Отправить письмо при регистрации (владелец или сотрудник).
   /// [passwordForConfirmation] — если передан и Confirm Email включён, в письмо добавляется ссылка подтверждения.
   Future<({bool ok, String? error})> sendRegistrationEmail({
@@ -107,13 +100,17 @@ class EmailService {
   }
 
   /// Запросить ссылку подтверждения (по кнопке «Отправить ссылку»).
-  /// Без пароля — magiclink; с паролем — Edge генерирует signup-link (надёжнее для только что созданного пользователя).
+  /// Сначала GoTrue [auth.resend] — тот же anon, без Edge (нет 401 в консоли, стабильнее на web).
+  /// Если не вышло — запасной путь через Edge + Resend (в т.ч. с [password] для signup-link).
   Future<({bool ok, String? error})> sendConfirmationLinkRequest(
     String to, {
     String? languageCode,
     String? password,
   }) async {
     try {
+      final viaAuth = await _tryAuthResendSignupConfirmation(to, languageCode);
+      if (viaAuth.ok) return viaAuth;
+
       final res = await _invokeSendRegistrationEmail({
         'type': 'confirmation_only',
         'to': to.trim(),
@@ -122,53 +119,55 @@ class EmailService {
         if (password != null && password.isNotEmpty) 'password': password,
       });
       if (res.status == 200) return (ok: true, error: null);
-      if (_shouldFallbackToAuthResend(res.status)) {
-        final fb = await _tryAuthResendSignupConfirmation(to, languageCode);
-        if (fb.ok) return fb;
-      }
       if (res.status == 0) {
         return (
           ok: false,
-          error:
+          error: viaAuth.error ??
               'Сеть или CORS: запрос к send-registration-email не дошёл (проверьте сайт и Edge Functions).',
         );
       }
       final msg = res.data is Map
           ? (res.data!['error'] ?? res.data!['message'] ?? res.status)
           : res.status;
-      return (ok: false, error: msg.toString());
+      return (
+        ok: false,
+        error: '${viaAuth.error ?? 'Auth resend failed'}. Edge: $msg',
+      );
     } catch (e) {
       return (ok: false, error: e.toString());
     }
   }
 
   /// Отправить только письмо с ссылкой подтверждения (для co-owner и др.).
+  /// Порядок как в [sendConfirmationLinkRequest]: сначала Auth resend, потом Edge.
   Future<({bool ok, String? error})> sendConfirmationEmail({
     required String to,
     required String password,
   }) async {
     try {
+      final viaAuth = await _tryAuthResendSignupConfirmation(to, null);
+      if (viaAuth.ok) return viaAuth;
+
       final res = await _invokeSendRegistrationEmail({
         'type': 'confirmation_only',
         'to': to.trim(),
         'password': password,
       });
       if (res.status == 200) return (ok: true, error: null);
-      if (_shouldFallbackToAuthResend(res.status)) {
-        final fb = await _tryAuthResendSignupConfirmation(to, null);
-        if (fb.ok) return fb;
-      }
       if (res.status == 0) {
         return (
           ok: false,
-          error:
+          error: viaAuth.error ??
               'Сеть или CORS: запрос к send-registration-email не дошёл (проверьте сайт и Edge Functions).',
         );
       }
       final msg = res.data is Map
           ? (res.data!['error'] ?? res.data!['message'] ?? res.status)
           : res.status;
-      return (ok: false, error: msg.toString());
+      return (
+        ok: false,
+        error: '${viaAuth.error ?? 'Auth resend failed'}. Edge: $msg',
+      );
     } catch (e) {
       return (ok: false, error: e.toString());
     }
