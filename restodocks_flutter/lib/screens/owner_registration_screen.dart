@@ -141,16 +141,20 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
           languageCode: loc.currentLanguageCode,
         ),
       );
+      var resendFailed = false;
       if (!signUpResult.hasSession) {
-        unawaited(
-          EmailService().sendConfirmationLinkRequest(
-            email,
-            languageCode: loc.currentLanguageCode,
-          ),
+        // Нельзя unawaited: на web переход на /confirm-email рвёт запрос к Edge до отправки письма.
+        final dup = await EmailService().sendConfirmationLinkRequest(
+          email,
+          languageCode: loc.currentLanguageCode,
+          password: password,
         );
+        resendFailed = !dup.ok;
       }
 
       if (!mounted) return;
+      final confirmQ =
+          'email=${Uri.encodeComponent(email)}&resendFailed=${resendFailed ? '1' : '0'}';
       if (signUpResult.hasSession) {
         final result = await accSupabase.completePendingOwnerRegistration();
         if (result != null) {
@@ -161,10 +165,10 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
           );
           context.go('/home');
         } else {
-          context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
+          context.go('/confirm-email?$confirmQ');
         }
       } else {
-        context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
+        context.go('/confirm-email?$confirmQ');
       }
     } catch (e) {
       if (!mounted) return;

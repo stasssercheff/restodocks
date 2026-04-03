@@ -236,13 +236,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
           languageCode: locUi,
         ),
       );
+      var resendFailed = false;
       if (!hasSession) {
-        unawaited(
-          EmailService().sendConfirmationLinkRequest(
-            email,
-            languageCode: locUi,
-          ),
+        final dup = await EmailService().sendConfirmationLinkRequest(
+          email,
+          languageCode: locUi,
+          password: password,
         );
+        resendFailed = !dup.ok;
       }
 
       if (!mounted) return;
@@ -254,7 +255,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         );
         context.go('/home');
       } else {
-        context.go('/confirm-email?email=${Uri.encodeComponent(email)}');
+        context.go(
+          '/confirm-email?email=${Uri.encodeComponent(email)}&resendFailed=${resendFailed ? '1' : '0'}',
+        );
       }
     } catch (e) {
       if (!mounted) return;
