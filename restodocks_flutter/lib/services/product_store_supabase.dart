@@ -11,6 +11,7 @@ import 'nutrition_backfill_service.dart';
 import '../models/nomenclature_item.dart';
 import 'offline_cache_service.dart';
 import 'supabase_service.dart';
+import 'account_manager_supabase.dart';
 
 /// Ошибка шлюза/сети: не путать с «нет колонки department» — иначе три SELECT подряд + RPC только усугубляют шторм при 502/503.
 bool _isLikelyGatewayOrNetworkError(Object e) {
@@ -176,6 +177,7 @@ class ProductStoreSupabase {
 
   Future<void> _scheduleNutritionBackfillAfterCatalogLoad() async {
     await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (!AccountManagerSupabase().isLoggedInSync) return;
     try {
       final client = Supabase.instance.client;
       if (client.auth.currentSession == null) return;

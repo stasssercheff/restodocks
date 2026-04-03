@@ -6,6 +6,59 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://osglfptwbuqqmquntt
 // Как в send-registration-email: веб открывает /auth/confirm-click → verifyOTP(token_hash), без «съедания» токена prefetch-ом.
 const CONFIRM_CLICK_URL = "https://restodocks.com/auth/confirm-click";
 
+type Lang = "ru" | "en" | "es" | "it" | "tr" | "vi";
+
+function normalizeLanguage(input?: string): Lang {
+  const v = (input ?? "").trim().toLowerCase();
+  if (v === "ru" || v === "en" || v === "es" || v === "it" || v === "tr" || v === "vi") return v;
+  return "en";
+}
+
+function languageFromRedirect(urlRaw?: string): Lang {
+  if (!urlRaw) return "en";
+  try {
+    const u = new URL(urlRaw);
+    return normalizeLanguage(u.searchParams.get("lang") ?? undefined);
+  } catch (_) {
+    return "en";
+  }
+}
+
+function copy(lang: Lang) {
+  switch (lang) {
+    case "ru":
+      return {
+        greeting: "Здравствуйте!",
+        actionLine: "Чтобы завершить регистрацию в Restodocks, нажмите на ссылку:",
+        cta: "Подтвердить email",
+        fallback: "Если кнопка не открывается, скопируйте ссылку в браузер:",
+        ignore: "Если вы не регистрировались — проигнорируйте это письмо.",
+        regards: "С уважением,\nКоманда Restodocks",
+        subjects: {
+          signup: "Подтвердите регистрацию — Restodocks",
+          magiclink: "Вход по ссылке — Restodocks",
+          recovery: "Сброс пароля — Restodocks",
+          invite: "Приглашение в Restodocks",
+        } as Record<string, string>,
+      };
+    default:
+      return {
+        greeting: "Hello!",
+        actionLine: "Please complete your Restodocks registration using this link:",
+        cta: "Confirm email",
+        fallback: "If the button does not open, copy this link in your browser:",
+        ignore: "If you did not request this, please ignore this email.",
+        regards: "Best regards,\nRestodocks team",
+        subjects: {
+          signup: "Confirm registration — Restodocks",
+          magiclink: "Sign in link — Restodocks",
+          recovery: "Password reset — Restodocks",
+          invite: "Invitation to Restodocks",
+        } as Record<string, string>,
+      };
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST", "Access-Control-Allow-Headers": "authorization, content-type" } });
@@ -29,7 +82,7 @@ Deno.serve(async (req) => {
     console.log("auth-send-email: received request, content-type:", headers["content-type"]);
     const wh = new Webhook(hookSecret);
     const { user, email_data } = wh.verify(payload, headers) as {
-      user: { email: string };
+      user: { email: string; user_metadata?: Record<string, unknown> };
       email_data: { token: string; token_hash: string; redirect_to: string; email_action_type: string; site_url: string };
     };
 
@@ -42,22 +95,20 @@ Deno.serve(async (req) => {
         ? `${CONFIRM_CLICK_URL}?token_hash=${encodeURIComponent(token_hash)}&type=${encodeURIComponent(email_action_type)}`
         : verifyUrl;
 
-    const subjectMap: Record<string, string> = {
-      signup: "Подтвердите регистрацию — Restodocks",
-      magiclink: "Вход по ссылке — Restodocks",
-      recovery: "Сброс пароля — Restodocks",
-      invite: "Приглашение в Restodocks",
-    };
-    const subject = subjectMap[email_action_type] ?? "Restodocks";
+    const metadataLang = normalizeLanguage(user.user_metadata?.["interface_language"]?.toString());
+    const redirectLang = languageFromRedirect(redirect_to);
+    const lang = redirectLang || metadataLang;
+    const i18n = copy(lang);
+    const subject = i18n.subjects[email_action_type] ?? "Restodocks";
 
     const html = `
-<p>Здравствуйте!</p>
-<p>Нажмите на ссылку для подтверждения:</p>
-<p><a href="${confirmClickHref}" style="color:#2754C5;text-decoration:underline">Подтвердить</a></p>
-<p>Или скопируйте ссылку в браузер:</p>
+<p>${i18n.greeting}</p>
+<p>${i18n.actionLine}</p>
+<p><a href="${confirmClickHref}" style="color:#2754C5;text-decoration:underline">${i18n.cta}</a></p>
+<p>${i18n.fallback}</p>
 <p style="word-break:break-all;font-size:12px;color:#666">${confirmClickHref}</p>
-<p>Если вы не регистрировались — проигнорируйте это письмо.</p>
-<p>С уважением,<br>Команда Restodocks</p>
+<p>${i18n.ignore}</p>
+<p>${i18n.regards.replace("\n", "<br>")}</p>
     `.trim();
 
     console.log("auth-send-email: sending to", user.email, "type=", email_action_type);

@@ -141,16 +141,9 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       if (!infoMail.ok) {
         devLog('OwnerRegistration: sendRegistrationEmail failed: ${infoMail.error}');
       }
+      // Confirmation email is sent by Supabase Auth hook.
+      // We keep only one confirmation channel to avoid duplicates.
       var resendFailed = false;
-      if (!signUpResult.hasSession) {
-        // Нельзя unawaited: на web переход на /confirm-email рвёт запрос к Edge до отправки письма.
-        final dup = await EmailService().sendConfirmationLinkRequest(
-          email,
-          languageCode: loc.currentLanguageCode,
-          password: password,
-        );
-        resendFailed = !dup.ok;
-      }
 
       if (!mounted) return;
       if (signUpResult.hasSession) {
@@ -163,14 +156,6 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
           );
           context.go('/home');
         } else {
-          // Без сессии после signUp письмо уже запросили выше; здесь — сессия есть, но pending
-          // не завершился: на экран подтверждения всё равно нужна ссылка из письма.
-          final dup = await EmailService().sendConfirmationLinkRequest(
-            email,
-            languageCode: loc.currentLanguageCode,
-            password: password,
-          );
-          resendFailed = !dup.ok;
           final confirmQ =
               'email=${Uri.encodeComponent(email)}&resendFailed=${resendFailed ? '1' : '0'}';
           context.go('/confirm-email?$confirmQ');

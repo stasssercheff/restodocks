@@ -730,8 +730,10 @@ class AccountManagerSupabase extends ChangeNotifier {
     try {
       devLog('DEBUG: Attempting signUp...');
       final redirectUrl = _getEmailRedirectUrl(interfaceLanguageCode);
+      final lang = (interfaceLanguageCode ?? 'en').trim().toLowerCase();
       final res = await _supabase.signUpWithEmail(emailTrim, password,
-          emailRedirectTo: redirectUrl);
+          emailRedirectTo: redirectUrl,
+          data: {'interface_language': lang});
       final uid = res.user?.id ?? _supabase.currentUser?.id;
       final hasSession = res.session != null;
       devLog('DEBUG: signUp completed, userId: $uid, hasSession: $hasSession');
@@ -784,11 +786,13 @@ class AccountManagerSupabase extends ChangeNotifier {
     String? positionRole,
   }) async {
     final normalizedPosition = positionRole?.trim().toLowerCase();
+    final lang = (interfaceLanguageCode ?? 'en').trim().toLowerCase();
     final res = await _supabase.signUpWithEmail(
       email.trim(),
       password,
       emailRedirectTo: _getEmailRedirectUrl(interfaceLanguageCode),
       data: {
+        'interface_language': lang,
         if (normalizedPosition != null &&
             normalizedPosition.isNotEmpty &&
             normalizedPosition != 'owner')

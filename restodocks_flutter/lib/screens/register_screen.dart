@@ -234,15 +234,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!infoMail.ok) {
         devLog('RegisterEmployee: sendRegistrationEmail failed: ${infoMail.error}');
       }
+      // Confirmation email is sent by Supabase Auth hook.
+      // Keep a single confirmation channel to avoid duplicate letters.
       var resendFailed = false;
-      if (!hasSession) {
-        final dup = await EmailService().sendConfirmationLinkRequest(
-          email,
-          languageCode: locUi,
-          password: password,
-        );
-        resendFailed = !dup.ok;
-      }
 
       if (!mounted) return;
       if (hasSession) {
