@@ -16,12 +16,16 @@ flutter test test/parsing_smoke_test.dart
 flutter test test/export_smoke_test.dart
 
 echo ""
-echo "== 3) Edge anon smoke (if SUPABASE_ANON_KEY provided) =="
+echo "== 3) Edge anon smoke (registration/email chain) =="
 cd "$ROOT"
 if [[ -n "${SUPABASE_ANON_KEY:-}" ]]; then
   ./scripts/smoke_edge_anon_registration.sh
 else
-  echo "SKIP: SUPABASE_ANON_KEY is not set"
+  if [[ "${CI_REQUIRE_EDGE_SMOKE:-0}" == "1" ]]; then
+    echo "FAIL: SUPABASE_ANON_KEY is required in CI but missing" >&2
+    exit 1
+  fi
+  echo "SKIP: SUPABASE_ANON_KEY is not set (local mode)"
 fi
 
 echo ""

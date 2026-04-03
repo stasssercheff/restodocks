@@ -26,4 +26,8 @@ jobs:
         run: flutter pub get
 
       - name: Run core regression script
+        env:
+          CI_REQUIRE_EDGE_SMOKE: "1"
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
         run: ./scripts/regression_core_checks.sh
