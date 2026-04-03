@@ -46,7 +46,11 @@ class EmailService {
         if (languageCode != null && languageCode.trim().isNotEmpty)
           'language': languageCode.trim().toLowerCase(),
       };
-      final res = await postEdgeFunctionWithRetry('send-registration-email', body);
+      final res = await postEdgeFunctionWithRetry(
+        'send-registration-email',
+        body,
+        bearerAlwaysAnon: true,
+      );
       if (res.status == 200) return (ok: true, error: null);
       if (res.status == 0) {
         return (
@@ -66,6 +70,7 @@ class EmailService {
 
   /// Запросить ссылку подтверждения (по кнопке «Отправить ссылку»).
   /// Без пароля — magiclink; с паролем — Edge генерирует signup-link (надёжнее для только что созданного пользователя).
+  /// Всегда Bearer=anon: после signUp сессия может дать JWT, из‑за которого Edge отвечает 401 (см. register-metadata).
   Future<({bool ok, String? error})> sendConfirmationLinkRequest(
     String to, {
     String? languageCode,
@@ -81,6 +86,7 @@ class EmailService {
             'language': languageCode.trim().toLowerCase(),
           if (password != null && password.isNotEmpty) 'password': password,
         },
+        bearerAlwaysAnon: true,
       );
       if (res.status == 200) return (ok: true, error: null);
       if (res.status == 0) {
@@ -108,6 +114,7 @@ class EmailService {
       final res = await postEdgeFunctionWithRetry(
         'send-registration-email',
         {'type': 'confirmation_only', 'to': to.trim(), 'password': password},
+        bearerAlwaysAnon: true,
       );
       if (res.status == 200) return (ok: true, error: null);
       if (res.status == 0) {
