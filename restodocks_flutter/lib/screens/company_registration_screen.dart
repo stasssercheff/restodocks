@@ -122,9 +122,6 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
                   pinCode: _pinCode,
                 );
 
-          // IP/гео best-effort отключено в регистрации: иногда Edge отвечает 401
-          // из-за рассинхрона секретов, что только шумит в консоли и не влияет на UX.
-
           if (!mounted) return;
           context.push('/register-owner', extra: establishment);
           return;

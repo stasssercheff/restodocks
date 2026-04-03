@@ -461,6 +461,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     _establishment = est;
     // Дефолтный стол создаётся в register_company_without_promo (SECURITY DEFINER);
     // до входа владельца клиент anon — RLS на pos_dining_tables недоступен.
+    registerMetadataBestEffort(est.id);
     return est;
   }
 
@@ -489,6 +490,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     final est = Establishment.fromJson(m);
     _establishment = est;
     // Дефолтный стол — в register_company_with_promo (см. registerCompanyWithoutPromo).
+    registerMetadataBestEffort(est.id);
     return est;
   }
 
