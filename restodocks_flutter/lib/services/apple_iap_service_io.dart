@@ -184,12 +184,16 @@ class AppleIapService extends ChangeNotifier {
         return;
       }
 
+      // Access token часто истекает во время диалога App Store; Edge getUser(JWT) → 401.
+      // Обновляем сессию до запроса и один повтор после 401 (см. edge_function_http).
       final res = await postEdgeFunctionWithRetry(
         'billing-verify-apple',
         {
           'establishment_id': est.id,
           'receipt_data': receiptData,
         },
+        refreshSessionBeforeFirstPost: true,
+        retryOnceOn401AfterSessionRefresh: true,
       );
 
       if (res.status != 200) {

@@ -25,6 +25,8 @@ class _AuthSessionLifecycleState extends State<AuthSessionLifecycle>
     with WidgetsBindingObserver {
   StreamSubscription? _visibilitySub;
   Timer? _periodicWebRefresh;
+  /// На iOS/Android без этого access_token истекает при долгой работе в foreground → 401 на Edge/RLS.
+  Timer? _periodicMobileRefresh;
   DateTime? _lastRefreshAttempt;
 
   @override
@@ -38,12 +40,17 @@ class _AuthSessionLifecycleState extends State<AuthSessionLifecycle>
       _periodicWebRefresh = Timer.periodic(const Duration(minutes: 4), (_) {
         unawaited(_tryRefreshSession());
       });
+    } else {
+      _periodicMobileRefresh = Timer.periodic(const Duration(minutes: 5), (_) {
+        unawaited(_tryRefreshSession());
+      });
     }
   }
 
   @override
   void dispose() {
     _periodicWebRefresh?.cancel();
+    _periodicMobileRefresh?.cancel();
     _visibilitySub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
