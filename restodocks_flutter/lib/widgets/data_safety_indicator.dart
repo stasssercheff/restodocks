@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-/// Индикатор безопасности данных - показывает, что данные защищены локально
+import '../services/services.dart';
+
+/// Индикатор безопасности данных — подпись из локализации.
 class DataSafetyIndicator extends StatelessWidget {
   final bool isVisible;
 
@@ -12,6 +15,8 @@ class DataSafetyIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!isVisible) return const SizedBox.shrink();
+
+    final label = context.watch<LocalizationService>().t('data_safety_protected');
 
     return Positioned(
       top: 8, // В пустой области между датой и строкой поиска
@@ -39,7 +44,7 @@ class DataSafetyIndicator extends StatelessWidget {
             ),
             const SizedBox(width: 4),
             Text(
-              'Данные защищены',
+              label,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w500,

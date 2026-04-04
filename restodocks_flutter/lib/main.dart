@@ -271,7 +271,8 @@ class _BootstrapFailureApp extends StatelessWidget {
                   const Icon(Icons.wifi_off, size: 48),
                   const SizedBox(height: 16),
                   Text(
-                    'Не удалось запустить приложение. Проверьте сеть и откройте снова.',
+                    // До LocalizationService.initialize() нет бандла переводов — нейтральный английский.
+                    'Unable to start the app. Check your network and try again.',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyLarge,
                   ),

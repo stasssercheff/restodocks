@@ -11,7 +11,11 @@ import 'translation_manager.dart';
 
 const _keyLocale = 'restodocks_locale';
 
-/// Сервис управления локализацией
+/// Локализация интерфейса: **в коде только ключи** (`loc.t('some_key')`), тексты — в
+/// `assets/translations/localizable.json` для **каждого** языка из [supportedLocales].
+/// Не смешивать в виджетах захардкоженный русский/английский и ключи: пользовательский
+/// текст интерфейса всегда из JSON. Исключения — служебное (логи, парсинг CSV/ИИ) и
+/// данные с сервера/пользователя, не являющиеся строками оболочки приложения.
 class LocalizationService extends ChangeNotifier {
   static final LocalizationService _instance = LocalizationService._internal();
   factory LocalizationService() => _instance;
@@ -235,21 +239,14 @@ class LocalizationService extends ChangeNotifier {
   }
 
   /// Получение перевода для текущей локали.
-  /// Русский не подставляем при нерусском UI — иначе смесь языков, если ключа нет в en.
+  ///
+  /// Разрешение: текущий язык → **en** (если для текущего нет строки) → сырой [key].
+  /// В коде **нет** fallback на русский или другой язык — в [localizable.json] должны быть
+  /// строки интерфейса для **всех** [supportedLocales] (и новые ключи добавлять сразу во все языки).
   String translate(String key, {Map<String, String>? args}) {
     var translation = _autoUiTranslations[currentLanguageCode]?[key] ??
         _translations[currentLanguageCode]?[key] ??
         _translations['en']?[key];
-
-    if (translation == null) {
-      if (currentLanguageCode == 'ru') {
-        translation = _translations['ru']?[key] ??
-            _translations['tr']?[key] ??
-            _translations['vi']?[key];
-      } else {
-        translation = _translations['tr']?[key] ?? _translations['vi']?[key];
-      }
-    }
 
     var out = translation ?? key;
 
@@ -350,16 +347,6 @@ class LocalizationService extends ChangeNotifier {
     var translation = _autoUiTranslations[languageCode]?[key] ??
         _translations[languageCode]?[key] ??
         _translations['en']?[key];
-
-    if (translation == null) {
-      if (languageCode == 'ru') {
-        translation = _translations['ru']?[key] ??
-            _translations['tr']?[key] ??
-            _translations['vi']?[key];
-      } else {
-        translation = _translations['tr']?[key] ?? _translations['vi']?[key];
-      }
-    }
 
     var out = translation ?? key;
 

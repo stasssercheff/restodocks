@@ -120,7 +120,7 @@ class AppShell extends StatelessWidget {
       case HomeButtonAction.inbox:
         return loc.t('inbox');
       case HomeButtonAction.messages:
-        return loc.t('inbox_tab_messages') ?? 'Сообщения';
+        return loc.t('inbox_tab_messages');
       case HomeButtonAction.schedule:
         return loc.t('schedule');
       case HomeButtonAction.productOrder:

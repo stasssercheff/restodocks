@@ -210,11 +210,17 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
       });
       return;
     }
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
     final parts = upcoming.map((e) {
-      if (e.daysUntil == 0) return '${e.emp.fullName} (сегодня)';
-      return '${e.emp.fullName} (через ${e.daysUntil} дн.)';
+      if (e.daysUntil == 0) {
+        return loc.t('birthday_notif_line_today', args: {'name': e.emp.fullName});
+      }
+      return loc.t('birthday_notif_line_in_days',
+          args: {'name': e.emp.fullName, 'days': '${e.daysUntil}'});
     }).toList();
-    final message = 'День рождения: ${parts.join(', ')}';
+    final message =
+        loc.t('birthday_notif_banner', args: {'parts': parts.join(', ')});
     AppToastService.showBanner(message, onTap: AppToastService.goToInboxNotifications);
     await prefs.setString(_keyBirthdayNotifyLastShown, todayStr);
     WidgetsBinding.instance.addPostFrameCallback((_) {

@@ -37,10 +37,10 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
         appBar: AppBar(
           leading: appBarBackButton(context),
           title: ScrollToTopAppBarTitle(
-            child: Text(loc.t('haccp_journals') ?? 'Журналы и ХАССП'),
+            child: Text(loc.t('haccp_journals')),
           ),
         ),
-        body: Center(child: Text(loc.t('haccp_establishment_not_selected') ?? 'Заведение не выбрано')),
+        body: Center(child: Text(loc.t('haccp_establishment_not_selected'))),
       );
     }
 
@@ -63,7 +63,7 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: ScrollToTopAppBarTitle(
-          child: Text(loc.t('haccp_journals') ?? 'Журналы и ХАССП'),
+          child: Text(loc.t('haccp_journals')),
         ),
       ),
       body: journals.isEmpty
@@ -80,7 +80,7 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
                   margin: const EdgeInsets.only(bottom: 8),
                   child: ListTile(
                     leading: Icon(_iconForType(t)),
-                    title: Text(loc.t(t.displayNameKey) ?? t.displayNameRu),
+                    title: Text(loc.t(t.displayNameKey)),
                     subtitle: Text(
                       _journalSubtitle(loc, t),
                       style: const TextStyle(fontSize: 11),
@@ -94,11 +94,9 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
     );
   }
 
-  /// Подзаголовок (Приложение … / рекомендуемая форма) — из JSON, не из enum.
+  /// Подзаголовок (Приложение … / рекомендуемая форма) — только из [localizable.json].
   static String _journalSubtitle(LocalizationService loc, HaccpLogType t) {
-    final key = 'haccp_sanpin_line_${t.code}';
-    final v = loc.t(key);
-    return v == key ? t.sanpinRef : v;
+    return loc.t('haccp_sanpin_line_${t.code}');
   }
 
   /// Иконки для поддерживаемых журналов (СанПиН 1–5 + фритюрные жиры).
@@ -149,13 +147,13 @@ class _EmptyState extends StatelessWidget {
             Icon(Icons.assignment_outlined, size: 64, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
             Text(
-              loc.t('haccp_no_journals_hint') ?? 'Журналы ХАССП не настроены',
+              loc.t('haccp_no_journals_hint'),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             Text(
-              loc.t('haccp_no_journals_subtitle') ?? 'Включите нужные журналы в Настройках (раздел «Журналы и ХАССП»). Формы соответствуют СанПиН 2.3/2.4.3590-20.',
+              loc.t('haccp_no_journals_subtitle'),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
@@ -164,7 +162,7 @@ class _EmptyState extends StatelessWidget {
               FilledButton.icon(
                 onPressed: onConfigure,
                 icon: const Icon(Icons.settings),
-                label: Text(loc.t('settings') ?? 'Настройки'),
+                label: Text(loc.t('settings')),
               ),
             ],
           ],

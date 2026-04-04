@@ -43,6 +43,7 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
   }
 
   Future<void> _loadInvitation() async {
+    final loc = context.read<LocalizationService>();
     try {
       final accountManager = context.read<AccountManagerSupabase>();
       final raw = await accountManager.supabase.client.rpc(
@@ -52,10 +53,10 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
       if (raw != null && mounted) {
         setState(() => _invitationData = Map<String, dynamic>.from(raw as Map));
       } else if (mounted) {
-        setState(() => _error = 'Приглашение не найдено или истекло');
+        setState(() => _error = loc.t('co_owner_invite_not_found_or_expired'));
       }
     } catch (e) {
-      if (mounted) setState(() => _error = 'Приглашение не найдено');
+      if (mounted) setState(() => _error = loc.t('co_owner_invite_not_found'));
     }
   }
 
@@ -82,7 +83,8 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
     setState(() => _isLoading = true);
     try {
       final accountManager = context.read<AccountManagerSupabase>();
-      final interfaceLang = context.read<LocalizationService>().currentLanguageCode;
+      final loc = context.read<LocalizationService>();
+      final interfaceLang = loc.currentLanguageCode;
       final email = _invitationData!['invited_email'] as String;
       final password = _passwordController.text;
       final token = widget.token;
@@ -96,7 +98,9 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
         password,
         interfaceLanguageCode: interfaceLang,
       );
-      if (signUpResult.userId == null) throw Exception('Не удалось создать учётную запись');
+      if (signUpResult.userId == null) {
+        throw Exception(loc.t('co_owner_account_create_failed'));
+      }
 
       if (!signUpResult.hasSession) {
         await PendingCoOwnerRegistration.save(
@@ -345,7 +349,9 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
                   labelText: loc.t('password'),
                   border: const OutlineInputBorder(),
                 ),
-                validator: (v) => (v?.length ?? 0) < 6 ? 'Минимум 6 символов' : null,
+                validator: (v) => (v?.length ?? 0) < 6
+                    ? loc.t('validation_password_min_6')
+                    : null,
               ),
               if (_error != null) ...[
                 const SizedBox(height: 16),

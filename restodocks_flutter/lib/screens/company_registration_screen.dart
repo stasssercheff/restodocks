@@ -52,14 +52,20 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
       final accountManager = context.read<AccountManagerSupabase>();
       await accountManager.deleteTestEmployees();
       if (mounted) {
+        final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Тестовые данные удалены')),
+          SnackBar(content: Text(loc.t('dev_test_data_cleared'))),
         );
       }
     } catch (e) {
       if (mounted) {
+        final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка очистки: $e')),
+          SnackBar(
+            content: Text(
+              loc.t('dev_test_data_clear_error', args: {'error': '$e'}),
+            ),
+          ),
         );
       }
     }
@@ -177,19 +183,20 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
           IconButton(
             icon: const Icon(Icons.cleaning_services),
             onPressed: () async {
+              final loc = context.read<LocalizationService>();
               final confirmed = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  title: const Text('Очистка тестовых данных'),
-                  content: const Text('Это удалит всех тестовых сотрудников из базы данных. Продолжить?'),
+                  title: Text(loc.t('dev_clear_test_data_title')),
+                  content: Text(loc.t('dev_clear_test_data_body')),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(ctx).pop(false),
-                      child: const Text('Отмена'),
+                      child: Text(loc.t('cancel')),
                     ),
                     TextButton(
                       onPressed: () => Navigator.of(ctx).pop(true),
-                      child: const Text('Удалить'),
+                      child: Text(loc.t('delete')),
                       style: TextButton.styleFrom(foregroundColor: Colors.red),
                     ),
                   ],
@@ -199,7 +206,7 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
                 _clearTestData();
               }
             },
-            tooltip: 'Очистить тестовые данные',
+            tooltip: loc.t('dev_clear_test_data_tooltip'),
           ),
         ],
       ),
