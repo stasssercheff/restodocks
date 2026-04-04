@@ -3,6 +3,11 @@ import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { getAdminPassword, getSupabaseConfig } from '@/lib/admin-env'
 import { verifySessionToken } from '@/lib/session'
+import {
+  hasEffectivePro,
+  summarizeSubscriptionForAdmin,
+  type PromoRedemptionRow,
+} from '@/lib/subscription-admin'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +24,7 @@ export async function GET() {
   const supabase = createClient(config.url, config.serviceRoleKey)
 
   const selectBase =
-    'id, name, address, created_at, default_currency, owner_id, parent_establishment_id, registration_ip, registration_country, registration_city'
+    'id, name, address, created_at, default_currency, owner_id, parent_establishment_id, registration_ip, registration_country, registration_city, subscription_type, pro_paid_until, pro_trial_ends_at'
 
   let { data: establishments, error } = await supabase
     .from('establishments')
@@ -39,6 +44,9 @@ export async function GET() {
       retry.data?.map(row => ({
         ...row,
         max_additional_establishments_override: null,
+        subscription_type: (row as { subscription_type?: unknown }).subscription_type ?? null,
+        pro_paid_until: (row as { pro_paid_until?: unknown }).pro_paid_until ?? null,
+        pro_trial_ends_at: (row as { pro_trial_ends_at?: unknown }).pro_trial_ends_at ?? null,
       })) ?? null
     error = retry.error
   }
@@ -71,6 +79,25 @@ export async function GET() {
   // Для филиалов: если в employees по самому филиалу владелец не найден,
   // показываем владельца основного (root parent establishment).
   const ids = list.map(e => e.id)
+
+  const promoByEstId = new Map<string, PromoRedemptionRow>()
+  if (ids.length > 0) {
+    const { data: redemptionRows } = await supabase
+      .from('promo_code_redemptions')
+      .select('establishment_id, promo_codes(code)')
+      .in('establishment_id', ids)
+
+    for (const raw of redemptionRows ?? []) {
+      const r = raw as unknown as {
+        establishment_id: string
+        promo_codes: { code: string } | { code: string }[] | null
+      }
+      const nested = r.promo_codes
+      const code = Array.isArray(nested) ? nested[0]?.code : nested?.code
+      if (!code || promoByEstId.has(r.establishment_id)) continue
+      promoByEstId.set(r.establishment_id, { code })
+    }
+  }
 
   const { data: employees } = await supabase
     .from('employees')
@@ -129,6 +156,15 @@ export async function GET() {
 
   const result = list.map(est => {
     const estId = est.id
+    const promo = promoByEstId.get(estId)
+    const subFields = {
+      subscription_type: est.subscription_type as string | null | undefined,
+      pro_paid_until: est.pro_paid_until as string | null | undefined,
+      pro_trial_ends_at: est.pro_trial_ends_at as string | null | undefined,
+    }
+    const subscription_summary = summarizeSubscriptionForAdmin(subFields, promo)
+    const effective_pro = hasEffectivePro(subFields)
+
     const isMain = !est.parent_establishment_id
     const scopeIds = isMain ? [estId, ...collectDescendants(estId)] : [estId]
     const estEmployees = scopeIds.flatMap(id => employeesByEstId.get(id) ?? [])
@@ -148,6 +184,8 @@ export async function GET() {
         owner_name: owner?.full_name ?? '—',
         owner_email: owner?.email ?? '—',
         establishment_type,
+        subscription_summary,
+        effective_pro,
       }
     }
 
@@ -169,6 +207,8 @@ export async function GET() {
       owner_name: rootOwner?.full_name ?? '—',
       owner_email: rootOwner?.email ?? '—',
       establishment_type,
+      subscription_summary,
+      effective_pro,
     }
   })
 

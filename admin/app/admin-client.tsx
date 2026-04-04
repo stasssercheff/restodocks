@@ -4,6 +4,14 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PromoCode } from '@/lib/supabase'
 
+type SubscriptionSummary = {
+  statusLabel: string
+  paymentLabel: string
+  promoCode: string | null
+  proUntilIso: string | null
+  detail: string | null
+}
+
 type Establishment = {
   id: string
   name: string
@@ -19,6 +27,8 @@ type Establishment = {
   /** Админ: лимит доп. заведений для владельца; null = общая настройка «Настройки» */
   max_additional_establishments_override?: number | null
   establishment_type?: 'main' | 'branch' | 'separate'
+  subscription_summary?: SubscriptionSummary
+  effective_pro?: boolean
 }
 
 function formatDate(iso: string | null) {
@@ -129,6 +139,43 @@ function EstablishmentsTab() {
     }
   }
 
+  function subscriptionStatusTextClass(status: string): string {
+    if (status === 'Без Pro') return 'text-gray-500'
+    if (status.startsWith('Пробный')) return 'text-sky-300'
+    if (status === 'Pro истёк') return 'text-red-300/90'
+    if (status.includes('промокод')) return 'text-amber-200'
+    if (status.includes('оплачен')) return 'text-emerald-300'
+    if (status === 'Pro') return 'text-emerald-200'
+    return 'text-gray-200'
+  }
+
+  function SubscriptionBlock({ row }: { row: Establishment }) {
+    const s = row.subscription_summary
+    if (!s) {
+      return <span className="text-gray-600 text-xs">—</span>
+    }
+    const payTitle =
+      s.paymentLabel === 'App Store (In-App Purchase)'
+        ? 'Подписка через App Store (In-App Purchase). Дата окончания в БД обычно уже учитывает отсрочку оплаты (grace period), если она пришла в чеке из App Store Connect.'
+        : undefined
+    return (
+      <div className="space-y-0.5 max-w-[15rem]">
+        <div className={`text-xs font-medium ${subscriptionStatusTextClass(s.statusLabel)}`}>
+          {s.statusLabel}
+        </div>
+        <div className="text-[11px] text-gray-500" title={payTitle}>
+          {s.paymentLabel}
+          {s.promoCode ? (
+            <span className="block font-mono text-amber-200/90 mt-0.5">{s.promoCode}</span>
+          ) : null}
+        </div>
+        {s.detail ? (
+          <div className="text-[10px] text-gray-600 leading-snug">{s.detail}</div>
+        ) : null}
+      </div>
+    )
+  }
+
   const [data, setData] = useState<Establishment[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -152,14 +199,22 @@ function EstablishmentsTab() {
 
   useEffect(() => { load() }, [load])
 
-  const filtered = data.filter(e =>
-    e.name.toLowerCase().includes(search.toLowerCase()) ||
-    e.owner_email.toLowerCase().includes(search.toLowerCase()) ||
-    e.owner_name.toLowerCase().includes(search.toLowerCase()) ||
-    (e.registration_ip ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (e.registration_country ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    (e.registration_city ?? '').toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = data.filter(e => {
+    const q = search.toLowerCase()
+    const sub = e.subscription_summary
+    const subText = sub
+      ? [sub.statusLabel, sub.paymentLabel, sub.promoCode, sub.detail].filter(Boolean).join(' ').toLowerCase()
+      : ''
+    return (
+      e.name.toLowerCase().includes(q) ||
+      e.owner_email.toLowerCase().includes(q) ||
+      e.owner_name.toLowerCase().includes(q) ||
+      (e.registration_ip ?? '').toLowerCase().includes(q) ||
+      (e.registration_country ?? '').toLowerCase().includes(q) ||
+      (e.registration_city ?? '').toLowerCase().includes(q) ||
+      subText.includes(q)
+    )
+  })
 
   function regInfo(row: Establishment) {
     if (!row.registration_ip) return '—'
@@ -171,6 +226,7 @@ function EstablishmentsTab() {
 
   const total = data.length
   const totalEmployees = data.reduce((s, e) => s + e.employee_count, 0)
+  const totalProActive = data.filter(e => e.effective_pro).length
 
   async function handleRefreshGeo() {
     setRefreshingGeo(true)
@@ -250,7 +306,7 @@ function EstablishmentsTab() {
       <div className="grid grid-cols-3 gap-2 mb-4 sm:gap-3 sm:mb-8">
         <StatCard label="Заведений" value={total} />
         <StatCard label="Сотрудников" value={totalEmployees} />
-        <StatCard label="Подписок" value="—" dimmed />
+        <StatCard label="Активных Pro" value={totalProActive} />
       </div>
 
       <div className="flex gap-2 mb-4 flex-wrap">
@@ -281,12 +337,18 @@ function EstablishmentsTab() {
       ) : (
         <>
           {/* Desktop table */}
-          <div className="hidden md:block bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="hidden md:block bg-gray-900 rounded-xl border border-gray-800 overflow-x-auto">
+            <table className="w-full text-sm min-w-[960px]">
               <thead>
                 <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
                   <th className="px-4 py-3 text-left">Заведение</th>
                   <th className="px-4 py-3 text-left">Тип</th>
+                  <th
+                    className="px-4 py-3 text-left min-w-[11rem]"
+                    title="Статус Pro, способ оплаты (сейчас App Store IAP или промокод), код промо при погашении"
+                  >
+                    Подписка
+                  </th>
                   <th className="px-4 py-3 text-left">Владелец</th>
                   <th className="px-4 py-3 text-left">Email</th>
                   <th className="px-4 py-3 text-center">Сотр.</th>
@@ -306,6 +368,9 @@ function EstablishmentsTab() {
                       <span className={establishmentTypeBadgeClass(row)}>
                         {establishmentTypeLabel(row)}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 align-top text-gray-300">
+                      <SubscriptionBlock row={row} />
                     </td>
                     <td className="px-4 py-3 text-gray-300">{row.owner_name}</td>
                     <td className="px-4 py-3 text-gray-400 text-xs">{row.owner_email}</td>
@@ -369,6 +434,9 @@ function EstablishmentsTab() {
                 <div className="text-gray-400 text-xs">{row.owner_name}</div>
                 <div className="mt-1">
                   <span className={establishmentTypeBadgeClass(row)}>{establishmentTypeLabel(row)}</span>
+                </div>
+                <div className="mt-2">
+                  <SubscriptionBlock row={row} />
                 </div>
                 <div className="text-gray-500 text-xs">{row.owner_email}</div>
                 <div className="text-gray-600 text-xs mt-1">{formatDate(row.created_at)}</div>
