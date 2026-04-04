@@ -220,7 +220,9 @@ class AppleIapService extends ChangeNotifier {
         return;
       }
 
-      await _account.refreshCurrentEstablishmentFromServer();
+      // Как после промокода: RPC check_establishment_access + актуальное заведение —
+      // иначе Pro в БД есть, а UI/промо-строки могут не совпасть.
+      await _account.syncEstablishmentAccessFromServer();
       _lastError = null;
       _busy = false;
       _successToken++;

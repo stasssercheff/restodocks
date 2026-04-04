@@ -74,6 +74,11 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
 
     if (iap.successToken != _lastIapSuccessToken && iap.successToken > 0) {
       _lastIapSuccessToken = iap.successToken;
+      if (mounted) {
+        setState(() {
+          _promoFuture = widget.accountManager.getEstablishmentPromoForOwner();
+        });
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(loc.t('pro_iap_activated'))),
       );
