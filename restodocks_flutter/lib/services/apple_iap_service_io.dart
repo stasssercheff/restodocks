@@ -41,6 +41,13 @@ class AppleIapService extends ChangeNotifier {
   /// Увеличивается после успешной проверки чека и обновления заведения (для SnackBar в UI).
   int get successToken => _successToken;
 
+  /// StoreKit 2 кладёт в [PurchaseVerificationData.serverVerificationData] JWS транзакции;
+  /// legacy Apple `verifyReceipt` принимает только base64 **app receipt** (как у StoreKit 1).
+  static bool _isStoreKit2Jws(String s) {
+    if (s.isEmpty) return false;
+    return s.startsWith('eyJ') && s.split('.').length == 3;
+  }
+
   Future<void> init() async {
     if (!isIOSPlatform) return;
     if (_ready) return;
@@ -117,7 +124,7 @@ class AppleIapService extends ChangeNotifier {
 
     try {
       var receiptData = purchase.verificationData.serverVerificationData;
-      if (receiptData.isEmpty) {
+      if (receiptData.isEmpty || _isStoreKit2Jws(receiptData)) {
         final add =
             _iap.getPlatformAddition<InAppPurchaseStoreKitPlatformAddition>();
         final v = await add.refreshPurchaseVerificationData();
@@ -140,6 +147,7 @@ class AppleIapService extends ChangeNotifier {
       );
 
       if (res.status != 200) {
+        devLog('IAP billing-verify-apple failed: ${res.status} ${res.data}');
         final err = res.data is Map
             ? (res.data as Map)['error']?.toString()
             : 'HTTP ${res.status}';
