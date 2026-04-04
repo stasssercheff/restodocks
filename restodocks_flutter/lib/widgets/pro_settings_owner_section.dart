@@ -78,18 +78,57 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
         SnackBar(content: Text(loc.t('pro_iap_activated'))),
       );
     } else if (_iapWasBusy && !iap.busy && iap.lastError != null) {
+      final err = iap.lastError!;
+      final msg = _iapFailureMessage(loc, err);
+      final restore = _iapOfferRestoreSnackAction(err);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          duration: const Duration(seconds: 10),
-          content: Text(_iapFailureMessage(loc, iap.lastError!)),
+          duration: const Duration(seconds: 14),
+          behavior: SnackBarBehavior.floating,
+          content: Text(msg),
+          action: restore
+              ? SnackBarAction(
+                  label: loc.t('pro_iap_restore'),
+                  onPressed: () => iap.restorePurchases(),
+                )
+              : null,
         ),
       );
     }
     _iapWasBusy = iap.busy;
   }
 
+  /// Apple мог уже списать деньги, а Pro на нашем сервере не активировался — не вводить в заблуждение.
+  bool _shouldAppendAppleChargedHint(String code) {
+    final c = code.toLowerCase();
+    if (c.contains('not_owner')) return false;
+    if (c.contains('store_unavailable')) return false;
+    if (c.contains('product_not')) return false;
+    if (c.contains('no_receipt')) return false;
+    if (c.contains('apple receipt validation') ||
+        c.contains('receipt validation failed')) {
+      return true;
+    }
+    return c.contains('verify_failed_http_') || c.contains('iap_client_exception');
+  }
+
+  /// Кнопка в SnackBar: то же, что «Восстановить покупки» в блоке PRO.
+  bool _iapOfferRestoreSnackAction(String code) {
+    final c = code.toLowerCase();
+    if (c.contains('no_receipt')) return true;
+    return _shouldAppendAppleChargedHint(code);
+  }
+
   /// Сообщения после покупки/restore: сервер Edge `billing-verify-apple`, Apple verifyReceipt, StoreKit.
   String _iapFailureMessage(LocalizationService loc, String code) {
+    final base = _iapFailureBaseMessage(loc, code);
+    if (_shouldAppendAppleChargedHint(code)) {
+      return '$base\n\n${loc.t('pro_iap_apple_charged_hint')}';
+    }
+    return base;
+  }
+
+  String _iapFailureBaseMessage(LocalizationService loc, String code) {
     final c = code.toLowerCase();
     if (c.contains('store_unavailable')) return loc.t('pro_iap_store_unavailable');
     if (c.contains('product_not') || c.contains('product_not_ready')) {
@@ -133,6 +172,12 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
       if (c.contains('verify_failed_http_500') && c.contains('server configuration')) {
         return loc.t('pro_iap_server_config');
       }
+      return loc.t('pro_iap_server_http', args: {'status': st});
+    }
+    // Остальные коды ответа Edge (404 и т.д.)
+    if (c.contains('verify_failed_http_')) {
+      final m = RegExp(r'verify_failed_http_(\d+)').firstMatch(c);
+      final st = m?.group(1) ?? '?';
       return loc.t('pro_iap_server_http', args: {'status': st});
     }
     if (c.contains('iap_client_exception')) {
