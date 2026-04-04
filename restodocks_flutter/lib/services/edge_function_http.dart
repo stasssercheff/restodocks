@@ -7,19 +7,13 @@ import 'package:restodocks/core/supabase_url_resolver_stub.dart'
 
 Dio _buildEdgeDio({
   required String anonKey,
-  required bool bearerAlwaysAnon,
+  required String authorizationBearer,
 }) {
-  final sessionToken = Supabase.instance.client.auth.currentSession?.accessToken;
-  final authBearer = bearerAlwaysAnon
-      ? anonKey
-      : ((sessionToken != null && sessionToken.isNotEmpty)
-          ? sessionToken
-          : anonKey);
   return Dio(
     BaseOptions(
       headers: {
         'apikey': anonKey,
-        'Authorization': 'Bearer $authBearer',
+        'Authorization': 'Bearer $authorizationBearer',
         'Content-Type': 'application/json',
       },
       validateStatus: (_) => true,
@@ -30,8 +24,11 @@ Dio _buildEdgeDio({
 /// POST к Edge Function с retry при 5xx/сети (proxy/ EarlyDrop).
 /// 4xx не retry. Возвращает (status, data).
 ///
-/// [bearerAlwaysAnon] — всегда Bearer = anon (например register-metadata до входа;
-/// иначе протухший JWT в сессии даёт 401 на Edge).
+/// [bearerAlwaysAnon] — всегда Bearer = anon (например register-metadata до входа).
+///
+/// Если [bearerAlwaysAnon] == false и JWT пользователя нет даже после [refreshSession],
+/// **не** подставляем anon в Authorization — иначе Edge даёт 401 «как будто сессия протухла»,
+/// хотя реально пользователь не аутентифицирован для этого запроса.
 ///
 /// [refreshSessionBeforeFirstPost] — обновить access token перед первым запросом
 /// (важно для IAP и долгих сессий без возврата в приложение).
@@ -58,6 +55,15 @@ Future<({int status, Map<String, dynamic>? data})> postEdgeFunctionWithRetry(
     }
   }
 
+  Future<String?> userJwtAfterRefresh() async {
+    var t = Supabase.instance.client.auth.currentSession?.accessToken;
+    if (t != null && t.isNotEmpty) return t;
+    await tryRefresh();
+    t = Supabase.instance.client.auth.currentSession?.accessToken;
+    if (t != null && t.isNotEmpty) return t;
+    return null;
+  }
+
   if (refreshSessionBeforeFirstPost) {
     await tryRefresh();
   }
@@ -70,8 +76,26 @@ Future<({int status, Map<String, dynamic>? data})> postEdgeFunctionWithRetry(
       await Future<void>.delayed(Duration(milliseconds: retryDelays[attempt - 1]));
       devLog('EdgeFunction retry $attempt/$maxRetries: $functionPath');
     }
+
+    final String authBearer;
+    if (bearerAlwaysAnon) {
+      authBearer = anonKey;
+    } else {
+      final jwt = await userJwtAfterRefresh();
+      if (jwt == null || jwt.isEmpty) {
+        devLog('EdgeFunction: no user JWT for $functionPath — not sending anon as Bearer');
+        return (
+          status: 401,
+          data: <String, dynamic>{
+            'error': 'missing_user_jwt',
+          },
+        );
+      }
+      authBearer = jwt;
+    }
+
     try {
-      final dio = _buildEdgeDio(anonKey: anonKey, bearerAlwaysAnon: bearerAlwaysAnon);
+      final dio = _buildEdgeDio(anonKey: anonKey, authorizationBearer: authBearer);
       final resp = await dio.post<dynamic>(url, data: body);
       final data = resp.data is Map<String, dynamic>
           ? resp.data as Map<String, dynamic>

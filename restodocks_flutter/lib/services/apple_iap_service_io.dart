@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'package:in_app_purchase_storekit/store_kit_wrappers.dart';
 
@@ -311,6 +312,11 @@ class AppleIapService extends ChangeNotifier {
     _lastError = null;
     notifyListeners();
     try {
+      try {
+        await Supabase.instance.client.auth.refreshSession();
+      } catch (e, st) {
+        devLog('IAP purchasePro refreshSession: $e $st');
+      }
       final param = PurchaseParam(productDetails: _product!);
       await _iap.buyNonConsumable(purchaseParam: param);
       return true;

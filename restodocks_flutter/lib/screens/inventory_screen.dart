@@ -10,6 +10,7 @@ import '../utils/dev_log.dart';
 
 import 'package:excel/excel.dart' hide Border, TextSpan;
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -4947,12 +4948,18 @@ class _IikoInventoryTable extends StatelessWidget {
         ),
       ));
     }
-    // ListView (не builder) — все строки сразу в DOM,
-    // Safari видит полную цепочку <input> и активирует кнопки ▲▼ в панели.
-    // keyboardDismissBehavior.manual — на мобильном при прокрутке клавиатура не скрывается.
-    return ListView(
+    // Web: все строки в DOM — Safari видит цепочку <input> для ▲▼ в панели.
+    // iOS/Android: builder — меньше лагов при длинном бланке.
+    if (kIsWeb) {
+      return ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+        children: items,
+      );
+    }
+    return ListView.builder(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
-      children: items,
+      itemCount: items.length,
+      itemBuilder: (context, i) => items[i],
     );
   }
 }

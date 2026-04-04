@@ -113,6 +113,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
   /// Apple мог уже списать деньги, а Pro на нашем сервере не активировался — не вводить в заблуждение.
   bool _shouldAppendAppleChargedHint(String code) {
     final c = code.toLowerCase();
+    if (c.contains('missing_user_jwt')) return false;
     if (c.contains('not_owner')) return false;
     if (c.contains('store_unavailable')) return false;
     if (c.contains('product_not')) return false;
@@ -150,6 +151,10 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     if (c.contains('no_receipt')) return loc.t('pro_iap_no_receipt');
     if (c.contains('verify_failed_http_429') || c.contains('too many requests')) {
       return loc.t('pro_iap_rate_limited');
+    }
+    // Клиент не смог получить JWT — раньше уходил anon → ложный 401 на Edge.
+    if (c.contains('missing_user_jwt')) {
+      return loc.t('pro_iap_session_missing');
     }
     // Сессия: JWT не принят Edge (истёк / не передан).
     if (c.contains('verify_failed_http_401') || c.contains('|unauthorized')) {
