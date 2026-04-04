@@ -2448,22 +2448,24 @@ with
       LocalizationService loc, int actualIndex, int rowNumber,
       {bool isLastRow = false}) {
     final row = _rows[actualIndex];
-    return _StandardInventoryRowTile(
-      fixedPart: _buildFixedDataRow(loc, actualIndex, rowNumber),
-      row: row,
-      actualIndex: actualIndex,
-      isLastRow: isLastRow,
-      completed: _completed,
-      formatQty: _formatQty,
-      onSetQuantity: _setQuantity,
-      onLastCellFocused: _onLastCellFocused,
-      onCellFocusLost: _onCellFocusLost,
-      onFocusChange: (hasFocus) => setState(() => _hasInputFocus = hasFocus),
-      leftWidth: _leftWidth(context),
-      colQtyWidth: _colQtyWidth,
-      colGap: _colGap,
-      dataRowHeight: _dataRowHeight,
-      loc: loc,
+    return RepaintBoundary(
+      child: _StandardInventoryRowTile(
+        fixedPart: _buildFixedDataRow(loc, actualIndex, rowNumber),
+        row: row,
+        actualIndex: actualIndex,
+        isLastRow: isLastRow,
+        completed: _completed,
+        formatQty: _formatQty,
+        onSetQuantity: _setQuantity,
+        onLastCellFocused: _onLastCellFocused,
+        onCellFocusLost: _onCellFocusLost,
+        onFocusChange: (hasFocus) => setState(() => _hasInputFocus = hasFocus),
+        leftWidth: _leftWidth(context),
+        colQtyWidth: _colQtyWidth,
+        colGap: _colGap,
+        dataRowHeight: _dataRowHeight,
+        loc: loc,
+      ),
     );
   }
 
@@ -4924,12 +4926,14 @@ class _IikoInventoryTable extends StatelessWidget {
           ));
         }
       }
-      items.add(_IikoInventoryRowTile(
-        key: ValueKey(row.product.id),
-        row: row,
-        completed: completed,
-        onChanged: (colIdx, qty) => onQuantityChanged(row, colIdx, qty),
-        onFocusChange: onFocusChange,
+      items.add(RepaintBoundary(
+        child: _IikoInventoryRowTile(
+          key: ValueKey(row.product.id),
+          row: row,
+          completed: completed,
+          onChanged: (colIdx, qty) => onQuantityChanged(row, colIdx, qty),
+          onFocusChange: onFocusChange,
+        ),
       ));
     }
     // ListView (не builder) — все строки сразу в DOM,

@@ -1007,7 +1007,7 @@
     "pro_payment_subtitle_paid_server_no_date": "Pro по серверу, без даты окончания в приложении",
     "pro_payment_open_apple_subscriptions": "Подписки Apple ID",
     "pro_iap_forbidden": "Нет прав подтвердить покупку для этого заведения. Войдите как собственник.",
-    "pro_payment_hub_restore_hint": "Если вы меняли устройство или переустанавливали приложение, нажмите «Восстановить покупки».",
+    "pro_payment_hub_restore_hint": "Сменили устройство или переустановили приложение — нажмите «Восстановить покупки».",
     "pro_conditions_title": "PRO — условия пользования",
     "pro_conditions_subtitle": "Полный список ограничений на 72 часа и после",
     "pro_required_expenses": "Раздел «Расходы» доступен по подписке Pro.",
@@ -2705,7 +2705,15 @@
     "checklist_dropdown_hint_example": "Вариант 1, Вариант 2, Вариант 3",
     "unknown_dish": "Неизвестно",
     "ttk_duplicate_name_dialog_body": "Название «{original}» уже используется.\nСоздать дубликат с именем «{duplicate}»?",
-    "account_display_prefs_sync_hint": "Сохраняется в учётной записи и совпадает на всех ваших устройствах."
+    "account_display_prefs_sync_hint": "Сохраняется в учётной записи и совпадает на всех ваших устройствах.",
+    "pro_payment_hub_line_subscription_until": "Подписка оплачена до {date}",
+    "pro_payment_hub_line_subscription_active": "Подписка активна",
+    "pro_payment_hub_line_promo_until": "Промокод действует до {date}",
+    "pro_payment_hub_line_promo_unlimited": "Промокод активен (срок не ограничен)",
+    "pro_payment_hub_status_fallback": "Доступ Pro включён для этого заведения.",
+    "pro_payment_subtitle_short_until": "Подписка до {date}",
+    "pro_payment_subtitle_active_no_date": "Подписка активна",
+    "pro_payment_body_short": "Оформите подписку в App Store или введите промокод выше. Без подписки и промокода доступен только бесплатный тариф (веб, iPhone, iPad)."
   },
   "en": {
     "app_name": "Restodocks",
@@ -3605,7 +3613,7 @@
     "pro_payment_subtitle_paid_server_no_date": "Pro active on the server (no end date in the app)",
     "pro_payment_open_apple_subscriptions": "Apple ID subscriptions",
     "pro_iap_forbidden": "You cannot verify a purchase for this establishment. Sign in as the owner.",
-    "pro_payment_hub_restore_hint": "If you reinstalled the app or changed devices, tap Restore purchases.",
+    "pro_payment_hub_restore_hint": "Changed device or reinstalled the app? Tap Restore purchases.",
     "pro_conditions_title": "PRO — terms of use",
     "pro_conditions_subtitle": "Full list of limits for 72h and after",
     "pro_required_expenses": "The Expenses section requires a Pro subscription.",
@@ -5413,7 +5421,15 @@
     "checklist_dropdown_hint_example": "Option 1, Option 2, Option 3",
     "unknown_dish": "Unknown",
     "ttk_duplicate_name_dialog_body": "The name «{original}» is already in use.\nCreate a duplicate named «{duplicate}»?",
-    "account_display_prefs_sync_hint": "Saved to your account and applies on all your devices."
+    "account_display_prefs_sync_hint": "Saved to your account and applies on all your devices.",
+    "pro_payment_hub_line_subscription_until": "Subscription paid until {date}",
+    "pro_payment_hub_line_subscription_active": "Subscription active",
+    "pro_payment_hub_line_promo_until": "Promo code valid until {date}",
+    "pro_payment_hub_line_promo_unlimited": "Promo code active (no expiry)",
+    "pro_payment_hub_status_fallback": "Pro access is enabled for this establishment.",
+    "pro_payment_subtitle_short_until": "Subscription until {date}",
+    "pro_payment_subtitle_active_no_date": "Subscription active",
+    "pro_payment_body_short": "Subscribe in the App Store or enter a promo code above. Without a subscription or promo, only the free plan is available (web, iPhone, iPad)."
   },
   "es": {
     "app_name": "Restodocks",
@@ -7544,7 +7560,7 @@
     "pro_payment_subtitle_paid_server_no_date": "Pro activo en el servidor (sin fecha de fin en la app)",
     "pro_payment_open_apple_subscriptions": "Suscripciones del Apple ID",
     "pro_iap_forbidden": "No puedes verificar la compra para este establecimiento. Inicia sesión como titular.",
-    "pro_payment_hub_restore_hint": "Si reinstalaste la app o cambiaste de dispositivo, usa Restaurar compras.",
+    "pro_payment_hub_restore_hint": "¿Cambiaste de dispositivo o reinstalaste? Pulsa Restaurar compras.",
     "inventory_merge_blank_hint": "Los datos se escribirán en la columna «Total»/«Saldo real» del formulario seleccionado. Solo se guardan los nombres cargados en el mismo idioma.",
     "haccp_tbl_med_exam_fio": "Full name",
     "documentation_name_required": "Enter a title",
@@ -8121,7 +8137,15 @@
     "documentation_insert_image_url_dialog_title": "URL de la imagen",
     "documentation_insert_image_url_hint": "https://example.com/image.jpg",
     "documentation_insert_image_button": "Insertar",
-    "account_display_prefs_sync_hint": "Se guarda en tu cuenta y coincide en todos tus dispositivos."
+    "account_display_prefs_sync_hint": "Se guarda en tu cuenta y coincide en todos tus dispositivos.",
+    "pro_payment_hub_line_subscription_until": "Suscripción pagada hasta {date}",
+    "pro_payment_hub_line_subscription_active": "Suscripción activa",
+    "pro_payment_hub_line_promo_until": "Código promocional válido hasta {date}",
+    "pro_payment_hub_line_promo_unlimited": "Código promocional activo (sin caducidad)",
+    "pro_payment_hub_status_fallback": "El acceso Pro está activado para este establecimiento.",
+    "pro_payment_subtitle_short_until": "Suscripción hasta {date}",
+    "pro_payment_subtitle_active_no_date": "Suscripción activa",
+    "pro_payment_body_short": "Contrata en App Store o introduce un código arriba. Sin suscripción ni código, solo el plan gratuito (web, iPhone, iPad)."
   },
   "de": {
     "app_name": "Restodocks",
@@ -9536,7 +9560,7 @@
     "pro_payment_subtitle_paid_server_no_date": "Pro laut Server (kein Enddatum in der App)",
     "pro_payment_open_apple_subscriptions": "Apple-ID-Abos",
     "pro_iap_forbidden": "Kauf kann für dieses Lokal nicht bestätigt werden. Als Inhaber anmelden.",
-    "pro_payment_hub_restore_hint": "Nach Neuinstallation oder Gerätewechsel: „Käufe wiederherstellen“.",
+    "pro_payment_hub_restore_hint": "Gerät gewechselt oder App neu installiert? Tippe auf Käufe wiederherstellen.",
     "inventory_total": "Total",
     "schedule_edit_shift": "Edit shift",
     "ttk_choose_product": "Choose product",
@@ -10829,7 +10853,15 @@
     "dev_clear_test_data_tooltip": "Testdaten löschen",
     "dev_test_data_clear_error": "Löschen fehlgeschlagen: {error}",
     "dev_test_data_cleared": "Testdaten gelöscht",
-    "validation_password_min_6": "Mindestens 6 Zeichen"
+    "validation_password_min_6": "Mindestens 6 Zeichen",
+    "pro_payment_hub_line_subscription_until": "Abonnement bezahlt bis {date}",
+    "pro_payment_hub_line_subscription_active": "Abonnement aktiv",
+    "pro_payment_hub_line_promo_until": "Promo-Code gültig bis {date}",
+    "pro_payment_hub_line_promo_unlimited": "Promo-Code aktiv (unbegrenzt)",
+    "pro_payment_hub_status_fallback": "Pro-Zugang ist für dieses Lokal aktiviert.",
+    "pro_payment_subtitle_short_until": "Abonnement bis {date}",
+    "pro_payment_subtitle_active_no_date": "Abonnement aktiv",
+    "pro_payment_body_short": "Im App Store abonnieren oder Promo-Code oben eingeben. Ohne Abo und Code nur Free-Tarif (Web, iPhone, iPad)."
   },
   "fr": {
     "app_name": "Restodocks",
@@ -12244,7 +12276,7 @@
     "pro_payment_subtitle_paid_server_no_date": "Pro actif côté serveur (pas de date de fin dans l’app)",
     "pro_payment_open_apple_subscriptions": "Abonnements Apple ID",
     "pro_iap_forbidden": "Impossible de valider l’achat pour cet établissement. Connectez-vous en tant que propriétaire.",
-    "pro_payment_hub_restore_hint": "Après réinstallation ou changement d’appareil : utilisez Restaurer les achats.",
+    "pro_payment_hub_restore_hint": "Appareil changé ou app réinstallée ? Appuyez sur Restaurer les achats.",
     "inventory_total": "Total",
     "schedule_edit_shift": "Edit shift",
     "ttk_choose_product": "Choose product",
@@ -13537,7 +13569,15 @@
     "dev_clear_test_data_tooltip": "Effacer les données de test",
     "dev_test_data_clear_error": "Échec de l’effacement : {error}",
     "dev_test_data_cleared": "Données de test effacées",
-    "validation_password_min_6": "Au moins 6 caractères"
+    "validation_password_min_6": "Au moins 6 caractères",
+    "pro_payment_hub_line_subscription_until": "Abonnement payé jusqu’au {date}",
+    "pro_payment_hub_line_subscription_active": "Abonnement actif",
+    "pro_payment_hub_line_promo_until": "Code promo valide jusqu’au {date}",
+    "pro_payment_hub_line_promo_unlimited": "Code promo actif (sans date de fin)",
+    "pro_payment_hub_status_fallback": "L’accès Pro est activé pour cet établissement.",
+    "pro_payment_subtitle_short_until": "Abonnement jusqu’au {date}",
+    "pro_payment_subtitle_active_no_date": "Abonnement actif",
+    "pro_payment_body_short": "Abonnez-vous sur l’App Store ou saisissez un code promo ci-dessus. Sans abonnement ni code, seul le gratuit (web, iPhone, iPad)."
   },
   "it": {
     "app_name": "Restodocks",
@@ -15664,7 +15704,7 @@
     "pro_payment_subtitle_paid_server_no_date": "Pro attivo sul server (nessuna data di fine nell’app)",
     "pro_payment_open_apple_subscriptions": "Abbonamenti Apple ID",
     "pro_iap_forbidden": "Impossibile verificare l’acquisto per questa struttura. Accedi come titolare.",
-    "pro_payment_hub_restore_hint": "Dopo reinstallazione o cambio dispositivo: ripristina gli acquisti.",
+    "pro_payment_hub_restore_hint": "Hai cambiato dispositivo o reinstallato? Tocca Ripristina acquisti.",
     "haccp_pdf_cover_hint": "Organization name, dates",
     "saved": "Saved",
     "inbox_notif_empty_message": "empty message",
@@ -16245,7 +16285,15 @@
     "documentation_insert_image_url_dialog_title": "URL immagine",
     "documentation_insert_image_url_hint": "https://example.com/image.jpg",
     "documentation_insert_image_button": "Inserisci",
-    "account_display_prefs_sync_hint": "Salvato nell’account e uguale su tutti i dispositivi."
+    "account_display_prefs_sync_hint": "Salvato nell’account e uguale su tutti i dispositivi.",
+    "pro_payment_hub_line_subscription_until": "Abbonamento pagato fino al {date}",
+    "pro_payment_hub_line_subscription_active": "Abbonamento attivo",
+    "pro_payment_hub_line_promo_until": "Codice promo valido fino al {date}",
+    "pro_payment_hub_line_promo_unlimited": "Codice promo attivo (senza scadenza)",
+    "pro_payment_hub_status_fallback": "Accesso Pro attivo per questa struttura.",
+    "pro_payment_subtitle_short_until": "Abbonamento fino al {date}",
+    "pro_payment_subtitle_active_no_date": "Abbonamento attivo",
+    "pro_payment_body_short": "Abbonati su App Store o inserisci un codice promo sopra. Senza abbonamento e codice, solo piano gratuito (web, iPhone, iPad)."
   },
   "tr": {
     "app_name": "Yeniden stoklamalar",
@@ -18372,7 +18420,7 @@
     "pro_payment_subtitle_paid_server_no_date": "Sunucuya göre Pro etkin (uygulamada bitiş tarihi yok)",
     "pro_payment_open_apple_subscriptions": "Apple ID abonelikleri",
     "pro_iap_forbidden": "Bu işletme için satın alma doğrulanamıyor. Sahip olarak giriş yapın.",
-    "pro_payment_hub_restore_hint": "Uygulamayı yeniden yüklediyseniz veya cihaz değiştirdiyseniz: Satın alımları geri yükle.",
+    "pro_payment_hub_restore_hint": "Cihaz değiştirdiniz veya uygulamayı yeniden mi yüklediniz? Satın alımları geri yükleyin.",
     "haccp_pdf_cover_hint": "Organization name, dates",
     "saved": "Saved",
     "inbox_notif_empty_message": "empty message",
@@ -18953,7 +19001,15 @@
     "documentation_insert_image_url_dialog_title": "Görsel URL’si",
     "documentation_insert_image_url_hint": "https://example.com/image.jpg",
     "documentation_insert_image_button": "Ekle",
-    "account_display_prefs_sync_hint": "Hesabınıza kaydedilir; tüm cihazlarınızda aynıdır."
+    "account_display_prefs_sync_hint": "Hesabınıza kaydedilir; tüm cihazlarınızda aynıdır.",
+    "pro_payment_hub_line_subscription_until": "Abonelik {date} tarihine kadar ödendi",
+    "pro_payment_hub_line_subscription_active": "Abonelik etkin",
+    "pro_payment_hub_line_promo_until": "Promosyon kodu {date} tarihine kadar geçerli",
+    "pro_payment_hub_line_promo_unlimited": "Promosyon kodu etkin (süresiz)",
+    "pro_payment_hub_status_fallback": "Bu işletme için Pro erişimi açık.",
+    "pro_payment_subtitle_short_until": "Abonelik {date}’e kadar",
+    "pro_payment_subtitle_active_no_date": "Abonelik etkin",
+    "pro_payment_body_short": "App Store’dan abone olun veya yukarıdan promosyon kodu girin. Abonelik ve kod yoksa yalnızca ücretsiz plan (web, iPhone, iPad)."
   },
   "vi": {
     "app_name": "Khôi phục lại",
@@ -21094,7 +21150,7 @@
     "pro_payment_subtitle_paid_server_no_date": "Pro theo máy chủ (không có ngày kết thúc trong ứng dụng)",
     "pro_payment_open_apple_subscriptions": "Đăng ký Apple ID",
     "pro_iap_forbidden": "Không thể xác nhận mua cho cơ sở này. Đăng nhập với tư cách chủ sở hữu.",
-    "pro_payment_hub_restore_hint": "Nếu cài lại ứng dụng hoặc đổi thiết bị, hãy chọn Khôi phục giao dịch mua.",
+    "pro_payment_hub_restore_hint": "Đổi thiết bị hoặc cài lại ứng dụng? Chọn Khôi phục giao dịch mua.",
     "haccp_pdf_cover_hint": "Organization name, dates",
     "saved": "Saved",
     "inbox_notif_empty_message": "empty message",
@@ -21661,6 +21717,14 @@
     "documentation_insert_image_url_dialog_title": "URL hình ảnh",
     "documentation_insert_image_url_hint": "https://example.com/image.jpg",
     "documentation_insert_image_button": "Chèn",
-    "account_display_prefs_sync_hint": "Lưu trong tài khoản và thống nhất trên mọi thiết bị của bạn."
+    "account_display_prefs_sync_hint": "Lưu trong tài khoản và thống nhất trên mọi thiết bị của bạn.",
+    "pro_payment_hub_line_subscription_until": "Đăng ký đã trả đến {date}",
+    "pro_payment_hub_line_subscription_active": "Đăng ký đang hoạt động",
+    "pro_payment_hub_line_promo_until": "Mã khuyến mãi có hiệu lực đến {date}",
+    "pro_payment_hub_line_promo_unlimited": "Mã khuyến mãi đang hoạt động (không hết hạn)",
+    "pro_payment_hub_status_fallback": "Đã bật quyền truy cập Pro cho cơ sở này.",
+    "pro_payment_subtitle_short_until": "Đăng ký đến {date}",
+    "pro_payment_subtitle_active_no_date": "Đăng ký đang hoạt động",
+    "pro_payment_body_short": "Đăng ký trên App Store hoặc nhập mã khuyến mãi ở trên. Không có đăng ký và mã thì chỉ gói miễn phí (web, iPhone, iPad)."
   }
 }

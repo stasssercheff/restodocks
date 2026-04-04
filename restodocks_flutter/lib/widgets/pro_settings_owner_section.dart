@@ -134,13 +134,54 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     });
   }
 
+  /// Даты в блоке PRO — коротко, в формате дд.мм.гггг (без «сервера» в тексте).
+  String _formatProDate(DateTime d) {
+    final loc = widget.localization;
+    final tag =
+        loc.currentLanguageCode == 'ru' ? 'ru_RU' : loc.currentLanguageCode;
+    return DateFormat('dd.MM.yyyy', tag).format(d.toLocal());
+  }
+
   String _formatDate(DateTime d) {
     final loc = widget.localization;
     final tag = loc.currentLanguageCode == 'ru' ? 'ru_RU' : loc.currentLanguageCode;
     return DateFormat.yMMMd(tag).format(d.toLocal());
   }
 
-  /// Подзаголовок пункта оплаты: промокод в БД даёт тот же «платный» Pro, что и IAP — текст различаем.
+  /// Строки статуса для диалога «Подписка и доступ» — по одной смысловой строке, без длинных абзацев.
+  List<String> _proHubStatusLines(
+    LocalizationService loc,
+    EstablishmentPromoInfo promo,
+    Establishment? est,
+  ) {
+    final lines = <String>[];
+    final estSafe = est;
+    final paidAccess = estSafe?.hasPaidProAccess ?? false;
+    final until = estSafe?.proPaidUntil;
+
+    if (until != null) {
+      lines.add(loc.t('pro_payment_hub_line_subscription_until',
+          args: {'date': _formatProDate(until)}));
+    } else if (paidAccess && !promo.isPromoGrantActive) {
+      lines.add(loc.t('pro_payment_hub_line_subscription_active'));
+    }
+
+    if (promo.isPromoGrantActive) {
+      if (promo.expiresAt != null) {
+        lines.add(loc.t('pro_payment_hub_line_promo_until',
+            args: {'date': _formatProDate(promo.expiresAt!)}));
+      } else {
+        lines.add(loc.t('pro_payment_hub_line_promo_unlimited'));
+      }
+    }
+
+    if (lines.isEmpty && paidAccess) {
+      lines.add(loc.t('pro_payment_hub_status_fallback'));
+    }
+    return lines;
+  }
+
+  /// Подзаголовок пункта «Оплата подписки» в списке настроек.
   String _paidProPaymentSubtitle(
     LocalizationService loc,
     EstablishmentPromoInfo? promo,
@@ -151,47 +192,10 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     }
     final until = est?.proPaidUntil;
     if (until != null) {
-      return loc.t('pro_payment_subtitle_paid_until',
-          args: {'date': _formatDate(until)});
+      return loc.t('pro_payment_subtitle_short_until',
+          args: {'date': _formatProDate(until)});
     }
-    return loc.t('pro_payment_subtitle_paid_server_no_date');
-  }
-
-  String _hubPromoExpiryLine(
-    EstablishmentPromoInfo promo,
-    LocalizationService loc,
-  ) {
-    if (promo.expiresAt != null) {
-      return loc.t('pro_payment_hub_promo_expiry',
-          args: {'date': _formatDate(promo.expiresAt!)});
-    }
-    return loc.t('pro_payment_hub_promo_expiry_none');
-  }
-
-  String _hubPaidNonPromoBody(LocalizationService loc, Establishment? est) {
-    final base = loc.t('pro_payment_hub_paid_detail');
-    final until = est?.proPaidUntil;
-    if (until != null) {
-      return '$base\n\n${loc.t('pro_payment_hub_paid_subscription_until', args: {'date': _formatDate(until)})}';
-    }
-    return '$base\n\n${loc.t('pro_payment_hub_paid_no_expiry_in_app')}';
-  }
-
-  String _hubActiveAccessBody(
-    LocalizationService loc,
-    EstablishmentPromoInfo promo,
-    Establishment? est,
-  ) {
-    if (promo.loadFailed) {
-      return _hubPaidNonPromoBody(loc, est);
-    }
-    if (promo.isPromoGrantActive) {
-      return loc.t('pro_payment_hub_promo_detail', args: {
-        'code': promo.code ?? '—',
-        'expiry_line': _hubPromoExpiryLine(promo, loc),
-      });
-    }
-    return _hubPaidNonPromoBody(loc, est);
+    return loc.t('pro_payment_subtitle_active_no_date');
   }
 
   String? _promoErrorFromException(Object e, LocalizationService loc) {
@@ -361,15 +365,20 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                     ),
                     const SizedBox(height: 16),
                     if (paid) ...[
-                      Text(
-                        _hubActiveAccessBody(loc, promo, est),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          height: 1.45,
+                      ..._proHubStatusLines(loc, promo, est).map(
+                        (line) => Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Text(
+                            line,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              height: 1.4,
+                            ),
+                          ),
                         ),
                       ),
                     ] else ...[
                       Text(
-                        loc.t('pro_payment_body'),
+                        loc.t('pro_payment_body_short'),
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: cs.onSurfaceVariant,
                           height: 1.45,
@@ -429,7 +438,17 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                         height: 1.35,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
+                    if (!paid && ready && product != null) ...[
+                      FilledButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          unawaited(iap.purchasePro());
+                        },
+                        child: Text(loc.t('pro_purchase')),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
                     OutlinedButton(
                       onPressed: () async {
                         Navigator.pop(ctx);
@@ -443,16 +462,6 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                       },
                       child: Text(loc.t('pro_payment_open_apple_subscriptions')),
                     ),
-                    if (!paid && ready && product != null) ...[
-                      const SizedBox(height: 8),
-                      FilledButton(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          unawaited(iap.purchasePro());
-                        },
-                        child: Text(loc.t('pro_purchase')),
-                      ),
-                    ],
                     TextButton(
                       onPressed: () => Navigator.pop(ctx),
                       child: Text(loc.t('close')),
