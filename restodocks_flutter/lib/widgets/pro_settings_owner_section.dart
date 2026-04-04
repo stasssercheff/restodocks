@@ -126,6 +126,14 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     });
   }
 
+  Future<void> _syncProSectionFromServer() async {
+    await widget.accountManager.syncEstablishmentAccessFromServer();
+    if (!mounted) return;
+    setState(() {
+      _promoFuture = widget.accountManager.getEstablishmentPromoForOwner();
+    });
+  }
+
   String _formatDate(DateTime d) {
     final loc = widget.localization;
     final tag = loc.currentLanguageCode == 'ru' ? 'ru_RU' : loc.currentLanguageCode;
@@ -146,7 +154,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
       return loc.t('pro_payment_subtitle_paid_until',
           args: {'date': _formatDate(until)});
     }
-    return loc.t('pro_iap_paid_already');
+    return loc.t('pro_payment_subtitle_paid_server_no_date');
   }
 
   String _hubPromoExpiryLine(
@@ -177,7 +185,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     if (promo.loadFailed) {
       return _hubPaidNonPromoBody(loc, est);
     }
-    if (promo.hasPromo && !promo.isDisabled) {
+    if (promo.isPromoGrantActive) {
       return loc.t('pro_payment_hub_promo_detail', args: {
         'code': promo.code ?? '—',
         'expiry_line': _hubPromoExpiryLine(promo, loc),
@@ -466,6 +474,9 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
       leading: const Icon(Icons.workspace_premium_outlined),
       title: Text(loc.t('pro_settings')),
       subtitle: Text(loc.t('pro_settings_desc')),
+      onExpansionChanged: (expanded) {
+        if (expanded) unawaited(_syncProSectionFromServer());
+      },
       children: [
         FutureBuilder<EstablishmentPromoInfo>(
           future: _promoFuture,
