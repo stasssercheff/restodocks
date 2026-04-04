@@ -6,6 +6,7 @@ import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_quill_extensions/flutter_quill_extensions.dart';
 
 import '../services/documentation_image_upload_service.dart';
+import '../services/services.dart';
 
 /// Rich text editor для документов: форматирование, изображения, вставка из Word/HTML.
 class DocumentationRichTextEditor extends StatefulWidget {
@@ -36,6 +37,7 @@ class _DocumentationRichTextEditorState extends State<DocumentationRichTextEdito
   }
 
   Future<String?> _onRequestPickImage(BuildContext context) async {
+    final loc = LocalizationService();
     final source = await showModalBottomSheet<InsertImageSource>(
       context: context,
       showDragHandle: true,
@@ -45,18 +47,18 @@ class _DocumentationRichTextEditorState extends State<DocumentationRichTextEdito
           children: [
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Галерея'),
+              title: Text(loc.t('documentation_image_source_gallery')),
               onTap: () => Navigator.pop(ctx, InsertImageSource.gallery),
             ),
             if (!kIsWeb)
               ListTile(
                 leading: const Icon(Icons.camera_alt),
-                title: const Text('Камера'),
+                title: Text(loc.t('documentation_image_source_camera')),
                 onTap: () => Navigator.pop(ctx, InsertImageSource.camera),
               ),
             ListTile(
               leading: const Icon(Icons.link),
-              title: const Text('Ссылка'),
+              title: Text(loc.t('documentation_image_source_link')),
               onTap: () => Navigator.pop(ctx, InsertImageSource.link),
             ),
           ],
@@ -74,14 +76,15 @@ class _DocumentationRichTextEditorState extends State<DocumentationRichTextEdito
         final url = await showDialog<String>(
           context: context,
           builder: (ctx) {
+            final l = LocalizationService();
             final controller = TextEditingController();
             return AlertDialog(
-              title: const Text('Вставка ссылки на изображение'),
+              title: Text(l.t('documentation_insert_image_url_dialog_title')),
               content: TextField(
                 controller: controller,
-                decoration: const InputDecoration(
-                  hintText: 'https://example.com/image.jpg',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  hintText: l.t('documentation_insert_image_url_hint'),
+                  border: const OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.url,
                 autofocus: true,
@@ -90,11 +93,11 @@ class _DocumentationRichTextEditorState extends State<DocumentationRichTextEdito
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Отмена'),
+                  child: Text(l.t('cancel')),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(ctx, controller.text.trim().isNotEmpty ? controller.text.trim() : null),
-                  child: const Text('Вставить'),
+                  child: Text(l.t('documentation_insert_image_button')),
                 ),
               ],
             );
@@ -106,87 +109,95 @@ class _DocumentationRichTextEditorState extends State<DocumentationRichTextEdito
 
   @override
   Widget build(BuildContext context) {
-    if (widget.readOnly) {
-      return Container(
-        constraints: BoxConstraints(minHeight: widget.minHeight),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          border: Border.all(color: Theme.of(context).dividerColor),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: QuillEditor(
-          focusNode: _focusNode,
-          scrollController: _scrollController,
-          controller: widget.controller,
-          config: QuillEditorConfig(
-            padding: EdgeInsets.zero,
-            placeholder: '',
-            embedBuilders: kIsWeb
-                ? FlutterQuillEmbeds.editorWebBuilders()
-                : FlutterQuillEmbeds.editorBuilders(),
-          ),
-        ),
-      );
-    }
+    return ListenableBuilder(
+      listenable: LocalizationService(),
+      builder: (context, _) {
+        final loc = LocalizationService();
+        final placeholder = loc.t('documentation_editor_placeholder');
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        QuillSimpleToolbar(
-          controller: widget.controller,
-          config: QuillSimpleToolbarConfig(
-            showBoldButton: true,
-            showItalicButton: true,
-            showUnderLineButton: true,
-            showStrikeThrough: true,
-            showFontFamily: true,
-            showFontSize: true,
-            showIndent: true,
-            showAlignmentButtons: true,
-            showHeaderStyle: true,
-            showListNumbers: true,
-            showListBullets: true,
-            showListCheck: true,
-            showCodeBlock: true,
-            showInlineCode: true,
-            showLink: true,
-            showClipboardCut: true,
-            showClipboardCopy: true,
-            showClipboardPaste: true,
-            showUndo: true,
-            showRedo: true,
-            showClearFormat: true,
-            embedButtons: FlutterQuillEmbeds.toolbarButtons(
-              imageButtonOptions: QuillToolbarImageButtonOptions(
-                imageButtonConfig: QuillToolbarImageConfig(
-                  onRequestPickImage: _onRequestPickImage,
+        if (widget.readOnly) {
+          return Container(
+            constraints: BoxConstraints(minHeight: widget.minHeight),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              border: Border.all(color: Theme.of(context).dividerColor),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: QuillEditor(
+              focusNode: _focusNode,
+              scrollController: _scrollController,
+              controller: widget.controller,
+              config: QuillEditorConfig(
+                padding: EdgeInsets.zero,
+                placeholder: '',
+                embedBuilders: kIsWeb
+                    ? FlutterQuillEmbeds.editorWebBuilders()
+                    : FlutterQuillEmbeds.editorBuilders(),
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            QuillSimpleToolbar(
+              controller: widget.controller,
+              config: QuillSimpleToolbarConfig(
+                showBoldButton: true,
+                showItalicButton: true,
+                showUnderLineButton: true,
+                showStrikeThrough: true,
+                showFontFamily: true,
+                showFontSize: true,
+                showIndent: true,
+                showAlignmentButtons: true,
+                showHeaderStyle: true,
+                showListNumbers: true,
+                showListBullets: true,
+                showListCheck: true,
+                showCodeBlock: true,
+                showInlineCode: true,
+                showLink: true,
+                showClipboardCut: true,
+                showClipboardCopy: true,
+                showClipboardPaste: true,
+                showUndo: true,
+                showRedo: true,
+                showClearFormat: true,
+                embedButtons: FlutterQuillEmbeds.toolbarButtons(
+                  imageButtonOptions: QuillToolbarImageButtonOptions(
+                    imageButtonConfig: QuillToolbarImageConfig(
+                      onRequestPickImage: _onRequestPickImage,
+                    ),
+                  ),
+                  videoButtonOptions: null,
                 ),
               ),
-              videoButtonOptions: null,
             ),
-          ),
-        ),
-        Container(
-          constraints: BoxConstraints(minHeight: widget.minHeight),
-          decoration: BoxDecoration(
-            border: Border.all(color: Theme.of(context).dividerColor),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: QuillEditor(
-            focusNode: _focusNode,
-            scrollController: _scrollController,
-            controller: widget.controller,
-            config: QuillEditorConfig(
-              padding: const EdgeInsets.all(16),
-              placeholder: 'Введите текст...',
-              embedBuilders: kIsWeb
-                  ? FlutterQuillEmbeds.editorWebBuilders()
-                  : FlutterQuillEmbeds.editorBuilders(),
+            Container(
+              constraints: BoxConstraints(minHeight: widget.minHeight),
+              decoration: BoxDecoration(
+                border: Border.all(color: Theme.of(context).dividerColor),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: QuillEditor(
+                focusNode: _focusNode,
+                scrollController: _scrollController,
+                controller: widget.controller,
+                config: QuillEditorConfig(
+                  padding: const EdgeInsets.all(16),
+                  placeholder: placeholder,
+                  embedBuilders: kIsWeb
+                      ? FlutterQuillEmbeds.editorWebBuilders()
+                      : FlutterQuillEmbeds.editorBuilders(),
+                ),
+              ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 }

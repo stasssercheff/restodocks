@@ -590,6 +590,13 @@
     "documentation_deleted": "Документ удалён",
     "documentation_delete_confirm": "Удалить документ?",
     "documentation_empty_body": "Текст отсутствует",
+    "documentation_editor_placeholder": "Введите текст…",
+    "documentation_image_source_gallery": "Галерея",
+    "documentation_image_source_camera": "Камера",
+    "documentation_image_source_link": "Ссылка",
+    "documentation_insert_image_url_dialog_title": "Ссылка на изображение",
+    "documentation_insert_image_url_hint": "https://example.com/image.jpg",
+    "documentation_insert_image_button": "Вставить",
     "haccp_download_agreement": "Скачать Соглашение с сотрудником",
     "haccp_download_order": "Скачать приказ (3 страницы)",
     "haccp_print_after_download": "После скачивания PDF распечатайте и заполните вручную там, где стоят линии.",
@@ -4950,6 +4957,13 @@
     "documentation_edit": "Edit",
     "documentation_empty": "No documents",
     "documentation_empty_body": "No body text",
+    "documentation_editor_placeholder": "Enter text…",
+    "documentation_image_source_gallery": "Gallery",
+    "documentation_image_source_camera": "Camera",
+    "documentation_image_source_link": "Link",
+    "documentation_insert_image_url_dialog_title": "Image URL",
+    "documentation_insert_image_url_hint": "https://example.com/image.jpg",
+    "documentation_insert_image_button": "Insert",
     "documentation_name": "Title",
     "documentation_name_required": "Enter a title",
     "documentation_topic": "Topic",
@@ -8004,7 +8018,14 @@
     "checklist_item_format_label": "Formato de ítem",
     "checklist_dropdown_hint_example": "Opción 1, Opción 2, Opción 3",
     "unknown_dish": "Desconocido",
-    "ttk_duplicate_name_dialog_body": "El nombre «{original}» ya está en uso.\n¿Crear un duplicado con el nombre «{duplicate}»?"
+    "ttk_duplicate_name_dialog_body": "El nombre «{original}» ya está en uso.\n¿Crear un duplicado con el nombre «{duplicate}»?",
+    "documentation_editor_placeholder": "Introduzca texto…",
+    "documentation_image_source_gallery": "Galería",
+    "documentation_image_source_camera": "Cámara",
+    "documentation_image_source_link": "Enlace",
+    "documentation_insert_image_url_dialog_title": "URL de la imagen",
+    "documentation_insert_image_url_hint": "https://example.com/image.jpg",
+    "documentation_insert_image_button": "Insertar"
   },
   "de": {
     "app_name": "Restodocks",
@@ -10660,7 +10681,14 @@
     "checklist_item_format_label": "Format der Einträge",
     "checklist_dropdown_hint_example": "Option 1, Option 2, Option 3",
     "unknown_dish": "Unbekannt",
-    "ttk_duplicate_name_dialog_body": "Der Name «{original}» wird bereits verwendet.\nDuplikat mit dem Namen «{duplicate}» erstellen?"
+    "ttk_duplicate_name_dialog_body": "Der Name «{original}» wird bereits verwendet.\nDuplikat mit dem Namen «{duplicate}» erstellen?",
+    "documentation_editor_placeholder": "Text eingeben…",
+    "documentation_image_source_gallery": "Galerie",
+    "documentation_image_source_camera": "Kamera",
+    "documentation_image_source_link": "Link",
+    "documentation_insert_image_url_dialog_title": "Bild-URL",
+    "documentation_insert_image_url_hint": "https://example.com/image.jpg",
+    "documentation_insert_image_button": "Einfügen"
   },
   "fr": {
     "app_name": "Restodocks",
@@ -13316,7 +13344,14 @@
     "checklist_item_format_label": "Format des lignes",
     "checklist_dropdown_hint_example": "Option 1, option 2, option 3",
     "unknown_dish": "Inconnu",
-    "ttk_duplicate_name_dialog_body": "Le nom «{original}» est déjà utilisé.\nCréer un doublon nommé «{duplicate}» ?"
+    "ttk_duplicate_name_dialog_body": "Le nom «{original}» est déjà utilisé.\nCréer un doublon nommé «{duplicate}» ?",
+    "documentation_editor_placeholder": "Saisissez le texte…",
+    "documentation_image_source_gallery": "Galerie",
+    "documentation_image_source_camera": "Appareil photo",
+    "documentation_image_source_link": "Lien",
+    "documentation_insert_image_url_dialog_title": "URL de l’image",
+    "documentation_insert_image_url_hint": "https://example.com/image.jpg",
+    "documentation_insert_image_button": "Insérer"
   },
   "it": {
     "app_name": "Restodocks",
@@ -15985,7 +16020,14 @@
     "checklist_item_format_label": "Formato voci",
     "checklist_dropdown_hint_example": "Opzione 1, Opzione 2, Opzione 3",
     "unknown_dish": "Sconosciuto",
-    "ttk_duplicate_name_dialog_body": "Il nome «{original}» è già in uso.\nCreare un duplicato con nome «{duplicate}»?"
+    "ttk_duplicate_name_dialog_body": "Il nome «{original}» è già in uso.\nCreare un duplicato con nome «{duplicate}»?",
+    "documentation_editor_placeholder": "Inserisci testo…",
+    "documentation_image_source_gallery": "Galleria",
+    "documentation_image_source_camera": "Fotocamera",
+    "documentation_image_source_link": "Collegamento",
+    "documentation_insert_image_url_dialog_title": "URL immagine",
+    "documentation_insert_image_url_hint": "https://example.com/image.jpg",
+    "documentation_insert_image_button": "Inserisci"
   },
   "tr": {
     "app_name": "Yeniden stoklamalar",
@@ -18654,7 +18696,14 @@
     "checklist_item_format_label": "Öğe formatı",
     "checklist_dropdown_hint_example": "Seçenek 1, Seçenek 2, Seçenek 3",
     "unknown_dish": "Bilinmiyor",
-    "ttk_duplicate_name_dialog_body": "«{original}» adı zaten kullanılıyor.\n«{duplicate}» adlı yinelenen oluşturulsun mu?"
+    "ttk_duplicate_name_dialog_body": "«{original}» adı zaten kullanılıyor.\n«{duplicate}» adlı yinelenen oluşturulsun mu?",
+    "documentation_editor_placeholder": "Metin girin…",
+    "documentation_image_source_gallery": "Galeri",
+    "documentation_image_source_camera": "Kamera",
+    "documentation_image_source_link": "Bağlantı",
+    "documentation_insert_image_url_dialog_title": "Görsel URL’si",
+    "documentation_insert_image_url_hint": "https://example.com/image.jpg",
+    "documentation_insert_image_button": "Ekle"
   },
   "vi": {
     "app_name": "Khôi phục lại",
@@ -21323,6 +21372,13 @@
     "checklist_item_format_label": "Định dạng mục",
     "checklist_dropdown_hint_example": "Tùy chọn 1, Tùy chọn 2, Tùy chọn 3",
     "unknown_dish": "Không rõ",
-    "ttk_duplicate_name_dialog_body": "Tên «{original}» đã được dùng.\nTạo bản sao tên «{duplicate}»?"
+    "ttk_duplicate_name_dialog_body": "Tên «{original}» đã được dùng.\nTạo bản sao tên «{duplicate}»?",
+    "documentation_editor_placeholder": "Nhập văn bản…",
+    "documentation_image_source_gallery": "Thư viện ảnh",
+    "documentation_image_source_camera": "Máy ảnh",
+    "documentation_image_source_link": "Liên kết",
+    "documentation_insert_image_url_dialog_title": "URL hình ảnh",
+    "documentation_insert_image_url_hint": "https://example.com/image.jpg",
+    "documentation_insert_image_button": "Chèn"
   }
 }
