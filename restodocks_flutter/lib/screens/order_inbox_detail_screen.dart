@@ -415,8 +415,10 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
       }
     } catch (e) {
       if (mounted) {
-        AppToastService.show('Ошибка: $e',
-            duration: const Duration(seconds: 4));
+        AppToastService.show(
+          loc.t('error_generic', args: {'error': '$e'}),
+          duration: const Duration(seconds: 4),
+        );
       }
     }
   }
@@ -444,8 +446,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
                   style: TextStyle(color: theme.colorScheme.error)),
               const SizedBox(height: 16),
               FilledButton(
-                  onPressed: () => context.pop(),
-                  child: Text(loc.t('back'))),
+                  onPressed: () => context.pop(), child: Text(loc.t('back'))),
             ],
           ),
         ),

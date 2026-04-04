@@ -36,7 +36,7 @@ class ThemeService extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// Значения `light` / `dark` из `employees.ui_theme` (синхронизация аккаунта).
+  /// Значения `light` / `dark` из `employees.ui_theme` (настройка отображения учётной записи на всех устройствах).
   Future<void> applyFromServer(String? uiTheme) async {
     if (uiTheme != 'light' && uiTheme != 'dark') return;
     final mode = uiTheme == 'dark' ? ThemeMode.dark : ThemeMode.light;

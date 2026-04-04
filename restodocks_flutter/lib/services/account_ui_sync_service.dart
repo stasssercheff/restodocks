@@ -9,7 +9,9 @@ import 'owner_view_preference_service.dart';
 import 'supabase_service.dart';
 import 'theme_service.dart';
 
-/// Синхронизация темы, «интерфейс как у владельца» и языка с профилем `employees` (одинаково на всех устройствах).
+/// Синхронизация настроек отображения учётной записи с профилем `employees`:
+/// язык, тема, режим «собственник / должность» и др. — изменение на одном устройстве
+/// подтягивается при входе и при возврате в приложение на других устройствах.
 class AccountUiSyncService {
   AccountUiSyncService._();
   static final AccountUiSyncService instance = AccountUiSyncService._();

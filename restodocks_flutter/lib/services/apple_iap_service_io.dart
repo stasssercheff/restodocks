@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
+import 'package:in_app_purchase_storekit/store_kit_wrappers.dart';
 
 import '../core/iap_constants.dart';
 import '../utils/dev_log.dart';
@@ -50,6 +51,31 @@ class AppleIapService extends ChangeNotifier {
   Future<String?> _receiptForLegacyVerify(PurchaseDetails purchase) async {
     final add =
         _iap.getPlatformAddition<InAppPurchaseStoreKitPlatformAddition>();
+
+    // 1) Unified app receipt из бандла (verifyReceipt на сервере ждёт base64 ASN.1, не JWS транзакции).
+    try {
+      final direct = await SKReceiptManager.retrieveReceiptData();
+      if (direct.isNotEmpty && !_isStoreKit2Jws(direct)) {
+        return direct;
+      }
+    } catch (e, st) {
+      devLog('IAP retrieveReceiptData (direct): $e $st');
+    }
+
+    // 2) StoreKit 2: синхронизация с App Store, затем снова чтение чека (после покупки файл может запаздывать).
+    try {
+      await add.sync();
+    } catch (e, st) {
+      devLog('IAP StoreKit sync: $e $st');
+    }
+    try {
+      final afterSync = await SKReceiptManager.retrieveReceiptData();
+      if (afterSync.isNotEmpty && !_isStoreKit2Jws(afterSync)) {
+        return afterSync;
+      }
+    } catch (e, st) {
+      devLog('IAP retrieveReceiptData (after sync): $e $st');
+    }
 
     const pauseMs = <int>[400, 500, 700, 1000, 1200, 1500];
     for (var i = 0; i < pauseMs.length; i++) {

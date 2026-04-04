@@ -175,7 +175,7 @@ class _KitchenBarSalesPlanFormScreenState
           DropdownButtonFormField<SalesPlanPeriodKind>(
             value: _kind,
             decoration: InputDecoration(
-              labelText: 'Период',
+              labelText: loc.t('haccp_period'),
             ),
             items: [
               for (final k in SalesPlanPeriodKind.values)
@@ -302,6 +302,7 @@ class _PlanLineCardState extends State<_PlanLineCard> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -329,7 +330,7 @@ class _PlanLineCardState extends State<_PlanLineCard> {
             TextField(
               controller: _qtyCtrl,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Кол-во'),
+              decoration: InputDecoration(labelText: loc.t('quantity_short')),
               onChanged: (s) {
                 final q = double.tryParse(s.replaceAll(',', '.')) ?? 0;
                 widget.onDraftChanged(

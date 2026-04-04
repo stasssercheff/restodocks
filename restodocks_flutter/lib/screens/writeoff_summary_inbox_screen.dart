@@ -186,7 +186,11 @@ class WriteoffSummaryInboxScreen extends StatelessWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(loc.t('error_generic', args: {'error': '$e'})),
+          ),
+        );
       }
     }
   }

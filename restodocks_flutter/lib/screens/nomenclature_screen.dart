@@ -5280,19 +5280,19 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
             children: [
               Expanded(
                 child: TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'Поиск по наименованию...',
-                    prefixIcon: Icon(Icons.search, size: 18),
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    hintText: loc.t('nomenclature_search_by_name_hint'),
+                    prefixIcon: const Icon(Icons.search, size: 18),
+                    border: const OutlineInputBorder(),
                     isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 7),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 7),
                   ),
                   onChanged: (v) => setState(() => _query = v),
                 ),
               ),
               IconButton(
                 icon: const Icon(Icons.upload_file),
-                tooltip: 'Загрузить новый бланк',
+                tooltip: loc.t('nomenclature_upload_new_blank_tooltip'),
                 onPressed: widget.onUpload,
               ),
               IconButton(

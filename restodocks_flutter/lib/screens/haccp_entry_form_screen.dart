@@ -1130,11 +1130,13 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             key: 'warehouse_premises',
             label: loc.t('haccp_warehouse_premises') ??
                 'Наименование складского помещения',
-            hintText: 'Например: Склад сухих продуктов, Овощной цех',
+            hintText: loc.t('haccp_warehouse_premises_example_hint'),
             options: _presetOptions['warehouse_premises'] ?? const [],
             presetFieldKey: 'warehouse_premises',
             validator: (v) {
-              if (v == null || v.trim().isEmpty) return 'Укажите помещение';
+              if (v == null || v.trim().isEmpty) {
+                return loc.t('haccp_warehouse_premises_required');
+              }
               return null;
             },
           ),
@@ -2268,9 +2270,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             Consumer<AccountManagerSupabase>(
               builder: (_, acc, __) => TextFormField(
                 initialValue: acc.establishment?.name ?? '—',
-                decoration: const InputDecoration(
-                  labelText: 'Наименование производственного помещения',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: loc.t('haccp_production_premises_name'),
+                  border: const OutlineInputBorder(),
                   isDense: true,
                 ),
                 readOnly: true,
@@ -2283,7 +2285,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               presetFieldKey: 'equipment',
             ),
             _mobileSlider(
-              label: 'Температура',
+              label: loc.t('haccp_temperature_short'),
               value: _tempValue,
               min: -25,
               max: 15,
@@ -2309,11 +2311,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   options: _presetOptions['warehouse_premises'] ?? const [],
                   presetFieldKey: 'warehouse_premises',
                   validator: (v) => (v == null || v.trim().isEmpty)
-                      ? 'Укажите помещение'
+                      ? loc.t('haccp_warehouse_premises_required')
                       : null,
                 ),
                 _mobileSlider(
-                  label: 'Температура',
+                  label: loc.t('haccp_temperature_short'),
                   value: _tempValue,
                   min: -5,
                   max: 35,
@@ -2323,7 +2325,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   fractionDigits: 1,
                 ),
                 _mobileSlider(
-                  label: 'Относительная влажность',
+                  label: loc.t('haccp_relative_humidity_short'),
                   value: _humidityValue,
                   min: 0,
                   max: 100,

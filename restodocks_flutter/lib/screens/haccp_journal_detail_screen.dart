@@ -32,8 +32,10 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
   DateTime? _dateFrom;
   DateTime? _dateTo;
 
-  /// Для Приложения 3: выбранное помещение (null = «Все»).
+  /// Для Приложения 3: выбранное помещение (null = все).
   String? _selectedWarehousePremises;
+
+  static const String _kAllWarehousePremises = '__haccp_all_premises__';
 
   /// Кэш ТТК для отображения локализованных названий в бракераже.
   Map<String, TechCard?> _techCardsById = {};
@@ -95,10 +97,8 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     return t == key ? e.roles.first : t;
   }
 
-  String _employeePdfLine(
-      Employee e, LocalizationService loc, String pdfLang) {
-    final rawName =
-        '${e.fullName}${e.surname != null ? ' ${e.surname}' : ''}';
+  String _employeePdfLine(Employee e, LocalizationService loc, String pdfLang) {
+    final rawName = '${e.fullName}${e.surname != null ? ' ${e.surname}' : ''}';
     final namePart = loc.displayPersonNameForLanguage(rawName, pdfLang);
     final rolePart = _roleLabelForPdf(e, loc, pdfLang);
     return rolePart.isEmpty ? namePart : '$namePart, $rolePart';
@@ -126,8 +126,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
 
     final emps = await acc.getEmployeesForEstablishment(est.id);
     final idToName = {
-      for (final e in emps)
-        e.id: _employeePdfLine(e, loc, pdfLanguageCode),
+      for (final e in emps) e.id: _employeePdfLine(e, loc, pdfLanguageCode),
     };
 
     final svc = context.read<HaccpLogServiceSupabase>();
@@ -380,6 +379,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setState) {
+          final loc = ctx.read<LocalizationService>();
           return SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -388,16 +388,13 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    context
-                            .read<LocalizationService>()
-                            .t('haccp_pdf_period_custom') ??
-                        'Период',
+                    loc.t('haccp_period'),
                     style: Theme.of(ctx2).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 16),
                   ListTile(
                     title: Text(DateFormat('dd.MM.yyyy').format(from)),
-                    subtitle: const Text('Дата начала'),
+                    subtitle: Text(loc.t('haccp_date_start')),
                     trailing: const Icon(Icons.calendar_today),
                     onTap: () async {
                       final d = await showDatePicker(
@@ -415,7 +412,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                   ),
                   ListTile(
                     title: Text(DateFormat('dd.MM.yyyy').format(to)),
-                    subtitle: const Text('Дата окончания'),
+                    subtitle: Text(loc.t('haccp_date_end')),
                     trailing: const Icon(Icons.calendar_today),
                     onTap: () async {
                       final d = await showDatePicker(
@@ -621,17 +618,21 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                     child: Row(
                       children: [
                         Text(
-                          'Наименование складского помещения:',
+                          '${loc.t('haccp_warehouse_premises')}:',
                           style: Theme.of(context).textTheme.labelLarge,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: DropdownButton<String>(
-                            value: _selectedWarehousePremises ?? 'Все',
+                            value: _selectedWarehousePremises ??
+                                _kAllWarehousePremises,
                             isExpanded: true,
                             items: [
-                              const DropdownMenuItem(
-                                  value: 'Все', child: Text('Все помещения')),
+                              DropdownMenuItem(
+                                value: _kAllWarehousePremises,
+                                child:
+                                    Text(loc.t('haccp_all_warehouse_premises')),
+                              ),
                               ...(() {
                                 final list = _logs
                                     .map((e) => e.equipment)
@@ -646,7 +647,9 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                             ],
                             onChanged: (v) => setState(() {
                               _selectedWarehousePremises =
-                                  (v == null || v == 'Все') ? null : v;
+                                  (v == null || v == _kAllWarehousePremises)
+                                      ? null
+                                      : v;
                             }),
                           ),
                         ),
@@ -847,12 +850,11 @@ class _JournalTableView extends StatelessWidget {
     for (final e in employees) {
       final raw = '${e.fullName}${e.surname != null ? ' ${e.surname}' : ''}';
       final name = loc.displayPersonNameForUi(raw);
-      final role =
-          e.roles.isNotEmpty ? loc.roleDisplayName(e.roles.first) : '';
+      final role = e.roles.isNotEmpty ? loc.roleDisplayName(e.roles.first) : '';
       idToName[e.id] = role.isEmpty ? name : '$name, $role';
     }
     if (!HaccpLogType.supportedInApp.contains(logType)) {
-      return const Center(child: Text('Неизвестный тип журнала'));
+      return Center(child: Text(loc.t('haccp_unknown_journal_type')));
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -864,14 +866,14 @@ class _JournalTableView extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Приложение № 3 к СанПиН 2.3/2.4.3590-20',
+                      loc.t('haccp_sanpin_line_warehouse_temp_humidity'),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.primary),
                     ),
                     if (warehousePremisesName != null) ...[
                       const SizedBox(height: 4),
                       Text(
-                        'Наименование складского помещения: $warehousePremisesName',
+                        '${loc.t('haccp_warehouse_premises')}: $warehousePremisesName',
                         style: Theme.of(context)
                             .textTheme
                             .titleSmall
@@ -1125,7 +1127,8 @@ class _JournalTableView extends StatelessWidget {
     }, border: TableBorder.all(color: Colors.grey), children: rows);
   }
 
-  Widget _buildMedBookTable(Map<String, String> idToName, LocalizationService loc) {
+  Widget _buildMedBookTable(
+      Map<String, String> idToName, LocalizationService loc) {
     final rows = <TableRow>[
       TableRow(
         children: [
@@ -1179,7 +1182,8 @@ class _JournalTableView extends StatelessWidget {
     );
   }
 
-  Widget _buildFryingOilTable(Map<String, String> idToName, LocalizationService loc) {
+  Widget _buildFryingOilTable(
+      Map<String, String> idToName, LocalizationService loc) {
     final rows = <TableRow>[
       TableRow(
         children: [
@@ -1324,7 +1328,8 @@ class _JournalTableView extends StatelessWidget {
     );
   }
 
-  Widget _buildFridgeTable(Map<String, Employee> idToEmp, LocalizationService loc) {
+  Widget _buildFridgeTable(
+      Map<String, Employee> idToEmp, LocalizationService loc) {
     final rows = <TableRow>[
       TableRow(
         children: [
@@ -1367,8 +1372,7 @@ class _JournalTableView extends StatelessWidget {
       TableRow(
         children: [
           _header(loc.t('haccp_tbl_pp_no')),
-          if (showPremisesColumn)
-            _header(loc.t('haccp_warehouse_premises')),
+          if (showPremisesColumn) _header(loc.t('haccp_warehouse_premises')),
           _header(loc.t('haccp_tbl_date')),
           _header(loc.t('haccp_tbl_temp_c_label')),
           _header(loc.t('haccp_tbl_rel_humidity_pct')),
@@ -1440,9 +1444,8 @@ class _JournalTableView extends StatelessWidget {
         ],
       ),
       ...logs.map((log) {
-        final tc = log.techCardId != null
-            ? techCardsById[log.techCardId!]
-            : null;
+        final tc =
+            log.techCardId != null ? techCardsById[log.techCardId!] : null;
         final matched = HaccpStoredFieldLocalizer.matchProduct(
             products.allProducts, log.productName);
         final dish = HaccpStoredFieldLocalizer.displayBrakerageDishName(
@@ -1456,10 +1459,9 @@ class _JournalTableView extends StatelessWidget {
             HaccpStoredFieldLocalizer.localizeFreeText(log.result, loc);
         final approval = HaccpStoredFieldLocalizer.localizeApprovalSnapshot(
             log.approvalToSell, loc);
-        final weighing = HaccpStoredFieldLocalizer.localizeFreeText(
-            log.weighingResult, loc);
-        final note =
-            HaccpStoredFieldLocalizer.localizeFreeText(log.note, loc);
+        final weighing =
+            HaccpStoredFieldLocalizer.localizeFreeText(log.weighingResult, loc);
+        final note = HaccpStoredFieldLocalizer.localizeFreeText(log.note, loc);
         return TableRow(
           children: [
             _wrapTap(_cell(_dateTimeFmt.format(log.createdAt)), log),
@@ -1490,9 +1492,11 @@ class _JournalTableView extends StatelessWidget {
     );
   }
 
-  Widget _buildBrakerageIncomingTable(BuildContext context,
+  Widget _buildBrakerageIncomingTable(
+      BuildContext context,
       Map<String, Employee> idToEmp,
-      Map<String, String> idToName, LocalizationService loc) {
+      Map<String, String> idToName,
+      LocalizationService loc) {
     final products = context.read<ProductStoreSupabase>();
     final lang = loc.currentLanguageCode;
     final rows = <TableRow>[
@@ -1542,8 +1546,8 @@ class _JournalTableView extends StatelessWidget {
             _wrapTap(_cell(dateSold), log),
             _wrapTap(_cell(empName), log),
             _wrapTap(
-                _cell(HaccpStoredFieldLocalizer.localizeFreeText(
-                    log.note, loc)),
+                _cell(
+                    HaccpStoredFieldLocalizer.localizeFreeText(log.note, loc)),
                 log),
           ],
         );

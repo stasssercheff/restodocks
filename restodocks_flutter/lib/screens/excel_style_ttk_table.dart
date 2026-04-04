@@ -673,13 +673,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                                 minLines: 5,
                                 style: const TextStyle(fontSize: 12),
                                 textAlign: TextAlign.left,
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   border: InputBorder.none,
                                   contentPadding: EdgeInsets.zero,
                                   isDense: true,
                                   filled: true,
                                   fillColor: Colors.transparent,
-                                  hintText: 'Введите технологию приготовления...',
+                                  hintText: widget.loc.t('ttk_technology_placeholder'),
                                 ),
                               )
                             : Text(

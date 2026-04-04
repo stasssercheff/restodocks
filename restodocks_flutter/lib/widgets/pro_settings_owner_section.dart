@@ -88,7 +88,9 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
   String _iapFailureMessage(LocalizationService loc, String code) {
     final c = code.toLowerCase();
     if (c.contains('store_unavailable')) return loc.t('pro_iap_store_unavailable');
-    if (c.contains('product_not')) return loc.t('pro_iap_product_unavailable');
+    if (c.contains('product_not') || c.contains('product_not_ready')) {
+      return loc.t('pro_iap_product_unavailable');
+    }
     if (c.contains('not_owner')) return loc.t('pro_iap_not_owner');
     if (c.contains('no_receipt')) return loc.t('pro_iap_no_receipt');
     if (c.contains('verify_failed_http_429') || c.contains('too many requests')) {

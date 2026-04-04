@@ -29,7 +29,7 @@ import 'services/services.dart';
 import 'services/translation_manager.dart';
 import 'widgets/widgets.dart';
 
-/// Язык интерфейса из профиля аккаунта (одинаковый на всех устройствах после синхронизации).
+/// Язык интерфейса из профиля сотрудника: хранится в учётной записи и совпадает на всех устройствах.
 Future<void> _applyLocaleFromEmployeeProfile(String profileLang) async {
   final loc = LocalizationService();
   final p = profileLang.trim().toLowerCase();

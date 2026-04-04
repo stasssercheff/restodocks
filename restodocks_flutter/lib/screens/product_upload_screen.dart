@@ -1185,10 +1185,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             child: TextField(
               controller: controller,
               maxLines: 12,
-              decoration: const InputDecoration(
-                hintText:
-                    'Вставьте список продуктов (название, цена, ед. изм.)',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                hintText: loc.t('product_upload_paste_list_hint_detailed'),
+                border: const OutlineInputBorder(),
               ),
             ),
           ),
@@ -1647,8 +1646,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Формат списка продуктов распознаётся автоматически.\n'
-                  'Просто вставьте текст в любом формате:',
+                  loc.t('product_upload_ai_format_intro'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 16),
@@ -1658,9 +1656,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
                     maxLines: null,
                     expands: true,
                     textAlignVertical: TextAlignVertical.top,
-                    decoration: const InputDecoration(
-                      hintText: 'Вставьте список продуктов здесь...',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      hintText: loc.t('product_upload_paste_list_here_hint'),
+                      border: const OutlineInputBorder(),
                       alignLabelWithHint: true,
                     ),
                   ),

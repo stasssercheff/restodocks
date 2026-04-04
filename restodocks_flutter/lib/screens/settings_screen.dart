@@ -2385,8 +2385,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ListTile(
               leading: const Icon(Icons.language),
               title: Text(localization.t('language')),
-              subtitle: Text(localization
-                  .getLanguageName(localization.currentLanguageCode)),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(localization
+                      .getLanguageName(localization.currentLanguageCode)),
+                  Text(
+                    localization.t('account_display_prefs_sync_hint'),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
+              isThreeLine: true,
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showLanguagePicker(context, localization),
             ),
@@ -2394,9 +2409,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
               builder: (_, themeService, __) => SwitchListTile(
                 secondary: const Icon(Icons.palette),
                 title: Text(localization.t('appearance')),
-                subtitle: Text(themeService.isDark
-                    ? localization.t('dark_theme')
-                    : localization.t('light_theme')),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(themeService.isDark
+                        ? localization.t('dark_theme')
+                        : localization.t('light_theme')),
+                    Text(
+                      localization.t('account_display_prefs_sync_hint'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+                isThreeLine: true,
                 value: themeService.isDark,
                 onChanged: (dark) => themeService
                     .setThemeMode(dark ? ThemeMode.dark : ThemeMode.light),
@@ -2669,7 +2699,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _ogrnOgrnipController,
             decoration: InputDecoration(
-              labelText: 'ОГРН / ОГРНИП',
+              labelText: widget.loc.t('requisites_ogrn_ogrnip'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -2678,7 +2708,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _kppController,
             decoration: InputDecoration(
-              labelText: 'КПП',
+              labelText: widget.loc.t('requisites_kpp'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -2687,7 +2717,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _bankRsController,
             decoration: InputDecoration(
-              labelText: 'Р/С',
+              labelText: widget.loc.t('requisites_bank_account'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -2696,7 +2726,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _bankBikController,
             decoration: InputDecoration(
-              labelText: 'БИК',
+              labelText: widget.loc.t('requisites_bik'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -2705,7 +2735,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _bankNameController,
             decoration: InputDecoration(
-              labelText: 'Банк',
+              labelText: widget.loc.t('requisites_bank_name'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -2714,7 +2744,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _directorFioController,
             decoration: InputDecoration(
-              labelText: 'ФИО руководителя',
+              labelText: widget.loc.t('requisites_director_fio'),
               border: const OutlineInputBorder(),
               filled: true,
             ),
@@ -2723,7 +2753,7 @@ class _RequisitesFormState extends State<_RequisitesForm> {
           TextField(
             controller: _directorPositionController,
             decoration: InputDecoration(
-              labelText: 'Должность руководителя',
+              labelText: widget.loc.t('requisites_director_position'),
               border: const OutlineInputBorder(),
               filled: true,
             ),

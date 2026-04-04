@@ -1,6 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+
+import '../services/localization_service.dart';
 
 /// Поле выбора времени: на мобильном — Cupertino scroll picker (прокрутка как на iOS),
 /// на веб/ПК — простой ввод цифр HH:mm.
@@ -14,6 +17,7 @@ class TimePickerField extends StatefulWidget {
   });
 
   final String label;
+
   /// Текущее значение в формате HH:mm (например "09:30")
   final String value;
   final ValueChanged<String> onChanged;
@@ -66,13 +70,15 @@ class _TimePickerFieldState extends State<TimePickerField> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
                       onPressed: () => Navigator.of(ctx).pop(),
-                      child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+                      child:
+                          Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
                     ),
                     const SizedBox(width: 8),
                     FilledButton(
@@ -95,74 +101,78 @@ class _TimePickerFieldState extends State<TimePickerField> {
   }
 
   /// Диалог с простым вводом времени цифрами (час и минуты).
-  Future<(int, int)?> _showSimpleTimeInputDialog(int initialHour, int initialMin) async {
+  Future<(int, int)?> _showSimpleTimeInputDialog(
+      int initialHour, int initialMin) async {
     final hourController = TextEditingController(text: _fmt(initialHour));
     final minController = TextEditingController(text: _fmt(initialMin));
 
     return showDialog<(int, int)?>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(widget.label),
-        content: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 56,
-              child: TextField(
-                controller: hourController,
-                keyboardType: TextInputType.number,
-                maxLength: 2,
-                textAlign: TextAlign.center,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  _TimeInputFormatter(0, 23),
-                ],
-                decoration: const InputDecoration(
-                  labelText: 'ЧЧ',
-                  counterText: '',
-                  border: OutlineInputBorder(),
+      builder: (ctx) {
+        final loc = Provider.of<LocalizationService>(ctx, listen: false);
+        return AlertDialog(
+          title: Text(widget.label),
+          content: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 56,
+                child: TextField(
+                  controller: hourController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 2,
+                  textAlign: TextAlign.center,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    _TimeInputFormatter(0, 23),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: loc.t('time_input_hour'),
+                    counterText: '',
+                    border: const OutlineInputBorder(),
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(':', style: Theme.of(ctx).textTheme.headlineSmall),
-            ),
-            SizedBox(
-              width: 56,
-              child: TextField(
-                controller: minController,
-                keyboardType: TextInputType.number,
-                maxLength: 2,
-                textAlign: TextAlign.center,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  _TimeInputFormatter(0, 59),
-                ],
-                decoration: const InputDecoration(
-                  labelText: 'ММ',
-                  counterText: '',
-                  border: OutlineInputBorder(),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(':', style: Theme.of(ctx).textTheme.headlineSmall),
+              ),
+              SizedBox(
+                width: 56,
+                child: TextField(
+                  controller: minController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 2,
+                  textAlign: TextAlign.center,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    _TimeInputFormatter(0, 59),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: loc.t('time_input_minute'),
+                    counterText: '',
+                    border: const OutlineInputBorder(),
+                  ),
                 ),
               ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
+            FilledButton(
+              onPressed: () {
+                final h = _parseHour(hourController.text);
+                final m = _parseMin(minController.text);
+                Navigator.of(ctx).pop((h, m));
+              },
+              child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
             ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () {
-              final h = _parseHour(hourController.text);
-              final m = _parseMin(minController.text);
-              Navigator.of(ctx).pop((h, m));
-            },
-            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -199,8 +209,16 @@ class _TimeInputFormatter extends TextInputFormatter {
     if (newValue.text.isEmpty) return newValue;
     final n = int.tryParse(newValue.text);
     if (n == null) return oldValue;
-    if (n < minVal) return TextEditingValue(text: minVal.toString(), selection: TextSelection.collapsed(offset: minVal.toString().length));
-    if (n > maxVal) return TextEditingValue(text: maxVal.toString(), selection: TextSelection.collapsed(offset: maxVal.toString().length));
+    if (n < minVal) {
+      return TextEditingValue(
+          text: minVal.toString(),
+          selection: TextSelection.collapsed(offset: minVal.toString().length));
+    }
+    if (n > maxVal) {
+      return TextEditingValue(
+          text: maxVal.toString(),
+          selection: TextSelection.collapsed(offset: maxVal.toString().length));
+    }
     return newValue;
   }
 }

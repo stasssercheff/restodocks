@@ -5,7 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _keyViewAsOwner = 'restodocks_owner_view_as_owner';
 
-/// Предпочтение собственника: показывать интерфейс владельца или интерфейс по должности.
+/// Режим отображения роли: интерфейс как у собственника или по выбранной должности.
+/// Хранится в учётной записи и совпадает на всех устройствах (колонка `employees.ui_view_as_owner`).
 class OwnerViewPreferenceService extends ChangeNotifier {
   static final OwnerViewPreferenceService _instance = OwnerViewPreferenceService._internal();
   factory OwnerViewPreferenceService() => _instance;

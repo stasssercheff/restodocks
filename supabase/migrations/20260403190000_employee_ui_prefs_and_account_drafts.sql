@@ -1,4 +1,4 @@
--- Тема и «интерфейс как у владельца» в профиле сотрудника (синхронизация между устройствами).
+-- Настройки отображения учётной записи в профиле сотрудника: тема, режим роли и т.д. (одинаково на всех устройствах).
 -- Черновики форм (JSON) по user_id для продолжения с другого устройства.
 
 ALTER TABLE public.employees
@@ -6,8 +6,8 @@ ALTER TABLE public.employees
     CHECK (ui_theme IS NULL OR ui_theme IN ('light', 'dark')),
   ADD COLUMN IF NOT EXISTS ui_view_as_owner boolean;
 
-COMMENT ON COLUMN public.employees.ui_theme IS 'Светлая/тёмная тема интерфейса (синхронизация аккаунта)';
-COMMENT ON COLUMN public.employees.ui_view_as_owner IS 'Показывать интерфейс как у владельца (синхронизация аккаунта)';
+COMMENT ON COLUMN public.employees.ui_theme IS 'Светлая/тёмная тема; сохраняется в учётной записи и совпадает на всех устройствах';
+COMMENT ON COLUMN public.employees.ui_view_as_owner IS 'Режим отображения роли (собственник / должность); общая настройка учётной записи на всех устройствах';
 
 CREATE TABLE IF NOT EXISTS public.account_form_drafts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

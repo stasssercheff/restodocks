@@ -121,17 +121,18 @@ class Employee extends Equatable {
   @JsonKey(name: 'subscription_plan')
   final String? subscriptionPlan; // 'free', 'pro', etc.
 
+  /// Язык интерфейса; хранится в учётной записи и совпадает на всех устройствах.
   @JsonKey(name: 'preferred_language')
   final String preferredLanguage; // 'ru', 'en', 'de', 'fr', 'es'
 
   @JsonKey(name: 'preferred_currency')
   final String? preferredCurrency; // 'RUB', 'USD', 'VND', 'EUR', etc.
 
-  /// Светлая/тёмная тема UI (синхронизация между устройствами). null — ещё не задано на сервере.
+  /// Светлая/тёмная тема UI; хранится в учётной записи и совпадает на всех устройствах. null — ещё не задано на сервере.
   @JsonKey(name: 'ui_theme')
   final String? uiTheme;
 
-  /// «Интерфейс как у владельца» (синхронизация между устройствами).
+  /// Режим отображения роли: интерфейс как у собственника или по выбранной должности; общая настройка учётной записи на всех устройствах.
   @JsonKey(name: 'ui_view_as_owner')
   final bool? uiViewAsOwner;
 
