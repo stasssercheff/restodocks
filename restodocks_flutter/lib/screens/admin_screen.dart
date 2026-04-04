@@ -433,7 +433,14 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
     try {
       final data = await widget.supabase
           .from('promo_codes')
-          .select('*, establishments:used_by_establishment_id(name)')
+          .select(
+            '*, '
+            'establishments:used_by_establishment_id(name, email), '
+            'promo_code_redemptions('
+            'redeemed_at, '
+            'establishments:establishment_id(name, email)'
+            ')',
+          )
           .order('created_at', ascending: false);
       setState(() => _codes = List<Map<String, dynamic>>.from(data));
     } catch (e) {
@@ -691,6 +698,98 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
     return d.isBefore(DateTime.now());
   }
 
+  /// Погашения из [promo_code_redemptions] (название, email заведения, дата) или legacy по колонкам promo_codes.
+  List<Widget> _promoUsageSubtitleWidgets(
+    Map<String, dynamic> row,
+    LocalizationService loc,
+  ) {
+    final raw = row['promo_code_redemptions'];
+    final list = <Map<String, dynamic>>[];
+    if (raw is List) {
+      for (final item in raw) {
+        if (item is Map<String, dynamic>) {
+          list.add(item);
+        } else if (item is Map) {
+          list.add(Map<String, dynamic>.from(item));
+        }
+      }
+    }
+    list.sort((a, b) {
+      final da = DateTime.tryParse(a['redeemed_at']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final db = DateTime.tryParse(b['redeemed_at']?.toString() ?? '') ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      return da.compareTo(db);
+    });
+
+    final out = <Widget>[];
+
+    if (list.isNotEmpty) {
+      out.add(const SizedBox(height: 2));
+      out.add(Text(
+        loc.t('admin_promo_who_used'),
+        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+      ));
+      for (final r in list) {
+        final est = r['establishments'];
+        var nameDisp = '—';
+        var emailDisp = '—';
+        if (est is Map) {
+          final n = est['name']?.toString().trim();
+          final e = est['email']?.toString().trim();
+          if (n != null && n.isNotEmpty) nameDisp = n;
+          if (e != null && e.isNotEmpty) emailDisp = e;
+        }
+        final redeemed = r['redeemed_at']?.toString();
+        final dateDisp = redeemed != null ? _formatDate(redeemed) : '—';
+        out.add(Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Text(
+            loc.t('admin_promo_usage_line', args: {
+              'name': nameDisp,
+              'email': emailDisp,
+              'date': dateDisp,
+            }),
+            style: const TextStyle(fontSize: 10),
+          ),
+        ));
+      }
+      return out;
+    }
+
+    final isUsed = row['is_used'] == true;
+    final usedAt = row['used_at'] as String?;
+    final estRow = row['establishments'] as Map?;
+    final establishmentName = estRow?['name'] as String?;
+    final establishmentEmail = estRow?['email'] as String?;
+    if (isUsed &&
+        (establishmentName != null ||
+            establishmentEmail != null ||
+            usedAt != null)) {
+      out.add(const SizedBox(height: 2));
+      out.add(Text(
+        loc.t('admin_promo_who_used'),
+        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
+      ));
+      out.add(Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Text(
+          loc.t('admin_promo_usage_line', args: {
+            'name': (establishmentName != null && establishmentName.isNotEmpty)
+                ? establishmentName
+                : '—',
+            'email': (establishmentEmail != null && establishmentEmail.isNotEmpty)
+                ? establishmentEmail
+                : '—',
+            'date': usedAt != null ? _formatDate(usedAt) : '—',
+          }),
+          style: const TextStyle(fontSize: 10),
+        ),
+      ));
+    }
+    return out;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -896,8 +995,6 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
     final isUsed = row['is_used'] == true;
     final note = row['note'] as String?;
     final expiresAt = row['expires_at'] as String?;
-    final usedAt = row['used_at'] as String?;
-    final establishmentName = (row['establishments'] as Map?)?['name'] as String?;
     final maxEmployees = row['max_employees'] as int?;
     final expired = _isExpired(expiresAt);
 
@@ -951,11 +1048,7 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (note != null && note.isNotEmpty) Text(note, style: const TextStyle(fontSize: 11)),
-          if (isUsed && establishmentName != null)
-            Text(loc.t('admin_establishment_line', args: {'name': establishmentName}), style: const TextStyle(fontSize: 11)),
-          if (isUsed && usedAt != null)
-            Text(loc.t('admin_used_line', args: {'date': _formatDate(usedAt)}),
-                style: const TextStyle(fontSize: 10, color: Colors.grey)),
+          ..._promoUsageSubtitleWidgets(row, loc),
           if (expiresAt != null)
             Text(loc.t('admin_expires_line', args: {'date': _formatDate(expiresAt)}),
                 style: TextStyle(fontSize: 10, color: expired ? Colors.red : Colors.grey)),

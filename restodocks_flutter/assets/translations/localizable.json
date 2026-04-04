@@ -2713,7 +2713,9 @@
     "pro_payment_subtitle_active_no_date": "Подписка активна",
     "pro_payment_body_short": "Оформите подписку в App Store или введите промокод выше. Без подписки и промокода доступен только бесплатный тариф (веб, iPhone, iPad).",
     "pro_promo_subtitle_active": "Активен",
-    "pro_payment_hub_line_promo_active": "Промокод активен"
+    "pro_payment_hub_line_promo_active": "Промокод активен",
+    "admin_promo_who_used": "Использовали:",
+    "admin_promo_usage_line": "{name} · {email} · {date}"
   },
   "en": {
     "app_name": "Restodocks",
@@ -5429,7 +5431,9 @@
     "pro_payment_subtitle_active_no_date": "Subscription active",
     "pro_payment_body_short": "Subscribe in the App Store or enter a promo code above. Without a subscription or promo, only the free plan is available (web, iPhone, iPad).",
     "pro_promo_subtitle_active": "Active",
-    "pro_payment_hub_line_promo_active": "Promo code active"
+    "pro_payment_hub_line_promo_active": "Promo code active",
+    "admin_promo_who_used": "Used by:",
+    "admin_promo_usage_line": "{name} · {email} · {date}"
   },
   "es": {
     "app_name": "Restodocks",
@@ -8145,7 +8149,9 @@
     "pro_payment_subtitle_active_no_date": "Suscripción activa",
     "pro_payment_body_short": "Contrata en App Store o introduce un código arriba. Sin suscripción ni código, solo el plan gratuito (web, iPhone, iPad).",
     "pro_promo_subtitle_active": "Activo",
-    "pro_payment_hub_line_promo_active": "Código promocional activo"
+    "pro_payment_hub_line_promo_active": "Código promocional activo",
+    "admin_promo_who_used": "Usado por:",
+    "admin_promo_usage_line": "{name} · {email} · {date}"
   },
   "de": {
     "app_name": "Restodocks",
@@ -10861,7 +10867,9 @@
     "pro_payment_subtitle_active_no_date": "Abonnement aktiv",
     "pro_payment_body_short": "Im App Store abonnieren oder Promo-Code oben eingeben. Ohne Abo und Code nur Free-Tarif (Web, iPhone, iPad).",
     "pro_promo_subtitle_active": "Aktiv",
-    "pro_payment_hub_line_promo_active": "Promo-Code aktiv"
+    "pro_payment_hub_line_promo_active": "Promo-Code aktiv",
+    "admin_promo_who_used": "Genutzt von:",
+    "admin_promo_usage_line": "{name} · {email} · {date}"
   },
   "fr": {
     "app_name": "Restodocks",
@@ -13577,7 +13585,9 @@
     "pro_payment_subtitle_active_no_date": "Abonnement actif",
     "pro_payment_body_short": "Abonnez-vous sur l’App Store ou saisissez un code promo ci-dessus. Sans abonnement ni code, seul le gratuit (web, iPhone, iPad).",
     "pro_promo_subtitle_active": "Actif",
-    "pro_payment_hub_line_promo_active": "Code promo actif"
+    "pro_payment_hub_line_promo_active": "Code promo actif",
+    "admin_promo_who_used": "Utilisé par :",
+    "admin_promo_usage_line": "{name} · {email} · {date}"
   },
   "it": {
     "app_name": "Restodocks",
@@ -16293,7 +16303,9 @@
     "pro_payment_subtitle_active_no_date": "Abbonamento attivo",
     "pro_payment_body_short": "Abbonati su App Store o inserisci un codice promo sopra. Senza abbonamento e codice, solo piano gratuito (web, iPhone, iPad).",
     "pro_promo_subtitle_active": "Attivo",
-    "pro_payment_hub_line_promo_active": "Codice promo attivo"
+    "pro_payment_hub_line_promo_active": "Codice promo attivo",
+    "admin_promo_who_used": "Utilizzato da:",
+    "admin_promo_usage_line": "{name} · {email} · {date}"
   },
   "tr": {
     "app_name": "Yeniden stoklamalar",
@@ -19009,7 +19021,9 @@
     "pro_payment_subtitle_active_no_date": "Abonelik etkin",
     "pro_payment_body_short": "App Store’dan abone olun veya yukarıdan promosyon kodu girin. Abonelik ve kod yoksa yalnızca ücretsiz plan (web, iPhone, iPad).",
     "pro_promo_subtitle_active": "Etkin",
-    "pro_payment_hub_line_promo_active": "Promosyon kodu etkin"
+    "pro_payment_hub_line_promo_active": "Promosyon kodu etkin",
+    "admin_promo_who_used": "Kullanan:",
+    "admin_promo_usage_line": "{name} · {email} · {date}"
   },
   "vi": {
     "app_name": "Khôi phục lại",
@@ -21725,6 +21739,8 @@
     "pro_payment_subtitle_active_no_date": "Đăng ký đang hoạt động",
     "pro_payment_body_short": "Đăng ký trên App Store hoặc nhập mã khuyến mãi ở trên. Không có đăng ký và mã thì chỉ gói miễn phí (web, iPhone, iPad).",
     "pro_promo_subtitle_active": "Đang hiệu lực",
-    "pro_payment_hub_line_promo_active": "Mã khuyến mãi đang hoạt động"
+    "pro_payment_hub_line_promo_active": "Mã khuyến mãi đang hoạt động",
+    "admin_promo_who_used": "Đã dùng:",
+    "admin_promo_usage_line": "{name} · {email} · {date}"
   }
 }
