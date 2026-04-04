@@ -1848,4 +1848,15 @@ class EstablishmentPromoInfo {
   final bool isDisabled;
 
   bool get hasPromo => !loadFailed && code != null && code!.isNotEmpty;
+
+  /// Промокод реально даёт Pro: не отключён, не истёк; совпадает с логикой [check_establishment_access].
+  bool get isPromoGrantActive {
+    if (loadFailed) return false;
+    final c = code?.trim();
+    if (c == null || c.isEmpty) return false;
+    if (isDisabled) return false;
+    final exp = expiresAt;
+    if (exp != null && !exp.isAfter(DateTime.now())) return false;
+    return true;
+  }
 }

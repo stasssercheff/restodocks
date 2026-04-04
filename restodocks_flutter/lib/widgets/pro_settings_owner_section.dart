@@ -2,10 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../models/models.dart';
 import '../services/services.dart';
 import 'post_registration_trial_dialog.dart';
 
@@ -105,34 +106,18 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
         c.contains('receipt validation failed')) {
       return loc.t('pro_iap_apple_validation_failed');
     }
+    if (c.contains('forbidden')) return loc.t('pro_iap_forbidden');
     return loc.t('pro_iap_error');
   }
 
-  /// StoreKit 2: [AppStoreProduct2Details.price] — это `Product.displayPrice` от Apple (как в листе оплаты).
-  /// StoreKit 1: в плагине цена склеивается из символа и числа — пересчитываем из [rawPrice]/[currencyCode].
-  /// Google Play: оставляем готовую строку [ProductDetails.price].
-  String _formatIapProductPrice(BuildContext context, ProductDetails product) {
-    if (product is AppStoreProduct2Details) {
-      return product.price;
+  /// Строка цены из стора ([ProductDetails.price]): для iOS это формат App Store по витрине, не локаль UI приложения.
+  String _formatIapProductPrice(ProductDetails product) => product.price;
+
+  Future<void> _openAppleSubscriptionsSettings() async {
+    final uri = Uri.parse('https://apps.apple.com/account/subscriptions');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
-    if (product is AppStoreProductDetails) {
-      final code = product.currencyCode.trim();
-      if (code.isEmpty) return product.price;
-      try {
-        final locale = Localizations.localeOf(context);
-        return NumberFormat.currency(
-          locale: locale.toString(),
-          name: code,
-        ).format(product.rawPrice);
-      } catch (_) {
-        try {
-          return NumberFormat.simpleCurrency(name: code).format(product.rawPrice);
-        } catch (_) {
-          return product.price;
-        }
-      }
-    }
-    return product.price;
   }
 
   void _reloadPromo() {
@@ -151,12 +136,15 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
   String _paidProPaymentSubtitle(
     LocalizationService loc,
     EstablishmentPromoInfo? promo,
+    Establishment? est,
   ) {
-    if (promo != null &&
-        promo.hasPromo &&
-        !promo.isDisabled &&
-        !promo.loadFailed) {
+    if (promo != null && promo.isPromoGrantActive) {
       return loc.t('pro_iap_already_active_promo');
+    }
+    final until = est?.proPaidUntil;
+    if (until != null) {
+      return loc.t('pro_payment_subtitle_paid_until',
+          args: {'date': _formatDate(until)});
     }
     return loc.t('pro_iap_paid_already');
   }
@@ -172,12 +160,22 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     return loc.t('pro_payment_hub_promo_expiry_none');
   }
 
+  String _hubPaidNonPromoBody(LocalizationService loc, Establishment? est) {
+    final base = loc.t('pro_payment_hub_paid_detail');
+    final until = est?.proPaidUntil;
+    if (until != null) {
+      return '$base\n\n${loc.t('pro_payment_hub_paid_subscription_until', args: {'date': _formatDate(until)})}';
+    }
+    return '$base\n\n${loc.t('pro_payment_hub_paid_no_expiry_in_app')}';
+  }
+
   String _hubActiveAccessBody(
     LocalizationService loc,
     EstablishmentPromoInfo promo,
+    Establishment? est,
   ) {
     if (promo.loadFailed) {
-      return loc.t('pro_payment_hub_paid_detail');
+      return _hubPaidNonPromoBody(loc, est);
     }
     if (promo.hasPromo && !promo.isDisabled) {
       return loc.t('pro_payment_hub_promo_detail', args: {
@@ -185,7 +183,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
         'expiry_line': _hubPromoExpiryLine(promo, loc),
       });
     }
-    return loc.t('pro_payment_hub_paid_detail');
+    return _hubPaidNonPromoBody(loc, est);
   }
 
   String? _promoErrorFromException(Object e, LocalizationService loc) {
@@ -304,10 +302,13 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     }
 
     await iap.init();
+    await widget.accountManager.syncEstablishmentAccessFromServer();
+    if (!mounted) return;
     final promo = await widget.accountManager.getEstablishmentPromoForOwner();
     if (!mounted) return;
 
     final paid = widget.accountManager.hasPaidProSubscription;
+    final est = widget.accountManager.establishment;
     final product = iap.product;
     final ready = iap.ready;
 
@@ -353,7 +354,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                     const SizedBox(height: 16),
                     if (paid) ...[
                       Text(
-                        _hubActiveAccessBody(loc, promo),
+                        _hubActiveAccessBody(loc, promo, est),
                         style: theme.textTheme.bodyMedium?.copyWith(
                           height: 1.45,
                         ),
@@ -380,7 +381,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                               horizontal: 12,
                             ),
                             child: Text(
-                              _formatIapProductPrice(ctx, product),
+                              _formatIapProductPrice(product),
                               textAlign: TextAlign.center,
                               style: theme.textTheme.headlineSmall?.copyWith(
                                 fontWeight: FontWeight.w700,
@@ -427,6 +428,12 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                         await iap.restorePurchases();
                       },
                       child: Text(loc.t('pro_iap_restore')),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        await _openAppleSubscriptionsSettings();
+                      },
+                      child: Text(loc.t('pro_payment_open_apple_subscriptions')),
                     ),
                     if (!paid && ready && product != null) ...[
                       const SizedBox(height: 8),
@@ -482,31 +489,23 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                 ),
               );
             }
-            final hasPromo = promo.hasPromo;
+            final showPromoDetails = promo.isPromoGrantActive;
             String subtitle;
-            if (!hasPromo) {
+            if (!showPromoDetails) {
               subtitle = loc.t('pro_promo_subtitle_none');
-            } else if (promo.isDisabled) {
-              subtitle = loc.t('pro_promo_subtitle_disabled');
             } else if (promo.expiresAt != null) {
               subtitle = loc.t('pro_promo_subtitle_until',
                   args: {'date': _formatDate(promo.expiresAt!)});
             } else {
               subtitle = loc.t('pro_promo_subtitle_no_expiry');
             }
-            final subtitleStyle = hasPromo && promo.isDisabled
-                ? TextStyle(color: Theme.of(context).colorScheme.error)
-                : null;
             return ListTile(
-              leading: Icon(
-                hasPromo && promo.isDisabled
-                    ? Icons.block_flipped
-                    : Icons.local_offer_outlined,
-              ),
+              leading: const Icon(Icons.local_offer_outlined),
               title: Text(loc.t('pro_promo_title')),
-              subtitle: Text(subtitle, style: subtitleStyle),
-              trailing: Icon(hasPromo ? Icons.info_outline : Icons.edit_outlined),
-              onTap: hasPromo
+              subtitle: Text(subtitle),
+              trailing:
+                  Icon(showPromoDetails ? Icons.info_outline : Icons.edit_outlined),
+              onTap: showPromoDetails
                   ? () {
                       final expText = promo.expiresAt != null
                           ? _formatDate(promo.expiresAt!)
@@ -522,15 +521,6 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                               Text(
                                   '${loc.t('pro_promo_code_label')}: ${promo.code}'),
                               const SizedBox(height: 12),
-                              if (promo.isDisabled) ...[
-                                Text(
-                                  loc.t('promo_code_disabled'),
-                                  style: TextStyle(
-                                    color: Theme.of(ctx).colorScheme.error,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                              ],
                               Text(
                                   '${loc.t('pro_promo_valid_until_label')}: $expText'),
                             ],
@@ -562,7 +552,11 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                     final busy = iap.busy;
                     final subtitle = !paidPro
                         ? loc.t('pro_payment_subtitle')
-                        : _paidProPaymentSubtitle(loc, promo);
+                        : _paidProPaymentSubtitle(
+                            loc,
+                            promo,
+                            widget.accountManager.establishment,
+                          );
                     return ListTile(
                       leading: const Icon(Icons.payment_outlined),
                       title: Text(loc.t('pro_payment_title')),
