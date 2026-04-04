@@ -297,9 +297,12 @@ function EstablishmentsTab() {
         <div className="mb-4 p-4 bg-red-900/30 border border-red-700 rounded-lg text-red-200 text-sm">
           {error}
           <span className="block mt-2 text-gray-500 text-xs">
-            Нет колонки или схема старая — открой Supabase → SQL Editor и выполни миграцию из{' '}
+            Нет колонки или схема старая — открой Supabase → SQL Editor и выполни миграции:{' '}
+            <code className="text-gray-400">supabase/migrations/20260502120000_pro_paid_until_and_status_rpc.sql</code>
+            {' '}(колонка <code className="text-gray-500">pro_paid_until</code>), при необходимости{' '}
             <code className="text-gray-400">supabase/migrations/20260430230000_establishments_max_additional_override.sql</code>
-            . Ошибка входа/401 — тогда проверь Secrets (SUPABASE_URL, SERVICE_ROLE_KEY).
+            . Ошибка входа/401 — проверь Secrets в Cloudflare (<code className="text-gray-500">SUPABASE_URL</code>,{' '}
+            <code className="text-gray-500">SERVICE_ROLE_KEY</code>) и перелогинься в админке.
           </span>
         </div>
       )}

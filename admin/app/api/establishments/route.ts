@@ -23,32 +23,47 @@ export async function GET() {
   if (!config) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
   const supabase = createClient(config.url, config.serviceRoleKey)
 
-  const selectBase =
-    'id, name, address, created_at, default_currency, owner_id, parent_establishment_id, registration_ip, registration_country, registration_city, subscription_type, pro_paid_until, pro_trial_ends_at'
+  const selectCore =
+    'id, name, address, created_at, default_currency, owner_id, parent_establishment_id, registration_ip, registration_country, registration_city'
 
-  let { data: establishments, error } = await supabase
-    .from('establishments')
-    .select(`${selectBase}, max_additional_establishments_override`)
-    .order('created_at', { ascending: false })
+  /** Пока на БД не все миграции — перебираем селекты от полного к минимальному. */
+  const selectVariants: string[] = [
+    `${selectCore}, subscription_type, pro_paid_until, pro_trial_ends_at, max_additional_establishments_override`,
+    `${selectCore}, subscription_type, pro_paid_until, pro_trial_ends_at`,
+    `${selectCore}, subscription_type, max_additional_establishments_override`,
+    `${selectCore}, subscription_type`,
+    selectCore,
+  ]
 
-  // Пока миграция не применена на БД, колонки нет — читаем без неё (лимит доп. в UI будет «платформа»).
-  if (
-    error &&
-    /max_additional_establishments_override|does not exist/i.test(error.message)
-  ) {
-    const retry = await supabase
-      .from('establishments')
-      .select(selectBase)
-      .order('created_at', { ascending: false })
-    establishments =
-      retry.data?.map(row => ({
-        ...row,
-        max_additional_establishments_override: null,
-        subscription_type: (row as { subscription_type?: unknown }).subscription_type ?? null,
-        pro_paid_until: (row as { pro_paid_until?: unknown }).pro_paid_until ?? null,
-        pro_trial_ends_at: (row as { pro_trial_ends_at?: unknown }).pro_trial_ends_at ?? null,
-      })) ?? null
-    error = retry.error
+  function isMissingColumnError(message: string) {
+    return /does not exist|column .+ does not exist/i.test(message)
+  }
+
+  function normalizeEstablishmentRow(row: Record<string, unknown>) {
+    return {
+      ...row,
+      max_additional_establishments_override:
+        (row.max_additional_establishments_override as number | null | undefined) ?? null,
+      subscription_type: (row.subscription_type as string | null | undefined) ?? null,
+      pro_paid_until: (row.pro_paid_until as string | null | undefined) ?? null,
+      pro_trial_ends_at: (row.pro_trial_ends_at as string | null | undefined) ?? null,
+    }
+  }
+
+  let establishments: ReturnType<typeof normalizeEstablishmentRow>[] | null = null
+  let error: { message: string } | null = null
+
+  for (const sel of selectVariants) {
+    const res = await supabase.from('establishments').select(sel).order('created_at', { ascending: false })
+    if (!res.error) {
+      establishments = (res.data ?? []).map(r =>
+        normalizeEstablishmentRow(r as unknown as Record<string, unknown>),
+      )
+      error = null
+      break
+    }
+    error = res.error
+    if (!isMissingColumnError(res.error.message)) break
   }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -67,7 +82,7 @@ export async function GET() {
     establishment_id: string
   }
 
-  const list = (establishments ?? []) as EstablishmentRow[]
+  const list = (establishments ?? []) as unknown as EstablishmentRow[]
   const mainCountByOwner = new Map<string, number>()
   for (const est of list) {
     const ownerId = est.owner_id ?? ''
