@@ -31,6 +31,9 @@ function parseRoles(raw: unknown): string[] {
   return [];
 }
 
+const VERIFY_PROD = "https://buy.itunes.apple.com/verifyReceipt";
+const VERIFY_SANDBOX = "https://sandbox.itunes.apple.com/verifyReceipt";
+
 async function verifyReceiptWithApple(
   receiptData: string,
   sharedSecret: string,
@@ -41,29 +44,37 @@ async function verifyReceiptWithApple(
     "exclude-old-transactions": true,
   };
 
-  const prodRes = await fetch("https://buy.itunes.apple.com/verifyReceipt", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const prodJson = (await prodRes.json()) as AppleVerifyReceiptResponse;
-  if (prodJson.status === 21007) {
-    const sandboxRes = await fetch("https://sandbox.itunes.apple.com/verifyReceipt", {
+  const post = async (url: string): Promise<AppleVerifyReceiptResponse> => {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    return (await sandboxRes.json()) as AppleVerifyReceiptResponse;
+    return (await res.json()) as AppleVerifyReceiptResponse;
+  };
+
+  // Стандарт Apple: сначала production; 21007 = чек из Sandbox (TestFlight/локальные тесты).
+  let json = await post(VERIFY_PROD);
+  if (json.status === 21007) {
+    json = await post(VERIFY_SANDBOX);
   }
-  return prodJson;
+  // 21008 = production-чек отправили на sandbox URL (редко; бывает при смене окружения).
+  if (json.status === 21008) {
+    json = await post(VERIFY_PROD);
+  }
+  return json;
 }
 
 function toExpiresMs(raw: unknown): number | null {
   if (raw == null) return null;
   if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) return raw;
   if (typeof raw === "string") {
-    const n = Number(raw.trim().replace(/\s/g, ""));
+    const t = raw.trim().replace(/\s/g, "");
+    const n = Number(t);
     if (Number.isFinite(n) && n > 0) return n;
+    // Apple иногда отдаёт только `expires_date` (ISO / RFC), без *_ms — в Sandbox чаще.
+    const parsed = Date.parse(raw);
+    if (!Number.isNaN(parsed)) return parsed;
   }
   return null;
 }
@@ -89,6 +100,7 @@ function extractMaxExpiryMs(data: AppleVerifyReceiptResponse): number | null {
 
   for (const row of rows) {
     consider(row["expires_date_ms"]);
+    consider(row["expires_date"]);
   }
 
   // Billing grace / retry: конец доступа может быть позже `expires_date_ms` строки подписки.
@@ -97,6 +109,7 @@ function extractMaxExpiryMs(data: AppleVerifyReceiptResponse): number | null {
       continue;
     }
     consider(row["grace_period_expires_date_ms"]);
+    consider(row["grace_period_expires_date"]);
   }
 
   return maxMs;
