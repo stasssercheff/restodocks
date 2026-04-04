@@ -618,6 +618,12 @@ class _InventoryScreenState extends State<InventoryScreen>
           final theme = Theme.of(ctx);
           return AlertDialog(
             title: Text(loc.t('inventory_mode_dialog_title')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(loc.t('back')),
+              ),
+            ],
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -717,7 +723,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           return;
         }
       }
-      _loadNomenclature();
+      await _loadNomenclature();
     } else if (choice == 'selective') {
       setState(() => _isSelectiveInventory = true);
       if (hasSelectiveDraft) {
@@ -759,14 +765,14 @@ class _InventoryScreenState extends State<InventoryScreen>
     final est = account.establishment;
     final estId = est?.dataEstablishmentId;
     if (estId == null) return;
-    final results = await Future.wait([
-      store.loadProducts(),
-      store.loadNomenclature(estId),
-      techCardSvc.getTechCardsForEstablishment(estId),
-    ]);
+    // Порядок важен: полный каталог должен быть стабилен до номенклатуры, иначе гонка
+    // Future.wait(loadProducts ∥ loadNomenclature) могла оставить getNomenclatureProducts пустым.
+    await store.loadProducts();
+    await store.loadNomenclature(estId);
+    final techCards =
+        await techCardSvc.getTechCardsForEstablishment(estId);
     if (!mounted) return;
     final products = store.getNomenclatureProducts(estId);
-    final techCards = results[2] as List<TechCard>;
     final pfOnly = techCards.where((tc) => tc.isSemiFinished).toList();
     if (!mounted) return;
     setState(() => _isLoadingProducts = false);

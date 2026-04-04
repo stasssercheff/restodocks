@@ -1391,7 +1391,11 @@ class ProductStoreSupabase {
 
   /// Продукты в номенклатуре заведения
   List<Product> getNomenclatureProducts(String establishmentId) {
-    return _allProducts.where((p) => _nomenclatureIds.contains(p.id)).toList();
+    final idSet =
+        _nomenclatureIds.map((id) => id.toLowerCase()).toSet();
+    return _allProducts
+        .where((p) => idSet.contains(p.id.toLowerCase()))
+        .toList();
   }
 
   /// Быстрая загрузка продуктов номенклатуры без загрузки всего каталога.

@@ -147,6 +147,47 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     return DateFormat.yMMMd(tag).format(d.toLocal());
   }
 
+  /// Подзаголовок пункта оплаты: промокод в БД даёт тот же «платный» Pro, что и IAP — текст различаем.
+  String _paidProPaymentSubtitle(
+    LocalizationService loc,
+    EstablishmentPromoInfo? promo,
+  ) {
+    if (promo != null &&
+        promo.hasPromo &&
+        !promo.isDisabled &&
+        !promo.loadFailed) {
+      return loc.t('pro_iap_already_active_promo');
+    }
+    return loc.t('pro_iap_paid_already');
+  }
+
+  String _hubPromoExpiryLine(
+    EstablishmentPromoInfo promo,
+    LocalizationService loc,
+  ) {
+    if (promo.expiresAt != null) {
+      return loc.t('pro_payment_hub_promo_expiry',
+          args: {'date': _formatDate(promo.expiresAt!)});
+    }
+    return loc.t('pro_payment_hub_promo_expiry_none');
+  }
+
+  String _hubActiveAccessBody(
+    LocalizationService loc,
+    EstablishmentPromoInfo promo,
+  ) {
+    if (promo.loadFailed) {
+      return loc.t('pro_payment_hub_paid_detail');
+    }
+    if (promo.hasPromo && !promo.isDisabled) {
+      return loc.t('pro_payment_hub_promo_detail', args: {
+        'code': promo.code ?? '—',
+        'expiry_line': _hubPromoExpiryLine(promo, loc),
+      });
+    }
+    return loc.t('pro_payment_hub_paid_detail');
+  }
+
   String? _promoErrorFromException(Object e, LocalizationService loc) {
     final msg = e.toString();
     if (msg.contains('PROMO_INVALID')) return loc.t('promo_code_invalid');
@@ -243,129 +284,172 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     controller.dispose();
   }
 
-  Future<void> _onPaymentTap(AppleIapService iap, LocalizationService loc) async {
+  /// Окно «подписка и доступ»: статус (промокод / оплаченный Pro), покупка, восстановление.
+  Future<void> _showProPaymentHub(AppleIapService iap, LocalizationService loc) async {
     if (!AppleIapService.isIOSPlatform) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('pro_iap_ios_only'))),
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(loc.t('pro_payment_hub_title')),
+          content: Text(loc.t('pro_iap_ios_only')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(loc.t('close')),
+            ),
+          ],
+        ),
       );
       return;
     }
-    if (widget.accountManager.hasPaidProSubscription) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('pro_iap_paid_already'))),
-      );
-      return;
-    }
+
     await iap.init();
+    final promo = await widget.accountManager.getEstablishmentPromoForOwner();
     if (!mounted) return;
-    if (!iap.ready) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('pro_iap_store_unavailable'))),
-      );
-      return;
-    }
-    if (iap.product == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('pro_iap_product_unavailable'))),
-      );
-      return;
-    }
-    final product = iap.product!;
-    final ok = await showDialog<bool>(
+
+    final paid = widget.accountManager.hasPaidProSubscription;
+    final product = iap.product;
+    final ready = iap.ready;
+
+    await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
         final theme = Theme.of(ctx);
         final cs = theme.colorScheme;
-        final priceText = _formatIapProductPrice(ctx, product);
+        final maxH = MediaQuery.sizeOf(ctx).height * 0.88;
         return Dialog(
           insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           clipBehavior: Clip.antiAlias,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Icon(Icons.apple, size: 40, color: cs.onSurfaceVariant),
-                  const SizedBox(height: 12),
-                  Text(
-                    loc.t('pro_payment_title'),
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    loc.t('pro_payment_body'),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: cs.onSurfaceVariant,
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHighest.withValues(alpha: 0.6),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 16,
-                        horizontal: 12,
-                      ),
-                      child: Text(
-                        priceText,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
+            constraints: BoxConstraints(maxWidth: 420, maxHeight: maxH),
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          paid ? Icons.verified_outlined : Icons.apple,
+                          size: 28,
                           color: cs.primary,
                         ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            loc.t('pro_payment_hub_title'),
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    if (paid) ...[
+                      Text(
+                        _hubActiveAccessBody(loc, promo),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          height: 1.45,
+                        ),
+                      ),
+                    ] else ...[
+                      Text(
+                        loc.t('pro_payment_body'),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: cs.onSurfaceVariant,
+                          height: 1.45,
+                        ),
+                      ),
+                      if (ready && product != null) ...[
+                        const SizedBox(height: 16),
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerHighest
+                                .withValues(alpha: 0.65),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                              horizontal: 12,
+                            ),
+                            child: Text(
+                              _formatIapProductPrice(ctx, product),
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: cs.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          loc.t('pro_payment_price_note'),
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            height: 1.35,
+                          ),
+                        ),
+                      ] else ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          !ready
+                              ? loc.t('pro_iap_store_unavailable')
+                              : loc.t('pro_iap_product_unavailable'),
+                          style: TextStyle(
+                            color: cs.error,
+                            fontSize: 14,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ],
+                    const SizedBox(height: 14),
+                    Text(
+                      loc.t('pro_payment_hub_restore_hint'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        height: 1.35,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    loc.t('pro_payment_price_note'),
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                      height: 1.35,
+                    const SizedBox(height: 16),
+                    OutlinedButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        await iap.restorePurchases();
+                      },
+                      child: Text(loc.t('pro_iap_restore')),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: () => Navigator.pop(ctx, true),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    if (!paid && ready && product != null) ...[
+                      const SizedBox(height: 8),
+                      FilledButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          unawaited(iap.purchasePro());
+                        },
+                        child: Text(loc.t('pro_purchase')),
+                      ),
+                    ],
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(loc.t('close')),
                     ),
-                    child: Text(loc.t('pro_purchase')),
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () async {
-                      Navigator.pop(ctx, false);
-                      await iap.restorePurchases();
-                    },
-                    child: Text(loc.t('pro_iap_restore')),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: Text(loc.t('cancel')),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         );
       },
     );
-    if (ok == true && mounted) {
-      await iap.purchasePro();
-    }
   }
 
   @override
@@ -465,21 +549,42 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
             );
           },
         ),
-        Consumer<AppleIapService>(
-          builder: (context, iap, _) {
-            final busy = iap.busy;
-            return ListTile(
-              leading: const Icon(Icons.payment_outlined),
-              title: Text(loc.t('pro_payment_title')),
-              subtitle: Text(loc.t('pro_payment_subtitle')),
-              trailing: busy
-                  ? const SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.apple),
-              onTap: busy ? null : () => _onPaymentTap(iap, loc),
+        FutureBuilder<EstablishmentPromoInfo>(
+          future: _promoFuture,
+          builder: (context, promoSnap) {
+            final promo = promoSnap.data;
+            return ListenableBuilder(
+              listenable: widget.accountManager,
+              builder: (context, _) {
+                final paidPro = widget.accountManager.hasPaidProSubscription;
+                return Consumer<AppleIapService>(
+                  builder: (context, iap, _) {
+                    final busy = iap.busy;
+                    final subtitle = !paidPro
+                        ? loc.t('pro_payment_subtitle')
+                        : _paidProPaymentSubtitle(loc, promo);
+                    return ListTile(
+                      leading: const Icon(Icons.payment_outlined),
+                      title: Text(loc.t('pro_payment_title')),
+                      subtitle: Text(subtitle),
+                      trailing: busy
+                          ? const SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              paidPro
+                                  ? Icons.check_circle_outline
+                                  : Icons.apple,
+                            ),
+                      onTap: busy
+                          ? null
+                          : () => _showProPaymentHub(iap, loc),
+                    );
+                  },
+                );
+              },
             );
           },
         ),
