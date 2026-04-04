@@ -1775,11 +1775,8 @@ class AccountManagerSupabase extends ChangeNotifier {
       if (rows.isEmpty) return const EstablishmentPromoInfo();
       final m = Map<String, dynamic>.from(rows.first as Map);
       final code = m['code']?.toString();
-      DateTime? exp;
-      final rawExp = m['expires_at'];
-      if (rawExp != null) {
-        exp = DateTime.tryParse(rawExp.toString());
-      }
+      final rawExp = m['expires_at'] ?? m['ExpiresAt'];
+      final exp = _parseRpcTimestamp(rawExp);
       final rawDis = m['is_disabled'];
       final isDisabled = rawDis == true || rawDis == 1;
       return EstablishmentPromoInfo(
@@ -1849,14 +1846,21 @@ class EstablishmentPromoInfo {
 
   bool get hasPromo => !loadFailed && code != null && code!.isNotEmpty;
 
-  /// Промокод реально даёт Pro: не отключён, не истёк; совпадает с логикой [check_establishment_access].
+  /// Промокод реально даёт Pro: не отключён, не истёк; в БД у промокода всегда есть [expires_at].
   bool get isPromoGrantActive {
     if (loadFailed) return false;
     final c = code?.trim();
     if (c == null || c.isEmpty) return false;
     if (isDisabled) return false;
     final exp = expiresAt;
-    if (exp != null && !exp.isAfter(DateTime.now())) return false;
+    if (exp == null) return false;
+    if (!exp.isAfter(DateTime.now())) return false;
     return true;
   }
+}
+
+DateTime? _parseRpcTimestamp(dynamic raw) {
+  if (raw == null) return null;
+  if (raw is DateTime) return raw;
+  return DateTime.tryParse(raw.toString());
 }

@@ -401,7 +401,7 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
   final _noteController = TextEditingController();
   final _maxEmployeesController = TextEditingController();
   final _bulkCountController = TextEditingController(text: '5');
-  DateTime? _expiresAt;
+  late DateTime _expiresAt;
 
   List<Map<String, dynamic>> _codes = [];
   bool _isLoading = true;
@@ -414,6 +414,7 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
   @override
   void initState() {
     super.initState();
+    _expiresAt = DateTime.now().add(const Duration(days: 30));
     _loadCodes();
   }
 
@@ -477,13 +478,13 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
       await widget.supabase.from('promo_codes').insert({
         'code': code,
         'note': _noteController.text.trim().isEmpty ? null : _noteController.text.trim(),
-        'expires_at': _expiresAt?.toIso8601String(),
+        'expires_at': _expiresAt.toIso8601String(),
         'max_employees': maxEmp,
       });
       _codeController.clear();
       _noteController.clear();
       _maxEmployeesController.clear();
-      setState(() => _expiresAt = null);
+      setState(() => _expiresAt = DateTime.now().add(const Duration(days: 30)));
       await _loadCodes();
     } catch (e) {
       if (mounted) {
@@ -524,7 +525,7 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
             Text(loc.t('admin_create_n_promos_body', args: {'count': '$count'})),
             if (note.isNotEmpty) Text(loc.t('admin_note_line', args: {'note': note})),
             if (maxEmp != null) Text(loc.t('admin_limit_employees_line', args: {'max': '$maxEmp'})),
-            if (_expiresAt != null) Text(loc.t('admin_expires_line', args: {'date': _formatDate(_expiresAt!.toIso8601String())})),
+            Text(loc.t('admin_expires_line', args: {'date': _formatDate(_expiresAt.toIso8601String())})),
           ],
         ),
         actions: [
@@ -548,7 +549,7 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
           rows.add({
             'code': code,
             'note': note.isEmpty ? null : note,
-            'expires_at': _expiresAt?.toIso8601String(),
+            'expires_at': _expiresAt.toIso8601String(),
             'max_employees': maxEmp,
           });
         }
@@ -566,14 +567,14 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
       }
       _noteController.clear();
       _maxEmployeesController.clear();
-      setState(() => _expiresAt = null);
+      setState(() => _expiresAt = DateTime.now().add(const Duration(days: 30)));
       await _loadCodes();
     } catch (e) {
       if (mounted) {
-        final loc = context.read<LocalizationService>();
+        final locErr = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.t('error_generic', args: {'error': e.toString()})),
+            content: Text(locErr.t('error_generic', args: {'error': e.toString()})),
             backgroundColor: Colors.red,
           ),
         );
@@ -625,11 +626,6 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
     await widget.supabase.from('promo_codes').update({
       'expires_at': picked.toIso8601String(),
     }).eq('id', id);
-    await _loadCodes();
-  }
-
-  Future<void> _clearExpires(int id) async {
-    await widget.supabase.from('promo_codes').update({'expires_at': null}).eq('id', id);
     await _loadCodes();
   }
 
@@ -769,9 +765,8 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
                       onPressed: _pickNewCodeExpiry,
                       icon: const Icon(Icons.calendar_today, size: 14),
                       label: Text(
-                        _expiresAt == null
-                            ? loc.t('admin_no_expiry')
-                            : loc.t('admin_until_prefix', args: {'date': _formatDate(_expiresAt!.toIso8601String())}),
+                        loc.t('admin_until_prefix',
+                            args: {'date': _formatDate(_expiresAt.toIso8601String())}),
                         style: const TextStyle(fontSize: 12),
                       ),
                       style: OutlinedButton.styleFrom(
@@ -779,15 +774,6 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
                       ),
                     ),
                   ),
-                  if (_expiresAt != null) ...[
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: const Icon(Icons.clear, size: 16),
-                      onPressed: () => setState(() => _expiresAt = null),
-                      tooltip: loc.t('admin_remove_expiry_tooltip'),
-                      visualDensity: VisualDensity.compact,
-                    ),
-                  ],
                   const SizedBox(width: 8),
                   FilledButton.icon(
                     onPressed: _isSaving ? null : _addCode,
@@ -986,7 +972,6 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
           switch (action) {
             case 'toggle': await _toggleUsed(id, isUsed); break;
             case 'set_expires': await _setExpires(id); break;
-            case 'clear_expires': await _clearExpires(id); break;
             case 'set_max_employees': await _setMaxEmployees(id, maxEmployees); break;
             case 'clear_max_employees': await _clearMaxEmployees(id); break;
             case 'delete': await _deleteCode(id); break;
@@ -1009,15 +994,6 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
               Text(loc.t('admin_change_expiry')),
             ]),
           ),
-          if (expiresAt != null)
-            PopupMenuItem(
-              value: 'clear_expires',
-              child: Row(children: [
-                const Icon(Icons.timer_off, size: 16),
-                const SizedBox(width: 8),
-                Text(loc.t('admin_remove_expiry')),
-              ]),
-            ),
           PopupMenuItem(
             value: 'set_max_employees',
             child: Row(children: [
