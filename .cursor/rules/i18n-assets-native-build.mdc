@@ -1,0 +1,12 @@
+---
+description: Переводы в assets — веб vs нативные приложения (нужен новый билд).
+globs: restodocks_flutter/assets/**,**/localizable.json,**/pubspec.yaml
+---
+
+# Локализация и релиз
+
+- **`assets/translations/localizable.json`** (и прочие assets с переводами) **вшиваются в бинарник** при `flutter build` для iOS/Android.
+- **Веб (restodocks.com):** после деплоя Beta/Prod пользователи получают новый JSON сразу — **достаточно деплоя** (merge в `staging` / Cloudflare).
+- **Приложение в App Store / TestFlight:** после изменений переводов или новых ключей пользователи **не увидят** обновление текста, пока не выйдет **новая сборка** (bump `version` в `pubspec.yaml` при необходимости → `flutter build ipa` / Android → загрузка в Store/Connect).
+
+Если правили только веб и не трогали переводы — новый нативный билд не обязателен. Если правили **локализацию в assets** — для мобильных пользователей нужен **обновлённый билд**, не только git merge и деплой сайта.
