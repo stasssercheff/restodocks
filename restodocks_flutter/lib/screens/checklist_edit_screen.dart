@@ -818,7 +818,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       borderRadius: BorderRadius.circular(12),
       child: InputDecorator(
         decoration: InputDecoration(
-          labelText: lang == 'ru' ? 'Цех' : 'Section',
+          labelText: loc.t('section'),
           hintText: loc.t('checklist_section_select') ?? 'Выбрать цеха',
           border: const OutlineInputBorder(),
           suffixIcon: canEdit
@@ -839,7 +839,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setInner) {
           return AlertDialog(
-            title: Text(lang == 'ru' ? 'Цех' : 'Section'),
+            title: Text(loc.t('section')),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1626,7 +1626,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(_error ?? 'Чеклист не найден',
+                Text(_error ?? loc.t('checklist_not_found'),
                     textAlign: TextAlign.center),
                 const SizedBox(height: 16),
                 FilledButton(

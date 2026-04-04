@@ -368,7 +368,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(_error ?? 'Чеклист не найден', textAlign: TextAlign.center),
+                Text(_error ?? loc.t('checklist_not_found'), textAlign: TextAlign.center),
                 const SizedBox(height: 16),
                 FilledButton(
                   onPressed: () => context.pop(),

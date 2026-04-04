@@ -366,28 +366,13 @@ class LocalizationService extends ChangeNotifier {
   /// Проверка, выбран ли язык
   bool get isLanguageSelected => true; // Пока всегда true
 
-  /// Получение названия языка
+  /// Получение названия языка (подписи в `localizable.json`: `lang_name_*`).
   String getLanguageName(String languageCode) {
-    switch (languageCode) {
-      case 'ru':
-        return 'Русский';
-      case 'en':
-        return 'English';
-      case 'es':
-        return 'Español';
-      case 'tr':
-        return 'Türkçe';
-      case 'it':
-        return 'Italiano';
-      case 'vi':
-        return 'Tiếng Việt';
-      case 'de':
-        return 'Deutsch';
-      case 'fr':
-        return 'Français';
-      default:
-        return languageCode;
-    }
+    final code = languageCode.trim().toLowerCase();
+    final key = 'lang_name_$code';
+    final v = t(key);
+    if (v != key) return v;
+    return code;
   }
 
   /// Получение списка доступных языков

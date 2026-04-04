@@ -64,7 +64,8 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
     if (fragment.contains('error=') &&
         (fragment.contains('otp_expired') || fragment.contains('access_denied'))) {
       setState(() {
-        _status = 'Ссылка истекла или уже использована. Войдите, используя email и пароль.';
+        _status =
+            LocalizationService().t('auth_confirm_link_expired');
         _showLoginButton = true;
       });
       clear_hash.clearHashFromUrl();
@@ -112,7 +113,8 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
     }
 
     setState(() {
-      _status = 'Сессия не восстановлена.';
+      _status =
+          LocalizationService().t('auth_confirm_session_not_restored');
       _showLoginButton = true;
     });
   }
@@ -124,6 +126,7 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
         body: BrandedAuthLoading(fullscreenLogo: true),
       );
     }
+    final loc = context.watch<LocalizationService>();
     return Scaffold(
       body: Center(
         child: Padding(
@@ -137,7 +140,7 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: () => context.go('/login'),
-                child: const Text('Войти'),
+                child: Text(loc.t('login')),
               ),
             ],
           ),

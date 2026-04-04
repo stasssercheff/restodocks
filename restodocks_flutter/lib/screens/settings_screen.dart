@@ -575,16 +575,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => const Center(
+        builder: (ctx) => Center(
           child: Card(
             child: Padding(
-              padding: EdgeInsets.all(24),
+              padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Удаление ТТК...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(loc.t('settings_clearing_ttk')),
                 ],
               ),
             ),
@@ -2436,7 +2436,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const Icon(Icons.restaurant_menu, color: Colors.orange),
                   title: Text(
                       localization.t('clear_all_ttk') ?? 'Удалить все ТТК'),
-                  subtitle: const Text('Временно для тестов (Beta)'),
+                  subtitle: Text(localization.t('settings_beta_admin_subtitle')),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _showClearAllTtkConfirm(context, localization),
                 ),
@@ -2528,9 +2528,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 leading: const Icon(Icons.admin_panel_settings,
                     color: Colors.deepPurple),
-                title: const Text('Platform Admin',
-                    style: TextStyle(color: Colors.deepPurple)),
-                subtitle: const Text('Промокоды и управление'),
+                title: Text(
+                  localization.t('settings_platform_admin_title'),
+                  style: const TextStyle(color: Colors.deepPurple),
+                ),
+                subtitle: Text(localization.t('settings_platform_admin_subtitle')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/admin'),
               ),

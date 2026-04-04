@@ -77,10 +77,10 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   int _loadingTotal = 0;
   Timer? _loadingTimeoutTimer; // Таймер для предотвращения зависания загрузки
 
-  void _setLoadingMessage(String message) {
-    if (mounted) {
-      setState(() => _loadingMessage = message);
-    }
+  void _setLoadingMsg(String key, {Map<String, String>? args}) {
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    setState(() => _loadingMessage = loc.t(key, args: args));
   }
 
   // Предотвращает зависание интерфейса в состоянии загрузки
@@ -168,7 +168,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     final loc = context.read<LocalizationService>();
     return Scaffold(
       appBar: AppBar(
-        title: Text(loc.t('Загрузка продуктов')),
+        title: Text(loc.t('product_upload_title')),
         leading: appBarBackButton(context),
       ),
       body: Center(
@@ -185,13 +185,13 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text(loc.t('Вернуться назад')),
+              child: Text(loc.t('product_upload_back')),
             ),
             const SizedBox(height: 16),
             // Кнопка для тестирования API
             OutlinedButton(
               onPressed: () => _testApiCall(context),
-              child: Text(loc.t('Тестировать API')),
+              child: Text(loc.t('product_upload_test_api')),
             ),
           ],
         ),
@@ -253,14 +253,14 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       // Проверяем авторизацию
       if (!account.isLoggedInSync) {
         _addDebugLog('Not logged in');
-        return _buildErrorScreen(loc.t('Необходимо войти в систему'));
+        return _buildErrorScreen(loc.t('product_upload_must_login'));
       }
 
       // Проверяем наличие заведения
       final establishmentId = account.dataEstablishmentId;
       if (establishmentId == null) {
         _addDebugLog('No establishment');
-        return _buildErrorScreen(loc.t('Не найдено заведение'));
+        return _buildErrorScreen(loc.t('establishment_not_found'));
       }
 
       final supplierId = widget.supplierOrderListId?.trim();
@@ -291,7 +291,12 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       return _buildMainScreen(loc, account, aiService, establishmentId);
     } catch (e, stackTrace) {
       _addDebugLog('Critical error in build: $e\n$stackTrace');
-      return _buildErrorScreen('Критическая ошибка: $e');
+      return _buildErrorScreen(
+        context.read<LocalizationService>().t(
+              'product_upload_critical_error',
+              args: {'error': '$e'},
+            ),
+      );
     }
   }
 
@@ -309,7 +314,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           if (kDebugMode) ...[
             IconButton(
               icon: const Icon(Icons.bug_report),
-              tooltip: 'Показать логи отладки',
+              tooltip: loc.t('product_upload_debug_tooltip'),
               onPressed: () => _showDebugLogs(context),
             ),
           ],
@@ -349,8 +354,10 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
                   border: Border.all(color: primary.withValues(alpha: 0.35)),
                 ),
                 child: Text(
-                  'Поставщик: ${widget.linkedSupplierName!.trim()}. '
-                  'Загруженные позиции будут добавлены в номенклатуру и в карточку этого поставщика.',
+                  loc.t(
+                    'product_upload_supplier_banner',
+                    args: {'name': widget.linkedSupplierName!.trim()},
+                  ),
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
@@ -380,7 +387,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
                           child: Text(
                             _loadingMessage.isNotEmpty
                                 ? _loadingMessage
-                                : 'Обработка...',
+                                : loc.t('product_upload_loading_processing'),
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                         ),
@@ -410,12 +417,12 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
             // Заголовок
             Text(
-              'Добавьте продукты в номенклатуру вашего заведения',
+              loc.t('product_upload_headline'),
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
             Text(
-              'Продукты будут добавлены в общую базу и станут доступны для создания ТТК и меню.',
+              loc.t('product_upload_subtitle'),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: Colors.grey[600],
                   ),
@@ -424,7 +431,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
             // Два способа загрузки
             Text(
-              'Выберите способ:',
+              loc.t('product_upload_choose_method'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -434,10 +441,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             // 1. Загрузить из текста
             _UploadMethodCard(
               icon: Icons.edit_note,
-              title: '1. Загрузить из текста',
-              description:
-                  'Вставьте список продуктов из Excel, мессенджера или заметок. '
-                  'Формат распознаётся автоматически, дубликаты и сверка цен.',
+              title: loc.t('product_upload_method_1_title'),
+              description: loc.t('product_upload_method_1_desc'),
               color: primary,
               onTap: _isLoading ? null : () => _showTextUploadDialog(),
             ),
@@ -446,9 +451,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
             // 2. Загрузить из файла (только xls/xlsx)
             _UploadMethodCard(
               icon: Icons.file_upload,
-              title: '2. Загрузить из файла',
-              description:
-                  'Excel (.xls, .xlsx). Модерация, поиск дубликатов, сверка цен.',
+              title: loc.t('product_upload_method_2_title'),
+              description: loc.t('product_upload_method_2_desc'),
               color: primary,
               onTap: _isLoading ? null : () => _uploadFromFileUnified(),
             ),
@@ -492,6 +496,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
   /// 4. Загрузить бланк iiko: парсит xlsx 1-в-1 (без ИИ), сохраняет в iiko_products
   Future<void> _uploadIikoBlank() async {
+    final loc = context.read<LocalizationService>();
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xlsx', 'xls'],
@@ -504,14 +509,15 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     final acc = context.read<AccountManagerSupabase>();
     final estId = acc.dataEstablishmentId;
     if (estId == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Не найдено заведение')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('establishment_not_found'))),
+      );
       return;
     }
 
     setState(() {
       _isLoading = true;
-      _loadingMessage = 'Чтение бланка iiko...';
+      _loadingMessage = loc.t('product_upload_loading_iiko_read');
     });
 
     try {
@@ -524,14 +530,18 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         if (mounted) {
           setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Не удалось распознать структуру бланка iiko')),
+            SnackBar(
+              content: Text(loc.t('product_upload_iiko_unrecognized')),
+            ),
           );
         }
         return;
       }
 
-      _setLoadingMessage('Сохранение ${products.length} позиций iiko...');
+      _setLoadingMsg(
+        'product_upload_loading_save_iiko',
+        args: {'count': '${products.length}'},
+      );
       final iikoStore = context.read<IikoProductStore>();
       await iikoStore.replaceAll(
         estId,
@@ -546,7 +556,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-                'Загружено ${products.length} позиций iiko. Доступны в номенклатуре → вкладка iiko'),
+              loc.t(
+                'product_upload_iiko_saved_count',
+                args: {'count': '${products.length}'},
+              ),
+            ),
             duration: const Duration(seconds: 5),
           ),
         );
@@ -554,8 +568,12 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(loc.t('product_upload_error_generic',
+                args: {'error': '$e'})),
+          ),
+        );
       }
     }
   }
@@ -741,7 +759,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     // и только при ошибке падает на локальный парсинг.
     setState(() => _isLoading = true);
     _startLoadingTimeout();
-    _setLoadingMessage('Чтение файла...');
+    _setLoadingMsg('product_upload_loading_read_file');
     await _processExcel(bytes, loc);
   }
 
@@ -1108,20 +1126,20 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     final choice = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('Импорт с модерацией')),
+        title: Text(loc.t('product_upload_import_moderation')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
               leading: const Icon(Icons.file_upload),
-              title: Text(loc.t('Из файла')),
-              subtitle: const Text('Excel (.xls, .xlsx)'),
+              title: Text(loc.t('product_upload_from_file')),
+              subtitle: Text(loc.t('product_upload_excel_types')),
               onTap: () => Navigator.of(ctx).pop('file'),
             ),
             ListTile(
               leading: const Icon(Icons.content_paste),
-              title: Text(loc.t('Вставить текст')),
-              subtitle: Text(loc.t('Из мессенджеров, заметок')),
+              title: Text(loc.t('product_upload_paste_text')),
+              subtitle: Text(loc.t('product_upload_paste_hint')),
               onTap: () => Navigator.of(ctx).pop('text'),
             ),
           ],
@@ -1150,7 +1168,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       List<String> rows = _extractRowsFromFile(bytes, name);
       if (rows.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('Не удалось извлечь данные из файла'))),
+          SnackBar(content: Text(loc.t('product_upload_extract_file_failed'))),
         );
         return;
       }
@@ -1161,7 +1179,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       final result = await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text(loc.t('Вставить текст')),
+          title: Text(loc.t('product_upload_paste_text')),
           content: SizedBox(
             width: 500,
             child: TextField(
@@ -1180,7 +1198,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
                 child: Text(loc.t('cancel'))),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(controller.text),
-              child: Text(loc.t('Анализ')),
+              child: Text(loc.t('product_upload_analyze')),
             ),
           ],
         ),
@@ -1202,7 +1220,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     if (est == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('Не найдено заведение'))),
+          SnackBar(content: Text(loc.t('establishment_not_found'))),
         );
       }
       return;
@@ -1210,7 +1228,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
     setState(() => _isLoading = true);
     _startLoadingTimeout();
-    _setLoadingMessage('Анализ данных...');
+    _setLoadingMsg('product_upload_loading_analyze');
 
     try {
       List<ParsedProductItem> parsed = [];
@@ -1235,7 +1253,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
       // Fallback: локальный парсинг, если ИИ недоступен или вернул пустой результат
       if (parsed.isEmpty) {
-        _setLoadingMessage('Разбор данных (локально)...');
+        _setLoadingMsg('product_upload_loading_parse_local');
         final rawLines = rows ??
             text!
                 .split(RegExp(r'\r?\n'))
@@ -1261,16 +1279,16 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         if (mounted) {
           setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text(
-                    'Не удалось извлечь продукты. Проверьте формат данных.'),
-                duration: Duration(seconds: 6)),
+            SnackBar(
+              content: Text(loc.t('product_upload_no_products_extracted')),
+              duration: const Duration(seconds: 6),
+            ),
           );
         }
         return;
       }
 
-      _setLoadingMessage('Сопоставление с базой...');
+      _setLoadingMsg('product_upload_loading_match_db');
       final store = context.read<ProductStoreSupabase>();
       await store.loadProducts(force: true);
       await store.loadNomenclature(est.dataEstablishmentId);
@@ -1328,7 +1346,10 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       if (mounted) {
         _cancelLoadingTimeout();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
+          SnackBar(
+            content: Text(loc.t('product_upload_error_generic',
+                args: {'error': '$e'})),
+          ),
         );
       }
     } finally {
@@ -1419,7 +1440,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
     try {
       setState(() => _isLoading = true);
-      _setLoadingMessage('Выбор файла...');
+      _setLoadingMsg('product_upload_loading_pick_file');
       _startLoadingTimeout(); // Предотвращаем зависание
 
       final loc = context.read<LocalizationService>();
@@ -1475,8 +1496,12 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     } catch (e, stackTrace) {
       _addDebugLog('Error in _uploadFromFile: $e\n$stackTrace');
       if (mounted) {
+        final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка загрузки файла: $e')),
+          SnackBar(
+            content: Text(loc.t('product_upload_error_file',
+                args: {'error': '$e'})),
+          ),
         );
       }
     } finally {
@@ -1493,7 +1518,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
     try {
       setState(() => _isLoading = true);
-      _setLoadingMessage('Открытие диалога...');
+      _setLoadingMsg('product_upload_loading_open_dialog');
       _startLoadingTimeout(); // Предотвращаем зависание
 
       final controller = TextEditingController();
@@ -1565,7 +1590,10 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       _addDebugLog('Error in _showPasteDialog: $e\n$stackTrace');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${loc.t('error')}: $e')),
+          SnackBar(
+            content: Text(loc.t('product_upload_error_generic',
+                args: {'error': '$e'})),
+          ),
         );
       }
     } finally {
@@ -1611,7 +1639,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setState) => AlertDialog(
-          title: Text('AI обработка списка продуктов'),
+          title: Text(loc.t('product_upload_ai_list_title')),
           content: SizedBox(
             width: 600,
             height: 450,
@@ -1639,9 +1667,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
                 ),
                 const SizedBox(height: 16),
                 CheckboxListTile(
-                  title: Text('Добавить в номенклатуру заведения',
+                  title: Text(loc.t('product_upload_add_to_venue_nomenclature'),
                       style: Theme.of(context).textTheme.bodyMedium),
-                  subtitle: Text('Продукты будут доступны для создания техкарт',
+                  subtitle: Text(loc.t('product_upload_add_to_venue_hint'),
                       style: Theme.of(context).textTheme.bodySmall),
                   value: addToNomenclature,
                   onChanged: (value) =>
@@ -1655,14 +1683,14 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Отмена'),
+              child: Text(loc.t('cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop((
                 text: controller.text,
                 addToNomenclature: addToNomenclature
               )),
-              child: const Text('Обработать с AI'),
+              child: Text(loc.t('product_upload_process_with_ai')),
             ),
           ],
         ),
@@ -1682,7 +1710,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
 
     if (establishmentId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не найдено заведение')),
+        SnackBar(content: Text(loc.t('establishment_not_found'))),
       );
       return;
     }
@@ -1778,7 +1806,10 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${loc.t('Ошибка импорта')}: $e')),
+        SnackBar(
+          content: Text(loc.t('product_upload_import_error',
+              args: {'error': '$e'})),
+        ),
       );
     } finally {
       if (mounted) {
@@ -1799,30 +1830,32 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       final resolution = await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text(loc.t('Неоднозначное совпадение')),
+          title: Text(loc.t('product_upload_ambiguous_title')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(loc.t('Продукт из файла: ${result.fileName}')),
-              Text(loc.t(
-                  'Найдено в базе: ${result.matchResult.existingProductName}')),
+              Text(loc.t('product_upload_file_product',
+                  args: {'name': result.fileName})),
+              Text(loc.t('product_upload_found_in_db', args: {
+                'name': result.matchResult.existingProductName ?? '',
+              })),
               const SizedBox(height: 16),
-              Text(loc.t('Что сделать?')),
+              Text(loc.t('product_upload_what_to_do')),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop('replace'),
-              child: Text(loc.t('Заменить существующий')),
+              child: Text(loc.t('product_upload_replace_existing')),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop('create'),
-              child: Text(loc.t('Создать новый')),
+              child: Text(loc.t('product_upload_create_new')),
             ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(loc.t('Пропустить')),
+              child: Text(loc.t('skip')),
             ),
           ],
         ),
@@ -1840,7 +1873,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       String text, LocalizationService loc, bool addToNomenclature) async {
     devLog('=== _processTextWithAI called ===');
     _addDebugLog('=== STARTING AI TEXT PROCESSING ===');
-    _setLoadingMessage('Обрабатываем текст...');
+    _setLoadingMsg('product_upload_loading_process_text');
 
     setState(() => _isLoading = true);
 
@@ -1973,15 +2006,18 @@ ${text}
             items, loc, addToNomenclature, processingResults);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text(
-                  'Не удалось извлечь продукты из текста. Проверьте формат данных.'),
-              duration: Duration(seconds: 5)),
+          SnackBar(
+            content: Text(loc.t('product_upload_ai_no_products_from_text')),
+            duration: const Duration(seconds: 5),
+          ),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка обработки текста AI: $e')),
+        SnackBar(
+          content: Text(loc.t('product_upload_error_ai_text',
+              args: {'error': '$e'})),
+        ),
       );
     } finally {
       if (mounted) {
@@ -2016,19 +2052,19 @@ ${text}
 
     if (!account.isLoggedInSync) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ошибка: пользователь не авторизован')),
+        SnackBar(content: Text(loc.t('product_upload_error_not_signed_in'))),
       );
       return;
     }
 
     if (establishmentId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ошибка: не найдено заведение')),
+        SnackBar(content: Text(loc.t('product_upload_error_no_establishment'))),
       );
       return;
     }
 
-    _setLoadingMessage('Определяем формат текста...');
+    _setLoadingMsg('product_upload_loading_detect_format');
 
     // Определяем формат текста
     final format = _detectTextFormat(text);
@@ -2042,7 +2078,7 @@ ${text}
     }
 
     // Обычный парсинг
-    _setLoadingMessage('Разбираем текст...');
+    _setLoadingMsg('product_upload_loading_parse_text');
     final lines = text
         .split(RegExp(r'\r?\n'))
         .map((s) => s.trim())
@@ -2087,7 +2123,7 @@ ${text}
 
     if (items.isEmpty) {
       _addDebugLog('WARNING: Basic parsing failed, trying AI processing');
-      _setLoadingMessage('Разбор данных...');
+      _setLoadingMsg('product_upload_loading_parse_data');
       // Если обычный парсинг не сработал, пробуем AI
       return await _processTextWithAI(text, loc, addToNomenclature);
     }
@@ -2102,7 +2138,10 @@ ${text}
           'Nomenclature loaded for text processing, products: ${store.nomenclatureProductIds.length}');
     }
 
-    _setLoadingMessage('Сохраняем ${items.length} продуктов...');
+    _setLoadingMsg(
+      'product_upload_loading_save_count',
+      args: {'count': '${items.length}'},
+    );
 
     // Инициализируем processingResults для всех продуктов
     final processingResults = <Map<String, dynamic>>[];
@@ -2213,7 +2252,7 @@ ${text}
 
     try {
       // Для OLE (.xls) и как основной путь — сервер-сайд парсинг через SheetJS
-      _setLoadingMessage('Чтение файла...');
+      _setLoadingMsg('product_upload_loading_read_file');
       final serverRows = await _parseXlsViaServer(bytes);
 
       if (serverRows != null && serverRows.isNotEmpty) {
@@ -2241,10 +2280,9 @@ ${text}
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'Не удалось прочитать файл. Попробуйте пересохранить его как .xlsx в Excel или скопировать данные вручную.'),
-            duration: Duration(seconds: 6),
+          SnackBar(
+            content: Text(loc.t('product_upload_excel_unreadable')),
+            duration: const Duration(seconds: 6),
           ),
         );
         context.go('/nomenclature');
@@ -2255,7 +2293,10 @@ ${text}
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка обработки файла: $e')),
+          SnackBar(
+            content: Text(loc.t('product_upload_error_file_process',
+                args: {'error': '$e'})),
+          ),
         );
         context.go('/nomenclature');
       }
@@ -2335,7 +2376,10 @@ ${text}
       _addDebugLog('ERROR: No items to process!');
       return;
     }
-    _setLoadingMessage('Обрабатываем ${items.length} продуктов...');
+    _setLoadingMsg(
+      'product_upload_loading_process_count',
+      args: {'count': '${items.length}'},
+    );
     setState(() {
       _isLoading = true;
       _loadingTotal = items.length;
@@ -2359,7 +2403,7 @@ ${text}
       if (!account.isLoggedInSync) {
         devLog('DEBUG: User not logged in!');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Пользователь не авторизован')),
+          SnackBar(content: Text(loc.t('product_upload_not_signed_in'))),
         );
         return;
       }
@@ -2367,7 +2411,7 @@ ${text}
       if (estId == null) {
         devLog('DEBUG: No establishment found!');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Не найдено заведение')),
+          SnackBar(content: Text(loc.t('establishment_not_found'))),
         );
         return;
       }
@@ -2381,8 +2425,14 @@ ${text}
         if (mounted) {
           setState(() {
             _loadingProgress = idx;
-            _loadingMessage =
-                'Обрабатываем ${idx + 1} из ${items.length}: ${item.name}';
+            _loadingMessage = loc.t(
+              'product_upload_loading_item',
+              args: {
+                'current': '${idx + 1}',
+                'total': '${items.length}',
+                'name': item.name,
+              },
+            );
           });
         }
         idx++;
@@ -2755,7 +2805,11 @@ ${text}
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                  'Предупреждение: не удалось загрузить номенклатуру ($e)'),
+                loc.t(
+                  'product_upload_warning_nomenclature',
+                  args: {'error': '$e'},
+                ),
+              ),
               backgroundColor: Colors.orange,
               duration: const Duration(seconds: 3),
             ),
@@ -2766,13 +2820,8 @@ ${text}
       if (mounted)
         setState(() {
           _loadingProgress = items.length;
-          _loadingMessage = 'Готово';
+          _loadingMessage = loc.t('product_upload_done');
         });
-
-      // Показываем результат
-      final message = failed == 0
-          ? 'Добавлено: ${added + skipped}'
-          : 'Добавлено: ${added + skipped}, Ошибок: $failed';
 
       devLog(
           'DEBUG: Final result - Added: $added, Skipped: $skipped, Failed: $failed');
@@ -2814,7 +2863,7 @@ ${text}
         showDialog<void>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Загрузка завершена'),
+            title: Text(loc.t('product_upload_complete_title')),
             content: SizedBox(
               width: double.maxFinite,
               child: Column(
@@ -2823,15 +2872,30 @@ ${text}
                 children: [
                   Text(
                     failed == 0
-                        ? 'Успешно обработано: ${added + skipped} продуктов.'
-                        : 'Обработано: ${added + skipped}.\nОшибок: $failed.',
+                        ? loc.t(
+                            'product_upload_result_success',
+                            args: {'count': '${added + skipped}'},
+                          )
+                        : loc.t(
+                            'product_upload_result_partial',
+                            args: {
+                              'total': '${added + skipped}',
+                              'failed': '$failed',
+                            },
+                          ),
                   ),
                   if (processingResults
                       .where((r) => r['status'] == 'no_change')
                       .isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
-                      '${processingResults.where((r) => r['status'] == 'no_change').length} продуктов без изменений цен',
+                      loc.t(
+                        'product_upload_no_price_change_count',
+                        args: {
+                          'count':
+                              '${processingResults.where((r) => r['status'] == 'no_change').length}',
+                        },
+                      ),
                       style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                   ],
@@ -2839,9 +2903,9 @@ ${text}
                   if (processingResults
                       .where((r) => _isResultChanged(r))
                       .isNotEmpty) ...[
-                    const Text(
-                      'Детальные результаты:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                    Text(
+                      loc.t('product_upload_detailed_results'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Container(
@@ -2870,21 +2934,23 @@ ${text}
 
                           switch (status) {
                             case 'added':
-                              statusText = 'Добавлен';
+                              statusText = loc.t('product_upload_status_added');
                               statusColor = Colors.green;
                               priceText = newPrice != null
                                   ? '${newPrice.toStringAsFixed(0)} ${defCur}'
                                   : '';
                               break;
                             case 'added_db_only':
-                              statusText = 'Добавлен (только в БД)';
+                              statusText =
+                                  loc.t('product_upload_status_added_db_only');
                               statusColor = Colors.blue;
                               priceText = newPrice != null
                                   ? '${newPrice.toStringAsFixed(0)} ${defCur}'
                                   : '';
                               break;
                             case 'updated':
-                              statusText = 'Цена обновлена';
+                              statusText =
+                                  loc.t('product_upload_status_price_updated');
                               statusColor = Colors.orange;
                               final samePrice = oldPrice != null &&
                                   newPrice != null &&
@@ -2900,28 +2966,31 @@ ${text}
                               }
                               break;
                             case 'skipped':
-                              statusText = 'Пропущен';
+                              statusText =
+                                  loc.t('product_upload_status_skipped');
                               statusColor = Colors.blue;
                               priceText = newPrice != null
                                   ? '${newPrice.toStringAsFixed(0)} ${defCur}'
                                   : '';
                               break;
                             case 'error':
-                              statusText = 'Ошибка';
+                              statusText = loc.t('product_upload_status_error');
                               statusColor = Colors.red;
                               priceText = newPrice != null
                                   ? '${newPrice.toStringAsFixed(0)} ${defCur}'
                                   : '';
                               break;
                             case 'pending':
-                              statusText = 'Ожидает';
+                              statusText =
+                                  loc.t('product_upload_status_pending');
                               statusColor = Colors.grey;
                               priceText = newPrice != null
                                   ? '${newPrice.toStringAsFixed(0)} ${defCur}'
                                   : '';
                               break;
                             default:
-                              statusText = 'Неизвестно';
+                              statusText =
+                                  loc.t('product_upload_status_unknown');
                               statusColor = Colors.grey;
                           }
 
@@ -2971,19 +3040,26 @@ ${text}
                       ),
                     ),
                   ] else ...[
-                    const Text(
-                      'Результаты:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                    Text(
+                      loc.t('product_upload_results_simple'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
-                    Text('• Новые продукты: $added'),
-                    Text('• Обновлены цены: $skipped'),
-                    if (failed > 0) Text('• Ошибок: $failed'),
+                    Text(
+                      '• ${loc.t('product_upload_stats_new', args: {'count': '$added'})}',
+                    ),
+                    Text(
+                      '• ${loc.t('product_upload_stats_prices', args: {'count': '$skipped'})}',
+                    ),
+                    if (failed > 0)
+                      Text(
+                        '• ${loc.t('product_upload_stats_errors', args: {'count': '$failed'})}',
+                      ),
                   ],
                   const SizedBox(height: 16),
-                  const Text(
-                    'Примечание: Для обновленных продуктов цены были изменены в соответствии с данными из файла.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  Text(
+                    loc.t('product_upload_note_prices_from_file'),
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
               ),
@@ -2991,7 +3067,7 @@ ${text}
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('OK'),
+                child: Text(loc.t('dialog_ok')),
               ),
             ],
           ),
@@ -3000,8 +3076,13 @@ ${text}
     } catch (e) {
       devLog('DEBUG: Error in direct processing: $e');
       if (mounted) {
+        final locErr = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка обработки: $e')),
+          SnackBar(
+            content: Text(
+              locErr.t('product_upload_error_process', args: {'error': '$e'}),
+            ),
+          ),
         );
       }
     } finally {
@@ -3478,12 +3559,12 @@ ${allProducts.map((p) => p.name).join('\n')}
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(loc.t('Логи отладки')),
+        title: Text(loc.t('debug_logs_title')),
         content: SizedBox(
           width: double.maxFinite,
           height: 400,
           child: _debugLogs.isEmpty
-              ? Center(child: Text(loc.t('Логов пока нет')))
+              ? Center(child: Text(loc.t('debug_logs_empty')))
               : SingleChildScrollView(
                   child: SelectableText(
                     _debugLogs.join('\n'),
@@ -3499,20 +3580,19 @@ ${allProducts.map((p) => p.name).join('\n')}
               await Clipboard.setData(ClipboardData(text: logs));
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Логи скопированы в буфер обмена')),
+                  SnackBar(content: Text(loc.t('product_upload_logs_copied'))),
                 );
               }
             },
-            child: Text(loc.t('Копировать')),
+            child: Text(loc.t('copy_btn')),
           ),
           TextButton(
             onPressed: () => setState(() => _debugLogs.clear()),
-            child: Text(loc.t('Очистить')),
+            child: Text(loc.t('clear')),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: Text(loc.t('Закрыть')),
+            child: Text(loc.t('close')),
           ),
         ],
       ),
@@ -3538,7 +3618,7 @@ class _QuickActions extends StatelessWidget {
                 Icon(Icons.rocket_launch, color: Colors.green[700]),
                 const SizedBox(width: 8),
                 Text(
-                  loc.t('Быстрые действия:'),
+                  loc.t('product_upload_quick_actions'),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: Colors.green[700],
@@ -3549,20 +3629,20 @@ class _QuickActions extends StatelessWidget {
             const SizedBox(height: 12),
             _buildQuickAction(
               context,
-              loc.t('Посмотреть номенклатуру'),
-              loc.t('Проверить добавленные продукты'),
+              loc.t('product_upload_open_nomenclature'),
+              loc.t('product_upload_check_products'),
               () => GoRouter.of(context).push('/products'),
             ),
             _buildQuickAction(
               context,
-              loc.t('Создать ТТК'),
-              loc.t('Использовать новые продукты в рецептах'),
+              loc.t('product_upload_create_ttk'),
+              loc.t('product_upload_use_in_recipes'),
               () => GoRouter.of(context).push('/tech-cards'),
             ),
             _buildQuickAction(
               context,
-              'Создать меню',
-              'Добавить блюда в меню ресторана',
+              loc.t('product_upload_menu_title'),
+              loc.t('product_upload_menu_subtitle'),
               () => GoRouter.of(context).push('/menu/kitchen'),
             ),
           ],
@@ -3614,6 +3694,7 @@ class _UploadSchoolCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     return Card(
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -3621,20 +3702,20 @@ class _UploadSchoolCard extends StatelessWidget {
           leading:
               Icon(Icons.school, color: Theme.of(context).colorScheme.primary),
           title: Text(
-            'Школа загрузки',
+            loc.t('product_upload_school_title'),
             style: Theme.of(context)
                 .textTheme
                 .titleSmall
                 ?.copyWith(fontWeight: FontWeight.bold),
           ),
-          subtitle: const Text('Формат данных, типы файлов, модерация'),
+          subtitle: Text(loc.t('product_upload_legal_subtitle')),
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Формат данных:',
+                  Text(loc.t('product_upload_format_data'),
                       style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 8),
                   Container(
@@ -3644,25 +3725,26 @@ class _UploadSchoolCard extends StatelessWidget {
                           Theme.of(context).colorScheme.surfaceContainerLowest,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text(
-                      'Авокадо\t99000\nБазилик\t267000\nМолоко\t38000',
-                      style: TextStyle(fontFamily: 'monospace', fontSize: 13),
+                    child: Text(
+                      loc.t('product_upload_format_example_block'),
+                      style: const TextStyle(
+                          fontFamily: 'monospace', fontSize: 13),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Название и цена — через Tab или пробелы. Распознаются запятые, символы валюты.',
+                    loc.t('product_upload_format_tab_hint'),
                     style: Theme.of(context)
                         .textTheme
                         .bodySmall
                         ?.copyWith(color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 16),
-                  Text('Поддерживаемые файлы:',
+                  Text(loc.t('product_upload_supported_files'),
                       style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 4),
                   Text(
-                    'Вставка текста или файл Excel (.xlsx, .xls).',
+                    loc.t('product_upload_supported_files_body'),
                     style: Theme.of(context)
                         .textTheme
                         .bodySmall
@@ -3687,7 +3769,7 @@ class _UploadSchoolCard extends StatelessWidget {
                                 size: 14,
                                 color: Theme.of(context).colorScheme.primary),
                             const SizedBox(width: 6),
-                            Text('Формат Excel файла:',
+                            Text(loc.t('product_upload_excel_format'),
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall
@@ -3695,20 +3777,14 @@ class _UploadSchoolCard extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 6),
-                        const Text(
-                          'Столбец A  |  Столбец B\n'
-                          '───────────────────────\n'
-                          'Авокадо    |  990\n'
-                          'Базилик    |  267\n'
-                          'Молоко     |  380',
-                          style:
-                              TextStyle(fontFamily: 'monospace', fontSize: 12),
+                        Text(
+                          loc.t('product_upload_excel_sample_block'),
+                          style: const TextStyle(
+                              fontFamily: 'monospace', fontSize: 12),
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          '• Столбец A — названия продуктов\n'
-                          '• Столбец B — цены напротив каждого продукта\n'
-                          '• Заголовки строк не нужны',
+                          loc.t('product_upload_excel_columns_hint'),
                           style: Theme.of(context)
                               .textTheme
                               .bodySmall
@@ -3718,14 +3794,11 @@ class _UploadSchoolCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Text('Модерация:',
+                  Text(loc.t('product_upload_moderation'),
                       style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 4),
                   Text(
-                    'После загрузки откроется экран проверки. Там можно:\n'
-                    '• Подтвердить или отклонить изменение цен\n'
-                    '• Добавить новые продукты в номенклатуру\n'
-                    '• Исправить предложенные названия',
+                    loc.t('product_upload_moderation_body'),
                     style: Theme.of(context)
                         .textTheme
                         .bodySmall
@@ -3802,6 +3875,7 @@ class _UploadMethodCard extends StatelessWidget {
 class _FormatExample extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     return Card(
       elevation: 1,
       color: Colors.grey[50],
@@ -3811,7 +3885,7 @@ class _FormatExample extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Пример формата данных:',
+              loc.t('product_upload_example_format_title'),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -3824,13 +3898,9 @@ class _FormatExample extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.grey[300]!),
               ),
-              child: const Text(
-                'Авокадо\t₫99,000\n'
-                'Базилик\t₫267,000\n'
-                'Баклажан\t₫12,000\n'
-                'Молоко\t₫38,000\n'
-                'Картофель\t₫25,000',
-                style: TextStyle(
+              child: Text(
+                loc.t('product_upload_example_monospace_block'),
+                style: const TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 14,
                   color: Colors.black87,
@@ -3839,9 +3909,7 @@ class _FormatExample extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              '• Название и цена разделяются табуляцией (Tab) или несколькими пробелами\n'
-              '• Можно использовать любые символы валюты\n'
-              '• Поддерживаются запятые в числах',
+              loc.t('product_upload_example_bullets'),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Colors.grey[600],
                   ),
@@ -3856,6 +3924,7 @@ class _FormatExample extends StatelessWidget {
 class _TipsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     return Card(
       elevation: 1,
       color: Colors.blue[50],
@@ -3869,7 +3938,7 @@ class _TipsSection extends StatelessWidget {
                 Icon(Icons.lightbulb, color: Colors.blue[700]),
                 const SizedBox(width: 8),
                 Text(
-                  'Полезные советы:',
+                  loc.t('product_upload_tips_title'),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: Colors.blue[700],
@@ -3878,10 +3947,10 @@ class _TipsSection extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            _buildTip('Экспортируйте продукты из Excel в текстовый файл'),
-            _buildTip('Или просто скопируйте список из любой таблицы'),
-            _buildTip('Названия и категории определяются автоматически'),
-            _buildTip('Продукты добавятся в общую базу и вашу номенклатуру'),
+            _buildTip(loc.t('product_upload_tip_export')),
+            _buildTip(loc.t('product_upload_tip_copy')),
+            _buildTip(loc.t('product_upload_tip_auto_names')),
+            _buildTip(loc.t('product_upload_tip_shared_base')),
           ],
         ),
       ),
@@ -3921,6 +3990,7 @@ class _PasteTextDialog extends StatefulWidget {
 class _PasteTextDialogState extends State<_PasteTextDialog> {
   @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final theme = Theme.of(context);
 
@@ -3939,12 +4009,12 @@ class _PasteTextDialogState extends State<_PasteTextDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Вставить список продуктов',
+                  loc.t('product_upload_paste_dialog_title'),
                   style: theme.textTheme.titleMedium,
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Вставьте список: из Excel (Ctrl+C), мессенджера, заметок. Формат распознаётся автоматически.',
+                  loc.t('product_upload_paste_dialog_body'),
                   style: theme.textTheme.bodySmall,
                 ),
                 const SizedBox(height: 12),
@@ -3952,9 +4022,9 @@ class _PasteTextDialogState extends State<_PasteTextDialog> {
                   controller: widget.controller,
                   maxLines: 6,
                   autofocus: true,
-                  decoration: const InputDecoration(
-                    hintText: 'Авокадо 99000\nБазилик 267000\nМолоко 38000',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    hintText: loc.t('product_upload_paste_dialog_hint'),
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -3963,13 +4033,13 @@ class _PasteTextDialogState extends State<_PasteTextDialog> {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Отмена'),
+                      child: Text(loc.t('cancel')),
                     ),
                     const SizedBox(width: 8),
                     FilledButton(
                       onPressed: () =>
                           Navigator.of(context).pop(widget.controller.text),
-                      child: const Text('Анализ'),
+                      child: Text(loc.t('product_upload_analyze')),
                     ),
                   ],
                 ),
@@ -3996,6 +4066,7 @@ class _InventoryPasteDialog extends StatefulWidget {
 class _InventoryPasteDialogState extends State<_InventoryPasteDialog> {
   @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final theme = Theme.of(context);
 
@@ -4019,7 +4090,7 @@ class _InventoryPasteDialogState extends State<_InventoryPasteDialog> {
                         color: Colors.orange[700], size: 20),
                     const SizedBox(width: 8),
                     Text(
-                      'Инвентаризационный бланк',
+                      loc.t('product_upload_inventory_dialog_title'),
                       style: theme.textTheme.titleMedium,
                     ),
                   ],
@@ -4036,13 +4107,12 @@ class _InventoryPasteDialogState extends State<_InventoryPasteDialog> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Скопируйте столбец «Наименование» из Excel (или несколько столбцов). '
-                        'ИИ сам определит название товара и отделит цифры (количество, цену, код).',
+                        loc.t('product_upload_inventory_dialog_body'),
                         style: theme.textTheme.bodySmall,
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Пример строки: "Т. Абсент Грин Зомби/Фея (хаус)"',
+                        loc.t('product_upload_inventory_example_line'),
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontFamily: 'monospace',
                           color: Colors.grey[600],
@@ -4057,10 +4127,7 @@ class _InventoryPasteDialogState extends State<_InventoryPasteDialog> {
                   maxLines: 8,
                   autofocus: true,
                   decoration: InputDecoration(
-                    hintText: 'Т.  Пенообразователь Bubble drops\n'
-                        'Т. Апельсин чипсы\n'
-                        'Т. Абсент Грин Зомби/Фея (хаус)\n'
-                        'Т. Мартини Бьянко вермут',
+                    hintText: loc.t('product_upload_inventory_hint'),
                     hintStyle: theme.textTheme.bodySmall
                         ?.copyWith(color: Colors.grey[400]),
                     border: const OutlineInputBorder(),
@@ -4073,12 +4140,12 @@ class _InventoryPasteDialogState extends State<_InventoryPasteDialog> {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Отмена'),
+                      child: Text(loc.t('cancel')),
                     ),
                     const SizedBox(width: 8),
                     FilledButton.icon(
                       icon: const Icon(Icons.auto_awesome, size: 16),
-                      label: const Text('Распознать'),
+                      label: Text(loc.t('product_upload_recognize')),
                       style: FilledButton.styleFrom(
                           backgroundColor: Colors.orange[700]),
                       onPressed: () =>

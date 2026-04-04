@@ -374,8 +374,14 @@ class AppRouter {
         pageBuilder: (context, state) {
           final token = state.queryParameters['token'];
           if (token == null || token.isEmpty) {
-            return _slideTransitionPage(state,
-                const Scaffold(body: Center(child: Text('Invalid link'))));
+            final loc =
+                Provider.of<LocalizationService>(context, listen: false);
+            return _slideTransitionPage(
+              state,
+              Scaffold(
+                body: Center(child: Text(loc.t('router_invalid_link'))),
+              ),
+            );
           }
           return _slideTransitionPage(
               state, RegisterCoOwnerScreen(token: token));
@@ -387,11 +393,15 @@ class AppRouter {
         pageBuilder: (context, state) {
           final token = state.queryParameters['token'];
           if (token == null || token.isEmpty) {
+            final loc =
+                Provider.of<LocalizationService>(context, listen: false);
             return _slideTransitionPage(
-                state,
-                const Scaffold(
-                  body: Center(child: Text('Invalid invitation link')),
-                ));
+              state,
+              Scaffold(
+                body:
+                    Center(child: Text(loc.t('router_invalid_invitation_link'))),
+              ),
+            );
           }
           return _slideTransitionPage(
               state, AcceptCoOwnerInvitationScreen(token: token));
@@ -900,12 +910,20 @@ class AppRouter {
                 );
               } catch (e) {
                 devLog('=== Error building ProductUploadScreen: $e ===');
+                final loc =
+                    Provider.of<LocalizationService>(context, listen: false);
                 return _slideTransitionPage(
-                    state,
-                    Scaffold(
-                      appBar: AppBar(title: const Text('Ошибка')),
-                      body: Center(child: Text('Ошибка загрузки экрана: $e')),
-                    ));
+                  state,
+                  Scaffold(
+                    appBar: AppBar(title: Text(loc.t('router_error_title'))),
+                    body: Center(
+                      child: Text(
+                        loc.t('router_screen_load_error',
+                            args: {'error': '$e'}),
+                      ),
+                    ),
+                  ),
+                );
               }
             },
           ),

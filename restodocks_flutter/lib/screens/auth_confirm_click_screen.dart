@@ -33,7 +33,8 @@ class AuthConfirmClickScreen extends StatefulWidget {
 }
 
 class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
-  String? _error;
+  /// Ключ из [localizable.json] или null.
+  String? _errorKey;
 
   Future<void> _applyLocaleAfterAuth(AccountManagerSupabase account) async {
     final lang = widget.languageCode.trim().toLowerCase();
@@ -68,8 +69,8 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
       _performVerify();
     } else if (widget.redirectParam.isNotEmpty) {
       _handleLegacyRedirect();
-    } else {
-      _error = 'Неверная ссылка. Войдите по паролю.';
+    } else if (mounted) {
+      setState(() => _errorKey = 'auth_click_invalid_params');
     }
   }
 
@@ -104,7 +105,7 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = 'Ссылка истекла или уже использована. Войдите по паролю.';
+        _errorKey = 'auth_click_verify_failed';
       });
       return;
     }
@@ -131,16 +132,17 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
       if (url.startsWith('http://') || url.startsWith('https://')) {
         redirect_impl.redirectToUrl(url);
       } else {
-        setState(() => _error = 'Неверная ссылка');
+        setState(() => _errorKey = 'auth_click_invalid_link_short');
       }
     } catch (e) {
-      setState(() => _error = 'Ссылка повреждена. Войдите по паролю.');
+      setState(() => _errorKey = 'auth_click_link_corrupted');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_error != null) {
+    if (_errorKey != null) {
+      final loc = context.watch<LocalizationService>();
       return Scaffold(
         body: SafeArea(
           child: Padding(
@@ -151,11 +153,11 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
                 children: [
                   Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.error),
                   const SizedBox(height: 16),
-                  Text(_error!, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyLarge),
+                  Text(loc.t(_errorKey!), textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyLarge),
                   const SizedBox(height: 24),
                   FilledButton(
                     onPressed: () => context.go('/login'),
-                    child: const Text('Войти'),
+                    child: Text(loc.t('login')),
                   ),
                 ],
               ),
