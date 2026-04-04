@@ -83,6 +83,13 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
         SnackBar(content: Text(loc.t('pro_iap_activated'))),
       );
     } else if (_iapWasBusy && !iap.busy && iap.lastError != null) {
+      iap.clearErrorIfProActive();
+      // Pro уже на сервере — не показываем ложное «ошибка» после успешной оплаты (дубли StoreKit).
+      if (iap.lastError == null ||
+          widget.accountManager.hasPaidProSubscription) {
+        _iapWasBusy = iap.busy;
+        return;
+      }
       final err = iap.lastError!;
       final msg = _iapFailureMessage(loc, err);
       final restore = _iapOfferRestoreSnackAction(err);

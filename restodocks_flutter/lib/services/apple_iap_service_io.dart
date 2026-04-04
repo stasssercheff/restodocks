@@ -161,6 +161,37 @@ class AppleIapService extends ChangeNotifier {
     }
   }
 
+  /// Сервер уже выставил Pro (другой вызов verify / дубликат события StoreKit).
+  bool get _paidProActiveOnServer =>
+      _account.establishment?.hasPaidProAccess ?? false;
+
+  /// Единый успех: sync заведения, сброс ошибки, completePurchase в StoreKit.
+  /// [countAsNewSuccess]: false — дубликат StoreKit после уже удачной верификации (без второго SnackBar).
+  Future<void> _finalizeVerifiedPurchase(
+    PurchaseDetails purchase, {
+    bool countAsNewSuccess = true,
+  }) async {
+    try {
+      await _account.syncEstablishmentAccessFromServer();
+    } catch (e, st) {
+      devLog('IAP finalize sync: $e $st');
+      try {
+        await _account.refreshCurrentEstablishmentFromServer();
+      } catch (_) {}
+    }
+    _lastError = null;
+    _busy = false;
+    if (countAsNewSuccess) {
+      _successToken++;
+    }
+    notifyListeners();
+    try {
+      await _iap.completePurchase(purchase);
+    } catch (e, st) {
+      devLog('IAP completePurchase after finalize: $e $st');
+    }
+  }
+
   Future<void> _verifyReceiptAndComplete(PurchaseDetails purchase) async {
     final est = _account.establishment;
     final emp = _account.currentEmployee;
@@ -177,6 +208,14 @@ class AppleIapService extends ChangeNotifier {
       // из-за этого ветка с разбором тела ответа не выполнялась.
       final receiptData = await _receiptForLegacyVerify(purchase);
       if (receiptData == null || receiptData.isEmpty) {
+        try {
+          await _account.refreshCurrentEstablishmentFromServer();
+        } catch (_) {}
+        if (_paidProActiveOnServer) {
+          devLog('IAP no_receipt but Pro already active — duplicate StoreKit event');
+          await _finalizeVerifiedPurchase(purchase, countAsNewSuccess: false);
+          return;
+        }
         _lastError = 'no_receipt';
         _busy = false;
         notifyListeners();
@@ -198,6 +237,16 @@ class AppleIapService extends ChangeNotifier {
 
       if (res.status != 200) {
         devLog('IAP billing-verify-apple failed: ${res.status} ${res.data}');
+        try {
+          await _account.refreshCurrentEstablishmentFromServer();
+        } catch (_) {}
+        if (_paidProActiveOnServer) {
+          devLog(
+            'IAP verify HTTP ${res.status} but Pro already active — ignoring spurious failure (duplicate StoreKit / race)',
+          );
+          await _finalizeVerifiedPurchase(purchase, countAsNewSuccess: false);
+          return;
+        }
         // Всегда сохраняем HTTP-статус первым сегментом — иначе UI показывает общий текст
         // и теряет различие между 401 / 403 / 400 / 5xx.
         final d = res.data;
@@ -220,16 +269,17 @@ class AppleIapService extends ChangeNotifier {
         return;
       }
 
-      // Как после промокода: RPC check_establishment_access + актуальное заведение —
-      // иначе Pro в БД есть, а UI/промо-строки могут не совпасть.
-      await _account.syncEstablishmentAccessFromServer();
-      _lastError = null;
-      _busy = false;
-      _successToken++;
-      notifyListeners();
-      await _iap.completePurchase(purchase);
+      await _finalizeVerifiedPurchase(purchase);
     } catch (e, st) {
       devLog('IAP verify: $e $st');
+      try {
+        await _account.refreshCurrentEstablishmentFromServer();
+      } catch (_) {}
+      if (_paidProActiveOnServer) {
+        devLog('IAP exception but Pro already active — treating as success');
+        await _finalizeVerifiedPurchase(purchase, countAsNewSuccess: false);
+        return;
+      }
       _lastError =
           'iap_client_exception|${e.runtimeType}|${e.toString().replaceAll('|', '/')}';
       _busy = false;
@@ -237,6 +287,14 @@ class AppleIapService extends ChangeNotifier {
       try {
         await _iap.completePurchase(purchase);
       } catch (_) {}
+    }
+  }
+
+  /// Убрать ложную ошибку в UI, если заведение уже Pro (после refresh с сервера).
+  void clearErrorIfProActive() {
+    if (_paidProActiveOnServer && _lastError != null) {
+      _lastError = null;
+      notifyListeners();
     }
   }
 
