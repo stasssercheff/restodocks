@@ -182,8 +182,16 @@ with
   /// Реже пишем большой черновик на диск — меньше подлагиваний при вводе в ячейках.
   @override
   int get scheduleSaveDebounceMs => 650;
-  Timer?
-      _serverAutoSaveTimer; // Таймер для автоматической отправки на сервер каждые 30 секунд
+
+  @override
+  void scheduleSave() {
+    _serverDraftDirty = true;
+    super.scheduleSave();
+  }
+
+  Timer? _serverAutoSaveTimer;
+  /// Пока false — таймер не гоняет [getCurrentState] и upsert на Supabase (нет лишней работы в фоне).
+  bool _serverDraftDirty = false;
   final List<_InventoryRow> _rows = [];
 
   /// Продукты, перерасчитанные из ПФ (третья секция); заполняется при загрузке файла.
@@ -221,6 +229,7 @@ with
 
   /// Сохранить данные немедленно в локальное хранилище (SharedPreferences/localStorage)
   void saveNow() {
+    _serverDraftDirty = true;
     saveImmediately(); // Немедленно, без debounce — данные не потеряются при закрытии/падении
   }
 
@@ -248,8 +257,8 @@ with
       saveNow();
     });
 
-    // Тихая отправка на сервер каждые 10 секунд — данные не теряются даже в инкогнито
-    _serverAutoSaveTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+    // Тихая отправка на сервер: реже, чем раньше, и только если черновик менялся ([_serverDraftDirty]).
+    _serverAutoSaveTimer = Timer.periodic(const Duration(seconds: 45), (timer) {
       if (mounted && !_completed) {
         _autoSaveToServer();
       }
@@ -886,10 +895,11 @@ with
     super.dispose();
   }
 
-  /// Автоматическая отправка данных на сервер каждые 30 секунд
+  /// Автоматическая отправка черновика на Supabase (без лишних вызовов при отсутствии изменений).
   Future<void> _autoSaveToServer() async {
     if (_completed || _rows.isEmpty)
       return; // Не сохранять если завершено или пусто
+    if (!_serverDraftDirty) return;
 
     try {
       final account = context.read<AccountManagerSupabase>();
@@ -901,6 +911,7 @@ with
 
       // Отправить на сервер как черновик инвентаризации
       await _saveDraftToServer(establishmentId, currentState);
+      if (mounted) _serverDraftDirty = false;
 
       devLog('📡 Auto-saved inventory draft to server');
     } catch (e) {
@@ -912,20 +923,18 @@ with
   /// Сохранить черновик инвентаризации на сервер
   Future<void> _saveDraftToServer(
       String establishmentId, Map<String, dynamic> data) async {
-    try {
-      final account = context.read<AccountManagerSupabase>();
-      final employeeId = account.currentEmployee?.id;
-      await Supabase.instance.client.from('inventory_drafts').upsert(
-        {
-          'establishment_id': establishmentId,
-          'employee_id': employeeId,
-          'draft_type': _isSelectiveInventory ? 'selective' : 'standard',
-          'draft_data': data,
-          'updated_at': DateTime.now().toIso8601String(),
-        },
-        onConflict: 'establishment_id,draft_type',
-      );
-    } catch (_) {}
+    final account = context.read<AccountManagerSupabase>();
+    final employeeId = account.currentEmployee?.id;
+    await Supabase.instance.client.from('inventory_drafts').upsert(
+      {
+        'establishment_id': establishmentId,
+        'employee_id': employeeId,
+        'draft_type': _isSelectiveInventory ? 'selective' : 'standard',
+        'draft_data': data,
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      onConflict: 'establishment_id,draft_type',
+    );
   }
 
   /// Минимум 2 пустых ячейки при открытии. При заполнении последней — добавляется ещё одна.
@@ -1626,7 +1635,8 @@ with
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
-    final account = context.watch<AccountManagerSupabase>();
+    // read: иначе любой notifyListeners у AccountManager (синк, сотрудник…) пересобирает весь бланк.
+    final account = context.read<AccountManagerSupabase>();
     final establishment = account.establishment;
     final employee = account.currentEmployee;
 
@@ -3617,6 +3627,12 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   @override
   int get scheduleSaveDebounceMs => 650;
 
+  @override
+  void scheduleSave() {
+    _serverDraftDirty = true;
+    super.scheduleSave();
+  }
+
   final List<_IikoInventoryRow> _rows = [];
   bool _isLoading = true;
   bool _completed = false;
@@ -3840,6 +3856,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
 
   Timer? _serverSaveTimer;
+  /// См. [_InventoryScreenState._serverDraftDirty] — не дергаем Supabase без изменений черновика.
+  bool _serverDraftDirty = false;
 
   void _setQuantity(_IikoInventoryRow row, int colIndex, double value) {
     setState(() {
@@ -3856,16 +3874,17 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     });
   }
 
-  /// Периодическое сохранение в Supabase каждые 10с — работает даже в инкогнито.
+  /// Периодическое сохранение в Supabase — реже и только при изменении черновика.
   void _startPeriodicServerSave() {
     _serverSaveTimer?.cancel();
-    _serverSaveTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+    _serverSaveTimer = Timer.periodic(const Duration(seconds: 45), (_) {
       if (mounted && !_completed) _saveIikoDraftToServer();
     });
   }
 
   Future<void> _saveIikoDraftToServer() async {
     if (_completed || _rows.isEmpty || !mounted) return;
+    if (!_serverDraftDirty) return;
     try {
       final account = context.read<AccountManagerSupabase>();
       final estId = account.establishment?.id;
@@ -3882,6 +3901,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         },
         onConflict: 'establishment_id,draft_type',
       );
+      if (mounted) _serverDraftDirty = false;
     } catch (_) {}
   }
 
@@ -4568,7 +4588,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
   @override
   Widget build(BuildContext context) {
-    final account = context.watch<AccountManagerSupabase>();
+    final account = context.read<AccountManagerSupabase>();
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
     final visibleRows = _filteredRows;
