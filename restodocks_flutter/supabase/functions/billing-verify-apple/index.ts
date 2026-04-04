@@ -13,6 +13,8 @@ type AppleVerifyReceiptResponse = {
   status?: number;
   environment?: string;
   latest_receipt_info?: Array<Record<string, unknown>>;
+  /** Автопродления; здесь же grace period при проблеме с оплатой (Connect → Grace Period). */
+  pending_renewal_info?: Array<Record<string, unknown>>;
   receipt?: {
     in_app?: Array<Record<string, unknown>>;
   };
@@ -57,18 +59,27 @@ async function verifyReceiptWithApple(
 }
 
 function extractMaxExpiryMs(data: AppleVerifyReceiptResponse): number | null {
-  const candidateRows = [
+  let maxMs: number | null = null;
+  const consider = (raw: unknown) => {
+    if (raw == null) return;
+    const ms = Number(raw);
+    if (!Number.isFinite(ms) || ms <= 0) return;
+    if (maxMs == null || ms > maxMs) maxMs = ms;
+  };
+
+  const fromReceipt = [
     ...(data.latest_receipt_info ?? []),
     ...((data.receipt?.in_app as Array<Record<string, unknown>> | undefined) ?? []),
   ];
-  let maxMs: number | null = null;
-  for (const row of candidateRows) {
-    const value = row["expires_date_ms"];
-    if (value == null) continue;
-    const ms = Number(value);
-    if (!Number.isFinite(ms) || ms <= 0) continue;
-    if (maxMs == null || ms > maxMs) maxMs = ms;
+  for (const row of fromReceipt) {
+    consider(row["expires_date_ms"]);
   }
+
+  // Billing grace / retry: конец доступа может быть позже `expires_date_ms` строки подписки.
+  for (const row of data.pending_renewal_info ?? []) {
+    consider(row["grace_period_expires_date_ms"]);
+  }
+
   return maxMs;
 }
 
