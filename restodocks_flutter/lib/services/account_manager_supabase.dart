@@ -173,10 +173,8 @@ class AccountManagerSupabase extends ChangeNotifier {
     }
   }
 
-  /// Синхронизация тарифа заведения (промокод = Pro-функции; вход в приложение на free не отменяется).
-  /// Раньше RPC возвращал `expired` → [logout] (ошибочно блокировал весь аккаунт). Миграция
-  /// check_establishment_access_promo_expires_to_free: истёкший промо → free, `ok`.
-  /// [logout] при `expired` — только для старой БД до миграции.
+  /// Синхронизация тарифа заведения: отключённый/истёкший промокод снимает только Pro (`subscription_type` / trial),
+  /// вход и работа на free остаются. RPC может вернуть `expired` на старых БД — [logout] не вызываем.
   /// Вызывать после входа, при возврате приложения на передний план и после применения промокода.
   Future<void> syncEstablishmentAccessFromServer() async {
     final estId = _establishment?.id;
@@ -188,9 +186,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       );
       if (result == 'expired') {
         devLog(
-            '🔐 AccountManager: Establishment access revoked (promo expired/disabled) $estId — logging out');
-        await logout();
-        return;
+            '🔐 AccountManager: check_establishment_access=expired (legacy) $estId — refresh establishment only, no logout');
       }
       await refreshCurrentEstablishmentFromServer();
     } catch (e) {

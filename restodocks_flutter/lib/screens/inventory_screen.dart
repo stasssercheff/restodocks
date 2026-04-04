@@ -2172,7 +2172,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   static const double _sectionHeaderHeight = 36;
 
   /// Фиксированная высота строки данных — для выравнивания ячеек ввода с текстом.
-  static const double _dataRowHeight = 44;
+  static const double _dataRowHeight = 40;
 
   /// Ширина фиксированной части: #, Наименование, Мера, Итого (продукт зафиксирован слева).
   double _leftWidth(BuildContext context) {
@@ -2342,9 +2342,9 @@ class _InventoryScreenState extends State<InventoryScreen>
     final row = _rows[actualIndex];
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 44),
+      constraints: const BoxConstraints(minHeight: 40),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         decoration: BoxDecoration(
           border: Border(
               bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
@@ -3040,6 +3040,10 @@ class _SelectiveInventoryPickerSheetState
                       ...products.map((p) {
                         final sel = _productIds.contains(p.id);
                         return CheckboxListTile(
+                          dense: true,
+                          visualDensity: VisualDensity.compact,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 0),
                           value: sel,
                           onChanged: (v) => setState(() {
                             if (v == true) {
@@ -3069,6 +3073,10 @@ class _SelectiveInventoryPickerSheetState
                       ...pfs.map((tc) {
                         final sel = _techCardIds.contains(tc.id);
                         return CheckboxListTile(
+                          dense: true,
+                          visualDensity: VisualDensity.compact,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 0),
                           value: sel,
                           onChanged: (v) => setState(() {
                             if (v == true) {
@@ -3204,7 +3212,7 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
               scrollDirection: Axis.horizontal,
               physics: const ClampingScrollPhysics(),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
                   border: Border(
@@ -3429,7 +3437,7 @@ class _QtyCellState extends State<_QtyCell> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return SizedBox(
-      height: 40,
+      height: 36,
       child: TextField(
         controller: _controller,
         focusNode: _focus,
@@ -3439,12 +3447,13 @@ class _QtyCellState extends State<_QtyCell> {
           FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),
         ],
         textAlign: TextAlign.center,
-        style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13, height: 1.2),
+        style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13, height: 1.15),
         decoration: InputDecoration(
-          isDense: false,
+          isDense: true,
+          visualDensity: VisualDensity.compact,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+              const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(3)),
           filled: true,
           fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
         ),
@@ -5135,10 +5144,11 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
               style: theme.textTheme.bodyMedium,
               decoration: InputDecoration(
                 isDense: true,
+                visualDensity: VisualDensity.compact,
                 contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
                 border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(3)),
                 filled: true,
                 fillColor:
                     theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
