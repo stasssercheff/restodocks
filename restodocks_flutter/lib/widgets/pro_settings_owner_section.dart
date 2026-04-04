@@ -26,6 +26,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
   late Future<EstablishmentPromoInfo> _promoFuture;
   AppleIapService? _iap;
   int _lastIapSuccessToken = 0;
+  bool _iapWasBusy = false;
   Timer? _promoReloadDebounce;
 
   @override
@@ -66,13 +67,29 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
   void _onIapChanged() {
     final iap = _iap;
     if (iap == null || !mounted) return;
+    final loc = widget.localization;
+
     if (iap.successToken != _lastIapSuccessToken && iap.successToken > 0) {
       _lastIapSuccessToken = iap.successToken;
-      final loc = widget.localization;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(loc.t('pro_iap_activated'))),
       );
+    } else if (_iapWasBusy && !iap.busy && iap.lastError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_iapFailureMessage(loc, iap.lastError!))),
+      );
     }
+    _iapWasBusy = iap.busy;
+  }
+
+  /// Сообщения после покупки/restore: сервер, чек, роль и т.д.
+  String _iapFailureMessage(LocalizationService loc, String code) {
+    final c = code.toLowerCase();
+    if (c.contains('store_unavailable')) return loc.t('pro_iap_store_unavailable');
+    if (c.contains('product_not')) return loc.t('pro_iap_product_unavailable');
+    if (c.contains('not_owner')) return loc.t('pro_iap_not_owner');
+    if (c.contains('no_receipt')) return loc.t('pro_iap_no_receipt');
+    return loc.t('pro_iap_error');
   }
 
   void _reloadPromo() {
@@ -198,9 +215,15 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     }
     await iap.init();
     if (!mounted) return;
-    if (!iap.ready || iap.product == null) {
+    if (!iap.ready) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('pro_iap_error'))),
+        SnackBar(content: Text(loc.t('pro_iap_store_unavailable'))),
+      );
+      return;
+    }
+    if (iap.product == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('pro_iap_product_unavailable'))),
       );
       return;
     }
