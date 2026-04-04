@@ -191,21 +191,20 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const { data: statusRows, error: statusError } = await supabase
-      .rpc("get_establishment_pro_status", { p_establishment_id: establishmentId });
-    if (statusError) {
-      return new Response(JSON.stringify({ error: statusError.message }), {
-        status: 500,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
-    }
+    // Не вызывать get_establishment_pro_status из Edge: RPC требует auth.uid(), а клиент
+    // с SUPABASE_SERVICE_ROLE_KEY даёт в БД auth.uid() = NULL → всегда ошибка.
+    const { data: estSnapshot } = await supabase
+      .from("establishments")
+      .select("subscription_type, pro_paid_until, pro_trial_ends_at")
+      .eq("id", establishmentId)
+      .maybeSingle();
 
     return new Response(JSON.stringify({
       ok: true,
       is_active: isActive,
       pro_paid_until: paidUntilIso,
       apple_environment: appleResp.environment ?? null,
-      status: Array.isArray(statusRows) && statusRows.length > 0 ? statusRows[0] : null,
+      establishment: estSnapshot ?? null,
     }), {
       status: 200,
       headers: { ...cors, "Content-Type": "application/json" },
