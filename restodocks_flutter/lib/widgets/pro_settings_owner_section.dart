@@ -171,7 +171,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
         lines.add(loc.t('pro_payment_hub_line_promo_until',
             args: {'date': _formatProDate(promo.expiresAt!)}));
       } else {
-        lines.add(loc.t('pro_payment_hub_line_promo_unlimited'));
+        lines.add(loc.t('pro_payment_hub_line_promo_active'));
       }
     }
 
@@ -517,7 +517,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
               subtitle = loc.t('pro_promo_subtitle_until',
                   args: {'date': _formatDate(promo.expiresAt!)});
             } else {
-              subtitle = loc.t('pro_promo_subtitle_no_expiry');
+              subtitle = loc.t('pro_promo_subtitle_active');
             }
             return ListTile(
               leading: const Icon(Icons.local_offer_outlined),
@@ -527,9 +527,6 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                   Icon(showPromoDetails ? Icons.info_outline : Icons.edit_outlined),
               onTap: showPromoDetails
                   ? () {
-                      final expText = promo.expiresAt != null
-                          ? _formatDate(promo.expiresAt!)
-                          : loc.t('pro_promo_subtitle_no_expiry');
                       showDialog<void>(
                         context: context,
                         builder: (ctx) => AlertDialog(
@@ -540,9 +537,14 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                             children: [
                               Text(
                                   '${loc.t('pro_promo_code_label')}: ${promo.code}'),
-                              const SizedBox(height: 12),
-                              Text(
-                                  '${loc.t('pro_promo_valid_until_label')}: $expText'),
+                              if (promo.expiresAt != null) ...[
+                                const SizedBox(height: 12),
+                                Text(
+                                    '${loc.t('pro_promo_valid_until_label')}: ${_formatDate(promo.expiresAt!)}'),
+                              ] else ...[
+                                const SizedBox(height: 12),
+                                Text(loc.t('pro_promo_subtitle_active')),
+                              ],
                             ],
                           ),
                           actions: [
