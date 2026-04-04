@@ -234,17 +234,26 @@ class LocalizationService extends ChangeNotifier {
     }
   }
 
-  /// Получение перевода для текущей локали (fallback: en → ru → key)
+  /// Получение перевода для текущей локали.
+  /// Русский не подставляем при нерусском UI — иначе смесь языков, если ключа нет в en.
   String translate(String key, {Map<String, String>? args}) {
     var translation = _autoUiTranslations[currentLanguageCode]?[key] ??
         _translations[currentLanguageCode]?[key] ??
-        _translations['en']?[key] ??
-        _translations['ru']?[key] ??
-        _translations['tr']?[key] ??
-        _translations['vi']?[key] ??
-        key;
+        _translations['en']?[key];
 
-    if (translation == key &&
+    if (translation == null) {
+      if (currentLanguageCode == 'ru') {
+        translation = _translations['ru']?[key] ??
+            _translations['tr']?[key] ??
+            _translations['vi']?[key];
+      } else {
+        translation = _translations['tr']?[key] ?? _translations['vi']?[key];
+      }
+    }
+
+    var out = translation ?? key;
+
+    if (out == key &&
         _shouldAutoTranslateUiString(key, currentLanguageCode)) {
       _scheduleAutoUiTranslation(
           sourceText: key, targetLanguage: currentLanguageCode);
@@ -253,11 +262,11 @@ class LocalizationService extends ChangeNotifier {
     // Замена аргументов в переводе
     if (args != null) {
       args.forEach((argKey, argValue) {
-        translation = translation.replaceAll('{$argKey}', argValue);
+        out = out.replaceAll('{$argKey}', argValue);
       });
     }
 
-    return translation;
+    return out;
   }
 
   /// Получение перевода с сокращенным синтаксисом
@@ -340,23 +349,31 @@ class LocalizationService extends ChangeNotifier {
       {Map<String, String>? args}) {
     var translation = _autoUiTranslations[languageCode]?[key] ??
         _translations[languageCode]?[key] ??
-        _translations['en']?[key] ??
-        _translations['ru']?[key] ??
-        _translations['tr']?[key] ??
-        _translations['vi']?[key] ??
-        key;
+        _translations['en']?[key];
 
-    if (translation == key && _shouldAutoTranslateUiString(key, languageCode)) {
+    if (translation == null) {
+      if (languageCode == 'ru') {
+        translation = _translations['ru']?[key] ??
+            _translations['tr']?[key] ??
+            _translations['vi']?[key];
+      } else {
+        translation = _translations['tr']?[key] ?? _translations['vi']?[key];
+      }
+    }
+
+    var out = translation ?? key;
+
+    if (out == key && _shouldAutoTranslateUiString(key, languageCode)) {
       _scheduleAutoUiTranslation(sourceText: key, targetLanguage: languageCode);
     }
 
     if (args != null) {
       args.forEach((argKey, argValue) {
-        translation = translation.replaceAll('{$argKey}', argValue);
+        out = out.replaceAll('{$argKey}', argValue);
       });
     }
 
-    return translation;
+    return out;
   }
 
   /// Проверка, выбран ли язык
