@@ -79,13 +79,16 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
       );
     } else if (_iapWasBusy && !iap.busy && iap.lastError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_iapFailureMessage(loc, iap.lastError!))),
+        SnackBar(
+          duration: const Duration(seconds: 10),
+          content: Text(_iapFailureMessage(loc, iap.lastError!)),
+        ),
       );
     }
     _iapWasBusy = iap.busy;
   }
 
-  /// Сообщения после покупки/restore: сервер, чек, роль и т.д.
+  /// Сообщения после покупки/restore: сервер Edge `billing-verify-apple`, Apple verifyReceipt, StoreKit.
   String _iapFailureMessage(LocalizationService loc, String code) {
     final c = code.toLowerCase();
     if (c.contains('store_unavailable')) return loc.t('pro_iap_store_unavailable');
@@ -97,17 +100,58 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     if (c.contains('verify_failed_http_429') || c.contains('too many requests')) {
       return loc.t('pro_iap_rate_limited');
     }
-    if (c.contains('verify_failed_http_500') ||
-        c.contains('server configuration error')) {
+    // Сессия: JWT не принят Edge (истёк / не передан).
+    if (c.contains('verify_failed_http_401') || c.contains('|unauthorized')) {
+      return loc.t('pro_iap_unauthorized');
+    }
+    // Не owner или чужое заведение.
+    if (c.contains('verify_failed_http_403') ||
+        c.contains('forbidden') ||
+        c.contains('only owner can verify')) {
+      return loc.t('pro_iap_forbidden');
+    }
+    // Конфиг сервера: нет APPLE_IAP_SHARED_SECRET и т.п.
+    if (c.contains('server configuration error')) {
       return loc.t('pro_iap_server_config');
     }
-    if (c.contains('verify_failed_http_400') ||
-        c.contains('apple receipt validation') ||
+    // Apple verifyReceipt status !== 0
+    if (c.contains('verify_failed_http_400')) {
+      final appleM = RegExp(r'apple_status_(\d+)').firstMatch(c);
+      if (appleM != null) {
+        return loc.t('pro_iap_apple_status_detail',
+            args: {'code': appleM.group(1)!});
+      }
+      if (c.contains('establishment_id and receipt_data')) {
+        return loc.t('pro_iap_bad_request');
+      }
+      return loc.t('pro_iap_apple_validation_failed');
+    }
+    // Любой 5xx на Edge или ошибка обновления БД
+    if (RegExp(r'verify_failed_http_5\d\d').hasMatch(c)) {
+      final m = RegExp(r'verify_failed_http_(\d+)').firstMatch(c);
+      final st = m?.group(1) ?? '5xx';
+      if (c.contains('verify_failed_http_500') && c.contains('server configuration')) {
+        return loc.t('pro_iap_server_config');
+      }
+      return loc.t('pro_iap_server_http', args: {'status': st});
+    }
+    if (c.contains('iap_client_exception')) {
+      return loc.t('pro_iap_client_error');
+    }
+    // Старые строки без префикса HTTP (совместимость)
+    if (c.contains('apple receipt validation') ||
         c.contains('receipt validation failed')) {
       return loc.t('pro_iap_apple_validation_failed');
     }
     if (c.contains('forbidden')) return loc.t('pro_iap_forbidden');
-    return loc.t('pro_iap_error');
+    return loc.t('pro_iap_error_with_detail', args: {'detail': _shortIapTechnical(code)});
+  }
+
+  /// Короткая строка для пользователя / поддержки (полный код в логах devLog).
+  String _shortIapTechnical(String code) {
+    final s = code.trim();
+    if (s.length <= 200) return s;
+    return '${s.substring(0, 197)}...';
   }
 
   /// Строка цены из стора ([ProductDetails.price]): для iOS это формат App Store по витрине, не локаль UI приложения.

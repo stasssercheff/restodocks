@@ -194,15 +194,22 @@ class AppleIapService extends ChangeNotifier {
 
       if (res.status != 200) {
         devLog('IAP billing-verify-apple failed: ${res.status} ${res.data}');
+        // Всегда сохраняем HTTP-статус первым сегментом — иначе UI показывает общий текст
+        // и теряет различие между 401 / 403 / 400 / 5xx.
         final d = res.data;
-        if (d != null && d['error'] != null) {
-          final apple = d['status'];
-          _lastError = apple != null
-              ? '${d['error']}_apple_$apple'
-              : d['error'].toString();
-        } else {
-          _lastError = 'verify_failed_http_${res.status}';
+        final buf = StringBuffer('verify_failed_http_${res.status}');
+        if (d != null) {
+          if (d['error'] != null) {
+            buf.write('|');
+            buf.write(
+              d['error'].toString().trim().replaceAll('|', '/'),
+            );
+          }
+          if (d['status'] != null) {
+            buf.write('|apple_status_${d['status']}');
+          }
         }
+        _lastError = buf.toString();
         _busy = false;
         notifyListeners();
         await _iap.completePurchase(purchase);
@@ -217,7 +224,8 @@ class AppleIapService extends ChangeNotifier {
       await _iap.completePurchase(purchase);
     } catch (e, st) {
       devLog('IAP verify: $e $st');
-      _lastError = e.toString();
+      _lastError =
+          'iap_client_exception|${e.runtimeType}|${e.toString().replaceAll('|', '/')}';
       _busy = false;
       notifyListeners();
       try {

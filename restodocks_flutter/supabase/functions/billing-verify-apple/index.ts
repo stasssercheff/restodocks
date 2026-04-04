@@ -58,12 +58,23 @@ async function verifyReceiptWithApple(
   return prodJson;
 }
 
+function toExpiresMs(raw: unknown): number | null {
+  if (raw == null) return null;
+  if (typeof raw === "number" && Number.isFinite(raw) && raw > 0) return raw;
+  if (typeof raw === "string") {
+    const n = Number(raw.trim().replace(/\s/g, ""));
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
+
+const TARGET_PRODUCT_ID = "restodocks_pro_monthly";
+
 function extractMaxExpiryMs(data: AppleVerifyReceiptResponse): number | null {
   let maxMs: number | null = null;
   const consider = (raw: unknown) => {
-    if (raw == null) return;
-    const ms = Number(raw);
-    if (!Number.isFinite(ms) || ms <= 0) return;
+    const ms = toExpiresMs(raw);
+    if (ms == null) return;
     if (maxMs == null || ms > maxMs) maxMs = ms;
   };
 
@@ -71,12 +82,20 @@ function extractMaxExpiryMs(data: AppleVerifyReceiptResponse): number | null {
     ...(data.latest_receipt_info ?? []),
     ...((data.receipt?.in_app as Array<Record<string, unknown>> | undefined) ?? []),
   ];
-  for (const row of fromReceipt) {
+  const forOurProduct = fromReceipt.filter((row) =>
+    String(row["product_id"] ?? "") === TARGET_PRODUCT_ID
+  );
+  const rows = forOurProduct.length > 0 ? forOurProduct : fromReceipt;
+
+  for (const row of rows) {
     consider(row["expires_date_ms"]);
   }
 
   // Billing grace / retry: конец доступа может быть позже `expires_date_ms` строки подписки.
   for (const row of data.pending_renewal_info ?? []) {
+    if (String(row["product_id"] ?? "") !== TARGET_PRODUCT_ID && forOurProduct.length > 0) {
+      continue;
+    }
     consider(row["grace_period_expires_date_ms"]);
   }
 
