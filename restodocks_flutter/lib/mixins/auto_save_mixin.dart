@@ -89,12 +89,15 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
     await _restoreDraft();
   }
 
+  /// Задержка перед записью черновика. Экраны с тяжёлым вводом (инвентаризация) могут увеличить.
+  int get scheduleSaveDebounceMs => 300;
+
   /// Запланировать сохранение с задержкой (данные намертво в localStorage)
   void scheduleSave() {
     if (!_isInitialized) return;
 
     _saveTimer?.cancel();
-    _saveTimer = Timer(const Duration(milliseconds: 300), () {
+    _saveTimer = Timer(Duration(milliseconds: scheduleSaveDebounceMs), () {
       if (mounted) {
         _saveDraft();
       }

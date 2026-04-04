@@ -176,9 +176,12 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen>
-    with
+with
         AutoSaveMixin<InventoryScreen>,
         InputChangeListenerMixin<InventoryScreen> {
+  /// Реже пишем большой черновик на диск — меньше подлагиваний при вводе в ячейках.
+  @override
+  int get scheduleSaveDebounceMs => 650;
   Timer?
       _serverAutoSaveTimer; // Таймер для автоматической отправки на сервер каждые 30 секунд
   final List<_InventoryRow> _rows = [];
@@ -2342,9 +2345,9 @@ class _InventoryScreenState extends State<InventoryScreen>
     final row = _rows[actualIndex];
 
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 40),
+      constraints: const BoxConstraints(minHeight: 52),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
         decoration: BoxDecoration(
           border: Border(
               bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
@@ -3212,7 +3215,7 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
               scrollDirection: Axis.horizontal,
               physics: const ClampingScrollPhysics(),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
                   border: Border(
@@ -3437,7 +3440,7 @@ class _QtyCellState extends State<_QtyCell> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return SizedBox(
-      height: 36,
+      height: 54,
       child: TextField(
         controller: _controller,
         focusNode: _focus,
@@ -3447,13 +3450,12 @@ class _QtyCellState extends State<_QtyCell> {
           FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),
         ],
         textAlign: TextAlign.center,
-        style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13, height: 1.15),
+        style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15, height: 1.25),
         decoration: InputDecoration(
-          isDense: true,
-          visualDensity: VisualDensity.compact,
+          isDense: false,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(3)),
+              const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
           filled: true,
           fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
         ),
@@ -3462,9 +3464,9 @@ class _QtyCellState extends State<_QtyCell> {
           final v = double.tryParse(s.replaceFirst(',', '.')) ?? 0;
           _currentValue = widget.useGrams ? v / 1000 : v;
 
-          // Откладываем применение изменений для избежания частых перестроений
+          // Реже поднимаем setState на весь экран — меньше подлагиваний при длинной таблице
           _updateTimer?.cancel();
-          _updateTimer = Timer(const Duration(milliseconds: 150), () {
+          _updateTimer = Timer(const Duration(milliseconds: 220), () {
             if (mounted) {
               widget.onChanged(_currentValue);
             }
@@ -3612,6 +3614,9 @@ final List<FocusNode> _iikoCellFocusNodes = [];
 
 class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     with AutoSaveMixin<InventoryIikoScreen> {
+  @override
+  int get scheduleSaveDebounceMs => 650;
+
   final List<_IikoInventoryRow> _rows = [];
   bool _isLoading = true;
   bool _completed = false;
@@ -5125,7 +5130,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     final borderClr = theme.dividerColor;
     final cb = BorderSide(color: borderClr);
 
-    // Ячейка ввода количества (48px, gap 4; растягивается по высоте строки)
+    // Ячейка ввода количества (достаточная высота тапа; строка тянется по названию)
     Widget numCell(int colIdx) {
       final ctrl = _ctrls[colIdx];
       final fn = colIdx < _focusNodes.length ? _focusNodes[colIdx] : null;
@@ -5133,6 +5138,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
         padding: EdgeInsets.only(right: colIdx < qtyCols - 1 ? _iikoColGap : 0),
         child: SizedBox(
           width: _iikoColCell,
+          height: 54,
           child: Center(
             child: TextField(
               controller: ctrl,
@@ -5141,14 +5147,12 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
                   const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.next,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium,
+              style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
               decoration: InputDecoration(
-                isDense: true,
-                visualDensity: VisualDensity.compact,
                 contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
                 border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(3)),
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
                 filled: true,
                 fillColor:
                     theme.colorScheme.surfaceContainerHighest.withOpacity(0.45),
@@ -5175,7 +5179,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
         border: Border(left: cb, bottom: cb),
       ),
       constraints:
-          const BoxConstraints(minHeight: 44), // растёт при длинном названии
+          const BoxConstraints(minHeight: 52), // растёт при длинном названии
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment:
