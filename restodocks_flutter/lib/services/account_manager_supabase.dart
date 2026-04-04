@@ -1260,6 +1260,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     if (useUiLang) {
       _currentEmployee = _currentEmployee!.copyWith(preferredLanguage: ui);
       onPreferredLanguageLoaded?.call(ui);
+      unawaited(LocalizationService().markLocaleChoiceFromAuthFlow());
       unawaited(savePreferredLanguage(ui));
     } else {
       onPreferredLanguageLoaded?.call(employee.preferredLanguage);
@@ -1660,11 +1661,23 @@ class AccountManagerSupabase extends ChangeNotifier {
   Future<void> savePreferredLanguage(String languageCode) async {
     final emp = _currentEmployee;
     if (emp == null) return;
+    final code = languageCode.trim().toLowerCase();
     try {
-      await _supabase.client
-          .from('employees')
-          .update({'preferred_language': languageCode}).eq('id', emp.id);
-      _currentEmployee = emp.copyWith(preferredLanguage: languageCode);
+      final res = await _supabase.client.rpc(
+        'patch_my_employee_profile',
+        params: {
+          'p_patch': {'preferred_language': code},
+        },
+      );
+      if (res is Map) {
+        final m = Map<String, dynamic>.from(res);
+        m['password'] = m['password_hash'] ?? '';
+        _currentEmployee = Employee.fromJson(m);
+      } else {
+        _currentEmployee = emp.copyWith(preferredLanguage: code);
+      }
+      await LocalizationService().markLocaleChoiceFromAuthFlow();
+      notifyListeners();
     } catch (e) {
       devLog('AccountManager: savePreferredLanguage error: $e');
     }

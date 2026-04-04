@@ -2005,6 +2005,30 @@ class _SupportTabState extends State<_SupportTab> {
           _kv(loc, 'ID', est['id']?.toString() ?? '—'),
           _kv(loc, loc.t('company_name'), est['name']?.toString() ?? '—'),
           _kv(loc, loc.t('company_pin'), est['pin_code']?.toString() ?? '—'),
+          _kv(loc, loc.t('admin_support_field_address'),
+              (est['address'] ?? '').toString().trim().isEmpty
+                  ? '—'
+                  : est['address'].toString()),
+          _kv(loc, loc.t('admin_support_field_phone'),
+              (est['phone'] ?? '').toString().trim().isEmpty
+                  ? '—'
+                  : est['phone'].toString()),
+          _kv(loc, loc.t('admin_support_field_est_email'),
+              (est['email'] ?? '').toString().trim().isEmpty
+                  ? '—'
+                  : est['email'].toString()),
+          _kv(loc, loc.t('admin_support_field_currency'),
+              (est['default_currency'] ?? '').toString().trim().isEmpty
+                  ? '—'
+                  : est['default_currency'].toString()),
+          _kv(loc, loc.t('admin_support_field_subscription'),
+              (est['subscription_type'] ?? '').toString().trim().isEmpty
+                  ? '—'
+                  : est['subscription_type'].toString()),
+          _kv(loc, loc.t('admin_support_field_parent_id'),
+              (est['parent_establishment_id'] ?? '').toString().trim().isEmpty
+                  ? '—'
+                  : est['parent_establishment_id'].toString()),
           const SizedBox(height: 16),
           Text(loc.t('admin_support_employees_title'),
               style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),

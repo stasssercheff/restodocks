@@ -3772,6 +3772,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   @override
   void dispose() {
     _filterDebounce?.cancel();
+    _qtyUiDebounce?.cancel();
     _filterCtrl.dispose();
     _searchFocusNode.dispose();
     _serverSaveTimer?.cancel();
@@ -3861,16 +3862,26 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   /// См. [_InventoryScreenState._serverDraftDirty] — не дергаем Supabase без изменений черновика.
   bool _serverDraftDirty = false;
 
+  /// Отложенный перерисовывание итогов: без этого каждая цифра вызывает setState на весь экран → лаги и сбои фокуса.
+  Timer? _qtyUiDebounce;
+
   void _setQuantity(_IikoInventoryRow row, int colIndex, double value) {
-    setState(() {
-      row.quantities[colIndex] = value;
-      // Добавляем ячейку если заполнили последнюю
-      if (colIndex == row.quantities.length - 1 && value > 0) {
-        row.quantities.add(0.0);
-      }
-    });
-    scheduleSave(); // AutoSaveMixin — localStorage, 300мс
-    // Обновляем метку после debounce (300мс)
+    row.quantities[colIndex] = value;
+    var addedCell = false;
+    if (colIndex == row.quantities.length - 1 && value > 0) {
+      row.quantities.add(0.0);
+      addedCell = true;
+    }
+    if (addedCell) {
+      _qtyUiDebounce?.cancel();
+      if (mounted) setState(() {});
+    } else {
+      _qtyUiDebounce?.cancel();
+      _qtyUiDebounce = Timer(const Duration(milliseconds: 24), () {
+        if (mounted) setState(() {});
+      });
+    }
+    scheduleSave(); // AutoSaveMixin — debounce записи черновика
     Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) setState(() => _lastSavedAt = DateTime.now());
     });
@@ -5101,11 +5112,12 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
 
     // Если количества были сброшены (обнуление) — обновляем текст контроллеров.
     // Сравниваем только если число ячеек не изменилось (иначе это добавление новой).
+    // Никогда не затираем ячейку, в которой идёт ввод (иначе «1234» ломается при setState родителя).
     if (old.row.quantities.length == qtys.length) {
       for (var i = 0; i < _ctrls.length && i < qtys.length; i++) {
         final expected = qtys[i] > 0 ? _fmt(qtys[i]) : '';
-        // Обновляем только если значение реально изменилось и поле не в фокусе
-        if (_ctrls[i].text != expected && !_ctrls[i].selection.isValid) {
+        final hasFocus = i < _focusNodes.length && _focusNodes[i].hasFocus;
+        if (!hasFocus && _ctrls[i].text != expected) {
           _ctrls[i].text = expected;
         }
       }

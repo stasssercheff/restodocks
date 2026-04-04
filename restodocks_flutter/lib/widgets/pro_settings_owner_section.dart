@@ -159,10 +159,16 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     final paidAccess = estSafe?.hasPaidProAccess ?? false;
     final until = estSafe?.proPaidUntil;
 
+    if (promo.hasPromo && promo.isDisabled) {
+      lines.add(loc.t('pro_payment_hub_line_promo_disabled_admin'));
+    }
+
     if (until != null) {
       lines.add(loc.t('pro_payment_hub_line_subscription_until',
           args: {'date': _formatProDate(until)}));
-    } else if (paidAccess && !promo.isPromoGrantActive) {
+    } else if (paidAccess &&
+        !promo.isPromoGrantActive &&
+        !(promo.hasPromo && promo.isDisabled)) {
       lines.add(loc.t('pro_payment_hub_line_subscription_active'));
     }
 
@@ -185,6 +191,9 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
   ) {
     if (promo != null && promo.isPromoGrantActive) {
       return loc.t('pro_iap_already_active_promo');
+    }
+    if (promo != null && promo.hasPromo && promo.isDisabled) {
+      return loc.t('pro_payment_subtitle_promo_disabled');
     }
     final until = est?.proPaidUntil;
     if (until != null) {

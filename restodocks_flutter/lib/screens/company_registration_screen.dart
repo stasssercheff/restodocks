@@ -238,7 +238,7 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
                   }).toList(),
                   onChanged: (l) async {
                     if (l == null) return;
-                    await loc.setLocale(l);
+                    await loc.setLocale(l, userChoice: true);
                   },
                 ),
                 const SizedBox(height: 24),

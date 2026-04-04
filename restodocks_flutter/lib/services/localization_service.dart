@@ -9,8 +9,6 @@ import '../models/employee.dart';
 import '../models/translation.dart';
 import 'translation_manager.dart';
 
-const _keyLocale = 'restodocks_locale';
-
 /// Локализация интерфейса: **в коде только ключи** (`loc.t('some_key')`), тексты — в
 /// `assets/translations/localizable.json` для **каждого** языка из [supportedLocales].
 /// Не смешивать в виджетах захардкоженный русский/английский и ключи: пользовательский
@@ -20,6 +18,11 @@ class LocalizationService extends ChangeNotifier {
   static final LocalizationService _instance = LocalizationService._internal();
   factory LocalizationService() => _instance;
   LocalizationService._internal();
+
+  static const String prefsKeyLocale = 'restodocks_locale';
+
+  /// Явный выбор языка (настройки / регистрация): при синхронизации профиля не затирать устройство сервером.
+  static const String prefsKeyLocaleUserSet = 'restodocks_locale_user_set';
 
   static const List<Locale> supportedLocales = [
     Locale('ru', 'RU'),
@@ -134,7 +137,7 @@ class LocalizationService extends ChangeNotifier {
   Future<void> _loadSavedLocale() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final code = prefs.getString(_keyLocale);
+      final code = prefs.getString(prefsKeyLocale);
       if (code == null) return;
       for (final l in supportedLocales) {
         if (l.languageCode == code) {
@@ -142,6 +145,14 @@ class LocalizationService extends ChangeNotifier {
           return;
         }
       }
+    } catch (_) {}
+  }
+
+  /// Язык с экрана входа/регистрации до загрузки профиля — считаем явным выбором.
+  Future<void> markLocaleChoiceFromAuthFlow() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(prefsKeyLocaleUserSet, true);
     } catch (_) {}
   }
 
@@ -194,7 +205,7 @@ class LocalizationService extends ChangeNotifier {
                           title: Text(getLanguageName(locale.languageCode)),
                           selected: selected,
                           onTap: () async {
-                            await setLocale(locale);
+                            await setLocale(locale, userChoice: true);
                             if (ctx.mounted) Navigator.of(ctx).pop();
                             final cb = afterApplied;
                             if (cb != null) {
@@ -214,8 +225,9 @@ class LocalizationService extends ChangeNotifier {
     );
   }
 
-  /// Установка текущей локали (сохраняется в SharedPreferences)
-  Future<void> setLocale(Locale locale) async {
+  /// Установка текущей локали (сохраняется в SharedPreferences).
+  /// [userChoice]: true — выбор из диалога языка; такой язык приоритетнее при синхронизации с сервером.
+  Future<void> setLocale(Locale locale, {bool userChoice = false}) async {
     if (!supportedLocales.any((l) => l.languageCode == locale.languageCode))
       return;
     try {
@@ -228,7 +240,10 @@ class LocalizationService extends ChangeNotifier {
     notifyListeners();
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_keyLocale, _currentLocale.languageCode);
+      await prefs.setString(prefsKeyLocale, _currentLocale.languageCode);
+      if (userChoice) {
+        await prefs.setBool(prefsKeyLocaleUserSet, true);
+      }
     } catch (_) {}
     try {
       await onAfterLocaleChanged?.call();
