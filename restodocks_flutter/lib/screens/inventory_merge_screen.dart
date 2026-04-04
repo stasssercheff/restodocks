@@ -64,23 +64,30 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     if (_selectedIds.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_loc.t('inventory_merge_select_least') ?? 'Выберите минимум один бланк')),
+          SnackBar(
+              content: Text(_loc.t('inventory_merge_select_least'))),
         );
       }
       return;
     }
 
-    final selected = _sortedDocs.where((d) => _selectedIds.contains(d.id)).toList();
-    final standards = selected.where((d) => d.type == DocumentType.inventory).toList();
-    final iikoList = selected.where((d) => d.type == DocumentType.iikoInventory).toList();
-    final writeoffList = selected.where((d) => d.type == DocumentType.writeoff).toList();
+    final selected =
+        _sortedDocs.where((d) => _selectedIds.contains(d.id)).toList();
+    final standards =
+        selected.where((d) => d.type == DocumentType.inventory).toList();
+    final iikoList =
+        selected.where((d) => d.type == DocumentType.iikoInventory).toList();
+    final writeoffList =
+        selected.where((d) => d.type == DocumentType.writeoff).toList();
 
-    final typeCount = (standards.isNotEmpty ? 1 : 0) + (iikoList.isNotEmpty ? 1 : 0) + (writeoffList.isNotEmpty ? 1 : 0);
+    final typeCount = (standards.isNotEmpty ? 1 : 0) +
+        (iikoList.isNotEmpty ? 1 : 0) +
+        (writeoffList.isNotEmpty ? 1 : 0);
     if (typeCount > 1) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_loc.t('inventory_merge_same_type') ?? 'Объединяйте только бланки одного типа'),
+            content: Text(_loc.t('inventory_merge_same_type')),
           ),
         );
       }
@@ -105,13 +112,14 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setState) => AlertDialog(
-          title: Text(_loc.t('inventory_merge_lang_title') ?? 'Язык сохранения'),
+          title:
+              Text(_loc.t('inventory_merge_lang_title')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                _loc.t('inventory_export_lang') ?? 'Язык сохранения:',
+                '${_loc.t('inventory_export_lang')}:',
                 style: Theme.of(ctx2).textTheme.titleSmall,
               ),
               const SizedBox(height: 8),
@@ -134,7 +142,8 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(selectedLang),
-              child: Text(_loc.t('inventory_merge_save') ?? 'Объединить и сохранить'),
+              child: Text(
+                  _loc.t('inventory_merge_save')),
             ),
           ],
         ),
@@ -156,7 +165,8 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
 
       for (final r in rows) {
         final row = r as Map<String, dynamic>;
-        final key = row['productId']?.toString() ?? '${row['productName']}_${row['unit']}';
+        final key = row['productId']?.toString() ??
+            '${row['productName']}_${row['unit']}';
         final total = (row['total'] as num?)?.toDouble() ?? 0.0;
         if (merged.containsKey(key)) {
           merged[key]!['total'] = (merged[key]!['total'] as double) + total;
@@ -175,7 +185,8 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
       'category': firstCategory ?? 'staff',
       'header': {
         ...?firstHeader,
-        'date': firstHeader?['date'] ?? DateFormat('yyyy-MM-dd').format(DateTime.now()),
+        'date': firstHeader?['date'] ??
+            DateFormat('yyyy-MM-dd').format(DateTime.now()),
         'employeeName': docs.map((d) => d.employeeName).join(', '),
       },
       'rows': merged.values.toList(),
@@ -185,7 +196,8 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
 
     try {
       final excel = Excel.createExcel();
-      final sheet = excel['Списание'];
+      final writeoffSheet = _loc.t('inventory_excel_sheet_writeoff');
+      final sheet = excel[writeoffSheet];
       sheet.appendRow([
         TextCellValue(_loc.t('inventory_excel_number')),
         TextCellValue(_loc.t('inventory_item_name')),
@@ -193,7 +205,8 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
         TextCellValue(_loc.t('inventory_excel_total')),
       ]);
       final sorted = merged.values.toList();
-      sorted.sort((a, b) => (a['productName']?.toString() ?? '').compareTo(b['productName']?.toString() ?? ''));
+      sorted.sort((a, b) => (a['productName']?.toString() ?? '')
+          .compareTo(b['productName']?.toString() ?? ''));
       for (var i = 0; i < sorted.length; i++) {
         final r = sorted[i];
         sheet.appendRow([
@@ -203,23 +216,29 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
           DoubleCellValue(r['total'] as double),
         ]);
       }
-      excel.setDefaultSheet('Списание');
+      excel.setDefaultSheet(writeoffSheet);
       final out = excel.encode();
       if (out != null && out.isNotEmpty) {
         final header = payload['header'] as Map<String, dynamic>?;
-        final dateStr = header?['date']?.toString() ?? DateTime.now().toIso8601String().split('T').first;
+        final dateStr = header?['date']?.toString() ??
+            DateTime.now().toIso8601String().split('T').first;
         await saveFileBytes('writeoff_merged_$dateStr.xlsx', out);
         await _saveMergedToInbox(payload);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(_loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
+            SnackBar(content: Text(_loc.t('inventory_excel_downloaded'))),
           );
           Navigator.of(context).pop(true);
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text(_loc.t('error_generic', args: {'error': e.toString()})),
+          ),
+        );
       }
     }
   }
@@ -237,13 +256,14 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setState) => AlertDialog(
-          title: Text(_loc.t('inventory_merge_lang_title') ?? 'Язык сохранения'),
+          title:
+              Text(_loc.t('inventory_merge_lang_title')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _loc.t('inventory_export_lang') ?? 'Язык сохранения:',
+                '${_loc.t('inventory_export_lang')}:',
                 style: Theme.of(ctx2).textTheme.titleSmall,
               ),
               const SizedBox(height: 8),
@@ -266,7 +286,8 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(selectedLang),
-              child: Text(_loc.t('inventory_export_excel') ?? 'Сохранить Excel'),
+              child:
+                  Text(_loc.t('inventory_export_excel')),
             ),
           ],
         ),
@@ -282,17 +303,26 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
 
   Map<String, dynamic> _mergeStandardPayloads(List<InboxDocument> docs) {
     final first = docs.first.metadata as Map<String, dynamic>? ?? {};
-    final header = Map<String, dynamic>.from(first['header'] as Map<String, dynamic>? ?? {});
-    header['date'] = header['date'] ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
-    header['timeStart'] = docs.map((d) {
-      final h = (d.metadata as Map?)?['header'] as Map?;
-      return h?['timeStart']?.toString() ?? '';
-    }).where((s) => s.isNotEmpty).join(', ');
-    header['timeEnd'] = docs.map((d) {
-      final h = (d.metadata as Map?)?['header'] as Map?;
-      return h?['timeEnd']?.toString() ?? '';
-    }).where((s) => s.isNotEmpty).join(', ');
-    header['employeeName'] = docs.map((d) => d.employeeName).where((s) => s.isNotEmpty).join(', ');
+    final header = Map<String, dynamic>.from(
+        first['header'] as Map<String, dynamic>? ?? {});
+    header['date'] =
+        header['date'] ?? DateFormat('yyyy-MM-dd').format(DateTime.now());
+    header['timeStart'] = docs
+        .map((d) {
+          final h = (d.metadata as Map?)?['header'] as Map?;
+          return h?['timeStart']?.toString() ?? '';
+        })
+        .where((s) => s.isNotEmpty)
+        .join(', ');
+    header['timeEnd'] = docs
+        .map((d) {
+          final h = (d.metadata as Map?)?['header'] as Map?;
+          return h?['timeEnd']?.toString() ?? '';
+        })
+        .where((s) => s.isNotEmpty)
+        .join(', ');
+    header['employeeName'] =
+        docs.map((d) => d.employeeName).where((s) => s.isNotEmpty).join(', ');
 
     final mergedRows = <String, Map<String, dynamic>>{};
     final mergedAggregated = <String, Map<String, dynamic>>{};
@@ -304,9 +334,12 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
 
       for (final r in rows) {
         final row = r as Map<String, dynamic>;
-        final key = row['productId']?.toString() ?? '${row['productName']}_${row['unit']}';
+        final key = row['productId']?.toString() ??
+            '${row['productName']}_${row['unit']}';
         final total = (row['total'] as num?)?.toDouble() ?? 0.0;
-        final quantities = (row['quantities'] as List<dynamic>? ?? []).map((q) => (q as num?)?.toDouble() ?? 0.0).toList();
+        final quantities = (row['quantities'] as List<dynamic>? ?? [])
+            .map((q) => (q as num?)?.toDouble() ?? 0.0)
+            .toList();
 
         if (mergedRows.containsKey(key)) {
           final existing = mergedRows[key]!;
@@ -335,10 +368,16 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
         final gross = (agg['grossGrams'] as num?)?.toDouble() ?? 0.0;
         final net = (agg['netGrams'] as num?)?.toDouble() ?? 0.0;
         if (mergedAggregated.containsKey(name)) {
-          mergedAggregated[name]!['grossGrams'] = (mergedAggregated[name]!['grossGrams'] as double) + gross;
-          mergedAggregated[name]!['netGrams'] = (mergedAggregated[name]!['netGrams'] as double) + net;
+          mergedAggregated[name]!['grossGrams'] =
+              (mergedAggregated[name]!['grossGrams'] as double) + gross;
+          mergedAggregated[name]!['netGrams'] =
+              (mergedAggregated[name]!['netGrams'] as double) + net;
         } else {
-          mergedAggregated[name] = {'productName': name, 'grossGrams': gross, 'netGrams': net};
+          mergedAggregated[name] = {
+            'productName': name,
+            'grossGrams': gross,
+            'netGrams': net
+          };
         }
       }
     }
@@ -366,12 +405,14 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
       'mergedBy': merger?.fullName ?? '—',
       'mergedById': merger?.id ?? '',
       'mergedAt': DateTime.now().toUtc().toIso8601String(),
-      'sourceDocuments': sourceDocs.map((d) => {
-        'id': d.id,
-        'employeeName': d.employeeName,
-        'createdAt': d.createdAt.toUtc().toIso8601String(),
-        'title': d.title,
-      }).toList(),
+      'sourceDocuments': sourceDocs
+          .map((d) => {
+                'id': d.id,
+                'employeeName': d.employeeName,
+                'createdAt': d.createdAt.toUtc().toIso8601String(),
+                'title': d.title,
+              })
+          .toList(),
     };
   }
 
@@ -399,9 +440,10 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     final loc = _loc;
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final rows = payload['rows'] as List<dynamic>? ?? [];
-    final sourceLang = (payload['sourceLang'] as String?)?.trim().isNotEmpty == true
-        ? payload['sourceLang'] as String
-        : 'ru';
+    final sourceLang =
+        (payload['sourceLang'] as String?)?.trim().isNotEmpty == true
+            ? payload['sourceLang'] as String
+            : 'ru';
 
     final namesForSave = <String, String>{};
     if (sourceLang != saveLang) {
@@ -409,7 +451,9 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
         final translationSvc = context.read<TranslationService>();
         final seen = <String>{};
         for (final r in rows) {
-          final name = (r is Map ? (r['productName'] as String?) ?? '' : '').toString().trim();
+          final name = (r is Map ? (r['productName'] as String?) ?? '' : '')
+              .toString()
+              .trim();
           if (name.isEmpty || seen.contains(name)) continue;
           seen.add(name);
           final translated = await translationSvc.translate(
@@ -420,7 +464,8 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
             from: sourceLang,
             to: saveLang,
           );
-          if (translated != null && translated != name) namesForSave[name] = translated;
+          if (translated != null && translated != name)
+            namesForSave[name] = translated;
         }
       } catch (_) {}
     }
@@ -449,22 +494,32 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
         headerCells.add(TextCellValue('$fillLabel ${c + 1}'));
       }
 
-      final sheet = excel['Объединённая инвентаризация'];
+      final mergedInvSheet = loc.t('inventory_excel_sheet_merged_inventory');
+      final sheet = excel[mergedInvSheet];
       sheet.appendRow(headerCells);
 
       final sortedRows = rows.map((e) => e as Map<String, dynamic>).toList();
       sortedRows.sort((a, b) {
-        final nameA = (namesForSave[a['productName'] ?? ''] ?? (a['productName'] ?? '')).toString().toLowerCase();
-        final nameB = (namesForSave[b['productName'] ?? ''] ?? (b['productName'] ?? '')).toString().toLowerCase();
+        final nameA =
+            (namesForSave[a['productName'] ?? ''] ?? (a['productName'] ?? ''))
+                .toString()
+                .toLowerCase();
+        final nameB =
+            (namesForSave[b['productName'] ?? ''] ?? (b['productName'] ?? ''))
+                .toString()
+                .toLowerCase();
         return nameA.compareTo(nameB);
       });
 
       var rowNum = 1;
       for (final r in sortedRows) {
         final total = (r['total'] as num?)?.toDouble() ?? 0.0;
-        final name = namesForSave[r['productName'] ?? ''] ?? (r['productName'] ?? '').toString();
+        final name = namesForSave[r['productName'] ?? ''] ??
+            (r['productName'] ?? '').toString();
         final unit = (r['unit'] ?? '').toString();
-        final quantities = (r['quantities'] as List<dynamic>? ?? []).map((q) => (q as num?)?.toDouble() ?? 0.0).toList();
+        final quantities = (r['quantities'] as List<dynamic>? ?? [])
+            .map((q) => (q as num?)?.toDouble() ?? 0.0)
+            .toList();
         final rowCells = <CellValue>[
           IntCellValue(rowNum++),
           TextCellValue(name),
@@ -472,32 +527,43 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
           DoubleCellValue(total),
         ];
         for (var c = 0; c < maxCols; c++) {
-          rowCells.add(DoubleCellValue(c < quantities.length ? quantities[c] : 0.0));
+          rowCells.add(
+              DoubleCellValue(c < quantities.length ? quantities[c] : 0.0));
         }
         sheet.appendRow(rowCells);
       }
 
-      excel.setDefaultSheet('Объединённая инвентаризация');
+      excel.setDefaultSheet(mergedInvSheet);
       final out = excel.encode();
       if (out != null && out.isNotEmpty) {
-        final date = header['date'] ?? DateTime.now().toIso8601String().split('T').first;
+        final date =
+            header['date'] ?? DateTime.now().toIso8601String().split('T').first;
         await saveFileBytes('inventory_merged_$date.xlsx', out);
         if (mounted) {
           final inboxPayload = Map<String, dynamic>.from(payload);
           inboxPayload['mergeMetadata'] = _buildMergeMetadata(sourceDocs);
           inboxPayload['header'] = Map<String, dynamic>.from(header);
           (inboxPayload['header'] as Map<String, dynamic>)['employeeName'] =
-              context.read<AccountManagerSupabase>().currentEmployee?.fullName ?? '—';
+              context
+                      .read<AccountManagerSupabase>()
+                      .currentEmployee
+                      ?.fullName ??
+                  '—';
           await _saveMergedToInbox(inboxPayload);
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
+            SnackBar(content: Text(loc.t('inventory_excel_downloaded'))),
           );
           Navigator.of(context).pop(true);
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content:
+                Text(_loc.t('error_generic', args: {'error': e.toString()})),
+          ),
+        );
       }
     }
   }
@@ -557,15 +623,17 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     } else {
       // Fallback: простой Excel
       final excel = Excel.createExcel();
-      final sheet = excel['Объединённая iiko'];
+      final mergedIikoSheet = _loc.t('inventory_excel_sheet_merged_iiko');
+      final sheet = excel[mergedIikoSheet];
       sheet.appendRow([
-        TextCellValue('Код'),
-        TextCellValue('Наименование'),
-        TextCellValue('Ед.изм.'),
-        TextCellValue('Итого'),
+        TextCellValue(_loc.t('iiko_excel_col_code')),
+        TextCellValue(_loc.t('iiko_excel_col_name')),
+        TextCellValue(_loc.t('iiko_excel_col_unit')),
+        TextCellValue(_loc.t('inventory_total')),
       ]);
       final sorted = merged.values.toList();
-      sorted.sort((a, b) => ((a['name'] ?? '') as String).compareTo((b['name'] ?? '') as String));
+      sorted.sort((a, b) =>
+          ((a['name'] ?? '') as String).compareTo((b['name'] ?? '') as String));
       for (final r in sorted) {
         final total = (r['total'] as num?)?.toDouble() ?? 0.0;
         if (total <= 0) continue;
@@ -576,14 +644,15 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
           DoubleCellValue(total),
         ]);
       }
-      excel.setDefaultSheet('Объединённая iiko');
+      excel.setDefaultSheet(mergedIikoSheet);
       final encoded = excel.encode();
       outBytes = encoded != null ? Uint8List.fromList(encoded) : Uint8List(0);
     }
 
-    final dateStr = firstHeader?['date']?.toString() ?? DateTime.now().toIso8601String().substring(0, 10);
+    final dateStr = firstHeader?['date']?.toString() ??
+        DateTime.now().toIso8601String().substring(0, 10);
     final dateLabel = dateStr.replaceAll(RegExp(r'[T:]'), '-').substring(0, 10);
-    final fileName = 'Инвентаризация_iiko_merged_$dateLabel.xlsx';
+    final fileName = _loc.t('inventory_merge_iiko_filename', args: {'date': dateLabel});
 
     setState(() => _loading = false);
 
@@ -601,7 +670,9 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
         };
         await _saveMergedToInbox(inboxPayload);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
+          SnackBar(
+              content: Text(
+                  _loc.t('inventory_excel_downloaded'))),
         );
         Navigator.of(context).pop(true);
       }
@@ -610,7 +681,8 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
 
   /// Выбор бланка iiko: если 1 версия — без диалога, выгрузка сразу; если несколько — диалог с мини-превью.
   /// Без выбора языка — сохранение исключительно по загруженным наименованиям на том же языке.
-  Future<(Uint8List?, int, Map<String, int>?)?> _showIikoBlankChoiceDialog(IikoProductStore iikoStore) async {
+  Future<(Uint8List?, int, Map<String, int>?)?> _showIikoBlankChoiceDialog(
+      IikoProductStore iikoStore) async {
     final loc = _loc;
     final account = context.read<AccountManagerSupabase>();
     final estId = account.establishment?.id;
@@ -618,7 +690,12 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
 
     setState(() => _loading = true);
     final metaList = await iikoStore.listBlanksForMerge(estId);
-    final blanks = <({String label, Uint8List bytes, int qtyCol, Map<String, int> sheetQtyCols})>[];
+    final blanks = <({
+      String label,
+      Uint8List bytes,
+      int qtyCol,
+      Map<String, int> sheetQtyCols
+    })>[];
 
     for (var i = 0; i < metaList.length; i++) {
       final m = metaList[i];
@@ -631,7 +708,8 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
       Map<String, int> sheetQtyCols = {};
       if (sheetQtyColsRaw is Map) {
         sheetQtyCols = Map<String, int>.from(
-          (sheetQtyColsRaw as Map).map((k, v) => MapEntry(k.toString(), (v as num?)?.toInt() ?? 5)),
+          (sheetQtyColsRaw as Map)
+              .map((k, v) => MapEntry(k.toString(), (v as num?)?.toInt() ?? 5)),
         );
       }
       final uploadedAt = m['uploaded_at']?.toString();
@@ -639,12 +717,17 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
           ? (DateTime.tryParse(uploadedAt)?.toLocal() ?? DateTime.now())
           : DateTime.now();
       final label = DateFormat('dd.MM.yyyy HH:mm').format(dt);
-      blanks.add((label: label, bytes: bytes, qtyCol: qtyCol, sheetQtyCols: sheetQtyCols));
+      blanks.add((
+        label: label,
+        bytes: bytes,
+        qtyCol: qtyCol,
+        sheetQtyCols: sheetQtyCols
+      ));
     }
     // Если нет версий за 3 месяца — используем загруженный бланк (originalBlankBytes)
     if (blanks.isEmpty && iikoStore.originalBlankBytes != null) {
       blanks.add((
-        label: loc.t('inventory_merge_blank_loaded') ?? 'Загруженный бланк',
+        label: loc.t('inventory_merge_blank_loaded'),
         bytes: iikoStore.originalBlankBytes!,
         qtyCol: iikoStore.originalQuantityColumnIndex ?? 5,
         sheetQtyCols: iikoStore.sheetQtyColumns,
@@ -664,22 +747,23 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     final result = await showDialog<(Uint8List, int, Map<String, int>)>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('inventory_merge_blank_choice') ?? 'Выберите бланк'),
+        title: Text(loc.t('inventory_merge_blank_choice')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                loc.t('inventory_merge_blank_hint') ?? 'Данные будут записаны в колонку «Итого»/«Остаток фактический» выбранного бланка. Сохранение исключительно по загруженным наименованиям на том же языке.',
+                loc.t('inventory_merge_blank_hint'),
                 style: Theme.of(ctx).textTheme.bodyMedium,
               ),
               const SizedBox(height: 16),
               ...blanks.map((b) => _buildBlankPreviewTile(
-                label: b.label,
-                bytes: b.bytes,
-                onSelect: () => Navigator.of(ctx).pop((b.bytes, b.qtyCol, b.sheetQtyCols)),
-              )),
+                    label: b.label,
+                    bytes: b.bytes,
+                    onSelect: () => Navigator.of(ctx)
+                        .pop((b.bytes, b.qtyCol, b.sheetQtyCols)),
+                  )),
             ],
           ),
         ),
@@ -713,9 +797,12 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.table_chart, color: Theme.of(context).colorScheme.primary),
+                  Icon(Icons.table_chart,
+                      color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600))),
+                  Expanded(
+                      child: Text(label,
+                          style: const TextStyle(fontWeight: FontWeight.w600))),
                 ],
               ),
               if (preview != null) ...[
@@ -723,7 +810,10 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
                 Container(
                   constraints: const BoxConstraints(maxHeight: 100),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest
+                        .withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   padding: const EdgeInsets.all(8),
@@ -755,13 +845,24 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
       final sheet = excel.tables[names.first];
       if (sheet == null) return null;
       final sb = StringBuffer();
-      sb.writeln('Листы: ${names.take(3).join(", ")}${names.length > 3 ? "..." : ""}');
+      sb.writeln(_loc.t('inventory_xlsx_sheets_line', args: {
+        'names':
+            '${names.take(3).join(", ")}${names.length > 3 ? "..." : ""}',
+      }));
       for (var r = 0; r < sheet.maxRows && r < 6; r++) {
         final cells = <String>[];
-        for (var c = 0; c < (sheet.maxColumns > 8 ? 8 : sheet.maxColumns); c++) {
-          final v = sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r)).value;
-          final s = (v == null ? '' : (v is TextCellValue ? v.value : v.toString()).toString()).trim();
-          cells.add(s.isEmpty ? '—' : (s.length > 12 ? '${s.substring(0, 12)}…' : s));
+        for (var c = 0;
+            c < (sheet.maxColumns > 8 ? 8 : sheet.maxColumns);
+            c++) {
+          final v = sheet
+              .cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r))
+              .value;
+          final s = (v == null
+                  ? ''
+                  : (v is TextCellValue ? v.value : v.toString()).toString())
+              .trim();
+          cells.add(
+              s.isEmpty ? '—' : (s.length > 12 ? '${s.substring(0, 12)}…' : s));
         }
         sb.writeln(cells.join(' | '));
       }
@@ -770,7 +871,6 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
       return null;
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -781,18 +881,22 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('inventory_merge_title') ?? 'Объединить бланки'),
+        title: Text(loc.t('inventory_merge_title')),
         actions: [
           if (_loading)
             const Padding(
               padding: EdgeInsets.all(16),
-              child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+              child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2)),
             )
           else
             FilledButton.icon(
               onPressed: docs.isEmpty ? null : _mergeAndSave,
               icon: const Icon(Icons.merge),
-              label: Text(loc.t('inventory_merge_save') ?? 'Объединить и сохранить'),
+              label: Text(
+                  loc.t('inventory_merge_save')),
             ),
         ],
       ),
@@ -801,10 +905,11 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.inbox_outlined, size: 64, color: Theme.of(context).colorScheme.outline),
+                  Icon(Icons.inbox_outlined,
+                      size: 64, color: Theme.of(context).colorScheme.outline),
                   const SizedBox(height: 16),
                   Text(
-                    loc.t('inventory_merge_empty') ?? 'Нет бланков инвентаризации во входящих',
+                    loc.t('inventory_merge_empty'),
                     style: Theme.of(context).textTheme.bodyLarge,
                     textAlign: TextAlign.center,
                   ),
@@ -820,16 +925,20 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        loc.t('inventory_merge_hint') ?? 'Выберите бланки по дате и времени сохранения. Итоговые количества будут суммированы.',
+                        loc.t('inventory_merge_hint'),
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        loc.t('inventory_merge_iiko_hint') ?? 'iiko: сохраняется в том же бланке, тот же язык, те же коды. Стандарт: можно выбрать язык сохранения.',
+                        loc.t('inventory_merge_iiko_hint'),
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                               fontStyle: FontStyle.italic,
                             ),
                       ),
@@ -840,12 +949,14 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
                   value: _selectedIds.length == docs.length,
                   tristate: true,
                   onChanged: (_) => _selectAll(),
-                  title: Text(loc.t('inventory_merge_select_all') ?? 'Выбрать все'),
+                  title: Text(
+                      loc.t('inventory_merge_select_all')),
                 ),
                 const Divider(height: 1),
                 Expanded(
                   child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     itemCount: docs.length,
                     itemBuilder: (context, i) {
                       final doc = docs[i];
@@ -856,8 +967,12 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
                           value: isSelected,
                           onChanged: (_) => _toggleSelection(doc.id),
                           secondary: CircleAvatar(
-                            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                            child: Icon(doc.icon, color: Theme.of(context).colorScheme.onPrimaryContainer),
+                            backgroundColor:
+                                Theme.of(context).colorScheme.primaryContainer,
+                            child: Icon(doc.icon,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimaryContainer),
                           ),
                           title: Text(doc.getLocalizedTitle(loc)),
                           subtitle: Column(
@@ -866,8 +981,13 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
                               Text(doc.employeeName),
                               Text(
                                 dateFormat.format(doc.createdAt),
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
                                     ),
                               ),
                             ],

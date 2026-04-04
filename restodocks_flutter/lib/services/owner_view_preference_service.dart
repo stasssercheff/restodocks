@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,7 +11,10 @@ class OwnerViewPreferenceService extends ChangeNotifier {
   factory OwnerViewPreferenceService() => _instance;
   OwnerViewPreferenceService._internal();
 
+  static Future<void> Function(bool value)? accountPersistHook;
+
   bool _viewAsOwner = true;
+  bool _suppressAccountPersist = false;
 
   bool get viewAsOwner => _viewAsOwner;
 
@@ -20,6 +25,19 @@ class OwnerViewPreferenceService extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<void> applyFromServer(bool? value) async {
+    if (value == null) return;
+    if (_viewAsOwner == value) return;
+    _suppressAccountPersist = true;
+    _viewAsOwner = value;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyViewAsOwner, value);
+    } catch (_) {}
+    _suppressAccountPersist = false;
+  }
+
   Future<void> setViewAsOwner(bool value) async {
     if (_viewAsOwner == value) return;
     _viewAsOwner = value;
@@ -28,5 +46,9 @@ class OwnerViewPreferenceService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_keyViewAsOwner, value);
     } catch (_) {}
+    final hook = accountPersistHook;
+    if (!_suppressAccountPersist && hook != null) {
+      unawaited(hook(value));
+    }
   }
 }

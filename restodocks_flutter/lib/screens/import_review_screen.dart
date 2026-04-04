@@ -22,6 +22,7 @@ class ImportReviewScreen extends StatefulWidget {
   });
 
   final List<ModerationItem> items;
+
   /// Как при интеллектуальном импорте Excel: переводы для новых продуктов.
   final bool generateTranslationsForNewProducts;
   final String? importSourceLanguage;
@@ -62,15 +63,21 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
 
   void _approveAllPriceUpdates() {
     setState(() {
-      _items = _items.map((i) => i.category == ModerationCategory.priceUpdate
-          ? i.copyWith(approved: true) : i).toList();
+      _items = _items
+          .map((i) => i.category == ModerationCategory.priceUpdate
+              ? i.copyWith(approved: true)
+              : i)
+          .toList();
     });
   }
 
   void _deselectAllPriceUpdates() {
     setState(() {
-      _items = _items.map((i) => i.category == ModerationCategory.priceUpdate
-          ? i.copyWith(approved: false) : i).toList();
+      _items = _items
+          .map((i) => i.category == ModerationCategory.priceUpdate
+              ? i.copyWith(approved: false)
+              : i)
+          .toList();
     });
   }
 
@@ -120,12 +127,15 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
 
   Future<void> _save({bool onlyNew = false}) async {
     final acc = context.read<AccountManagerSupabase>();
-    final est = acc.establishment;
     final loc = context.read<LocalizationService>();
+    final est = acc.establishment;
 
     if (est == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ошибка: заведение не найдено. Перезайдите в аккаунт.'), duration: Duration(seconds: 6)),
+        SnackBar(
+          content: Text(loc.t('import_review_establishment_missing')),
+          duration: const Duration(seconds: 6),
+        ),
       );
       return;
     }
@@ -133,7 +143,9 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     final store = context.read<ProductStoreSupabase>();
     final defCur = est.defaultCurrency ?? 'RUB';
     final toSave = onlyNew
-        ? _items.where((i) => i.approved && i.existingProductId == null).toList()
+        ? _items
+            .where((i) => i.approved && i.existingProductId == null)
+            .toList()
         : _items.where((i) => i.approved).toList();
     setState(() {
       _saving = true;
@@ -143,14 +155,16 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     var created = 0;
     var updated = 0;
 
-    devLog('💾 ImportReview: starting save, ${toSave.length} items, est=${est.id}');
+    devLog(
+        '💾 ImportReview: starting save, ${toSave.length} items, est=${est.id}');
     try {
       for (final item in toSave) {
         if (!mounted) return;
 
         if (item.existingProductId != null) {
           final newPrice = item.displayPrice ?? item.price;
-          final ep = store.getEstablishmentPrice(item.existingProductId!, est.id);
+          final ep =
+              store.getEstablishmentPrice(item.existingProductId!, est.id);
           final price = newPrice ?? ep?.$1;
           final cur = item.currency ?? defCur;
           // Связь продукт ↔ заведение — чтобы ТТК подтягивала цену
@@ -188,7 +202,8 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
           bool? containsGluten;
           bool? containsLactose;
           try {
-            final nutrition = await NutritionApiService.fetchNutrition(item.name);
+            final nutrition =
+                await NutritionApiService.fetchNutrition(item.name);
             if (nutrition != null && nutrition.hasData) {
               calories = nutrition.calories;
               protein = nutrition.protein;
@@ -226,7 +241,8 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                 aiService: context.read<AiServiceSupabase>(),
                 supabase: context.read<SupabaseService>(),
               ),
-              getSupportedLanguages: () => LocalizationService.productLanguageCodes,
+              getSupportedLanguages: () =>
+                  LocalizationService.productLanguageCodes,
             );
             await tm.handleEntitySave(
               entityType: TranslationEntityType.product,
@@ -249,7 +265,8 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
         if (mounted) setState(() => _saveProgress++);
       }
 
-      devLog('💾 ImportReview: all saved. created=$created updated=$updated. Reloading...');
+      devLog(
+          '💾 ImportReview: all saved. created=$created updated=$updated. Reloading...');
       await store.loadProducts(force: true);
       await store.loadNomenclature(est.dataEstablishmentId);
       devLog('💾 ImportReview: reload done, navigating to nomenclature');
@@ -264,7 +281,13 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
           SnackBar(
             content: Text(
               created > 0 || updated > 0
-                  ? 'Сохранено: $created новых, $updated обновлено'
+                  ? loc.t(
+                      'import_review_saved_counts',
+                      args: {
+                        'created': '$created',
+                        'updated': '$updated',
+                      },
+                    )
                   : loc.t('no_changes'),
             ),
           ),
@@ -285,9 +308,11 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
           _saveProgress = 0;
           _saveTotal = 0;
         });
+        final locErr = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Ошибка сохранения: $e'),
+            content: Text(locErr
+                .t('import_review_save_error', args: {'error': e.toString()})),
             duration: const Duration(seconds: 10),
           ),
         );
@@ -305,16 +330,16 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('import_review_title') ?? 'Модерация импорта'),
+        title: Text(loc.t('import_review_title')),
       ),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
             child: Text(
-              loc.t('import_review_hint') ??
-                  'Проверьте данные перед сохранением. Запись в базу произойдёт только после подтверждения.',
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              loc.t('import_review_hint'),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
           ),
           // Строка с кнопками цен (слева) + чекбокс "выбрать/снять все" (справа, над чекбоксами продуктов)
@@ -322,49 +347,70 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Row(
               children: [
-                if (_items.any((i) => i.category == ModerationCategory.priceUpdate)) ...[
+                if (_items.any(
+                    (i) => i.category == ModerationCategory.priceUpdate)) ...[
                   Expanded(
                     child: Builder(
                       builder: (context) {
-                        final priceUpdateItems = _items.where((i) => i.category == ModerationCategory.priceUpdate).toList();
-                        final allApproved = priceUpdateItems.isNotEmpty && priceUpdateItems.every((i) => i.approved);
-                        final noneApproved = priceUpdateItems.every((i) => !i.approved);
+                        final priceUpdateItems = _items
+                            .where((i) =>
+                                i.category == ModerationCategory.priceUpdate)
+                            .toList();
+                        final allApproved = priceUpdateItems.isNotEmpty &&
+                            priceUpdateItems.every((i) => i.approved);
+                        final noneApproved =
+                            priceUpdateItems.every((i) => !i.approved);
                         return Wrap(
                           spacing: 8,
                           runSpacing: 8,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             FilledButton.tonal(
-                              onPressed: _saving ? null : _approveAllPriceUpdates,
+                              onPressed:
+                                  _saving ? null : _approveAllPriceUpdates,
                               style: FilledButton.styleFrom(
-                                backgroundColor: allApproved ? theme.colorScheme.primaryContainer : null,
-                                foregroundColor: allApproved ? theme.colorScheme.onPrimaryContainer : null,
+                                backgroundColor: allApproved
+                                    ? theme.colorScheme.primaryContainer
+                                    : null,
+                                foregroundColor: allApproved
+                                    ? theme.colorScheme.onPrimaryContainer
+                                    : null,
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   if (allApproved) ...[
-                                    Icon(Icons.check_circle, size: 18, color: theme.colorScheme.onPrimaryContainer),
+                                    Icon(Icons.check_circle,
+                                        size: 18,
+                                        color: theme
+                                            .colorScheme.onPrimaryContainer),
                                     const SizedBox(width: 6),
                                   ],
-                                  Text(loc.t('apply_all_price_updates') ?? 'Принять все обновления цен'),
+                                  Text(loc.t('apply_all_price_updates')),
                                 ],
                               ),
                             ),
                             OutlinedButton(
-                              onPressed: _saving ? null : _deselectAllPriceUpdates,
+                              onPressed:
+                                  _saving ? null : _deselectAllPriceUpdates,
                               style: OutlinedButton.styleFrom(
-                                backgroundColor: noneApproved ? theme.colorScheme.surfaceContainerHighest : null,
-                                foregroundColor: noneApproved ? theme.colorScheme.onSurface : null,
+                                backgroundColor: noneApproved
+                                    ? theme.colorScheme.surfaceContainerHighest
+                                    : null,
+                                foregroundColor: noneApproved
+                                    ? theme.colorScheme.onSurface
+                                    : null,
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   if (noneApproved) ...[
-                                    Icon(Icons.cancel_outlined, size: 18, color: theme.colorScheme.onSurface),
+                                    Icon(Icons.cancel_outlined,
+                                        size: 18,
+                                        color: theme.colorScheme.onSurface),
                                     const SizedBox(width: 6),
                                   ],
-                                  Text(loc.t('deselect_price_updates') ?? 'Снять обновления цен'),
+                                  Text(loc.t('deselect_price_updates')),
                                 ],
                               ),
                             ),
@@ -422,7 +468,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                           child: Row(
                             children: [
                               Text(
-                                loc.t('price_per_kg_computed') ?? 'Цена за кг',
+                                loc.t('price_per_kg_computed'),
                                 style: theme.textTheme.bodySmall,
                               ),
                               const SizedBox(width: 8),
@@ -432,17 +478,22 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                                   controller: _priceControllers.putIfAbsent(
                                     i,
                                     () => TextEditingController(
-                                      text: item.displayPrice?.toStringAsFixed(0) ?? '',
+                                      text: item.displayPrice
+                                              ?.toStringAsFixed(0) ??
+                                          '',
                                     ),
                                   ),
-                                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                  keyboardType: TextInputType.numberWithOptions(
+                                      decimal: true),
                                   decoration: const InputDecoration(
                                     hintText: '-',
                                     isDense: true,
-                                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                                    contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 8),
                                   ),
                                   onChanged: (v) {
-                                    final n = double.tryParse(v.replaceFirst(',', '.'));
+                                    final n = double.tryParse(
+                                        v.replaceFirst(',', '.'));
                                     _updatePrice(i, n);
                                   },
                                 ),
@@ -468,7 +519,8 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                 LinearProgressIndicator(
                   value: _saveProgress / _saveTotal,
                   backgroundColor: theme.colorScheme.surfaceContainerHighest,
-                  valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -485,17 +537,22 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white),
                       )
-                    : Text(loc.t('save') ?? 'Сохранить'),
+                    : Text(loc.t('save')),
               ),
               if (_items.any((i) => i.existingProductId == null)) ...[
                 const SizedBox(height: 8),
                 OutlinedButton(
-                  onPressed: _saving || _items.where((i) => i.approved && i.existingProductId == null).isEmpty
+                  onPressed: _saving ||
+                          _items
+                              .where((i) =>
+                                  i.approved && i.existingProductId == null)
+                              .isEmpty
                       ? null
                       : _saveOnlyNew,
-                  child: Text(loc.t('save_only_new_products') ?? 'Сохранить только новые продукты'),
+                  child: Text(loc.t('save_only_new_products')),
                 ),
               ],
             ],
@@ -510,34 +567,60 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
     final parts = <String>[];
     // Сопоставление с номенклатурой: явно показываем "Сопоставлено с: X" или "Новый продукт"
     if (item.existingProductId != null && item.existingProductName != null) {
-      parts.add((loc.t('match_in_nomenclature') ?? 'Сопоставлено с: %s').replaceAll('%s', item.existingProductName!));
+      parts.add(loc
+          .t('match_in_nomenclature')
+          .replaceAll('%s', item.existingProductName!));
     } else {
-      parts.add(loc.t('new_product_label') ?? 'Новый продукт');
+      parts.add(loc.t('new_product_label'));
     }
-    final cur = ' ${Establishment.currencySymbolFor(item.currency ?? context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND')}';
+    final cur =
+        ' ${Establishment.currencySymbolFor(item.currency ?? context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND')}';
     // Для priceUpdate: всегда показываем реальную старую и реальную новую цену
     if (item.category == ModerationCategory.priceUpdate &&
         item.existingProductId != null &&
-        (item.existingPrice != null || item.displayPrice != null || item.price != null)) {
+        (item.existingPrice != null ||
+            item.displayPrice != null ||
+            item.price != null)) {
       final oldPrice = item.existingPrice;
       final newPrice = item.displayPrice ?? item.price;
       if (oldPrice != null && newPrice != null) {
-        parts.add('Было: $oldPrice$cur → Станет: $newPrice$cur');
+        parts.add(loc.t('import_review_price_old_new', args: {
+          'old': '$oldPrice',
+          'new': '$newPrice',
+          'cur': cur,
+        }));
       } else if (newPrice != null) {
-        parts.add('Новая цена: $newPrice$cur');
+        parts.add(loc.t('import_review_price_new_only', args: {
+          'price': '$newPrice',
+          'cur': cur,
+        }));
       } else if (oldPrice != null) {
-        parts.add('Цена: $oldPrice$cur');
+        parts.add(loc.t('import_review_price_line', args: {
+          'price': '$oldPrice',
+          'cur': cur,
+        }));
       }
     } else if (item.displayPrice != null) {
-      final hasPriceChange = item.existingProductId != null && item.existingPrice != null &&
+      final hasPriceChange = item.existingProductId != null &&
+          item.existingPrice != null &&
           (item.existingPrice! - item.displayPrice!).abs() > 0.01;
       if (hasPriceChange) {
-        parts.add('Было: ${item.existingPrice}$cur → Станет: ${item.displayPrice}$cur');
+        parts.add(loc.t('import_review_price_old_new', args: {
+          'old': '${item.existingPrice}',
+          'new': '${item.displayPrice}',
+          'cur': cur,
+        }));
       } else {
-        parts.add('Цена: ${item.displayPrice}$cur');
+        parts.add(loc.t('import_review_price_line', args: {
+          'price': '${item.displayPrice}',
+          'cur': cur,
+        }));
       }
     } else if (item.existingProductId != null && item.existingPrice != null) {
-      parts.add('Цена: ${item.existingPrice}$cur');
+      parts.add(loc.t('import_review_price_line', args: {
+        'price': '${item.existingPrice}',
+        'cur': cur,
+      }));
     }
     if (item.unit != null) parts.add(item.unit!);
     if (item.normalizedName != null && item.normalizedName != item.name) {
@@ -548,6 +631,7 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
   }
 
   Widget _categoryChip(ModerationCategory cat, ThemeData theme) {
+    final locChip = context.read<LocalizationService>();
     Color color;
     switch (cat) {
       case ModerationCategory.nameFix:
@@ -570,22 +654,22 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        _catShort(cat),
+        _catShort(locChip, cat),
         style: theme.textTheme.labelSmall?.copyWith(color: color),
       ),
     );
   }
 
-  String _catShort(ModerationCategory cat) {
+  String _catShort(LocalizationService loc, ModerationCategory cat) {
     switch (cat) {
       case ModerationCategory.nameFix:
-        return 'Назв.';
+        return loc.t('moderation_cat_name_fix_abbr');
       case ModerationCategory.priceAnomaly:
-        return 'Цена';
+        return loc.t('moderation_cat_price_anomaly_abbr');
       case ModerationCategory.priceUpdate:
-        return 'Обнов.';
+        return loc.t('moderation_cat_price_update_abbr');
       case ModerationCategory.newProduct:
-        return 'Нов.';
+        return loc.t('moderation_cat_new_product_abbr');
     }
   }
 }

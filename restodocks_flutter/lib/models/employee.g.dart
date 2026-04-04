@@ -21,6 +21,8 @@ Employee _$EmployeeFromJson(Map<String, dynamic> json) => Employee(
       subscriptionPlan: json['subscription_plan'] as String?,
       preferredLanguage: json['preferred_language'] as String? ?? 'ru',
       preferredCurrency: json['preferred_currency'] as String?,
+      uiTheme: json['ui_theme'] as String?,
+      uiViewAsOwner: json['ui_view_as_owner'] as bool?,
       gettingStartedShown: json['getting_started_shown'] as bool? ?? false,
       firstSessionAt: json['first_session_at'] == null
           ? null
@@ -61,6 +63,8 @@ Map<String, dynamic> _$EmployeeToJson(Employee instance) => <String, dynamic>{
       'subscription_plan': instance.subscriptionPlan,
       'preferred_language': instance.preferredLanguage,
       'preferred_currency': instance.preferredCurrency,
+      'ui_theme': instance.uiTheme,
+      'ui_view_as_owner': instance.uiViewAsOwner,
       'getting_started_shown': instance.gettingStartedShown,
       'first_session_at': instance.firstSessionAt?.toIso8601String(),
       'payment_type': instance.paymentType,

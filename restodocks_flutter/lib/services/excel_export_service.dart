@@ -86,8 +86,8 @@ class ExcelExportService {
         .trim();
   }
 
+  /// Подписи в PDF/XLSX: строго по языку документа (ru / es / остальное → en).
   String _tr(String key, String lang) {
-    final ru = lang == 'ru';
     const ruMap = {
       'title_ttk': 'Технологическая карта',
       'title_act': 'Акт проработки',
@@ -110,36 +110,106 @@ class ExcelExportService {
       'total': 'Итого',
       'semi': 'Полуфабрикат',
       'dish': 'Блюдо',
+      'organoleptic': 'Органолептические свойства',
+      'appearance': 'Внешний вид',
+      'consistency': 'Консистенция',
+      'color_label': 'Цвет',
+      'taste_smell': 'Вкус и запах',
+      'index_sheet': 'Список ТТК',
+      'idx_col_name': 'Название',
+      'idx_col_type': 'Тип',
+      'idx_col_category': 'Категория',
+      'idx_col_ing_count': 'Количество ингредиентов',
+      'idx_col_total_out': 'Общий выход (г)',
+      'idx_col_total_cost': 'Общая стоимость',
     };
     const enMap = {
-      'title_ttk': 'Technical Card',
-      'title_act': 'Development Report',
+      'title_ttk': 'Technical specification (tech card)',
+      'title_act': 'Development report',
       'name': 'Name',
       'type': 'Type',
       'category': 'Category',
       'establishment': 'Establishment',
       'chef': 'Chef',
       'date': 'Date',
-      'technology': 'Cooking Technology',
+      'technology': 'Cooking instructions',
       'product': 'Product',
       'gross': 'Gross (g)',
       'waste': 'Waste (%)',
       'net': 'Net (g)',
-      'method': 'Cooking Method',
-      'shrink': 'Shrink (%)',
-      'output': 'Output (g)',
+      'method': 'Cooking method',
+      'shrink': 'Cooking loss (%)',
+      'output': 'Yield (g)',
       'cost': 'Cost',
       'priceKg': 'Price per kg',
       'total': 'Total',
       'semi': 'Semi-finished',
       'dish': 'Dish',
-      'organoleptic': 'Organoleptic Properties',
+      'organoleptic': 'Organoleptic properties',
       'appearance': 'Appearance',
       'consistency': 'Consistency',
       'color_label': 'Color',
       'taste_smell': 'Taste and smell',
+      'index_sheet': 'Tech cards list',
+      'idx_col_name': 'Name',
+      'idx_col_type': 'Type',
+      'idx_col_category': 'Category',
+      'idx_col_ing_count': 'Ingredients count',
+      'idx_col_total_out': 'Total yield (g)',
+      'idx_col_total_cost': 'Total cost',
     };
-    return (ru ? ruMap : enMap)[key] ?? key;
+    const esMap = {
+      'title_ttk': 'Ficha técnica',
+      'title_act': 'Acta de elaboración',
+      'name': 'Nombre',
+      'type': 'Tipo',
+      'category': 'Categoría',
+      'establishment': 'Establecimiento',
+      'chef': 'Chef',
+      'date': 'Fecha',
+      'technology': 'Tecnología de elaboración',
+      'product': 'Producto',
+      'gross': 'Bruto (g)',
+      'waste': 'Merma (%)',
+      'net': 'Neto (g)',
+      'method': 'Método de cocción',
+      'shrink': 'Pérdida por cocción (%)',
+      'output': 'Rendimiento (g)',
+      'cost': 'Coste',
+      'priceKg': 'Precio por kg',
+      'total': 'Total',
+      'semi': 'Semielaborado',
+      'dish': 'Plato',
+      'organoleptic': 'Propiedades organolépticas',
+      'appearance': 'Aspecto',
+      'consistency': 'Consistencia',
+      'color_label': 'Color',
+      'taste_smell': 'Sabor y olor',
+      'index_sheet': 'Lista de fichas',
+      'idx_col_name': 'Nombre',
+      'idx_col_type': 'Tipo',
+      'idx_col_category': 'Categoría',
+      'idx_col_ing_count': 'Nº de ingredientes',
+      'idx_col_total_out': 'Rendimiento total (g)',
+      'idx_col_total_cost': 'Coste total',
+    };
+    final Map<String, String> primary;
+    switch (lang) {
+      case 'ru':
+        primary = ruMap;
+        break;
+      case 'es':
+        primary = esMap;
+        break;
+      default:
+        primary = enMap;
+    }
+    return primary[key] ?? enMap[key] ?? key;
+  }
+
+  String _formatDocumentDate(DateTime d, String lang) {
+    if (lang == 'ru') return DateFormat('dd.MM.yyyy').format(d);
+    return DateFormat('dd/MM/yyyy').format(d);
   }
 
   String _transliterateRuToLatin(String input) {
@@ -230,14 +300,25 @@ class ExcelExportService {
             'Чистые, без посторонних привкусов и запахов. Вкус сбалансированный.',
       );
     }
+    if (lang == 'es') {
+      return const OrganolepticProperties(
+        appearance:
+            'Los ingredientes están preparados y emplatados según la tecnología de elaboración.',
+        consistency: 'Propia de este tipo de producto.',
+        color:
+            'Natural, acorde a los ingredientes. Sin signos de resecamiento ni deterioro.',
+        tasteAndSmell:
+            'Limpios, sin sabores ni olores extraños. Sabor equilibrado.',
+      );
+    }
     return const OrganolepticProperties(
       appearance:
-          'Ingredients are prepared and plated according to the cooking technology.',
+          'Ingredients are prepared and plated according to the cooking instructions.',
       consistency: 'Characteristic for this type of product.',
       color:
-          'Natural, typical for ingredients included in the composition. No signs of drying or spoilage.',
+          'Natural, typical for the ingredients used. No signs of drying or spoilage.',
       tasteAndSmell:
-          'Clean, without off-flavors or off-odors. Taste is balanced.',
+          'Clean, without off-flavors or off-odors. Balanced taste.',
     );
   }
 
@@ -252,20 +333,24 @@ class ExcelExportService {
     await _exportSingleTechCardPdf(techCard, options);
   }
 
-  /// Экспорт одной технологической карты
-  Future<void> exportSingleTechCard(TechCard techCard) async {
+  /// Экспорт одной технологической карты (язык подписей и текста — [languageCode]).
+  Future<void> exportSingleTechCard(
+    TechCard techCard, {
+    required String languageCode,
+  }) async {
+    final lang = languageCode;
     await exportSingleTechCardAdvanced(
       techCard,
       TechCardExportOptions(
         format: TechCardExportFormat.xlsx,
         kind: TechCardExportKind.withPrice,
-        languageCode: 'ru',
+        languageCode: lang,
         establishmentName: '',
         chefName: '',
         chefPosition: '',
         documentDate: techCard.createdAt,
         organolepticMode: OrganolepticMode.template,
-        organoleptic: defaultOrganolepticTemplate('ru'),
+        organoleptic: defaultOrganolepticTemplate(lang),
       ),
     );
   }
@@ -287,7 +372,8 @@ class ExcelExportService {
     sheet.cell(CellIndex.indexByString('B3')).value =
         TextCellValue(techCard.isSemiFinished ? _tr('semi', lang) : _tr('dish', lang));
     sheet.cell(CellIndex.indexByString('A4')).value = TextCellValue('${_tr('category', lang)}:');
-    sheet.cell(CellIndex.indexByString('B4')).value = TextCellValue(_getCategoryName(techCard.category));
+    sheet.cell(CellIndex.indexByString('B4')).value =
+        TextCellValue(_getCategoryName(techCard.category, lang));
     sheet.cell(CellIndex.indexByString('A5')).value = TextCellValue('${_tr('establishment', lang)}:');
     sheet.cell(CellIndex.indexByString('B5')).value = TextCellValue(options.establishmentName);
     sheet.cell(CellIndex.indexByString('A6')).value = TextCellValue('${_tr('chef', lang)}:');
@@ -295,7 +381,7 @@ class ExcelExportService {
         TextCellValue('${options.chefName} ${options.chefPosition}'.trim());
     sheet.cell(CellIndex.indexByString('A7')).value = TextCellValue('${_tr('date', lang)}:');
     sheet.cell(CellIndex.indexByString('B7')).value =
-        TextCellValue(DateFormat('dd.MM.yyyy').format(options.documentDate));
+        TextCellValue(_formatDocumentDate(options.documentDate, lang));
 
     final technology = techCard.getLocalizedTechnology(lang);
     if (technology.isNotEmpty) {
@@ -412,14 +498,14 @@ class ExcelExportService {
             '${_tr('chef', lang)}: ${options.chefName} ${options.chefPosition}'.trim(),
             style: const pw.TextStyle(fontSize: 10),
           ),
-          pw.Text('${_tr('date', lang)}: ${DateFormat('dd.MM.yyyy').format(options.documentDate)}', style: const pw.TextStyle(fontSize: 10)),
+          pw.Text('${_tr('date', lang)}: ${_formatDocumentDate(options.documentDate, lang)}', style: const pw.TextStyle(fontSize: 10)),
           pw.SizedBox(height: 8),
           pw.Text('${_tr('name', lang)}: ${_pdfSafe(techCard.dishName)}', style: const pw.TextStyle(fontSize: 10)),
           pw.Text(
             '${_tr('type', lang)}: ${techCard.isSemiFinished ? _tr('semi', lang) : _tr('dish', lang)}',
             style: const pw.TextStyle(fontSize: 10),
           ),
-          pw.Text('${_tr('category', lang)}: ${_getCategoryName(techCard.category)}', style: const pw.TextStyle(fontSize: 10)),
+          pw.Text('${_tr('category', lang)}: ${_getCategoryName(techCard.category, lang)}', style: const pw.TextStyle(fontSize: 10)),
           if (technology.trim().isNotEmpty) ...[
             pw.SizedBox(height: 8),
             pw.Text('${_tr('technology', lang)}:', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
@@ -531,171 +617,172 @@ class ExcelExportService {
     );
   }
 
-  /// Экспорт выбранных технологических карт
-  Future<void> exportSelectedTechCards(List<TechCard> techCards) async {
-    final excel = Excel.createExcel();
+  String _safeExcelSheetName(String raw) {
+    var s = raw.replaceAll(RegExp(r'[:\\/?*\[\]]'), ' ').trim();
+    if (s.length > 31) s = '${s.substring(0, 28)}...';
+    return s.isEmpty ? 'Sheet' : s;
+  }
 
-    for (int cardIndex = 0; cardIndex < techCards.length; cardIndex++) {
-      final techCard = techCards[cardIndex];
-      final sheetName = techCard.dishName.length > 30
-          ? techCard.dishName.substring(0, 27) + '...'
-          : techCard.dishName;
-      final sheet = excel[sheetName];
+  void _writeTechCardSheetBulk(
+    Sheet sheet,
+    TechCard techCard,
+    String lang,
+  ) {
+    final title = _tr('title_ttk', lang);
+    sheet.cell(CellIndex.indexByString('A1')).value = TextCellValue(title);
+    sheet.cell(CellIndex.indexByString('A2')).value =
+        TextCellValue('${_tr('name', lang)}:');
+    sheet.cell(CellIndex.indexByString('B2')).value = TextCellValue(techCard.dishName);
+    sheet.cell(CellIndex.indexByString('A3')).value =
+        TextCellValue('${_tr('type', lang)}:');
+    sheet.cell(CellIndex.indexByString('B3')).value = TextCellValue(
+        techCard.isSemiFinished ? _tr('semi', lang) : _tr('dish', lang));
+    sheet.cell(CellIndex.indexByString('A4')).value =
+        TextCellValue('${_tr('category', lang)}:');
+    sheet.cell(CellIndex.indexByString('B4')).value =
+        TextCellValue(_getCategoryName(techCard.category, lang));
 
-      // Заголовок
-      sheet.cell(CellIndex.indexByString('A1')).value = TextCellValue('Технологическая карта');
-      sheet.cell(CellIndex.indexByString('A2')).value = TextCellValue('Название:');
-      sheet.cell(CellIndex.indexByString('B2')).value = TextCellValue(techCard.dishName);
-      sheet.cell(CellIndex.indexByString('A3')).value = TextCellValue('Тип:');
-      sheet.cell(CellIndex.indexByString('B3')).value = TextCellValue(techCard.isSemiFinished ? 'Полуфабрикат' : 'Блюдо');
-      sheet.cell(CellIndex.indexByString('A4')).value = TextCellValue('Категория:');
-      sheet.cell(CellIndex.indexByString('B4')).value = TextCellValue(_getCategoryName(techCard.category));
-
-      // Технология приготовления
-      final technology = techCard.technologyLocalized?['ru'] ?? '';
-      if (technology.isNotEmpty) {
-        sheet.cell(CellIndex.indexByString('A6')).value = TextCellValue('Технология приготовления:');
-        sheet.cell(CellIndex.indexByString('A7')).value = TextCellValue(technology);
-      }
-
-      // Заголовки таблицы ингредиентов
-      int rowIndex = technology.isNotEmpty ? 9 : 6;
-      sheet.cell(CellIndex.indexByString('A${rowIndex}')).value = TextCellValue('Продукт');
-      sheet.cell(CellIndex.indexByString('B${rowIndex}')).value = TextCellValue('Брутто (г)');
-      sheet.cell(CellIndex.indexByString('C${rowIndex}')).value = TextCellValue('Отход (%)');
-      sheet.cell(CellIndex.indexByString('D${rowIndex}')).value = TextCellValue('Нетто (г)');
-      sheet.cell(CellIndex.indexByString('E${rowIndex}')).value = TextCellValue('Способ приготовления');
-      sheet.cell(CellIndex.indexByString('F${rowIndex}')).value = TextCellValue('Ужарка (%)');
-      sheet.cell(CellIndex.indexByString('G${rowIndex}')).value = TextCellValue('Выход (г)');
-      sheet.cell(CellIndex.indexByString('H${rowIndex}')).value = TextCellValue('Стоимость');
-      sheet.cell(CellIndex.indexByString('I${rowIndex}')).value = TextCellValue('Цена за кг');
-
-      // Данные ингредиентов
-      for (int i = 0; i < techCard.ingredients.length; i++) {
-        final ingredient = techCard.ingredients[i];
-        final currentRow = rowIndex + i + 1;
-
-        sheet.cell(CellIndex.indexByString('A$currentRow')).value = TextCellValue(ingredient.productName);
-        sheet.cell(CellIndex.indexByString('B$currentRow')).value = DoubleCellValue(ingredient.grossWeight);
-        sheet.cell(CellIndex.indexByString('C$currentRow')).value = DoubleCellValue(ingredient.primaryWastePct);
-        sheet.cell(CellIndex.indexByString('D$currentRow')).value = DoubleCellValue(ingredient.effectiveGrossWeight);
-        sheet.cell(CellIndex.indexByString('E$currentRow')).value = TextCellValue(ingredient.cookingProcessName ?? '');
-        sheet.cell(CellIndex.indexByString('F$currentRow')).value = DoubleCellValue(ingredient.cookingLossPctOverride ?? ingredient.weightLossPercentage);
-        sheet.cell(CellIndex.indexByString('G$currentRow')).value = DoubleCellValue(ingredient.netWeight);
-        sheet.cell(CellIndex.indexByString('H$currentRow')).value = DoubleCellValue(ingredient.cost);
-        sheet.cell(CellIndex.indexByString('I$currentRow')).value = DoubleCellValue(ingredient.netWeight > 0 ? ingredient.cost * 1000 / ingredient.netWeight : 0);
-      }
-
-      // Итого
-      final totalRow = rowIndex + techCard.ingredients.length + 1;
-      final totalNet = techCard.ingredients.fold<double>(0, (sum, ing) => sum + ing.netWeight);
-      final totalCost = techCard.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
-
-      sheet.cell(CellIndex.indexByString('A$totalRow')).value = TextCellValue('Итого:');
-      sheet.cell(CellIndex.indexByString('G$totalRow')).value = DoubleCellValue(totalNet);
-      sheet.cell(CellIndex.indexByString('H$totalRow')).value = DoubleCellValue(totalCost);
-      sheet.cell(CellIndex.indexByString('I$totalRow')).value = DoubleCellValue(totalNet > 0 ? totalCost * 1000 / totalNet : 0);
+    final technology = techCard.getLocalizedTechnology(lang);
+    if (technology.isNotEmpty) {
+      sheet.cell(CellIndex.indexByString('A6')).value =
+          TextCellValue('${_tr('technology', lang)}:');
+      sheet.cell(CellIndex.indexByString('A7')).value = TextCellValue(technology);
     }
 
-    // Сохранение файла
-    final fileName = 'ТТК_выбранные_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+    var rowIndex = technology.isNotEmpty ? 9 : 6;
+    sheet.cell(CellIndex.indexByString('A$rowIndex')).value =
+        TextCellValue(_tr('product', lang));
+    sheet.cell(CellIndex.indexByString('B$rowIndex')).value =
+        TextCellValue(_tr('gross', lang));
+    sheet.cell(CellIndex.indexByString('C$rowIndex')).value =
+        TextCellValue(_tr('waste', lang));
+    sheet.cell(CellIndex.indexByString('D$rowIndex')).value =
+        TextCellValue(_tr('net', lang));
+    sheet.cell(CellIndex.indexByString('E$rowIndex')).value =
+        TextCellValue(_tr('method', lang));
+    sheet.cell(CellIndex.indexByString('F$rowIndex')).value =
+        TextCellValue(_tr('shrink', lang));
+    sheet.cell(CellIndex.indexByString('G$rowIndex')).value =
+        TextCellValue(_tr('output', lang));
+    sheet.cell(CellIndex.indexByString('H$rowIndex')).value =
+        TextCellValue(_tr('cost', lang));
+    sheet.cell(CellIndex.indexByString('I$rowIndex')).value =
+        TextCellValue(_tr('priceKg', lang));
+
+    for (var i = 0; i < techCard.ingredients.length; i++) {
+      final ingredient = techCard.ingredients[i];
+      final currentRow = rowIndex + i + 1;
+      sheet.cell(CellIndex.indexByString('A$currentRow')).value =
+          TextCellValue(_pdfSafe(ingredient.productName));
+      sheet.cell(CellIndex.indexByString('B$currentRow')).value =
+          DoubleCellValue(ingredient.grossWeight);
+      sheet.cell(CellIndex.indexByString('C$currentRow')).value =
+          DoubleCellValue(ingredient.primaryWastePct);
+      sheet.cell(CellIndex.indexByString('D$currentRow')).value =
+          DoubleCellValue(ingredient.effectiveGrossWeight);
+      sheet.cell(CellIndex.indexByString('E$currentRow')).value =
+          TextCellValue(_pdfSafe(ingredient.cookingProcessName ?? ''));
+      sheet.cell(CellIndex.indexByString('F$currentRow')).value = DoubleCellValue(
+          ingredient.cookingLossPctOverride ?? ingredient.weightLossPercentage);
+      sheet.cell(CellIndex.indexByString('G$currentRow')).value =
+          DoubleCellValue(ingredient.netWeight);
+      sheet.cell(CellIndex.indexByString('H$currentRow')).value =
+          DoubleCellValue(ingredient.cost);
+      sheet.cell(CellIndex.indexByString('I$currentRow')).value = DoubleCellValue(
+          ingredient.netWeight > 0 ? ingredient.cost * 1000 / ingredient.netWeight : 0);
+    }
+
+    final totalRow = rowIndex + techCard.ingredients.length + 1;
+    final totalNet =
+        techCard.ingredients.fold<double>(0, (sum, ing) => sum + ing.netWeight);
+    final totalCost =
+        techCard.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
+
+    sheet.cell(CellIndex.indexByString('A$totalRow')).value =
+        TextCellValue('${_tr('total', lang)}:');
+    sheet.cell(CellIndex.indexByString('G$totalRow')).value =
+        DoubleCellValue(totalNet);
+    sheet.cell(CellIndex.indexByString('H$totalRow')).value =
+        DoubleCellValue(totalCost);
+    sheet.cell(CellIndex.indexByString('I$totalRow')).value = DoubleCellValue(
+        totalNet > 0 ? totalCost * 1000 / totalNet : 0);
+  }
+
+  /// Экспорт выбранных технологических карт (подписи — [languageCode]).
+  Future<void> exportSelectedTechCards(
+    List<TechCard> techCards, {
+    required String languageCode,
+  }) async {
+    final lang = languageCode;
+    final excel = Excel.createExcel();
+
+    for (final techCard in techCards) {
+      final rawName = techCard.dishName;
+      final sheetName = _safeExcelSheetName(
+          rawName.length > 30 ? '${rawName.substring(0, 27)}...' : rawName);
+      final sheet = excel[sheetName];
+      _writeTechCardSheetBulk(sheet, techCard, lang);
+    }
+
+    final fileName = 'TTK_selected_${DateTime.now().millisecondsSinceEpoch}.xlsx';
     _saveExcelFile(excel, fileName);
   }
 
-  /// Экспорт всех технологических карт
-  Future<void> exportAllTechCards(List<TechCard> techCards) async {
+  /// Экспорт всех технологических карт (подписи — [languageCode]).
+  Future<void> exportAllTechCards(
+    List<TechCard> techCards, {
+    required String languageCode,
+  }) async {
+    final lang = languageCode;
     final excel = Excel.createExcel();
 
-    // Создаем лист со списком всех ТТК
-    final indexSheet = excel['Список ТТК'];
+    final indexSheetName = _safeExcelSheetName(_tr('index_sheet', lang));
+    final indexSheet = excel[indexSheetName];
 
-    // Заголовки
-    indexSheet.cell(CellIndex.indexByString('A1')).value = TextCellValue('Название');
-    indexSheet.cell(CellIndex.indexByString('B1')).value = TextCellValue('Тип');
-    indexSheet.cell(CellIndex.indexByString('C1')).value = TextCellValue('Категория');
-    indexSheet.cell(CellIndex.indexByString('D1')).value = TextCellValue('Количество ингредиентов');
-    indexSheet.cell(CellIndex.indexByString('E1')).value = TextCellValue('Общий выход (г)');
-    indexSheet.cell(CellIndex.indexByString('F1')).value = TextCellValue('Общая стоимость');
+    indexSheet.cell(CellIndex.indexByString('A1')).value =
+        TextCellValue(_tr('idx_col_name', lang));
+    indexSheet.cell(CellIndex.indexByString('B1')).value =
+        TextCellValue(_tr('idx_col_type', lang));
+    indexSheet.cell(CellIndex.indexByString('C1')).value =
+        TextCellValue(_tr('idx_col_category', lang));
+    indexSheet.cell(CellIndex.indexByString('D1')).value =
+        TextCellValue(_tr('idx_col_ing_count', lang));
+    indexSheet.cell(CellIndex.indexByString('E1')).value =
+        TextCellValue(_tr('idx_col_total_out', lang));
+    indexSheet.cell(CellIndex.indexByString('F1')).value =
+        TextCellValue(_tr('idx_col_total_cost', lang));
 
-    // Список ТТК
-    for (int i = 0; i < techCards.length; i++) {
+    for (var i = 0; i < techCards.length; i++) {
       final techCard = techCards[i];
-      final totalNet = techCard.ingredients.fold<double>(0, (sum, ing) => sum + ing.netWeight);
-      final totalCost = techCard.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
+      final totalNet = techCard.ingredients
+          .fold<double>(0, (sum, ing) => sum + ing.netWeight);
+      final totalCost =
+          techCard.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
 
-      indexSheet.cell(CellIndex.indexByString('A${i + 2}')).value = TextCellValue(techCard.dishName);
-      indexSheet.cell(CellIndex.indexByString('B${i + 2}')).value = TextCellValue(techCard.isSemiFinished ? 'Полуфабрикат' : 'Блюдо');
-      indexSheet.cell(CellIndex.indexByString('C${i + 2}')).value = TextCellValue(_getCategoryName(techCard.category));
-      indexSheet.cell(CellIndex.indexByString('D${i + 2}')).value = IntCellValue(techCard.ingredients.length);
-      indexSheet.cell(CellIndex.indexByString('E${i + 2}')).value = DoubleCellValue(totalNet);
-      indexSheet.cell(CellIndex.indexByString('F${i + 2}')).value = DoubleCellValue(totalCost);
+      indexSheet.cell(CellIndex.indexByString('A${i + 2}')).value =
+          TextCellValue(techCard.dishName);
+      indexSheet.cell(CellIndex.indexByString('B${i + 2}')).value =
+          TextCellValue(
+              techCard.isSemiFinished ? _tr('semi', lang) : _tr('dish', lang));
+      indexSheet.cell(CellIndex.indexByString('C${i + 2}')).value =
+          TextCellValue(_getCategoryName(techCard.category, lang));
+      indexSheet.cell(CellIndex.indexByString('D${i + 2}')).value =
+          IntCellValue(techCard.ingredients.length);
+      indexSheet.cell(CellIndex.indexByString('E${i + 2}')).value =
+          DoubleCellValue(totalNet);
+      indexSheet.cell(CellIndex.indexByString('F${i + 2}')).value =
+          DoubleCellValue(totalCost);
     }
 
-    // Создаем отдельные листы для каждой ТТК
-    for (int cardIndex = 0; cardIndex < techCards.length; cardIndex++) {
-      final techCard = techCards[cardIndex];
-      final sheetName = techCard.dishName.length > 30
-          ? techCard.dishName.substring(0, 27) + '...'
-          : techCard.dishName;
+    for (final techCard in techCards) {
+      final rawName = techCard.dishName;
+      final sheetName = _safeExcelSheetName(
+          rawName.length > 30 ? '${rawName.substring(0, 27)}...' : rawName);
       final sheet = excel[sheetName];
-
-      // Заголовок
-      sheet.cell(CellIndex.indexByString('A1')).value = TextCellValue('Технологическая карта');
-      sheet.cell(CellIndex.indexByString('A2')).value = TextCellValue('Название:');
-      sheet.cell(CellIndex.indexByString('B2')).value = TextCellValue(techCard.dishName);
-      sheet.cell(CellIndex.indexByString('A3')).value = TextCellValue('Тип:');
-      sheet.cell(CellIndex.indexByString('B3')).value = TextCellValue(techCard.isSemiFinished ? 'Полуфабрикат' : 'Блюдо');
-      sheet.cell(CellIndex.indexByString('A4')).value = TextCellValue('Категория:');
-      sheet.cell(CellIndex.indexByString('B4')).value = TextCellValue(_getCategoryName(techCard.category));
-
-      // Технология приготовления
-      final technology = techCard.technologyLocalized?['ru'] ?? '';
-      if (technology.isNotEmpty) {
-        sheet.cell(CellIndex.indexByString('A6')).value = TextCellValue('Технология приготовления:');
-        sheet.cell(CellIndex.indexByString('A7')).value = TextCellValue(technology);
-      }
-
-      // Заголовки таблицы ингредиентов
-      int rowIndex = technology.isNotEmpty ? 9 : 6;
-      sheet.cell(CellIndex.indexByString('A${rowIndex}')).value = TextCellValue('Продукт');
-      sheet.cell(CellIndex.indexByString('B${rowIndex}')).value = TextCellValue('Брутто (г)');
-      sheet.cell(CellIndex.indexByString('C${rowIndex}')).value = TextCellValue('Отход (%)');
-      sheet.cell(CellIndex.indexByString('D${rowIndex}')).value = TextCellValue('Нетто (г)');
-      sheet.cell(CellIndex.indexByString('E${rowIndex}')).value = TextCellValue('Способ приготовления');
-      sheet.cell(CellIndex.indexByString('F${rowIndex}')).value = TextCellValue('Ужарка (%)');
-      sheet.cell(CellIndex.indexByString('G${rowIndex}')).value = TextCellValue('Выход (г)');
-      sheet.cell(CellIndex.indexByString('H${rowIndex}')).value = TextCellValue('Стоимость');
-      sheet.cell(CellIndex.indexByString('I${rowIndex}')).value = TextCellValue('Цена за кг');
-
-      // Данные ингредиентов
-      for (int i = 0; i < techCard.ingredients.length; i++) {
-        final ingredient = techCard.ingredients[i];
-        final currentRow = rowIndex + i + 1;
-
-        sheet.cell(CellIndex.indexByString('A$currentRow')).value = TextCellValue(ingredient.productName);
-        sheet.cell(CellIndex.indexByString('B$currentRow')).value = DoubleCellValue(ingredient.grossWeight);
-        sheet.cell(CellIndex.indexByString('C$currentRow')).value = DoubleCellValue(ingredient.primaryWastePct);
-        sheet.cell(CellIndex.indexByString('D$currentRow')).value = DoubleCellValue(ingredient.effectiveGrossWeight);
-        sheet.cell(CellIndex.indexByString('E$currentRow')).value = TextCellValue(ingredient.cookingProcessName ?? '');
-        sheet.cell(CellIndex.indexByString('F$currentRow')).value = DoubleCellValue(ingredient.cookingLossPctOverride ?? ingredient.weightLossPercentage);
-        sheet.cell(CellIndex.indexByString('G$currentRow')).value = DoubleCellValue(ingredient.netWeight);
-        sheet.cell(CellIndex.indexByString('H$currentRow')).value = DoubleCellValue(ingredient.cost);
-        sheet.cell(CellIndex.indexByString('I$currentRow')).value = DoubleCellValue(ingredient.netWeight > 0 ? ingredient.cost * 1000 / ingredient.netWeight : 0);
-      }
-
-      // Итого
-      final totalRow = rowIndex + techCard.ingredients.length + 1;
-      final totalNet = techCard.ingredients.fold<double>(0, (sum, ing) => sum + ing.netWeight);
-      final totalCost = techCard.ingredients.fold<double>(0, (sum, ing) => sum + ing.cost);
-
-      sheet.cell(CellIndex.indexByString('A$totalRow')).value = TextCellValue('Итого:');
-      sheet.cell(CellIndex.indexByString('G$totalRow')).value = DoubleCellValue(totalNet);
-      sheet.cell(CellIndex.indexByString('H$totalRow')).value = DoubleCellValue(totalCost);
-      sheet.cell(CellIndex.indexByString('I$totalRow')).value = DoubleCellValue(totalNet > 0 ? totalCost * 1000 / totalNet : 0);
+      _writeTechCardSheetBulk(sheet, techCard, lang);
     }
 
-    // Сохранение файла
-    final fileName = 'Все_ТТК_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+    final fileName = 'TTK_all_${DateTime.now().millisecondsSinceEpoch}.xlsx';
     _saveExcelFile(excel, fileName);
   }
 
@@ -706,9 +793,8 @@ class ExcelExportService {
     file_saver.saveExcelBytes(Uint8List.fromList(bytes), fileName);
   }
 
-  /// Получение названия категории на русском
-  String _getCategoryName(String category) {
-    const categoryNames = {
+  String _getCategoryName(String category, String lang) {
+    const ru = {
       'vegetables': 'Овощи',
       'fruits': 'Фрукты',
       'meat': 'Мясо',
@@ -724,6 +810,49 @@ class ExcelExportService {
       'nuts': 'Орехи',
       'misc': 'Разное',
     };
-    return categoryNames[category] ?? category;
+    const en = {
+      'vegetables': 'Vegetables',
+      'fruits': 'Fruits',
+      'meat': 'Meat',
+      'seafood': 'Seafood',
+      'dairy': 'Dairy',
+      'grains': 'Grains',
+      'bakery': 'Bakery',
+      'pantry': 'Dry goods',
+      'spices': 'Spices',
+      'beverages': 'Beverages',
+      'eggs': 'Eggs',
+      'legumes': 'Legumes',
+      'nuts': 'Nuts',
+      'misc': 'Other',
+    };
+    const es = {
+      'vegetables': 'Verduras',
+      'fruits': 'Frutas',
+      'meat': 'Carne',
+      'seafood': 'Pescado y marisco',
+      'dairy': 'Lácteos',
+      'grains': 'Cereales',
+      'bakery': 'Panadería',
+      'pantry': 'Despensa',
+      'spices': 'Especias',
+      'beverages': 'Bebidas',
+      'eggs': 'Huevos',
+      'legumes': 'Legumbres',
+      'nuts': 'Frutos secos',
+      'misc': 'Varios',
+    };
+    final Map<String, String> m;
+    switch (lang) {
+      case 'ru':
+        m = ru;
+        break;
+      case 'es':
+        m = es;
+        break;
+      default:
+        m = en;
+    }
+    return m[category] ?? category;
   }
 }

@@ -94,7 +94,7 @@ class _CategoryPickerField extends StatelessWidget {
               Icon(Icons.add_circle_outline,
                   size: 20, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 8),
-              Text(loc.t('ttk_add_custom_category') ?? 'Свой вариант',
+              Text(loc.t('ttk_add_custom_category'),
                   style: TextStyle(
                       color: Theme.of(context).colorScheme.primary,
                       fontWeight: FontWeight.w500)),
@@ -117,7 +117,7 @@ class _CategoryPickerField extends StatelessWidget {
                         .onSurface
                         .withValues(alpha: 0.6)),
                 const SizedBox(width: 8),
-                Text(loc.t('ttk_manage_custom_categories') ?? 'Управление',
+                Text(loc.t('ttk_manage_custom_categories'),
                     style: TextStyle(
                         fontSize: 13,
                         color: Theme.of(context)
@@ -1053,6 +1053,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   @override
   Map<String, dynamic> getCurrentState() {
     return {
+      'draftSavedAt': DateTime.now().toUtc().toIso8601String(),
       'techCardId': widget.techCardId,
       'name': _nameController.text,
       'technology': _technologyController.text,
@@ -2206,7 +2207,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         return StatefulBuilder(
           builder: (ctx2, setInnerState) {
             return AlertDialog(
-              title: Text('Уточните ПФ для: $ingredientName'),
+              title: Text(loc.t('ttk_clarify_pf_for').replaceFirst('%s', ingredientName)),
               content: SizedBox(
                 width: 560,
                 child: SingleChildScrollView(
@@ -2253,8 +2254,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                       onPressed: () =>
                                           _showTechCardCompositionDialog(
                                               ctx2, c, lang),
-                                      child:
-                                          Text(loc.t('ttk_view') ?? 'Состав'),
+                                      child: Text(loc.t('ttk_composition_short')),
                                     ),
                                   ],
                                 ),
@@ -2270,7 +2270,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(null),
-                  child: Text(loc.t('cancel') ?? 'Отмена'),
+                  child: Text(loc.t('cancel')),
                 ),
                 FilledButton(
                   onPressed: () {
@@ -2278,7 +2278,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                         candidates.where((c) => c.id == selectedId).firstOrNull;
                     Navigator.of(ctx).pop(picked);
                   },
-                  child: Text(loc.t('apply') ?? 'Применить'),
+                  child: Text(loc.t('apply')),
                 ),
               ],
             );
@@ -2295,6 +2295,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     showDialog<void>(
       context: ctx,
       builder: (dCtx) {
+        final loc = dCtx.read<LocalizationService>();
         final items = tc.ingredients
             .where((i) => i.productName.trim().isNotEmpty)
             .toList();
@@ -2304,7 +2305,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             width: 620,
             height: 420,
             child: items.isEmpty
-                ? const Center(child: Text('Состав пуст'))
+                ? Center(child: Text(loc.t('ttk_composition_empty')))
                 : ListView.separated(
                     itemCount: items.length,
                     separatorBuilder: (_, __) => const Divider(height: 1),
@@ -2320,7 +2321,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                       return ListTile(
                         dense: true,
                         title: Text(name),
-                        subtitle: Text('Выход: ${w.toStringAsFixed(0)} г'),
+                        subtitle: Text(loc
+                            .t('ttk_output_weight_grams')
+                            .replaceFirst('%s', w.toStringAsFixed(0))),
                       );
                     },
                   ),
@@ -2328,7 +2331,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           actions: [
             TextButton(
                 onPressed: () => Navigator.of(dCtx).pop(),
-                child: const Text('Ок')),
+                child: Text(loc.t('dialog_ok'))),
           ],
         );
       },
@@ -2559,12 +2562,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: Text(loc.t('ttk_add_custom_category') ?? 'Свой вариант'),
+          title: Text(loc.t('ttk_add_custom_category')),
           content: TextField(
             controller: controller,
             decoration: InputDecoration(
-              labelText: loc.t('ttk_custom_category_hint') ??
-                  'Название своей категории',
+              labelText: loc.t('ttk_custom_category_hint'),
               border: const OutlineInputBorder(),
             ),
             autofocus: true,
@@ -2574,10 +2576,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           actions: [
             TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: Text(loc.t('back') ?? 'Назад')),
+                child: Text(loc.t('back'))),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-              child: Text(loc.t('save') ?? 'Сохранить'),
+              child: Text(loc.t('save')),
             ),
           ],
         );
@@ -2593,8 +2595,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.t('ttk_custom_category_save_error') ??
-                'Не удалось сохранить. Проверьте, что в Supabase применена миграция tech_card_custom_categories.'),
+            content: Text(loc.t('ttk_custom_category_save_error')),
             duration: const Duration(seconds: 4),
           ),
         );
@@ -2623,8 +2624,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (list.isEmpty) {
       if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(
-                loc.t('ttk_no_custom_categories') ?? 'Нет своих категорий')));
+            content: Text(loc.t('ttk_no_custom_categories'))));
       return;
     }
     final tcSvc = context.read<TechCardServiceSupabase>();
@@ -2638,8 +2638,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-                loc.t('ttk_manage_custom_categories') ??
-                    'Управление своими категориями',
+                loc.t('ttk_manage_custom_categories'),
                 style: Theme.of(ctx).textTheme.titleMedium),
             const SizedBox(height: 12),
             ...list.map((c) => ListTile(
@@ -2654,9 +2653,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                       if (count > 0) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                              content: Text((loc
-                                          .t('ttk_custom_category_in_use') ??
-                                      'Используется в %s ТТК — удалить нельзя')
+                              content: Text(loc
+                                  .t('ttk_custom_category_in_use')
                                   .replaceAll('%s', '$count'))),
                         );
                         return;
@@ -2763,28 +2761,32 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   }) {
     return showDialog<_DuplicateNameAction>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Такая ТТК уже есть в системе'),
-        content: Text(
-          'Название "$originalName" уже используется.\n'
-          'Создать дубликат с именем "$duplicateName"?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(_DuplicateNameAction.edit),
-            child: const Text('Внести правки'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(_DuplicateNameAction.delete),
-            child: const Text('Удалить'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.of(ctx).pop(_DuplicateNameAction.createDuplicate),
-            child: const Text('Создать дубликат'),
-          ),
-        ],
-      ),
+      builder: (ctx) {
+        final loc = context.read<LocalizationService>();
+        return AlertDialog(
+          title: Text(loc.t('ttk_duplicate_exists_in_system')),
+          content: Text(loc.t('ttk_duplicate_name_dialog_body', args: {
+            'original': originalName,
+            'duplicate': duplicateName,
+          })),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(_DuplicateNameAction.edit),
+              child: Text(loc.t('ttk_edit_existing')),
+            ),
+            TextButton(
+              onPressed: () =>
+                  Navigator.of(ctx).pop(_DuplicateNameAction.delete),
+              child: Text(loc.t('delete')),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(ctx).pop(_DuplicateNameAction.createDuplicate),
+              child: Text(loc.t('ttk_create_duplicate')),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -2805,7 +2807,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       setState(() => _saving = true);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(loc.t('ttk_saving') ?? 'Сохранение...'),
+            content: Text(loc.t('ttk_saving')),
             duration: const Duration(seconds: 2)),
       );
     }
@@ -3239,7 +3241,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         content: SizedBox(
           width: 400,
           child: entries.isEmpty
-              ? Text(loc.t('ttk_history_empty') ?? 'Нет записей',
+              ? Text(loc.t('ttk_history_empty'),
                   style: Theme.of(ctx).textTheme.bodyMedium)
               : ListView.separated(
                   shrinkWrap: true,
@@ -3249,8 +3251,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                     final e = entries[i];
                     final dateStr =
                         '${e.changedAt.day.toString().padLeft(2, '0')}.${e.changedAt.month.toString().padLeft(2, '0')}.${e.changedAt.year} ${e.changedAt.hour.toString().padLeft(2, '0')}:${e.changedAt.minute.toString().padLeft(2, '0')}';
-                    final who = e.changedByName ??
-                        (loc.t('ttk_history_unknown') ?? '—');
+                    final who =
+                        e.changedByName ?? loc.t('ttk_history_unknown');
                     final changeLines = e.changes
                         .map<String>((c) => _formatHistoryChange(c, loc))
                         .where((s) => s.isNotEmpty)
@@ -3373,7 +3375,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       final svc = context.read<TechCardServiceSupabase>();
       final created = await svc.cloneTechCard(tc, emp.id);
       if (!mounted) return;
-      AppToastService.show(loc.t('ttk_created_duplicate') ?? 'Дубликат создан');
+      AppToastService.show(loc.t('ttk_created_duplicate'));
       context.pushReplacement('/tech-cards/${created.id}');
     } catch (e) {
       if (mounted) {
@@ -3409,17 +3411,17 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocalState) => AlertDialog(
-          title: const Text('Экспорт документа'),
+          title: Text(loc.t('ttk_export_document_title')),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Что сохранить:'),
+                Text(loc.t('ttk_export_what_to_save')),
                 RadioListTile<TechCardExportKind>(
                   contentPadding: EdgeInsets.zero,
                   dense: true,
-                  title: const Text('1) Сохранить с ценой'),
+                  title: Text(loc.t('ttk_export_with_price')),
                   value: TechCardExportKind.withPrice,
                   groupValue: kind,
                   onChanged: (v) {
@@ -3429,7 +3431,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 RadioListTile<TechCardExportKind>(
                   contentPadding: EdgeInsets.zero,
                   dense: true,
-                  title: const Text('2) Сохранить без цены'),
+                  title: Text(loc.t('ttk_export_without_price')),
                   value: TechCardExportKind.withoutPrice,
                   groupValue: kind,
                   onChanged: (v) {
@@ -3439,7 +3441,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 RadioListTile<TechCardExportKind>(
                   contentPadding: EdgeInsets.zero,
                   dense: true,
-                  title: const Text('3) Сохранить как акт проработки'),
+                  title: Text(loc.t('ttk_export_as_act')),
                   value: TechCardExportKind.actDevelopment,
                   groupValue: kind,
                   onChanged: (v) {
@@ -3447,7 +3449,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   },
                 ),
                 const SizedBox(height: 8),
-                const Text('Формат файла:'),
+                Text(loc.t('ttk_export_file_format')),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<TechCardExportFormat>(
                   value: format,
@@ -3467,7 +3469,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   },
                 ),
                 const SizedBox(height: 10),
-                const Text('Язык документа:'),
+                Text(loc.t('ttk_export_document_language')),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
                   value: lang,
@@ -3500,11 +3502,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   const SizedBox(height: 12),
                   const Divider(height: 1),
                   const SizedBox(height: 10),
-                  const Text('Органолептические свойства'),
+                  Text(loc.t('ttk_organoleptic_properties')),
                   RadioListTile<OrganolepticMode>(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
-                    title: const Text('По шаблону'),
+                    title: Text(loc.t('ttk_organoleptic_by_template')),
                     value: OrganolepticMode.template,
                     groupValue: organolepticMode,
                     onChanged: (v) {
@@ -3526,7 +3528,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   RadioListTile<OrganolepticMode>(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
-                    title: const Text('Изменить шаблон'),
+                    title: Text(loc.t('ttk_organoleptic_edit_template')),
                     value: OrganolepticMode.custom,
                     groupValue: organolepticMode,
                     onChanged: (v) {
@@ -3539,9 +3541,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   TextFormField(
                     controller: appearanceCtrl,
                     enabled: organolepticMode == OrganolepticMode.custom,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       isDense: true,
-                      labelText: 'Внешний вид',
+                      labelText: loc.t('ttk_organoleptic_appearance'),
                     ),
                     maxLines: 2,
                   ),
@@ -3549,9 +3551,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   TextFormField(
                     controller: consistencyCtrl,
                     enabled: organolepticMode == OrganolepticMode.custom,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       isDense: true,
-                      labelText: 'Консистенция',
+                      labelText: loc.t('ttk_organoleptic_consistency'),
                     ),
                     maxLines: 2,
                   ),
@@ -3559,9 +3561,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   TextFormField(
                     controller: colorCtrl,
                     enabled: organolepticMode == OrganolepticMode.custom,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       isDense: true,
-                      labelText: 'Цвет',
+                      labelText: loc.t('ttk_organoleptic_color'),
                     ),
                     maxLines: 3,
                   ),
@@ -3569,9 +3571,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   TextFormField(
                     controller: tasteCtrl,
                     enabled: organolepticMode == OrganolepticMode.custom,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       isDense: true,
-                      labelText: 'Вкус и запах',
+                      labelText: loc.t('ttk_organoleptic_taste_smell'),
                     ),
                     maxLines: 3,
                   ),
@@ -3627,7 +3629,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   );
                 }
               },
-              child: const Text('Сохранить'),
+              child: Text(loc.t('save')),
             ),
           ],
         ),
@@ -4474,7 +4476,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(loc.t('description_for_hall') ?? 'Описание для гостей',
+                    Text(loc.t('description_for_hall'),
                         style: const TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w500)),
                     const SizedBox(height: 4),
@@ -4484,8 +4486,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                             maxLines: 3,
                             style: const TextStyle(fontSize: 13),
                             decoration: InputDecoration(
-                              hintText: loc.t('description_for_hall_hint') ??
-                                  'Краткое описание блюда для гостей',
+                              hintText: loc.t('description_for_hall_hint'),
                               isDense: true,
                               border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8)),
@@ -4497,7 +4498,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                 : _descriptionForHallController.text,
                             style: const TextStyle(fontSize: 13, height: 1.4)),
                     const SizedBox(height: 12),
-                    Text(loc.t('composition_for_hall') ?? 'Состав для гостей',
+                    Text(loc.t('composition_for_hall'),
                         style: const TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w500)),
                     const SizedBox(height: 4),
@@ -4507,8 +4508,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                             maxLines: 3,
                             style: const TextStyle(fontSize: 13),
                             decoration: InputDecoration(
-                              hintText: loc.t('composition_for_hall_hint') ??
-                                  'Состав: ингредиенты для меню (например: курица, рис, соус)',
+                              hintText: loc.t('composition_for_hall_hint'),
                               isDense: true,
                               border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8)),
@@ -4527,7 +4527,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                         sections: _selectedSections,
                         department: widget.department)) ...[
                       const SizedBox(height: 12),
-                      Text(loc.t('selling_price') ?? 'Продажная цена',
+                      Text(loc.t('selling_price'),
                           style: const TextStyle(
                               fontSize: 12, fontWeight: FontWeight.w500)),
                       const SizedBox(height: 4),
@@ -4554,7 +4554,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                         _techCard!.sellingPrice != null &&
                         _techCard!.sellingPrice! > 0) ...[
                       const SizedBox(height: 12),
-                      Text(loc.t('selling_price') ?? 'Продажная цена',
+                      Text(loc.t('selling_price'),
                           style: const TextStyle(
                               fontSize: 12, fontWeight: FontWeight.w500)),
                       const SizedBox(height: 4),
@@ -4817,7 +4817,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               ),
               const SizedBox(height: 16),
               Text(
-                loc.t('loading') ?? 'Загрузка...',
+                loc.t('loading'),
                 style: TextStyle(
                   fontSize: 14,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -4869,7 +4869,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 const SizedBox(height: 16),
               ],
               if (desc.isNotEmpty) ...[
-                Text(loc.t('description_for_hall') ?? 'Описание',
+                Text(loc.t('description_for_hall'),
                     style: Theme.of(context)
                         .textTheme
                         .titleMedium
@@ -4879,7 +4879,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 const SizedBox(height: 16),
               ],
               if (comp.isNotEmpty) ...[
-                Text(loc.t('composition_for_hall') ?? 'Состав',
+                Text(loc.t('composition_for_hall'),
                     style: Theme.of(context)
                         .textTheme
                         .titleMedium
@@ -4889,7 +4889,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 const SizedBox(height: 16),
               ],
               if (sellingPrice != null && sellingPrice > 0) ...[
-                Text(loc.t('selling_price') ?? 'Цена',
+                Text(loc.t('selling_price'),
                     style: Theme.of(context)
                         .textTheme
                         .titleMedium
@@ -4908,8 +4908,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Text(
-                    loc.t('hall_info_empty') ??
-                        'Описание и состав для зала не заполнены в ТТК.',
+                    loc.t('hall_info_empty'),
                     style: TextStyle(color: Colors.grey[600]),
                     textAlign: TextAlign.center,
                   ),
@@ -4967,7 +4966,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                     )
                   : const Icon(Icons.copy),
               onPressed: _duplicating ? null : () => _duplicateTechCard(loc),
-              tooltip: loc.t('ttk_create_duplicate') ?? 'Создать дубликат',
+              tooltip: loc.t('ttk_create_duplicate'),
               style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
             ),
           // Кнопка экспорта текущей ТТК
@@ -4975,7 +4974,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             IconButton(
               icon: const Icon(Icons.download),
               onPressed: () => _showExportOptionsDialog(loc),
-              tooltip: 'Экспорт PDF/XLSX',
+              tooltip: loc.t('ttk_export_pdf_xlsx_tooltip'),
               style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
             ),
         ],
@@ -5529,12 +5528,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                     final ok = await showDialog<bool>(
                                       context: context,
                                       builder: (ctx) => AlertDialog(
-                                        title: Text(
-                                            loc.t('ttk_adjust_waste_title') ??
-                                                'Подстроить отход'),
+                                        title: Text(loc.t('ttk_adjust_waste_title')),
                                         content: Text(
-                                          (loc.t('ttk_adjust_waste_confirm') ??
-                                                  'Подстроить процент отхода у всех ингредиентов, чтобы итоговый выход был %s г? Текущая сумма выходов: %s г.')
+                                          loc
+                                              .t('ttk_adjust_waste_confirm')
                                               .replaceFirst(
                                                   '%s',
                                                   _portionWeight
@@ -5554,7 +5551,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                           FilledButton(
                                               onPressed: () =>
                                                   Navigator.of(ctx).pop(true),
-                                              child: Text(loc.t('ok') ?? 'Да')),
+                                              child: Text(loc.t('answer_yes')),
+                                          ),
                                         ],
                                       ),
                                     );
@@ -5571,8 +5569,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                               .primary),
                                       const SizedBox(width: 6),
                                       Text(
-                                          loc.t('ttk_adjust_waste_to_output') ??
-                                              'Подстроить % отхода под целевой выход',
+                                          loc.t('ttk_adjust_waste_to_output'),
                                           style: const TextStyle(fontSize: 13)),
                                     ],
                                   ),
@@ -5753,7 +5750,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                             onPressed: () =>
                                                 Navigator.of(dCtx).pop(),
                                             child:
-                                                Text(loc.t('cancel') ?? 'OK'),
+                                                Text(loc.t('dialog_ok')),
                                           ),
                                         ],
                                       );
@@ -5798,8 +5795,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                           onPressed: showMissingNutritionDialog,
                                           child: Text(
                                             loc.t(
-                                                    'kbju_incomplete_dish_nutrition_show_list') ??
-                                                'Показать список',
+                                                'kbju_incomplete_dish_nutrition_show_list'),
                                           ),
                                         ),
                                       ),
@@ -5847,8 +5843,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                                     showMissingNutritionDialog,
                                                 child: Text(
                                                   loc.t(
-                                                          'kbju_incomplete_dish_nutrition_show_list') ??
-                                                      'Показать список',
+                                                      'kbju_incomplete_dish_nutrition_show_list'),
                                                 ),
                                               ),
                                             ),
@@ -7594,13 +7589,14 @@ class _ProductDropdownInCell extends StatelessWidget {
               }
               final products = snap.data!;
               if (products.isEmpty) {
+                final loc = ctx.read<LocalizationService>();
                 return AlertDialog(
-                  title: const Text('Нет данных'),
-                  content: const Text('Список продуктов пуст'),
+                  title: Text(loc.t('products_list_empty_title')),
+                  content: Text(loc.t('products_list_empty_body')),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(ctx).pop(),
-                      child: const Text('OK'),
+                      child: Text(loc.t('dialog_ok')),
                     ),
                   ],
                 );

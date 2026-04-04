@@ -10,7 +10,6 @@ import 'core/url_strategy_stub.dart'
     if (dart.library.html) 'core/url_strategy_web.dart' as url_strategy;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/auth_session_lifecycle.dart';
@@ -30,35 +29,16 @@ import 'services/services.dart';
 import 'services/translation_manager.dart';
 import 'widgets/widgets.dart';
 
-/// Ключ совпадает с [LocalizationService] (SharedPreferences).
-const _kLocalePrefKey = 'restodocks_locale';
-
-/// Язык из профиля Supabase не должен затирать выбор пользователя на этом устройстве.
+/// Язык интерфейса из профиля аккаунта (одинаковый на всех устройствах после синхронизации).
 Future<void> _applyLocaleFromEmployeeProfile(String profileLang) async {
   final loc = LocalizationService();
-  final prefs = await SharedPreferences.getInstance();
-  final saved = prefs.getString(_kLocalePrefKey);
   final p = profileLang.trim().toLowerCase();
   if (!LocalizationService.supportedLocales.any((l) => l.languageCode == p)) {
     return;
   }
-  if (saved != null && saved.isNotEmpty) {
-    if (saved != p) {
-      if (loc.currentLanguageCode != saved) {
-        await loc.setLocale(Locale(saved));
-      }
-      final acc = AccountManagerSupabase();
-      if (acc.currentEmployee != null) {
-        await acc.savePreferredLanguage(saved);
-      }
-      return;
-    }
-    if (loc.currentLanguageCode != p) {
-      await loc.setLocale(Locale(p));
-    }
-    return;
+  if (loc.currentLanguageCode != p) {
+    await loc.setLocale(Locale(p));
   }
-  await loc.setLocale(Locale(p));
 }
 
 Future<void> main() async {
@@ -196,6 +176,21 @@ Future<void> _bootstrapApp() async {
     MobileUiScaleService().initialize(),
     PosOrdersDisplaySettingsService().initialize(),
   ]);
+
+  ThemeService.accountPersistHook = (mode) async {
+    await AccountUiSyncService.instance.persistThemeFromUser(mode);
+  };
+  OwnerViewPreferenceService.accountPersistHook = (value) async {
+    await AccountUiSyncService.instance.persistViewAsOwnerFromUser(value);
+  };
+  AccountUiSyncService.instance.onEmployeeMerged = (e) {
+    AccountManagerSupabase().mergeCurrentEmployeeInMemory(e);
+  };
+  final syncedEmployee = AccountManagerSupabase().currentEmployee;
+  if (syncedEmployee != null) {
+    unawaited(AccountUiSyncService.instance.applyAfterLogin(syncedEmployee));
+  }
+
   AppToastService.init(AppRouter.rootNavigatorKey);
 }
 

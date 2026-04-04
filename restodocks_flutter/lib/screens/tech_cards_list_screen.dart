@@ -29,6 +29,8 @@ import '../services/tech_card_translation_cache.dart';
 
 enum _TtkImportMode { single, multi }
 
+enum _TtkNewDraftChoice { continueDraft, startNew, cancel }
+
 /// Список ТТК заведения. Создание и переход к редактированию.
 class TechCardsListScreen extends StatefulWidget {
   const TechCardsListScreen(
@@ -1225,7 +1227,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Text(
-            'Нет ТТК на проверку',
+            loc.t('ttk_review_tab_empty'),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant),
             textAlign: TextAlign.center,
@@ -1406,7 +1408,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       children: [
                         Expanded(
                           child: Text(
-                            'На проверку: ${_tcListName(tc, lang)}',
+                            loc
+                                .t('ttk_review_sheet_title')
+                                .replaceFirst('%s', _tcListName(tc, lang)),
                             style: Theme.of(ctx2)
                                 .textTheme
                                 .titleMedium
@@ -1430,7 +1434,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                           // Секция неоднозначных ПФ
                           if (ambiguousMatches.isNotEmpty) ...[
                             Text(
-                              'Неоднозначные полуфабрикаты (${ambiguousMatches.length})',
+                              loc
+                                  .t('ttk_review_ambiguous_pf_section')
+                                  .replaceFirst(
+                                      '%s', '${ambiguousMatches.length}'),
                               style:
                                   Theme.of(ctx2).textTheme.titleSmall?.copyWith(
                                         fontWeight: FontWeight.w600,
@@ -1470,9 +1477,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                     DropdownButtonFormField<String>(
                                       value: selId,
                                       isExpanded: true,
-                                      decoration: const InputDecoration(
+                                      decoration: InputDecoration(
                                           isDense: true,
-                                          labelText: 'Кандидат ПФ'),
+                                          labelText:
+                                              loc.t('ttk_pf_candidate_label')),
                                       items: m.candidates
                                           .map((c) => DropdownMenuItem<String>(
                                                 value: c.id,
@@ -1495,7 +1503,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                         onPressed: () =>
                                             _showTechCardCompositionDialog(
                                                 ctx2, selPf, lang),
-                                        child: const Text('Состав'),
+                                        child: Text(loc.t('ttk_composition_short')),
                                       ),
                                     ),
                                   ],
@@ -1508,7 +1516,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                             if (ambiguousMatches.isNotEmpty)
                               const SizedBox(height: 16),
                             Text(
-                              'Ингредиенты без цен (${missingPriceIngredients.length})',
+                              loc
+                                  .t('ttk_review_no_price_section')
+                                  .replaceFirst(
+                                      '%s', '${missingPriceIngredients.length}'),
                               style:
                                   Theme.of(ctx2).textTheme.titleSmall?.copyWith(
                                         fontWeight: FontWeight.w600,
@@ -1551,7 +1562,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                 missingPriceIngredients.isNotEmpty)
                               const SizedBox(height: 16),
                             Text(
-                              'Проблемы с весом (${missingWeightIssues.length})',
+                              loc
+                                  .t('ttk_review_weight_section')
+                                  .replaceFirst(
+                                      '%s', '${missingWeightIssues.length}'),
                               style:
                                   Theme.of(ctx2).textTheme.titleSmall?.copyWith(
                                         fontWeight: FontWeight.w600,
@@ -1595,7 +1609,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                 missingWeightIssues.isNotEmpty)
                               const SizedBox(height: 16),
                             Text(
-                              'Проблемы с технологией (${missingTechnologyIssues.length})',
+                              loc
+                                  .t('ttk_review_technology_section')
+                                  .replaceFirst(
+                                      '%s',
+                                      '${missingTechnologyIssues.length}'),
                               style:
                                   Theme.of(ctx2).textTheme.titleSmall?.copyWith(
                                         fontWeight: FontWeight.w600,
@@ -1649,7 +1667,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                     if (mounted && needRefresh == true)
                                       _load(showLoading: false);
                                   },
-                            child: const Text('Открыть карточку'),
+                            child: Text(loc.t('ttk_open_tech_card')),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -1696,8 +1714,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                         if (ctx2.mounted) {
                                           ScaffoldMessenger.of(ctx2)
                                               .showSnackBar(SnackBar(
-                                                  content: Text(
-                                                      'Ошибка сохранения: $e')));
+                                                  content: Text(loc
+                                                      .t('save_error')
+                                                      .replaceFirst(
+                                                          '%s', '$e'))));
                                         }
                                       } finally {
                                         if (ctx2.mounted)
@@ -1710,7 +1730,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                       height: 18,
                                       child: CircularProgressIndicator(
                                           strokeWidth: 2))
-                                  : const Text('Применить'),
+                                  : Text(loc.t('apply')),
                             ),
                           ),
                       ],
@@ -2353,8 +2373,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   /// Экспорт одной ТТК
   Future<void> _exportSingleTechCard(TechCard techCard) async {
+    final lang = context.read<LocalizationService>().currentLanguageCode;
     try {
-      await ExcelExportService().exportSingleTechCard(techCard);
+      await ExcelExportService()
+          .exportSingleTechCard(techCard, languageCode: lang);
       if (mounted) {
         final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2388,7 +2410,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
 
     try {
-      await ExcelExportService().exportSelectedTechCards(selectedCards);
+      final lang = context.read<LocalizationService>().currentLanguageCode;
+      await ExcelExportService()
+          .exportSelectedTechCards(selectedCards, languageCode: lang);
       if (mounted) {
         final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -2425,7 +2449,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
 
     try {
-      await ExcelExportService().exportAllTechCards(_list);
+      await ExcelExportService()
+          .exportAllTechCards(_list, languageCode: loc.currentLanguageCode);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -3282,6 +3307,49 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     );
   }
 
+  Future<void> _onTapCreateTechCard(LocalizationService loc) async {
+    if (_loading) return;
+    const draftKey = 'tech_card_edit_new';
+    final merged = await DraftStorageService()
+        .loadTechCardEditDraftMerged('new', draftKey);
+    if (merged != null &&
+        DraftStorageService.techCardDraftLooksNonEmpty(merged)) {
+      final choice = await showDialog<_TtkNewDraftChoice>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(loc.t('ttk_draft_unsaved_title')),
+          content: Text(loc.t('ttk_draft_unsaved_body')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, _TtkNewDraftChoice.cancel),
+              child: Text(loc.t('cancel')),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, _TtkNewDraftChoice.startNew),
+              child: Text(loc.t('ttk_draft_start_new')),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(ctx, _TtkNewDraftChoice.continueDraft),
+              child: Text(loc.t('continue_action')),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      if (choice == null || choice == _TtkNewDraftChoice.cancel) return;
+      if (choice == _TtkNewDraftChoice.startNew) {
+        await DraftStorageService()
+            .clearTechCardEditDraftEverywhere('new', draftKey);
+      }
+    }
+    final path = widget.department == 'bar'
+        ? '/tech-cards/new?department=bar'
+        : '/tech-cards/new';
+    final needRefresh = await context.push<bool>(path);
+    if (mounted && needRefresh == true) _load(showLoading: false);
+  }
+
   List<Widget> _buildAppBarActions(LocalizationService loc, bool canEdit) {
     final ctrl = _ttkTourController;
     Widget wrap(String id, Widget w) =>
@@ -3313,16 +3381,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             icon: Icon(Icons.add,
                 color: _loading ? Theme.of(context).disabledColor : null),
             tooltip: loc.t('create_tech_card'),
-            onPressed: _loading
-                ? null
-                : () async {
-                    final path = widget.department == 'bar'
-                        ? '/tech-cards/new?department=bar'
-                        : '/tech-cards/new';
-                    final needRefresh = await context.push<bool>(path);
-                    if (mounted && needRefresh == true)
-                      _load(showLoading: false);
-                  },
+            onPressed: _loading ? null : () => _onTapCreateTechCard(loc),
           )
         : null;
     final importWidget = canEdit
@@ -3529,7 +3588,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           selected: selectedIndex == 1,
         );
     Widget chipReview() => _ttkTabChip(
-          loc.t('ttk_tab_review') ?? 'На проверку',
+          loc.t('ttk_tab_review'),
           selected: selectedIndex == 2,
           badgeCount: reviewCount,
         );

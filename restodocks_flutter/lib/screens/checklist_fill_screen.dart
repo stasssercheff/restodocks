@@ -246,7 +246,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     if (c == null) return;
     if (!_allActionCellsFilled) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.read<LocalizationService>().t('checklist_fill_all_required') ?? 'Заполните все поля окна действия')),
+        SnackBar(content: Text(context.read<LocalizationService>().t('checklist_fill_all_required'))),
       );
       return;
     }
@@ -281,7 +281,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
           .toList();
       if (chefIds.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('checklist_no_chefs') ?? 'Нет шефа/су-шефа для отправки')),
+          SnackBar(content: Text(loc.t('checklist_no_chefs'))),
         );
         return;
       }
@@ -326,7 +326,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
 
     if (emp != null && !canAccessChecklists) {
       return Scaffold(
-        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('fill_checklist') ?? 'Заполнить чеклист')),
+        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('fill_checklist'))),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -355,13 +355,13 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('fill_checklist') ?? 'Заполнить чеклист')),
+        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('fill_checklist'))),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_error != null || _checklist == null) {
       return Scaffold(
-        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('fill_checklist') ?? 'Заполнить чеклист')),
+        appBar: AppBar(leading: appBarBackButton(context), title: Text(loc.t('fill_checklist'))),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -413,7 +413,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                   TextField(
                     controller: _commentsController,
                     decoration: InputDecoration(
-                      labelText: loc.t('checklist_comments') ?? 'Комментарии',
+                      labelText: loc.t('checklist_comments'),
                       hintText: loc.t('checklist_comments_hint'),
                       border: const OutlineInputBorder(),
                       alignLabelWithHint: true,
@@ -435,7 +435,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                 child: FilledButton.icon(
                   onPressed: _allActionCellsFilled ? _submit : null,
                   icon: const Icon(Icons.check_circle, size: 24),
-                  label: Text(loc.t('checklist_complete') ?? 'Завершить', style: const TextStyle(fontSize: 18)),
+                  label: Text(loc.t('checklist_complete'), style: const TextStyle(fontSize: 18)),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                     backgroundColor: Theme.of(context).colorScheme.primary,
@@ -486,17 +486,17 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
               style: Theme.of(context).textTheme.bodySmall,
             ),
             if (emp?.department == 'kitchen' && emp?.section != null)
-              Text('${loc.t('kitchen_section') ?? 'Цех'}: ${KitchenSection.fromCode(emp!.section!)?.displayName ?? emp.section}', style: Theme.of(context).textTheme.bodySmall),
+              Text('${loc.t('kitchen_section')}: ${KitchenSection.fromCode(emp!.section!)?.displayName ?? emp.section}', style: Theme.of(context).textTheme.bodySmall),
             if (checklist.deadlineAt != null || reminderLine != null) ...[
               const SizedBox(height: 6),
               if (reminderLine != null)
                 Text(reminderLine, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
               if (checklist.deadlineAt != null)
-                Text('${loc.t('checklist_complete_by') ?? 'Завершить до'}: ${formatDateTime(checklist.deadlineAt!)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
+                Text('${loc.t('checklist_complete_by')}: ${formatDateTime(checklist.deadlineAt!)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
             ],
             const SizedBox(height: 4),
-            Text('${loc.t('checklist_start_time') ?? 'Начало'}: ${formatTime(_startTime)}', style: Theme.of(context).textTheme.labelSmall),
-            Text('${loc.t('checklist_end_time') ?? 'Конец'}: ${formatTime(_endTime)}', style: Theme.of(context).textTheme.labelSmall),
+            Text('${loc.t('checklist_start_time')}: ${formatTime(_startTime)}', style: Theme.of(context).textTheme.labelSmall),
+            Text('${loc.t('checklist_end_time')}: ${formatTime(_endTime)}', style: Theme.of(context).textTheme.labelSmall),
           ],
         ),
       ),
@@ -506,8 +506,8 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
   Widget _buildTableHeader(LocalizationService loc, ChecklistActionConfig cfg) {
     final statusWidth = MediaQuery.of(context).size.width < 600 ? 160.0 : 220.0;
     final children = <Widget>[
-      SizedBox(width: 28, child: Text(loc.t('checklist_number') ?? '№', style: Theme.of(context).textTheme.labelLarge)),
-      Expanded(child: Text(loc.t('checklist_name') ?? 'Наименование', style: Theme.of(context).textTheme.labelLarge)),
+      SizedBox(width: 28, child: Text(loc.t('checklist_number'), style: Theme.of(context).textTheme.labelLarge)),
+      Expanded(child: Text(loc.t('checklist_name'), style: Theme.of(context).textTheme.labelLarge)),
     ];
     if (cfg.hasNumeric) {
       children.add(SizedBox(
@@ -521,7 +521,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     if (cfg.dropdownOptions != null && cfg.dropdownOptions!.isNotEmpty) {
       children.add(SizedBox(
           width: 96,
-          child: Text(loc.t('checklist_action_choice') ?? 'Выбор',
+          child: Text(loc.t('checklist_action_choice'),
               style: Theme.of(context).textTheme.labelLarge, textAlign: TextAlign.center)));
     }
     if (cfg.hasToggle) {
@@ -673,8 +673,8 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                       Flexible(
                         child: Text(
                           done
-                              ? (loc.t('done') ?? 'Сделано')
-                              : (loc.t('not_done') ?? 'Не сделано'),
+                              ? (loc.t('done'))
+                              : (loc.t('not_done')),
                           style: Theme.of(context).textTheme.bodySmall,
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,

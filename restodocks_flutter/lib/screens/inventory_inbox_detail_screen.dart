@@ -19,13 +19,16 @@ class InventoryInboxDetailScreen extends StatefulWidget {
   final String documentId;
 
   @override
-  State<InventoryInboxDetailScreen> createState() => _InventoryInboxDetailScreenState();
+  State<InventoryInboxDetailScreen> createState() =>
+      _InventoryInboxDetailScreenState();
 }
 
-class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen> {
+class _InventoryInboxDetailScreenState
+    extends State<InventoryInboxDetailScreen> {
   Map<String, dynamic>? _doc;
   bool _loading = true;
   String? _error;
+
   /// Переводы названий продуктов: оригинальное имя -> переведённое
   final Map<String, String> _translatedNames = {};
 
@@ -46,7 +49,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     setState(() {
       _doc = doc;
       _loading = false;
-      if (doc == null) _error = 'Документ не найден';
+      if (doc == null) _error = LocalizationService().t('document_not_found');
     });
     if (doc != null) {
       final estId = context.read<AccountManagerSupabase>().establishment?.id;
@@ -60,9 +63,10 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     final loc = context.read<LocalizationService>();
     final targetLang = loc.currentLanguageCode;
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
-    final sourceLang = (payload['sourceLang'] as String?)?.trim().isNotEmpty == true
-        ? payload['sourceLang'] as String
-        : 'ru';
+    final sourceLang =
+        (payload['sourceLang'] as String?)?.trim().isNotEmpty == true
+            ? payload['sourceLang'] as String
+            : 'ru';
     if (targetLang == sourceLang) return;
 
     final rows = payload['rows'] as List<dynamic>? ?? [];
@@ -94,12 +98,17 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
 
   /// Возвращает строки, отсортированные по названию А-Я.
   /// namesMap: оригинальное имя -> отображаемое. Если null — _translatedNames.
-  List<Map<String, dynamic>> _sortedRows(List<dynamic> rows, [Map<String, String>? namesMap]) {
+  List<Map<String, dynamic>> _sortedRows(List<dynamic> rows,
+      [Map<String, String>? namesMap]) {
     final map = namesMap ?? _translatedNames;
     final list = rows.map((e) => e as Map<String, dynamic>).toList();
     list.sort((a, b) {
-      final nameA = (map[(a['productName'] as String? ?? '')] ?? (a['productName'] as String? ?? '')).toLowerCase();
-      final nameB = (map[(b['productName'] as String? ?? '')] ?? (b['productName'] as String? ?? '')).toLowerCase();
+      final nameA = (map[(a['productName'] as String? ?? '')] ??
+              (a['productName'] as String? ?? ''))
+          .toLowerCase();
+      final nameB = (map[(b['productName'] as String? ?? '')] ??
+              (b['productName'] as String? ?? ''))
+          .toLowerCase();
       return nameA.compareTo(nameB);
     });
     return list;
@@ -114,7 +123,8 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
   }) async {
     if (sourceLang == targetLang) return {};
     final loc = context.read<LocalizationService>();
-    if (targetLang == loc.currentLanguageCode) return Map.from(_translatedNames);
+    if (targetLang == loc.currentLanguageCode)
+      return Map.from(_translatedNames);
 
     final seen = <String>{};
     final result = <String, String>{};
@@ -123,7 +133,9 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     try {
       final translationSvc = context.read<TranslationService>();
       for (final r in rows) {
-        final name = (r is Map ? (r['productName'] as String?) ?? '' : '').toString().trim();
+        final name = (r is Map ? (r['productName'] as String?) ?? '' : '')
+            .toString()
+            .trim();
         if (name.isEmpty || seen.contains(name)) continue;
         seen.add(name);
         final translated = await translationSvc.translate(
@@ -137,7 +149,9 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
         if (translated != null && translated != name) result[name] = translated;
       }
       for (final p in aggregated) {
-        final name = (p is Map ? (p['productName'] as String?) ?? '' : '').toString().trim();
+        final name = (p is Map ? (p['productName'] as String?) ?? '' : '')
+            .toString()
+            .trim();
         if (name.isEmpty || seen.contains(name)) continue;
         seen.add(name);
         final translated = await translationSvc.translate(
@@ -158,22 +172,23 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
   Future<void> _showSaveLanguageAndExport({bool withPrice = false}) async {
     final loc = context.read<LocalizationService>();
     final payload = _doc?['payload'] as Map<String, dynamic>? ?? {};
-    final sourceLang = (payload['sourceLang'] as String?)?.trim().isNotEmpty == true
-        ? payload['sourceLang'] as String
-        : 'ru';
+    final sourceLang =
+        (payload['sourceLang'] as String?)?.trim().isNotEmpty == true
+            ? payload['sourceLang'] as String
+            : 'ru';
     String selectedLang = loc.currentLanguageCode;
 
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setState) => AlertDialog(
-          title: Text(loc.t('inventory_export_dialog_title') ?? 'Сохранение на устройство'),
+          title: Text(loc.t('inventory_export_dialog_title')),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                loc.t('inventory_export_lang') ?? 'Язык сохранения:',
+                '${loc.t('inventory_export_lang')}:',
                 style: Theme.of(ctx2).textTheme.titleSmall,
               ),
               const SizedBox(height: 8),
@@ -196,7 +211,7 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
             ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(selectedLang),
-              child: Text(loc.t('inventory_export_excel') ?? 'Сохранить Excel'),
+              child: Text(loc.t('inventory_export_excel')),
             ),
           ],
         ),
@@ -207,7 +222,8 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     }
   }
 
-  Future<void> _saveToFile({bool withPrice = false, required String saveLang}) async {
+  Future<void> _saveToFile(
+      {bool withPrice = false, required String saveLang}) async {
     final doc = _doc;
     final loc = context.read<LocalizationService>();
     if (doc == null) return;
@@ -217,10 +233,15 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     final rows = payload['rows'] as List<dynamic>? ?? [];
     final aggregated = payload['aggregatedProducts'] as List<dynamic>? ?? [];
 
-    final sourceLang = (payload['sourceLang'] as String?)?.trim().isNotEmpty == true
-        ? payload['sourceLang'] as String
-        : 'ru';
-    final namesForSave = await _getNamesInLanguage(rows: rows, aggregated: aggregated, sourceLang: sourceLang, targetLang: saveLang);
+    final sourceLang =
+        (payload['sourceLang'] as String?)?.trim().isNotEmpty == true
+            ? payload['sourceLang'] as String
+            : 'ru';
+    final namesForSave = await _getNamesInLanguage(
+        rows: rows,
+        aggregated: aggregated,
+        sourceLang: sourceLang,
+        targetLang: saveLang);
 
     Map<String, double>? pricePerProduct;
     String? establishmentId;
@@ -232,7 +253,9 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
         pricePerProduct = {};
         for (final r in rows) {
           final pid = (r as Map<String, dynamic>)['productId'] as String?;
-          if (pid != null && !pid.startsWith('pf_') && !pid.startsWith('free_')) {
+          if (pid != null &&
+              !pid.startsWith('pf_') &&
+              !pid.startsWith('free_')) {
             final priceInfo = store.getEstablishmentPrice(pid, establishmentId);
             if (priceInfo != null && priceInfo.$1 != null) {
               pricePerProduct[pid] = priceInfo.$1!;
@@ -259,8 +282,10 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
       final acc = context.read<AccountManagerSupabase>();
       final est = acc.establishment;
       final currency = est?.defaultCurrency ?? 'VND';
-      final currencySym = est?.currencySymbol ?? Establishment.currencySymbolFor(currency);
-      final sumLabel = '${loc.t('inventory_excel_sum') ?? 'Сумма'}${currencySym.isNotEmpty ? ' ($currencySym)' : ''}';
+      final currencySym =
+          est?.currencySymbol ?? Establishment.currencySymbolFor(currency);
+      final sumLabel =
+          '${loc.t('inventory_excel_sum')}${currencySym.isNotEmpty ? ' ($currencySym)' : ''}';
       final fillLabel = loc.t('inventory_excel_fill_data');
 
       final headerCells = <CellValue>[
@@ -279,8 +304,12 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
       sheet1.appendRow(headerCells);
 
       final allRows = rows.map((e) => e as Map<String, dynamic>).toList();
-      final productsOnly = allRows.where((r) => !((r['productId'] as String?) ?? '').startsWith('pf_')).toList();
-      final pfRows = allRows.where((r) => ((r['productId'] as String?) ?? '').startsWith('pf_')).toList();
+      final productsOnly = allRows
+          .where((r) => !((r['productId'] as String?) ?? '').startsWith('pf_'))
+          .toList();
+      final pfRows = allRows
+          .where((r) => ((r['productId'] as String?) ?? '').startsWith('pf_'))
+          .toList();
 
       double totalSumAll = 0;
       final productsSorted = _sortedRows(productsOnly, namesForSave);
@@ -296,7 +325,9 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
             totalSumAll += rowSum;
           } else if (pricePerProduct != null && establishmentId != null) {
             final pid = r['productId'] as String?;
-            if (pid != null && !pid.startsWith('pf_') && !pid.startsWith('free_')) {
+            if (pid != null &&
+                !pid.startsWith('pf_') &&
+                !pid.startsWith('free_')) {
               final price = pricePerProduct[pid];
               if (price != null && price > 0) {
                 rowSum = total / 1000 * price;
@@ -313,22 +344,27 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
           IntCellValue(rowNum++),
           TextCellValue(name),
           TextCellValue(unit),
-          if (withPrice) TextCellValue(NumberFormatUtils.formatSum(rowSum, currency)),
+          if (withPrice)
+            TextCellValue(NumberFormatUtils.formatSum(rowSum, currency)),
           DoubleCellValue(total),
         ];
         for (var c = 0; c < maxCols; c++) {
-          rowCells.add(DoubleCellValue(c < quantities.length ? (quantities[c] as num?)?.toDouble() ?? 0.0 : 0.0));
+          rowCells.add(DoubleCellValue(c < quantities.length
+              ? (quantities[c] as num?)?.toDouble() ?? 0.0
+              : 0.0));
         }
         sheet1.appendRow(rowCells);
       }
       if (withPrice && totalSumAll > 0) {
-        final totalLabelFinal = loc.t('inventory_excel_total_sum') ?? 'Итого:';
+        final totalLabelFinal = loc.t('inventory_excel_total_sum');
         final totalRow = <CellValue>[
           TextCellValue(''),
           TextCellValue(totalLabelFinal),
           TextCellValue(''),
         ];
-        if (withPrice) totalRow.add(TextCellValue(NumberFormatUtils.formatSum(totalSumAll, currency)));
+        if (withPrice)
+          totalRow.add(TextCellValue(
+              NumberFormatUtils.formatSum(totalSumAll, currency)));
         totalRow.add(DoubleCellValue(0));
         for (var c = 0; c < maxCols; c++) totalRow.add(TextCellValue(''));
         sheet1.appendRow(totalRow);
@@ -355,7 +391,9 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
             DoubleCellValue(total),
           ];
           for (var c = 0; c < maxCols; c++) {
-            rowCells.add(DoubleCellValue(c < quantities.length ? (quantities[c] as num?)?.toDouble() ?? 0.0 : 0.0));
+            rowCells.add(DoubleCellValue(c < quantities.length
+                ? (quantities[c] as num?)?.toDouble() ?? 0.0
+                : 0.0));
           }
           sheet1.appendRow(rowCells);
         }
@@ -376,16 +414,26 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
           final gross = (p['grossGrams'] as num?)?.toDouble() ?? 0.0;
           final net = (p['netGrams'] as num?)?.toDouble() ?? 0.0;
           if (groupedProducts.containsKey(name)) {
-            groupedProducts[name]!['grossGrams'] = (groupedProducts[name]!['grossGrams'] as double) + gross;
-            groupedProducts[name]!['netGrams'] = (groupedProducts[name]!['netGrams'] as double) + net;
+            groupedProducts[name]!['grossGrams'] =
+                (groupedProducts[name]!['grossGrams'] as double) + gross;
+            groupedProducts[name]!['netGrams'] =
+                (groupedProducts[name]!['netGrams'] as double) + net;
           } else {
-            groupedProducts[name] = {'productName': name, 'grossGrams': gross, 'netGrams': net};
+            groupedProducts[name] = {
+              'productName': name,
+              'grossGrams': gross,
+              'netGrams': net
+            };
           }
         }
         final groupedList = groupedProducts.values.toList()
           ..sort((a, b) {
-            final nameA = (namesForSave[a['productName'] as String? ?? ''] ?? (a['productName'] as String? ?? '')).toLowerCase();
-            final nameB = (namesForSave[b['productName'] as String? ?? ''] ?? (b['productName'] as String? ?? '')).toLowerCase();
+            final nameA = (namesForSave[a['productName'] as String? ?? ''] ??
+                    (a['productName'] as String? ?? ''))
+                .toLowerCase();
+            final nameB = (namesForSave[b['productName'] as String? ?? ''] ??
+                    (b['productName'] as String? ?? ''))
+                .toLowerCase();
             return nameA.compareTo(nameB);
           });
         for (var i = 0; i < groupedList.length; i++) {
@@ -424,7 +472,8 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
             'productName': name,
             'unit': unit,
             'total': total,
-            'quantities': List<double>.from(quantities.map((q) => (q as num?)?.toDouble() ?? 0.0)),
+            'quantities': List<double>.from(
+                quantities.map((q) => (q as num?)?.toDouble() ?? 0.0)),
           };
         }
       }
@@ -452,8 +501,12 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
 
       final sortedProducts = allProducts.values.toList()
         ..sort((a, b) {
-          final nameA = (namesForSave[a['productName'] as String? ?? ''] ?? (a['productName'] as String? ?? '')).toLowerCase();
-          final nameB = (namesForSave[b['productName'] as String? ?? ''] ?? (b['productName'] as String? ?? '')).toLowerCase();
+          final nameA = (namesForSave[a['productName'] as String? ?? ''] ??
+                  (a['productName'] as String? ?? ''))
+              .toLowerCase();
+          final nameB = (namesForSave[b['productName'] as String? ?? ''] ??
+                  (b['productName'] as String? ?? ''))
+              .toLowerCase();
           return nameA.compareTo(nameB);
         });
       for (var i = 0; i < sortedProducts.length; i++) {
@@ -470,14 +523,17 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
           DoubleCellValue(total),
         ];
         for (var c = 0; c < maxCols; c++) {
-          rowCells.add(DoubleCellValue(c < quantities.length ? quantities[c] : 0.0));
+          rowCells.add(
+              DoubleCellValue(c < quantities.length ? quantities[c] : 0.0));
         }
         sheet2.appendRow(rowCells);
       }
 
       excel.setDefaultSheet('Продукты + ПФ');
       for (final name in excel.tables.keys.toList()) {
-        if (name != 'Продукты + ПФ' && name != 'Все продукты с ПФ' && excel.tables.keys.length > 2) {
+        if (name != 'Продукты + ПФ' &&
+            name != 'Все продукты с ПФ' &&
+            excel.tables.keys.length > 2) {
           excel.delete(name);
           break;
         }
@@ -485,18 +541,22 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
 
       final out = excel.encode();
       if (out != null && out.isNotEmpty) {
-        final date = header['date'] ?? DateTime.now().toIso8601String().split('T').first;
+        final date =
+            header['date'] ?? DateTime.now().toIso8601String().split('T').first;
         await saveFileBytes('inventory_$date.xlsx', out);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
+            SnackBar(content: Text(loc.t('inventory_excel_downloaded'))),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
+          SnackBar(
+            content:
+                Text(loc.t('error_generic', args: {'error': e.toString()})),
+          ),
         );
       }
     }
@@ -521,9 +581,12 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_error ?? 'Документ не найден', style: TextStyle(color: theme.colorScheme.error)),
+              Text(_error ?? loc.t('document_not_found'),
+                  style: TextStyle(color: theme.colorScheme.error)),
               const SizedBox(height: 16),
-              FilledButton(onPressed: () => context.pop(), child: Text(loc.t('back') ?? 'Назад')),
+              FilledButton(
+                  onPressed: () => context.pop(),
+                  child: Text(loc.t('back'))),
             ],
           ),
         ),
@@ -542,11 +605,18 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.download),
-            tooltip: loc.t('download') ?? 'Сохранить',
-            onSelected: (v) => _showSaveLanguageAndExport(withPrice: v == 'with_price'),
+            tooltip: loc.t('download'),
+            onSelected: (v) =>
+                _showSaveLanguageAndExport(withPrice: v == 'with_price'),
             itemBuilder: (_) => [
-              PopupMenuItem(value: 'no_price', child: Text(loc.t('inventory_export_no_price') ?? 'Без цены')),
-              PopupMenuItem(value: 'with_price', child: Text(loc.t('inventory_export_with_price') ?? 'С ценой')),
+              PopupMenuItem(
+                  value: 'no_price',
+                  child:
+                      Text(loc.t('inventory_export_no_price'))),
+              PopupMenuItem(
+                  value: 'with_price',
+                  child:
+                      Text(loc.t('inventory_export_with_price'))),
             ],
           ),
         ],
@@ -559,7 +629,8 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
             _buildHeader(loc, header),
             if ((payload['mergeMetadata'] as Map?)?['mergedBy'] != null) ...[
               const SizedBox(height: 16),
-              _buildMergeMetadata(loc, payload['mergeMetadata'] as Map<String, dynamic>),
+              _buildMergeMetadata(
+                  loc, payload['mergeMetadata'] as Map<String, dynamic>),
             ],
             const SizedBox(height: 24),
             Text(
@@ -574,13 +645,15 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     );
   }
 
-  Widget _buildMergeMetadata(LocalizationService loc, Map<String, dynamic> meta) {
+  Widget _buildMergeMetadata(
+      LocalizationService loc, Map<String, dynamic> meta) {
     final mergedBy = meta['mergedBy']?.toString() ?? '—';
     final mergedAtRaw = meta['mergedAt']?.toString() ?? '';
     String mergedAtStr = mergedAtRaw;
     try {
       final dt = DateTime.parse(mergedAtRaw).toLocal();
-      mergedAtStr = '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      mergedAtStr =
+          '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     } catch (_) {}
     final sources = (meta['sourceDocuments'] as List<dynamic>?) ?? [];
     final theme = Theme.of(context);
@@ -596,11 +669,13 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
         children: [
           Row(
             children: [
-              Icon(Icons.merge_type, size: 18, color: theme.colorScheme.primary),
+              Icon(Icons.merge_type,
+                  size: 18, color: theme.colorScheme.primary),
               const SizedBox(width: 6),
               Text(
-                loc.t('inventory_merge_merged_by') ?? 'Объединено',
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                loc.t('inventory_merge_merged_by'),
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -609,21 +684,26 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
           if (sources.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              loc.t('inventory_merge_source_blanks') ?? 'Исходные бланки',
-              style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+              loc.t('inventory_merge_source_blanks'),
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
             ...sources.map<Widget>((s) {
-              final m = s is Map ? Map<String, dynamic>.from(s as Map) : <String, dynamic>{};
+              final m = s is Map
+                  ? Map<String, dynamic>.from(s as Map)
+                  : <String, dynamic>{};
               final emp = m['employeeName']?.toString() ?? '—';
               final createdRaw = m['createdAt']?.toString() ?? '';
               String createdStr = createdRaw;
               try {
                 final dt = DateTime.parse(createdRaw).toLocal();
-                createdStr = '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+                createdStr =
+                    '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
               } catch (_) {}
               return Padding(
                 padding: const EdgeInsets.only(top: 2),
-                child: Text('• $emp — $createdStr', style: theme.textTheme.bodySmall),
+                child: Text('• $emp — $createdStr',
+                    style: theme.textTheme.bodySmall),
               );
             }),
           ],
@@ -636,7 +716,8 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _headerRow(loc.t('inventory_establishment'), header['establishmentName'] ?? '—'),
+        _headerRow(loc.t('inventory_establishment'),
+            header['establishmentName'] ?? '—'),
         _headerRow(loc.t('inventory_employee'), header['employeeName'] ?? '—'),
         _headerRow(loc.t('inventory_date'), header['date'] ?? '—'),
         _headerRow(loc.t('inventory_time_start'), header['timeStart'] ?? '—'),
@@ -664,7 +745,8 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     );
   }
 
-  Widget _buildTable(ThemeData theme, LocalizationService loc, List<Map<String, dynamic>> rows) {
+  Widget _buildTable(ThemeData theme, LocalizationService loc,
+      List<Map<String, dynamic>> rows) {
     return Table(
       border: TableBorder.all(color: theme.dividerColor),
       columnWidths: const {
@@ -676,7 +758,8 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
       },
       children: [
         TableRow(
-          decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest),
+          decoration:
+              BoxDecoration(color: theme.colorScheme.surfaceContainerHighest),
           children: [
             _cell(theme, '#', bold: true),
             _cell(theme, loc.t('inventory_item_name'), bold: true),
@@ -720,23 +803,30 @@ class _InventoryInboxDetailScreenState extends State<InventoryInboxDetailScreen>
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
     final currency = est?.defaultCurrency ?? 'VND';
-    final base = loc.t('inventory_excel_sum') ?? 'Сумма';
+    final base = loc.t('inventory_excel_sum');
     return currency.isNotEmpty ? '$base $currency' : base;
   }
 
   String _fmt(dynamic v) {
     if (v == null) return '—';
-    if (v is num) return v == v.truncateToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
+    if (v is num)
+      return v == v.truncateToDouble()
+          ? v.toInt().toString()
+          : v.toStringAsFixed(1);
     return v.toString();
   }
 
   /// Формат суммы инвентаризации: разделитель тысяч (пробел), для VND и подобных — без десятичных.
   String _fmtPrice(num value) {
-    final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
+    final currency =
+        context.read<AccountManagerSupabase>().establishment?.defaultCurrency ??
+            'VND';
     final noDecimals = {'VND', 'JPY', 'KRW'}.contains(currency.toUpperCase());
     final nf = noDecimals
         ? NumberFormat('#,##0', 'ru_RU')
         : NumberFormat('#,##0.##', 'ru_RU');
-    return nf.format(noDecimals ? value.round() : value).replaceAll('\u00A0', ' ');
+    return nf
+        .format(noDecimals ? value.round() : value)
+        .replaceAll('\u00A0', ' ');
   }
 }

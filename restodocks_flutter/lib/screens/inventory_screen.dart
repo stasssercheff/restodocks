@@ -96,15 +96,19 @@ class _InventoryRow {
   double get packageWeightGrams => product?.packageWeightGrams ?? 1.0;
 
   /// Для ПФ используем pfUnit: g → гр/g, иначе порц./pcs.
-  String unitDisplay(String lang) {
+  String unitDisplay(LocalizationService loc, String lang) {
     if (isPf) {
       final u = pfUnit ?? _pfUnitPcs;
       return u == _pfUnitGrams
-          ? (lang == 'ru' ? 'гр' : 'g')
-          : (lang == 'ru' ? 'порц.' : 'pcs');
+          ? loc.tForLanguage(lang, 'unit_pf_grams_abbr')
+          : loc.tForLanguage(lang, 'unit_pf_pcs_abbr');
     }
-    if (unitOverride == 'btl') return lang == 'ru' ? 'бутылка' : 'bottle';
-    if (isCountedByPackage) return lang == 'ru' ? 'упак.' : 'pkg';
+    if (unitOverride == 'btl') {
+      return loc.tForLanguage(lang, 'unit_bottle_display');
+    }
+    if (isCountedByPackage) {
+      return loc.tForLanguage(lang, 'unit_package_abbr');
+    }
     return CulinaryUnits.displayName(unit.toLowerCase(), lang);
   }
 
@@ -114,10 +118,12 @@ class _InventoryRow {
       !isCountedByPackage &&
       (unit.toLowerCase() == 'kg' || unit == 'кг');
 
-  String unitDisplayForBlank(String lang) {
-    if (unitOverride == 'btl') return lang == 'ru' ? 'мл' : 'ml';
-    if (isCountedByPackage) return lang == 'ru' ? 'г' : 'g';
-    return isWeightInKg ? (lang == 'ru' ? 'гр' : 'g') : unitDisplay(lang);
+  String unitDisplayForBlank(LocalizationService loc, String lang) {
+    if (unitOverride == 'btl') return loc.tForLanguage(lang, 'unit_ml_abbr');
+    if (isCountedByPackage) return loc.tForLanguage(lang, 'unit_g_letter');
+    return isWeightInKg
+        ? loc.tForLanguage(lang, 'unit_pf_grams_abbr')
+        : unitDisplay(loc, lang);
   }
 
   double quantityDisplayAt(int i) =>
@@ -190,6 +196,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   _InventoryBlockFilter _blockFilter = _InventoryBlockFilter.all;
   final TextEditingController _nameFilterCtrl = TextEditingController();
   final FocusNode _nameFilterFocusNode = FocusNode();
+  Timer? _nameFilterDebounce;
   String _nameFilter = '';
   bool _stateRestored = false; // Флаг: предотвращает двойное восстановление
   bool _isLoadingProducts =
@@ -219,8 +226,15 @@ class _InventoryScreenState extends State<InventoryScreen>
     super.initState();
     _startTime = TimeOfDay.now();
     WidgetsBinding.instance.addPostFrameCallback((_) => _initScreen());
-    _nameFilterCtrl
-        .addListener(() => setState(() => _nameFilter = _nameFilterCtrl.text));
+    _nameFilterCtrl.addListener(() {
+      _nameFilterDebounce?.cancel();
+      _nameFilterDebounce = Timer(const Duration(milliseconds: 120), () {
+        if (!mounted) return;
+        final t = _nameFilterCtrl.text;
+        if (_nameFilter == t) return;
+        setState(() => _nameFilter = t);
+      });
+    });
     _nameFilterFocusNode.addListener(() {
       setState(() => _hasInputFocus = _nameFilterFocusNode.hasFocus);
     });
@@ -572,6 +586,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     final employee = context.read<AccountManagerSupabase>().currentEmployee;
     final isHall =
         employee?.department == 'hall' || employee?.department == 'dining_room';
+    final loc = context.read<LocalizationService>();
 
     Widget _continueBadge(BuildContext ctx) {
       final theme = Theme.of(ctx);
@@ -583,7 +598,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           borderRadius: BorderRadius.circular(4),
         ),
         child: Text(
-          'Продолжить',
+          loc.t('inventory_continue'),
           style: TextStyle(
             fontSize: 11,
             color: theme.colorScheme.onPrimaryContainer,
@@ -593,7 +608,6 @@ class _InventoryScreenState extends State<InventoryScreen>
       );
     }
 
-    final loc = context.read<LocalizationService>();
     if (mounted) setState(() => _inventoryModePickerOpen = true);
     String? choice;
     try {
@@ -603,8 +617,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         builder: (ctx) {
           final theme = Theme.of(ctx);
           return AlertDialog(
-            title: Text(
-                loc.t('inventory_mode_dialog_title') ?? 'Тип инвентаризации'),
+            title: Text(loc.t('inventory_mode_dialog_title')),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -612,14 +625,12 @@ class _InventoryScreenState extends State<InventoryScreen>
                   ListTile(
                     leading: const Icon(Icons.list_alt, color: Colors.blue),
                     title: Row(children: [
-                      Text(loc.t('inventory_mode_standard') ?? 'Стандартный'),
+                      Text(loc.t('inventory_mode_standard')),
                       if (hasStdDraft) _continueBadge(ctx),
                     ]),
                     subtitle: Text(hasStdDraft
-                        ? (loc.t('inventory_mode_saved_draft') ??
-                            'Незавершённая инвентаризация сохранена')
-                        : (loc.t('inventory_mode_standard_hint') ??
-                            'Продукты из номенклатуры')),
+                        ? loc.t('inventory_mode_saved_draft')
+                        : loc.t('inventory_mode_standard_hint')),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                     tileColor: Colors.blue.withOpacity(0.05),
@@ -630,41 +641,37 @@ class _InventoryScreenState extends State<InventoryScreen>
                     leading: Icon(Icons.filter_alt_outlined,
                         color: theme.colorScheme.secondary),
                     title: Row(children: [
-                      Text(loc.t('inventory_selective_mode_title') ??
-                          'Выборочная'),
+                      Text(loc.t('inventory_selective_mode_title')),
                       if (hasSelectiveDraft) _continueBadge(ctx),
                     ]),
                     subtitle: Text(
                       hasSelectiveDraft
-                          ? (loc.t('inventory_mode_saved_draft') ??
-                              'Незавершённая инвентаризация сохранена')
-                          : (loc.t('inventory_selective_mode_subtitle') ??
-                              'Только выбранные позиции из номенклатуры и ПФ'),
+                          ? loc.t('inventory_mode_saved_draft')
+                          : loc.t('inventory_selective_mode_subtitle'),
                     ),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
-                    tileColor: theme.colorScheme.secondaryContainer
-                        .withOpacity(0.25),
+                    tileColor:
+                        theme.colorScheme.secondaryContainer.withOpacity(0.25),
                     onTap: () => Navigator.of(ctx).pop('selective'),
                   ),
                   if (!isHall) ...[
                     const SizedBox(height: 8),
                     ListTile(
                       leading: Icon(Icons.table_chart_outlined,
-                          color:
-                              hasIiko ? theme.colorScheme.primary : Colors.grey),
+                          color: hasIiko
+                              ? theme.colorScheme.primary
+                              : Colors.grey),
                       title: Row(children: [
-                        Text(loc.t('inventory_mode_iiko') ?? 'Бланк iiko'),
+                        Text(loc.t('inventory_mode_iiko')),
                         if (hasIikoDraft) _continueBadge(ctx),
                       ]),
                       subtitle: Text(
                         hasIikoDraft
-                            ? (loc.t('inventory_mode_saved_draft') ??
-                                'Незавершённая инвентаризация сохранена')
+                            ? loc.t('inventory_mode_saved_draft')
                             : hasIiko
-                                ? '${loc.t('inventory_mode_iiko_hint_products') ?? 'Продукты из iiko-бланка'} · ${iikoStore.products.length}'
-                                : (loc.t('inventory_mode_iiko_hint_upload') ??
-                                    'Сначала загрузите бланк iiko в «Загрузка продуктов»'),
+                                ? '${loc.t('inventory_mode_iiko_hint_products')} · ${iikoStore.products.length}'
+                                : loc.t('inventory_mode_iiko_hint_upload'),
                       ),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
@@ -795,8 +802,8 @@ class _InventoryScreenState extends State<InventoryScreen>
               quantities: List<double>.generate(minQtyCount, (_) => 0.0)));
         }
         for (final tc in pfOnly) {
-          if (_rows.any(
-              (r) => r.techCard?.id == tc.id || r.techCardId == tc.id))
+          if (_rows
+              .any((r) => r.techCard?.id == tc.id || r.techCardId == tc.id))
             continue;
           _rows.add(_InventoryRow(
               product: null,
@@ -863,6 +870,7 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   @override
   void dispose() {
+    _nameFilterDebounce?.cancel();
     _nameFilterCtrl.dispose();
     _nameFilterFocusNode.dispose();
     _serverAutoSaveTimer?.cancel(); // Отменить таймер автосохранения на сервер
@@ -1155,8 +1163,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (docSaved == null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(loc.t('inventory_document_save_error') ??
-              'Не удалось сохранить инвентаризацию во входящие. Проверьте подключение.'),
+          content: Text(loc.t('inventory_document_save_error')),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -1222,7 +1229,8 @@ class _InventoryScreenState extends State<InventoryScreen>
       } else if (result.format == 'csv') {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('CSV экспорт пока не реализован')),
+            SnackBar(
+                content: Text(loc.t('inventory_csv_export_not_implemented'))),
           );
         }
       }
@@ -1231,8 +1239,12 @@ class _InventoryScreenState extends State<InventoryScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  '${loc.t('inventory_document_saved')} (Экспорт: ${e.toString()})')),
+            content: Text(
+              '${loc.t('inventory_document_saved')}${loc.t('inventory_export_error_suffix', args: {
+                    'error': e.toString()
+                  })}',
+            ),
+          ),
         );
       }
     }
@@ -1315,7 +1327,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       final nameLabel = loc.t('inventory_item_name');
       final unitLabel = loc.t('inventory_unit');
       final totalLabel = loc.t('inventory_excel_total');
-      final sumLabel = loc.t('inventory_excel_sum') ?? 'Сумма';
+      final sumLabel = loc.t('inventory_excel_sum');
       final fillLabel = loc.t('inventory_excel_fill_data');
 
       // ЛИСТ 1: Продукты + ПФ с итогами + перерасчет ПФ в брутто (объединенный)
@@ -1559,7 +1571,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       }
 
       // Строка «Итого» по сумме внизу листа
-      final totalSumLabel = loc.t('inventory_excel_total_sum') ?? 'Итого:';
+      final totalSumLabel = loc.t('inventory_excel_total_sum');
       final totalRow = <CellValue>[
         TextCellValue(''),
         TextCellValue(totalSumLabel),
@@ -1648,61 +1660,64 @@ class _InventoryScreenState extends State<InventoryScreen>
         }
       },
       child: Scaffold(
-      appBar: (isNarrow && isKeyboardOpen)
-          ? AppBar(
-              leading: _inventoryAppBarLeading(context),
-              title: Text(
-                _inventoryAppBarTitle(loc),
-                style: const TextStyle(fontSize: 16),
-              ),
-              toolbarHeight: 40,
-              elevation: 0,
-            )
-          : _isInputMode
-              ? AppBar(
-                  leading: _inventoryAppBarLeading(context),
-                  title: Text(
-                    _inventoryAppBarTitle(loc),
-                    style: const TextStyle(fontSize: 16),
+        appBar: (isNarrow && isKeyboardOpen)
+            ? AppBar(
+                leading: _inventoryAppBarLeading(context),
+                title: Text(
+                  _inventoryAppBarTitle(loc),
+                  style: const TextStyle(fontSize: 16),
+                ),
+                toolbarHeight: 40,
+                elevation: 0,
+              )
+            : _isInputMode
+                ? AppBar(
+                    leading: _inventoryAppBarLeading(context),
+                    title: Text(
+                      _inventoryAppBarTitle(loc),
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    toolbarHeight: 48,
+                    elevation: 0,
+                  )
+                : AppBar(
+                    leading: _inventoryAppBarLeading(context),
+                    title: Text(_inventoryAppBarTitle(loc)),
                   ),
-                  toolbarHeight: 48,
-                  elevation: 0,
-                )
-              : AppBar(
-                  leading: _inventoryAppBarLeading(context),
-                  title: Text(_inventoryAppBarTitle(loc)),
+        // Кнопка "Завершить" в bottomNavigationBar — Flutter поднимает её над клавиатурой автоматически.
+        // Браузерный URL-бар (Safari/Chrome) остаётся ниже неё и не перекрывает таблицу.
+        bottomNavigationBar: _buildFooter(loc, collapseLayout),
+        body: Stack(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (!collapseLayout)
+                  _buildHeader(
+                    loc,
+                    establishment,
+                    employee,
+                    collapseLayout: collapseLayout,
+                    hideInfoRow: mobileKeyboardOpen,
+                  ),
+                if (collapseLayout && !_completed && _rows.isNotEmpty)
+                  _buildCompactSearchBar(loc),
+                if (!collapseLayout) const Divider(height: 1),
+                if (collapseLayout && !_completed && _rows.isNotEmpty)
+                  const Divider(height: 1),
+                Expanded(
+                  child: _buildTable(loc),
                 ),
-      // Кнопка "Завершить" в bottomNavigationBar — Flutter поднимает её над клавиатурой автоматически.
-      // Браузерный URL-бар (Safari/Chrome) остаётся ниже неё и не перекрывает таблицу.
-      bottomNavigationBar: _buildFooter(loc, collapseLayout),
-      body: Stack(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (!collapseLayout)
-                _buildHeader(
-                  loc,
-                  establishment,
-                  employee,
-                  collapseLayout: collapseLayout,
-                  hideInfoRow: mobileKeyboardOpen,
-                ),
-              if (collapseLayout && !_completed && _rows.isNotEmpty)
-                _buildCompactSearchBar(loc),
-              if (!collapseLayout) const Divider(height: 1),
-              if (collapseLayout && !_completed && _rows.isNotEmpty)
-                const Divider(height: 1),
-              Expanded(
-                child: _buildTable(loc),
+              ],
+            ),
+            if (!collapseLayout && !mobileKeyboardOpen)
+              DataSafetyIndicator(
+                isVisible: true,
+                labelKey: 'inventory_data_protected',
               ),
-            ],
-          ),
-          if (!collapseLayout && !mobileKeyboardOpen)
-            DataSafetyIndicator(isVisible: true),
-        ],
+          ],
+        ),
       ),
-    ),
     );
   }
 
@@ -1712,8 +1727,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     final sortAlphabetButton = IconButton(
       icon: const Icon(Icons.sort_by_alpha, size: 22),
       tooltip: _sortMode == _InventorySort.alphabetAsc
-          ? (loc.t('inventory_sort_az') ?? 'А–Я')
-          : (loc.t('inventory_sort_za') ?? 'Я–А'),
+          ? loc.t('inventory_sort_az')
+          : loc.t('inventory_sort_za'),
       onPressed: () => setState(() {
         _sortMode = _sortMode == _InventorySort.alphabetAsc
             ? _InventorySort.alphabetDesc
@@ -1738,7 +1753,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               keyboardType: TextInputType.text,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
-                hintText: loc.t('inventory_filter_name') ?? 'По названию',
+                hintText: loc.t('inventory_filter_name'),
                 prefixIcon: Icon(Icons.search,
                     size: 22, color: theme.colorScheme.onSurfaceVariant),
                 filled: true,
@@ -1754,7 +1769,17 @@ class _InventoryScreenState extends State<InventoryScreen>
                 ),
               ),
               style: const TextStyle(fontSize: 15),
-              onChanged: (_) => setState(() {}),
+            ),
+          ),
+          Tooltip(
+            message: loc.t('inventory_data_protected'),
+            child: Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: Icon(
+                Icons.verified_user_outlined,
+                size: 22,
+                color: Colors.green.shade700,
+              ),
             ),
           ),
         ],
@@ -1804,8 +1829,8 @@ class _InventoryScreenState extends State<InventoryScreen>
         ? IconButton(
             icon: Icon(Icons.sort_by_alpha, size: 22),
             tooltip: _sortMode == _InventorySort.alphabetAsc
-                ? (loc.t('inventory_sort_az') ?? 'А–Я')
-                : (loc.t('inventory_sort_za') ?? 'Я–А'),
+                ? loc.t('inventory_sort_az')
+                : loc.t('inventory_sort_za'),
             onPressed: () => setState(() {
               _sortMode = _sortMode == _InventorySort.alphabetAsc
                   ? _InventorySort.alphabetDesc
@@ -1822,7 +1847,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               keyboardType: TextInputType.text,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
-                hintText: loc.t('inventory_filter_name') ?? 'По названию',
+                hintText: loc.t('inventory_filter_name'),
                 prefixIcon: Icon(Icons.search,
                     size: 22, color: theme.colorScheme.onSurfaceVariant),
                 filled: true,
@@ -1838,7 +1863,6 @@ class _InventoryScreenState extends State<InventoryScreen>
                 ),
               ),
               style: const TextStyle(fontSize: 15),
-              onChanged: (_) => setState(() {}),
             ),
           )
         : null;
@@ -1959,13 +1983,13 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   Widget _buildTable(LocalizationService loc) {
     if (_isLoadingProducts) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Загрузка продуктов...'),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(loc.t('inventory_loading_products')),
           ],
         ),
       );
@@ -1982,8 +2006,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               const SizedBox(height: 16),
               Text(
                 _isSelectiveInventory
-                    ? (loc.t('inventory_selective_empty_hint') ??
-                        'Выберите позиции в номенклатуре для этой инвентаризации.')
+                    ? loc.t('inventory_selective_empty_hint')
                     : loc.t('inventory_empty_hint'),
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant),
@@ -1999,11 +2022,11 @@ class _InventoryScreenState extends State<InventoryScreen>
                     await _showProductPicker(context, loc);
                   }
                 },
-                icon: Icon(_isSelectiveInventory ? Icons.filter_alt : Icons.add),
+                icon:
+                    Icon(_isSelectiveInventory ? Icons.filter_alt : Icons.add),
                 label: Text(
                   _isSelectiveInventory
-                      ? (loc.t('inventory_selective_pick_again') ??
-                          'Выбрать позиции')
+                      ? loc.t('inventory_selective_pick_again')
                       : loc.t('inventory_add_product'),
                 ),
               ),
@@ -2356,17 +2379,15 @@ class _InventoryScreenState extends State<InventoryScreen>
                               DropdownMenuItem(
                                   value: _pfUnitPcs,
                                   child: Text(
-                                      loc.currentLanguageCode == 'ru'
-                                          ? 'порц.'
-                                          : 'pcs',
+                                      loc.tForLanguage(loc.currentLanguageCode,
+                                          'unit_pf_pcs_abbr'),
                                       style: theme.textTheme.bodySmall,
                                       overflow: TextOverflow.ellipsis)),
                               DropdownMenuItem(
                                   value: _pfUnitGrams,
                                   child: Text(
-                                      loc.currentLanguageCode == 'ru'
-                                          ? 'гр'
-                                          : 'g',
+                                      loc.tForLanguage(loc.currentLanguageCode,
+                                          'unit_pf_grams_abbr'),
                                       style: theme.textTheme.bodySmall,
                                       overflow: TextOverflow.ellipsis)),
                             ],
@@ -2379,11 +2400,12 @@ class _InventoryScreenState extends State<InventoryScreen>
                               ? (row.unitOverride ?? 'pkg')
                               : row.unit,
                           lang: loc.currentLanguageCode,
+                          loc: loc,
                           product: row.product,
                           onChanged: (v) => _setProductUnit(actualIndex, v),
                           theme: theme,
                         ))
-                  : Text(row.unitDisplayForBlank(loc.currentLanguageCode),
+                  : Text(row.unitDisplayForBlank(loc, loc.currentLanguageCode),
                       style: theme.textTheme.bodySmall
                           ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                       overflow: TextOverflow.ellipsis),
@@ -2588,15 +2610,14 @@ class _InventoryScreenState extends State<InventoryScreen>
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx2, setState) => AlertDialog(
-            title: Text(loc.t('inventory_export_dialog_title') ??
-                'Сохранение на устройство'),
+            title: Text(loc.t('inventory_export_dialog_title')),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    loc.t('inventory_export_lang') ?? 'Язык сохранения:',
+                    loc.t('inventory_export_lang'),
                     style: Theme.of(ctx2).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 8),
@@ -2622,8 +2643,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               FilledButton(
                 onPressed: () => Navigator.of(ctx)
                     .pop((format: 'excel', lang: selectedLang)),
-                child:
-                    Text(loc.t('inventory_export_excel') ?? 'Сохранить Excel'),
+                child: Text(loc.t('inventory_export_excel')),
               ),
               TextButton(
                 onPressed: () =>
@@ -2722,9 +2742,9 @@ class _InventoryScreenState extends State<InventoryScreen>
         'productName': r.productName(lang),
         'unit': r.isCountedByPackage
             ? (r.unitOverride == 'btl'
-                ? (lang == 'ru' ? 'мл' : 'ml')
-                : (lang == 'ru' ? 'г' : 'g'))
-            : r.unitDisplayForBlank(lang),
+                ? loc.tForLanguage(lang, 'unit_ml_abbr')
+                : loc.tForLanguage(lang, 'unit_g_letter'))
+            : r.unitDisplayForBlank(loc, lang),
         'quantities': r.isCountedByPackage
             ? r.quantities.map((q) => q * r.packageWeightGrams).toList()
             : r.isWeightInKg
@@ -2736,8 +2756,8 @@ class _InventoryScreenState extends State<InventoryScreen>
         map['packageCount'] = r.total;
         map['packageWeightGrams'] = r.packageWeightGrams;
         map['unitRaw'] = r.unitOverride == 'btl'
-            ? (lang == 'ru' ? 'бутылка' : 'bottle')
-            : (lang == 'ru' ? 'упак.' : 'pkg');
+            ? loc.tForLanguage(lang, 'unit_bottle_display')
+            : loc.tForLanguage(lang, 'unit_package_abbr');
       }
       if (r.isPf) map['pfUnit'] = r.pfUnit ?? _pfUnitPcs;
       // Цена: из номенклатуры заведения или карточки × итого
@@ -2760,8 +2780,7 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   String _inventoryAppBarTitle(LocalizationService loc) {
     if (_isSelectiveInventory) {
-      return loc.t('inventory_selective_blank_title') ??
-          'Выборочная инвентаризация';
+      return loc.t('inventory_selective_blank_title');
     }
     return loc.t('inventory_blank_title');
   }
@@ -2792,15 +2811,15 @@ class _InventoryScreenState extends State<InventoryScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-                '${loc.t('nomenclature')}: ${loc.t('no_products')}'),
+            content: Text('${loc.t('nomenclature')}: ${loc.t('no_products')}'),
           ),
         );
       }
       return false;
     }
 
-    final result = await showModalBottomSheet<({Set<String> p, Set<String> tc})>(
+    final result =
+        await showModalBottomSheet<({Set<String> p, Set<String> tc})>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -2815,8 +2834,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.t('inventory_selective_pick_empty') ??
-                'Отметьте хотя бы одну позицию'),
+            content: Text(loc.t('inventory_selective_pick_empty')),
           ),
         );
       }
@@ -2877,7 +2895,9 @@ class _SelectiveInventoryPickerSheet extends StatefulWidget {
 
 class _SelectiveInventoryPickerSheetState
     extends State<_SelectiveInventoryPickerSheet> {
-  String _query = '';
+  late final TextEditingController _queryCtrl;
+  Timer? _queryDebounce;
+  String _debouncedQuery = '';
   final Set<String> _productIds = {};
   final Set<String> _techCardIds = {};
 
@@ -2885,10 +2905,32 @@ class _SelectiveInventoryPickerSheetState
       tc.getDisplayNameInLists(widget.loc.currentLanguageCode);
 
   @override
+  void initState() {
+    super.initState();
+    _queryCtrl = TextEditingController();
+    _queryCtrl.addListener(() {
+      _queryDebounce?.cancel();
+      _queryDebounce = Timer(const Duration(milliseconds: 150), () {
+        if (!mounted) return;
+        final t = _queryCtrl.text;
+        if (_debouncedQuery == t) return;
+        setState(() => _debouncedQuery = t);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _queryDebounce?.cancel();
+    _queryCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final lang = widget.loc.currentLanguageCode;
-    final q = _query.trim().toLowerCase();
+    final q = _debouncedQuery.trim().toLowerCase();
     final products = widget.products.where((p) {
       if (q.isEmpty) return true;
       return p.name.toLowerCase().contains(q) ||
@@ -2917,8 +2959,7 @@ class _SelectiveInventoryPickerSheetState
                   children: [
                     Expanded(
                       child: Text(
-                        widget.loc.t('inventory_selective_pick_title') ??
-                            'Позиции для инвентаризации',
+                        widget.loc.t('inventory_selective_pick_title'),
                         style: theme.textTheme.titleLarge,
                       ),
                     ),
@@ -2932,14 +2973,14 @@ class _SelectiveInventoryPickerSheetState
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: TextField(
+                  controller: _queryCtrl,
                   decoration: InputDecoration(
-                    hintText: widget.loc.t('search') ?? 'Поиск',
+                    hintText: widget.loc.t('search'),
                     prefixIcon: const Icon(Icons.search),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onChanged: (s) => setState(() => _query = s),
                 ),
               ),
               Padding(
@@ -2955,8 +2996,8 @@ class _SelectiveInventoryPickerSheetState
                           : () => setState(() {
                                 _productIds.addAll(products.map((p) => p.id));
                               }),
-                      child: Text(widget.loc.t('inventory_selective_all_products') ??
-                          'Все продукты'),
+                      child: Text(
+                          widget.loc.t('inventory_selective_all_products')),
                     ),
                     TextButton(
                       onPressed: pfs.isEmpty
@@ -2964,16 +3005,14 @@ class _SelectiveInventoryPickerSheetState
                           : () => setState(() {
                                 _techCardIds.addAll(pfs.map((tc) => tc.id));
                               }),
-                      child: Text(widget.loc.t('inventory_selective_all_pf') ??
-                          'Все ПФ'),
+                      child: Text(widget.loc.t('inventory_selective_all_pf')),
                     ),
                     TextButton(
                       onPressed: () => setState(() {
                         _productIds.clear();
                         _techCardIds.clear();
                       }),
-                      child: Text(widget.loc.t('inventory_selective_clear') ??
-                          'Снять всё'),
+                      child: Text(widget.loc.t('inventory_selective_clear')),
                     ),
                   ],
                 ),
@@ -2986,8 +3025,7 @@ class _SelectiveInventoryPickerSheetState
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                         child: Text(
-                          widget.loc.t('inventory_block_products') ??
-                              'Продукты',
+                          widget.loc.t('inventory_block_products'),
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -3016,7 +3054,7 @@ class _SelectiveInventoryPickerSheetState
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                         child: Text(
-                          widget.loc.t('inventory_block_pf') ?? 'Полуфабрикаты',
+                          widget.loc.t('inventory_block_pf'),
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
@@ -3050,12 +3088,13 @@ class _SelectiveInventoryPickerSheetState
                   child: FilledButton(
                     onPressed: () {
                       Navigator.of(ctx).pop(
-                        (p: Set<String>.from(_productIds),
-                            tc: Set<String>.from(_techCardIds)),
+                        (
+                          p: Set<String>.from(_productIds),
+                          tc: Set<String>.from(_techCardIds)
+                        ),
                       );
                     },
-                    child: Text(widget.loc.t('inventory_selective_confirm') ??
-                        'Готово'),
+                    child: Text(widget.loc.t('inventory_selective_confirm')),
                   ),
                 ),
               ),
@@ -3234,6 +3273,7 @@ class _ProductUnitDropdown extends StatelessWidget {
   const _ProductUnitDropdown({
     required this.value,
     required this.lang,
+    required this.loc,
     required this.onChanged,
     required this.theme,
     this.product,
@@ -3241,6 +3281,7 @@ class _ProductUnitDropdown extends StatelessWidget {
 
   final String value;
   final String lang;
+  final LocalizationService loc;
   final void Function(String) onChanged;
   final ThemeData theme;
   final Product? product;
@@ -3279,9 +3320,9 @@ class _ProductUnitDropdown extends StatelessWidget {
                   value: u,
                   child: Text(
                     u == 'pkg'
-                        ? (lang == 'ru' ? 'упак.' : 'pkg')
+                        ? loc.tForLanguage(lang, 'unit_package_abbr')
                         : u == 'btl'
-                            ? (lang == 'ru' ? 'бутылка' : 'bottle')
+                            ? loc.tForLanguage(lang, 'unit_bottle_display')
                             : CulinaryUnits.displayName(u, lang),
                     style: theme.textTheme.bodySmall,
                     overflow: TextOverflow.ellipsis,
@@ -3435,10 +3476,13 @@ class _ProductPickerSheet extends StatefulWidget {
 }
 
 class _ProductPickerSheetState extends State<_ProductPickerSheet> {
-  String _query = '';
+  late final TextEditingController _queryCtrl;
+  Timer? _queryDebounce;
+  String _debouncedQuery = '';
+
   List<Product> get _filtered {
-    if (_query.isEmpty) return widget.products;
-    final q = _query.toLowerCase();
+    if (_debouncedQuery.isEmpty) return widget.products;
+    final q = _debouncedQuery.toLowerCase();
     final lang = widget.loc.currentLanguageCode;
     return widget.products
         .where((p) =>
@@ -3446,6 +3490,28 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
             p.getLocalizedName(lang).toLowerCase().contains(q) ||
             p.category.toLowerCase().contains(q))
         .toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _queryCtrl = TextEditingController();
+    _queryCtrl.addListener(() {
+      _queryDebounce?.cancel();
+      _queryDebounce = Timer(const Duration(milliseconds: 150), () {
+        if (!mounted) return;
+        final t = _queryCtrl.text;
+        if (_debouncedQuery == t) return;
+        setState(() => _debouncedQuery = t);
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _queryDebounce?.cancel();
+    _queryCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -3460,6 +3526,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
+              controller: _queryCtrl,
               keyboardType: TextInputType.text,
               textCapitalization: TextCapitalization.sentences,
               decoration: InputDecoration(
@@ -3467,7 +3534,6 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
                 prefixIcon: const Icon(Icons.search),
                 border: const OutlineInputBorder(),
               ),
-              onChanged: (v) => setState(() => _query = v),
             ),
           ),
           Expanded(
@@ -3536,6 +3602,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   bool _completed = false;
   DateTime _date = DateTime.now();
   String _nameFilter = '';
+  Timer? _filterDebounce;
   String? _selectedSheet; // активный лист (null = первый/все)
   final TextEditingController _filterCtrl = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -3604,8 +3671,15 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   @override
   void initState() {
     super.initState(); // AutoSaveMixin.initState регистрирует lifecycle-хуки
-    _filterCtrl
-        .addListener(() => setState(() => _nameFilter = _filterCtrl.text));
+    _filterCtrl.addListener(() {
+      _filterDebounce?.cancel();
+      _filterDebounce = Timer(const Duration(milliseconds: 120), () {
+        if (!mounted) return;
+        final t = _filterCtrl.text;
+        if (_nameFilter == t) return;
+        setState(() => _nameFilter = t);
+      });
+    });
     _searchFocusNode.addListener(() => setState(() {}));
     _registerJsNavChannel();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -3659,6 +3733,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
   @override
   void dispose() {
+    _filterDebounce?.cancel();
     _filterCtrl.dispose();
     _searchFocusNode.dispose();
     _serverSaveTimer?.cancel();
@@ -3822,24 +3897,23 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
   /// Диалог подтверждения обнуления всех количеств.
   Future<void> _confirmReset() async {
+    final loc = context.read<LocalizationService>();
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Обнулить данные?'),
-        content: const Text(
-          'Все введённые количества будут сброшены. Продукты останутся.',
-        ),
+        title: Text(loc.t('inventory_reset_dialog_title')),
+        content: Text(loc.t('inventory_reset_dialog_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Отмена'),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(ctx).colorScheme.error,
             ),
-            child: const Text('Обнулить'),
+            child: Text(loc.t('inventory_reset_confirm')),
           ),
         ],
       ),
@@ -3859,6 +3933,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
 
   Future<void> _saveAndExport() async {
+    final loc = context.read<LocalizationService>();
     // Снимаем фокус чтобы зафиксировать последнее значение в активном поле
     FocusScope.of(context).unfocus();
     // Даём фреймворку обработать onEditingComplete / onChanged
@@ -3866,8 +3941,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     final bytes = await _buildIikoExcel();
 
     final date = _date;
+    final dateStr =
+        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     final fileName =
-        'Инвентаризация_iiko_${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}.xlsx';
+        loc.t('inventory_iiko_export_filename', args: {'date': dateStr});
 
     try {
       await _downloadBytes(bytes, fileName);
@@ -3879,13 +3956,19 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Сохранено и отправлено шефу: $fileName')),
+          SnackBar(
+            content: Text(
+                loc.t('inventory_saved_sent_chef', args: {'file': fileName})),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка сохранения: $e')),
+          SnackBar(
+            content: Text(
+                loc.t('inventory_save_error', args: {'error': e.toString()})),
+          ),
         );
       }
     }
@@ -4452,8 +4535,12 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       await saveFileBytes(fileName, bytes);
     } catch (e) {
       if (mounted) {
+        final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка скачивания: $e')),
+          SnackBar(
+            content: Text(loc
+                .t('inventory_download_error', args: {'error': e.toString()})),
+          ),
         );
       }
     }
@@ -4465,6 +4552,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
     final visibleRows = _filteredRows;
+    final iikoStatusDateStr =
+        '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}';
 
     return Scaffold(
       appBar: AppBar(
@@ -4473,7 +4562,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko',
+            Text(loc.t('iiko_inventory_title'),
                 style: const TextStyle(fontSize: 16)),
             Text(
               account.establishment?.name ?? '',
@@ -4485,13 +4574,13 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         actions: const [],
       ),
       body: _isLoading
-          ? const Center(
+          ? Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Загрузка продуктов...'),
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(loc.t('inventory_loading_products')),
                 ],
               ),
             )
@@ -4537,10 +4626,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                       child: TextField(
                         controller: _filterCtrl,
                         focusNode: _searchFocusNode,
-                        decoration: const InputDecoration(
-                          hintText: 'Поиск по наименованию...',
-                          prefixIcon: Icon(Icons.search),
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          hintText: loc.t('inventory_search_by_name_hint'),
+                          prefixIcon: const Icon(Icons.search),
+                          border: const OutlineInputBorder(),
                           isDense: true,
                         ),
                       ),
@@ -4558,10 +4647,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                                 size: 16, color: theme.colorScheme.primary),
                             const SizedBox(width: 6),
                             Text(
-                              'iiko · ${_rows.length} поз. · '
-                              '${_date.day.toString().padLeft(2, '0')}.'
-                              '${_date.month.toString().padLeft(2, '0')}.'
-                              '${_date.year}',
+                              loc.t('inventory_iiko_status', args: {
+                                'count': '${_rows.length}',
+                                'date': iikoStatusDateStr,
+                              }),
                               style: TextStyle(
                                   fontSize: 12,
                                   color: theme.colorScheme.onSurfaceVariant),
@@ -4586,7 +4675,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                                         size: 12, color: Colors.green),
                                     const SizedBox(width: 4),
                                     Text(
-                                      'Данные защищены',
+                                      loc.t('inventory_data_protected'),
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: Colors.green[700],
@@ -4607,8 +4696,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                                 if (picked != null)
                                   setState(() => _date = picked);
                               },
-                              child: const Text('Дата',
-                                  style: TextStyle(fontSize: 12)),
+                              child: Text(loc.t('inventory_date'),
+                                  style: const TextStyle(fontSize: 12)),
                             ),
                           ],
                         ),
@@ -4625,7 +4714,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                     // Задержка 100ms: поиск refocus быстрее при скролле; ячейка успевает получить фокус.
                     Expanded(
                       child: visibleRows.isEmpty
-                          ? const Center(child: Text('Нет позиций'))
+                          ? Center(child: Text(loc.t('inventory_no_positions')))
                           : Listener(
                               onPointerDown: (_) {
                                 final pf = FocusManager.instance.primaryFocus;
@@ -4662,7 +4751,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                             Expanded(
                               child: FilledButton.icon(
                                 icon: const Icon(Icons.save_alt),
-                                label: const Text('Сохранить и скачать xlsx'),
+                                label:
+                                    Text(loc.t('inventory_save_download_xlsx')),
                                 onPressed: _saveAndExport,
                               ),
                             ),
@@ -4677,8 +4767,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 14, vertical: 12),
                               ),
-                              child: const Text('Обнулить',
-                                  style: TextStyle(fontSize: 13)),
+                              child: Text(loc.t('inventory_reset_confirm'),
+                                  style: const TextStyle(fontSize: 13)),
                             ),
                           ],
                         ),

@@ -250,7 +250,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    widget.loc.t('loading') ?? 'Загрузка...',
+                    widget.loc.t('loading'),
                     style: TextStyle(
                       fontSize: 14,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1008,7 +1008,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             devLog('TTK onProductSelected error: $e\n$st');
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+                SnackBar(
+                  content: Text(widget.loc.t('error_generic',
+                      args: {'error': e.toString()})),
+                  backgroundColor: Colors.red,
+                ),
               );
             }
           }
@@ -1084,12 +1088,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       child: widget.canEdit
           ? DropdownButton<String>(
               isExpanded: true,
-              hint: const Text('Способ', style: TextStyle(fontSize: 12)),
+              hint: Text(widget.loc.t('ttk_cooking_method'),
+                  style: const TextStyle(fontSize: 12)),
               value: ingredient.cookingProcessId ?? (ingredient.cookingProcessName == 'Свой вариант' ? 'custom' : null),
               items: [
-                const DropdownMenuItem<String>(
+                DropdownMenuItem<String>(
                   value: 'custom',
-                  child: Text('Свой вариант', style: TextStyle(fontSize: 12)),
+                  child: Text(widget.loc.t('cooking_method_custom'),
+                      style: const TextStyle(fontSize: 12)),
                 ),
                 ...CookingProcess.defaultProcesses.map((process) {
                   return DropdownMenuItem<String>(

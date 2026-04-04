@@ -1,8 +1,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Кабинет платформенного администратора бэты.
@@ -34,17 +36,18 @@ class _AdminScreenState extends State<AdminScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loc = context.watch<LocalizationService>();
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: const Text('Бета-Админка'),
+        title: Text(loc.t('admin_title')),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(icon: Icon(Icons.dashboard_outlined), text: 'Дашборд'),
-            Tab(icon: Icon(Icons.confirmation_number_outlined), text: 'Промокоды'),
-            Tab(icon: Icon(Icons.store_outlined), text: 'Заведения'),
-            Tab(icon: Icon(Icons.people_outline), text: 'Пользователи'),
+          tabs: [
+            Tab(icon: const Icon(Icons.dashboard_outlined), text: loc.t('admin_tab_dashboard')),
+            Tab(icon: const Icon(Icons.confirmation_number_outlined), text: loc.t('admin_tab_promo_codes')),
+            Tab(icon: const Icon(Icons.store_outlined), text: loc.t('admin_tab_establishments')),
+            Tab(icon: const Icon(Icons.people_outline), text: loc.t('admin_tab_users')),
           ],
           labelStyle: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
         ),
@@ -165,15 +168,16 @@ class _DashboardTabState extends State<_DashboardTab> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Ошибка: $_error'),
+            Text(loc.t('error_generic', args: {'error': _error!})),
             const SizedBox(height: 12),
-            FilledButton(onPressed: _load, child: const Text('Повторить')),
+            FilledButton(onPressed: _load, child: Text(loc.t('retry'))),
           ],
         ),
       );
@@ -184,81 +188,81 @@ class _DashboardTabState extends State<_DashboardTab> {
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _SectionTitle('Заведения'),
+          _SectionTitle(loc.t('admin_section_establishments')),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(child: _KpiCard(
                 icon: Icons.store,
-                label: 'Всего',
+                label: loc.t('admin_kpi_total'),
                 value: '${s['total_establishments']}',
                 color: Colors.blue,
               )),
               const SizedBox(width: 8),
               Expanded(child: _KpiCard(
                 icon: Icons.fiber_new,
-                label: 'За неделю',
+                label: loc.t('admin_kpi_this_week'),
                 value: '+${s['new_this_week']}',
                 color: Colors.green,
               )),
               const SizedBox(width: 8),
               Expanded(child: _KpiCard(
                 icon: Icons.calendar_month,
-                label: 'За месяц',
+                label: loc.t('admin_kpi_this_month'),
                 value: '+${s['new_this_month']}',
                 color: Colors.teal,
               )),
             ],
           ),
           const SizedBox(height: 16),
-          _SectionTitle('Пользователи'),
+          _SectionTitle(loc.t('admin_section_users')),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(child: _KpiCard(
                 icon: Icons.people,
-                label: 'Сотрудников',
+                label: loc.t('admin_kpi_employees'),
                 value: '${s['total_employees']}',
                 color: Colors.purple,
               )),
               const SizedBox(width: 8),
               Expanded(child: _KpiCard(
                 icon: Icons.manage_accounts,
-                label: 'Владельцев',
+                label: loc.t('admin_kpi_owners'),
                 value: '${s['total_owners']}',
                 color: Colors.indigo,
               )),
             ],
           ),
           const SizedBox(height: 16),
-          _SectionTitle('Промокоды'),
+          _SectionTitle(loc.t('admin_section_promo_codes')),
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(child: _KpiCard(
                 icon: Icons.confirmation_number,
-                label: 'Всего',
+                label: loc.t('admin_kpi_total'),
                 value: '${s['total_promo_codes']}',
                 color: Colors.orange,
               )),
               const SizedBox(width: 8),
               Expanded(child: _KpiCard(
                 icon: Icons.check_circle,
-                label: 'Использовано',
+                label: loc.t('admin_kpi_used'),
                 value: '${s['used_promo_codes']}',
                 color: Colors.green,
               )),
               const SizedBox(width: 8),
               Expanded(child: _KpiCard(
                 icon: Icons.lock_open,
-                label: 'Свободно',
+                label: loc.t('admin_kpi_free'),
                 value: '${s['free_promo_codes']}',
                 color: Colors.lightBlue,
               )),
             ],
           ),
           const SizedBox(height: 16),
-          _SectionTitle('Регистрации за последние 14 дней'),
+          _SectionTitle(loc.t('admin_section_registrations_14d')),
           const SizedBox(height: 8),
           _BarChart(data: Map<String, int>.from(s['registrations_by_day'])),
         ],
@@ -483,8 +487,12 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
       await _loadCodes();
     } catch (e) {
       if (mounted) {
+        final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(loc.t('error_generic', args: {'error': e.toString()})),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -493,10 +501,11 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
   }
 
   Future<void> _bulkCreateCodes() async {
+    final loc = context.read<LocalizationService>();
     final count = int.tryParse(_bulkCountController.text.trim()) ?? 5;
     if (count < 1 || count > 100) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Количество от 1 до 100')),
+        SnackBar(content: Text(loc.t('admin_promo_qty_range'))),
       );
       return;
     }
@@ -507,20 +516,20 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Создать $count промокодов?'),
+        title: Text(loc.t('admin_create_n_promos_title', args: {'count': '$count'})),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Будет сгенерировано $count уникальных кодов'),
-            if (note.isNotEmpty) Text('Заметка: $note'),
-            if (maxEmp != null) Text('Лимит: $maxEmp сотрудников'),
-            if (_expiresAt != null) Text('Срок до: ${_formatDate(_expiresAt!.toIso8601String())}'),
+            Text(loc.t('admin_create_n_promos_body', args: {'count': '$count'})),
+            if (note.isNotEmpty) Text(loc.t('admin_note_line', args: {'note': note})),
+            if (maxEmp != null) Text(loc.t('admin_limit_employees_line', args: {'max': '$maxEmp'})),
+            if (_expiresAt != null) Text(loc.t('admin_expires_line', args: {'date': _formatDate(_expiresAt!.toIso8601String())})),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Создать')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(loc.t('cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(loc.t('admin_button_create'))),
         ],
       ),
     );
@@ -547,9 +556,10 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
       }
       await widget.supabase.from('promo_codes').insert(rows);
       if (mounted) {
+        final locOk = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Создано ${rows.length} промокодов'),
+            content: Text(locOk.t('admin_promos_created', args: {'count': '${rows.length}'})),
             backgroundColor: Colors.green,
           ),
         );
@@ -560,8 +570,12 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
       await _loadCodes();
     } catch (e) {
       if (mounted) {
+        final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(loc.t('error_generic', args: {'error': e.toString()})),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -570,17 +584,18 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
   }
 
   Future<void> _deleteCode(int id) async {
+    final loc = context.read<LocalizationService>();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Удалить промокод?'),
-        content: const Text('Это действие нельзя отменить.'),
+        title: Text(loc.t('admin_delete_promo_title')),
+        content: Text(loc.t('admin_delete_promo_body')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(loc.t('cancel'))),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Удалить'),
+            child: Text(loc.t('delete')),
           ),
         ],
       ),
@@ -619,28 +634,29 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
   }
 
   Future<void> _setMaxEmployees(int id, int? current) async {
+    final loc = context.read<LocalizationService>();
     final controller = TextEditingController(text: current?.toString() ?? '');
     final result = await showDialog<int?>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Лимит сотрудников'),
+        title: Text(loc.t('admin_employee_limit_title')),
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.number,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Макс. количество сотрудников',
-            hintText: 'Например: 10',
+          decoration: InputDecoration(
+            labelText: loc.t('admin_max_employees_label'),
+            hintText: loc.t('admin_hint_example_10'),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Отмена')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(loc.t('cancel'))),
           FilledButton(
             onPressed: () {
               final v = int.tryParse(controller.text.trim());
               Navigator.pop(ctx, v);
             },
-            child: const Text('Сохранить'),
+            child: Text(loc.t('save')),
           ),
         ],
       ),
@@ -682,6 +698,7 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loc = context.watch<LocalizationService>();
     final filtered = _filteredCodes;
 
     return Column(
@@ -693,7 +710,7 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Новый промокод', style: theme.textTheme.titleSmall),
+              Text(loc.t('admin_new_promo'), style: theme.textTheme.titleSmall),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -703,14 +720,14 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
                       controller: _codeController,
                       textCapitalization: TextCapitalization.characters,
                       decoration: InputDecoration(
-                        labelText: 'Код',
-                        hintText: 'BETA001',
+                        labelText: loc.t('admin_field_code'),
+                        hintText: loc.t('admin_code_hint'),
                         prefixIcon: const Icon(Icons.confirmation_number_outlined, size: 18),
                         isDense: true,
                         suffixIcon: IconButton(
                           icon: const Icon(Icons.auto_fix_high, size: 16),
                           onPressed: () => _codeController.text = _generateCode(),
-                          tooltip: 'Сгенерировать',
+                          tooltip: loc.t('admin_generate_tooltip'),
                         ),
                       ),
                     ),
@@ -720,10 +737,10 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
                     flex: 3,
                     child: TextField(
                       controller: _noteController,
-                      decoration: const InputDecoration(
-                        labelText: 'Заметка',
-                        hintText: 'Для кого',
-                        prefixIcon: Icon(Icons.notes, size: 18),
+                      decoration: InputDecoration(
+                        labelText: loc.t('admin_field_note'),
+                        hintText: loc.t('admin_hint_for_whom'),
+                        prefixIcon: const Icon(Icons.notes, size: 18),
                         isDense: true,
                       ),
                     ),
@@ -734,10 +751,10 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
                     child: TextField(
                       controller: _maxEmployeesController,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Сотр.',
+                      decoration: InputDecoration(
+                        labelText: loc.t('admin_field_employees_short'),
                         hintText: '∞',
-                        prefixIcon: Icon(Icons.people_outline, size: 16),
+                        prefixIcon: const Icon(Icons.people_outline, size: 16),
                         isDense: true,
                       ),
                     ),
@@ -753,8 +770,8 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
                       icon: const Icon(Icons.calendar_today, size: 14),
                       label: Text(
                         _expiresAt == null
-                            ? 'Без срока'
-                            : 'До ${_formatDate(_expiresAt!.toIso8601String())}',
+                            ? loc.t('admin_no_expiry')
+                            : loc.t('admin_until_prefix', args: {'date': _formatDate(_expiresAt!.toIso8601String())}),
                         style: const TextStyle(fontSize: 12),
                       ),
                       style: OutlinedButton.styleFrom(
@@ -767,7 +784,7 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
                     IconButton(
                       icon: const Icon(Icons.clear, size: 16),
                       onPressed: () => setState(() => _expiresAt = null),
-                      tooltip: 'Убрать срок',
+                      tooltip: loc.t('admin_remove_expiry_tooltip'),
                       visualDensity: VisualDensity.compact,
                     ),
                   ],
@@ -777,7 +794,7 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
                     icon: _isSaving
                         ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.add, size: 16),
-                    label: const Text('Создать'),
+                    label: Text(loc.t('admin_button_create')),
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     ),
@@ -825,7 +842,7 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
               TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: 'Поиск по коду или заметке...',
+                  hintText: loc.t('admin_search_code_note'),
                   prefixIcon: const Icon(Icons.search, size: 18),
                   isDense: true,
                   suffixIcon: _searchQuery.isNotEmpty
@@ -843,22 +860,22 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  _FilterChip(label: 'Все (${_codes.length})', value: 'all', current: _filter,
+                  _FilterChip(label: loc.t('admin_filter_all', args: {'count': '${_codes.length}'}), value: 'all', current: _filter,
                       onTap: (v) => setState(() => _filter = v)),
                   const SizedBox(width: 6),
-                  _FilterChip(label: 'Свободные', value: 'free', current: _filter,
+                  _FilterChip(label: loc.t('admin_filter_free'), value: 'free', current: _filter,
                       onTap: (v) => setState(() => _filter = v)),
                   const SizedBox(width: 6),
-                  _FilterChip(label: 'Использованные', value: 'used', current: _filter,
+                  _FilterChip(label: loc.t('admin_filter_used'), value: 'used', current: _filter,
                       onTap: (v) => setState(() => _filter = v)),
                   const SizedBox(width: 6),
-                  _FilterChip(label: 'Истёкшие', value: 'expired', current: _filter,
+                  _FilterChip(label: loc.t('admin_filter_expired'), value: 'expired', current: _filter,
                       onTap: (v) => setState(() => _filter = v)),
                   const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.refresh, size: 18),
                     onPressed: _loadCodes,
-                    tooltip: 'Обновить',
+                    tooltip: loc.t('refresh'),
                     visualDensity: VisualDensity.compact,
                   ),
                 ],
@@ -872,9 +889,9 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
               : _error != null
-                  ? Center(child: Text('Ошибка: $_error'))
+                  ? Center(child: Text(loc.t('error_generic', args: {'error': _error!})))
                   : filtered.isEmpty
-                      ? const Center(child: Text('Ничего не найдено'))
+                      ? Center(child: Text(loc.t('admin_nothing_found')))
                       : ListView.separated(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                           itemCount: filtered.length,
@@ -887,6 +904,7 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
   }
 
   Widget _buildCodeTile(Map<String, dynamic> row) {
+    final loc = context.watch<LocalizationService>();
     final id = row['id'] as int;
     final code = row['code'] as String;
     final isUsed = row['is_used'] == true;
@@ -898,7 +916,11 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
     final expired = _isExpired(expiresAt);
 
     Color statusColor = isUsed ? Colors.green : expired ? Colors.red : Colors.orange;
-    String statusLabel = isUsed ? 'Использован' : expired ? 'Истёк' : 'Свободен';
+    final statusLabel = isUsed
+        ? loc.t('admin_promo_status_used')
+        : expired
+            ? loc.t('admin_promo_status_expired')
+            : loc.t('admin_promo_status_free');
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
@@ -920,7 +942,7 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
             onTap: () {
               Clipboard.setData(ClipboardData(text: code));
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Код скопирован'), duration: Duration(seconds: 1)),
+                SnackBar(content: Text(loc.t('admin_code_copied')), duration: const Duration(seconds: 1)),
               );
             },
             child: Text(
@@ -944,15 +966,17 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
         children: [
           if (note != null && note.isNotEmpty) Text(note, style: const TextStyle(fontSize: 11)),
           if (isUsed && establishmentName != null)
-            Text('Заведение: $establishmentName', style: const TextStyle(fontSize: 11)),
+            Text(loc.t('admin_establishment_line', args: {'name': establishmentName}), style: const TextStyle(fontSize: 11)),
           if (isUsed && usedAt != null)
-            Text('Использован: ${_formatDate(usedAt)}',
+            Text(loc.t('admin_used_line', args: {'date': _formatDate(usedAt)}),
                 style: const TextStyle(fontSize: 10, color: Colors.grey)),
           if (expiresAt != null)
-            Text('Срок до: ${_formatDate(expiresAt)}',
+            Text(loc.t('admin_expires_line', args: {'date': _formatDate(expiresAt)}),
                 style: TextStyle(fontSize: 10, color: expired ? Colors.red : Colors.grey)),
           Text(
-            'Сотрудники: ${maxEmployees != null ? '≤ $maxEmployees' : '∞'}',
+            loc.t('admin_employees_line', args: {
+              'value': maxEmployees != null ? '≤ $maxEmployees' : '∞',
+            }),
             style: TextStyle(fontSize: 10, color: maxEmployees != null ? Colors.blueGrey : Colors.grey),
           ),
         ],
@@ -974,24 +998,24 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
             child: Row(children: [
               Icon(isUsed ? Icons.refresh : Icons.check, size: 16),
               const SizedBox(width: 8),
-              Text(isUsed ? 'Освободить' : 'Отметить использованным'),
+              Text(isUsed ? loc.t('admin_action_free') : loc.t('admin_action_mark_used')),
             ]),
           ),
           PopupMenuItem(
             value: 'set_expires',
-            child: const Row(children: [
-              Icon(Icons.calendar_today, size: 16),
-              SizedBox(width: 8),
-              Text('Изменить срок'),
+            child: Row(children: [
+              const Icon(Icons.calendar_today, size: 16),
+              const SizedBox(width: 8),
+              Text(loc.t('admin_change_expiry')),
             ]),
           ),
           if (expiresAt != null)
-            const PopupMenuItem(
+            PopupMenuItem(
               value: 'clear_expires',
               child: Row(children: [
-                Icon(Icons.timer_off, size: 16),
-                SizedBox(width: 8),
-                Text('Убрать срок'),
+                const Icon(Icons.timer_off, size: 16),
+                const SizedBox(width: 8),
+                Text(loc.t('admin_remove_expiry')),
               ]),
             ),
           PopupMenuItem(
@@ -999,25 +1023,25 @@ class _PromoCodesTabState extends State<_PromoCodesTab> {
             child: Row(children: [
               const Icon(Icons.people_outline, size: 16),
               const SizedBox(width: 8),
-              Text(maxEmployees != null ? 'Изменить лимит' : 'Задать лимит'),
+              Text(maxEmployees != null ? loc.t('admin_change_limit') : loc.t('admin_set_limit')),
             ]),
           ),
           if (maxEmployees != null)
-            const PopupMenuItem(
+            PopupMenuItem(
               value: 'clear_max_employees',
               child: Row(children: [
-                Icon(Icons.people_alt, size: 16),
-                SizedBox(width: 8),
-                Text('Убрать лимит'),
+                const Icon(Icons.people_alt, size: 16),
+                const SizedBox(width: 8),
+                Text(loc.t('admin_remove_limit')),
               ]),
             ),
           const PopupMenuDivider(),
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'delete',
             child: Row(children: [
-              Icon(Icons.delete, size: 16, color: Colors.red),
-              SizedBox(width: 8),
-              Text('Удалить', style: TextStyle(color: Colors.red)),
+              const Icon(Icons.delete, size: 16, color: Colors.red),
+              const SizedBox(width: 8),
+              Text(loc.t('delete'), style: const TextStyle(color: Colors.red)),
             ]),
           ),
         ],
@@ -1190,6 +1214,7 @@ class _EstablishmentsTabState extends State<_EstablishmentsTab> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     return Column(
       children: [
         Padding(
@@ -1200,7 +1225,7 @@ class _EstablishmentsTabState extends State<_EstablishmentsTab> {
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Поиск заведения...',
+                    hintText: loc.t('admin_search_establishment'),
                     prefixIcon: const Icon(Icons.search, size: 18),
                     isDense: true,
                     suffixIcon: _searchQuery.isNotEmpty
@@ -1220,7 +1245,7 @@ class _EstablishmentsTabState extends State<_EstablishmentsTab> {
               IconButton(
                 icon: const Icon(Icons.refresh),
                 onPressed: _load,
-                tooltip: 'Обновить',
+                tooltip: loc.t('refresh'),
               ),
             ],
           ),
@@ -1230,13 +1255,13 @@ class _EstablishmentsTabState extends State<_EstablishmentsTab> {
           child: Row(
             children: [
               Text(
-                'Всего: ${_establishments.length}',
+                loc.t('admin_total_establishments', args: {'count': '${_establishments.length}'}),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               if (_searchQuery.isNotEmpty) ...[
                 const SizedBox(width: 8),
                 Text(
-                  'Найдено: ${_filtered.length}',
+                  loc.t('admin_found_establishments', args: {'count': '${_filtered.length}'}),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -1252,14 +1277,14 @@ class _EstablishmentsTabState extends State<_EstablishmentsTab> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('Ошибка: $_error'),
+                          Text(loc.t('error_generic', args: {'error': _error!})),
                           const SizedBox(height: 12),
-                          FilledButton(onPressed: _load, child: const Text('Повторить')),
+                          FilledButton(onPressed: _load, child: Text(loc.t('retry'))),
                         ],
                       ),
                     )
                   : _filtered.isEmpty
-                      ? const Center(child: Text('Ничего не найдено'))
+                      ? Center(child: Text(loc.t('admin_nothing_found')))
                       : RefreshIndicator(
                           onRefresh: _load,
                           child: ListView.separated(
@@ -1295,7 +1320,7 @@ class _EstablishmentsTabState extends State<_EstablishmentsTab> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Зарегистрировано: ${_formatDate(est['created_at'] as String?)}',
+                                      loc.t('admin_registered_line', args: {'date': _formatDate(est['created_at'] as String?)}),
                                       style: const TextStyle(fontSize: 11),
                                     ),
                                     Row(
@@ -1303,7 +1328,7 @@ class _EstablishmentsTabState extends State<_EstablishmentsTab> {
                                         Icon(Icons.people_outline, size: 12,
                                             color: Colors.grey.shade600),
                                         const SizedBox(width: 3),
-                                        Text('$empCount сотр.',
+                                        Text(loc.t('admin_emp_count_short', args: {'count': '$empCount'}),
                                             style: const TextStyle(fontSize: 11)),
                                         if (promo != null) ...[
                                           const SizedBox(width: 8),
@@ -1319,8 +1344,8 @@ class _EstablishmentsTabState extends State<_EstablishmentsTab> {
                                             ),
                                           ),
                                           if (promoExpired)
-                                            const Text(' (истёк)',
-                                                style: TextStyle(fontSize: 10, color: Colors.red)),
+                                            Text(loc.t('admin_expired_suffix'),
+                                                style: const TextStyle(fontSize: 10, color: Colors.red)),
                                         ],
                                       ],
                                     ),
@@ -1354,6 +1379,7 @@ class _EstablishmentDetails extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loc = context.watch<LocalizationService>();
     final promo = est['promo'] as Map<String, dynamic>?;
     final promoExpired = isPromoExpired(promo);
     final empCount = est['employee_count'] as int;
@@ -1391,7 +1417,7 @@ class _EstablishmentDetails extends StatelessWidget {
                 children: [
                   Text(est['name'] as String? ?? '—',
                       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                  Text('Зарегистрировано: ${formatDate(est['created_at'] as String?)}',
+                  Text(loc.t('admin_registered_line', args: {'date': formatDate(est['created_at'] as String?)}),
                       style: theme.textTheme.bodySmall),
                 ],
               ),
@@ -1399,23 +1425,23 @@ class _EstablishmentDetails extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 20),
-        _DetailRow(icon: Icons.people_outline, label: 'Сотрудников', value: '$empCount'),
+        _DetailRow(icon: Icons.people_outline, label: loc.t('admin_detail_employees'), value: '$empCount'),
         if (est['address'] != null && (est['address'] as String).isNotEmpty)
-          _DetailRow(icon: Icons.location_on_outlined, label: 'Адрес', value: est['address'] as String),
+          _DetailRow(icon: Icons.location_on_outlined, label: loc.t('admin_detail_address'), value: est['address'] as String),
         if (est['phone'] != null && (est['phone'] as String).isNotEmpty)
-          _DetailRow(icon: Icons.phone_outlined, label: 'Телефон', value: est['phone'] as String),
+          _DetailRow(icon: Icons.phone_outlined, label: loc.t('admin_detail_phone'), value: est['phone'] as String),
         if (est['email'] != null && (est['email'] as String).isNotEmpty)
-          _DetailRow(icon: Icons.email_outlined, label: 'Email', value: est['email'] as String),
+          _DetailRow(icon: Icons.email_outlined, label: loc.t('email_label'), value: est['email'] as String),
         _DetailRow(
           icon: Icons.currency_exchange,
-          label: 'Валюта',
+          label: loc.t('admin_detail_currency'),
           value: est['default_currency'] as String? ?? 'RUB',
         ),
         const Divider(height: 24),
-        Text('Промокод', style: theme.textTheme.titleSmall),
+        Text(loc.t('admin_promo_section'), style: theme.textTheme.titleSmall),
         const SizedBox(height: 8),
         if (promo == null)
-          const Text('Промокод не привязан', style: TextStyle(color: Colors.grey))
+          Text(loc.t('admin_promo_not_linked'), style: const TextStyle(color: Colors.grey))
         else
           Container(
             padding: const EdgeInsets.all(12),
@@ -1454,15 +1480,15 @@ class _EstablishmentDetails extends StatelessWidget {
                           color: Colors.red.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Text('ИСТЁК',
-                            style: TextStyle(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold)),
+                        child: Text(loc.t('admin_expired_badge'),
+                            style: const TextStyle(fontSize: 10, color: Colors.red, fontWeight: FontWeight.bold)),
                       ),
                     ],
                   ],
                 ),
                 if (promo['expires_at'] != null) ...[
                   const SizedBox(height: 4),
-                  Text('Срок до: ${formatDate(promo['expires_at'] as String?)}',
+                  Text(loc.t('admin_expires_line', args: {'date': formatDate(promo['expires_at'] as String?)}),
                       style: TextStyle(
                           fontSize: 12,
                           color: promoExpired ? Colors.red : Colors.grey)),
@@ -1471,7 +1497,7 @@ class _EstablishmentDetails extends StatelessWidget {
             ),
           ),
         const SizedBox(height: 8),
-        Text('ID: ${est['id']}',
+        Text(loc.t('admin_id_line', args: {'id': '${est['id']}'}),
             style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline)),
       ],
     );
@@ -1589,22 +1615,14 @@ class _UsersTabState extends State<_UsersTab> {
     return '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
   }
 
-  String _rolesLabel(dynamic roles) {
-    if (roles is! List || roles.isEmpty) return 'Сотрудник';
-    const map = {
-      'owner': 'Владелец',
-      'executive_chef': 'Шеф-повар',
-      'sous_chef': 'Су-шеф',
-      'cook': 'Повар',
-      'brigadier': 'Бригадир',
-      'bartender': 'Бармен',
-      'waiter': 'Официант',
-    };
-    return roles.map((r) => map[r] ?? r).join(', ');
+  String _rolesLabel(LocalizationService loc, dynamic roles) {
+    if (roles is! List || roles.isEmpty) return loc.t('admin_role_fallback');
+    return roles.map((r) => loc.roleDisplayName(r.toString())).join(', ');
   }
 
   @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     final filtered = _filtered;
     final ownersCount = _users.where((u) {
       final roles = u['roles'];
@@ -1621,7 +1639,7 @@ class _UsersTabState extends State<_UsersTab> {
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Поиск по имени, email, заведению...',
+                    hintText: loc.t('admin_users_search_hint'),
                     prefixIcon: const Icon(Icons.search, size: 18),
                     isDense: true,
                     suffixIcon: _searchQuery.isNotEmpty
@@ -1641,7 +1659,7 @@ class _UsersTabState extends State<_UsersTab> {
               IconButton(
                 icon: const Icon(Icons.refresh),
                 onPressed: _load,
-                tooltip: 'Обновить',
+                tooltip: loc.t('refresh'),
               ),
             ],
           ),
@@ -1650,7 +1668,7 @@ class _UsersTabState extends State<_UsersTab> {
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
             children: [
-              Text('Всего: ${_users.length}  •  Владельцев: $ownersCount',
+              Text(loc.t('admin_users_total', args: {'total': '${_users.length}', 'owners': '$ownersCount'}),
                   style: Theme.of(context).textTheme.bodySmall),
               const Spacer(),
               GestureDetector(
@@ -1663,7 +1681,7 @@ class _UsersTabState extends State<_UsersTab> {
                       visualDensity: VisualDensity.compact,
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    const Text('Только владельцы', style: TextStyle(fontSize: 12)),
+                    Text(loc.t('admin_only_owners'), style: const TextStyle(fontSize: 12)),
                   ],
                 ),
               ),
@@ -1679,14 +1697,14 @@ class _UsersTabState extends State<_UsersTab> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('Ошибка: $_error'),
+                          Text(loc.t('error_generic', args: {'error': _error!})),
                           const SizedBox(height: 12),
-                          FilledButton(onPressed: _load, child: const Text('Повторить')),
+                          FilledButton(onPressed: _load, child: Text(loc.t('retry'))),
                         ],
                       ),
                     )
                   : filtered.isEmpty
-                      ? const Center(child: Text('Ничего не найдено'))
+                      ? Center(child: Text(loc.t('admin_nothing_found')))
                       : RefreshIndicator(
                           onRefresh: _load,
                           child: ListView.separated(
@@ -1736,8 +1754,8 @@ class _UsersTabState extends State<_UsersTab> {
                                           color: Colors.grey.withOpacity(0.15),
                                           borderRadius: BorderRadius.circular(4),
                                         ),
-                                        child: const Text('неакт.',
-                                            style: TextStyle(
+                                        child: Text(loc.t('admin_inactive_short'),
+                                            style: const TextStyle(
                                                 fontSize: 9, color: Colors.grey)),
                                       ),
                                   ],
@@ -1750,7 +1768,7 @@ class _UsersTabState extends State<_UsersTab> {
                                     Row(
                                       children: [
                                         Text(
-                                          _rolesLabel(roles),
+                                          _rolesLabel(loc, roles),
                                           style: TextStyle(
                                             fontSize: 11,
                                             color: isOwner ? Colors.indigo : Colors.grey,
@@ -1770,7 +1788,7 @@ class _UsersTabState extends State<_UsersTab> {
                                         ],
                                       ],
                                     ),
-                                    Text('Рег.: ${_formatDate(u['created_at'] as String?)}',
+                                    Text(loc.t('admin_list_line', args: {'date': _formatDate(u['created_at'] as String?)}),
                                         style: const TextStyle(fontSize: 10, color: Colors.grey)),
                                   ],
                                 ),

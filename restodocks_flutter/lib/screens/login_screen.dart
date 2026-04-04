@@ -458,7 +458,27 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text.trim(),
         interfaceLanguageCode: uiLang,
       );
+      // Старая БД: syncEstablishmentAccessFromServer мог вернуть expired → logout (сейчас промо даёт Pro,
+      // не «доступ к сайту»; миграция check_establishment_access_promo_expires_to_free убирает это).
+      if (!accountManager.isLoggedInSync) {
+        if (mounted) {
+          setState(() {
+            _isUnconfirmedEmail = false;
+            _errorMessage = loc.t('promo_code_expired');
+          });
+        }
+        return;
+      }
       await PendingOwnerRole.applyIfNeeded(accountManager);
+      if (!accountManager.isLoggedInSync) {
+        if (mounted) {
+          setState(() {
+            _isUnconfirmedEmail = false;
+            _errorMessage = loc.t('promo_code_expired');
+          });
+        }
+        return;
+      }
 
       if (mounted) {
         // Возврат на страницу, где был пользователь до выхода (после F5)

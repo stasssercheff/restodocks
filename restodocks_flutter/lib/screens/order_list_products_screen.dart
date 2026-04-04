@@ -101,7 +101,11 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
               ),
               items: allowedUnits.map((id) => DropdownMenuItem(
                 value: id,
-                child: Text(id == 'pkg' ? (loc.currentLanguageCode == 'ru' ? 'упак.' : 'pkg') : _unitLabel(id, loc.currentLanguageCode)),
+                child: Text(
+                  id == 'pkg'
+                      ? loc.t('unit_package_abbr')
+                      : _unitLabel(id, loc.currentLanguageCode),
+                ),
               )).toList(),
               onChanged: (v) => setState(() => selected = v ?? selected),
             ),
@@ -190,7 +194,7 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
-                      '${loc.t('supplier_contact_person') ?? 'Контактное лицо'}: ${_list.contactPerson}',
+                      '${loc.t('supplier_contact_person')}: ${_list.contactPerson}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),

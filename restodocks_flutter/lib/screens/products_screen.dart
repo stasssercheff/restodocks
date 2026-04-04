@@ -67,8 +67,13 @@ class _ProductsScreenState extends State<ProductsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
+        final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка загрузки продуктов: $e')),
+          SnackBar(
+            content: Text(
+              loc.t('products_load_error', args: {'error': e.toString()}),
+            ),
+          ),
         );
       }
     }
@@ -138,8 +143,10 @@ class _ProductsScreenState extends State<ProductsScreen> {
       if (duplicateGroups.isEmpty) {
         if (mounted) {
           setState(() => _isLoading = false);
+          final locEmpty = context.read<LocalizationService>();
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Полных дубликатов не найдено')),
+            SnackBar(
+                content: Text(locEmpty.t('products_full_duplicates_none'))),
           );
         }
         return;
@@ -186,10 +193,18 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
             if (mounted) {
               await _loadProducts();
+              final locSnack = context.read<LocalizationService>();
+              final skippedPart = skippedCount > 0
+                  ? locSnack.t('products_duplicates_skipped_suffix',
+                      args: {'n': '$skippedCount'})
+                  : '';
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                    content: Text(
-                        'Удалено дубликатов: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
+                    content: Text(locSnack.t('products_duplicates_removal_done',
+                        args: {
+                          'deleted': '$deletedCount',
+                          'skipped': skippedPart,
+                        }))),
               );
             }
           },
@@ -197,8 +212,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
       );
     } catch (e) {
       if (mounted) {
+        final locErr = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка поиска дубликатов: $e')),
+          SnackBar(
+            content: Text(locErr.t('products_duplicates_search_error',
+                args: {'error': e.toString()})),
+          ),
         );
       }
     } finally {
@@ -249,6 +268,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
       int deletedCount = 0;
       int skippedCount = 0;
+      final locUsage = context.read<LocalizationService>();
 
       // Удаляем каждый продукт, проверяя не используется ли он
       for (final product in _products) {
@@ -262,8 +282,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
               establishment.dataEstablishmentId);
           if (nomenclatureIds.contains(product.id)) {
             isUsed = true;
-            usageMessage =
-                'Продукт используется в номенклатуре заведения "${establishment.name}"';
+            usageMessage = locUsage.t('product_in_nomenclature_usage',
+                args: {'name': establishment.name});
           }
         }
 
@@ -278,8 +298,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   ing['product_id'] == product.id ||
                   ing['productId'] == product.id)) {
                 isUsed = true;
-                usageMessage =
-                    'Продукт используется в ТТК "${techCard['dish_name'] ?? techCard['name'] ?? 'Неизвестно'}"';
+                final dn = techCard['dish_name'] ??
+                    techCard['name'] ??
+                    locUsage.t('unknown_dish');
+                usageMessage = locUsage.t('product_used_in_ttk_cannot_remove',
+                    args: {'dish': '$dn'});
                 break;
               }
             } catch (e) {
@@ -322,7 +345,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${loc.t('error')}: $e')),
+          SnackBar(
+            content: Text(
+              loc.t('error_generic', args: {'error': e.toString()}),
+            ),
+          ),
         );
       }
     }
@@ -399,8 +426,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
                   establishment.dataEstablishmentId);
               if (nomenclatureIds.contains(product.id)) {
                 isUsed = true;
-                usageMessage =
-                    'Продукт используется в номенклатуре заведения "${establishment.name}"';
+                usageMessage = context.read<LocalizationService>().t(
+                    'product_in_nomenclature_usage',
+                    args: {'name': establishment.name});
               }
             }
 
@@ -427,17 +455,29 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
       if (mounted) {
         await _loadProducts(); // Перезагружаем список
+        final locSnack = context.read<LocalizationService>();
+        final skippedPart = skippedCount > 0
+            ? locSnack.t('products_duplicates_skipped_suffix',
+                args: {'n': '$skippedCount'})
+            : '';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(
-                  'Удалено дубликатов по названию: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
+              content: Text(locSnack.t('products_duplicates_by_name_done',
+                  args: {
+                    'deleted': '$deletedCount',
+                    'skipped': skippedPart,
+                  }))),
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
+        final locErr = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка удаления дубликатов: $e')),
+          SnackBar(
+            content: Text(locErr.t('products_duplicates_delete_error',
+                args: {'error': e.toString()})),
+          ),
         );
       }
     }
@@ -446,9 +486,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
   /// Умный поиск дубликатов с помощью ИИ
   Future<void> _findDuplicatesWithAI(_DuplicateMode mode) async {
     if (_products.length < 2) {
+      final locNeed = context.read<LocalizationService>();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-            content: Text('Нужно минимум 2 продукта для поиска дубликатов')),
+        SnackBar(content: Text(locNeed.t('duplicates_need_more'))),
       );
       return;
     }
@@ -478,8 +518,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     ),
                     const SizedBox(width: 16),
                     Text(mode == _DuplicateMode.full
-                        ? 'Поиск полных дубликатов…'
-                        : 'Поиск дубликатов…'),
+                        ? loc.t('products_search_full_progress')
+                        : loc.t('products_search_duplicates_progress')),
                   ],
                 ),
               ),
@@ -512,8 +552,8 @@ class _ProductsScreenState extends State<ProductsScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
                 content: Text(mode == _DuplicateMode.full
-                    ? 'Полных дубликатов не найдено'
-                    : 'Дубликатов не найдено')),
+                    ? loc.t('products_full_duplicates_none')
+                    : loc.t('duplicates_none'))),
           );
         }
         return;
@@ -595,10 +635,18 @@ class _ProductsScreenState extends State<ProductsScreen> {
 
             if (mounted) {
               await _loadProducts();
+              final locSnack = context.read<LocalizationService>();
+              final skippedPart = skippedCount > 0
+                  ? locSnack.t('products_duplicates_skipped_suffix',
+                      args: {'n': '$skippedCount'})
+                  : '';
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                    content: Text(
-                        'Удалено дубликатов: $deletedCount${skippedCount > 0 ? ', пропущено (используются): $skippedCount' : ''}')),
+                    content: Text(locSnack.t('products_duplicates_removal_done',
+                        args: {
+                          'deleted': '$deletedCount',
+                          'skipped': skippedPart,
+                        }))),
               );
             }
           },
@@ -607,8 +655,12 @@ class _ProductsScreenState extends State<ProductsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
+        final locErr = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка поиска дубликатов: $e')),
+          SnackBar(
+            content: Text(locErr.t('products_duplicates_search_error',
+                args: {'error': e.toString()})),
+          ),
         );
       }
     } finally {
@@ -1028,8 +1080,13 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
       }
     } catch (e) {
       if (mounted) {
+        final le = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
+          SnackBar(
+            content: Text(
+              le.t('error_generic', args: {'error': e.toString()}),
+            ),
+          ),
         );
       }
     } finally {
@@ -1054,8 +1111,13 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
       }
     } catch (e) {
       if (mounted) {
+        final le = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
+          SnackBar(
+            content: Text(
+              le.t('error_generic', args: {'error': e.toString()}),
+            ),
+          ),
         );
       }
     } finally {
@@ -1084,8 +1146,8 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
             if (techCard.ingredients
                 .any((ing) => ing.productId == widget.product.id)) {
               isUsed = true;
-              usageMessage =
-                  'Продукт используется в технологической карте "${techCard.dishName}"';
+              usageMessage = loc.t('product_used_in_ttk_cannot_remove',
+                  args: {'dish': techCard.dishName});
               break;
             }
           }
@@ -1151,7 +1213,11 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${loc.t('error')}: $e')),
+          SnackBar(
+            content: Text(
+              loc.t('error_generic', args: {'error': e.toString()}),
+            ),
+          ),
         );
       }
     } finally {
@@ -1235,7 +1301,7 @@ class _ProductDetailsDialogState extends State<_ProductDetailsDialog> {
         TextButton(
           onPressed: _isUpdating ? null : _deleteProduct,
           style: TextButton.styleFrom(foregroundColor: Colors.red),
-          child: const Text('Удалить продукт'),
+          child: Text(loc.t('delete_product_action')),
         ),
       ],
     );
@@ -1400,7 +1466,10 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Ошибка удаления: $e")),
+          SnackBar(
+            content: Text(widget.loc.t('remove_duplicates_apply_error',
+                args: {'error': e.toString()})),
+          ),
         );
       }
     } finally {
@@ -1417,11 +1486,12 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final loc = widget.loc;
 
     return AlertDialog(
       title: Text(widget.mode == _DuplicateMode.full
-          ? "Полные дубликаты"
-          : "Умный поиск дубликатов"),
+          ? loc.t('products_duplicates_full_title')
+          : loc.t('products_duplicates_ai')),
       content: SizedBox(
         width: 600,
         height: 500,
@@ -1430,8 +1500,8 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
           children: [
             Text(
               widget.mode == _DuplicateMode.full
-                  ? "Найдены продукты с полностью идентичными данными. Выберите, какие удалить."
-                  : "Найдены похожие названия продуктов. Выберите, какие удалить.",
+                  ? loc.t('products_smart_duplicates_desc_full')
+                  : loc.t('products_smart_duplicates_desc_ai'),
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
@@ -1442,7 +1512,10 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Удаление: $_removalCurrent из $_removalTotal',
+                      loc.t('products_deleting_progress', args: {
+                        'current': '$_removalCurrent',
+                        'total': '$_removalTotal',
+                      }),
                       style: theme.textTheme.bodySmall,
                     ),
                     const SizedBox(height: 4),
@@ -1468,7 +1541,8 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            "Группа ${groupIndex + 1} (оригинал — первый, остальные дубликаты)",
+                            loc.t('products_duplicate_group_caption',
+                                args: {'n': '${groupIndex + 1}'}),
                             style: theme.textTheme.labelLarge?.copyWith(
                               color: theme.colorScheme.primary,
                               fontWeight: FontWeight.bold,
@@ -1509,9 +1583,10 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
                                         product.id, estId);
                                     final priceStr = ep != null && ep.$1 != null
                                         ? '${ep.$1} ${ep.$2 ?? ""}'
-                                        : "не указана";
+                                        : loc.t('products_price_not_specified');
                                     return Text(
-                                      "Цена: $priceStr",
+                                      loc.t('products_price_line',
+                                          args: {'price': priceStr}),
                                       style: theme.textTheme.bodySmall,
                                     );
                                   },
@@ -1533,12 +1608,12 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
       actions: [
         TextButton(
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text("Отмена"),
+          child: Text(loc.t('cancel')),
         ),
         TextButton(
           onPressed: _saving ? null : _selectAllExceptFirst,
           style: TextButton.styleFrom(foregroundColor: Colors.orange),
-          child: const Text("Оставить первый в каждой группе"),
+          child: Text(loc.t('duplicates_keep_first_each_group')),
         ),
         FilledButton(
           onPressed:
@@ -1549,7 +1624,8 @@ class _SmartDuplicatesDialogState extends State<_SmartDuplicatesDialog> {
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2))
-              : Text("Удалить ${_selectedToRemove.length} дубликатов"),
+              : Text(loc.t('products_delete_n_duplicates',
+                  args: {'n': '${_selectedToRemove.length}'})),
         ),
       ],
     );

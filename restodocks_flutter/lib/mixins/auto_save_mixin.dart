@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../utils/dev_log.dart';
 import 'package:flutter/scheduler.dart';
 
+import '../services/cloud_draft_service.dart';
 import '../services/draft_storage_service.dart';
 import '../services/web_lifecycle_saver_stub.dart'
     if (dart.library.html) '../services/web_lifecycle_saver_web.dart' as web_lifecycle;
@@ -159,6 +160,7 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
     } else if (draftKey.startsWith('tech_card_edit_')) {
       final id = draftKey.replaceFirst('tech_card_edit_', '');
       await _draftStorage.saveTechCardEditDraft(id, data);
+      CloudDraftService.instance.scheduleUpsert(draftKey, data);
     } else if (draftKey == 'writeoffs') {
       await _draftStorage.saveWriteoffsDraft(data);
     }
@@ -181,7 +183,7 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
       return await _draftStorage.loadChecklistFillDraft(id);
     } else if (draftKey.startsWith('tech_card_edit_')) {
       final id = draftKey.replaceFirst('tech_card_edit_', '');
-      return await _draftStorage.loadTechCardEditDraft(id);
+      return await _draftStorage.loadTechCardEditDraftMerged(id, draftKey);
     } else if (draftKey == 'writeoffs') {
       return await _draftStorage.loadWriteoffsDraft();
     }
@@ -205,7 +207,7 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
       await _draftStorage.clearChecklistFillDraft(id);
     } else if (draftKey.startsWith('tech_card_edit_')) {
       final id = draftKey.replaceFirst('tech_card_edit_', '');
-      await _draftStorage.clearTechCardEditDraft(id);
+      await _draftStorage.clearTechCardEditDraftEverywhere(id, draftKey);
     } else if (draftKey == 'writeoffs') {
       await _draftStorage.clearWriteoffsDraft();
     }

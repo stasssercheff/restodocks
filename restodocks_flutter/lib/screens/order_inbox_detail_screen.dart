@@ -440,12 +440,12 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_error ?? 'Документ не найден',
+              Text(_error ?? loc.t('document_not_found'),
                   style: TextStyle(color: theme.colorScheme.error)),
               const SizedBox(height: 16),
               FilledButton(
                   onPressed: () => context.pop(),
-                  child: Text(loc.t('back') ?? 'Назад')),
+                  child: Text(loc.t('back'))),
             ],
           ),
         ),

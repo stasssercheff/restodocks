@@ -751,10 +751,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (context.mounted) {
           final message = e is TimeoutException
               ? (e.message ?? loc.t('clear_nomenclature_timeout'))
-              : '${loc.t('error') ?? 'Ошибка'}: $e';
+              : loc.t('error_generic', args: {'error': e.toString()});
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(message ?? 'Ошибка'),
+              content: Text(message),
               backgroundColor: Colors.red,
             ),
           );

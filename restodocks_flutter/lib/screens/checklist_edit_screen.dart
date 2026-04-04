@@ -456,11 +456,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       );
       if (mounted) {
         // Для нового чеклиста показываем явное подтверждение создания.
-        final toastText = _isNew
-            ? (loc.currentLanguageCode == 'ru'
-                ? 'Чеклист создан'
-                : (loc.t('checklist_created') ?? 'Checklist created'))
-            : (loc.t('saved') ?? 'Сохранено');
+        final toastText =
+            _isNew ? loc.t('checklist_created') : loc.t('saved');
         AppToastService.show(toastText, duration: const Duration(seconds: 4));
         clearDraft();
         context.go('/checklists?department=$dept&refresh=1');
@@ -590,7 +587,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 children: [
                   Padding(
                     padding: const EdgeInsets.all(12),
-                    child: Text(loc.t('select_pf') ?? 'Выбрать ПФ',
+                    child: Text(loc.t('select_pf'),
                         style: Theme.of(context).textTheme.titleMedium),
                   ),
                   Flexible(
@@ -639,8 +636,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                  loc.t('checklist_item_quantity_hint') ??
-                      'Укажите количество (необязательно)',
+                  loc.t('checklist_item_quantity_hint'),
                   style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
                       color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
               const SizedBox(height: 12),
@@ -653,7 +649,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
-                        labelText: loc.t('checklist_quantity') ?? 'Количество',
+                        labelText: loc.t('checklist_quantity'),
                         isDense: true,
                         border: const OutlineInputBorder(),
                       ),
@@ -665,7 +661,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                     child: DropdownButtonFormField<String>(
                       value: selectedUnit,
                       decoration: InputDecoration(
-                        labelText: loc.t('unit') ?? 'Ед.',
+                        labelText: loc.t('unit'),
                         isDense: true,
                         border: const OutlineInputBorder(),
                       ),
@@ -689,7 +685,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 Navigator.of(ctx).pop();
                 _addItem(title: title, techCardId: techCardId);
               },
-              child: Text(loc.t('skip') ?? 'Пропустить'),
+              child: Text(loc.t('skip')),
             ),
             FilledButton(
               onPressed: () {
@@ -702,7 +698,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                     targetQuantity: qty,
                     targetUnit: qty != null ? selectedUnit : null);
               },
-              child: Text(loc.t('add_item') ?? 'Добавить'),
+              child: Text(loc.t('add_item')),
             ),
           ],
         ),
@@ -743,7 +739,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
                       decoration: InputDecoration(
-                        labelText: loc.t('checklist_quantity') ?? 'Количество',
+                        labelText: loc.t('checklist_quantity'),
                         isDense: true,
                         border: const OutlineInputBorder(),
                       ),
@@ -755,7 +751,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                     child: DropdownButtonFormField<String>(
                       value: selectedUnit,
                       decoration: InputDecoration(
-                        labelText: loc.t('unit') ?? 'Ед.',
+                        labelText: loc.t('unit'),
                         isDense: true,
                         border: const OutlineInputBorder(),
                       ),
@@ -782,11 +778,11 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                       item.copyWith(targetQuantity: null, targetUnit: null));
                   scheduleSave();
                 },
-                child: Text(loc.t('delete') ?? 'Удалить'),
+                child: Text(loc.t('delete')),
               ),
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(loc.t('back') ?? 'Отмена'),
+              child: Text(loc.t('back')),
             ),
             FilledButton(
               onPressed: () {
@@ -799,7 +795,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                     ));
                 scheduleSave();
               },
-              child: Text(loc.t('save') ?? 'Сохранить'),
+              child: Text(loc.t('save')),
             ),
           ],
         ),
@@ -811,15 +807,15 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       LocalizationService loc, String lang, bool canEdit) {
     final ids = _checklist?.effectiveSectionIds ?? const <String>[];
     final label = ids.isEmpty
-        ? (loc.t('checklist_section_all') ?? 'Все цеха')
-        : '${ids.length} ${loc.t('checklist_section') ?? 'Цех'}';
+        ? (loc.t('checklist_section_all'))
+        : '${ids.length} ${loc.t('checklist_section')}';
     return InkWell(
       onTap: canEdit ? () => _showSectionPicker(loc, lang, canEdit) : null,
       borderRadius: BorderRadius.circular(12),
       child: InputDecorator(
         decoration: InputDecoration(
           labelText: loc.t('section'),
-          hintText: loc.t('checklist_section_select') ?? 'Выбрать цеха',
+          hintText: loc.t('checklist_section_select'),
           border: const OutlineInputBorder(),
           suffixIcon: canEdit
               ? Icon(Icons.arrow_drop_down,
@@ -851,7 +847,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                       groupValue: selected.isEmpty,
                       onChanged: (_) => setInner(() => selected.clear()),
                     ),
-                    title: Text(loc.t('checklist_section_all') ?? 'Все цеха'),
+                    title: Text(loc.t('checklist_section_all')),
                     onTap: () => setInner(() => selected.clear()),
                   ),
                   ...KitchenSection.values.map((s) {
@@ -902,15 +898,15 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   Widget _buildEmployeeSelector(
       LocalizationService loc, String lang, bool canEdit) {
     final label = _selectedEmployeeIds.isEmpty
-        ? loc.t('checklist_employee_all') ?? 'Все'
+        ? loc.t('checklist_employee_all')
         : '${_selectedEmployeeIds.length} ${loc.t('checklist_employee')}';
     return InkWell(
       onTap: canEdit ? () => _showEmployeePicker(loc, lang, canEdit) : null,
       borderRadius: BorderRadius.circular(12),
       child: InputDecorator(
         decoration: InputDecoration(
-          labelText: loc.t('checklist_employee') ?? 'Сотрудник',
-          hintText: loc.t('checklist_employee_select') ?? 'Выбрать сотрудников',
+          labelText: loc.t('checklist_employee'),
+          hintText: loc.t('checklist_employee_select'),
           border: const OutlineInputBorder(),
           suffixIcon: canEdit
               ? Icon(Icons.arrow_drop_down,
@@ -930,7 +926,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setInner) {
           return AlertDialog(
-            title: Text(loc.t('checklist_employee') ?? 'Сотрудник'),
+            title: Text(loc.t('checklist_employee')),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -942,7 +938,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                       groupValue: selected.isEmpty,
                       onChanged: (_) => setInner(() => selected.clear()),
                     ),
-                    title: Text(loc.t('checklist_employee_all') ?? 'Все'),
+                    title: Text(loc.t('checklist_employee_all')),
                     onTap: () => setInner(() => selected.clear()),
                   ),
                   ..._employees.map((e) {
@@ -971,7 +967,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                       subtitle: Text(
                         rolesDisplay.isNotEmpty
                             ? rolesDisplay
-                            : (loc.t('employee') ?? 'Сотрудник'),
+                            : (loc.t('employee')),
                         style: Theme.of(ctx).textTheme.bodySmall,
                       ),
                     );
@@ -1132,7 +1128,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             ),
             const SizedBox(width: 16),
             Expanded(
-              child: Text(loc.t('checklist_complete_by') ?? 'Завершить до'),
+              child: Text(loc.t('checklist_complete_by')),
             ),
           ],
         ),
@@ -1175,7 +1171,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 const SizedBox(width: 8),
                 Expanded(
                   child: TimePickerField(
-                    label: loc.t('time') ?? 'Время',
+                    label: loc.t('time'),
                     value: _deadline != null
                         ? '${_deadline!.hour.toString().padLeft(2, '0')}:${_deadline!.minute.toString().padLeft(2, '0')}'
                         : '00:00',
@@ -1218,7 +1214,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               const SizedBox(width: 16),
               Expanded(
                   child:
-                      Text(loc.t('checklist_include_time') ?? 'Указать время')),
+                      Text(loc.t('checklist_include_time'))),
             ],
           ),
         ],
@@ -1451,14 +1447,14 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                     child: Text(
                       _reminderConfig.recurrenceEndDate != null
                           ? '${_reminderConfig.recurrenceEndDate!.day.toString().padLeft(2, '0')}.${_reminderConfig.recurrenceEndDate!.month.toString().padLeft(2, '0')}.${_reminderConfig.recurrenceEndDate!.year}'
-                          : (loc.t('not_specified') ?? 'Не указана'),
+                          : (loc.t('not_specified')),
                     ),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               IconButton(
-                tooltip: loc.t('clear') ?? 'Очистить',
+                tooltip: loc.t('clear'),
                 onPressed: canEdit && _reminderConfig.recurrenceEndDate != null
                     ? () => setState(() {
                           _reminderConfig =
@@ -1555,8 +1551,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             ),
             const SizedBox(height: 4),
             Text(
-              loc.t('checklist_reminder_multi_daily_hint') ??
-                  loc.t('checklist_reminder_shift_hint'),
+              loc.t('checklist_reminder_multi_daily_hint'),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
@@ -1669,7 +1664,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                       DropdownButtonFormField<ChecklistType>(
                         value: _type,
                         decoration: InputDecoration(
-                          labelText: loc.t('checklist_type') ?? 'Тип чеклиста',
+                          labelText: loc.t('checklist_type'),
                         ),
                         items: ChecklistType.values
                             .map((t) => DropdownMenuItem(
@@ -1704,9 +1699,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                     if (canEdit)
                       InputDecorator(
                         decoration: InputDecoration(
-                          labelText: lang == 'ru'
-                              ? 'Формат отметки'
-                              : 'Checklist item format',
+                          labelText: loc.t('checklist_item_format_label'),
                           border: const OutlineInputBorder(),
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 14),
@@ -1720,7 +1713,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                               materialTapTargetSize:
                                   MaterialTapTargetSize.shrinkWrap,
                               title: Text(
-                                  loc.t('checklist_action_numeric') ?? 'Цифра'),
+                                  loc.t('checklist_action_numeric')),
                               value: _actionHasNumeric,
                               onChanged: (v) {
                                 setState(() {
@@ -1754,9 +1747,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                       TextField(
                         controller: _dropdownOptionsController,
                         decoration: InputDecoration(
-                          labelText: loc.t('checklist_dropdown_options') ??
-                              'Варианты выбора (через запятую)',
-                          hintText: 'Вариант 1, Вариант 2, Вариант 3',
+                          labelText: loc.t('checklist_dropdown_options'),
+                          hintText: loc.t('checklist_dropdown_hint_example'),
                         ),
                         onChanged: (_) => scheduleSave(),
                       ),
@@ -1776,7 +1768,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                             borderRadius: BorderRadius.circular(4),
                             child: InputDecorator(
                               decoration: InputDecoration(
-                                labelText: loc.t('select_pf') ?? 'Выбрать ПФ',
+                                labelText: loc.t('select_pf'),
                                 suffixIcon: Icon(Icons.keyboard_arrow_down,
                                     color: Theme.of(context)
                                         .colorScheme
@@ -1798,10 +1790,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                                 decoration: InputDecoration(
                                   labelText: loc.t('add_item'),
                                   hintText: _type == ChecklistType.tasks
-                                      ? (loc.t('checklist_item_hint') ??
-                                          'Введите наименование')
-                                      : (loc.t('checklist_item_prep_hint') ??
-                                          'Введите своё или выберите ПФ'),
+                                      ? (loc.t('checklist_item_hint'))
+                                      : (loc.t('checklist_item_prep_hint')),
                                 ),
                                 onSubmitted: (_) {
                                   if (_type == ChecklistType.prep &&
@@ -1845,7 +1835,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                                   child: InputDecorator(
                                     decoration: InputDecoration(
                                       labelText:
-                                          loc.t('select_pf') ?? 'Выбрать ПФ',
+                                          loc.t('select_pf'),
                                       suffixIcon: Icon(
                                           Icons.keyboard_arrow_down,
                                           color: Theme.of(context)
@@ -1866,10 +1856,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                                 decoration: InputDecoration(
                                   labelText: loc.t('add_item'),
                                   hintText: _type == ChecklistType.tasks
-                                      ? (loc.t('checklist_item_hint') ??
-                                          'Введите наименование')
-                                      : (loc.t('checklist_item_prep_hint') ??
-                                          'Введите своё или выберите ПФ'),
+                                      ? (loc.t('checklist_item_hint'))
+                                      : (loc.t('checklist_item_prep_hint')),
                                 ),
                                 onSubmitted: (_) {
                                   if (_type == ChecklistType.prep &&
@@ -1941,7 +1929,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               if (it.techCardId != null)
-                                Text(loc.t('ttk_pf') ?? 'ТТК ПФ',
+                                Text(loc.t('ttk_pf'),
                                     style:
                                         Theme.of(context).textTheme.labelSmall),
                               if (localizedQuantityLabel != null)
@@ -1990,8 +1978,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Text(
-                                      loc.t('checklist_add_quantity') ??
-                                          '+ кол-во',
+                                      loc.t('checklist_add_quantity'),
                                       style: Theme.of(context)
                                           .textTheme
                                           .labelSmall

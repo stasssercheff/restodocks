@@ -127,6 +127,14 @@ class Employee extends Equatable {
   @JsonKey(name: 'preferred_currency')
   final String? preferredCurrency; // 'RUB', 'USD', 'VND', 'EUR', etc.
 
+  /// Светлая/тёмная тема UI (синхронизация между устройствами). null — ещё не задано на сервере.
+  @JsonKey(name: 'ui_theme')
+  final String? uiTheme;
+
+  /// «Интерфейс как у владельца» (синхронизация между устройствами).
+  @JsonKey(name: 'ui_view_as_owner')
+  final bool? uiViewAsOwner;
+
   /// Показывали ли уже сотруднику окно «Начало работы».
   /// Храним на сервере, чтобы не зависеть от localStorage/деплоев.
   @JsonKey(name: 'getting_started_shown', defaultValue: false)
@@ -200,6 +208,8 @@ class Employee extends Equatable {
     this.subscriptionPlan,
     this.preferredLanguage = 'ru',
     this.preferredCurrency,
+    this.uiTheme,
+    this.uiViewAsOwner,
     this.gettingStartedShown = false,
     this.firstSessionAt,
     this.paymentType,
@@ -232,6 +242,8 @@ class Employee extends Equatable {
     String? avatarUrl,
     String? preferredLanguage,
     String? preferredCurrency,
+    String? uiTheme,
+    bool? uiViewAsOwner,
     bool? gettingStartedShown,
     DateTime? firstSessionAt,
     String? paymentType,
@@ -262,6 +274,8 @@ class Employee extends Equatable {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       preferredLanguage: preferredLanguage ?? this.preferredLanguage,
       preferredCurrency: preferredCurrency ?? this.preferredCurrency,
+      uiTheme: uiTheme ?? this.uiTheme,
+      uiViewAsOwner: uiViewAsOwner ?? this.uiViewAsOwner,
       gettingStartedShown: gettingStartedShown ?? this.gettingStartedShown,
       firstSessionAt: firstSessionAt ?? this.firstSessionAt,
       paymentType: paymentType ?? this.paymentType,

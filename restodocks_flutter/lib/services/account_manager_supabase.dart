@@ -12,6 +12,7 @@ import '../core/pending_co_owner_registration.dart';
 import '../core/public_app_origin.dart';
 import '../models/models.dart';
 import '../utils/dev_log.dart';
+import 'account_ui_sync_service.dart';
 import 'establishment_data_warmup_service.dart';
 import 'tech_card_translation_cache.dart';
 import 'offline_cache_service.dart';
@@ -172,8 +173,10 @@ class AccountManagerSupabase extends ChangeNotifier {
     }
   }
 
-  /// Проверка доступа заведения (промо/отключение/срок) и актуализация Pro с сервера.
-  /// При `expired` (истёк или отключён промокод) — [logout].
+  /// Синхронизация тарифа заведения (промокод = Pro-функции; вход в приложение на free не отменяется).
+  /// Раньше RPC возвращал `expired` → [logout] (ошибочно блокировал весь аккаунт). Миграция
+  /// check_establishment_access_promo_expires_to_free: истёкший промо → free, `ok`.
+  /// [logout] при `expired` — только для старой БД до миграции.
   /// Вызывать после входа, при возврате приложения на передний план и после применения промокода.
   Future<void> syncEstablishmentAccessFromServer() async {
     final estId = _establishment?.id;
@@ -1287,6 +1290,10 @@ class AccountManagerSupabase extends ChangeNotifier {
     await syncEstablishmentAccessFromServer();
     if (!isLoggedInSync) {
       return;
+    }
+    final empUi = _currentEmployee;
+    if (empUi != null) {
+      unawaited(AccountUiSyncService.instance.applyAfterLogin(empUi));
     }
     notifyListeners();
   }

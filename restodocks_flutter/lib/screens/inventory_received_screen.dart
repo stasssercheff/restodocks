@@ -1,6 +1,5 @@
 import 'package:excel/excel.dart' hide TextSpan;
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../utils/inventory_document_labels.dart';
@@ -13,7 +12,8 @@ class InventoryReceivedScreen extends StatefulWidget {
   const InventoryReceivedScreen({super.key});
 
   @override
-  State<InventoryReceivedScreen> createState() => _InventoryReceivedScreenState();
+  State<InventoryReceivedScreen> createState() =>
+      _InventoryReceivedScreenState();
 }
 
 class _InventoryReceivedScreenState extends State<InventoryReceivedScreen> {
@@ -37,7 +37,7 @@ class _InventoryReceivedScreenState extends State<InventoryReceivedScreen> {
     if (employee == null) {
       setState(() {
         _loading = false;
-        _error = 'Не авторизован';
+        _error = LocalizationService().t('error_not_logged_in');
       });
       return;
     }
@@ -78,7 +78,8 @@ class _InventoryReceivedScreenState extends State<InventoryReceivedScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            Text(_error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error)),
             const SizedBox(height: 16),
             FilledButton(onPressed: _load, child: Text(loc.t('back'))),
           ],
@@ -90,7 +91,8 @@ class _InventoryReceivedScreenState extends State<InventoryReceivedScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.inbox_outlined, size: 64, color: Theme.of(context).colorScheme.outline),
+            Icon(Icons.inbox_outlined,
+                size: 64, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
             Text(
               loc.t('inventory_received_empty'),
@@ -110,9 +112,27 @@ class _InventoryReceivedScreenState extends State<InventoryReceivedScreen> {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Row(
               children: [
-                Expanded(flex: 1, child: Text(loc.t('inbox_header_date') ?? 'Дата', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-                Expanded(flex: 2, child: Text(loc.t('inbox_header_section') ?? 'Цех', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
-                Expanded(flex: 2, child: Text(loc.t('inbox_header_employee') ?? 'Сотрудник', style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(
+                    flex: 1,
+                    child: Text(loc.t('inbox_header_date'),
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelMedium
+                            ?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(
+                    flex: 2,
+                    child: Text(loc.t('inbox_header_section'),
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelMedium
+                            ?.copyWith(fontWeight: FontWeight.bold))),
+                Expanded(
+                    flex: 2,
+                    child: Text(loc.t('inbox_header_employee'),
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelMedium
+                            ?.copyWith(fontWeight: FontWeight.bold))),
               ],
             ),
           ),
@@ -135,7 +155,8 @@ class _InventoryReceivedScreenState extends State<InventoryReceivedScreen> {
     );
   }
 
-  void _openDetail(BuildContext context, Map<String, dynamic> doc, LocalizationService loc) {
+  void _openDetail(
+      BuildContext context, Map<String, dynamic> doc, LocalizationService loc) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => _InventoryDocumentDetailScreen(doc: doc, loc: loc),
@@ -172,10 +193,22 @@ class _DocCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Expanded(flex: 1, child: Text(date, style: Theme.of(context).textTheme.bodyMedium)),
-                  Expanded(flex: 2, child: Text(establishmentName, style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
-                  Expanded(flex: 2, child: Text(employeeName, style: Theme.of(context).textTheme.bodyMedium, overflow: TextOverflow.ellipsis)),
-                  Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.outline),
+                  Expanded(
+                      flex: 1,
+                      child: Text(date,
+                          style: Theme.of(context).textTheme.bodyMedium)),
+                  Expanded(
+                      flex: 2,
+                      child: Text(establishmentName,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                          overflow: TextOverflow.ellipsis)),
+                  Expanded(
+                      flex: 2,
+                      child: Text(employeeName,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                          overflow: TextOverflow.ellipsis)),
+                  Icon(Icons.chevron_right,
+                      color: Theme.of(context).colorScheme.outline),
                 ],
               ),
               Padding(
@@ -194,7 +227,6 @@ class _DocCard extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _InventoryDocumentDetailScreen extends StatelessWidget {
@@ -241,7 +273,9 @@ class _InventoryDocumentDetailScreen extends StatelessWidget {
           DoubleCellValue(total),
         ];
         for (var c = 0; c < maxCols; c++) {
-          final q = c < quantities.length ? (quantities[c] as num?)?.toDouble() ?? 0.0 : 0.0;
+          final q = c < quantities.length
+              ? (quantities[c] as num?)?.toDouble() ?? 0.0
+              : 0.0;
           rowCells.add(DoubleCellValue(q));
         }
         sheet.appendRow(rowCells);
@@ -269,18 +303,22 @@ class _InventoryDocumentDetailScreen extends StatelessWidget {
 
       final out = excel.encode();
       if (out != null && out.isNotEmpty) {
-        final date = header['date'] ?? DateTime.now().toIso8601String().split('T').first;
+        final date =
+            header['date'] ?? DateTime.now().toIso8601String().split('T').first;
         await saveFileBytes('inventory_$date.xlsx', out);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл Excel сохранён')),
+            SnackBar(content: Text(loc.t('inventory_excel_downloaded'))),
           );
         }
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
+          SnackBar(
+            content:
+                Text(loc.t('error_generic', args: {'error': e.toString()})),
+          ),
         );
       }
     }
@@ -299,7 +337,7 @@ class _InventoryDocumentDetailScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.download),
-            tooltip: loc.t('download') ?? 'Скачать',
+            tooltip: loc.t('download'),
             onPressed: () => _download(context),
           ),
         ],
@@ -327,7 +365,8 @@ class _InventoryDocumentDetailScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _headerRow(loc.t('inventory_establishment'), header['establishmentName'] ?? '—'),
+        _headerRow(loc.t('inventory_establishment'),
+            header['establishmentName'] ?? '—'),
         _headerRow(loc.t('inventory_employee'), header['employeeName'] ?? '—'),
         _headerRow(loc.t('inventory_date'), header['date'] ?? '—'),
         _headerRow(loc.t('inventory_time_start'), header['timeStart'] ?? '—'),
@@ -368,7 +407,8 @@ class _InventoryDocumentDetailScreen extends StatelessWidget {
       },
       children: [
         TableRow(
-          decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest),
+          decoration:
+              BoxDecoration(color: theme.colorScheme.surfaceContainerHighest),
           children: [
             _cell(theme, '#', bold: true),
             _cell(theme, loc.t('inventory_item_name'), bold: true),
@@ -405,7 +445,10 @@ class _InventoryDocumentDetailScreen extends StatelessWidget {
 
   String _fmt(dynamic v) {
     if (v == null) return '—';
-    if (v is num) return v == v.truncateToDouble() ? v.toInt().toString() : v.toStringAsFixed(1);
+    if (v is num)
+      return v == v.truncateToDouble()
+          ? v.toInt().toString()
+          : v.toStringAsFixed(1);
     return v.toString();
   }
 }

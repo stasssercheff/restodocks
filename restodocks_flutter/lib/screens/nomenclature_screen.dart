@@ -461,9 +461,13 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       devLog('❌ NomenclatureScreen: _ensureLoaded error: $e');
       if (mounted) {
         setState(() => _loadError = e);
+        final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Ошибка загрузки номенклатуры: $e'),
+              content: Text(loc.t(
+                'nomenclature_load_error',
+                args: {'error': '$e'},
+              )),
               duration: const Duration(seconds: 6)),
         );
       }
@@ -532,10 +536,12 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         result.files.single.bytes == null) return;
 
     final acc = context.read<AccountManagerSupabase>();
+    final loc = context.read<LocalizationService>();
     final estId = acc.establishment?.id;
     if (estId == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Не найдено заведение')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('establishment_not_found'))),
+      );
       return;
     }
 
@@ -551,10 +557,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         if (mounted) {
           setState(() => _iikoUploading = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Не удалось распознать структуру бланка iiko. '
-                  'Убедитесь что файл содержит столбцы: код, наименование, остаток.'),
-              duration: Duration(seconds: 6),
+            SnackBar(
+              content: Text(loc.t('nomenclature_iiko_blank_unrecognized')),
+              duration: const Duration(seconds: 6),
             ),
           );
         }
@@ -599,7 +604,12 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         setState(() => _iikoUploading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Загружено ${parsed.products.length} позиций iiko'),
+            content: Text(
+              loc.t(
+                'nomenclature_iiko_loaded_count',
+                args: {'count': '${parsed.products.length}'},
+              ),
+            ),
             duration: const Duration(seconds: 5),
           ),
         );
@@ -607,8 +617,12 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _iikoUploading = false);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Ошибка: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(loc.t('product_upload_error_generic',
+                args: {'error': '$e'})),
+          ),
+        );
       }
     }
   }
@@ -974,8 +988,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (productItems.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(loc.t('duplicates_need_more') ??
-                'Нужно минимум 2 продукта для поиска дубликатов')),
+            content: Text(loc.t('duplicates_need_more'))),
       );
       return;
     }
@@ -990,9 +1003,9 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-              loc.t('duplicates_none') ?? 'Дубликатов не найдено'),
+              loc.t('duplicates_none')),
           action: SnackBarAction(
-            label: loc.t('duplicates_search_ai') ?? 'ИИ',
+            label: loc.t('duplicates_search_ai'),
             onPressed: () => _showDuplicatesWithAI(),
           ),
         ),
@@ -1011,8 +1024,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (productItems.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(loc.t('duplicates_need_more') ??
-                'Нужно минимум 2 продукта для поиска дубликатов')),
+            content: Text(loc.t('duplicates_need_more'))),
       );
       return;
     }
@@ -1040,8 +1052,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               ),
               const SizedBox(width: 16),
               Expanded(
-                  child: Text(loc.t('duplicates_ai_progress') ??
-                      'Поиск дубликатов (ИИ)…')),
+                  child: Text(loc.t('duplicates_ai_progress'))),
             ],
           ),
         ),
@@ -1075,7 +1086,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(
-                  loc.t('duplicates_none') ?? 'Дубликатов не найдено')),
+                  loc.t('duplicates_none'))),
         );
         return;
       }
@@ -1221,8 +1232,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                  content: Text(
-                      'Невозможно удалить: продукт используется в ТТК "${tc.dishName}"')),
+                  content: Text(loc.t('product_used_in_ttk_cannot_remove',
+                      args: {'dish': tc.dishName}))),
             );
           }
           return;
@@ -1302,7 +1313,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final base =
         hideCategory ? priceText : '${_categoryLabel(p.category)} · $priceText';
     if (branchOnly) {
-      final label = loc.t('branch_only_product_label') ?? 'доп от филиала';
+      final label = loc.t('branch_only_product_label');
       return '$base · $label';
     }
     return base;
@@ -1630,7 +1641,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               tooltip: loc.t('tooltip_show_duplicates'),
             ),
             PopupMenuButton<String>(
-              tooltip: loc.t('add') ?? 'Добавить',
+              tooltip: loc.t('add'),
               icon: const Icon(Icons.add),
               onSelected: (v) {
                 if (v == 'create') {
@@ -1652,7 +1663,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                         Icon(Icons.add_box_outlined, size: 20, color: accent),
                         const SizedBox(width: 10),
                         Text(
-                          loc.t('create_product') ?? 'Создать новый',
+                          loc.t('create_product'),
                           style: TextStyle(color: accent, fontWeight: FontWeight.w500),
                         ),
                       ],
@@ -1665,7 +1676,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                         Icon(Icons.upload_file, size: 20, color: accent),
                         const SizedBox(width: 10),
                         Text(
-                          loc.t('upload_products') ?? 'Загрузить продукты',
+                          loc.t('upload_products'),
                           style: TextStyle(color: accent, fontWeight: FontWeight.w500),
                         ),
                       ],
@@ -1726,7 +1737,12 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                           size: 16,
                           color: Theme.of(context).colorScheme.primary,
                         ),
-                        label: Text('Без $currencySymbol'),
+                        label: Text(
+                          loc.t(
+                            'nomenclature_filter_without_price',
+                            args: {'symbol': currencySymbol},
+                          ),
+                        ),
                         selected: _filterNoPrice,
                         showCheckmark: false,
                         onSelected: (v) => setState(() => _filterNoPrice = v),
@@ -1877,8 +1893,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 16),
                                 child: Text(
-                                  loc.t('nomenclature_new_empty') ??
-                                      'Нет продуктов без цены',
+                                  loc.t('nomenclature_new_empty'),
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodyMedium
@@ -1891,8 +1906,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                               )
                             else
                               Text(
-                                loc.t('nomenclature_new_hint') ??
-                                    'Укажите цену и единицу измерения',
+                                loc.t('nomenclature_new_hint'),
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall
@@ -2315,7 +2329,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       if (sheet == null) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Ошибка: не найдена таблица в файле')));
+            SnackBar(content: Text(loc.t('excel_no_sheet_in_file'))));
         return;
       }
 
@@ -2345,7 +2359,11 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка обработки Excel файла: $e')));
+          SnackBar(
+              content: Text(loc.t(
+                'excel_file_process_error',
+                args: {'error': '$e'},
+              ))));
     }
   }
 
@@ -2365,7 +2383,16 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         items.take(2).map((item) => '${item.name}: ${item.price}').join(', ');
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(
-          'Найдено строк: ${lines.length}, валидных: ${items.length}\nСтроки: $sampleLines\nЭлементы: $sampleItems'),
+        loc.t(
+          'nomenclature_parse_debug_snackbar',
+          args: {
+            'lines_count': '${lines.length}',
+            'valid_count': '${items.length}',
+            'sample_lines': sampleLines,
+            'sample_items': sampleItems,
+          },
+        ),
+      ),
       duration: const Duration(seconds: 8),
     ));
 
@@ -2457,7 +2484,12 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           } catch (e) {
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Ошибка сохранения: $e')),
+                SnackBar(
+                  content: Text(loc.t(
+                    'nomenclature_save_error',
+                    args: {'error': '$e'},
+                  )),
+                ),
               );
             }
             rethrow; // Чтобы диалог не закрывался при ошибке
@@ -2528,8 +2560,7 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
       if (kept.length != 1) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(loc.t('duplicates_merge_need_one_kept') ??
-                  'В каждой группе оставьте ровно один эталон.')),
+                  content: Text(loc.t('duplicates_merge_need_one_kept'))),
         );
         return;
       }
@@ -2538,8 +2569,7 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
       if (removed.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(loc.t('duplicates_merge_pick_per_group') ??
-                  'В каждой группе отметьте дубликаты для слияния.')),
+              content: Text(loc.t('duplicates_merge_pick_per_group'))),
         );
         return;
       }
@@ -2569,7 +2599,7 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AlertDialog(
-      title: Text(widget.loc.t('duplicates_title') ?? 'Поиск дубликатов'),
+      title: Text(widget.loc.t('duplicates_title')),
       content: SizedBox(
         width: 500,
         height: 400,
@@ -2577,15 +2607,13 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              widget.loc.t('duplicates_hint') ??
-                  'Найдены похожие названия. Выберите, какие удалить (останется один эталон).',
+              widget.loc.t('duplicates_hint'),
               style: theme.textTheme.bodySmall,
             ),
             if (widget.onMergeProducts != null) ...[
               const SizedBox(height: 8),
               Text(
-                widget.loc.t('duplicates_hint_merge') ??
-                    '«Объединить» переносит ссылки (ТТК, склад) на один продукт и удаляет дубликаты из справочника. «Снять с номенклатуры» — только убрать из списка заведения.',
+                widget.loc.t('duplicates_hint_merge'),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -2598,7 +2626,7 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
                 child: TextButton.icon(
                   onPressed: _saving ? null : widget.onRequestAi,
                   icon: const Icon(Icons.auto_awesome, size: 18),
-                  label: Text(widget.loc.t('duplicates_search_ai') ?? 'ИИ'),
+                  label: Text(widget.loc.t('duplicates_search_ai')),
                 ),
               ),
             ],
@@ -2616,8 +2644,8 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            widget.loc.t('duplicates_group') ??
-                                'Группа ${gi + 1}',
+                            widget.loc.t('duplicates_group_n',
+                                args: {'n': '${gi + 1}'}),
                             style: theme.textTheme.labelMedium
                                 ?.copyWith(color: theme.colorScheme.primary),
                           ),
@@ -2661,20 +2689,18 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
       actions: [
         TextButton(
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: Text(widget.loc.t('cancel') ?? 'Закрыть'),
+          child: Text(widget.loc.t('cancel')),
         ),
         TextButton(
           onPressed: _saving ? null : _selectAllExceptFirst,
-          child: Text(widget.loc.t('duplicates_remove_all') ??
-              'Удалить все кроме первого'),
+          child: Text(widget.loc.t('duplicates_remove_all')),
         ),
         if (widget.onMergeProducts != null) ...[
           OutlinedButton(
             onPressed: _saving || _selectedToRemove.isEmpty
                 ? null
                 : _applyRemoval,
-            child: Text(widget.loc.t('duplicates_nomenclature_only') ??
-                'Снять с номенклатуры'),
+            child: Text(widget.loc.t('duplicates_nomenclature_only')),
           ),
           FilledButton(
             onPressed: _saving || _selectedToRemove.isEmpty ? null : _applyMerge,
@@ -2683,8 +2709,7 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2))
-                : Text(widget.loc.t('duplicates_merge_catalog') ??
-                    'Объединить в справочнике'),
+                : Text(widget.loc.t('duplicates_merge_catalog')),
           ),
         ] else
           FilledButton(
@@ -2695,7 +2720,7 @@ class _DuplicatesDialogState extends State<_DuplicatesDialog> {
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2))
-                : Text(widget.loc.t('duplicates_apply') ?? 'Применить'),
+                : Text(widget.loc.t('duplicates_apply')),
           ),
       ],
     );
@@ -3103,8 +3128,7 @@ class _NomenclatureEmpty extends StatelessWidget {
             const SizedBox(height: 16),
             if (loadError != null) ...[
               Text(
-                loc.t('nomenclature_load_error') ??
-                    'Ошибка загрузки номенклатуры',
+                loc.t('nomenclature_load_error'),
                 style: theme.textTheme.titleMedium
                     ?.copyWith(color: theme.colorScheme.error),
                 textAlign: TextAlign.center,
@@ -3122,7 +3146,7 @@ class _NomenclatureEmpty extends StatelessWidget {
               FilledButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
-                label: Text(loc.t('retry') ?? 'Повторить'),
+                label: Text(loc.t('retry')),
               ),
             ] else ...[
               Text(
@@ -4132,8 +4156,7 @@ class _CatalogTab extends StatelessWidget {
       scaffold.showSnackBar(SnackBar(content: Text(msg)));
     } on DuplicateProductNameException {
       scaffold.showSnackBar(SnackBar(
-          content: Text(loc.t('product_name_duplicate') ??
-              'В номенклатуре не должно быть двух продуктов с одинаковым названием.')));
+          content: Text(loc.t('product_name_duplicate'))));
     } catch (e) {
       scaffold.showSnackBar(SnackBar(
           content: Text(
@@ -4325,7 +4348,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content:
-                  Text(widget.loc.t('ai_name_ok') ?? 'Название в порядке')),
+                  Text(widget.loc.t('ai_name_ok'))),
         );
       }
     } catch (_) {}
@@ -4421,8 +4444,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     } on DuplicateProductNameException {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(widget.loc.t('product_name_duplicate') ??
-                'В номенклатуре не должно быть двух продуктов с одинаковым названием.')));
+            content: Text(widget.loc.t('product_name_duplicate'))));
       }
     } catch (e) {
       if (mounted) {
@@ -4486,7 +4508,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                   controller: _gramsPerPieceController,
                   decoration: InputDecoration(
                     labelText:
-                        widget.loc.t('grams_per_piece_label') ?? 'Вес 1 шт, г',
+                        widget.loc.t('grams_per_piece_label'),
                     border: const OutlineInputBorder(),
                   ),
                   keyboardType:
@@ -4503,7 +4525,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(widget.loc.t('kbju_per_100g') ?? 'КБЖУ на 100 г',
+                        Text(widget.loc.t('kbju_per_100g'),
                             style: Theme.of(context).textTheme.titleSmall),
                         const SizedBox(height: 8),
                         Row(
@@ -4513,7 +4535,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                                 controller: _caloriesController,
                                 decoration: InputDecoration(
                                   labelText:
-                                      widget.loc.t('ttk_calories') ?? 'Калории',
+                                      widget.loc.t('ttk_calories'),
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -4528,7 +4550,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                                 controller: _proteinController,
                                 decoration: InputDecoration(
                                   labelText:
-                                      widget.loc.t('ttk_protein') ?? 'Белки',
+                                      widget.loc.t('ttk_protein'),
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -4542,7 +4564,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                               child: TextFormField(
                                 controller: _fatController,
                                 decoration: InputDecoration(
-                                  labelText: widget.loc.t('ttk_fat') ?? 'Жиры',
+                                  labelText: widget.loc.t('ttk_fat'),
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -4557,7 +4579,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                                 controller: _carbsController,
                                 decoration: InputDecoration(
                                   labelText:
-                                      widget.loc.t('ttk_carbs') ?? 'Углеводы',
+                                      widget.loc.t('ttk_carbs'),
                                   border: const OutlineInputBorder(),
                                   isDense: true,
                                 ),
@@ -4588,14 +4610,12 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                       segments: [
                         ButtonSegment(
                           value: false,
-                          label: Text(widget.loc.t('price_per_unit_label') ??
-                              'За кг / ед'),
+                          label: Text(widget.loc.t('price_per_unit_label')),
                           icon: const Icon(Icons.scale_outlined, size: 16),
                         ),
                         ButtonSegment(
                           value: true,
-                          label: Text(widget.loc.t('price_per_package_label') ??
-                              'За упаковку'),
+                          label: Text(widget.loc.t('price_per_package_label')),
                           icon:
                               const Icon(Icons.inventory_2_outlined, size: 16),
                         ),
@@ -4653,8 +4673,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                       child: TextFormField(
                         controller: _packagePriceController,
                         decoration: InputDecoration(
-                          labelText: widget.loc.t('package_price_label') ??
-                              'Цена упаковки',
+                          labelText: widget.loc.t('package_price_label'),
                           border: const OutlineInputBorder(),
                         ),
                         keyboardType: const TextInputType.numberWithOptions(
@@ -4667,8 +4686,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                       child: TextFormField(
                         controller: _packageWeightController,
                         decoration: InputDecoration(
-                          labelText: widget.loc.t('package_weight_label') ??
-                              'Вес упаковки, г',
+                          labelText: widget.loc.t('package_weight_label'),
                           border: const OutlineInputBorder(),
                         ),
                         keyboardType: const TextInputType.numberWithOptions(
@@ -4699,7 +4717,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      '${widget.loc.t('price_per_kg_computed') ?? 'Цена за кг'}: ${_computedPricePerKg!.toStringAsFixed(2)} $_currency',
+                      '${widget.loc.t('price_per_kg_computed')}: ${_computedPricePerKg!.toStringAsFixed(2)} $_currency',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.w600,
@@ -4710,7 +4728,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
               if (widget.establishmentId != null &&
                   widget.establishmentId!.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                Text(widget.loc.t('price_history') ?? 'История изменений цены',
+                Text(widget.loc.t('price_history'),
                     style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 8),
                 if (!_priceHistoryLoaded)
@@ -4720,7 +4738,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                           child: CircularProgressIndicator(strokeWidth: 2)))
                 else if (_priceHistory.isEmpty)
                   Text(
-                    widget.loc.t('price_history_empty') ?? 'Нет записей',
+                    widget.loc.t('price_history_empty'),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant),
                   )
@@ -4970,21 +4988,17 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Очистить всю номенклатуру?'),
-        content: const Text(
-          'Это действие удалит ВСЕ продукты из номенклатуры заведения.\n\n'
-          'Продукты можно будет добавить заново через загрузку.\n\n'
-          'Это действие нельзя отменить!',
-        ),
+        title: Text(loc.t('nomenclature_clear_all_dialog_title')),
+        content: Text(loc.t('nomenclature_clear_all_dialog_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Отмена'),
+            child: Text(loc.t('cancel')),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Удалить всё'),
+            child: Text(loc.t('delete_all_btn')),
           ),
         ],
       ),
@@ -4998,7 +5012,7 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
 
         if (estId == null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Не найдено заведение')),
+            SnackBar(content: Text(loc.t('establishment_not_found'))),
           );
           return;
         }
@@ -5008,8 +5022,7 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
           context: context,
           barrierDismissible: false,
           builder: (ctx) => LongOperationProgressDialog(
-            message:
-                loc.t('clear_nomenclature_progress') ?? 'Очищаем номенклатуру',
+            message: loc.t('clear_nomenclature_progress'),
             hint: null,
             productCount: count > 0 ? count : null,
           ),
@@ -5019,8 +5032,7 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
         await store.clearAllNomenclature(estId).timeout(
               const Duration(minutes: 2),
               onTimeout: () => throw TimeoutException(
-                loc.t('clear_nomenclature_timeout') ??
-                    'Операция заняла слишком много времени (2 мин). Обновите страницу — данные могли уже удалиться.',
+                loc.t('clear_nomenclature_timeout'),
               ),
             );
 
@@ -5031,8 +5043,8 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
 
         // Показываем успех
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Вся номенклатура очищена'),
+          SnackBar(
+            content: Text(loc.t('clear_nomenclature_done')),
             backgroundColor: Colors.green,
           ),
         );
@@ -5043,10 +5055,10 @@ class _NomenclatureSkeletonItem extends StatelessWidget {
         }
         final message = e is TimeoutException
             ? (e.message ?? loc.t('clear_nomenclature_timeout'))
-            : 'Ошибка очистки: $e';
+            : loc.t('nomenclature_clear_failed', args: {'error': '$e'});
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(message ?? 'Ошибка'),
+            content: Text(message),
             backgroundColor: Colors.red,
           ),
         );
@@ -5122,21 +5134,20 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
   }
 
   Future<void> _confirmDeleteAll(BuildContext context) async {
+    final loc = context.read<LocalizationService>();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Удалить все iiko-продукты?'),
-        content: const Text(
-          'Все загруженные iiko-продукты будут удалены из базы.\nЭто действие нельзя отменить.',
-        ),
+        title: Text(loc.t('nomenclature_delete_all_iiko_title')),
+        content: Text(loc.t('nomenclature_delete_all_iiko_body')),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Отмена')),
+              child: Text(loc.t('cancel'))),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Удалить'),
+            child: Text(loc.t('delete')),
           ),
         ],
       ),
@@ -5146,13 +5157,16 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
       await widget.store.deleteAll(widget.establishmentId);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('iiko-продукты удалены')),
+          SnackBar(content: Text(loc.t('nomenclature_iiko_products_deleted'))),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка: $e')),
+          SnackBar(
+            content: Text(loc.t('product_upload_error_generic',
+                args: {'error': '$e'})),
+          ),
         );
       }
     }
@@ -5161,6 +5175,7 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final loc = context.watch<LocalizationService>();
     final products = widget.store.products;
 
     if (widget.store.isLoading) {
@@ -5174,13 +5189,13 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
           children: [
             Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            Text('iiko-продукты не загружены',
+            Text(loc.t('nomenclature_iiko_empty_title'),
                 style: Theme.of(context)
                     .textTheme
                     .titleMedium
                     ?.copyWith(color: Colors.grey[600])),
             const SizedBox(height: 8),
-            Text('Загрузите инвентаризационный бланк iiko',
+            Text(loc.t('nomenclature_iiko_empty_subtitle'),
                 textAlign: TextAlign.center,
                 style: Theme.of(context)
                     .textTheme
@@ -5189,7 +5204,7 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
             const SizedBox(height: 24),
             FilledButton.icon(
               icon: const Icon(Icons.upload_file),
-              label: const Text('Загрузить бланк iiko'),
+              label: Text(loc.t('nomenclature_upload_iiko_blank_button')),
               onPressed: widget.onUpload,
             ),
           ],
@@ -5288,7 +5303,7 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
               ),
               IconButton(
                 icon: Icon(Icons.delete_sweep_outlined, color: Colors.red[400]),
-                tooltip: 'Удалить все',
+                tooltip: loc.t('nomenclature_delete_all_tooltip'),
                 onPressed: () => _confirmDeleteAll(context),
               ),
             ],
@@ -5300,7 +5315,11 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
           child: Align(
             alignment: Alignment.centerLeft,
-            child: Text('${products.length} позиций',
+            child: Text(
+                loc.t(
+                  'nomenclature_positions_count',
+                  args: {'count': '${products.length}'},
+                ),
                 style: TextStyle(fontSize: 11, color: Colors.grey[500])),
           ),
         ),
@@ -5553,6 +5572,7 @@ class _QtyColumnPickerDialogState extends State<_QtyColumnPickerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
     final cols = widget.maxCols;
 
@@ -5587,11 +5607,13 @@ class _QtyColumnPickerDialogState extends State<_QtyColumnPickerDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Укажи столбец остатка',
+                      Text(loc.t('nomenclature_qty_column_title'),
                           style: theme.textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w700)),
                       if (widget.sheetName.isNotEmpty)
-                        Text('Лист: ${widget.sheetName}',
+                        Text(
+                            loc.t('nomenclature_sheet_label',
+                                args: {'name': widget.sheetName}),
                             style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurface
                                     .withOpacity(0.55))),
@@ -5601,8 +5623,7 @@ class _QtyColumnPickerDialogState extends State<_QtyColumnPickerDialog> {
               ]),
               const SizedBox(height: 6),
               Text(
-                'Система не смогла автоматически определить столбец «Фактический остаток». '
-                'Нажми на нужный столбец в таблице ниже.',
+                loc.t('nomenclature_qty_column_help'),
                 style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurface.withOpacity(0.65)),
               ),
@@ -5677,14 +5698,14 @@ class _QtyColumnPickerDialogState extends State<_QtyColumnPickerDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(null),
-                    child: const Text('Отмена'),
+                    child: Text(loc.t('cancel')),
                   ),
                   const SizedBox(width: 8),
                   FilledButton(
                     onPressed: _selected == null
                         ? null
                         : () => Navigator.of(context).pop(_selected),
-                    child: const Text('Подтвердить'),
+                    child: Text(loc.t('confirm_btn')),
                   ),
                 ],
               ),

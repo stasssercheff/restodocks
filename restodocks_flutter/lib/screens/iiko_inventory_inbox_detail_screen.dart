@@ -44,10 +44,11 @@ class _IikoInventoryInboxDetailScreenState
   Future<void> _load() async {
     final doc = await InventoryDocumentService().getById(widget.documentId);
     if (!mounted) return;
+    final loc = context.read<LocalizationService>();
     setState(() {
       _doc = doc;
       _loading = false;
-      if (doc == null) _error = 'Документ не найден';
+      if (doc == null) _error = loc.t('document_not_found');
     });
     if (doc != null && mounted) {
       final estId = context.read<AccountManagerSupabase>().establishment?.id;
@@ -60,16 +61,17 @@ class _IikoInventoryInboxDetailScreenState
   Future<void> _saveToFile() async {
     final doc = _doc;
     if (doc == null) return;
+    final loc = context.read<LocalizationService>();
 
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
-    final header  = payload['header'] as Map<String, dynamic>? ?? {};
-    final rows    = (payload['rows'] as List<dynamic>? ?? [])
-        .cast<Map<String, dynamic>>();
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    final rows =
+        (payload['rows'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
 
     // Строим карту код → total (все строки с total > 0)
     final qtyByCode = <String, double>{};
     for (final r in rows) {
-      final code  = (r['code'] as String?)?.trim() ?? '';
+      final code = (r['code'] as String?)?.trim() ?? '';
       final total = (r['total'] as num?)?.toDouble() ?? 0.0;
       if (code.isNotEmpty && total > 0) qtyByCode[code] = total;
     }
@@ -77,7 +79,7 @@ class _IikoInventoryInboxDetailScreenState
     final iikoStore = context.read<IikoProductStore>();
     await iikoStore.restoreBlankFromStorage();
     final origBytes = iikoStore.originalBlankBytes;
-    final qtyCol    = iikoStore.originalQuantityColumnIndex ?? 5;
+    final qtyCol = iikoStore.originalQuantityColumnIndex ?? 5;
 
     final dateStr = header['date']?.toString() ?? '';
     final dateLabel = dateStr.isNotEmpty
@@ -90,29 +92,36 @@ class _IikoInventoryInboxDetailScreenState
     if (origBytes != null) {
       // Байтовый патч — сохраняет форматирование всех листов
       outBytes = IikoXlsxPatcher.patch(
-        origBytes:     origBytes,
+        origBytes: origBytes,
         defaultQtyCol: qtyCol,
-        sheetQtyCols:  iikoStore.sheetQtyColumns,
-        qtyByCode:     qtyByCode,
+        sheetQtyCols: iikoStore.sheetQtyColumns,
+        qtyByCode: qtyByCode,
       );
       fileName = header['fileName'] as String? ??
-          'Инвентаризация_iiko_$dateLabel.xlsx';
+          loc.t('inventory_iiko_export_filename', args: {'date': dateLabel});
     } else {
       outBytes = _buildFallback(rows, header);
-      fileName = 'Инвентаризация_iiko_$dateLabel.xlsx';
+      fileName =
+          loc.t('inventory_iiko_export_filename', args: {'date': dateLabel});
     }
 
     try {
       await saveFileBytes(fileName, outBytes);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Сохранено: $fileName')),
+          SnackBar(
+            content:
+                Text(loc.t('file_saved_snackbar', args: {'file': fileName})),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Ошибка скачивания: $e')),
+          SnackBar(
+            content: Text(loc
+                .t('inventory_download_error', args: {'error': e.toString()})),
+          ),
         );
       }
     }
@@ -123,14 +132,14 @@ class _IikoInventoryInboxDetailScreenState
       List<Map<String, dynamic>> rows, Map<String, dynamic> header) {
     final loc = context.read<LocalizationService>();
     final excel = Excel.createExcel();
-    final sheetName = loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko';
+    final sheetName = loc.t('iiko_inventory_title');
     final sheet = excel[sheetName];
 
     sheet.appendRow([
-      TextCellValue('Код'),
-      TextCellValue('Наименование'),
-      TextCellValue('Ед.изм.'),
-      TextCellValue('Остаток фактический'),
+      TextCellValue(loc.t('iiko_excel_col_code')),
+      TextCellValue(loc.t('iiko_excel_col_name')),
+      TextCellValue(loc.t('iiko_excel_col_unit')),
+      TextCellValue(loc.t('iiko_excel_col_actual_stock')),
     ]);
 
     for (final r in rows) {
@@ -160,19 +169,19 @@ class _IikoInventoryInboxDetailScreenState
     }
 
     if (_error != null || _doc == null) {
+      final locErr = context.watch<LocalizationService>();
       return Scaffold(
         appBar: AppBar(leading: appBarBackButton(context)),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(_error ?? 'Документ не найден',
-                  style: TextStyle(
-                      color: Theme.of(context).colorScheme.error)),
+              Text(_error ?? locErr.t('document_not_found'),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error)),
               const SizedBox(height: 16),
               FilledButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Назад')),
+                  child: Text(locErr.t('back'))),
             ],
           ),
         ),
@@ -180,9 +189,9 @@ class _IikoInventoryInboxDetailScreenState
     }
 
     final payload = _doc!['payload'] as Map<String, dynamic>? ?? {};
-    final header  = payload['header'] as Map<String, dynamic>? ?? {};
-    final allRows = (payload['rows'] as List<dynamic>? ?? [])
-        .cast<Map<String, dynamic>>();
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    final allRows =
+        (payload['rows'] as List<dynamic>? ?? []).cast<Map<String, dynamic>>();
 
     // Определяем листы
     final sheetNames = allRows
@@ -201,17 +210,18 @@ class _IikoInventoryInboxDetailScreenState
         ? allRows.where((r) => r['sheetName'] == activeSheet).toList()
         : allRows;
 
-    final filledCount = rows.where((r) => ((r['total'] as num?)?.toDouble() ?? 0.0) > 0).length;
+    final filledCount =
+        rows.where((r) => ((r['total'] as num?)?.toDouble() ?? 0.0) > 0).length;
 
     final loc = context.watch<LocalizationService>();
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko'),
+        title: Text(loc.t('iiko_inventory_title')),
         actions: [
           IconButton(
             icon: const Icon(Icons.download),
-            tooltip: 'Скачать xlsx',
+            tooltip: loc.t('download_xlsx_tooltip'),
             onPressed: _saveToFile,
           ),
         ],
@@ -226,7 +236,8 @@ class _IikoInventoryInboxDetailScreenState
           ),
           // Метаданные объединения
           if ((payload['mergeMetadata'] as Map?)?['mergedBy'] != null)
-            _MergeMetadataPanel(meta: payload['mergeMetadata'] as Map<String, dynamic>),
+            _MergeMetadataPanel(
+                meta: payload['mergeMetadata'] as Map<String, dynamic>),
           // Вкладки листов (если > 1)
           if (hasSheets)
             _InboxSheetTabBar(
@@ -239,13 +250,12 @@ class _IikoInventoryInboxDetailScreenState
           // Строки — все, включая незаполненные
           Expanded(
             child: rows.isEmpty
-                ? const Center(
-                    child: Text('Нет позиций',
-                        style: TextStyle(color: Colors.grey)))
+                ? Center(
+                    child: Text(loc.t('inventory_no_positions'),
+                        style: const TextStyle(color: Colors.grey)))
                 : ListView.builder(
                     itemCount: rows.length,
-                    itemBuilder: (ctx, i) =>
-                        _TableRow(row: rows[i], index: i),
+                    itemBuilder: (ctx, i) => _TableRow(row: rows[i], index: i),
                   ),
           ),
         ],
@@ -284,16 +294,20 @@ class _InboxSheetTabBar extends StatelessWidget {
                 onTap: () => onSelect(name),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(
-                    color: isActive ? theme.colorScheme.primary : Colors.transparent,
+                    color: isActive
+                        ? theme.colorScheme.primary
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     name,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight:
+                          isActive ? FontWeight.w600 : FontWeight.normal,
                       color: isActive
                           ? theme.colorScheme.onPrimary
                           : theme.colorScheme.onSurface.withOpacity(0.7),
@@ -324,7 +338,8 @@ class _MergeMetadataPanel extends StatelessWidget {
     String mergedAtStr = mergedAtRaw;
     try {
       final dt = DateTime.parse(mergedAtRaw).toLocal();
-      mergedAtStr = '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      mergedAtStr =
+          '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
     } catch (_) {}
     final sources = (meta['sourceDocuments'] as List<dynamic>?) ?? [];
 
@@ -342,11 +357,13 @@ class _MergeMetadataPanel extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.merge_type, size: 18, color: theme.colorScheme.primary),
+              Icon(Icons.merge_type,
+                  size: 18, color: theme.colorScheme.primary),
               const SizedBox(width: 6),
               Text(
-                loc.t('inventory_merge_merged_by') ?? 'Объединено',
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                loc.t('inventory_merge_merged_by'),
+                style: theme.textTheme.titleSmall
+                    ?.copyWith(fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -355,21 +372,26 @@ class _MergeMetadataPanel extends StatelessWidget {
           if (sources.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              loc.t('inventory_merge_source_blanks') ?? 'Исходные бланки',
-              style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+              loc.t('inventory_merge_source_blanks'),
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(fontWeight: FontWeight.w600),
             ),
             ...sources.map<Widget>((s) {
-              final m = s is Map ? Map<String, dynamic>.from(s as Map) : <String, dynamic>{};
+              final m = s is Map
+                  ? Map<String, dynamic>.from(s as Map)
+                  : <String, dynamic>{};
               final emp = m['employeeName']?.toString() ?? '—';
               final createdRaw = m['createdAt']?.toString() ?? '';
               String createdStr = createdRaw;
               try {
                 final dt = DateTime.parse(createdRaw).toLocal();
-                createdStr = '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+                createdStr =
+                    '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
               } catch (_) {}
               return Padding(
                 padding: const EdgeInsets.only(top: 2),
-                child: Text('• $emp — $createdStr', style: theme.textTheme.bodySmall),
+                child: Text('• $emp — $createdStr',
+                    style: theme.textTheme.bodySmall),
               );
             }),
           ],
@@ -393,9 +415,12 @@ class _HeaderPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dateRaw  = header['date'] as String? ?? '';
+    final loc = context.watch<LocalizationService>();
+    final dateRaw = header['date'] as String? ?? '';
     DateTime? dt;
-    try { dt = DateTime.parse(dateRaw).toLocal(); } catch (_) {}
+    try {
+      dt = DateTime.parse(dateRaw).toLocal();
+    } catch (_) {}
     final dateStr = dt != null
         ? '${dt.day.toString().padLeft(2, '0')}.${dt.month.toString().padLeft(2, '0')}.${dt.year}'
         : dateRaw;
@@ -409,14 +434,25 @@ class _HeaderPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(header['establishmentName'] as String? ?? '—',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              style:
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
           const SizedBox(height: 2),
-          Text('Дата: $dateStr  •  Сотрудник: ${header['employeeName'] ?? '—'}',
-              style: TextStyle(fontSize: 12,
+          Text(
+              loc.t('iiko_inbox_subtitle', args: {
+                'date': dateStr,
+                'employee': header['employeeName']?.toString() ?? '—',
+              }),
+              style: TextStyle(
+                  fontSize: 12,
                   color: theme.colorScheme.onSurface.withOpacity(0.6))),
           const SizedBox(height: 2),
-          Text('Заполнено: $filledRows из $totalRows позиций',
-              style: TextStyle(fontSize: 12,
+          Text(
+              loc.t('iiko_inbox_filled_stats', args: {
+                'filled': '$filledRows',
+                'total': '$totalRows',
+              }),
+              style: TextStyle(
+                  fontSize: 12,
                   color: theme.colorScheme.primary,
                   fontWeight: FontWeight.w500)),
         ],
@@ -431,11 +467,13 @@ class _TableHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme  = Theme.of(context);
-    final bg     = theme.colorScheme.surfaceContainerHighest;
+    final theme = Theme.of(context);
+    final loc = context.watch<LocalizationService>();
+    final bg = theme.colorScheme.surfaceContainerHighest;
     final border = BorderSide(color: theme.dividerColor);
-    final style  = TextStyle(
-        fontSize: 11, fontWeight: FontWeight.w700,
+    final style = TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
         color: theme.colorScheme.onSurface);
 
     Widget hCell(String t, double w) => Container(
@@ -449,15 +487,15 @@ class _TableHeader extends StatelessWidget {
         );
 
     return Container(
-      decoration: BoxDecoration(
-          border: Border(left: border, top: border), color: bg),
+      decoration:
+          BoxDecoration(border: Border(left: border, top: border), color: bg),
       child: Row(
         children: [
-          hCell('Группа', 100),
-          hCell('Код',    58),
-          Expanded(child: hCell('Наименование', double.infinity)),
-          hCell('Ед.',    44),
-          hCell('Итого',  72),
+          hCell(loc.t('iiko_inbox_col_group'), 100),
+          hCell(loc.t('iiko_excel_col_code'), 58),
+          Expanded(child: hCell(loc.t('inventory_item_name'), double.infinity)),
+          hCell(loc.t('unit_short'), 44),
+          hCell(loc.t('inventory_total'), 72),
         ],
       ),
     );
@@ -473,13 +511,14 @@ class _TableRow extends StatelessWidget {
 
   String _fmt(double v) => v == v.roundToDouble()
       ? v.toInt().toString()
-      : v.toStringAsFixed(3)
+      : v
+          .toStringAsFixed(3)
           .replaceAll(RegExp(r'0+$'), '')
           .replaceAll(RegExp(r'\.$'), '');
 
   @override
   Widget build(BuildContext context) {
-    final theme  = Theme.of(context);
+    final theme = Theme.of(context);
     final border = BorderSide(color: theme.dividerColor);
 
     Widget cell(Widget child, {double? width, Color? bg}) => Container(
@@ -492,9 +531,9 @@ class _TableRow extends StatelessWidget {
           child: child,
         );
 
-    final name  = row['name']  as String? ?? '';
-    final code  = row['code']  as String? ?? '';
-    final unit  = row['unit']  as String? ?? '';
+    final name = row['name'] as String? ?? '';
+    final code = row['code'] as String? ?? '';
+    final unit = row['unit'] as String? ?? '';
     final group = row['groupName'] as String? ?? '';
     final total = (row['total'] as num?)?.toDouble() ?? 0.0;
     final isEmpty = total == 0;
@@ -524,7 +563,8 @@ class _TableRow extends StatelessWidget {
             ),
             cell(
               Text(code,
-                  style: TextStyle(fontSize: 11,
+                  style: TextStyle(
+                      fontSize: 11,
                       color: theme.colorScheme.onSurface.withOpacity(0.6)),
                   textAlign: TextAlign.center),
               width: 58,

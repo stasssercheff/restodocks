@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import '../utils/dev_log.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'cloud_draft_service.dart';
+
 /// Сервис для хранения черновиков инвентаризации и чек-листов в localStorage
 class DraftStorageService {
   static const String _inventoryKey = 'draft_inventory';
@@ -150,6 +152,44 @@ class DraftStorageService {
 
   static const String _techCardEditPrefix = 'draft_tech_card_edit_';
 
+  static DateTime? _parseDraftSavedAt(dynamic v) {
+    if (v is String) return DateTime.tryParse(v);
+    return null;
+  }
+
+  static Map<String, dynamic>? _pickNewerTechCardDraft(
+    Map<String, dynamic>? local,
+    Map<String, dynamic>? cloud,
+    DateTime? cloudUpdatedAt,
+  ) {
+    if (local == null) return cloud;
+    if (cloud == null) return local;
+    final tl = _parseDraftSavedAt(local['draftSavedAt']) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    final tc = _parseDraftSavedAt(cloud['draftSavedAt']) ??
+        cloudUpdatedAt ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    return !tl.isAfter(tc) ? cloud : local;
+  }
+
+  /// Черновик ТТК с данными для UI: не пустое название/технология или есть ингредиенты с названием.
+  static bool techCardDraftLooksNonEmpty(Map<String, dynamic>? d) {
+    if (d == null) return false;
+    final name = (d['name'] as String? ?? '').trim();
+    final tech = (d['technology'] as String? ?? '').trim();
+    if (name.isNotEmpty || tech.isNotEmpty) return true;
+    final rawIng = d['ingredients'];
+    if (rawIng is List) {
+      for (final e in rawIng) {
+        if (e is Map &&
+            ((e['productName'] as String?) ?? '').trim().isNotEmpty) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   Future<void> saveTechCardEditDraft(String techCardId, Map<String, dynamic> data) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -157,6 +197,21 @@ class DraftStorageService {
     } catch (e) {
       devLog('Failed to save tech card draft: $e');
     }
+  }
+
+  /// Локальный черновик + облако (`account_form_drafts`), более свежий по [draftSavedAt] / updated_at.
+  Future<Map<String, dynamic>?> loadTechCardEditDraftMerged(
+    String storageSuffix,
+    String cloudDraftKey,
+  ) async {
+    final local = await loadTechCardEditDraft(storageSuffix);
+    Map<String, dynamic>? cloud;
+    DateTime? cloudAt;
+    try {
+      cloud = await CloudDraftService.instance.fetchPayload(cloudDraftKey);
+      cloudAt = await CloudDraftService.instance.fetchUpdatedAt(cloudDraftKey);
+    } catch (_) {}
+    return _pickNewerTechCardDraft(local, cloud, cloudAt);
   }
 
   Future<Map<String, dynamic>?> loadTechCardEditDraft(String techCardId) async {
@@ -183,6 +238,14 @@ class DraftStorageService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('$_techCardEditPrefix$techCardId');
     } catch (_) {}
+  }
+
+  Future<void> clearTechCardEditDraftEverywhere(
+    String storageSuffix,
+    String cloudDraftKey,
+  ) async {
+    await clearTechCardEditDraft(storageSuffix);
+    await CloudDraftService.instance.deleteDraft(cloudDraftKey);
   }
 
   // ── Списания ──────────────────────────────────────────────────────────────────
