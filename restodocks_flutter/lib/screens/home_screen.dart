@@ -140,15 +140,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!forceReplay && await tourService.isPageTourSeen(employeeId, PageTourKeys.home)) return;
     if (!mounted) return;
 
-    // Тур собирает строки один раз: дождаться языка профиля (async setLocale из main не гарантирует порядок кадров).
+    // Локаль уже согласована в bootstrap (prefs + профиль); тур использует текущий [LocalizationService].
     final accountManager = context.read<AccountManagerSupabase>();
-    final locService = context.read<LocalizationService>();
-    final empPref = accountManager.currentEmployee?.preferredLanguage.trim().toLowerCase();
-    if (empPref != null &&
-        empPref.isNotEmpty &&
-        LocalizationService.isSupportedLanguageCode(empPref)) {
-      await locService.setLocale(Locale(empPref));
-    }
     if (!mounted) return;
     await Future<void>.delayed(Duration.zero);
     if (!mounted) return;

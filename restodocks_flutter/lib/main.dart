@@ -10,6 +10,7 @@ import 'core/url_strategy_stub.dart'
     if (dart.library.html) 'core/url_strategy_web.dart' as url_strategy;
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/auth_session_lifecycle.dart';
@@ -28,6 +29,37 @@ import 'services/fcm_push_service.dart';
 import 'services/services.dart';
 import 'services/translation_manager.dart';
 import 'widgets/widgets.dart';
+
+/// Ключ совпадает с [LocalizationService] (SharedPreferences).
+const _kLocalePrefKey = 'restodocks_locale';
+
+/// Язык из профиля Supabase не должен затирать выбор пользователя на этом устройстве.
+Future<void> _applyLocaleFromEmployeeProfile(String profileLang) async {
+  final loc = LocalizationService();
+  final prefs = await SharedPreferences.getInstance();
+  final saved = prefs.getString(_kLocalePrefKey);
+  final p = profileLang.trim().toLowerCase();
+  if (!LocalizationService.supportedLocales.any((l) => l.languageCode == p)) {
+    return;
+  }
+  if (saved != null && saved.isNotEmpty) {
+    if (saved != p) {
+      if (loc.currentLanguageCode != saved) {
+        await loc.setLocale(Locale(saved));
+      }
+      final acc = AccountManagerSupabase();
+      if (acc.currentEmployee != null) {
+        await acc.savePreferredLanguage(saved);
+      }
+      return;
+    }
+    if (loc.currentLanguageCode != p) {
+      await loc.setLocale(Locale(p));
+    }
+    return;
+  }
+  await loc.setLocale(Locale(p));
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -124,11 +156,10 @@ Future<void> _bootstrapApp() async {
       }
     }
   }
-  // Параллельно: раньше шли подряд и умножали время до первого кадра.
-  await Future.wait([
-    AccountManagerSupabase().initialize(),
-    LocalizationService.initialize(),
-  ]);
+  // Сначала переводы + сохранённая локаль (SharedPreferences), затем аккаунт.
+  // Иначе загрузка профиля вызывает onPreferredLanguageLoaded и затирает язык из prefs.
+  await LocalizationService.initialize();
+  await AccountManagerSupabase().initialize();
 
   // Оверлей переводов ТТК не сбрасываем при смене языка — слои по языкам копятся локально; догрузка — в onAfterLocaleChanged.
   LocalizationService.onAfterLocaleChanged = () async {
@@ -150,10 +181,9 @@ Future<void> _bootstrapApp() async {
     );
   };
 
-  // Подключаем callback: при загрузке профиля сотрудника применяем его preferred_language.
-  // Это обеспечивает сохранение языка между браузерами и режимом инкогнито (хранится в Supabase).
+  // При загрузке профиля: язык из БД + локальный выбор (prefs не затираем языком из БД).
   AccountManagerSupabase().onPreferredLanguageLoaded = (langCode) {
-    unawaited(LocalizationService().setLocale(Locale(langCode)));
+    unawaited(_applyLocaleFromEmployeeProfile(langCode));
   };
 
   // Только SharedPreferences / локальные prefs — безопасно грузить параллельно.
