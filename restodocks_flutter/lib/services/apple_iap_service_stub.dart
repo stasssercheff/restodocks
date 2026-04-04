@@ -2,20 +2,15 @@ import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
 import 'account_manager_supabase.dart';
-import 'supabase_service.dart';
 
 /// Web: без StoreKit; публичный API как у реализации для iOS.
 class AppleIapService extends ChangeNotifier {
   AppleIapService({
     required AccountManagerSupabase accountManager,
-    SupabaseService? supabase,
-  })  : _account = accountManager,
-        _supabase = supabase ?? SupabaseService();
+  }) : _account = accountManager;
 
   // ignore: unused_field
   final AccountManagerSupabase _account;
-  // ignore: unused_field
-  final SupabaseService _supabase;
 
   static bool get isIOSPlatform =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;

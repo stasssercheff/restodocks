@@ -7,18 +7,15 @@ import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
 import '../core/iap_constants.dart';
 import '../utils/dev_log.dart';
 import 'account_manager_supabase.dart';
-import 'supabase_service.dart';
+import 'edge_function_http.dart';
 
 /// In-App Purchase (iOS): подписка Pro → Edge `billing-verify-apple` → `establishments`.
 class AppleIapService extends ChangeNotifier {
   AppleIapService({
     required AccountManagerSupabase accountManager,
-    SupabaseService? supabase,
-  })  : _account = accountManager,
-        _supabase = supabase ?? SupabaseService();
+  }) : _account = accountManager;
 
   final AccountManagerSupabase _account;
-  final SupabaseService _supabase;
 
   static bool get isIOSPlatform =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
@@ -46,6 +43,33 @@ class AppleIapService extends ChangeNotifier {
   static bool _isStoreKit2Jws(String s) {
     if (s.isEmpty) return false;
     return s.startsWith('eyJ') && s.split('.').length == 3;
+  }
+
+  /// Legacy `verifyReceipt` нужен base64 app receipt. После покупки чек на диске может
+  /// обновиться с задержкой — несколько refresh с паузами.
+  Future<String?> _receiptForLegacyVerify(PurchaseDetails purchase) async {
+    final add =
+        _iap.getPlatformAddition<InAppPurchaseStoreKitPlatformAddition>();
+
+    const pauseMs = <int>[400, 500, 700, 1000, 1200, 1500];
+    for (var i = 0; i < pauseMs.length; i++) {
+      await Future<void>.delayed(Duration(milliseconds: pauseMs[i]));
+      try {
+        final v = await add.refreshPurchaseVerificationData();
+        final r = v?.serverVerificationData ?? v?.localVerificationData ?? '';
+        if (r.isNotEmpty && !_isStoreKit2Jws(r)) {
+          return r;
+        }
+      } catch (e, st) {
+        devLog('IAP refresh receipt attempt ${i + 1}: $e $st');
+      }
+    }
+
+    final fromPurchase = purchase.verificationData.serverVerificationData;
+    if (fromPurchase.isNotEmpty && !_isStoreKit2Jws(fromPurchase)) {
+      return fromPurchase;
+    }
+    return null;
   }
 
   Future<void> init() async {
@@ -123,14 +147,10 @@ class AppleIapService extends ChangeNotifier {
     }
 
     try {
-      var receiptData = purchase.verificationData.serverVerificationData;
-      if (receiptData.isEmpty || _isStoreKit2Jws(receiptData)) {
-        final add =
-            _iap.getPlatformAddition<InAppPurchaseStoreKitPlatformAddition>();
-        final v = await add.refreshPurchaseVerificationData();
-        receiptData = v?.serverVerificationData ?? v?.localVerificationData ?? '';
-      }
-      if (receiptData.isEmpty) {
+      // Не использовать `functions.invoke`: при 4xx SDK бросает [FunctionException],
+      // из-за этого ветка с разбором тела ответа не выполнялась.
+      final receiptData = await _receiptForLegacyVerify(purchase);
+      if (receiptData == null || receiptData.isEmpty) {
         _lastError = 'no_receipt';
         _busy = false;
         notifyListeners();
@@ -138,9 +158,9 @@ class AppleIapService extends ChangeNotifier {
         return;
       }
 
-      final res = await _supabase.client.functions.invoke(
+      final res = await postEdgeFunctionWithRetry(
         'billing-verify-apple',
-        body: {
+        {
           'establishment_id': est.id,
           'receipt_data': receiptData,
         },
@@ -148,10 +168,15 @@ class AppleIapService extends ChangeNotifier {
 
       if (res.status != 200) {
         devLog('IAP billing-verify-apple failed: ${res.status} ${res.data}');
-        final err = res.data is Map
-            ? (res.data as Map)['error']?.toString()
-            : 'HTTP ${res.status}';
-        _lastError = err ?? 'verify_failed';
+        final d = res.data;
+        if (d != null && d['error'] != null) {
+          final apple = d['status'];
+          _lastError = apple != null
+              ? '${d['error']}_apple_$apple'
+              : d['error'].toString();
+        } else {
+          _lastError = 'verify_failed_http_${res.status}';
+        }
         _busy = false;
         notifyListeners();
         await _iap.completePurchase(purchase);
