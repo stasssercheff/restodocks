@@ -1641,6 +1641,7 @@ class AccountManagerSupabase extends ChangeNotifier {
             'director_fio': establishment.directorFio,
             'director_position': establishment.directorPosition,
             'default_currency': establishment.defaultCurrency,
+            'support_access_enabled': establishment.supportAccessEnabled,
             'updated_at': establishment.updatedAt.toIso8601String(),
           })
           .eq('id', establishment.id)

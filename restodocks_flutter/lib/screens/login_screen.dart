@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'legal_document_screen.dart';
 import '../core/pending_owner_role.dart';
@@ -271,6 +272,33 @@ class _LoginScreenState extends State<LoginScreen> {
         style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 14)),
         label: Text(loc.t('legal_offer_and_privacy_button')),
+      ),
+      const SizedBox(height: 32),
+      Text(
+        loc.t('login_footer_contact'),
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+      ),
+      const SizedBox(height: 8),
+      Center(
+        child: InkWell(
+          onTap: () async {
+            final addr = loc.t('login_footer_email');
+            final uri = Uri(scheme: 'mailto', path: addr);
+            if (await canLaunchUrl(uri)) {
+              await launchUrl(uri);
+            }
+          },
+          child: Text(
+            loc.t('login_footer_email'),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.primary,
+              decoration: TextDecoration.underline,
+            ),
+          ),
+        ),
       ),
     ];
   }

@@ -33,6 +33,7 @@ Establishment _$EstablishmentFromJson(Map<String, dynamic> json) =>
           ? null
           : DateTime.parse(json['pro_paid_until'] as String),
       parentEstablishmentId: json['parent_establishment_id'] as String?,
+      supportAccessEnabled: json['support_access_enabled'] as bool? ?? false,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );
@@ -60,6 +61,7 @@ Map<String, dynamic> _$EstablishmentToJson(Establishment instance) =>
       'pro_trial_ends_at': instance.proTrialEndsAt?.toIso8601String(),
       'pro_paid_until': instance.proPaidUntil?.toIso8601String(),
       'parent_establishment_id': instance.parentEstablishmentId,
+      'support_access_enabled': instance.supportAccessEnabled,
       'created_at': instance.createdAt.toIso8601String(),
       'updated_at': instance.updatedAt.toIso8601String(),
     };

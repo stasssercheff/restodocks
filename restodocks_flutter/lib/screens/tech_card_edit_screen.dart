@@ -1452,6 +1452,36 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     return 'misc';
   }
 
+  bool get _hasImportVerificationContext {
+    if (widget.initialFromAi != null) return true;
+    final sig = widget.initialHeaderSignature?.trim();
+    if (sig != null && sig.isNotEmpty) return true;
+    final rows = widget.initialSourceRows;
+    return rows != null && rows.isNotEmpty;
+  }
+
+  Future<void> _maybeShowImportVerificationNotice() async {
+    if (!_hasImportVerificationContext) return;
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('ttk_import_verify_title')),
+        content: SingleChildScrollView(
+          child: Text(loc.t('ttk_import_verify_message')),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('dialog_ok')),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -1718,9 +1748,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             if (kIsWeb) {
               // На web jsonDecode/localStorage может блокировать UI на несколько секунд.
               // Не ждём восстановление, чтобы форма/инпуты успевали отрисоваться.
-              unawaited(restoreDraftNow());
+              unawaited(() async {
+                await restoreDraftNow();
+                if (mounted) await _maybeShowImportVerificationNotice();
+              }());
             } else {
               await restoreDraftNow();
+              if (mounted) await _maybeShowImportVerificationNotice();
             }
           }
         }

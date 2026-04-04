@@ -2163,6 +2163,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onChanged: (v) => screenPref.setShowHallSection(v),
                     ),
                   ),
+                  Consumer<AccountManagerSupabase>(
+                    builder: (context, account, _) {
+                      final est = account.establishment;
+                      if (est == null) return const SizedBox.shrink();
+                      return SwitchListTile(
+                        secondary: const Icon(Icons.support_agent_outlined),
+                        title:
+                            Text(localization.t('support_access_toggle_title')),
+                        subtitle:
+                            Text(localization.t('support_access_toggle_hint')),
+                        value: est.supportAccessEnabled,
+                        onChanged: (v) async {
+                          try {
+                            await account.updateEstablishment(
+                              est.copyWith(
+                                supportAccessEnabled: v,
+                                updatedAt: DateTime.now(),
+                              ),
+                            );
+                          } catch (_) {}
+                        },
+                      );
+                    },
+                  ),
                 ],
               ],
             ),

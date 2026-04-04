@@ -24,7 +24,7 @@ class _AdminScreenState extends State<AdminScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -48,6 +48,7 @@ class _AdminScreenState extends State<AdminScreen>
             Tab(icon: const Icon(Icons.confirmation_number_outlined), text: loc.t('admin_tab_promo_codes')),
             Tab(icon: const Icon(Icons.store_outlined), text: loc.t('admin_tab_establishments')),
             Tab(icon: const Icon(Icons.people_outline), text: loc.t('admin_tab_users')),
+            Tab(icon: const Icon(Icons.support_agent_outlined), text: loc.t('admin_tab_support')),
           ],
           labelStyle: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
         ),
@@ -59,6 +60,7 @@ class _AdminScreenState extends State<AdminScreen>
           _PromoCodesTab(supabase: _supabase),
           _EstablishmentsTab(supabase: _supabase),
           _UsersTab(supabase: _supabase),
+          _SupportTab(supabase: _supabase),
         ],
       ),
     );
@@ -1867,6 +1869,181 @@ class _UsersTabState extends State<_UsersTab> {
                         ),
         ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ПОДДЕРЖКА: по PIN заведения (при включённом доступе в настройках клиента)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SupportTab extends StatefulWidget {
+  const _SupportTab({required this.supabase});
+  final SupabaseClient supabase;
+
+  @override
+  State<_SupportTab> createState() => _SupportTabState();
+}
+
+class _SupportTabState extends State<_SupportTab> {
+  final _pinController = TextEditingController();
+  bool _loading = false;
+  String? _error;
+  Map<String, dynamic>? _payload;
+
+  @override
+  void dispose() {
+    _pinController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _lookup() async {
+    final loc = context.read<LocalizationService>();
+    final pin = _pinController.text.trim();
+    if (pin.isEmpty) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+      _payload = null;
+    });
+    try {
+      final raw = await widget.supabase
+          .rpc('support_lookup_establishment_by_pin', params: {'p_pin': pin});
+      if (!mounted) return;
+      if (raw == null) {
+        setState(() {
+          _error = loc.t('admin_support_error_not_found');
+          _loading = false;
+        });
+        return;
+      }
+      final map = Map<String, dynamic>.from(raw as Map);
+      final ok = map['ok'] == true;
+      if (!ok) {
+        final reason = map['reason']?.toString() ?? '';
+        String msg;
+        switch (reason) {
+          case 'forbidden':
+            msg = loc.t('admin_support_error_forbidden');
+            break;
+          case 'support_disabled':
+            msg = loc.t('admin_support_error_disabled');
+            break;
+          case 'not_found':
+            msg = loc.t('admin_support_error_not_found');
+            break;
+          case 'invalid_pin':
+            msg = loc.t('admin_support_error_invalid_pin');
+            break;
+          default:
+            msg = loc.t('error_generic', args: {'error': reason});
+        }
+        setState(() {
+          _error = msg;
+          _loading = false;
+        });
+        return;
+      }
+      setState(() {
+        _payload = map;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
+    final theme = Theme.of(context);
+    final est = _payload?['establishment'] as Map<String, dynamic>?;
+    final employees = _payload?['employees'];
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(loc.t('admin_support_intro'),
+            style: theme.textTheme.bodyMedium),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _pinController,
+          textCapitalization: TextCapitalization.characters,
+          decoration: InputDecoration(
+            labelText: loc.t('admin_support_pin_label'),
+            hintText: loc.t('admin_support_pin_hint'),
+            border: const OutlineInputBorder(),
+          ),
+          onSubmitted: (_) {
+            if (!_loading) _lookup();
+          },
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: _loading ? null : _lookup,
+          icon: _loading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.search, size: 20),
+          label: Text(loc.t('admin_support_lookup')),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: 16),
+          Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+        ],
+        if (est != null) ...[
+          const SizedBox(height: 24),
+          Text(loc.t('admin_support_result_title'),
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          _kv(loc, 'ID', est['id']?.toString() ?? '—'),
+          _kv(loc, loc.t('company_name'), est['name']?.toString() ?? '—'),
+          _kv(loc, loc.t('company_pin'), est['pin_code']?.toString() ?? '—'),
+          const SizedBox(height: 16),
+          Text(loc.t('admin_support_employees_title'),
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          if (employees is List && employees.isNotEmpty)
+            ...employees.map((e) {
+              final row = Map<String, dynamic>.from(e as Map);
+              final name = [
+                row['full_name'] as String? ?? '',
+                row['surname'] as String? ?? '',
+              ].where((s) => s.isNotEmpty).join(' ');
+              final em = row['email'] as String? ?? '';
+              return ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: Text(name.isEmpty ? '—' : name),
+                subtitle: Text(em.isEmpty ? '—' : em),
+              );
+            })
+          else
+            Text(loc.t('admin_support_no_employees'), style: theme.textTheme.bodySmall),
+        ],
+      ],
+    );
+  }
+
+  Widget _kv(LocalizationService loc, String k, String v) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 140,
+            child: Text(k, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+          ),
+          Expanded(child: Text(v, style: const TextStyle(fontSize: 13))),
+        ],
+      ),
     );
   }
 }

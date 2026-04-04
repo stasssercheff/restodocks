@@ -80,6 +80,10 @@ class Establishment extends Equatable {
   @JsonKey(name: 'parent_establishment_id')
   final String? parentEstablishmentId;
 
+  /// Владелец разрешил техподдержке находить заведение по PIN в админке.
+  @JsonKey(name: 'support_access_enabled', defaultValue: false)
+  final bool supportAccessEnabled;
+
   // Alias for subscriptionType for backward compatibility
   String? get subscriptionPlan => subscriptionType;
 
@@ -140,6 +144,7 @@ class Establishment extends Equatable {
     this.proTrialEndsAt,
     this.proPaidUntil,
     this.parentEstablishmentId,
+    this.supportAccessEnabled = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -167,6 +172,7 @@ class Establishment extends Equatable {
     DateTime? proTrialEndsAt,
     DateTime? proPaidUntil,
     String? parentEstablishmentId,
+    bool? supportAccessEnabled,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -192,6 +198,7 @@ class Establishment extends Equatable {
       proTrialEndsAt: proTrialEndsAt ?? this.proTrialEndsAt,
       proPaidUntil: proPaidUntil ?? this.proPaidUntil,
       parentEstablishmentId: parentEstablishmentId ?? this.parentEstablishmentId,
+      supportAccessEnabled: supportAccessEnabled ?? this.supportAccessEnabled,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -273,6 +280,7 @@ class Establishment extends Equatable {
     proTrialEndsAt,
     proPaidUntil,
     parentEstablishmentId,
+    supportAccessEnabled,
     createdAt,
     updatedAt,
   ];
@@ -298,6 +306,7 @@ class Establishment extends Equatable {
       phone: phone,
       email: email,
       defaultCurrency: defaultCurrency ?? 'RUB',
+      supportAccessEnabled: false,
       createdAt: now,
       updatedAt: now,
     );
