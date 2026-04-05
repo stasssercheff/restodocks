@@ -78,7 +78,9 @@ class AppleIapService extends ChangeNotifier {
       devLog('IAP retrieveReceiptData (after sync): $e $st');
     }
 
-    const pauseMs = <int>[400, 500, 700, 1000, 1200, 1500];
+    const pauseMs = <int>[
+      400, 500, 700, 1000, 1200, 1500, 1800, 2200, 2800,
+    ];
     for (var i = 0; i < pauseMs.length; i++) {
       await Future<void>.delayed(Duration(milliseconds: pauseMs[i]));
       try {
@@ -107,8 +109,11 @@ class AppleIapService extends ChangeNotifier {
   }
 
   /// Несколько попыток [refreshSession] — окно Apple может длиться долго, JWT успевает протухнуть.
-  Future<bool> _ensureSessionForPayment() async {
-    const delaysMs = <int>[0, 100, 250, 500];
+  /// [aggressive]: больше пауз — реже показываем пользователю ошибку сессии до/после оплаты.
+  Future<bool> _ensureSessionForPayment({bool aggressive = false}) async {
+    final delaysMs = aggressive
+        ? <int>[0, 120, 280, 500, 800, 1200, 1700, 2400, 3200]
+        : <int>[0, 100, 250, 500, 800, 1200];
     for (var i = 0; i < delaysMs.length; i++) {
       if (delaysMs[i] > 0) {
         await Future<void>.delayed(Duration(milliseconds: delaysMs[i]));
@@ -129,7 +134,10 @@ class AppleIapService extends ChangeNotifier {
     required String establishmentId,
     required String receiptData,
   }) async {
-    final ok = await _ensureSessionForPayment();
+    var ok = await _ensureSessionForPayment();
+    if (!ok) {
+      ok = await _ensureSessionForPayment(aggressive: true);
+    }
     if (!ok) {
       return (
         status: 401,
@@ -309,10 +317,22 @@ class AppleIapService extends ChangeNotifier {
         return;
       }
 
-      final res = await _postBillingVerifyApple(
+      var res = await _postBillingVerifyApple(
         establishmentId: est.id,
         receiptData: receiptData,
       );
+
+      if (res.status != 200 &&
+          (res.status == 401 || res.status == 403)) {
+        devLog(
+          'IAP billing-verify-apple ${res.status} → aggressive session + one retry',
+        );
+        await _ensureSessionForPayment(aggressive: true);
+        res = await _postBillingVerifyApple(
+          establishmentId: est.id,
+          receiptData: receiptData,
+        );
+      }
 
       if (res.status != 200) {
         devLog('IAP billing-verify-apple failed: ${res.status} ${res.data}');
@@ -391,10 +411,12 @@ class AppleIapService extends ChangeNotifier {
     notifyListeners();
     try {
       if (!await _ensureSessionForPayment()) {
-        _lastError = 'iap_session_unavailable_pre_store';
-        _busy = false;
-        notifyListeners();
-        return false;
+        if (!await _ensureSessionForPayment(aggressive: true)) {
+          _lastError = 'iap_session_unavailable_pre_store';
+          _busy = false;
+          notifyListeners();
+          return false;
+        }
       }
       final param = PurchaseParam(productDetails: _product!);
       await _iap.buyNonConsumable(purchaseParam: param);
