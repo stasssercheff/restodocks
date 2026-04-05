@@ -79,14 +79,17 @@ export async function DELETE(
   if (!id) return NextResponse.json({ error: 'Establishment ID required' }, { status: 400 })
 
   try {
-    const { error } = await supabase.rpc('_delete_establishment_cascade', { p_establishment_id: id })
+    const { error } = await supabase.rpc('admin_delete_establishment', { p_establishment_id: id })
     if (error) {
-      const msg =
-        typeof (error as { message?: string }).message === 'string'
-          ? (error as { message: string }).message
-          : String(error)
+      const err = error as {
+        message?: string
+        details?: string
+        hint?: string
+        code?: string
+      }
+      const msg = [err.message, err.details, err.hint].filter(Boolean).join(' — ') || String(error)
       console.error('Admin delete establishment error:', error)
-      return NextResponse.json({ error: msg }, { status: 500 })
+      return NextResponse.json({ error: msg, code: err.code }, { status: 500 })
     }
     return NextResponse.json({ ok: true })
   } catch (e) {
