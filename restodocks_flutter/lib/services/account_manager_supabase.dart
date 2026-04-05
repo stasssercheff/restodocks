@@ -48,6 +48,10 @@ class AccountManagerSupabase extends ChangeNotifier {
   final SecureStorageService _secureStorage = SecureStorageService();
   final OfflineCacheService _offlineCache = OfflineCacheService();
   final RealtimeSyncService _realtimeSync = RealtimeSyncService();
+
+  /// Список сотрудников заведения в памяти (мобильный клиент): меньше повторных SELECT по экранам.
+  final Map<String, ({DateTime at, List<Employee> list})> _employeesListCache = {};
+  static const _employeesCacheTtl = Duration(minutes: 20);
   Establishment? _establishment;
   Employee? _currentEmployee;
   bool _initialized = false;
@@ -1313,6 +1317,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       await TechCardTranslationCache.clearForEstablishment(est.dataEstablishmentId);
     }
     EstablishmentDataWarmupService.instance.resetSession();
+    _employeesListCache.clear();
     await _realtimeSync.stop();
     await _offlineCache.clearCurrentUserCache();
     await _supabase.signOut();
@@ -1343,17 +1348,30 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// Получить всех сотрудников компании
   Future<List<Employee>> getEmployeesForEstablishment(
       String establishmentId) async {
+    final hit = _employeesListCache[establishmentId];
+    if (hit != null &&
+        DateTime.now().difference(hit.at) <= _employeesCacheTtl) {
+      return List<Employee>.from(hit.list);
+    }
     try {
       final data = await _supabase.client
           .from('employees')
           .select()
           .eq('establishment_id', establishmentId);
 
-      return (data as List).map((json) => Employee.fromJson(json)).toList();
+      final list =
+          (data as List).map((json) => Employee.fromJson(json)).toList();
+      _employeesListCache[establishmentId] = (at: DateTime.now(), list: list);
+      return list;
     } catch (e) {
       devLog('Ошибка получения сотрудников: $e');
       return [];
     }
+  }
+
+  /// Прогрев кэша сотрудников после входа (мобильный общий сценарий).
+  Future<void> warmEmployeesCache(String establishmentId) async {
+    await getEmployeesForEstablishment(establishmentId);
   }
 
   /// Шеф-повара/су-шеф/владельцы заведения (для инвентаризации: кабинет + email).
@@ -1439,6 +1457,8 @@ class AccountManagerSupabase extends ChangeNotifier {
           if (attempt == 5) rethrow;
         }
       }
+
+      _employeesListCache.remove(employee.establishmentId);
 
       if (_currentEmployee?.id == employee.id) {
         _currentEmployee = employee;

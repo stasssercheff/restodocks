@@ -158,6 +158,7 @@ Future<void> _bootstrapApp() async {
         supabase: SupabaseService(),
       ),
       localization: loc,
+      establishment: acc.establishment,
     );
   };
 

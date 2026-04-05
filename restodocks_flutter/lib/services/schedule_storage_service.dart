@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/schedule_model.dart';
@@ -9,12 +10,15 @@ import 'supabase_service.dart';
 const _keyPrefix = 'restodocks_schedule_';
 const _table = 'establishment_schedule_data';
 
-/// Загружает график: приоритет Supabase, fallback SharedPreferences с миграцией в Supabase.
-Future<ScheduleModel> loadSchedule(String establishmentId) async {
+Future<void> _persistScheduleLocal(
+    SharedPreferences prefs, String key, ScheduleModel model) async {
+  await prefs.setString(key, jsonEncode(model.toJson()));
+}
+
+/// Фоновое выравнивание с Supabase после показа локального графика (мобильный клиент).
+Future<void> _syncScheduleFromSupabase(String establishmentId) async {
   final prefs = await SharedPreferences.getInstance();
   final key = '$_keyPrefix$establishmentId';
-
-  // 1. Пробуем Supabase
   try {
     final supabase = SupabaseService().client;
     final res = await supabase
@@ -23,16 +27,56 @@ Future<ScheduleModel> loadSchedule(String establishmentId) async {
         .eq('establishment_id', establishmentId)
         .maybeSingle();
     if (res != null && res['data'] != null) {
-      final json = res['data'] is Map ? Map<String, dynamic>.from(res['data'] as Map) : null;
+      final json = res['data'] is Map
+          ? Map<String, dynamic>.from(res['data'] as Map)
+          : null;
       if (json != null && json.isNotEmpty) {
-        return ScheduleModel.fromJson(json);
+        final model = ScheduleModel.fromJson(json);
+        await _persistScheduleLocal(prefs, key, model);
+      }
+    }
+  } catch (_) {}
+}
+
+/// Загружает график: на мобильных сначала локальная копия (мгновенно), затем фоновая подтяжка с сервера.
+/// На web — как раньше: приоритет Supabase, fallback SharedPreferences.
+Future<ScheduleModel> loadSchedule(String establishmentId) async {
+  final prefs = await SharedPreferences.getInstance();
+  final key = '$_keyPrefix$establishmentId';
+
+  if (!kIsWeb) {
+    final rawLocal = prefs.getString(key);
+    if (rawLocal != null && rawLocal.isNotEmpty) {
+      try {
+        final json = jsonDecode(rawLocal) as Map<String, dynamic>;
+        final model = ScheduleModel.fromJson(json);
+        unawaited(_syncScheduleFromSupabase(establishmentId));
+        return model;
+      } catch (_) {}
+    }
+  }
+
+  try {
+    final supabase = SupabaseService().client;
+    final res = await supabase
+        .from(_table)
+        .select('data')
+        .eq('establishment_id', establishmentId)
+        .maybeSingle();
+    if (res != null && res['data'] != null) {
+      final json = res['data'] is Map
+          ? Map<String, dynamic>.from(res['data'] as Map)
+          : null;
+      if (json != null && json.isNotEmpty) {
+        final model = ScheduleModel.fromJson(json);
+        await _persistScheduleLocal(prefs, key, model);
+        return model;
       }
     }
   } catch (_) {
     // Ошибка сети — fallback на локальные данные
   }
 
-  // 2. Fallback: SharedPreferences
   final raw = prefs.getString(key);
   if (raw == null || raw.isEmpty) {
     return _defaultSchedule();
@@ -40,7 +84,6 @@ Future<ScheduleModel> loadSchedule(String establishmentId) async {
   try {
     final json = jsonDecode(raw) as Map<String, dynamic>;
     final model = ScheduleModel.fromJson(json);
-    // Миграция: переносим в Supabase при первой загрузке (fire-and-forget)
     unawaited(_migrateToSupabase(establishmentId, json));
     return model;
   } catch (_) {
@@ -65,7 +108,10 @@ Future<bool> saveSchedule(String establishmentId, ScheduleModel model) async {
     if (existing != null) {
       await supabase
           .from(_table)
-          .update({'data': json, 'updated_at': DateTime.now().toUtc().toIso8601String()})
+          .update({
+            'data': json,
+            'updated_at': DateTime.now().toUtc().toIso8601String()
+          })
           .eq('establishment_id', establishmentId);
     } else {
       await supabase.from(_table).insert({
@@ -73,14 +119,15 @@ Future<bool> saveSchedule(String establishmentId, ScheduleModel model) async {
         'data': json,
       });
     }
-    await prefs.setString(key, jsonStr); // Локальный бэкап
+    await prefs.setString(key, jsonStr);
     return true;
   } catch (_) {
-    return prefs.setString(key, jsonStr); // Fallback при отсутствии сети
+    return prefs.setString(key, jsonStr);
   }
 }
 
-Future<void> _migrateToSupabase(String establishmentId, Map<String, dynamic> json) async {
+Future<void> _migrateToSupabase(
+    String establishmentId, Map<String, dynamic> json) async {
   try {
     await SupabaseService().client.from(_table).upsert(
       {

@@ -54,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
       productStore: context.read<ProductStoreSupabase>(),
       translationService: context.read<TranslationService>(),
       localization: context.read<LocalizationService>(),
+      establishment: est,
     ));
   }
 

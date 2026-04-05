@@ -1,12 +1,18 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 import '../models/models.dart';
 import '../utils/dev_log.dart';
+import 'account_manager_supabase.dart';
+import 'documentation_service_supabase.dart';
 import 'localization_service.dart';
 import 'product_store_supabase.dart';
+import 'schedule_storage_service.dart';
 import 'tech_card_service_supabase.dart';
 import 'tech_card_translation_cache.dart';
 import 'translation_service.dart';
 
-/// Фоновая подгрузка данных заведения после входа: ТТК, номенклатура/продукты, оверлей переводов названий ТТК.
+/// Фоновая подгрузка данных заведения после входа: ТТК, номенклатура/продукты, оверлей переводов,
+/// на мобильных — ещё документация, график, список сотрудников (кэш), филиальная номенклатура.
 class EstablishmentDataWarmupService {
   EstablishmentDataWarmupService._();
   static final EstablishmentDataWarmupService instance =
@@ -21,6 +27,7 @@ class EstablishmentDataWarmupService {
     required ProductStoreSupabase productStore,
     required TranslationService translationService,
     required LocalizationService localization,
+    Establishment? establishment,
   }) {
     _chain = _chain.then((_) => _runForEstablishmentBody(
           dataEstablishmentId: dataEstablishmentId,
@@ -28,6 +35,7 @@ class EstablishmentDataWarmupService {
           productStore: productStore,
           translationService: translationService,
           localization: localization,
+          establishment: establishment,
         ));
     return _chain;
   }
@@ -38,6 +46,7 @@ class EstablishmentDataWarmupService {
     required ProductStoreSupabase productStore,
     required TranslationService translationService,
     required LocalizationService localization,
+    Establishment? establishment,
   }) async {
     try {
       await TechCardTranslationCache.loadForEstablishment(dataEstablishmentId);
@@ -76,6 +85,29 @@ class EstablishmentDataWarmupService {
 
       await productStore.loadProducts().catchError((_) {});
       await productStore.loadNomenclature(dataEstablishmentId).catchError((_) {});
+
+      if (establishment != null &&
+          establishment.isBranch &&
+          establishment.parentEstablishmentId != null &&
+          establishment.parentEstablishmentId!.isNotEmpty) {
+        await productStore
+            .loadNomenclatureForBranch(
+              establishment.id,
+              establishment.dataEstablishmentId,
+            )
+            .catchError((_) {});
+      }
+
+      if (!kIsWeb && establishment != null) {
+        try {
+          await Future.wait([
+            DocumentationServiceSupabase()
+                .prefetchDocumentsCacheForMobile(establishment.id),
+            loadSchedule(establishment.id),
+            AccountManagerSupabase().warmEmployeesCache(establishment.id),
+          ]);
+        } catch (_) {}
+      }
     } catch (e, st) {
       devLog('EstablishmentDataWarmupService: $e $st');
     }

@@ -2,21 +2,48 @@ import 'package:flutter/foundation.dart';
 
 import '../models/models.dart';
 import '../utils/dev_log.dart';
+import 'offline_cache_service.dart';
 import 'supabase_service.dart';
 
 /// Сервис документации заведения.
 class DocumentationServiceSupabase {
-  static final DocumentationServiceSupabase _instance = DocumentationServiceSupabase._internal();
+  static final DocumentationServiceSupabase _instance =
+      DocumentationServiceSupabase._internal();
   factory DocumentationServiceSupabase() => _instance;
   DocumentationServiceSupabase._internal();
 
   final SupabaseService _supabase = SupabaseService();
+  final OfflineCacheService _offlineCache = OfflineCacheService();
+
+  static const _docsListDataset = 'establishment_documents_full';
+  static const _docBodyDataset = 'establishment_document_body';
+  static const _docsCacheTtl = Duration(minutes: 15);
 
   /// Документы, видимые текущему сотруднику (по visibility)
   Future<List<EstablishmentDocument>> getDocumentsForEmployee(
     String establishmentId,
     Employee employee,
   ) async {
+    if (!kIsWeb) {
+      final listKey = await _offlineCache.scopedKey(
+        dataset: _docsListDataset,
+        establishmentId: establishmentId,
+      );
+      final cached = await _offlineCache.readJsonList(listKey);
+      if (cached != null &&
+          cached.isNotEmpty &&
+          await _offlineCache.isKeyFresh(listKey, _docsCacheTtl)) {
+        final list = <EstablishmentDocument>[];
+        for (final m in cached) {
+          try {
+            final doc = EstablishmentDocument.fromJson(m);
+            if (_isVisibleToEmployee(doc, employee)) list.add(doc);
+          } catch (_) {}
+        }
+        return list;
+      }
+    }
+
     try {
       final data = await _supabase.client
           .from('establishment_documents')
@@ -24,15 +51,27 @@ class DocumentationServiceSupabase {
           .eq('establishment_id', establishmentId)
           .order('updated_at', ascending: false);
 
-      final list = <EstablishmentDocument>[];
+      final all = <EstablishmentDocument>[];
       for (final row in data) {
-        final doc = EstablishmentDocument.fromJson(Map<String, dynamic>.from(row));
-        if (_isVisibleToEmployee(doc, employee)) {
-          list.add(doc);
-        }
+        try {
+          all.add(
+            EstablishmentDocument.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ),
+          );
+        } catch (_) {}
+      }
+      if (!kIsWeb && all.isNotEmpty) {
+        await _writeDocumentsListCache(establishmentId, all);
+      }
+      final list = <EstablishmentDocument>[];
+      for (final doc in all) {
+        if (_isVisibleToEmployee(doc, employee)) list.add(doc);
       }
       if (kDebugMode) {
-        devLog('DocumentationService: loaded ${list.length} documents for $establishmentId');
+        devLog(
+          'DocumentationService: loaded ${list.length} documents for $establishmentId',
+        );
       }
       return list;
     } catch (e) {
@@ -41,13 +80,63 @@ class DocumentationServiceSupabase {
     }
   }
 
+  Future<void> _writeDocumentsListCache(
+    String establishmentId,
+    List<EstablishmentDocument> all,
+  ) async {
+    final listKey = await _offlineCache.scopedKey(
+      dataset: _docsListDataset,
+      establishmentId: establishmentId,
+    );
+    await _offlineCache.writeJsonList(
+      listKey,
+      all.map((e) => e.toJson()).toList(),
+    );
+    for (final d in all) {
+      final dk = await _offlineCache.scopedKey(
+        dataset: _docBodyDataset,
+        establishmentId: establishmentId,
+        suffix: d.id,
+      );
+      await _offlineCache.writeJsonMap(dk, d.toJson());
+    }
+  }
+
+  /// Полная подгрузка документов в локальный кэш после входа (iOS/Android).
+  Future<void> prefetchDocumentsCacheForMobile(String establishmentId) async {
+    if (kIsWeb) return;
+    try {
+      final data = await _supabase.client
+          .from('establishment_documents')
+          .select()
+          .eq('establishment_id', establishmentId)
+          .order('updated_at', ascending: false);
+      final all = <EstablishmentDocument>[];
+      for (final row in data) {
+        try {
+          all.add(
+            EstablishmentDocument.fromJson(
+              Map<String, dynamic>.from(row as Map),
+            ),
+          );
+        } catch (_) {}
+      }
+      if (all.isEmpty) return;
+      await _writeDocumentsListCache(establishmentId, all);
+    } catch (e, st) {
+      devLog('DocumentationService prefetch: $e $st');
+    }
+  }
+
   bool _isVisibleToEmployee(EstablishmentDocument doc, Employee employee) {
     switch (doc.visibilityType) {
       case DocumentVisibilityType.all:
         return true;
       case DocumentVisibilityType.department:
-        final dept = employee.department == 'dining_room' ? 'hall' : employee.department;
-        return doc.visibilityIds.contains(dept) || doc.visibilityIds.contains(employee.department);
+        final dept =
+            employee.department == 'dining_room' ? 'hall' : employee.department;
+        return doc.visibilityIds.contains(dept) ||
+            doc.visibilityIds.contains(employee.department);
       case DocumentVisibilityType.section:
         final section = employee.section ?? '';
         return section.isNotEmpty && doc.visibilityIds.contains(section);

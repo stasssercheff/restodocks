@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/dev_log.dart';
 
@@ -27,6 +28,7 @@ class TechCardServiceSupabase {
 
   /// v2: раньше shallow-лист перезаписывал этот кэш без ингредиентов — меняем префикс, чтобы сбросить битые снимки.
   static const _cacheDataset = 'tech_cards_v2';
+  static const _mobileTechCardsCacheTtl = Duration(minutes: 18);
 
   /// Кэш одной карточки; v2 — сброс после багов с «пустыми» снимками в offline/web.
   static const _detailDataset = 'tech_card_detail_v2';
@@ -166,9 +168,12 @@ class TechCardServiceSupabase {
     final cached = await _offlineCache.readJsonList(cacheKey);
     if (cached != null && cached.isNotEmpty) {
       final cachedCards = cached.map(TechCard.fromJson).toList();
-      // Обновим кэш в фоне полным вариантом (с tt_ingredients), чтобы прогреть detail-кэши.
-      unawaited(
-          _refreshTechCardsCache(establishmentId, includeIngredients: true));
+      final skipBgRefresh = !kIsWeb &&
+          await _offlineCache.isKeyFresh(cacheKey, _mobileTechCardsCacheTtl);
+      if (!skipBgRefresh) {
+        unawaited(
+            _refreshTechCardsCache(establishmentId, includeIngredients: true));
+      }
       return cachedCards;
     }
     return _fetchTechCardsFromServer(
