@@ -223,7 +223,9 @@ class _InventoryScreenState extends State<InventoryScreen>
   final TextEditingController _nameFilterCtrl = TextEditingController();
   final FocusNode _nameFilterFocusNode = FocusNode();
   Timer? _nameFilterDebounce;
-  String _nameFilter = '';
+  /// Фильтр по имени: уведомляет только блок таблицы, без setState всего экрана.
+  final ValueNotifier<String> _inventoryFilterNotifier =
+      ValueNotifier<String>('');
   bool _stateRestored = false; // Флаг: предотвращает двойное восстановление
   bool _isLoadingProducts =
       true; // Показывать "Загрузка продуктов..." пока не завершился initScreen
@@ -255,11 +257,11 @@ class _InventoryScreenState extends State<InventoryScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) => _initScreen());
     _nameFilterCtrl.addListener(() {
       _nameFilterDebounce?.cancel();
-      _nameFilterDebounce = Timer(const Duration(milliseconds: 120), () {
+      _nameFilterDebounce = Timer(const Duration(milliseconds: 200), () {
         if (!mounted) return;
         final t = _nameFilterCtrl.text;
-        if (_nameFilter == t) return;
-        setState(() => _nameFilter = t);
+        if (_inventoryFilterNotifier.value == t) return;
+        _inventoryFilterNotifier.value = t;
       });
     });
     _nameFilterFocusNode.addListener(() {
@@ -284,7 +286,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       'completed': _completed,
       'sortMode': _sortMode.name,
       'blockFilter': _blockFilter.name,
-      'nameFilter': _nameFilter,
+      'nameFilter': _inventoryFilterNotifier.value,
       'rows': _rows
           .map((row) => {
                 'productId': row.product?.id,
@@ -335,8 +337,9 @@ class _InventoryScreenState extends State<InventoryScreen>
         orElse: () => _InventoryBlockFilter.all,
       );
 
-      _nameFilter = data['nameFilter'] ?? '';
-      _nameFilterCtrl.text = _nameFilter;
+      final restoredFilter = data['nameFilter']?.toString() ?? '';
+      _inventoryFilterNotifier.value = restoredFilter;
+      _nameFilterCtrl.text = restoredFilter;
 
       // Восстановить строки (product/techCard будут подставлены в _loadNomenclature)
       final rowsData = data['rows'] as List<dynamic>? ?? [];
@@ -388,55 +391,33 @@ class _InventoryScreenState extends State<InventoryScreen>
     await _loadNomenclature(fillAllProducts: !_isSelectiveInventory);
   }
 
-  bool _matchesNameFilter(String name) {
-    if (_nameFilter.isEmpty) return true;
-    return name.toLowerCase().contains(_nameFilter.toLowerCase());
-  }
-
-  /// Индексы строк-продуктов и свободных (номенклатура + с чека), отсортированы и отфильтрованы.
-  List<int> get _productIndices {
-    final lang = context.read<LocalizationService>().currentLanguageCode;
-    var indices = List.generate(_rows.length, (i) => i)
-        .where((i) =>
-            !_rows[i].isPf && _matchesNameFilter(_rows[i].productName(lang)))
-        .toList();
-    if (_sortMode == _InventorySort.alphabetAsc) {
-      indices.sort((a, b) => _rows[a]
-          .productName(lang)
-          .toLowerCase()
-          .compareTo(_rows[b].productName(lang).toLowerCase()));
-    } else {
-      indices.sort((a, b) => _rows[b]
-          .productName(lang)
-          .toLowerCase()
-          .compareTo(_rows[a].productName(lang).toLowerCase()));
+  /// Индексы продуктов и ПФ за один проход по строкам (фильтр + сортировка).
+  ({List<int> product, List<int> pf}) _computeFilteredIndices(String lang) {
+    final q = _inventoryFilterNotifier.value.trim().toLowerCase();
+    final product = <int>[];
+    final pf = <int>[];
+    for (var i = 0; i < _rows.length; i++) {
+      final row = _rows[i];
+      final name = row.productName(lang);
+      if (q.isNotEmpty && !name.toLowerCase().contains(q)) continue;
+      if (row.isPf) {
+        pf.add(i);
+      } else {
+        product.add(i);
+      }
     }
-    return indices;
-  }
-
-  /// Индексы строк-ПФ (из ТТК), отсортированы и отфильтрованы.
-  List<int> get _pfIndices {
-    final lang = context.read<LocalizationService>().currentLanguageCode;
-    var indices = List.generate(_rows.length, (i) => i)
-        .where((i) =>
-            _rows[i].isPf && _matchesNameFilter(_rows[i].productName(lang)))
-        .toList();
-    if (_sortMode == _InventorySort.alphabetAsc) {
-      indices.sort((a, b) => _rows[a]
-          .productName(lang)
-          .toLowerCase()
-          .compareTo(_rows[b].productName(lang).toLowerCase()));
-    } else {
-      indices.sort((a, b) => _rows[b]
-          .productName(lang)
-          .toLowerCase()
-          .compareTo(_rows[a].productName(lang).toLowerCase()));
+    int cmp(int a, int b) {
+      final na = _rows[a].productName(lang).toLowerCase();
+      final nb = _rows[b].productName(lang).toLowerCase();
+      return _sortMode == _InventorySort.alphabetAsc
+          ? na.compareTo(nb)
+          : nb.compareTo(na);
     }
-    return indices;
-  }
 
-  /// Порядок отображения: сначала продукты, потом ПФ (для обратной совместимости с нумерацией в Excel).
-  List<int> get _displayOrder => [..._productIndices, ..._pfIndices];
+    product.sort(cmp);
+    pf.sort(cmp);
+    return (product: product, pf: pf);
+  }
 
   /// При открытии: если есть черновик — восстанавливаем без диалога.
   /// Порядок приоритетов: localStorage → Supabase → диалог.
@@ -905,6 +886,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
     _rowRepaintTicks.clear();
     _nameFilterDebounce?.cancel();
+    _inventoryFilterNotifier.dispose();
     _nameFilterCtrl.dispose();
     _nameFilterFocusNode.dispose();
     _serverAutoSaveTimer?.cancel(); // Отменить таймер автосохранения на сервер
@@ -2116,7 +2098,11 @@ class _InventoryScreenState extends State<InventoryScreen>
     // По ТЗ: всегда таблица с фиксированным левым столбцом (продукты, мера, итого)
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 300),
-      child: _buildTableWithFixedColumn(loc),
+      child: ValueListenableBuilder<String>(
+        valueListenable: _inventoryFilterNotifier,
+        builder: (context, _, __) =>
+            _buildTableWithFixedColumn(loc),
+      ),
     );
   }
 
@@ -2164,6 +2150,10 @@ class _InventoryScreenState extends State<InventoryScreen>
   Widget _buildTableWithFixedColumn(LocalizationService loc) {
     _syncRowRepaintNotifiers();
     final leftW = _leftWidth(context);
+    final lang = loc.currentLanguageCode;
+    final idx = _computeFilteredIndices(lang);
+    final productIndices = idx.product;
+    final pfIndices = idx.pf;
 
     return Column(
       children: [
@@ -2188,26 +2178,26 @@ class _InventoryScreenState extends State<InventoryScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (_blockFilter != _InventoryBlockFilter.pfOnly &&
-                    _productIndices.isNotEmpty) ...[
+                    productIndices.isNotEmpty) ...[
                   _buildSectionHeaderRow(
                       loc, loc.t('inventory_block_products'), leftW),
-                  ..._productIndices.asMap().entries.map((e) {
-                    final lastIdx = _pfIndices.isNotEmpty
-                        ? _pfIndices.last
-                        : _productIndices.last;
+                  ...productIndices.asMap().entries.map((e) {
+                    final lastIdx = pfIndices.isNotEmpty
+                        ? pfIndices.last
+                        : productIndices.last;
                     return _buildScrollableDataRow(loc, e.value, e.key + 1,
                         isLastRow: e.value == lastIdx);
                   }),
                 ],
                 if (_blockFilter != _InventoryBlockFilter.productsOnly &&
-                    _pfIndices.isNotEmpty) ...[
+                    pfIndices.isNotEmpty) ...[
                   _buildSectionHeaderRow(
                       loc, loc.t('inventory_block_pf'), leftW),
-                  ..._pfIndices.asMap().entries.map((e) {
-                    final lastIdx = _pfIndices.last;
+                  ...pfIndices.asMap().entries.map((e) {
+                    final lastIdx = pfIndices.last;
                     final rowNum = _blockFilter == _InventoryBlockFilter.pfOnly
                         ? e.key + 1
-                        : _productIndices.length + e.key + 1;
+                        : productIndices.length + e.key + 1;
                     return _buildScrollableDataRow(loc, e.value, rowNum,
                         isLastRow: e.value == lastIdx);
                   }),
@@ -3713,7 +3703,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   bool _isLoading = true;
   bool _completed = false;
   DateTime _date = DateTime.now();
-  String _nameFilter = '';
+  final ValueNotifier<String> _iikoFilterNotifier = ValueNotifier<String>('');
   Timer? _filterDebounce;
   String? _selectedSheet; // активный лист (null = первый/все)
   final TextEditingController _filterCtrl = TextEditingController();
@@ -3799,11 +3789,11 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     WidgetsBinding.instance.addObserver(this);
     _filterCtrl.addListener(() {
       _filterDebounce?.cancel();
-      _filterDebounce = Timer(const Duration(milliseconds: 120), () {
+      _filterDebounce = Timer(const Duration(milliseconds: 200), () {
         if (!mounted) return;
         final t = _filterCtrl.text;
-        if (_nameFilter == t) return;
-        setState(() => _nameFilter = t);
+        if (_iikoFilterNotifier.value == t) return;
+        _iikoFilterNotifier.value = t;
       });
     });
     _searchFocusNode.addListener(_syncKeyboardChrome);
@@ -3867,6 +3857,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _filterDebounce?.cancel();
+    _iikoFilterNotifier.dispose();
     _savedBadgeDebounce?.cancel();
     _keyboardChromeVisible.dispose();
     _lastSavedAtNotifier.dispose();
@@ -3946,8 +3937,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         return sn == activeSheet;
       }).toList();
     }
-    if (_nameFilter.isEmpty) return rows;
-    final q = _nameFilter.toLowerCase();
+    if (_iikoFilterNotifier.value.isEmpty) return rows;
+    final q = _iikoFilterNotifier.value.toLowerCase();
     return rows
         .where((r) =>
             r.product.displayName.toLowerCase().contains(q) ||
@@ -4692,7 +4683,6 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     final account = context.read<AccountManagerSupabase>();
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
-    final visibleRows = _filteredRows;
     final iikoStatusDateStr =
         '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}';
 
@@ -4866,35 +4856,47 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                     ),
                     // Список строк — тап/скролл внутри не закрывает клавиатуру (refocus).
                     // Задержка 100ms: поиск refocus быстрее при скролле; ячейка успевает получить фокус.
+                    // Фильтр обновляет только таблицу, без пересборки шапки/футера.
                     Expanded(
-                      child: visibleRows.isEmpty
-                          ? Center(child: Text(loc.t('inventory_no_positions')))
-                          : Listener(
-                              onPointerDown: (_) {
-                                final pf = FocusManager.instance.primaryFocus;
-                                final isOurInput = pf != null &&
-                                    (_iikoCellFocusNodes.contains(pf) ||
-                                        pf == _searchFocusNode);
-                                if (!isOurInput) return;
-                                final nodeToRestore = pf!;
-                                Future.delayed(
-                                    const Duration(milliseconds: 100), () {
-                                  if (!mounted) return;
-                                  final current =
-                                      FocusManager.instance.primaryFocus;
-                                  if (current != null &&
-                                      (_iikoCellFocusNodes.contains(current) ||
-                                          current == _searchFocusNode)) return;
-                                  nodeToRestore.requestFocus();
-                                });
-                              },
-                              child: _IikoInventoryTable(
-                                rows: visibleRows,
-                                completed: _completed,
-                                onQuantityChanged: _setQuantity,
-                                onFocusChange: _syncKeyboardChrome,
-                              ),
-                            ),
+                      child: ValueListenableBuilder<String>(
+                        valueListenable: _iikoFilterNotifier,
+                        builder: (context, _, __) {
+                          final visibleRows = _filteredRows;
+                          return visibleRows.isEmpty
+                              ? Center(
+                                  child: Text(loc.t('inventory_no_positions')))
+                              : Listener(
+                                  onPointerDown: (_) {
+                                    final pf =
+                                        FocusManager.instance.primaryFocus;
+                                    final isOurInput = pf != null &&
+                                        (_iikoCellFocusNodes.contains(pf) ||
+                                            pf == _searchFocusNode);
+                                    if (!isOurInput) return;
+                                    final nodeToRestore = pf!;
+                                    Future.delayed(
+                                        const Duration(milliseconds: 100), () {
+                                      if (!mounted) return;
+                                      final current =
+                                          FocusManager.instance.primaryFocus;
+                                      if (current != null &&
+                                          (_iikoCellFocusNodes
+                                                  .contains(current) ||
+                                              current == _searchFocusNode)) {
+                                        return;
+                                      }
+                                      nodeToRestore.requestFocus();
+                                    });
+                                  },
+                                  child: _IikoInventoryTable(
+                                    rows: visibleRows,
+                                    completed: _completed,
+                                    onQuantityChanged: _setQuantity,
+                                    onFocusChange: _syncKeyboardChrome,
+                                  ),
+                                );
+                        },
+                      ),
                     ),
                     ValueListenableBuilder<bool>(
                       valueListenable: _keyboardChromeVisible,
