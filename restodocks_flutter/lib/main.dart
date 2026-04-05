@@ -192,9 +192,8 @@ Future<void> _bootstrapApp() async {
     unawaited(AccountUiSyncService.instance.applyAfterLogin(syncedEmployee));
   }
 
-  // Холодный старт с сохранённой сессией: на iOS/Android сразу грузим каталог (не ждём Home).
-  // На web тот же прогрев даёт второй проход вместе с HomeScreen и конкурирует с первым кадром —
-  // оставляем один вызов из [HomeScreen] после кадра.
+  // Холодный старт с сохранённой сессией: на iOS/Android сразу тянем данные в кэш (не ждём Home).
+  // Web: один прогрев из [HomeScreen] после кадра (иначе дубль с этим блоком).
   if (!kIsWeb) {
     final accWarm = AccountManagerSupabase();
     if (accWarm.isLoggedInSync && accWarm.establishment != null) {
