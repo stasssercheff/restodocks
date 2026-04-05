@@ -99,6 +99,93 @@ class AppleIapService extends ChangeNotifier {
     return null;
   }
 
+  Map<String, dynamic>? _normalizeEdgeJson(dynamic data) {
+    if (data == null) return null;
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return null;
+  }
+
+  /// Несколько попыток [refreshSession] — окно Apple может длиться долго, JWT успевает протухнуть.
+  Future<bool> _ensureSessionForPayment() async {
+    const delaysMs = <int>[0, 100, 250, 500];
+    for (var i = 0; i < delaysMs.length; i++) {
+      if (delaysMs[i] > 0) {
+        await Future<void>.delayed(Duration(milliseconds: delaysMs[i]));
+      }
+      try {
+        await Supabase.instance.client.auth.refreshSession();
+      } catch (e, st) {
+        devLog('IAP ensureSession refresh $i: $e $st');
+      }
+      final t = Supabase.instance.client.auth.currentSession?.accessToken;
+      if (t != null && t.isNotEmpty) return true;
+    }
+    return false;
+  }
+
+  /// Сначала [functions.invoke] (тот же JWT, что у RPC), при не-2xx — [postEdgeFunctionWithRetry] с несколькими 401-retry.
+  Future<({int status, Map<String, dynamic>? data})> _postBillingVerifyApple({
+    required String establishmentId,
+    required String receiptData,
+  }) async {
+    final ok = await _ensureSessionForPayment();
+    if (!ok) {
+      return (
+        status: 401,
+        data: <String, dynamic>{'error': 'iap_session_unavailable'},
+      );
+    }
+
+    final body = <String, dynamic>{
+      'establishment_id': establishmentId,
+      'receipt_data': receiptData,
+    };
+
+    Future<({int status, Map<String, dynamic>? data})> invokeOnce() async {
+      try {
+        final res = await Supabase.instance.client.functions.invoke(
+          'billing-verify-apple',
+          body: body,
+        );
+        return (status: res.status, data: _normalizeEdgeJson(res.data));
+      } on FunctionException catch (e) {
+        return (status: e.status, data: _normalizeEdgeJson(e.details));
+      }
+    }
+
+    try {
+      var r = await invokeOnce();
+      if (r.status == 401 || r.status == 403) {
+        devLog('IAP billing invoke ${r.status} → refresh + retry');
+        try {
+          await Supabase.instance.client.auth.refreshSession();
+        } catch (_) {}
+        r = await invokeOnce();
+      }
+      if (r.status >= 200 && r.status < 300) {
+        return r;
+      }
+      devLog('IAP billing invoke HTTP ${r.status}, fallback Dio');
+      return await postEdgeFunctionWithRetry(
+        'billing-verify-apple',
+        body,
+        refreshSessionBeforeFirstPost: true,
+        retryOnceOn401AfterSessionRefresh: true,
+        max401RecoveryAttempts: 2,
+      );
+    } catch (e, st) {
+      devLog('IAP billing invoke exception → fallback Dio: $e $st');
+      return await postEdgeFunctionWithRetry(
+        'billing-verify-apple',
+        body,
+        refreshSessionBeforeFirstPost: true,
+        retryOnceOn401AfterSessionRefresh: true,
+        max401RecoveryAttempts: 2,
+      );
+    }
+  }
+
   Future<void> init() async {
     if (!isIOSPlatform) return;
     if (_ready) return;
@@ -205,8 +292,6 @@ class AppleIapService extends ChangeNotifier {
     }
 
     try {
-      // Не использовать `functions.invoke`: при 4xx SDK бросает [FunctionException],
-      // из-за этого ветка с разбором тела ответа не выполнялась.
       final receiptData = await _receiptForLegacyVerify(purchase);
       if (receiptData == null || receiptData.isEmpty) {
         try {
@@ -224,16 +309,9 @@ class AppleIapService extends ChangeNotifier {
         return;
       }
 
-      // Access token часто истекает во время диалога App Store; Edge getUser(JWT) → 401.
-      // Обновляем сессию до запроса и один повтор после 401 (см. edge_function_http).
-      final res = await postEdgeFunctionWithRetry(
-        'billing-verify-apple',
-        {
-          'establishment_id': est.id,
-          'receipt_data': receiptData,
-        },
-        refreshSessionBeforeFirstPost: true,
-        retryOnceOn401AfterSessionRefresh: true,
+      final res = await _postBillingVerifyApple(
+        establishmentId: est.id,
+        receiptData: receiptData,
       );
 
       if (res.status != 200) {
@@ -312,10 +390,11 @@ class AppleIapService extends ChangeNotifier {
     _lastError = null;
     notifyListeners();
     try {
-      try {
-        await Supabase.instance.client.auth.refreshSession();
-      } catch (e, st) {
-        devLog('IAP purchasePro refreshSession: $e $st');
+      if (!await _ensureSessionForPayment()) {
+        _lastError = 'iap_session_unavailable_pre_store';
+        _busy = false;
+        notifyListeners();
+        return false;
       }
       final param = PurchaseParam(productDetails: _product!);
       await _iap.buyNonConsumable(purchaseParam: param);

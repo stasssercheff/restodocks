@@ -33,8 +33,8 @@ Dio _buildEdgeDio({
 /// [refreshSessionBeforeFirstPost] — обновить access token перед первым запросом
 /// (важно для IAP и долгих сессий без возврата в приложение).
 ///
-/// [retryOnceOn401AfterSessionRefresh] — при 401 один раз вызвать [refreshSession]
-/// и повторить POST с новым JWT (типичный случай: истёк access_token во время оплаты).
+/// [retryOnceOn401AfterSessionRefresh] — при 401 вызывать [refreshSession] и повторить POST
+/// (до [max401RecoveryAttempts] раз — во время IAP окно Apple может «съесть» несколько минут).
 Future<({int status, Map<String, dynamic>? data})> postEdgeFunctionWithRetry(
   String functionPath,
   Map<String, dynamic> body, {
@@ -43,6 +43,7 @@ Future<({int status, Map<String, dynamic>? data})> postEdgeFunctionWithRetry(
   bool bearerAlwaysAnon = false,
   bool refreshSessionBeforeFirstPost = false,
   bool retryOnceOn401AfterSessionRefresh = false,
+  int max401RecoveryAttempts = 1,
 }) async {
   final url = '${supabase_url.getSupabaseBaseUrl()}/functions/v1/$functionPath';
   final anonKey = supabase_url.getSupabaseAnonKey().trim();
@@ -69,7 +70,7 @@ Future<({int status, Map<String, dynamic>? data})> postEdgeFunctionWithRetry(
   }
 
   ({int status, Map<String, dynamic>? data}) lastResult = (status: 0, data: null);
-  var retried401 = false;
+  var recovery401Count = 0;
 
   for (var attempt = 0; attempt < maxRetries; attempt++) {
     if (attempt > 0) {
@@ -108,10 +109,12 @@ Future<({int status, Map<String, dynamic>? data})> postEdgeFunctionWithRetry(
       }
       if (code == 401 &&
           retryOnceOn401AfterSessionRefresh &&
-          !retried401 &&
+          recovery401Count < max401RecoveryAttempts &&
           !bearerAlwaysAnon) {
-        retried401 = true;
-        devLog('EdgeFunction 401 → refreshSession + retry once: $functionPath');
+        recovery401Count++;
+        devLog(
+          'EdgeFunction 401 → refreshSession ($recovery401Count/$max401RecoveryAttempts): $functionPath',
+        );
         await tryRefresh();
         attempt--;
         continue;
@@ -129,10 +132,12 @@ Future<({int status, Map<String, dynamic>? data})> postEdgeFunctionWithRetry(
 
       if (status == 401 &&
           retryOnceOn401AfterSessionRefresh &&
-          !retried401 &&
+          recovery401Count < max401RecoveryAttempts &&
           !bearerAlwaysAnon) {
-        retried401 = true;
-        devLog('EdgeFunction 401 (Dio) → refreshSession + retry once: $functionPath');
+        recovery401Count++;
+        devLog(
+          'EdgeFunction 401 (Dio) → refreshSession ($recovery401Count/$max401RecoveryAttempts): $functionPath',
+        );
         await tryRefresh();
         attempt--;
         continue;
