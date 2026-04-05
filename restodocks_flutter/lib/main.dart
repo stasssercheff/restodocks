@@ -192,8 +192,7 @@ Future<void> _bootstrapApp() async {
     unawaited(AccountUiSyncService.instance.applyAfterLogin(syncedEmployee));
   }
 
-  // Холодный старт с сохранённой сессией: на iOS/Android сразу тянем данные в кэш (не ждём Home).
-  // Web: один прогрев из [HomeScreen] после кадра (иначе дубль с этим блоком).
+  // Натив: сразу полное локальное зеркало заведения (офлайн + быстрый UI). Web — см. [HomeScreen].
   if (!kIsWeb) {
     final accWarm = AccountManagerSupabase();
     if (accWarm.isLoggedInSync && accWarm.establishment != null) {

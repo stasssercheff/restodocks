@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:feature_spotlight/feature_spotlight.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -42,7 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  /// Фоновая подгрузка ТТК, номенклатуры и переводов названий ТТК после входа.
+  /// Web: синх после входа. Натив: полное зеркало стартует из [main] / login — без дубля здесь.
   void _warmupEstablishmentDataIfNeeded() {
     if (!mounted) return;
     final account = context.read<AccountManagerSupabase>();

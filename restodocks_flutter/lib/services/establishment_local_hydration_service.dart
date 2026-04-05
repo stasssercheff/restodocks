@@ -26,6 +26,9 @@ import 'tech_card_service_supabase.dart';
 
 /// Полная выгрузка данных заведения в локальные кэши (фоном) и периодическое обновление.
 /// Тяжёлый jsonEncode для SQLite — в отдельном isolate (не блокирует UI).
+///
+/// [runBackgroundDeltaSync] на мобильных реже перекачивает весь каталог (длинный TTL);
+/// чаще обновляются «лёгкие» сущности — сеть после офлайна не должна тянуть 100% данных каждый раз.
 class EstablishmentLocalHydrationService {
   EstablishmentLocalHydrationService._();
   static final EstablishmentLocalHydrationService instance =
@@ -349,7 +352,10 @@ class EstablishmentLocalHydrationService {
         dataset: _productsCacheDataset,
         establishmentId: 'global',
       );
-      if (!await _offlineCache.isKeyFresh(pk, const Duration(minutes: 25))) {
+      final productTtl = kIsWeb
+          ? const Duration(minutes: 25)
+          : const Duration(minutes: 120);
+      if (!await _offlineCache.isKeyFresh(pk, productTtl)) {
         await ps.loadProducts(force: true);
       }
 
@@ -358,7 +364,10 @@ class EstablishmentLocalHydrationService {
         establishmentId: dataId,
         suffix: 'main',
       );
-      if (!await _offlineCache.isKeyFresh(nk, const Duration(minutes: 15))) {
+      final nomTtl = kIsWeb
+          ? const Duration(minutes: 15)
+          : const Duration(minutes: 60);
+      if (!await _offlineCache.isKeyFresh(nk, nomTtl)) {
         await ps.loadNomenclatureForce(dataId);
       }
 

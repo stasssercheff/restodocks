@@ -13,7 +13,12 @@ import '../core/public_app_origin.dart';
 import '../models/models.dart';
 import '../utils/dev_log.dart';
 import 'account_ui_sync_service.dart';
+import 'ai_service_supabase.dart';
 import 'establishment_data_warmup_service.dart';
+import 'establishment_local_hydration_service.dart';
+import 'product_store_supabase.dart';
+import 'tech_card_service_supabase.dart';
+import 'translation_service.dart';
 import 'local_snapshot_store.dart';
 import 'tech_card_translation_cache.dart';
 import 'offline_cache_service.dart';
@@ -1298,6 +1303,27 @@ class AccountManagerSupabase extends ChangeNotifier {
       unawaited(AccountUiSyncService.instance.applyAfterLogin(empUi));
     }
     notifyListeners();
+
+    if (!kIsWeb && isLoggedInSync && _establishment != null) {
+      final est = _establishment!;
+      final dataId = est.dataEstablishmentId.trim();
+      if (dataId.isNotEmpty) {
+        EstablishmentLocalHydrationService.instance.ensurePeriodicSyncStarted();
+        unawaited(
+          EstablishmentDataWarmupService.instance.runForEstablishment(
+            dataEstablishmentId: dataId,
+            techCards: TechCardServiceSupabase(),
+            productStore: ProductStoreSupabase(),
+            translationService: TranslationService(
+              aiService: AiServiceSupabase(),
+              supabase: SupabaseService(),
+            ),
+            localization: LocalizationService(),
+            establishment: est,
+          ),
+        );
+      }
+    }
   }
 
   /// Загрузить сохранённые учётные данные (для автозаполнения формы входа)
