@@ -4,8 +4,10 @@
 // чтобы второй аккаунт Restodocks на том же Apple ID не «наследовал» оплату. Дальше — отдельные тарифы
 // (несколько заведений) и другие способы оплаты; клиент передаёт applicationUserName = establishment UUID при покупке.
 //
-// Опционально (staging): IAP_BILLING_TEST_ESTABLISHMENT_IDS=uuid1,uuid2
-// + IAP_BILLING_TEST_RESET_MINUTES=3 — после успешной оплаты через ~3 мин сброс Pro/привязки для повторных тестов.
+// Тестовый режим (Edge Secrets в проекте Supabase):
+//   IAP_BILLING_TEST_ESTABLISHMENT_IDS=uuid1,uuid2 — заведения, для которых после успешной верификации
+//   через ~IAP_BILLING_TEST_RESET_MINUTES минут сбрасываются subscription_type / привязка apple_iap_subscription_claims
+//   (удобно для повторных прогонов TestFlight). Нужны миграции: apple_iap_subscription_claims, iap_billing_test_state.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
@@ -57,7 +59,12 @@ async function verifyReceiptWithApple(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    return (await res.json()) as AppleVerifyReceiptResponse;
+    const text = await res.text();
+    try {
+      return JSON.parse(text) as AppleVerifyReceiptResponse;
+    } catch {
+      throw new Error(`Apple verifyReceipt non-JSON (${res.status}): ${text.slice(0, 200)}`);
+    }
   };
 
   // Стандарт Apple: сначала production; 21007 = чек из Sandbox (TestFlight/локальные тесты).
@@ -239,10 +246,15 @@ Deno.serve(async (req: Request) => {
   });
 
   try {
-    const body = (await req.json()) as {
-      establishment_id?: string;
-      receipt_data?: string;
-    };
+    let body: { establishment_id?: string; receipt_data?: string };
+    try {
+      body = (await req.json()) as { establishment_id?: string; receipt_data?: string };
+    } catch {
+      return new Response(JSON.stringify({ error: "Invalid or empty JSON body" }), {
+        status: 400,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
     const establishmentId = String(body.establishment_id ?? "").trim();
     const receiptData = String(body.receipt_data ?? "").trim();
     if (!establishmentId || !receiptData) {
@@ -320,7 +332,20 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const appleResp = await verifyReceiptWithApple(receiptData, appleSharedSecret);
+    let appleResp: AppleVerifyReceiptResponse;
+    try {
+      appleResp = await verifyReceiptWithApple(receiptData, appleSharedSecret);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("billing-verify-apple: Apple verifyReceipt failed", msg);
+      return new Response(
+        JSON.stringify({ error: "Apple verifyReceipt request failed", detail: msg }),
+        {
+          status: 502,
+          headers: { ...cors, "Content-Type": "application/json" },
+        },
+      );
+    }
     if (appleResp.status !== 0) {
       return new Response(JSON.stringify({ error: "Apple receipt validation failed", status: appleResp.status }), {
         status: 400,

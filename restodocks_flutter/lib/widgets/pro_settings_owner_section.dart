@@ -486,11 +486,9 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
         await iap.init();
         await widget.accountManager.syncEstablishmentAccessFromServer();
         if (!mounted) return;
-        if (!widget.accountManager.hasPaidProSubscription) {
-          await iap.trySyncProFromStoreReceipt();
-          await widget.accountManager.syncEstablishmentAccessFromServer();
-        }
-        if (!mounted) return;
+        // Не вызываем trySyncProFromStoreReceipt() здесь: это давало долгий спиннер и
+        // «тихо» активировало Pro до явного действия пользователя. Привязка подписки Apple
+        // к заведению — через кнопку «Восстановить покупки» (или после новой покупки).
         promo = await widget.accountManager.getEstablishmentPromoForOwner();
       } catch (e, st) {
         debugPrint('_showProPaymentHub preload: $e $st');
