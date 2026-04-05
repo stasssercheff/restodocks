@@ -21,6 +21,7 @@ import '../widgets/long_operation_progress_dialog.dart';
 import '../widgets/post_registration_trial_dialog.dart';
 import '../widgets/pro_settings_owner_section.dart';
 import '../widgets/sales_financials_management_tile.dart';
+import '../utils/establishment_currency_options.dart';
 
 const _adminEmails = <String>{'stasssercheff@gmail.com'};
 bool _isPlatformAdminEmail(String email) =>
@@ -69,49 +70,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) setState(() => _loadingEstablishments = false);
     }
   }
-
-  /// Основные валюты мира (как в Numbers/Excel)
-  static const List<Map<String, String>> _currencies = [
-    {'code': 'RUB', 'symbol': '₽', 'name': 'Российский рубль'},
-    {'code': 'USD', 'symbol': '\$', 'name': 'Доллар США'},
-    {'code': 'EUR', 'symbol': '€', 'name': 'Евро'},
-    {'code': 'GBP', 'symbol': '£', 'name': 'Фунт стерлингов'},
-    {'code': 'CHF', 'symbol': 'Fr', 'name': 'Швейцарский франк'},
-    {'code': 'JPY', 'symbol': '¥', 'name': 'Японская иена'},
-    {'code': 'CNY', 'symbol': '¥', 'name': 'Китайский юань'},
-    {'code': 'VND', 'symbol': '₫', 'name': 'Вьетнамский донг'},
-    {'code': 'KZT', 'symbol': '₸', 'name': 'Казахстанский тенге'},
-    {'code': 'UAH', 'symbol': '₴', 'name': 'Украинская гривна'},
-    {'code': 'BYN', 'symbol': 'Br', 'name': 'Белорусский рубль'},
-    {'code': 'PLN', 'symbol': 'zł', 'name': 'Польский злотый'},
-    {'code': 'CZK', 'symbol': 'Kč', 'name': 'Чешская крона'},
-    {'code': 'TRY', 'symbol': '₺', 'name': 'Турецкая лира'},
-    {'code': 'INR', 'symbol': '₹', 'name': 'Индийская рупия'},
-    {'code': 'BRL', 'symbol': 'R\$', 'name': 'Бразильский реал'},
-    {'code': 'MXN', 'symbol': '\$', 'name': 'Мексиканское песо'},
-    {'code': 'KRW', 'symbol': '₩', 'name': 'Южнокорейская вона'},
-    {'code': 'SGD', 'symbol': 'S\$', 'name': 'Сингапурский доллар'},
-    {'code': 'HKD', 'symbol': 'HK\$', 'name': 'Гонконгский доллар'},
-    {'code': 'THB', 'symbol': '฿', 'name': 'Тайский бат'},
-    {'code': 'CAD', 'symbol': 'C\$', 'name': 'Канадский доллар'},
-    {'code': 'AUD', 'symbol': 'A\$', 'name': 'Австралийский доллар'},
-    {'code': 'SEK', 'symbol': 'kr', 'name': 'Шведская крона'},
-    {'code': 'NOK', 'symbol': 'kr', 'name': 'Норвежская крона'},
-    {'code': 'DKK', 'symbol': 'kr', 'name': 'Датская крона'},
-    {'code': 'IDR', 'symbol': 'Rp', 'name': 'Индонезийская рупия'},
-    {'code': 'PHP', 'symbol': '₱', 'name': 'Филиппинское песо'},
-    {'code': 'MYR', 'symbol': 'RM', 'name': 'Малайзийский ринггит'},
-    {'code': 'AED', 'symbol': 'د.إ', 'name': 'Дирхам ОАЭ'},
-    {'code': 'SAR', 'symbol': '﷼', 'name': 'Саудовский риал'},
-    {'code': 'ILS', 'symbol': '₪', 'name': 'Израильский шекель'},
-    {'code': 'EGP', 'symbol': 'E£', 'name': 'Египетский фунт'},
-    {'code': 'ZAR', 'symbol': 'R', 'name': 'Южноафриканский рэнд'},
-    {'code': 'NGN', 'symbol': '₦', 'name': 'Нигерийская найра'},
-    {'code': 'GEL', 'symbol': '₾', 'name': 'Грузинский лари'},
-    {'code': 'AMD', 'symbol': '֏', 'name': 'Армянский драм'},
-    {'code': 'AZN', 'symbol': '₼', 'name': 'Азербайджанский манат'},
-    {'code': 'UZS', 'symbol': 'soʻm', 'name': 'Узбекский сум'},
-  ];
 
   String _homeButtonActionLabel(
       LocalizationService loc, HomeButtonAction action) {
@@ -1074,12 +1032,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _showCurrencyPicker(BuildContext context, LocalizationService loc) {
     final account = context.read<AccountManagerSupabase>();
+    final productStore = context.read<ProductStoreSupabase>();
     final establishment = account.establishment;
     if (establishment == null) return;
 
     final currentCode = establishment.defaultCurrency.toUpperCase();
     final customController = TextEditingController();
-    var useOther = !_currencies.any((c) => c['code'] == currentCode);
+    var useOther =
+        !EstablishmentCurrencyOptions.all.any((c) => c['code'] == currentCode);
     if (useOther) customController.text = currentCode;
 
     showDialog<void>(
@@ -1143,7 +1103,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Flexible(
                           child: ListView(
                             shrinkWrap: true,
-                            children: _currencies.map((c) {
+                            children: EstablishmentCurrencyOptions.all.map((c) {
                               final code = c['code']!;
                               final symbol = c['symbol']!;
                               final name = c['name']!;
@@ -1162,6 +1122,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     updatedAt: DateTime.now(),
                                   );
                                   await account.updateEstablishment(updated);
+                                  await productStore
+                                      .syncEstablishmentNomenclatureCurrency(
+                                    updated.productsEstablishmentId,
+                                    updated.defaultCurrency,
+                                  );
                                   if (ctx2.mounted) {
                                     Navigator.of(ctx2).pop();
                                     ScaffoldMessenger.of(ctx2).showSnackBar(
@@ -1198,6 +1163,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     updatedAt: DateTime.now(),
                                   );
                                   await account.updateEstablishment(updated);
+                                  await productStore
+                                      .syncEstablishmentNomenclatureCurrency(
+                                    updated.productsEstablishmentId,
+                                    updated.defaultCurrency,
+                                  );
                                   if (ctx2.mounted) {
                                     Navigator.of(ctx2).pop();
                                     ScaffoldMessenger.of(ctx2).showSnackBar(

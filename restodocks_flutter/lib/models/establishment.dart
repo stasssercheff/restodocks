@@ -116,6 +116,9 @@ class Establishment extends Equatable {
       ? parentEstablishmentId!
       : id;
 
+  /// `establishment_id` в `establishment_products` (цены номенклатуры): у филиала — id филиала, у основного — [dataEstablishmentId].
+  String get productsEstablishmentId => isBranch ? id : dataEstablishmentId;
+
   @JsonKey(name: 'created_at')
   final DateTime createdAt;
 

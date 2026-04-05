@@ -35,6 +35,7 @@ import '../models/translation.dart';
 import '../services/account_manager.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/long_operation_progress_dialog.dart';
+import '../widgets/establishment_currency_picker_dialog.dart';
 import '../services/account_manager_supabase.dart';
 import '../services/product_store.dart';
 import '../services/product_store_supabase.dart';
@@ -2471,31 +2472,42 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     AccountManagerSupabase account,
     ProductStoreSupabase store,
   ) {
-    showDialog<void>(
+    final est = account.establishment!;
+    showEstablishmentCurrencyPickerDialog(
       context: context,
-      builder: (ctx) => _CurrencySettingsDialog(
-        establishment: account.establishment!,
-        store: store,
-        loc: loc,
-        onSaved: (Establishment updated) async {
-          try {
-            await account.updateEstablishment(updated);
-            if (context.mounted) setState(() {});
-          } catch (e) {
-            if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(loc.t(
-                    'nomenclature_save_error',
-                    args: {'error': '$e'},
-                  )),
-                ),
-              );
-            }
-            rethrow; // Чтобы диалог не закрывался при ошибке
+      loc: loc,
+      currentCode: est.defaultCurrency,
+      onApply: (code) async {
+        final updated = est.copyWith(
+          defaultCurrency: code,
+          updatedAt: DateTime.now(),
+        );
+        try {
+          await account.updateEstablishment(updated);
+          await store.syncEstablishmentNomenclatureCurrency(
+            updated.productsEstablishmentId,
+            updated.defaultCurrency,
+          );
+          if (context.mounted) {
+            setState(() {});
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(loc.t('currency_saved'))),
+            );
           }
-        },
-      ),
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(loc.t(
+                  'nomenclature_save_error',
+                  args: {'error': '$e'},
+                )),
+              ),
+            );
+          }
+          rethrow;
+        }
+      },
     );
   }
 }
@@ -4771,135 +4783,6 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
             onPressed: () => Navigator.of(context).pop(),
             child: Text(widget.loc.t('cancel'))),
         FilledButton(onPressed: _save, child: Text(widget.loc.t('save'))),
-      ],
-    );
-  }
-}
-
-/// Диалог настройки валюты заведения
-class _CurrencySettingsDialog extends StatefulWidget {
-  const _CurrencySettingsDialog({
-    required this.establishment,
-    required this.store,
-    required this.loc,
-    required this.onSaved,
-  });
-
-  final Establishment establishment;
-  final ProductStoreSupabase store;
-  final LocalizationService loc;
-  final Future<void> Function(Establishment) onSaved;
-
-  static const _presetCurrencies = [
-    'RUB',
-    'USD',
-    'EUR',
-    'VND',
-    'THB',
-    'KZT',
-    'GBP',
-    'UAH'
-  ];
-
-  @override
-  State<_CurrencySettingsDialog> createState() =>
-      _CurrencySettingsDialogState();
-}
-
-class _CurrencySettingsDialogState extends State<_CurrencySettingsDialog> {
-  late String _currency;
-  bool _useCustom = false;
-  final _customController = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _currency = widget.establishment.defaultCurrency;
-    _useCustom = !_CurrencySettingsDialog._presetCurrencies.contains(_currency);
-    if (_useCustom) _customController.text = _currency;
-  }
-
-  @override
-  void dispose() {
-    _customController.dispose();
-    super.dispose();
-  }
-
-  String get _effectiveCurrency => _useCustom
-      ? _customController.text.trim().toUpperCase().isEmpty
-          ? 'RUB'
-          : _customController.text.trim().toUpperCase()
-      : _currency;
-
-  Future<void> _saveAsDefault() async {
-    final c = _effectiveCurrency;
-    final updated = widget.establishment.copyWith(
-      defaultCurrency: c,
-      updatedAt: DateTime.now(),
-    );
-    try {
-      await widget.onSaved(updated);
-      if (!mounted) return;
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(widget.loc.t('currency_saved'))));
-    } catch (_) {
-      // Ошибка уже показана в onSaved, диалог остаётся открытым
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.loc.t('default_currency')),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          CheckboxListTile(
-            value: _useCustom,
-            onChanged: (v) => setState(() => _useCustom = v ?? false),
-            title: Text(widget.loc.t('custom_currency'),
-                style: const TextStyle(fontSize: 14)),
-            contentPadding: EdgeInsets.zero,
-            controlAffinity: ListTileControlAffinity.leading,
-          ),
-          if (_useCustom)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: TextField(
-                controller: _customController,
-                decoration: InputDecoration(
-                  labelText: widget.loc.t('currency_code'),
-                  hintText: widget.loc.t('currency_hint'),
-                  border: const OutlineInputBorder(),
-                ),
-                textCapitalization: TextCapitalization.characters,
-                onChanged: (_) => setState(() {}),
-              ),
-            )
-          else
-            DropdownButtonFormField<String>(
-              value:
-                  _CurrencySettingsDialog._presetCurrencies.contains(_currency)
-                      ? _currency
-                      : _CurrencySettingsDialog._presetCurrencies.first,
-              decoration: InputDecoration(
-                  labelText: widget.loc.t('currency'),
-                  border: const OutlineInputBorder()),
-              items: _CurrencySettingsDialog._presetCurrencies
-                  .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                  .toList(),
-              onChanged: (v) => setState(() => _currency = v ?? _currency),
-            ),
-        ],
-      ),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(widget.loc.t('cancel'))),
-        FilledButton(
-            onPressed: _saveAsDefault, child: Text(widget.loc.t('save'))),
       ],
     );
   }

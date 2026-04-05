@@ -29,6 +29,7 @@ import '../services/translation_manager.dart';
 import '../services/iiko_product_store.dart';
 import '../services/iiko_xlsx_sanitizer.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/establishment_currency_picker_dialog.dart';
 import '../utils/moderation_items_from_import_results.dart';
 
 // Глобальная переменная для хранения debug логов
@@ -137,6 +138,36 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   void dispose() {
     _cancelLoadingTimeout(); // Отменяем таймер при уничтожении виджета
     super.dispose();
+  }
+
+  /// Валюта заведения (как в настройках); номенклатура синхронизируется при смене.
+  Future<void> _pickEstablishmentCurrency(LocalizationService loc) async {
+    final account = context.read<AccountManagerSupabase>();
+    final store = context.read<ProductStoreSupabase>();
+    final est = account.establishment;
+    if (est == null) return;
+    await showEstablishmentCurrencyPickerDialog(
+      context: context,
+      loc: loc,
+      currentCode: est.defaultCurrency,
+      onApply: (code) async {
+        final updated = est.copyWith(
+          defaultCurrency: code,
+          updatedAt: DateTime.now(),
+        );
+        await account.updateEstablishment(updated);
+        await store.syncEstablishmentNomenclatureCurrency(
+          updated.productsEstablishmentId,
+          updated.defaultCurrency,
+        );
+        if (mounted) {
+          setState(() {});
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.t('currency_saved'))),
+          );
+        }
+      },
+    );
   }
 
   Future<void> _appendProductToSupplierList({
@@ -427,7 +458,18 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
                     color: Colors.grey[600],
                   ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.currency_exchange, color: primary),
+              title: Text(loc.t('currency')),
+              subtitle: Text(
+                '${account.establishment?.defaultCurrency ?? '—'} · ${account.establishment?.currencySymbol ?? ''}',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _isLoading ? null : () => _pickEstablishmentCurrency(loc),
+            ),
+            const SizedBox(height: 16),
 
             // Два способа загрузки
             Text(
@@ -4014,6 +4056,21 @@ class _PasteTextDialogState extends State<_PasteTextDialog> {
                 Text(
                   loc.t('product_upload_paste_dialog_body'),
                   style: theme.textTheme.bodySmall,
+                ),
+                Consumer<AccountManagerSupabase>(
+                  builder: (context, acc, _) {
+                    final e = acc.establishment;
+                    if (e == null) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8, bottom: 4),
+                      child: Text(
+                        '${loc.t('currency')}: ${e.defaultCurrency} · ${e.currencySymbol}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextField(

@@ -664,6 +664,32 @@ class ProductStoreSupabase {
     }
   }
 
+  /// Единая валюта цен в номенклатуре заведения (при смене в настройках / диалогах).
+  Future<void> syncEstablishmentNomenclatureCurrency(
+    String establishmentId,
+    String currency,
+  ) async {
+    final c = currency.trim().toUpperCase();
+    if (c.length != 3) return;
+    try {
+      await _supabase.client
+          .from('establishment_products')
+          .update({'currency': c})
+          .eq('establishment_id', establishmentId);
+    } catch (e, st) {
+      devLog('❌ syncEstablishmentNomenclatureCurrency: $e\n$st');
+      rethrow;
+    }
+    final prefix = '${establishmentId}_';
+    for (final key in _priceCache.keys.toList()) {
+      if (!key.startsWith(prefix)) continue;
+      final v = _priceCache[key];
+      if (v == null) continue;
+      _priceCache[key] = (v.$1, c);
+    }
+    _bumpCatalogRevision();
+  }
+
   /// Удалить продукт
   Future<void> removeProduct(String productId) async {
     try {
