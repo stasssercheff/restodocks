@@ -1,13 +1,7 @@
--- Persist owner position role through pending registration and completion.
--- Колонка position_role; save_pending оставляем совместимым с owner-first
--- (p_establishment_id в конце, DEFAULT NULL) — см. 20260406200000.
--- Не перезаписываем complete_pending_owner_registration: в 20260406200000 уже есть
--- проверка establishment_id IS NULL и метаданные auth.users.
+-- Fix ERROR 42P13: в PostgreSQL после параметра с DEFAULT все следующие тоже должны иметь DEFAULT.
+-- Переносим p_establishment_id в конец (миграция 20260406200000 изначально ставила DEFAULT у 2-го аргумента).
+-- Удаляем старые overloads (7-arg и вариант 20260502190000 с обязательным establishment вторым).
 
-ALTER TABLE public.pending_owner_registrations
-  ADD COLUMN IF NOT EXISTS position_role text;
-
--- Старые сигнатуры (обязательный establishment вторым аргументом или 7-arg) мешают RPC.
 DROP FUNCTION IF EXISTS public.save_pending_owner_registration(uuid, uuid, text, text, text, text[], text);
 DROP FUNCTION IF EXISTS public.save_pending_owner_registration(uuid, uuid, text, text, text, text[], text, text);
 

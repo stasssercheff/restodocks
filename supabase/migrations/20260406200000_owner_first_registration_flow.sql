@@ -5,13 +5,13 @@ ALTER TABLE public.pending_owner_registrations
 
 CREATE OR REPLACE FUNCTION public.save_pending_owner_registration(
   p_auth_user_id uuid,
-  p_establishment_id uuid DEFAULT NULL,
   p_full_name text,
   p_surname text,
   p_email text,
   p_roles text[] DEFAULT ARRAY['owner']::text[],
   p_preferred_language text DEFAULT 'ru',
-  p_position_role text DEFAULT NULL
+  p_position_role text DEFAULT NULL,
+  p_establishment_id uuid DEFAULT NULL
 )
 RETURNS void
 LANGUAGE plpgsql

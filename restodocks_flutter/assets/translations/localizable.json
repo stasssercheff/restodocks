@@ -844,7 +844,7 @@
     "pin_copied": "PIN скопирован",
     "pin_auto_hint": "Генерируется при регистрации, не вводится вручную. Всегда уникален.",
     "register_company": "Регистрация компании",
-    "register_owner": "Регистрация владельца",
+    "register_owner": "Регистрация собственника",
     "register_employee": "Регистрация сотрудника",
     "register_prefill_email_from_apple": "Подставить email из Apple ID",
     "register_apple_email_unavailable": "Apple не передал адрес (часто при повторном входе). Введите email вручную.",

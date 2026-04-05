@@ -20,8 +20,16 @@ BEGIN
     AND 'owner' = ANY (COALESCE(emp.roles, ARRAY[]::text[]));
 
   IF to_regclass('public.apple_iap_subscription_claims') IS NOT NULL THEN
-    DELETE FROM public.apple_iap_subscription_claims c
-    WHERE c.establishment_id IN (SELECT id FROM _reset_est);
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'apple_iap_subscription_claims' AND column_name = 'owner_id'
+    ) THEN
+      DELETE FROM public.apple_iap_subscription_claims c
+      WHERE c.owner_id IN (SELECT DISTINCT e.owner_id FROM public.establishments e WHERE e.id IN (SELECT id FROM _reset_est));
+    ELSE
+      DELETE FROM public.apple_iap_subscription_claims c
+      WHERE c.establishment_id IN (SELECT id FROM _reset_est);
+    END IF;
   END IF;
 
   IF to_regclass('public.iap_billing_test_state') IS NOT NULL THEN

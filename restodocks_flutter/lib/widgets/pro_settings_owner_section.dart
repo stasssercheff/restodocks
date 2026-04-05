@@ -169,8 +169,9 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     if (c.contains('verify_failed_http_401') || c.contains('|unauthorized')) {
       return loc.t('pro_iap_unauthorized');
     }
-    // Чек Apple привязан к другому заведению (applicationUsername в чеке ≠ текущее заведение).
-    if (c.contains('receipt_bound_to_other_establishment')) {
+    // Чек Apple привязан к другому владельцу / заведению (applicationUsername в чеке ≠ этот owner).
+    if (c.contains('receipt_bound_to_other_establishment') ||
+        c.contains('receipt_bound_to_other_owner')) {
       return loc.t('pro_iap_receipt_other_establishment');
     }
     // Не owner или чужое заведение.

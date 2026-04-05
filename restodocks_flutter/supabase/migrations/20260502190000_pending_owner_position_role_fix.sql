@@ -1,18 +1,25 @@
 -- Persist owner position role through pending registration and completion.
--- This makes owner position deterministic after email confirmation.
+-- Колонка position_role; save_pending оставляем совместимым с owner-first
+-- (p_establishment_id в конце, DEFAULT NULL) — см. 20260406200000.
+-- Не перезаписываем complete_pending_owner_registration: в 20260406200000 уже есть
+-- проверка establishment_id IS NULL и метаданные auth.users.
 
 ALTER TABLE public.pending_owner_registrations
   ADD COLUMN IF NOT EXISTS position_role text;
 
+-- Старые сигнатуры (обязательный establishment вторым аргументом или 7-arg) мешают RPC.
+DROP FUNCTION IF EXISTS public.save_pending_owner_registration(uuid, uuid, text, text, text, text[], text);
+DROP FUNCTION IF EXISTS public.save_pending_owner_registration(uuid, uuid, text, text, text, text[], text, text);
+
 CREATE OR REPLACE FUNCTION public.save_pending_owner_registration(
   p_auth_user_id uuid,
-  p_establishment_id uuid,
   p_full_name text,
   p_surname text,
   p_email text,
   p_roles text[] DEFAULT ARRAY['owner']::text[],
   p_preferred_language text DEFAULT 'ru',
-  p_position_role text DEFAULT NULL
+  p_position_role text DEFAULT NULL,
+  p_establishment_id uuid DEFAULT NULL
 )
 RETURNS void
 LANGUAGE plpgsql
@@ -39,6 +46,35 @@ BEGIN
     FROM unnest(coalesce(p_roles, ARRAY['owner']::text[])) AS r
     WHERE lower(trim(r)) <> 'owner'
     LIMIT 1;
+  END IF;
+
+  IF p_establishment_id IS NULL THEN
+    INSERT INTO pending_owner_registrations (
+      auth_user_id, establishment_id, full_name, surname, email, roles,
+      preferred_language, position_role, created_at, updated_at
+    )
+    VALUES (
+      p_auth_user_id,
+      NULL,
+      trim(p_full_name),
+      nullif(trim(p_surname), ''),
+      trim(p_email),
+      p_roles,
+      v_lang,
+      nullif(v_pos, ''),
+      now(),
+      now()
+    )
+    ON CONFLICT (auth_user_id) DO UPDATE SET
+      establishment_id = EXCLUDED.establishment_id,
+      full_name = EXCLUDED.full_name,
+      surname = EXCLUDED.surname,
+      email = EXCLUDED.email,
+      roles = EXCLUDED.roles,
+      preferred_language = EXCLUDED.preferred_language,
+      position_role = EXCLUDED.position_role,
+      updated_at = now();
+    RETURN;
   END IF;
 
   SELECT owner_id INTO v_owner_id
@@ -92,70 +128,6 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.complete_pending_owner_registration()
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_row record;
-  v_emp jsonb;
-  v_personal_pin text;
-  v_now timestamptz := now();
-  v_lang text;
-  v_roles text[];
-  v_pos text;
-BEGIN
-  IF auth.uid() IS NULL THEN RETURN NULL; END IF;
-  SELECT * INTO v_row FROM pending_owner_registrations WHERE auth_user_id = auth.uid();
-  IF NOT FOUND THEN RETURN NULL; END IF;
-
-  v_lang := lower(trim(coalesce(nullif(v_row.preferred_language, ''), 'ru')));
-  IF v_lang NOT IN ('ru', 'en', 'es', 'it', 'tr', 'vi') THEN
-    v_lang := 'ru';
-  END IF;
-
-  v_pos := lower(trim(coalesce(nullif(v_row.position_role, ''), '')));
-  IF v_pos = 'owner' THEN
-    v_pos := '';
-  END IF;
-
-  v_roles := ARRAY['owner']::text[];
-  IF v_pos <> '' THEN
-    v_roles := ARRAY['owner', v_pos]::text[];
-  ELSIF v_row.roles IS NOT NULL AND array_length(v_row.roles, 1) > 0 THEN
-    SELECT array_agg(DISTINCT x) INTO v_roles
-    FROM (
-      SELECT 'owner'::text AS x
-      UNION ALL
-      SELECT lower(trim(r))::text
-      FROM unnest(v_row.roles) AS r
-      WHERE lower(trim(r)) <> 'owner'
-    ) t;
-  END IF;
-
-  v_personal_pin := lpad((floor(random() * 900000) + 100000)::text, 6, '0');
-  INSERT INTO employees (
-    id, auth_user_id, full_name, surname, email, password_hash,
-    department, section, roles, establishment_id, personal_pin,
-    preferred_language, is_active, data_access_enabled, owner_access_level, created_at, updated_at
-  ) VALUES (
-    auth.uid(), auth.uid(), trim(v_row.full_name), v_row.surname, trim(v_row.email), NULL,
-    'management', NULL, v_roles, v_row.establishment_id, v_personal_pin,
-    v_lang, true, true, 'full', v_now, v_now
-  );
-  UPDATE establishments SET owner_id = auth.uid(), updated_at = v_now WHERE id = v_row.establishment_id;
-  DELETE FROM pending_owner_registrations WHERE auth_user_id = auth.uid();
-  SELECT to_jsonb(r) INTO v_emp FROM (
-    SELECT id, full_name, surname, email, department, section, roles, establishment_id,
-           personal_pin, preferred_language, is_active, data_access_enabled, owner_access_level, created_at, updated_at
-    FROM employees WHERE id = auth.uid()
-  ) r;
-  RETURN jsonb_build_object('employee', v_emp, 'establishment', (SELECT to_jsonb(e) FROM establishments e WHERE id = v_row.establishment_id));
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.save_pending_owner_registration(uuid, uuid, text, text, text, text[], text, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.save_pending_owner_registration(uuid, uuid, text, text, text, text[], text, text) TO anon;
-GRANT EXECUTE ON FUNCTION public.save_pending_owner_registration(uuid, uuid, text, text, text, text[], text, text) TO authenticated;
+REVOKE ALL ON FUNCTION public.save_pending_owner_registration(uuid, text, text, text, text[], text, text, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.save_pending_owner_registration(uuid, text, text, text, text[], text, text, uuid) TO anon;
+GRANT EXECUTE ON FUNCTION public.save_pending_owner_registration(uuid, text, text, text, text[], text, text, uuid) TO authenticated;

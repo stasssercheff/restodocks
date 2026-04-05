@@ -80,13 +80,26 @@ export async function DELETE(
 
   try {
     const { error } = await supabase.rpc('_delete_establishment_cascade', { p_establishment_id: id })
-    if (error) throw error
+    if (error) {
+      const msg =
+        typeof (error as { message?: string }).message === 'string'
+          ? (error as { message: string }).message
+          : String(error)
+      console.error('Admin delete establishment error:', error)
+      return NextResponse.json({ error: msg }, { status: 500 })
+    }
     return NextResponse.json({ ok: true })
   } catch (e) {
     console.error('Admin delete establishment error:', e)
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Delete failed' },
-      { status: 500 }
-    )
+    const msg =
+      e instanceof Error
+        ? e.message
+        : typeof e === 'object' &&
+            e !== null &&
+            'message' in e &&
+            typeof (e as { message: unknown }).message === 'string'
+          ? (e as { message: string }).message
+          : 'Delete failed'
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

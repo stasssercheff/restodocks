@@ -531,10 +531,10 @@ class AppleIapService extends ChangeNotifier {
         notifyListeners();
         return false;
       }
-      // Связка с компанией в Restodocks для App Store (opaque id); сервер дополнительно закрепляет чек за establishment_id.
+      // Один Apple ID → один owner_id: Pro на все заведения этого владельца (см. billing-verify-apple).
       final param = PurchaseParam(
         productDetails: _product!,
-        applicationUserName: est.id,
+        applicationUserName: est.ownerId,
       );
       await _iap.buyNonConsumable(purchaseParam: param);
       return true;

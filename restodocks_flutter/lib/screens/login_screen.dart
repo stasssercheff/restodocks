@@ -254,7 +254,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 14)),
-        child: Text(loc.t('register_company')),
+        child: Text(loc.t('register_owner')),
       ),
       const SizedBox(height: 12),
       OutlinedButton(

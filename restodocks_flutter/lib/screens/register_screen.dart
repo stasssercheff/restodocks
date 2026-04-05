@@ -70,7 +70,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               Navigator.of(ctx).pop();
               context.push('/register-company');
             },
-            child: Text(loc.t('register_company')),
+            child: Text(loc.t('register_owner')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(),
