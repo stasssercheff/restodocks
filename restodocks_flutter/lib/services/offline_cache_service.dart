@@ -80,6 +80,25 @@ class OfflineCacheService {
     await prefs.remove('$key:ts');
   }
 
+  /// Возраст кэша по ключу; `null` если записи или метки времени нет.
+  Future<Duration?> ageOfKey(String key) async {
+    final prefs = await _sp();
+    final ts = prefs.getInt('$key:ts');
+    if (ts == null) return null;
+    return DateTime.now().difference(
+      DateTime.fromMillisecondsSinceEpoch(ts),
+    );
+  }
+
+  /// Есть данные и метка времени не старше [maxAge].
+  Future<bool> isKeyFresh(String key, Duration maxAge) async {
+    final prefs = await _sp();
+    if (!prefs.containsKey(key)) return false;
+    final age = await ageOfKey(key);
+    if (age == null) return false;
+    return age <= maxAge;
+  }
+
   Future<void> clearCurrentUserCache() async {
     final token = await _scopeToken();
     final prefs = await _sp();

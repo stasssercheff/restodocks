@@ -65,6 +65,11 @@ class ProductStoreSupabase {
   static const _productsCacheDataset = 'products_all';
   static const _nomenclatureCacheDataset = 'nomenclature';
 
+  /// На iOS/Android держим данные в памяти/SharedPreferences и не дёргаем сеть на каждый экран,
+  /// пока кэш не устарел (на web — чаще обновляем, там localStorage и ожидание сети дешевле для консистентности).
+  static const _mobileProductsCacheTtl = Duration(minutes: 20);
+  static const _mobileNomenclatureCacheTtl = Duration(minutes: 12);
+
   // Геттеры
   List<Product> get allProducts => _allProducts;
   List<String> get categories => _categories;
@@ -93,7 +98,11 @@ class ProductStoreSupabase {
           ..sort();
         _hasFullProductCatalog = true;
         _bumpCatalogRevision();
-        unawaited(_loadProductsFromServer());
+        final bgSync = kIsWeb ||
+            !await _offlineCache.isKeyFresh(cacheKey, _mobileProductsCacheTtl);
+        if (bgSync) {
+          unawaited(_loadProductsFromServer());
+        }
         return;
       }
     }
@@ -742,8 +751,16 @@ class ProductStoreSupabase {
         await _reloadNomenclatureFromServer(establishmentId);
         return;
       }
-      // Ждём фоновое обновление: иначе после return номенклатура оказывается пустой
-      // (reload сначала очищает данные) и UI теряет список до конца запроса.
+      // Web: ждём сеть — иначе при быстром переходе виден рассинхрон.
+      // Mobile: при свежем локальном кэше не блокируем UI; устаревший — фоновое обновление.
+      if (!kIsWeb &&
+          await _offlineCache.isKeyFresh(cacheKey, _mobileNomenclatureCacheTtl)) {
+        return;
+      }
+      if (!kIsWeb) {
+        unawaited(_reloadNomenclatureFromServer(establishmentId));
+        return;
+      }
       await _reloadNomenclatureFromServer(establishmentId);
       return;
     }
@@ -855,6 +872,14 @@ class ProductStoreSupabase {
       _bumpCatalogRevision();
       if (_nomenclatureIds.isEmpty) {
         await _reloadNomenclatureForBranchFromServer(branchId, mainId);
+        return;
+      }
+      if (!kIsWeb &&
+          await _offlineCache.isKeyFresh(cacheKey, _mobileNomenclatureCacheTtl)) {
+        return;
+      }
+      if (!kIsWeb) {
+        unawaited(_reloadNomenclatureForBranchFromServer(branchId, mainId));
         return;
       }
       await _reloadNomenclatureForBranchFromServer(branchId, mainId);
