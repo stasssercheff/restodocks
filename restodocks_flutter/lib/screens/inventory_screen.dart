@@ -32,6 +32,9 @@ import '../widgets/app_bar_home_button.dart';
 const String _pfUnitGrams = 'g';
 const String _pfUnitPcs = 'pcs';
 
+/// Размер цифр в ячейках количества (−2 pt к body, чтобы длинные значения влезали).
+const double _kInventoryQtyFontSize = 13;
+
 /// Строка бланка: продукт из номенклатуры, полуфабрикат (ТТК) или свободная строка (например, с чека).
 class _InventoryRow {
   final Product? product;
@@ -211,8 +214,10 @@ class _InventoryScreenState extends State<InventoryScreen>
   TimeOfDay? _endTime;
   bool _completed = false;
   bool _isInputMode = false; // Режим ввода количества (клавиатура открыта)
-  bool _hasInputFocus =
-      false; // Фокус в ячейке/фильтре — для скрытия шапки на мобильном
+  /// Фокус в числовой ячейке (обновляется без setState на весь экран).
+  bool _qtyCellFocused = false;
+  /// Пересборка только шапки/футера при смене фокуса ячейки или поля фильтра.
+  final ValueNotifier<int> _inventoryLayoutPulse = ValueNotifier<int>(0);
   _InventorySort _sortMode = _InventorySort.alphabetAsc;
   _InventoryBlockFilter _blockFilter = _InventoryBlockFilter.all;
   final TextEditingController _nameFilterCtrl = TextEditingController();
@@ -258,7 +263,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       });
     });
     _nameFilterFocusNode.addListener(() {
-      setState(() => _hasInputFocus = _nameFilterFocusNode.hasFocus);
+      _inventoryLayoutPulse.value++;
     });
 
     // Тихая отправка на сервер: реже, чем раньше, и только если черновик менялся ([_serverDraftDirty]).
@@ -894,6 +899,7 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   @override
   void dispose() {
+    _inventoryLayoutPulse.dispose();
     for (final n in _rowRepaintTicks) {
       n.dispose();
     }
@@ -1653,6 +1659,16 @@ class _InventoryScreenState extends State<InventoryScreen>
     );
   }
 
+  bool _inventoryCollapseLayout(BuildContext context) {
+    final isNarrow = MediaQuery.sizeOf(context).width < 600;
+    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    return (_isInputMode && !isNarrow) ||
+        (isNarrow &&
+            (isKeyboardOpen ||
+                _nameFilterFocusNode.hasFocus ||
+                _qtyCellFocused));
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -1684,13 +1700,6 @@ class _InventoryScreenState extends State<InventoryScreen>
         }
       });
     }
-
-    // collapseLayout: скрывать футер и шапку при клавиатуре. На мобильном viewInsets ненадёжен — по фокусу.
-    final collapseLayout = (_isInputMode && !isNarrow) ||
-        (isNarrow && (isKeyboardOpen || _hasInputFocus));
-    // На мобильном при открытой клавиатуре скрываем строку с датой/именем (верхняя шапка),
-    // но оставляем строку с фильтром — это делается без setState через isKeyboardOpen.
-    final mobileKeyboardOpen = isNarrow && isKeyboardOpen;
 
     return PopScope(
       canPop: !_inventoryModePickerOpen,
@@ -1726,35 +1735,64 @@ class _InventoryScreenState extends State<InventoryScreen>
                   ),
         // Кнопка "Завершить" в bottomNavigationBar — Flutter поднимает её над клавиатурой автоматически.
         // Браузерный URL-бар (Safari/Chrome) остаётся ниже неё и не перекрывает таблицу.
-        bottomNavigationBar: _buildFooter(loc, collapseLayout),
+        bottomNavigationBar: ValueListenableBuilder<int>(
+          valueListenable: _inventoryLayoutPulse,
+          builder: (ctx, _, __) =>
+              _buildFooter(loc, _inventoryCollapseLayout(ctx)) ??
+              const SizedBox.shrink(),
+        ),
         body: Stack(
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (!collapseLayout)
-                  _buildHeader(
-                    loc,
-                    establishment,
-                    employee,
-                    collapseLayout: collapseLayout,
-                    hideInfoRow: mobileKeyboardOpen,
-                  ),
-                if (collapseLayout && !_completed && _rows.isNotEmpty)
-                  _buildCompactSearchBar(loc),
-                if (!collapseLayout) const Divider(height: 1),
-                if (collapseLayout && !_completed && _rows.isNotEmpty)
-                  const Divider(height: 1),
+                ValueListenableBuilder<int>(
+                  valueListenable: _inventoryLayoutPulse,
+                  builder: (ctx, _, __) {
+                    final collapseLayout = _inventoryCollapseLayout(ctx);
+                    final narrow = MediaQuery.sizeOf(ctx).width < 600;
+                    final kbOpen = MediaQuery.viewInsetsOf(ctx).bottom > 0;
+                    final hideInfo = narrow && kbOpen;
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!collapseLayout)
+                          _buildHeader(
+                            loc,
+                            establishment,
+                            employee,
+                            collapseLayout: collapseLayout,
+                            hideInfoRow: hideInfo,
+                          ),
+                        if (collapseLayout && !_completed && _rows.isNotEmpty)
+                          _buildCompactSearchBar(loc),
+                        if (!collapseLayout) const Divider(height: 1),
+                        if (collapseLayout && !_completed && _rows.isNotEmpty)
+                          const Divider(height: 1),
+                      ],
+                    );
+                  },
+                ),
                 Expanded(
                   child: _buildTable(loc),
                 ),
               ],
             ),
-            if (!collapseLayout && !mobileKeyboardOpen)
-              DataSafetyIndicator(
-                isVisible: true,
-                labelKey: 'inventory_data_protected',
-              ),
+            ValueListenableBuilder<int>(
+              valueListenable: _inventoryLayoutPulse,
+              builder: (ctx, _, __) {
+                final collapseLayout = _inventoryCollapseLayout(ctx);
+                final narrow = MediaQuery.sizeOf(ctx).width < 600;
+                final kbOpen = MediaQuery.viewInsetsOf(ctx).bottom > 0;
+                if (!collapseLayout && !(narrow && kbOpen)) {
+                  return DataSafetyIndicator(
+                    isVisible: true,
+                    labelKey: 'inventory_data_protected',
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
           ],
         ),
       ),
@@ -2482,7 +2520,11 @@ class _InventoryScreenState extends State<InventoryScreen>
         onSetQuantity: _setQuantity,
         onLastCellFocused: _onLastCellFocused,
         onCellFocusLost: _onCellFocusLost,
-        onFocusChange: (hasFocus) => setState(() => _hasInputFocus = hasFocus),
+        onFocusChange: (hasFocus) {
+          if (_qtyCellFocused == hasFocus) return;
+          _qtyCellFocused = hasFocus;
+          _inventoryLayoutPulse.value++;
+        },
         leftWidth: _leftWidth(context),
         colQtyWidth: _colQtyWidth,
         colGap: _colGap,
@@ -3286,7 +3328,10 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
                                       ? Text(
                                           widget.formatQty(
                                               row.quantityDisplayAt(colIndex)),
-                                          style: theme.textTheme.bodyMedium)
+                                          style: theme.textTheme.bodyMedium
+                                              ?.copyWith(
+                                                  fontSize:
+                                                      _kInventoryQtyFontSize))
                                       : _QtyCell(
                                           key: ValueKey(
                                               'qty_${widget.actualIndex}_$colIndex'),
@@ -3432,7 +3477,6 @@ class _QtyCellState extends State<_QtyCell> {
   late TextEditingController _controller;
   final FocusNode _focus = FocusNode();
   late double _currentValue;
-  Timer? _updateTimer;
 
   double get _displayValueRaw =>
       widget.useGrams ? widget.value * 1000 : widget.value;
@@ -3479,7 +3523,6 @@ class _QtyCellState extends State<_QtyCell> {
 
   @override
   void dispose() {
-    _updateTimer?.cancel();
     _focus.removeListener(_onFocusChanged);
     _controller.dispose();
     _focus.dispose();
@@ -3500,27 +3543,20 @@ class _QtyCellState extends State<_QtyCell> {
           FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),
         ],
         textAlign: TextAlign.center,
-        style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15, height: 1.25),
+        style: theme.textTheme.bodyMedium?.copyWith(
+            fontSize: _kInventoryQtyFontSize, height: 1.2),
         decoration: InputDecoration(
           isDense: false,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+              const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
           filled: true,
           fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
         ),
         onChanged: (s) {
-          // Обновляем локальное значение
           final v = double.tryParse(s.replaceFirst(',', '.')) ?? 0;
           _currentValue = widget.useGrams ? v / 1000 : v;
-
-          // Реже поднимаем setState на весь экран — меньше подлагиваний при длинной таблице
-          _updateTimer?.cancel();
-          _updateTimer = Timer(const Duration(milliseconds: 220), () {
-            if (mounted) {
-              widget.onChanged(_currentValue);
-            }
-          });
+          widget.onChanged(_currentValue);
         },
       ),
     );
@@ -5297,10 +5333,11 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
                   const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.next,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(fontSize: _kInventoryQtyFontSize, height: 1.2),
               decoration: InputDecoration(
                 contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
                 filled: true,
