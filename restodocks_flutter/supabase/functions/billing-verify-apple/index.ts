@@ -271,13 +271,41 @@ Deno.serve(async (req: Request) => {
           headers: { ...cors, "Content-Type": "application/json" },
         });
       }
-      const { data: caller, error: callerError } = await supabase
+      // Два запроса вместо .or() в URL: PostgREST/прокси иногда криво кодирует UUID в or().
+      let caller: { id: string; roles: unknown; establishment_id: string } | null = null;
+      const sel = "id, roles, establishment_id";
+      const { data: byId, error: errById } = await supabase
         .from("employees")
-        .select("id, roles, establishment_id")
+        .select(sel)
         .eq("establishment_id", establishmentId)
-        .or(`id.eq.${authUid},auth_user_id.eq.${authUid}`)
+        .eq("id", authUid)
         .maybeSingle();
-      if (callerError || !caller?.id) {
+      if (errById && !isMissingRelationError(errById)) {
+        return new Response(JSON.stringify({ error: errById.message }), {
+          status: 500,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+      if (byId?.id) {
+        caller = byId as { id: string; roles: unknown; establishment_id: string };
+      } else {
+        const { data: byAuth, error: errAuth } = await supabase
+          .from("employees")
+          .select(sel)
+          .eq("establishment_id", establishmentId)
+          .eq("auth_user_id", authUid)
+          .maybeSingle();
+        if (errAuth && !isMissingRelationError(errAuth)) {
+          return new Response(JSON.stringify({ error: errAuth.message }), {
+            status: 500,
+            headers: { ...cors, "Content-Type": "application/json" },
+          });
+        }
+        if (byAuth?.id) {
+          caller = byAuth as { id: string; roles: unknown; establishment_id: string };
+        }
+      }
+      if (!caller?.id) {
         return new Response(JSON.stringify({ error: "Forbidden for establishment" }), {
           status: 403,
           headers: { ...cors, "Content-Type": "application/json" },

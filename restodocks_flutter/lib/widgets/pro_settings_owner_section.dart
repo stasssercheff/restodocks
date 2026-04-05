@@ -229,8 +229,12 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     return '${s.substring(0, 197)}...';
   }
 
-  /// Строка цены из стора ([ProductDetails.price]): для iOS это формат App Store по витрине, не локаль UI приложения.
-  String _formatIapProductPrice(ProductDetails product) => product.price;
+  /// Цена из StoreKit + ISO-код валюты (USD/VND и т.д. — задаёт Apple для Apple ID, не приложение).
+  String _formatIapProductPrice(ProductDetails product) {
+    final cc = product.currencyCode.trim();
+    if (cc.isEmpty) return product.price;
+    return '${product.price} · $cc';
+  }
 
   Future<void> _openAppleSubscriptionsSettings() async {
     final uri = Uri.parse('https://apps.apple.com/account/subscriptions');
@@ -450,233 +454,20 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     _proPaymentHubOpening = true;
     setState(() {});
 
-    void closeLoadingDialog() {
-      if (!mounted) return;
-      final nav = Navigator.of(context, rootNavigator: true);
-      if (nav.canPop()) nav.pop();
-    }
-
-    showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      useRootNavigator: true,
-      builder: (loadingCtx) => PopScope(
-        canPop: false,
-        child: AlertDialog(
-          content: Row(
-            children: [
-              const SizedBox(
-                width: 28,
-                height: 28,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Text(loc.t('pro_payment_hub_loading')),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    EstablishmentPromoInfo promo = const EstablishmentPromoInfo();
     try {
-      try {
-        await iap.init();
-        await widget.accountManager.syncEstablishmentAccessFromServer();
-        if (!mounted) return;
-        // Не вызываем trySyncProFromStoreReceipt() здесь: это давало долгий спиннер и
-        // «тихо» активировало Pro до явного действия пользователя. Привязка подписки Apple
-        // к заведению — через кнопку «Восстановить покупки» (или после новой покупки).
-        promo = await widget.accountManager.getEstablishmentPromoForOwner();
-      } catch (e, st) {
-        debugPrint('_showProPaymentHub preload: $e $st');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(loc.t('pro_payment_hub_load_error'))),
-          );
-        }
-        return;
-      } finally {
-        closeLoadingDialog();
-      }
-
-      if (!mounted) return;
-
-      final paid = widget.accountManager.hasPaidProSubscription;
-      final est = widget.accountManager.establishment;
-      final product = iap.product;
-      final ready = iap.ready;
-
       await showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (ctx) {
-        final theme = Theme.of(ctx);
-        final cs = theme.colorScheme;
-        final maxH = MediaQuery.sizeOf(ctx).height * 0.88;
-        return Dialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          clipBehavior: Clip.antiAlias,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: 420, maxHeight: maxH),
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          paid ? Icons.verified_outlined : Icons.apple,
-                          size: 28,
-                          color: cs.primary,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            loc.t('pro_payment_hub_title'),
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    if (paid) ...[
-                      ..._proHubStatusLines(loc, promo, est).map(
-                        (line) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Text(
-                            line,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              height: 1.4,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ] else ...[
-                      Text(
-                        loc.t('pro_payment_body_short'),
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: cs.onSurfaceVariant,
-                          height: 1.45,
-                        ),
-                      ),
-                      if (est != null) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          '${loc.t('currency')}: ${est.defaultCurrency} (${est.currencySymbol})',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                      if (ready && product != null) ...[
-                        const SizedBox(height: 16),
-                        DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: cs.surfaceContainerHighest
-                                .withValues(alpha: 0.65),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 14,
-                              horizontal: 12,
-                            ),
-                            child: Text(
-                              _formatIapProductPrice(product),
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: cs.primary,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          loc.t('pro_payment_price_note'),
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            height: 1.35,
-                          ),
-                        ),
-                      ] else ...[
-                        const SizedBox(height: 12),
-                        Text(
-                          !ready
-                              ? loc.t('pro_iap_store_unavailable')
-                              : loc.t('pro_iap_product_unavailable'),
-                          style: TextStyle(
-                            color: cs.error,
-                            fontSize: 14,
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ],
-                    const SizedBox(height: 14),
-                    Text(
-                      loc.t('pro_payment_hub_restore_hint'),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                        height: 1.35,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      loc.t('pro_iap_apple_account_hint'),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
-                        height: 1.35,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (!paid && ready && product != null) ...[
-                      FilledButton(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          unawaited(iap.purchasePro());
-                        },
-                        child: Text(loc.t('pro_purchase')),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                    OutlinedButton(
-                      onPressed: () async {
-                        Navigator.pop(ctx);
-                        await iap.restorePurchases();
-                      },
-                      child: Text(loc.t('pro_iap_restore')),
-                    ),
-                    TextButton(
-                      onPressed: () async {
-                        await _openAppleSubscriptionsSettings();
-                      },
-                      child: Text(loc.t('pro_payment_open_apple_subscriptions')),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: Text(loc.t('close')),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
+        context: context,
+        barrierDismissible: true,
+        useRootNavigator: true,
+        builder: (ctx) => _ProPaymentHubFutureDialog(
+          iap: iap,
+          accountManager: widget.accountManager,
+          loc: loc,
+          statusLines: _proHubStatusLines,
+          formatIapPrice: _formatIapProductPrice,
+          onOpenAppleSubs: _openAppleSubscriptionsSettings,
+        ),
+      );
     } finally {
       _proPaymentHubOpening = false;
       if (mounted) setState(() {});
@@ -814,4 +605,272 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
       ],
     );
   }
+}
+
+/// Один маршрут: загрузка StoreKit + данные сервера внутри диалога (без второго полноэкранного спиннера).
+class _ProPaymentHubFutureDialog extends StatefulWidget {
+  const _ProPaymentHubFutureDialog({
+    required this.iap,
+    required this.accountManager,
+    required this.loc,
+    required this.statusLines,
+    required this.formatIapPrice,
+    required this.onOpenAppleSubs,
+  });
+
+  final AppleIapService iap;
+  final AccountManagerSupabase accountManager;
+  final LocalizationService loc;
+  final List<String> Function(
+    LocalizationService loc,
+    EstablishmentPromoInfo promo,
+    Establishment? est,
+  ) statusLines;
+  final String Function(ProductDetails product) formatIapPrice;
+  final Future<void> Function() onOpenAppleSubs;
+
+  @override
+  State<_ProPaymentHubFutureDialog> createState() =>
+      _ProPaymentHubFutureDialogState();
+}
+
+class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> {
+  late final Future<_ProHubPreload> _preload;
+
+  @override
+  void initState() {
+    super.initState();
+    _preload = _runPreload();
+  }
+
+  Future<_ProHubPreload> _runPreload() async {
+    await Future.wait<void>([
+      widget.iap.init(),
+      widget.accountManager.syncEstablishmentAccessFromServer(),
+    ]);
+    final promo = await widget.accountManager.getEstablishmentPromoForOwner();
+    return _ProHubPreload(promo: promo);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = widget.loc;
+    return FutureBuilder<_ProHubPreload>(
+      future: _preload,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return AlertDialog(
+            content: Row(
+              children: [
+                const SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 16),
+                Expanded(child: Text(loc.t('pro_payment_hub_loading'))),
+              ],
+            ),
+          );
+        }
+        if (snap.hasError) {
+          debugPrint('_ProPaymentHubFutureDialog: ${snap.error}');
+          return AlertDialog(
+            title: Text(loc.t('pro_payment_hub_title')),
+            content: Text(loc.t('pro_payment_hub_load_error')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(loc.t('close')),
+              ),
+            ],
+          );
+        }
+        final promo = snap.data!.promo;
+        return ListenableBuilder(
+          listenable: widget.accountManager,
+          builder: (context, _) {
+            final paid = widget.accountManager.hasPaidProSubscription;
+            final est = widget.accountManager.establishment;
+            final product = widget.iap.product;
+            final ready = widget.iap.ready;
+            final theme = Theme.of(context);
+            final cs = theme.colorScheme;
+            final maxH = MediaQuery.sizeOf(context).height * 0.88;
+            return Dialog(
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: 420, maxHeight: maxH),
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              paid
+                                  ? Icons.verified_outlined
+                                  : Icons.apple,
+                              size: 28,
+                              color: cs.primary,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                loc.t('pro_payment_hub_title'),
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        if (paid) ...[
+                          ...widget
+                              .statusLines(loc, promo, est)
+                              .map(
+                                (line) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: Text(
+                                    line,
+                                    style: theme.textTheme.bodyMedium
+                                        ?.copyWith(height: 1.4),
+                                  ),
+                                ),
+                              ),
+                        ] else ...[
+                          Text(
+                            loc.t('pro_payment_body_short'),
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              height: 1.45,
+                            ),
+                          ),
+                          if (est != null) ...[
+                            const SizedBox(height: 10),
+                            Text(
+                              '${loc.t('currency')}: ${est.defaultCurrency} (${est.currencySymbol})',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                          if (ready && product != null) ...[
+                            const SizedBox(height: 16),
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: cs.surfaceContainerHighest
+                                    .withValues(alpha: 0.65),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                  horizontal: 12,
+                                ),
+                                child: Text(
+                                  widget.formatIapPrice(product),
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.headlineSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: cs.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              loc.t('pro_payment_price_note'),
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                                height: 1.35,
+                              ),
+                            ),
+                          ] else ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              !ready
+                                  ? loc.t('pro_iap_store_unavailable')
+                                  : loc.t('pro_iap_product_unavailable'),
+                              style: TextStyle(
+                                color: cs.error,
+                                fontSize: 14,
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ],
+                        const SizedBox(height: 14),
+                        Text(
+                          loc.t('pro_payment_hub_restore_hint'),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            height: 1.35,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          loc.t('pro_iap_apple_account_hint'),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            height: 1.35,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        if (!paid && ready && product != null) ...[
+                          FilledButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              unawaited(widget.iap.purchasePro());
+                            },
+                            child: Text(loc.t('pro_purchase')),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+                        OutlinedButton(
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            await widget.iap.restorePurchases();
+                          },
+                          child: Text(loc.t('pro_iap_restore')),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            await widget.onOpenAppleSubs();
+                          },
+                          child: Text(
+                            loc.t('pro_payment_open_apple_subscriptions'),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(loc.t('close')),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _ProHubPreload {
+  _ProHubPreload({required this.promo});
+  final EstablishmentPromoInfo promo;
 }
