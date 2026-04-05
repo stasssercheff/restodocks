@@ -101,6 +101,96 @@ class AppleIapService extends ChangeNotifier {
     return null;
   }
 
+  /// App Store receipt (base64) без экрана покупки: синхронизация Pro, если подписка уже есть у Apple ID.
+  Future<String?> _appReceiptBase64ForProSync() async {
+    final add =
+        _iap.getPlatformAddition<InAppPurchaseStoreKitPlatformAddition>();
+    try {
+      final direct = await SKReceiptManager.retrieveReceiptData();
+      if (direct.isNotEmpty && !_isStoreKit2Jws(direct)) return direct;
+    } catch (e, st) {
+      devLog('IAP sync receipt direct: $e $st');
+    }
+    try {
+      await add.sync();
+    } catch (e, st) {
+      devLog('IAP sync receipt StoreKit sync: $e $st');
+    }
+    try {
+      final after = await SKReceiptManager.retrieveReceiptData();
+      if (after.isNotEmpty && !_isStoreKit2Jws(after)) return after;
+    } catch (e, st) {
+      devLog('IAP sync receipt after sync: $e $st');
+    }
+    try {
+      await _iap.restorePurchases();
+    } catch (e, st) {
+      devLog('IAP restorePurchases for receipt sync: $e $st');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    try {
+      await add.sync();
+    } catch (_) {}
+    try {
+      final afterRestore = await SKReceiptManager.retrieveReceiptData();
+      if (afterRestore.isNotEmpty && !_isStoreKit2Jws(afterRestore)) {
+        return afterRestore;
+      }
+    } catch (e, st) {
+      devLog('IAP sync receipt after restore: $e $st');
+    }
+    const pauseMs = <int>[300, 500, 800, 1200];
+    for (final ms in pauseMs) {
+      await Future<void>.delayed(Duration(milliseconds: ms));
+      try {
+        final v = await add.refreshPurchaseVerificationData();
+        final r = v?.serverVerificationData ?? v?.localVerificationData ?? '';
+        if (r.isNotEmpty && !_isStoreKit2Jws(r)) return r;
+      } catch (_) {}
+    }
+    return null;
+  }
+
+  /// Если в App Store уже активна подписка Pro, а на сервере ещё нет — шлём чек на Edge и подтягиваем Pro без «Оплатить».
+  Future<bool> trySyncProFromStoreReceipt() async {
+    if (!isIOSPlatform) return false;
+    await init();
+    if (!_ready) return false;
+    final est = _account.establishment;
+    final emp = _account.currentEmployee;
+    if (est == null || emp == null || !emp.hasRole('owner')) return false;
+    if (_account.establishment?.hasPaidProAccess ?? false) return true;
+
+    final receiptData = await _appReceiptBase64ForProSync();
+    if (receiptData == null || receiptData.isEmpty) {
+      devLog('IAP trySyncProFromStoreReceipt: no receipt');
+      return false;
+    }
+
+    final res = await _postBillingVerifyApple(
+      establishmentId: est.id,
+      receiptData: receiptData,
+    );
+    if (res.status != 200) {
+      devLog(
+        'IAP trySyncProFromStoreReceipt: verify ${res.status} ${res.data}',
+      );
+      return false;
+    }
+    try {
+      await _account.syncEstablishmentAccessFromServer();
+    } catch (e, st) {
+      devLog('IAP trySyncPro sync establishment: $e $st');
+    }
+    _lastError = null;
+    final ok = _account.establishment?.hasPaidProAccess ?? false;
+    if (ok) {
+      _successToken++;
+    }
+    notifyListeners();
+    return ok;
+  }
+
   Map<String, dynamic>? _normalizeEdgeJson(dynamic data) {
     if (data == null) return null;
     if (data is Map<String, dynamic>) return data;

@@ -31,6 +31,8 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
   int _lastIapSuccessToken = 0;
   bool _iapWasBusy = false;
   Timer? _promoReloadDebounce;
+  /// Открывается окно «Подписка и доступ» — повторные нажатия игнорируем (иначе несколько диалогов).
+  bool _proPaymentHubOpening = false;
 
   @override
   void initState() {
@@ -241,6 +243,14 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
   Future<void> _syncProSectionFromServer() async {
     await widget.accountManager.syncEstablishmentAccessFromServer();
     if (!mounted) return;
+    if (AppleIapService.isIOSPlatform &&
+        !widget.accountManager.hasPaidProSubscription) {
+      final iap = context.read<AppleIapService>();
+      await iap.init();
+      await iap.trySyncProFromStoreReceipt();
+      await widget.accountManager.syncEstablishmentAccessFromServer();
+    }
+    if (!mounted) return;
     setState(() {
       _promoFuture = widget.accountManager.getEstablishmentPromoForOwner();
     });
@@ -413,6 +423,8 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
 
   /// Окно «подписка и доступ»: статус (промокод / оплаченный Pro), покупка, восстановление.
   Future<void> _showProPaymentHub(AppleIapService iap, LocalizationService loc) async {
+    if (_proPaymentHubOpening) return;
+
     if (!AppleIapService.isIOSPlatform) {
       await showDialog<void>(
         context: context,
@@ -430,18 +442,71 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
       return;
     }
 
-    await iap.init();
-    await widget.accountManager.syncEstablishmentAccessFromServer();
-    if (!mounted) return;
-    final promo = await widget.accountManager.getEstablishmentPromoForOwner();
-    if (!mounted) return;
+    _proPaymentHubOpening = true;
+    setState(() {});
 
-    final paid = widget.accountManager.hasPaidProSubscription;
-    final est = widget.accountManager.establishment;
-    final product = iap.product;
-    final ready = iap.ready;
+    void closeLoadingDialog() {
+      if (!mounted) return;
+      final nav = Navigator.of(context, rootNavigator: true);
+      if (nav.canPop()) nav.pop();
+    }
 
-    await showDialog<void>(
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (loadingCtx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            children: [
+              const SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Text(loc.t('pro_payment_hub_loading')),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    EstablishmentPromoInfo promo = const EstablishmentPromoInfo();
+    try {
+      try {
+        await iap.init();
+        await widget.accountManager.syncEstablishmentAccessFromServer();
+        if (!mounted) return;
+        if (!widget.accountManager.hasPaidProSubscription) {
+          await iap.trySyncProFromStoreReceipt();
+          await widget.accountManager.syncEstablishmentAccessFromServer();
+        }
+        if (!mounted) return;
+        promo = await widget.accountManager.getEstablishmentPromoForOwner();
+      } catch (e, st) {
+        debugPrint('_showProPaymentHub preload: $e $st');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.t('pro_payment_hub_load_error'))),
+          );
+        }
+        return;
+      } finally {
+        closeLoadingDialog();
+      }
+
+      if (!mounted) return;
+
+      final paid = widget.accountManager.hasPaidProSubscription;
+      final est = widget.accountManager.establishment;
+      final product = iap.product;
+      final ready = iap.ready;
+
+      await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
@@ -501,6 +566,16 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                           height: 1.45,
                         ),
                       ),
+                      if (est != null) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          '${loc.t('currency')}: ${est.defaultCurrency} (${est.currencySymbol})',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
                       if (ready && product != null) ...[
                         const SizedBox(height: 16),
                         DecoratedBox(
@@ -555,6 +630,14 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                         height: 1.35,
                       ),
                     ),
+                    const SizedBox(height: 10),
+                    Text(
+                      loc.t('pro_iap_apple_account_hint'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        height: 1.35,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     if (!paid && ready && product != null) ...[
                       FilledButton(
@@ -591,6 +674,10 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
         );
       },
     );
+    } finally {
+      _proPaymentHubOpening = false;
+      if (mounted) setState(() {});
+    }
   }
 
   @override
@@ -704,7 +791,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                                   ? Icons.check_circle_outline
                                   : Icons.apple,
                             ),
-                      onTap: busy
+                      onTap: (busy || _proPaymentHubOpening)
                           ? null
                           : () => _showProPaymentHub(iap, loc),
                     );

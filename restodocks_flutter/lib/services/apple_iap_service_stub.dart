@@ -27,5 +27,7 @@ class AppleIapService extends ChangeNotifier {
 
   Future<void> restorePurchases() async {}
 
+  Future<bool> trySyncProFromStoreReceipt() async => false;
+
   void clearErrorIfProActive() {}
 }
