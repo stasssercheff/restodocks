@@ -2014,13 +2014,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         value: est.supportAccessEnabled,
                         onChanged: (v) async {
                           try {
-                            await account.updateEstablishment(
-                              est.copyWith(
-                                supportAccessEnabled: v,
-                                updatedAt: DateTime.now(),
+                            await account.updateEstablishmentSupportAccess(
+                              establishmentId: est.id,
+                              enabled: v,
+                            );
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  localization
+                                      .t('error_with_message')
+                                      .replaceAll('%s', e.toString()),
+                                ),
                               ),
                             );
-                          } catch (_) {}
+                          }
                         },
                       );
                     },

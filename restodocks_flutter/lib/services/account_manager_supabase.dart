@@ -1690,7 +1690,6 @@ class AccountManagerSupabase extends ChangeNotifier {
             'director_fio': establishment.directorFio,
             'director_position': establishment.directorPosition,
             'default_currency': establishment.defaultCurrency,
-            'support_access_enabled': establishment.supportAccessEnabled,
             'updated_at': establishment.updatedAt.toIso8601String(),
           })
           .eq('id', establishment.id)
@@ -1702,6 +1701,30 @@ class AccountManagerSupabase extends ChangeNotifier {
       devLog('Ошибка обновления заведения: $e');
       rethrow; // Пробросить, чтобы UI мог показать ошибку
     }
+  }
+
+  /// Только `support_access_enabled` — не смешивать с [updateEstablishment], чтобы на БД
+  /// без миграции `20260403150000_establishment_support_access.sql` не ломались валюта и реквизиты.
+  Future<void> updateEstablishmentSupportAccess({
+    required String establishmentId,
+    required bool enabled,
+  }) async {
+    final now = DateTime.now();
+    await _supabase.client
+        .from('establishments')
+        .update({
+          'support_access_enabled': enabled,
+          'updated_at': now.toIso8601String(),
+        })
+        .eq('id', establishmentId)
+        .select();
+    if (_establishment?.id == establishmentId) {
+      _establishment = _establishment!.copyWith(
+        supportAccessEnabled: enabled,
+        updatedAt: now,
+      );
+    }
+    notifyListeners();
   }
 
   /// Сохранить выбранный язык в профиле сотрудника (preferred_language в Supabase).
