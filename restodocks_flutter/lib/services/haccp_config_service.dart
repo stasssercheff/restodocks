@@ -26,7 +26,8 @@ class HaccpConfigService extends ChangeNotifier {
   }
 
   /// Загрузить настройки из Supabase.
-  Future<void> load(String establishmentId) async {
+  /// [notify] — false при фоновой гидратации, чтобы не дёргать перерисовку всего дерева.
+  Future<void> load(String establishmentId, {bool notify = true}) async {
     try {
       final row = await _supabase.client
           .from('establishment_haccp_config')
@@ -44,10 +45,10 @@ class HaccpConfigService extends ChangeNotifier {
       } else {
         _cache[establishmentId] = {};
       }
-      notifyListeners();
+      if (notify) notifyListeners();
     } catch (_) {
       _cache[establishmentId] = {};
-      notifyListeners();
+      if (notify) notifyListeners();
     }
   }
 

@@ -14,6 +14,7 @@ import '../models/models.dart';
 import '../utils/dev_log.dart';
 import 'account_ui_sync_service.dart';
 import 'establishment_data_warmup_service.dart';
+import 'local_snapshot_store.dart';
 import 'tech_card_translation_cache.dart';
 import 'offline_cache_service.dart';
 import 'realtime_sync_service.dart';
@@ -1315,6 +1316,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     final est = _establishment;
     if (est != null) {
       await TechCardTranslationCache.clearForEstablishment(est.dataEstablishmentId);
+      await LocalSnapshotStore.instance.clearEstablishment(est.id);
     }
     EstablishmentDataWarmupService.instance.resetSession();
     _employeesListCache.clear();

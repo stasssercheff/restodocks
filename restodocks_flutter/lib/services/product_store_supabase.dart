@@ -769,6 +769,15 @@ class ProductStoreSupabase {
     _nomenclatureLoadedBranchKey = null;
   }
 
+  /// Полная перезагрузка номенклатуры с сервера (после входа / фоновое обновление).
+  Future<void> loadNomenclatureForce(String establishmentId) async {
+    _nomenclatureLoadedMainId = null;
+    _nomenclatureLoadedBranchKey = null;
+    await _reloadNomenclatureFromServer(establishmentId);
+    _nomenclatureLoadedMainId = establishmentId;
+    _nomenclatureLoadedBranchKey = null;
+  }
+
   /// Сырой список строк establishment_products (без изменения кэша в памяти).
   Future<List<dynamic>> _fetchNomenclatureRowsRaw(String establishmentId) async {
     dynamic response;

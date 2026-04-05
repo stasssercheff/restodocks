@@ -1,12 +1,13 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import '../models/models.dart';
 import '../utils/dev_log.dart';
 import 'account_manager_supabase.dart';
-import 'documentation_service_supabase.dart';
+import 'establishment_local_hydration_service.dart';
 import 'localization_service.dart';
 import 'product_store_supabase.dart';
-import 'schedule_storage_service.dart';
 import 'tech_card_service_supabase.dart';
 import 'tech_card_translation_cache.dart';
 import 'translation_service.dart';
@@ -49,6 +50,20 @@ class EstablishmentDataWarmupService {
     Establishment? establishment,
   }) async {
     try {
+      // Полная выгрузка заведения в кэши — в фоне после кадра, без блокировки ТТК/переводов.
+      if (establishment != null) {
+        unawaited(
+          Future<void>(() async {
+            await Future<void>.delayed(Duration.zero);
+            await EstablishmentLocalHydrationService.instance.runFullHydration(
+              establishmentId: establishment.id,
+              dataEstablishmentId: dataEstablishmentId,
+              productStore: productStore,
+              establishment: establishment,
+            );
+          }),
+        );
+      }
       await TechCardTranslationCache.loadForEstablishment(dataEstablishmentId);
       final lang = localization.currentLanguageCode;
 
@@ -101,9 +116,6 @@ class EstablishmentDataWarmupService {
       if (!kIsWeb && establishment != null) {
         try {
           await Future.wait([
-            DocumentationServiceSupabase()
-                .prefetchDocumentsCacheForMobile(establishment.id),
-            loadSchedule(establishment.id),
             AccountManagerSupabase().warmEmployeesCache(establishment.id),
           ]);
         } catch (_) {}
@@ -116,5 +128,6 @@ class EstablishmentDataWarmupService {
   void resetSession() {
     _chain = Future<void>.value();
     TechCard.clearTranslationOverlay();
+    EstablishmentLocalHydrationService.instance.stopPeriodicSync();
   }
 }

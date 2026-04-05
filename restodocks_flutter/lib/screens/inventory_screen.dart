@@ -3626,7 +3626,7 @@ class InventoryIikoScreen extends StatefulWidget {
 final List<FocusNode> _iikoCellFocusNodes = [];
 
 class _InventoryIikoScreenState extends State<InventoryIikoScreen>
-    with AutoSaveMixin<InventoryIikoScreen> {
+    with AutoSaveMixin<InventoryIikoScreen>, WidgetsBindingObserver {
   @override
   int get scheduleSaveDebounceMs => 650;
 
@@ -3649,8 +3649,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   // Временное хранилище данных черновика до загрузки продуктов
   Map<String, dynamic>? _pendingDraftData;
 
-  // Метка времени последнего сохранения (для индикатора "Данные защищены")
-  DateTime? _lastSavedAt;
+  /// Индикатор «данные защищены» — без полного setState экрана.
+  final ValueNotifier<DateTime?> _lastSavedAtNotifier =
+      ValueNotifier<DateTime?>(null);
+  Timer? _savedBadgeDebounce;
 
   // ── AutoSaveMixin ──────────────────────────────────────────────────────────
   @override
@@ -3692,14 +3694,25 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
           }
         }
       }
-      _lastSavedAt = DateTime.now(); // черновик загружен — данные под защитой
     });
+    _lastSavedAtNotifier.value = DateTime.now(); // черновик загружен
   }
   // ──────────────────────────────────────────────────────────────────────────
 
+  /// Обновление видимости статуса/кнопок без setState всего экрана.
+  final ValueNotifier<bool> _keyboardChromeVisible = ValueNotifier(false);
+
+  void _syncKeyboardChrome() {
+    if (!mounted) return;
+    final active = _keyboardActiveNow();
+    if (_keyboardChromeVisible.value != active) {
+      _keyboardChromeVisible.value = active;
+    }
+  }
+
   /// Скрывать статус и кнопки при клавиатуре. На мобильном viewInsets часто 0,
   /// поэтому на узком экране скрываем по фокусу в поле.
-  bool get _isKeyboardActive {
+  bool _keyboardActiveNow() {
     if (!mounted) return false;
     if (MediaQuery.viewInsetsOf(context).bottom > 0) return true;
     if (MediaQuery.sizeOf(context).width >= 600) return false;
@@ -3710,6 +3723,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   @override
   void initState() {
     super.initState(); // AutoSaveMixin.initState регистрирует lifecycle-хуки
+    WidgetsBinding.instance.addObserver(this);
     _filterCtrl.addListener(() {
       _filterDebounce?.cancel();
       _filterDebounce = Timer(const Duration(milliseconds: 120), () {
@@ -3719,7 +3733,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         setState(() => _nameFilter = t);
       });
     });
-    _searchFocusNode.addListener(() => setState(() {}));
+    _searchFocusNode.addListener(_syncKeyboardChrome);
     _registerJsNavChannel();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Подписываемся на store: когда restoreBlankFromStorage завершится и
@@ -3728,7 +3742,13 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       store.addListener(_onStoreUpdated);
       _loadProducts();
       _startPeriodicServerSave();
+      _syncKeyboardChrome();
     });
+  }
+
+  @override
+  void didChangeMetrics() {
+    _syncKeyboardChrome();
   }
 
   /// Регистрирует window._flutterNav(dir) — вызывается JS кнопками ▲▼.
@@ -3772,8 +3792,11 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _filterDebounce?.cancel();
-    _qtyUiDebounce?.cancel();
+    _savedBadgeDebounce?.cancel();
+    _keyboardChromeVisible.dispose();
+    _lastSavedAtNotifier.dispose();
     _filterCtrl.dispose();
     _searchFocusNode.dispose();
     _serverSaveTimer?.cancel();
@@ -3863,9 +3886,6 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   /// См. [_InventoryScreenState._serverDraftDirty] — не дергаем Supabase без изменений черновика.
   bool _serverDraftDirty = false;
 
-  /// Отложенный перерисовывание итогов: без этого каждая цифра вызывает setState на весь экран → лаги и сбои фокуса.
-  Timer? _qtyUiDebounce;
-
   void _setQuantity(_IikoInventoryRow row, int colIndex, double value) {
     row.quantities[colIndex] = value;
     var addedCell = false;
@@ -3873,18 +3893,12 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
       row.quantities.add(0.0);
       addedCell = true;
     }
-    if (addedCell) {
-      _qtyUiDebounce?.cancel();
-      if (mounted) setState(() {});
-    } else {
-      _qtyUiDebounce?.cancel();
-      _qtyUiDebounce = Timer(const Duration(milliseconds: 24), () {
-        if (mounted) setState(() {});
-      });
-    }
+    // Новая колонка замеров — нужна перерисовка шапки; иначе «Итого» обновляет строка локально.
+    if (addedCell && mounted) setState(() {});
     scheduleSave(); // AutoSaveMixin — debounce записи черновика
-    Future.delayed(const Duration(milliseconds: 400), () {
-      if (mounted) setState(() => _lastSavedAt = DateTime.now());
+    _savedBadgeDebounce?.cancel();
+    _savedBadgeDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) _lastSavedAtNotifier.value = DateTime.now();
     });
   }
 
@@ -3978,8 +3992,8 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         r.quantities = [0.0, 0.0];
       }
       _completed = false;
-      _lastSavedAt = null;
     });
+    _lastSavedAtNotifier.value = null;
     // Сбрасываем черновики
     await clearDraft();
     _clearServerDraft();
@@ -4688,74 +4702,87 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                         ),
                       ),
                     ),
-                    // Статус-строка — скрываем при фокусе (поиск или ячейка)
-                    if (!_isKeyboardActive)
-                      Container(
-                        color: theme.colorScheme.surfaceContainerHighest
-                            .withOpacity(0.5),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 6),
-                        child: Row(
-                          children: [
-                            Icon(Icons.table_chart_outlined,
-                                size: 16, color: theme.colorScheme.primary),
-                            const SizedBox(width: 6),
-                            Text(
-                              loc.t('inventory_iiko_status', args: {
-                                'count': '${_rows.length}',
-                                'date': iikoStatusDateStr,
-                              }),
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: theme.colorScheme.onSurfaceVariant),
-                            ),
-                            const Spacer(),
-                            // Индикатор защиты данных
-                            if (_lastSavedAt != null)
-                              Container(
-                                margin: const EdgeInsets.only(right: 4),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 7, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                      color: Colors.green.withOpacity(0.4)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.security,
-                                        size: 12, color: Colors.green),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      loc.t('inventory_data_protected'),
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Colors.green[700],
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                    // Статус-строка — скрываем при фокусе (без setState всего экрана)
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _keyboardChromeVisible,
+                      builder: (context, keyboardActive, _) {
+                        if (keyboardActive) return const SizedBox.shrink();
+                        return Container(
+                          color: theme.colorScheme.surfaceContainerHighest
+                              .withOpacity(0.5),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 6),
+                          child: Row(
+                            children: [
+                              Icon(Icons.table_chart_outlined,
+                                  size: 16, color: theme.colorScheme.primary),
+                              const SizedBox(width: 6),
+                              Text(
+                                loc.t('inventory_iiko_status', args: {
+                                  'count': '${_rows.length}',
+                                  'date': iikoStatusDateStr,
+                                }),
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    color: theme.colorScheme.onSurfaceVariant),
                               ),
-                            TextButton(
-                              onPressed: () async {
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: _date,
-                                  firstDate: DateTime(2020),
-                                  lastDate: DateTime(2030),
-                                );
-                                if (picked != null)
-                                  setState(() => _date = picked);
-                              },
-                              child: Text(loc.t('inventory_date'),
-                                  style: const TextStyle(fontSize: 12)),
-                            ),
-                          ],
-                        ),
-                      ),
+                              const Spacer(),
+                              ValueListenableBuilder<DateTime?>(
+                                valueListenable: _lastSavedAtNotifier,
+                                builder: (context, savedAt, _) {
+                                  if (savedAt == null) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return Container(
+                                    margin: const EdgeInsets.only(right: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 7, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                          color:
+                                              Colors.green.withOpacity(0.4)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.security,
+                                            size: 12, color: Colors.green),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          loc.t('inventory_data_protected'),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.green[700],
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                              TextButton(
+                                onPressed: () async {
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: _date,
+                                    firstDate: DateTime(2020),
+                                    lastDate: DateTime(2030),
+                                  );
+                                  if (picked != null) {
+                                    setState(() => _date = picked);
+                                  }
+                                },
+                                child: Text(loc.t('inventory_date'),
+                                    style: const TextStyle(fontSize: 12)),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                     // Шапка таблицы
                     _IikoInventoryHeader(
                       qtyCols: _rows.isEmpty
@@ -4792,41 +4819,45 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                                 rows: visibleRows,
                                 completed: _completed,
                                 onQuantityChanged: _setQuantity,
-                                onFocusChange: () => setState(() {}),
+                                onFocusChange: _syncKeyboardChrome,
                               ),
                             ),
                     ),
-                    // Кнопки внизу — скрываем при фокусе (поиск или ячейка)
-                    if (!_isKeyboardActive)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: FilledButton.icon(
-                                icon: const Icon(Icons.save_alt),
-                                label:
-                                    Text(loc.t('inventory_save_download_xlsx')),
-                                onPressed: _saveAndExport,
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _keyboardChromeVisible,
+                      builder: (context, keyboardActive, _) {
+                        if (keyboardActive) return const SizedBox.shrink();
+                        return Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton.icon(
+                                  icon: const Icon(Icons.save_alt),
+                                  label: Text(
+                                      loc.t('inventory_save_download_xlsx')),
+                                  onPressed: _saveAndExport,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            OutlinedButton(
-                              onPressed: _confirmReset,
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: theme.colorScheme.error,
-                                side: BorderSide(
-                                    color: theme.colorScheme.error
-                                        .withOpacity(0.5)),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 12),
+                              const SizedBox(width: 8),
+                              OutlinedButton(
+                                onPressed: _confirmReset,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: theme.colorScheme.error,
+                                  side: BorderSide(
+                                      color: theme.colorScheme.error
+                                          .withOpacity(0.5)),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 12),
+                                ),
+                                child: Text(loc.t('inventory_reset_confirm'),
+                                    style: const TextStyle(fontSize: 13)),
                               ),
-                              child: Text(loc.t('inventory_reset_confirm'),
-                                  style: const TextStyle(fontSize: 13)),
-                            ),
-                          ],
-                        ),
-                      ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ],
@@ -4898,6 +4929,15 @@ class _IikoInventoryHeader extends StatelessWidget {
 }
 
 // ── Таблица ──────────────────────────────────────────────────────────────────
+class _IikoFlatEntry {
+  const _IikoFlatEntry._({this.header, this.row});
+  final String? header;
+  final _IikoInventoryRow? row;
+  bool get isHeader => header != null;
+  factory _IikoFlatEntry.group(String h) => _IikoFlatEntry._(header: h);
+  factory _IikoFlatEntry.row(_IikoInventoryRow r) => _IikoFlatEntry._(row: r);
+}
+
 class _IikoInventoryTable extends StatelessWidget {
   const _IikoInventoryTable({
     required this.rows,
@@ -4912,56 +4952,86 @@ class _IikoInventoryTable extends StatelessWidget {
       onQuantityChanged;
   final VoidCallback? onFocusChange;
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  static List<_IikoFlatEntry> _entriesFor(List<_IikoInventoryRow> rows) {
+    final entries = <_IikoFlatEntry>[];
     String? lastGroup;
-    final items = <Widget>[];
-    for (var i = 0; i < rows.length; i++) {
-      final row = rows[i];
+    for (final row in rows) {
       final groupName = row.product.groupName ?? '';
       final groupDisplay = row.product.displayGroupName ?? '';
       if (groupName != lastGroup) {
         lastGroup = groupName;
         if (groupDisplay.isNotEmpty) {
-          items.add(Container(
-            width: double.infinity,
-            color: theme.colorScheme.primaryContainer.withOpacity(0.25),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: Text(
-              groupDisplay,
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.primary),
-            ),
-          ));
+          entries.add(_IikoFlatEntry.group(groupDisplay));
         }
       }
-      items.add(RepaintBoundary(
-        child: _IikoInventoryRowTile(
-          key: ValueKey(row.product.id),
-          row: row,
-          completed: completed,
-          onChanged: (colIdx, qty) => onQuantityChanged(row, colIdx, qty),
-          onFocusChange: onFocusChange,
-        ),
-      ));
+      entries.add(_IikoFlatEntry.row(row));
     }
+    return entries;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = _entriesFor(rows);
     // Web: все строки в DOM — Safari видит цепочку <input> для ▲▼ в панели.
-    // iOS/Android: builder — меньше лагов при длинном бланке.
+    // iOS/Android: builder — не создаём тысячи виджетов на каждый кадр.
     if (kIsWeb) {
       return ListView(
         keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
-        children: items,
+        children: [
+          for (final e in entries)
+            e.isHeader
+                ? _iikoGroupHeaderWidget(context, e.header!)
+                : RepaintBoundary(
+                    child: _IikoInventoryRowTile(
+                      key: ValueKey(e.row!.product.id),
+                      row: e.row!,
+                      completed: completed,
+                      onChanged: (colIdx, qty) =>
+                          onQuantityChanged(e.row!, colIdx, qty),
+                      onFocusChange: onFocusChange,
+                    ),
+                  ),
+        ],
       );
     }
     return ListView.builder(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
-      itemCount: items.length,
-      itemBuilder: (context, i) => items[i],
+      itemCount: entries.length,
+      itemBuilder: (context, i) {
+        final e = entries[i];
+        if (e.isHeader) {
+          return _iikoGroupHeaderWidget(context, e.header!);
+        }
+        return RepaintBoundary(
+          child: _IikoInventoryRowTile(
+            key: ValueKey(e.row!.product.id),
+            row: e.row!,
+            completed: completed,
+            onChanged: (colIdx, qty) =>
+                onQuantityChanged(e.row!, colIdx, qty),
+            onFocusChange: onFocusChange,
+          ),
+        );
+      },
     );
   }
+}
+
+Widget _iikoGroupHeaderWidget(BuildContext context, String groupDisplay) {
+  final theme = Theme.of(context);
+  return Container(
+    width: double.infinity,
+    color: theme.colorScheme.primaryContainer.withOpacity(0.25),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    child: Text(
+      groupDisplay,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: theme.colorScheme.primary,
+      ),
+    ),
+  );
 }
 
 // ── Строка с 2 ячейками и итого ──────────────────────────────────────────────
@@ -5206,10 +5276,12 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
               onChanged: (v) {
                 final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
                 widget.onChanged(colIdx, qty);
+                setState(() {}); // только «Итого» в строке, без перерисовки всего списка
               },
               onSubmitted: (v) {
                 final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
                 widget.onChanged(colIdx, qty);
+                setState(() {});
               },
             ),
           ),

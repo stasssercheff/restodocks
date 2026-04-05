@@ -8,6 +8,7 @@ import 'auth_visibility_resume_stub.dart'
     if (dart.library.html) 'auth_visibility_resume_web.dart' as auth_vis;
 import '../services/account_manager_supabase.dart';
 import '../services/account_ui_sync_service.dart';
+import '../services/establishment_local_hydration_service.dart';
 import '../utils/dev_log.dart';
 
 /// На вебе при простое истекает access_token; без refresh роль становится anon, RLS на
@@ -85,6 +86,7 @@ class _AuthSessionLifecycleState extends State<AuthSessionLifecycle>
     // В т.ч. legacy-вход без JWT: проверка промо/Pro на сервере при возврате в приложение.
     unawaited(AccountManagerSupabase().syncEstablishmentAccessFromServer());
     unawaited(AccountUiSyncService.instance.refreshEmployeeProfileFromServer());
+    unawaited(EstablishmentLocalHydrationService.instance.runBackgroundDeltaSync());
   }
 
   @override

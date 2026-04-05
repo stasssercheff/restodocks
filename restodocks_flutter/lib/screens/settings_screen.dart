@@ -2462,9 +2462,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 leading: const Icon(Icons.currency_exchange),
                 title: Text(localization.t('currency')),
-                subtitle: Text(establishment?.currencySymbol ??
-                    Establishment.currencySymbolFor(
-                        establishment?.defaultCurrency ?? 'VND')),
+                subtitle: Text(
+                  establishment == null
+                      ? Establishment.currencySymbolFor('VND')
+                      : '${establishment.defaultCurrency} · ${establishment.currencySymbol}',
+                ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _showCurrencyPicker(context, localization),
               ),

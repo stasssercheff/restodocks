@@ -99,6 +99,13 @@ class OfflineCacheService {
     return age <= maxAge;
   }
 
+  /// Обновить метку времени кэша без перезаписи payload (после полной гидратации).
+  Future<void> touchKey(String key) async {
+    final prefs = await _sp();
+    if (!prefs.containsKey(key)) return;
+    await prefs.setInt('$key:ts', DateTime.now().millisecondsSinceEpoch);
+  }
+
   Future<void> clearCurrentUserCache() async {
     final token = await _scopeToken();
     final prefs = await _sp();

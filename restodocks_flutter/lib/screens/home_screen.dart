@@ -48,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final account = context.read<AccountManagerSupabase>();
     final est = account.establishment;
     if (est == null) return;
+    EstablishmentLocalHydrationService.instance.ensurePeriodicSyncStarted();
     unawaited(EstablishmentDataWarmupService.instance.runForEstablishment(
       dataEstablishmentId: est.dataEstablishmentId,
       techCards: context.read<TechCardServiceSupabase>(),
