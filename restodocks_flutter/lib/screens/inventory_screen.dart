@@ -10,7 +10,7 @@ import '../utils/dev_log.dart';
 
 import 'package:excel/excel.dart' hide Border, TextSpan;
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, ValueNotifier;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -26,7 +26,6 @@ import '../services/services.dart';
 import '../services/iiko_product_store.dart';
 import '../services/draft_storage_service.dart';
 import '../mixins/auto_save_mixin.dart';
-import '../mixins/input_change_listener_mixin.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Единица для ПФ в бланке: вес (г) или штуки/порции.
@@ -177,12 +176,10 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen>
-with
-        AutoSaveMixin<InventoryScreen>,
-        InputChangeListenerMixin<InventoryScreen> {
+    with AutoSaveMixin<InventoryScreen> {
   /// Реже пишем большой черновик на диск — меньше подлагиваний при вводе в ячейках.
   @override
-  int get scheduleSaveDebounceMs => 650;
+  int get scheduleSaveDebounceMs => 850;
 
   @override
   void scheduleSave() {
@@ -194,6 +191,18 @@ with
   /// Пока false — таймер не гоняет [getCurrentState] и upsert на Supabase (нет лишней работы в фоне).
   bool _serverDraftDirty = false;
   final List<_InventoryRow> _rows = [];
+
+  /// Локальное обновление строки «Итого» без [setState] на всём экране (иначе при сотнях строк лаг при вводе).
+  final List<ValueNotifier<int>> _rowRepaintTicks = [];
+
+  void _syncRowRepaintNotifiers() {
+    while (_rowRepaintTicks.length < _rows.length) {
+      _rowRepaintTicks.add(ValueNotifier<int>(0));
+    }
+    while (_rowRepaintTicks.length > _rows.length) {
+      _rowRepaintTicks.removeLast().dispose();
+    }
+  }
 
   /// Продукты, перерасчитанные из ПФ (третья секция); заполняется при загрузке файла.
   List<Map<String, dynamic>>? _aggregatedFromFile;
@@ -250,12 +259,6 @@ with
     });
     _nameFilterFocusNode.addListener(() {
       setState(() => _hasInputFocus = _nameFilterFocusNode.hasFocus);
-    });
-
-    // Настроить автосохранение - сохранять чаще
-    setOnInputChanged(() {
-      // Сохранять немедленно при любом изменении
-      saveNow();
     });
 
     // Тихая отправка на сервер: реже, чем раньше, и только если черновик менялся ([_serverDraftDirty]).
@@ -839,6 +842,7 @@ with
         }
       }
     });
+    _syncRowRepaintNotifiers();
   }
 
   /// Добавить строки из распознанного чека (ИИ).
@@ -858,6 +862,7 @@ with
         ));
       }
     });
+    _syncRowRepaintNotifiers();
     scheduleSave(); // Автосохранение при добавлении строк из чека
   }
 
@@ -889,6 +894,10 @@ with
 
   @override
   void dispose() {
+    for (final n in _rowRepaintTicks) {
+      n.dispose();
+    }
+    _rowRepaintTicks.clear();
     _nameFilterDebounce?.cancel();
     _nameFilterCtrl.dispose();
     _nameFilterFocusNode.dispose();
@@ -1069,6 +1078,7 @@ with
       _rows.add(
           _InventoryRow(product: p, techCard: null, quantities: quantities));
     });
+    _syncRowRepaintNotifiers();
     saveNow(); // Сохранить немедленно при добавлении продукта
   }
 
@@ -1083,9 +1093,17 @@ with
     // Обновляем значение напрямую
     row.quantities[colIndex] = value;
 
-    // Вызываем setState только если значение действительно изменилось
     if (oldValue != value) {
-      setState(() {});
+      if (rowIndex < _rowRepaintTicks.length) {
+        final t = _rowRepaintTicks[rowIndex];
+        t.value = t.value + 1;
+      } else {
+        _syncRowRepaintNotifiers();
+        if (rowIndex < _rowRepaintTicks.length) {
+          final t = _rowRepaintTicks[rowIndex];
+          t.value = t.value + 1;
+        }
+      }
     }
 
     // При печати в ячейке используем debounce-автосохранение, чтобы не блокировать UI.
@@ -1097,6 +1115,7 @@ with
     setState(() {
       _rows.removeAt(index);
     });
+    _syncRowRepaintNotifiers();
     saveNow(); // Сохранить немедленно при удалении строки
   }
 
@@ -1280,6 +1299,7 @@ with
       _endTime = null;
       _completed = false;
     });
+    _syncRowRepaintNotifiers();
     clearDraft();
     if (wasSelective) {
       Future.microtask(() async {
@@ -2104,6 +2124,7 @@ with
   }
 
   Widget _buildTableWithFixedColumn(LocalizationService loc) {
+    _syncRowRepaintNotifiers();
     final leftW = _leftWidth(context);
 
     return Column(
@@ -2451,7 +2472,8 @@ with
     final row = _rows[actualIndex];
     return RepaintBoundary(
       child: _StandardInventoryRowTile(
-        fixedPart: _buildFixedDataRow(loc, actualIndex, rowNumber),
+        rowRepaintTick: _rowRepaintTicks[actualIndex],
+        buildFixedPart: () => _buildFixedDataRow(loc, actualIndex, rowNumber),
         row: row,
         actualIndex: actualIndex,
         isLastRow: isLastRow,
@@ -2893,6 +2915,7 @@ with
         }
       }
     });
+    _syncRowRepaintNotifiers();
     saveNow();
     return true;
   }
@@ -3139,7 +3162,8 @@ class _SelectiveInventoryPickerSheetState
 /// Строка стандартной инвентаризации: [фикс.часть | скролл ячеек]. Скролл — per-row, как в iiko.
 class _StandardInventoryRowTile extends StatefulWidget {
   const _StandardInventoryRowTile({
-    required this.fixedPart,
+    required this.rowRepaintTick,
+    required this.buildFixedPart,
     required this.row,
     required this.actualIndex,
     required this.isLastRow,
@@ -3156,7 +3180,9 @@ class _StandardInventoryRowTile extends StatefulWidget {
     required this.loc,
   });
 
-  final Widget fixedPart;
+  final ValueNotifier<int> rowRepaintTick;
+  /// Вызывается при каждом тике (обновление «Итого» без перерисовки всей таблицы).
+  final Widget Function() buildFixedPart;
   final _InventoryRow row;
   final int actualIndex;
   final bool isLastRow;
@@ -3213,86 +3239,97 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final row = widget.row;
-    final qtyCols = row.quantities.length;
+    return ValueListenableBuilder<int>(
+      valueListenable: widget.rowRepaintTick,
+      builder: (context, _, __) {
+        final theme = Theme.of(context);
+        final row = widget.row;
+        final qtyCols = row.quantities.length;
 
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(width: widget.leftWidth, child: widget.fixedPart),
-          Expanded(
-            child: SingleChildScrollView(
-              controller: _hScroll,
-              scrollDirection: Axis.horizontal,
-              physics: const ClampingScrollPhysics(),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surface,
-                  border: Border(
-                      bottom: BorderSide(
-                          color: theme.dividerColor.withOpacity(0.5))),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    ...List.generate(
-                      qtyCols,
-                      (colIndex) {
-                        final isLastCell =
-                            widget.isLastRow && colIndex == qtyCols - 1;
-                        return Padding(
-                          padding: EdgeInsets.only(
-                              right:
-                                  colIndex < qtyCols - 1 ? widget.colGap : 0),
-                          child: SizedBox(
-                            width: widget.colQtyWidth,
-                            child: Center(
-                              child: widget.completed
-                                  ? Text(
-                                      widget.formatQty(
-                                          row.quantityDisplayAt(colIndex)),
-                                      style: theme.textTheme.bodyMedium)
-                                  : _QtyCell(
-                                      key: ValueKey(
-                                          'qty_${widget.actualIndex}_$colIndex'),
-                                      value: row.quantities[colIndex],
-                                      useGrams: row.isWeightInKg,
-                                      onChanged: (v) => widget.onSetQuantity(
-                                          widget.actualIndex, colIndex, v),
-                                      textInputAction: isLastCell
-                                          ? TextInputAction.done
-                                          : TextInputAction.next,
-                                      onFocusGained: () {
-                                        widget.onFocusChange(true);
-                                        if (colIndex == qtyCols - 1) {
-                                          widget.onLastCellFocused(
-                                              widget.actualIndex);
-                                        }
-                                      },
-                                      onFocusLost: () {
-                                        widget.onFocusChange(false);
-                                        widget.onCellFocusLost(
-                                            widget.actualIndex, colIndex);
-                                        if (colIndex == qtyCols - 2 &&
-                                            row.quantities[colIndex] > 0)
-                                          _scrollToEnd();
-                                      },
-                                    ),
-                            ),
-                          ),
-                        );
-                      },
+        return IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                  width: widget.leftWidth, child: widget.buildFixedPart()),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _hScroll,
+                  scrollDirection: Axis.horizontal,
+                  physics: const ClampingScrollPhysics(),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surface,
+                      border: Border(
+                          bottom: BorderSide(
+                              color: theme.dividerColor.withOpacity(0.5))),
                     ),
-                  ],
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ...List.generate(
+                          qtyCols,
+                          (colIndex) {
+                            final isLastCell =
+                                widget.isLastRow && colIndex == qtyCols - 1;
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                  right: colIndex < qtyCols - 1
+                                      ? widget.colGap
+                                      : 0),
+                              child: SizedBox(
+                                width: widget.colQtyWidth,
+                                child: Center(
+                                  child: widget.completed
+                                      ? Text(
+                                          widget.formatQty(
+                                              row.quantityDisplayAt(colIndex)),
+                                          style: theme.textTheme.bodyMedium)
+                                      : _QtyCell(
+                                          key: ValueKey(
+                                              'qty_${widget.actualIndex}_$colIndex'),
+                                          value: row.quantities[colIndex],
+                                          useGrams: row.isWeightInKg,
+                                          onChanged: (v) =>
+                                              widget.onSetQuantity(
+                                                  widget.actualIndex,
+                                                  colIndex,
+                                                  v),
+                                          textInputAction: isLastCell
+                                              ? TextInputAction.done
+                                              : TextInputAction.next,
+                                          onFocusGained: () {
+                                            widget.onFocusChange(true);
+                                            if (colIndex == qtyCols - 1) {
+                                              widget.onLastCellFocused(
+                                                  widget.actualIndex);
+                                            }
+                                          },
+                                          onFocusLost: () {
+                                            widget.onFocusChange(false);
+                                            widget.onCellFocusLost(
+                                                widget.actualIndex, colIndex);
+                                            if (colIndex == qtyCols - 2 &&
+                                                row.quantities[colIndex] > 0)
+                                              _scrollToEnd();
+                                          },
+                                        ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
