@@ -280,8 +280,11 @@ function EstablishmentsTab() {
     setDeleting(row.id)
     try {
       const res = await fetch(`/api/establishments/${row.id}`, { method: 'DELETE' })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json?.error || 'Ошибка удаления')
+      const json = (await res.json().catch(() => ({}))) as { error?: string; code?: string }
+      if (!res.ok) {
+        const parts = [json?.error, json?.code ? `(${json.code})` : ''].filter(Boolean)
+        throw new Error(parts.join(' ') || 'Ошибка удаления')
+      }
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Ошибка удаления')
