@@ -16,6 +16,7 @@ import '../models/iiko_product.dart';
 import '../utils/number_format_utils.dart';
 import '../utils/product_name_utils.dart';
 import '../utils/nomenclature_duplicate_groups.dart';
+import '../utils/establishment_currency_options.dart';
 import '../services/iiko_product_store.dart';
 import '../services/iiko_xlsx_sanitizer.dart';
 
@@ -4216,17 +4217,6 @@ class _ProductEditDialog extends StatefulWidget {
   final bool isCreate;
   final VoidCallback onSaved;
 
-  static const _currencies = [
-    'RUB',
-    'USD',
-    'EUR',
-    'VND',
-    'THB',
-    'KZT',
-    'GBP',
-    'UAH'
-  ];
-
   @override
   State<_ProductEditDialog> createState() => _ProductEditDialogState();
 }
@@ -4338,6 +4328,129 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     return double.tryParse(s);
   }
 
+  bool get _currencyFollowsEstablishment =>
+      widget.establishmentId != null && widget.establishmentId!.isNotEmpty;
+
+  String _currencyCodeForSave(AccountManagerSupabase acc) {
+    if (_currencyFollowsEstablishment) {
+      return (acc.establishment?.defaultCurrency ?? _currency).toUpperCase();
+    }
+    return _currency.toUpperCase();
+  }
+
+  Future<void> _openEstablishmentCurrencyPicker() async {
+    final account = context.read<AccountManagerSupabase>();
+    final est = account.establishment;
+    if (est == null) return;
+    await showEstablishmentCurrencyPickerDialog(
+      context: context,
+      loc: widget.loc,
+      currentCode: est.defaultCurrency,
+      onApply: (code) async {
+        final updated = est.copyWith(
+          defaultCurrency: code,
+          updatedAt: DateTime.now(),
+        );
+        try {
+          await account.updateEstablishment(updated);
+          await widget.store.syncEstablishmentNomenclatureCurrency(
+            updated.productsEstablishmentId,
+            updated.defaultCurrency,
+          );
+          if (mounted) setState(() {});
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(widget.loc.t('currency_saved'))),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  widget.loc.t(
+                    'nomenclature_save_error',
+                    args: {'error': '$e'},
+                  ),
+                ),
+              ),
+            );
+          }
+        }
+      },
+    );
+  }
+
+  Widget _buildCurrencyControl(AccountManagerSupabase account) {
+    if (_currencyFollowsEstablishment) {
+      final code = account.establishment?.defaultCurrency ?? _currency;
+      final preset = EstablishmentCurrencyOptions.presetForCode(code);
+      return InkWell(
+        onTap: _openEstablishmentCurrencyPicker,
+        borderRadius: BorderRadius.circular(4),
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: widget.loc.t('currency'),
+            border: const OutlineInputBorder(),
+          ),
+          child: Row(
+            children: [
+              Text(
+                preset?['symbol'] ?? '',
+                style: const TextStyle(fontSize: 20),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  preset != null
+                      ? '${preset['code']} — ${preset['name']}'
+                      : code.toUpperCase(),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const Icon(Icons.arrow_drop_down, size: 20),
+            ],
+          ),
+        ),
+      );
+    }
+    final known = EstablishmentCurrencyOptions.isKnownPreset(_currency);
+    final v = _currency.toUpperCase();
+    return DropdownButtonFormField<String>(
+      value: v,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: widget.loc.t('currency'),
+        border: const OutlineInputBorder(),
+      ),
+      items: [
+        ...EstablishmentCurrencyOptions.all.map(
+          (c) => DropdownMenuItem(
+            value: c['code']!,
+            child: Row(
+              children: [
+                Text(c['symbol']!, style: const TextStyle(fontSize: 18)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${c['code']} — ${c['name']}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (!known)
+          DropdownMenuItem(
+            value: v,
+            child: Text(v),
+          ),
+      ],
+      onChanged: (nv) => setState(() => _currency = nv ?? _currency),
+    );
+  }
+
   /// ИИ проверяет название на опечатки — подсказка только в тексте, название не меняем автоматически.
   Future<void> _checkNameWithAi() async {
     final name = _nameController.text.trim();
@@ -4401,10 +4514,12 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     final gpp = CulinaryUnits.isCountable(_unit)
         ? _parseNum(_gramsPerPieceController.text)
         : null;
+    final acc = context.read<AccountManagerSupabase>();
+    final currencyCode = _currencyCodeForSave(acc);
     final updated = widget.product.copyWith(
       name: name,
       names: merged,
-      currency: _currency,
+      currency: currencyCode,
       packagePrice: pkgPrice,
       clearPackagePrice: !_priceByPackage,
       packageWeightGrams: pkgWeight,
@@ -4430,7 +4545,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
             widget.establishmentId!,
             savedUpdated.id,
             price: pricePerKg,
-            currency: _currency,
+            currency: currencyCode,
           );
         }
       } else {
@@ -4442,7 +4557,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
               widget.establishmentId!,
               widget.product.id,
               pricePerKg,
-              _currency,
+              currencyCode,
             );
           }
         }
@@ -4470,7 +4585,15 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final account = context.watch<AccountManagerSupabase>();
     final lang = widget.loc.currentLanguageCode;
+    final priceDisplayCode = _currencyFollowsEstablishment
+        ? (account.establishment?.defaultCurrency ?? _currency)
+        : _currency;
+    final priceDisplayPreset =
+        EstablishmentCurrencyOptions.presetForCode(priceDisplayCode);
+    final priceSuffix =
+        priceDisplayPreset?['symbol'] ?? priceDisplayCode.toUpperCase();
     return AlertDialog(
       title: Text(
           widget.loc.t(widget.isCreate ? 'add_from_catalog' : 'edit_product')),
@@ -4659,21 +4782,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _currency,
-                        decoration: InputDecoration(
-                          labelText: widget.loc.t('currency'),
-                          border: const OutlineInputBorder(),
-                        ),
-                        items: _ProductEditDialog._currencies
-                            .map((c) =>
-                                DropdownMenuItem(value: c, child: Text(c)))
-                            .toList(),
-                        onChanged: (v) =>
-                            setState(() => _currency = v ?? _currency),
-                      ),
-                    ),
+                    Expanded(child: _buildCurrencyControl(account)),
                   ],
                 ),
               ] else ...[
@@ -4707,21 +4816,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: _currency,
-                        decoration: InputDecoration(
-                          labelText: widget.loc.t('currency'),
-                          border: const OutlineInputBorder(),
-                        ),
-                        items: _ProductEditDialog._currencies
-                            .map((c) =>
-                                DropdownMenuItem(value: c, child: Text(c)))
-                            .toList(),
-                        onChanged: (v) =>
-                            setState(() => _currency = v ?? _currency),
-                      ),
-                    ),
+                    Expanded(child: _buildCurrencyControl(account)),
                   ],
                 ),
                 // Показываем расчётную цену за кг
@@ -4729,7 +4824,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      '${widget.loc.t('price_per_kg_computed')}: ${_computedPricePerKg!.toStringAsFixed(2)} $_currency',
+                      '${widget.loc.t('price_per_kg_computed')}: ${_computedPricePerKg!.toStringAsFixed(2)} $priceSuffix',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Theme.of(context).colorScheme.primary,
                             fontWeight: FontWeight.w600,

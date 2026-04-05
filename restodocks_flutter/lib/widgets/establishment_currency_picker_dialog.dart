@@ -75,7 +75,8 @@ Future<void> showEstablishmentCurrencyPickerDialog({
                         ),
                       )
                     else
-                      Flexible(
+                      SizedBox(
+                        height: 360,
                         child: ListView(
                           shrinkWrap: true,
                           children: EstablishmentCurrencyOptions.all.map((c) {

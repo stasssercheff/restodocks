@@ -21,7 +21,7 @@ import '../widgets/long_operation_progress_dialog.dart';
 import '../widgets/post_registration_trial_dialog.dart';
 import '../widgets/pro_settings_owner_section.dart';
 import '../widgets/sales_financials_management_tile.dart';
-import '../utils/establishment_currency_options.dart';
+import '../widgets/establishment_currency_picker_dialog.dart';
 
 const _adminEmails = <String>{'stasssercheff@gmail.com'};
 bool _isPlatformAdminEmail(String email) =>
@@ -1036,161 +1036,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final establishment = account.establishment;
     if (establishment == null) return;
 
-    final currentCode = establishment.defaultCurrency.toUpperCase();
-    final customController = TextEditingController();
-    var useOther =
-        !EstablishmentCurrencyOptions.all.any((c) => c['code'] == currentCode);
-    if (useOther) customController.text = currentCode;
-
-    showDialog<void>(
+    showEstablishmentCurrencyPickerDialog(
       context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx2, setDialogState) {
-            return Center(
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  constraints:
-                      const BoxConstraints(maxWidth: 400, maxHeight: 500),
-                  decoration: BoxDecoration(
-                    color: Theme.of(ctx2).dialogBackgroundColor,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 16,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-                        child: Text(
-                          loc.t('currency'),
-                          style: Theme.of(ctx2).textTheme.titleMedium,
-                        ),
-                      ),
-                      CheckboxListTile(
-                        value: useOther,
-                        onChanged: (v) =>
-                            setDialogState(() => useOther = v ?? false),
-                        title: Text(loc.t('custom_currency'),
-                            style: const TextStyle(fontSize: 14)),
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 16),
-                        controlAffinity: ListTileControlAffinity.leading,
-                      ),
-                      if (useOther)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                          child: TextField(
-                            controller: customController,
-                            decoration: InputDecoration(
-                              labelText: loc.t('currency_code'),
-                              hintText: loc.t('currency_hint'),
-                              border: const OutlineInputBorder(),
-                            ),
-                            textCapitalization: TextCapitalization.characters,
-                            maxLength: 3,
-                            onChanged: (_) => setDialogState(() {}),
-                          ),
-                        )
-                      else
-                        Flexible(
-                          child: ListView(
-                            shrinkWrap: true,
-                            children: EstablishmentCurrencyOptions.all.map((c) {
-                              final code = c['code']!;
-                              final symbol = c['symbol']!;
-                              final name = c['name']!;
-                              final selected = currentCode == code;
-                              return ListTile(
-                                leading: Text(symbol,
-                                    style: const TextStyle(fontSize: 20)),
-                                title: Text('$code — $name'),
-                                trailing: selected
-                                    ? const Icon(Icons.check,
-                                        color: Colors.green)
-                                    : null,
-                                onTap: () async {
-                                  final updated = establishment.copyWith(
-                                    defaultCurrency: code,
-                                    updatedAt: DateTime.now(),
-                                  );
-                                  await account.updateEstablishment(updated);
-                                  await productStore
-                                      .syncEstablishmentNomenclatureCurrency(
-                                    updated.productsEstablishmentId,
-                                    updated.defaultCurrency,
-                                  );
-                                  if (ctx2.mounted) {
-                                    Navigator.of(ctx2).pop();
-                                    ScaffoldMessenger.of(ctx2).showSnackBar(
-                                      SnackBar(
-                                          content: Text(
-                                              '${loc.t('currency_saved')}: $code')),
-                                    );
-                                  }
-                                },
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      if (useOther)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              TextButton(
-                                onPressed: () => Navigator.of(ctx2).pop(),
-                                child: Text(MaterialLocalizations.of(ctx2)
-                                    .cancelButtonLabel),
-                              ),
-                              const SizedBox(width: 8),
-                              FilledButton(
-                                onPressed: () async {
-                                  final code = customController.text
-                                      .trim()
-                                      .toUpperCase();
-                                  if (code.length != 3) return;
-                                  final updated = establishment.copyWith(
-                                    defaultCurrency: code,
-                                    updatedAt: DateTime.now(),
-                                  );
-                                  await account.updateEstablishment(updated);
-                                  await productStore
-                                      .syncEstablishmentNomenclatureCurrency(
-                                    updated.productsEstablishmentId,
-                                    updated.defaultCurrency,
-                                  );
-                                  if (ctx2.mounted) {
-                                    Navigator.of(ctx2).pop();
-                                    ScaffoldMessenger.of(ctx2).showSnackBar(
-                                      SnackBar(
-                                          content: Text(
-                                              '${loc.t('currency_saved')}: $code')),
-                                    );
-                                  }
-                                },
-                                child: Text(loc.t('save')),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
+      loc: loc,
+      currentCode: establishment.defaultCurrency,
+      onApply: (code) async {
+        final updated = establishment.copyWith(
+          defaultCurrency: code,
+          updatedAt: DateTime.now(),
         );
+        await account.updateEstablishment(updated);
+        await productStore.syncEstablishmentNomenclatureCurrency(
+          updated.productsEstablishmentId,
+          updated.defaultCurrency,
+        );
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${loc.t('currency_saved')}: $code'),
+            ),
+          );
+        }
       },
-    ).then((_) => customController.dispose());
+    );
   }
 
   void _showBirthdayNotifyDaysPicker(BuildContext context,

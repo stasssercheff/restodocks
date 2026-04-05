@@ -46,4 +46,13 @@ abstract final class EstablishmentCurrencyOptions {
 
   static bool isKnownPreset(String code) =>
       all.any((c) => c['code'] == code.toUpperCase());
+
+  /// Пресет из списка или `null` для произвольного трёхбуквенного кода.
+  static Map<String, String>? presetForCode(String code) {
+    final u = code.toUpperCase();
+    for (final c in all) {
+      if (c['code'] == u) return c;
+    }
+    return null;
+  }
 }

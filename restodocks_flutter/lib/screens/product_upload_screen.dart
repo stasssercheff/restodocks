@@ -30,6 +30,7 @@ import '../services/iiko_product_store.dart';
 import '../services/iiko_xlsx_sanitizer.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/establishment_currency_picker_dialog.dart';
+import '../utils/establishment_currency_options.dart';
 import '../utils/moderation_items_from_import_results.dart';
 
 // Глобальная переменная для хранения debug логов
@@ -4061,13 +4062,58 @@ class _PasteTextDialogState extends State<_PasteTextDialog> {
                   builder: (context, acc, _) {
                     final e = acc.establishment;
                     if (e == null) return const SizedBox.shrink();
+                    final code = e.defaultCurrency;
+                    final preset = EstablishmentCurrencyOptions.presetForCode(code);
+                    final line = preset != null
+                        ? '${preset['symbol']} · ${preset['code']} — ${preset['name']}'
+                        : code.toUpperCase();
                     return Padding(
                       padding: const EdgeInsets.only(top: 8, bottom: 4),
-                      child: Text(
-                        '${loc.t('currency')}: ${e.defaultCurrency} · ${e.currencySymbol}',
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${loc.t('currency')}: $line',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              final store =
+                                  context.read<ProductStoreSupabase>();
+                              await showEstablishmentCurrencyPickerDialog(
+                                context: context,
+                                loc: loc,
+                                currentCode: e.defaultCurrency,
+                                onApply: (newCode) async {
+                                  final est = acc.establishment;
+                                  if (est == null) return;
+                                  final updated = est.copyWith(
+                                    defaultCurrency: newCode,
+                                    updatedAt: DateTime.now(),
+                                  );
+                                  await acc.updateEstablishment(updated);
+                                  await store.syncEstablishmentNomenclatureCurrency(
+                                    updated.productsEstablishmentId,
+                                    updated.defaultCurrency,
+                                  );
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content:
+                                            Text(loc.t('currency_saved')),
+                                      ),
+                                    );
+                                  }
+                                },
+                              );
+                            },
+                            child: Text(loc.t('change')),
+                          ),
+                        ],
                       ),
                     );
                   },
