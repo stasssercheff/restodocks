@@ -1,10 +1,7 @@
 import 'dart:async' show unawaited;
 
-import 'package:flutter/foundation.dart' show kIsWeb;
-
 import '../models/models.dart';
 import '../utils/dev_log.dart';
-import 'account_manager_supabase.dart';
 import 'establishment_local_hydration_service.dart';
 import 'localization_service.dart';
 import 'product_store_supabase.dart';
@@ -50,20 +47,24 @@ class EstablishmentDataWarmupService {
     Establishment? establishment,
   }) async {
     try {
-      // Полная выгрузка заведения в кэши — в фоне после кадра, без блокировки ТТК/переводов.
-      if (establishment != null) {
-        unawaited(
-          Future<void>(() async {
-            await Future<void>.delayed(Duration.zero);
-            await EstablishmentLocalHydrationService.instance.runFullHydration(
-              establishmentId: establishment.id,
-              dataEstablishmentId: dataEstablishmentId,
-              productStore: productStore,
-              establishment: establishment,
-            );
-          }),
-        );
+      // Сначала каталог и номенклатура — экраны инвентаризации/остатков не пустые при первом кадре.
+      await Future.wait([
+        productStore.loadProducts(force: true).catchError((_) {}),
+        productStore.loadNomenclatureForce(dataEstablishmentId).catchError((_) {}),
+      ]);
+
+      if (establishment != null &&
+          establishment.isBranch &&
+          establishment.parentEstablishmentId != null &&
+          establishment.parentEstablishmentId!.isNotEmpty) {
+        await productStore
+            .loadNomenclatureForBranch(
+              establishment.id,
+              establishment.dataEstablishmentId,
+            )
+            .catchError((_) {});
       }
+
       await TechCardTranslationCache.loadForEstablishment(dataEstablishmentId);
       final lang = localization.currentLanguageCode;
 
@@ -98,27 +99,20 @@ class EstablishmentDataWarmupService {
         await TechCardTranslationCache.saveForEstablishment(dataEstablishmentId);
       }
 
-      await productStore.loadProducts().catchError((_) {});
-      await productStore.loadNomenclature(dataEstablishmentId).catchError((_) {});
-
-      if (establishment != null &&
-          establishment.isBranch &&
-          establishment.parentEstablishmentId != null &&
-          establishment.parentEstablishmentId!.isNotEmpty) {
-        await productStore
-            .loadNomenclatureForBranch(
-              establishment.id,
-              establishment.dataEstablishmentId,
-            )
-            .catchError((_) {});
-      }
-
-      if (!kIsWeb && establishment != null) {
-        try {
-          await Future.wait([
-            AccountManagerSupabase().warmEmployeesCache(establishment.id),
-          ]);
-        } catch (_) {}
+      // Остальное в фоне: сотрудники, документы, iiko, снимки — без повторной загрузки каталога.
+      if (establishment != null) {
+        unawaited(
+          Future<void>(() async {
+            await Future<void>.delayed(Duration.zero);
+            await EstablishmentLocalHydrationService.instance.runFullHydration(
+              establishmentId: establishment.id,
+              dataEstablishmentId: dataEstablishmentId,
+              productStore: productStore,
+              establishment: establishment,
+              includeCatalog: false,
+            );
+          }),
+        );
       }
     } catch (e, st) {
       devLog('EstablishmentDataWarmupService: $e $st');

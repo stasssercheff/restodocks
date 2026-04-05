@@ -192,6 +192,29 @@ Future<void> _bootstrapApp() async {
     unawaited(AccountUiSyncService.instance.applyAfterLogin(syncedEmployee));
   }
 
+  // Холодный старт с сохранённой сессией: не ждём первого кадра Home — сразу грузим каталог и ТТК.
+  final accWarm = AccountManagerSupabase();
+  if (accWarm.isLoggedInSync && accWarm.establishment != null) {
+    final est = accWarm.establishment!;
+    final dataId = est.dataEstablishmentId.trim();
+    if (dataId.isNotEmpty) {
+      EstablishmentLocalHydrationService.instance.ensurePeriodicSyncStarted();
+      unawaited(
+        EstablishmentDataWarmupService.instance.runForEstablishment(
+          dataEstablishmentId: dataId,
+          techCards: TechCardServiceSupabase(),
+          productStore: ProductStoreSupabase(),
+          translationService: TranslationService(
+            aiService: AiServiceSupabase(),
+            supabase: SupabaseService(),
+          ),
+          localization: LocalizationService(),
+          establishment: est,
+        ),
+      );
+    }
+  }
+
   AppToastService.init(AppRouter.rootNavigatorKey);
 }
 

@@ -64,12 +64,13 @@ class EstablishmentLocalHydrationService {
     }
   }
 
-  /// Старт после первого кадра — не перехватывает UI-поток на парсинг каталога.
+  /// [includeCatalog]: false — если каталог и номенклатура уже загружены вызывающим кодом (избегаем дубля).
   Future<void> runFullHydration({
     required String establishmentId,
     required String dataEstablishmentId,
     required ProductStoreSupabase productStore,
     Establishment? establishment,
+    bool includeCatalog = true,
   }) async {
     if (_fullHydrationRunning) return;
     final acc = AccountManagerSupabase();
@@ -78,11 +79,12 @@ class EstablishmentLocalHydrationService {
     _fullHydrationRunning = true;
     try {
       await Future<void>.delayed(Duration.zero);
-      devLog('EstablishmentLocalHydration: full sync start $establishmentId');
+      devLog(
+          'EstablishmentLocalHydration: full sync start $establishmentId (catalog=$includeCatalog)');
 
       final futures = <Future<void>>[
-        productStore.loadProducts(force: true),
-        productStore.loadNomenclatureForce(dataEstablishmentId),
+        if (includeCatalog) productStore.loadProducts(force: true),
+        if (includeCatalog) productStore.loadNomenclatureForce(dataEstablishmentId),
         _hydrateEmployees(establishmentId),
         _hydrateDocuments(establishmentId),
         loadSchedule(establishmentId),
@@ -99,7 +101,8 @@ class EstablishmentLocalHydrationService {
       if (!kIsWeb) {
         futures.add(_hydrateIikoIfPossible(establishmentId));
       }
-      if (establishment != null &&
+      if (includeCatalog &&
+          establishment != null &&
           establishment.isBranch &&
           establishment.parentEstablishmentId != null &&
           establishment.parentEstablishmentId!.isNotEmpty) {
