@@ -58,13 +58,22 @@
 
 ### C. Логи с текстом ошибки (не только Boot/Shutdown)
 
-1. Откройте [Logs — billing-verify-apple](https://supabase.com/dashboard/project/osglfptwbuqqmqunttha/functions/billing-verify-apple/logs) (или Logs → фильтр по имени функции).
-2. В поиске введите: **`billing-verify-apple`** или **`error`** или **`verifyReceipt`**.
-3. В колонке **event_message** ищите строки с **`console.error`** из кода, например:  
-   - `billing-verify-apple: Apple verifyReceipt failed`  
-   - `billing-verify-apple: establishments update failed`  
-4. Если при **500** в ответе JSON есть поля **`error`**, **`code`**, **`hint`** — скопируйте их; в Flutter в dev-логе бывает строка вида  
-   `IAP billing-verify-apple failed: 500 {error: ...}`.
+В логах Edge часто видны только **`booted`** / **`shutdown`** / **`EarlyDrop`** — это события рантайма, а не тело ответа. После деплоя актуальной функции в логах появляются **JSON-строки** (поиск по тексту):
+
+| Строка в `event_message` (фрагмент) | Значение |
+|-------------------------------------|----------|
+| `"fn":"billing-verify-apple","phase":"start"` | Запрос дошёл до handler: есть `establishment_id`, длина чека, тип auth. |
+| `"phase":"success"` | Ответ **200**, Pro обновлён. |
+| `"phase":"config_missing"` | **500** — нет `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` / **`APPLE_IAP_SHARED_SECRET`** в Secrets. |
+| `"phase":"unhandled_exception"` | **500** — исключение в коде; смотрите поле `error`. |
+| `establishments update failed` | **500** — ошибка `UPDATE establishments` (колонка, constraint, RLS — для service_role обычно колонка/constraint). |
+| `Apple verifyReceipt failed` | Обычно **502**, не 500. |
+
+1. Откройте [Logs — billing-verify-apple](https://supabase.com/dashboard/project/osglfptwbuqqmqunttha/functions/billing-verify-apple/logs).
+2. В поиске: **`phase":"start"`** или **`billing-verify-apple`** или **`config_missing`** или **`error`**.
+3. Вкладка **Invocations** у той же функции — там видны **HTTP status** и длительность по запросам (удобно сопоставить с нажатием в приложении).
+4. Если при **500** в ответе JSON есть **`error`**, **`code`**, **`hint`** — скопируйте; в Flutter в dev-логе:  
+   `IAP billing-verify-apple failed: 500 ...` и объект `res.data`.
 
 ---
 

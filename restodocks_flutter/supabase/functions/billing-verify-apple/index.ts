@@ -264,6 +264,15 @@ Deno.serve(async (req: Request) => {
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const appleSharedSecret = Deno.env.get("APPLE_IAP_SHARED_SECRET") ?? "";
   if (!supabaseUrl || !serviceKey || !appleSharedSecret) {
+    console.error(
+      JSON.stringify({
+        fn: "billing-verify-apple",
+        phase: "config_missing",
+        has_supabase_url: Boolean(supabaseUrl),
+        has_service_role: Boolean(serviceKey),
+        has_apple_shared_secret: Boolean(appleSharedSecret),
+      }),
+    );
     return new Response(JSON.stringify({ error: "Server configuration error" }), {
       status: 500,
       headers: { ...cors, "Content-Type": "application/json" },
@@ -292,6 +301,16 @@ Deno.serve(async (req: Request) => {
         headers: { ...cors, "Content-Type": "application/json" },
       });
     }
+
+    console.log(
+      JSON.stringify({
+        fn: "billing-verify-apple",
+        phase: "start",
+        establishment_id: establishmentId,
+        receipt_len: receiptData.length,
+        auth: isService ? "service" : (authUid ?? "none"),
+      }),
+    );
 
     if (!isService) {
       if (!authUid) {
@@ -674,6 +693,15 @@ Deno.serve(async (req: Request) => {
       .eq("id", establishmentId)
       .maybeSingle();
 
+    console.log(
+      JSON.stringify({
+        fn: "billing-verify-apple",
+        phase: "success",
+        establishment_id: establishmentId,
+        is_active: isActive,
+      }),
+    );
+
     return new Response(JSON.stringify({
       ok: true,
       is_active: isActive,
@@ -687,6 +715,13 @@ Deno.serve(async (req: Request) => {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (e) {
+    console.error(
+      JSON.stringify({
+        fn: "billing-verify-apple",
+        phase: "unhandled_exception",
+        error: String(e),
+      }),
+    );
     return new Response(JSON.stringify({ error: String(e) }), {
       status: 500,
       headers: { ...cors, "Content-Type": "application/json" },
