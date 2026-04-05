@@ -150,13 +150,17 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!mounted) return;
 
     final loc = context.read<LocalizationService>();
+    final screenPref = context.read<ScreenLayoutPreferenceService>();
     final emp = accountManager.currentEmployee;
     final isOwnerView = emp != null && emp.hasRole('owner') &&
         (emp.positionRole == null || context.read<OwnerViewPreferenceService>().viewAsOwner);
 
     final List<SpotlightStep> steps;
     if (isOwnerView) {
-      final ownerSteps = HomeTourConfig.ownerSteps();
+      final ownerSteps = HomeTourConfig.ownerStepsForLayout(
+        showBarSection: screenPref.showBarSection,
+        showHallSection: screenPref.showHallSection,
+      );
       steps = [
         for (var i = 0; i < ownerSteps.length; i++)
           SpotlightStep(
@@ -393,9 +397,9 @@ class _HomeScreenState extends State<HomeScreen> {
       return OwnerHomeContent(tourController: tourCtrl);
     }
     if (employee.canViewDepartment('management')) {
-      return ManagementHomeContent(employee: employee);
+      return ManagementHomeContent(employee: employee, tourController: tourCtrl);
     }
-    return StaffHomeContent(employee: employee);
+    return StaffHomeContent(employee: employee, tourController: tourCtrl);
   }
 }
 

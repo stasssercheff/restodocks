@@ -41,6 +41,41 @@ abstract final class HomeTourConfig {
     (id: 'home-expenses', text: (l) => _t(l, 'tour_tile_expenses', 'Расходы: ФЗП (по графику и ставкам), заказы продуктов, списания. Выбор учёта для итоговой суммы.')),
   ];
 
+  /// Id шагов секции «Бар» на главной владельца (должны совпадать с плитками на экране).
+  static const Set<String> ownerBarStepIds = {
+    'home-schedule-bar',
+    'home-menu-bar',
+    'home-ttk-bar',
+    'home-nomenclature-bar',
+    'home-suppliers-bar',
+    'home-order-bar',
+    'home-writeoffs-bar',
+    'home-checklists-bar',
+  };
+
+  /// Id шагов секции «Зал».
+  static const Set<String> ownerHallStepIds = {
+    'home-schedule-hall',
+    'home-menu-hall',
+    'home-checklists-hall',
+    'home-suppliers-hall',
+    'home-order-hall',
+    'home-writeoffs-hall',
+  };
+
+  /// Полный тур владельца с учётом настроек «Показывать секцию Бар/Зал» — иначе шаги ссылаются на отсутствующие виджеты.
+  static List<({String id, String Function(LocalizationService loc) text})> ownerStepsForLayout({
+    required bool showBarSection,
+    required bool showHallSection,
+  }) {
+    return [
+      for (final s in ownerSteps())
+        if ((showBarSection || !ownerBarStepIds.contains(s.id)) &&
+            (showHallSection || !ownerHallStepIds.contains(s.id)))
+          s
+    ];
+  }
+
   /// Id и текст для менеджмента (шеф, барменеджер, менеджер зала).
   static List<({String id, String Function(LocalizationService loc) text})> managementSteps() => [
     (id: 'home-schedule', text: (l) => _t(l, 'tour_tile_schedule', 'График формируется руководителем.')),
