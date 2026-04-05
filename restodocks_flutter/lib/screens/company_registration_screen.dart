@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/models.dart';
 import '../services/countries_cities_data.dart';
@@ -10,8 +11,11 @@ import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Регистрация компании: язык, название, страна/город (выпадающие с поиском), PIN автоген + копирование.
+/// [ownerFirst] — шаг после регистрации владельца (сессия auth); RPC register_first_establishment_*.
 class CompanyRegistrationScreen extends StatefulWidget {
-  const CompanyRegistrationScreen({super.key});
+  const CompanyRegistrationScreen({super.key, this.ownerFirst = false});
+
+  final bool ownerFirst;
 
   @override
   State<CompanyRegistrationScreen> createState() => _CompanyRegistrationScreenState();
@@ -116,6 +120,47 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
 
       for (var attempt = 0; attempt < maxRetries; attempt++) {
         try {
+          if (widget.ownerFirst) {
+            final acc = accountManager as AccountManagerSupabase;
+            if (Supabase.instance.client.auth.currentSession == null) {
+              if (!mounted) return;
+              setState(() {
+                _isLoading = false;
+                _errorMessage = loc.t('pro_iap_session_missing');
+              });
+              return;
+            }
+            final Map<String, dynamic> rpcResult;
+            if (promoRaw.isEmpty) {
+              rpcResult = await acc.registerFirstEstablishmentWithoutPromo(
+                name: name,
+                address: address,
+                pinCode: _pinCode,
+              );
+            } else {
+              rpcResult = await acc.registerFirstEstablishmentWithPromo(
+                promoCode: promoCode,
+                name: name,
+                address: address,
+                pinCode: _pinCode,
+              );
+            }
+            await acc.loginFromOwnerFirstEstablishmentResult(
+              rpcResult,
+              interfaceLanguageCode: lang,
+            );
+            final estRaw = rpcResult['establishment'];
+            final estId = estRaw is Map
+                ? estRaw['id']?.toString()
+                : null;
+            if (estId != null && estId.isNotEmpty) {
+              acc.registerMetadataBestEffort(estId);
+            }
+            if (!mounted) return;
+            context.go('/home');
+            return;
+          }
+
           final establishment = promoRaw.isEmpty
               ? await accountManager.registerCompanyWithoutPromo(
                   name: name,

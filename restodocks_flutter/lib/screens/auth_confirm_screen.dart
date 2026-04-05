@@ -93,6 +93,14 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
       return;
     }
 
+    if (account.needsCompanyRegistration) {
+      await _applyLocaleAfterAuth(account, lang);
+      clear_hash.clearHashFromUrl();
+      if (!mounted) return;
+      context.go('/register-company-details?ownerFirst=1');
+      return;
+    }
+
     // Повторная попытка — сессия может восстанавливаться с задержкой
     for (int i = 0; i < 3 && mounted; i++) {
       await Future.delayed(const Duration(milliseconds: 600));
@@ -108,6 +116,13 @@ class _AuthConfirmScreenState extends State<AuthConfirmScreen> {
         clear_hash.clearHashFromUrl();
         if (!mounted) return;
         context.go('/home');
+        return;
+      }
+      if (account.needsCompanyRegistration) {
+        await _applyLocaleAfterAuth(account, lang);
+        clear_hash.clearHashFromUrl();
+        if (!mounted) return;
+        context.go('/register-company-details?ownerFirst=1');
         return;
       }
     }

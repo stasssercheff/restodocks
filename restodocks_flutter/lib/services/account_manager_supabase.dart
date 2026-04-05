@@ -100,12 +100,23 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// Авторизован ли пользователь (своя сессия employees или восстановленная из хранилища)
   bool get isLoggedInSync => _currentEmployee != null && _establishment != null;
 
+  /// Сессия Auth есть, но employee ещё нет: owner-first — ждём экран создания первого заведения.
+  bool _needsCompanyRegistration = false;
+  bool get needsCompanyRegistration => _needsCompanyRegistration;
+
+  /// После owner-first signUp со сессией: заведение ещё не создано (до шага company-details).
+  void markNeedsCompanyRegistration() {
+    _needsCompanyRegistration = true;
+    notifyListeners();
+  }
+
   /// Инициализация сервиса
   /// Supabase восстанавливает сессию из localStorage при Supabase.initialize() в main().
   /// При F5/hard refresh Auth может восстанавливаться асинхронно — делаем retry.
   /// [forceRetryFromAuth] — true при переходе по ссылке confirm (getSessionFromUrl уже вызван).
   Future<void> initialize({bool forceRetryFromAuth = false}) async {
     if (forceRetryFromAuth) _initialized = false;
+    if (forceRetryFromAuth) _needsCompanyRegistration = false;
     // Если уже инициализирован и авторизован — не повторяем дорогую инициализацию.
     if (_initialized && isLoggedInSync) return;
     devLog('🔐 AccountManager: Starting initialization...');
@@ -162,6 +173,20 @@ class AccountManagerSupabase extends ChangeNotifier {
             '🔐 AccountManager: User data loaded from Auth, logged in: $isLoggedInSync');
         await syncEstablishmentAccessFromServer();
         return;
+      }
+      // Owner-first: JWT есть, employee ещё нет — ждём шаг «создать заведение».
+      try {
+        final pending = await _supabase.client
+            .rpc('owner_has_pending_registration_without_company');
+        if (pending == true) {
+          _needsCompanyRegistration = true;
+          devLog(
+              '🔐 AccountManager: Auth without employee — pending owner, needs company registration',
+          );
+          return;
+        }
+      } catch (e) {
+        devLog('🔐 AccountManager: owner_has_pending_registration_without_company: $e');
       }
       // JWT есть в Keychain, а сотрудник/RLS не сходятся — «зомби»-сессия: мешает входу по паролю.
       devLog(
@@ -507,6 +532,73 @@ class AccountManagerSupabase extends ChangeNotifier {
     return est;
   }
 
+  /// Первое заведение после шага «только владелец» (сессия auth, pending без establishment_id).
+  /// Возвращает тот же jsonb, что complete_pending_owner_registration (employee + establishment).
+  Future<Map<String, dynamic>> registerFirstEstablishmentWithoutPromo({
+    required String name,
+    required String address,
+    required String pinCode,
+  }) async {
+    final res = await _supabase.client.rpc(
+      'register_first_establishment_without_promo',
+      params: {
+        'p_name': name.trim(),
+        'p_address': address.trim(),
+        'p_pin_code': pinCode.trim().toUpperCase(),
+      },
+    );
+    if (res is! Map) {
+      throw Exception('register_first_establishment_without_promo: invalid response');
+    }
+    return Map<String, dynamic>.from(res);
+  }
+
+  /// То же с промокодом (owner-first).
+  Future<Map<String, dynamic>> registerFirstEstablishmentWithPromo({
+    required String promoCode,
+    required String name,
+    required String address,
+    required String pinCode,
+  }) async {
+    final res = await _supabase.client.rpc(
+      'register_first_establishment_with_promo',
+      params: {
+        'p_code': promoCode.trim().toUpperCase(),
+        'p_name': name.trim(),
+        'p_address': address.trim(),
+        'p_pin_code': pinCode.trim().toUpperCase(),
+      },
+    );
+    if (res is! Map) {
+      throw Exception('register_first_establishment_with_promo: invalid response');
+    }
+    return Map<String, dynamic>.from(res);
+  }
+
+  /// Выполнить вход после [registerFirstEstablishment*] (ответ RPC = employee + establishment).
+  Future<void> loginFromOwnerFirstEstablishmentResult(
+    Map<String, dynamic> rpcResult, {
+    String? interfaceLanguageCode,
+  }) async {
+    final empRaw = rpcResult['employee'];
+    final estRaw = rpcResult['establishment'];
+    if (empRaw == null || estRaw == null) {
+      throw Exception('loginFromOwnerFirstEstablishmentResult: missing employee/establishment');
+    }
+    final empData = Map<String, dynamic>.from(empRaw as Map);
+    empData['password'] = '';
+    empData['password_hash'] = '';
+    final employee = Employee.fromJson(empData);
+    final establishment =
+        Establishment.fromJson(Map<String, dynamic>.from(estRaw as Map));
+    _needsCompanyRegistration = false;
+    await login(
+      employee,
+      establishment,
+      interfaceLanguageCode: interfaceLanguageCode,
+    );
+  }
+
   /// IP/гео при регистрации компании (Edge register-metadata). Не блокирует UX; ошибки не пробрасываются.
   /// HTTP POST с явным anon (как send-registration-email): invoke иногда шлёт битый JWT → 401 на Edge.
   void registerMetadataBestEffort(String establishmentId) {
@@ -817,9 +909,10 @@ class AccountManagerSupabase extends ChangeNotifier {
   }
 
   /// Сохранить pending owner — employee создастся после confirm (когда user в auth.users).
+  /// [establishment] null — сценарий owner-first (заведение создаётся на следующем шаге).
   Future<void> savePendingOwnerRegistration({
     required String authUserId,
-    required Establishment establishment,
+    Establishment? establishment,
     required String fullName,
     String? surname,
     required String email,
@@ -828,20 +921,23 @@ class AccountManagerSupabase extends ChangeNotifier {
   }) async {
     var lang = preferredLanguage.trim().toLowerCase();
     if (!LocalizationService.isSupportedLanguageCode(lang)) lang = 'ru';
+    final params = <String, dynamic>{
+      'p_auth_user_id': authUserId,
+      'p_full_name': fullName,
+      'p_surname': surname ?? '',
+      'p_email': email,
+      'p_roles': roles,
+      'p_preferred_language': lang,
+      'p_position_role': roles
+          .map((r) => r.trim().toLowerCase())
+          .firstWhere((r) => r.isNotEmpty && r != 'owner', orElse: () => ''),
+    };
+    if (establishment != null) {
+      params['p_establishment_id'] = establishment.id;
+    }
     await _supabase.client.rpc(
       'save_pending_owner_registration',
-      params: {
-        'p_auth_user_id': authUserId,
-        'p_establishment_id': establishment.id,
-        'p_full_name': fullName,
-        'p_surname': surname ?? '',
-        'p_email': email,
-        'p_roles': roles,
-        'p_preferred_language': lang,
-        'p_position_role': roles
-            .map((r) => r.trim().toLowerCase())
-            .firstWhere((r) => r.isNotEmpty && r != 'owner', orElse: () => ''),
-      },
+      params: params,
     );
   }
 
@@ -1257,6 +1353,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     /// Язык, выбранный на экране входа/регистрации до авторизации; сохраняется в профиль.
     String? interfaceLanguageCode,
   }) async {
+    _needsCompanyRegistration = false;
     devLog(
         '🔐 AccountManager: Setting current user - employee: ${employee.id}, establishment: ${establishment.id}');
     _currentEmployee = employee;
@@ -1353,6 +1450,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     _currentEmployee = null;
     _establishment = null;
     _initialized = false;
+    _needsCompanyRegistration = false;
     if (kIsWeb) {
       clear_hash.clearHashFromUrl();
     }

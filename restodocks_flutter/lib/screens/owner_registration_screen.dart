@@ -10,11 +10,11 @@ import '../utils/person_name_format.dart';
 import '../models/models.dart';
 import '../widgets/apple_email_prefill_button.dart';
 
-/// Регистрация владельца после создания компании. PIN подставлен с предыдущего шага.
+/// Регистрация владельца. [establishment] задан — старый порядок (компания уже создана); null — сначала владелец, затем компания.
 class OwnerRegistrationScreen extends StatefulWidget {
-  const OwnerRegistrationScreen({super.key, required this.establishment});
+  const OwnerRegistrationScreen({super.key, this.establishment});
 
-  final Establishment establishment;
+  final Establishment? establishment;
 
   @override
   State<OwnerRegistrationScreen> createState() => _OwnerRegistrationScreenState();
@@ -45,6 +45,8 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
   bool _isLoading = false;
   String? _errorMessage;
 
+  bool get _ownerFirst => widget.establishment == null;
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -73,7 +75,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       final email = _emailController.text.trim();
       await PendingOwnerRole.saveForOwner(
         email: email,
-        establishmentId: estab.id,
+        establishmentId: estab?.id ?? '',
         role: _selectedRole,
       );
       final nameStr = formatPersonNameField(_nameController.text);
@@ -82,7 +84,6 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
           surnameStr.isEmpty ? nameStr : '$nameStr $surnameStr';
       final registeredAtLocal = DateTime.now().toLocal().toString();
 
-      // Проверяем, занят ли email глобально (email должен быть уникальным во всех заведениях)
       final emailTakenGlobally = await accountManager.isEmailTakenGlobally(email);
       if (emailTakenGlobally) {
         if (!mounted) return;
@@ -92,7 +93,6 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       }
 
       final password = _passwordController.text;
-      // 1. Supabase Auth
       final accSupabase = accountManager as AccountManagerSupabase;
       final signUpResult = await accSupabase.signUpWithEmailForOwner(
         email,
@@ -103,10 +103,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       final authUserId = signUpResult.userId;
       if (authUserId == null) throw Exception('Не удалось создать учётную запись');
 
-      // 2. Сохраняем pending — employee создадим после confirm (когда user в auth.users)
       final loc = context.read<LocalizationService>();
-      // После signUp иногда auth.users ещё не “виден” в БД сразу (race),
-      // поэтому делаем небольшой ретрай по P0001.
       final preferredLanguage = loc.currentLanguageCode;
       for (var attempt = 1; attempt <= 5; attempt++) {
         try {
@@ -128,15 +125,17 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         }
       }
 
-      // Как и для confirmation_only: на web нельзя fire-and-forget — навигация рвёт Dio до Edge.
+      final companyNameForEmail = estab?.name ??
+          loc.t('register_company');
+
       final infoMail = await EmailService().sendRegistrationEmail(
         isOwner: true,
         to: email,
-        companyName: estab.name,
+        companyName: companyNameForEmail,
         email: email,
         fullName: fullName,
         registeredAtLocal: registeredAtLocal,
-        pinCode: estab.pinCode,
+        pinCode: estab?.pinCode,
         languageCode: loc.currentLanguageCode,
       );
       if (!infoMail.ok) {
@@ -165,6 +164,9 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
             interfaceLanguageCode: loc.currentLanguageCode,
           );
           context.go('/home');
+        } else if (_ownerFirst) {
+          accSupabase.markNeedsCompanyRegistration();
+          context.go('/register-company-details?ownerFirst=1');
         } else {
           context.go(
             '/confirm-email?email=${Uri.encodeComponent(email)}&resendFailed=${resendFailed ? '1' : '0'}',
@@ -187,7 +189,7 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
-    final pin = widget.establishment.pinCode;
+    final pin = widget.establishment?.pinCode;
 
     return Scaffold(
       appBar: AppBar(
@@ -296,20 +298,22 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                Text(loc.t('company_pin'), style: Theme.of(context).textTheme.titleSmall),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(8),
+                if (!_ownerFirst && pin != null) ...[
+                  Text(loc.t('company_pin'), style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      pin,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 1),
+                    ),
                   ),
-                  child: Text(
-                    pin,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, letterSpacing: 1),
-                  ),
-                ),
-                const SizedBox(height: 20),
+                  const SizedBox(height: 20),
+                ],
 
                 Text(loc.t('position_optional'), style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 8),

@@ -6,6 +6,7 @@ import '../../utils/dev_log.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../initial_location_stub.dart'
     if (dart.library.html) '../initial_location_web.dart' as initial_loc;
@@ -239,22 +240,32 @@ class AppRouter {
         },
       ),
 
-      // Регистрация компании
+      // Регистрация компании: шаг 1 — владелец (owner-first)
       GoRoute(
         path: '/register-company',
         pageBuilder: (context, state) =>
-            _slideTransitionPage(state, const CompanyRegistrationScreen()),
+            _slideTransitionPage(state, const OwnerRegistrationScreen()),
       ),
-      // Регистрация владельца (extra: Establishment)
+      // Шаг 2 — данные компании (ownerFirst=1 после владельца)
+      GoRoute(
+        path: '/register-company-details',
+        pageBuilder: (context, state) {
+          final ownerFirst = state.queryParameters['ownerFirst'] == '1';
+          return _slideTransitionPage(
+            state,
+            CompanyRegistrationScreen(ownerFirst: ownerFirst),
+          );
+        },
+      ),
+      // Регистрация владельца при старом порядке (extra: Establishment после создания компании вручную)
       GoRoute(
         path: '/register-owner',
         pageBuilder: (context, state) {
           final establishment = state.extra as Establishment?;
-          if (establishment == null) {
-            return _slideTransitionPage(state, const _RedirectToLogin());
-          }
           return _slideTransitionPage(
-              state, OwnerRegistrationScreen(establishment: establishment));
+            state,
+            OwnerRegistrationScreen(establishment: establishment),
+          );
         },
       ),
       // Регистрация сотрудника
@@ -1360,6 +1371,9 @@ class _SplashScreenState extends State<SplashScreen> {
         devLog(
             '[Splash] go → ${target ?? '/home'} (cached=${initial_loc.getCachedInitialPath()})');
         context.go(target ?? '/home');
+      } else if (Supabase.instance.client.auth.currentSession != null &&
+          accountManager.needsCompanyRegistration) {
+        context.go('/register-company-details?ownerFirst=1');
       } else {
         context.go('/login');
       }
@@ -1552,30 +1566,6 @@ class _DeferredTechCardNewState extends State<_DeferredTechCardNew> {
         title: Text(loc.t('create_tech_card')),
       ),
       body: const Center(child: CircularProgressIndicator()),
-    );
-  }
-}
-
-class _RedirectToLogin extends StatefulWidget {
-  const _RedirectToLogin();
-
-  @override
-  State<_RedirectToLogin> createState() => _RedirectToLoginState();
-}
-
-class _RedirectToLoginState extends State<_RedirectToLogin> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.go('/login');
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
     );
   }
 }
