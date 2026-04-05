@@ -175,6 +175,18 @@ class AppleIapService extends ChangeNotifier {
       devLog(
         'IAP trySyncProFromStoreReceipt: verify ${res.status} ${res.data}',
       );
+      if (res.status == 409) {
+        final d = res.data;
+        final buf = StringBuffer('verify_failed_http_409');
+        if (d != null && d['error'] != null) {
+          buf.write('|');
+          buf.write(
+            d['error'].toString().trim().replaceAll('|', '/'),
+          );
+        }
+        _lastError = buf.toString();
+        notifyListeners();
+      }
       return false;
     }
     try {
@@ -508,7 +520,18 @@ class AppleIapService extends ChangeNotifier {
           return false;
         }
       }
-      final param = PurchaseParam(productDetails: _product!);
+      final est = _account.establishment;
+      if (est == null) {
+        _lastError = 'not_owner';
+        _busy = false;
+        notifyListeners();
+        return false;
+      }
+      // Связка с компанией в Restodocks для App Store (opaque id); сервер дополнительно закрепляет чек за establishment_id.
+      final param = PurchaseParam(
+        productDetails: _product!,
+        applicationUserName: est.id,
+      );
       await _iap.buyNonConsumable(purchaseParam: param);
       return true;
     } catch (e) {

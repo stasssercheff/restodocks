@@ -174,6 +174,11 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
         c.contains('only owner can verify')) {
       return loc.t('pro_iap_forbidden');
     }
+    // Подписка Apple уже привязана к другому заведению в Restodocks.
+    if (c.contains('verify_failed_http_409') ||
+        c.contains('apple_subscription_already_linked')) {
+      return loc.t('pro_iap_subscription_linked_other_account');
+    }
     // Конфиг сервера: нет APPLE_IAP_SHARED_SECRET и т.п.
     if (c.contains('server configuration error')) {
       return loc.t('pro_iap_server_config');
