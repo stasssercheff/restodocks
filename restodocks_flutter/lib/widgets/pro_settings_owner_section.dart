@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../utils/iap_product_price_format.dart';
 import 'post_registration_trial_dialog.dart';
 
 /// Блок настроек PRO для собственника: промокод, оплата (iOS IAP), условия.
@@ -168,6 +169,10 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     if (c.contains('verify_failed_http_401') || c.contains('|unauthorized')) {
       return loc.t('pro_iap_unauthorized');
     }
+    // Чек Apple привязан к другому заведению (applicationUsername в чеке ≠ текущее заведение).
+    if (c.contains('receipt_bound_to_other_establishment')) {
+      return loc.t('pro_iap_receipt_other_establishment');
+    }
     // Не owner или чужое заведение.
     if (c.contains('verify_failed_http_403') ||
         c.contains('forbidden') ||
@@ -185,6 +190,9 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     }
     // Apple verifyReceipt status !== 0
     if (c.contains('verify_failed_http_400')) {
+      if (c.contains('receipt_missing_app_account_binding')) {
+        return loc.t('pro_iap_binding_unverified');
+      }
       final appleM = RegExp(r'apple_status_(\d+)').firstMatch(c);
       if (appleM != null) {
         return loc.t('pro_iap_apple_status_detail',
@@ -229,12 +237,9 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     return '${s.substring(0, 197)}...';
   }
 
-  /// Цена из StoreKit + ISO-код валюты (USD/VND и т.д. — задаёт Apple для Apple ID, не приложение).
-  String _formatIapProductPrice(ProductDetails product) {
-    final cc = product.currencyCode.trim();
-    if (cc.isEmpty) return product.price;
-    return '${product.price} · $cc';
-  }
+  /// Сумма из StoreKit ([rawPrice] + [currencyCode]), формат числа под витрину валюты — не язык приложения.
+  String _formatIapProductPrice(ProductDetails product) =>
+      formatIapPriceForAppleStorefront(product);
 
   Future<void> _openAppleSubscriptionsSettings() async {
     final uri = Uri.parse('https://apps.apple.com/account/subscriptions');
@@ -251,14 +256,6 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
 
   Future<void> _syncProSectionFromServer() async {
     await widget.accountManager.syncEstablishmentAccessFromServer();
-    if (!mounted) return;
-    if (AppleIapService.isIOSPlatform &&
-        !widget.accountManager.hasPaidProSubscription) {
-      final iap = context.read<AppleIapService>();
-      await iap.init();
-      await iap.trySyncProFromStoreReceipt();
-      await widget.accountManager.syncEstablishmentAccessFromServer();
-    }
     if (!mounted) return;
     setState(() {
       _promoFuture = widget.accountManager.getEstablishmentPromoForOwner();
@@ -755,16 +752,6 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
                               height: 1.45,
                             ),
                           ),
-                          if (est != null) ...[
-                            const SizedBox(height: 10),
-                            Text(
-                              '${loc.t('currency')}: ${est.defaultCurrency} (${est.currencySymbol})',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                                height: 1.35,
-                              ),
-                            ),
-                          ],
                           if (ready && product != null) ...[
                             const SizedBox(height: 16),
                             DecoratedBox(
@@ -778,17 +765,43 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
                                   vertical: 14,
                                   horizontal: 12,
                                 ),
-                                child: Text(
-                                  widget.formatIapPrice(product),
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.headlineSmall?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: cs.primary,
-                                  ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    Text(
+                                      widget.formatIapPrice(product),
+                                      textAlign: TextAlign.center,
+                                      style: theme.textTheme.headlineSmall
+                                          ?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                        color: cs.primary,
+                                      ),
+                                    ),
+                                    if (product.currencyCode
+                                        .trim()
+                                        .isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        loc.t('pro_payment_iap_currency_line',
+                                            args: {
+                                              'code': product.currencyCode
+                                                  .trim()
+                                                  .toUpperCase(),
+                                            }),
+                                        textAlign: TextAlign.center,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                          color: cs.onSurfaceVariant,
+                                          height: 1.3,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 10),
                             Text(
                               loc.t('pro_payment_price_note'),
                               textAlign: TextAlign.center,
@@ -811,23 +824,17 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
                             ),
                           ],
                         ],
-                        const SizedBox(height: 14),
-                        Text(
-                          loc.t('pro_payment_hub_restore_hint'),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            height: 1.35,
+                        if (!paid) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            loc.t('pro_payment_hub_restore_hint'),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              height: 1.35,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          loc.t('pro_iap_apple_account_hint'),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                            height: 1.35,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
+                          const SizedBox(height: 12),
+                        ],
                         if (!paid && ready && product != null) ...[
                           FilledButton(
                             onPressed: () {

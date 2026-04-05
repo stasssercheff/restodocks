@@ -1,8 +1,9 @@
 // Edge Function: server-side validation Apple receipt -> единый Pro-статус заведения.
 //
-// Продукт: одна цепочка подписки Apple (original_transaction_id) закрепляется за одним establishment_id,
-// чтобы второй аккаунт Restodocks на том же Apple ID не «наследовал» оплату. Дальше — отдельные тарифы
-// (несколько заведений) и другие способы оплаты; клиент передаёт applicationUserName = establishment UUID при покупке.
+// Продукт: подписка Apple ID привязана к одному заведению Restodocks (и тем самым к аккаунту владельца):
+// клиент передаёт UUID заведения в StoreKit как applicationUserName; в чеке это application_username / app_account_token.
+// Сервер отклоняет верификацию, если привязка в чеке ≠ запрошенное заведение (403), и не выдаёт Pro без
+// подтверждённой привязки (claims по OTID или сильная привязка из чека).
 //
 // Тестовый режим (Edge Secrets в проекте Supabase):
 //   IAP_BILLING_TEST_ESTABLISHMENT_IDS=uuid1,uuid2 — заведения, для которых после успешной верификации
@@ -179,6 +180,34 @@ function extractOriginalTransactionId(data: AppleVerifyReceiptResponse): string 
     if (otid.length > 0) return otid;
   }
   return null;
+}
+
+function normalizeEstId(s: string): string {
+  return s.trim().toLowerCase().replace(/-/g, "");
+}
+
+function estIdsEqual(a: string, b: string): boolean {
+  return normalizeEstId(a) === normalizeEstId(b);
+}
+
+/** UUID заведения из чека: StoreKit передаёт его как applicationUserName / app account token. */
+function extractReceiptEstablishmentBinding(data: AppleVerifyReceiptResponse): string | null {
+  const rows = pickReceiptRows(data);
+  if (rows.length === 0) return null;
+  let best: { ms: number; id: string } | null = null;
+  for (const row of rows) {
+    const ms = rowExpiryMs(row) ?? 0;
+    const raw =
+      row["app_account_token"] ??
+      row["application_username"] ??
+      row["appAccountToken"] ??
+      row["applicationUsername"];
+    if (raw == null) continue;
+    const id = String(raw).trim();
+    if (id.length === 0) continue;
+    if (best == null || ms >= best.ms) best = { ms, id };
+  }
+  return best?.id ?? null;
 }
 
 function isMissingRelationError(err: { message?: string; code?: string; details?: string } | null): boolean {
@@ -387,6 +416,26 @@ Deno.serve(async (req: Request) => {
     const isActive = expiryMs != null && expiryMs > nowMs;
     const paidUntilIso = expiryMs != null ? new Date(expiryMs).toISOString() : null;
 
+    const receiptBindingEstId = extractReceiptEstablishmentBinding(appleResp);
+    if (
+      receiptBindingEstId != null &&
+      receiptBindingEstId.length > 0 &&
+      !estIdsEqual(receiptBindingEstId, establishmentId)
+    ) {
+      return new Response(
+        JSON.stringify({ error: "receipt_bound_to_other_establishment" }),
+        {
+          status: 403,
+          headers: { ...cors, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const strongBinding =
+      receiptBindingEstId != null &&
+      receiptBindingEstId.length > 0 &&
+      estIdsEqual(receiptBindingEstId, establishmentId);
+
     let claimsEnforced = true;
     let claimSkippedReason: string | null = null;
 
@@ -395,7 +444,33 @@ Deno.serve(async (req: Request) => {
       claimsEnforced = false;
     }
 
-    if (claimsEnforced && isActive) {
+    let allowProUpdate = false;
+    if (isActive) {
+      if (strongBinding) {
+        allowProUpdate = true;
+      } else {
+        allowProUpdate = Boolean(
+          claimsEnforced &&
+            claimSkippedReason === null &&
+            originalTransactionId &&
+            originalTransactionId.length > 0,
+        );
+      }
+      if (!allowProUpdate) {
+        return new Response(
+          JSON.stringify({
+            error: "receipt_missing_app_account_binding",
+            detail: claimSkippedReason ?? "cannot_verify_subscription_binding",
+          }),
+          {
+            status: 400,
+            headers: { ...cors, "Content-Type": "application/json" },
+          },
+        );
+      }
+    }
+
+    if (isActive && originalTransactionId && originalTransactionId.length > 0) {
       const { data: rowByOtid, error: errByOtid } = await supabase
         .from("apple_iap_subscription_claims")
         .select("establishment_id")
@@ -411,7 +486,7 @@ Deno.serve(async (req: Request) => {
             headers: { ...cors, "Content-Type": "application/json" },
           });
         }
-      } else if (claimsEnforced && rowByOtid && String(rowByOtid.establishment_id) !== establishmentId) {
+      } else if (claimsEnforced && rowByOtid && !estIdsEqual(String(rowByOtid.establishment_id), establishmentId)) {
         return new Response(
           JSON.stringify({
             error: "apple_subscription_already_linked",
@@ -423,11 +498,7 @@ Deno.serve(async (req: Request) => {
           },
         );
       }
-    }
 
-    // UNIQUE(establishment_id): нельзя upsert только по original_transaction_id — при смене цепочки
-    // Apple INSERT давал duplicate key на establishment_id. Снимаем старую привязку заведения, затем INSERT.
-    if (claimsEnforced && isActive && originalTransactionId) {
       const { error: delMine } = await supabase
         .from("apple_iap_subscription_claims")
         .delete()
@@ -474,33 +545,99 @@ Deno.serve(async (req: Request) => {
           }
         }
       }
-    } else if (claimsEnforced && !isActive && originalTransactionId && originalTransactionId.length > 0) {
-      const { error: delExp } = await supabase
-        .from("apple_iap_subscription_claims")
-        .delete()
-        .eq("original_transaction_id", originalTransactionId)
-        .eq("establishment_id", establishmentId);
-      if (delExp && !isMissingRelationError(delExp)) {
-        return new Response(JSON.stringify({ error: delExp.message }), {
-          status: 500,
-          headers: { ...cors, "Content-Type": "application/json" },
-        });
+
+      if (!strongBinding && (!claimsEnforced || claimSkippedReason != null)) {
+        return new Response(
+          JSON.stringify({
+            error: "receipt_missing_app_account_binding",
+            detail: claimSkippedReason ?? "claims_unavailable",
+          }),
+          {
+            status: 400,
+            headers: { ...cors, "Content-Type": "application/json" },
+          },
+        );
       }
     }
 
+    if (!isActive) {
+      let allowDowngradeUpdate = false;
+      if (strongBinding) {
+        allowDowngradeUpdate = true;
+      } else if (originalTransactionId && originalTransactionId.length > 0) {
+        const { data: clRow, error: errCl } = await supabase
+          .from("apple_iap_subscription_claims")
+          .select("establishment_id")
+          .eq("original_transaction_id", originalTransactionId)
+          .maybeSingle();
+        if (errCl && !isMissingRelationError(errCl)) {
+          return new Response(JSON.stringify({ error: errCl.message }), {
+            status: 500,
+            headers: { ...cors, "Content-Type": "application/json" },
+          });
+        }
+        if (clRow && estIdsEqual(String(clRow.establishment_id), establishmentId)) {
+          allowDowngradeUpdate = true;
+        }
+      }
+      if (!allowDowngradeUpdate) {
+        const { data: estSnapshot } = await supabase
+          .from("establishments")
+          .select("subscription_type, pro_paid_until, pro_trial_ends_at")
+          .eq("id", establishmentId)
+          .maybeSingle();
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            is_active: false,
+            applied: false,
+            reason: "receipt_does_not_apply_to_establishment",
+            pro_paid_until: paidUntilIso,
+            establishment: estSnapshot ?? null,
+          }),
+          {
+            status: 200,
+            headers: { ...cors, "Content-Type": "application/json" },
+          },
+        );
+      }
+      if (originalTransactionId && originalTransactionId.length > 0) {
+        const { error: delExp } = await supabase
+          .from("apple_iap_subscription_claims")
+          .delete()
+          .eq("original_transaction_id", originalTransactionId)
+          .eq("establishment_id", establishmentId);
+        if (delExp && !isMissingRelationError(delExp)) {
+          return new Response(JSON.stringify({ error: delExp.message }), {
+            status: 500,
+            headers: { ...cors, "Content-Type": "application/json" },
+          });
+        }
+      }
+    }
+
+    const nowIso = new Date().toISOString();
     const updatePayload = isActive
-      ? { subscription_type: "pro", pro_paid_until: paidUntilIso }
-      : { subscription_type: "free", pro_paid_until: paidUntilIso };
+      ? { subscription_type: "pro", pro_paid_until: paidUntilIso, updated_at: nowIso }
+      : { subscription_type: "free", pro_paid_until: paidUntilIso, updated_at: nowIso };
 
     const { error: updateError } = await supabase
       .from("establishments")
       .update(updatePayload)
       .eq("id", establishmentId);
     if (updateError) {
-      return new Response(JSON.stringify({ error: updateError.message }), {
-        status: 500,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
+      console.error("billing-verify-apple: establishments update failed", updateError);
+      return new Response(
+        JSON.stringify({
+          error: updateError.message,
+          code: updateError.code ?? null,
+          hint: updateError.hint ?? null,
+        }),
+        {
+          status: 500,
+          headers: { ...cors, "Content-Type": "application/json" },
+        },
+      );
     }
 
     if (isTestEst) {

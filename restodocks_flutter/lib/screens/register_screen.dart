@@ -8,6 +8,7 @@ import '../core/config/roles_config.dart';
 import '../services/services.dart';
 import '../utils/person_name_format.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/apple_email_prefill_button.dart';
 
 /// Один раз за сессию показываем подсказку про PIN заведения при открытии экрана.
 bool _employeeRegisterPinHintShownThisSession = false;
@@ -339,6 +340,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     }
                     return null;
                   },
+                ),
+                AppleEmailPrefillButton(
+                  controller: _emailController,
+                  localization: loc,
                 ),
                 const SizedBox(height: 16),
 

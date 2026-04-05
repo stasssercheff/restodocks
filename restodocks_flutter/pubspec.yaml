@@ -2,7 +2,7 @@ name: restodocks
 description: Restaurant management application for iOS, Android and Web
 
 publish_to: 'none'
-version: 1.0.3+68
+version: 1.0.3+69
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -67,6 +67,9 @@ dependencies:
 
   # Permissions
   permission_handler: ^11.0.1
+
+  # Только подстановка email с Sign in with Apple (iOS), без регистрации «в один клик»
+  sign_in_with_apple: ^6.1.4
 
   # Supabase
   supabase_flutter: ^2.0.0

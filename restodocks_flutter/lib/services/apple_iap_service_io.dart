@@ -152,7 +152,9 @@ class AppleIapService extends ChangeNotifier {
   }
 
   /// Если в App Store уже активна подписка Pro, а на сервере ещё нет — шлём чек на Edge и подтягиваем Pro без «Оплатить».
-  Future<bool> trySyncProFromStoreReceipt() async {
+  ///
+  /// [silentFailures]: не выставлять [lastError] при ошибке (фоновый sync при открытии настроек — без ложных SnackBar).
+  Future<bool> trySyncProFromStoreReceipt({bool silentFailures = false}) async {
     if (!isIOSPlatform) return false;
     await init();
     if (!_ready) return false;
@@ -175,17 +177,19 @@ class AppleIapService extends ChangeNotifier {
       devLog(
         'IAP trySyncProFromStoreReceipt: verify ${res.status} ${res.data}',
       );
-      if (res.status == 409) {
-        final d = res.data;
-        final buf = StringBuffer('verify_failed_http_409');
-        if (d != null && d['error'] != null) {
-          buf.write('|');
-          buf.write(
-            d['error'].toString().trim().replaceAll('|', '/'),
-          );
+      if (!silentFailures) {
+        if (res.status == 409) {
+          final d = res.data;
+          final buf = StringBuffer('verify_failed_http_409');
+          if (d != null && d['error'] != null) {
+            buf.write('|');
+            buf.write(
+              d['error'].toString().trim().replaceAll('|', '/'),
+            );
+          }
+          _lastError = buf.toString();
+          notifyListeners();
         }
-        _lastError = buf.toString();
-        notifyListeners();
       }
       return false;
     }

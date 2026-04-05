@@ -93,6 +93,7 @@ class _RegisterCoOwnerScreenState extends State<RegisterCoOwnerScreen> {
       );
 
       final accSupabase = accountManager;
+
       final signUpResult = await accSupabase.signUpWithEmailForOwner(
         email,
         password,

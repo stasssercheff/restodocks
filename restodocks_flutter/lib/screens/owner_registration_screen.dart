@@ -8,6 +8,7 @@ import '../services/services.dart';
 import '../utils/dev_log.dart';
 import '../utils/person_name_format.dart';
 import '../models/models.dart';
+import '../widgets/apple_email_prefill_button.dart';
 
 /// Регистрация владельца после создания компании. PIN подставлен с предыдущего шага.
 class OwnerRegistrationScreen extends StatefulWidget {
@@ -256,6 +257,10 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
                     }
                     return null;
                   },
+                ),
+                AppleEmailPrefillButton(
+                  controller: _emailController,
+                  localization: loc,
                 ),
                 const SizedBox(height: 16),
 
