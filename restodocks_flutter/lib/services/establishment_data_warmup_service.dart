@@ -1,5 +1,7 @@
 import 'dart:async' show unawaited;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 import '../models/models.dart';
 import '../utils/dev_log.dart';
 import 'establishment_local_hydration_service.dart';
@@ -47,11 +49,20 @@ class EstablishmentDataWarmupService {
     Establishment? establishment,
   }) async {
     try {
-      // Сначала каталог и номенклатура — экраны инвентаризации/остатков не пустые при первом кадре.
-      await Future.wait([
-        productStore.loadProducts(force: true).catchError((_) {}),
-        productStore.loadNomenclatureForce(dataEstablishmentId).catchError((_) {}),
-      ]);
+      // Сначала каталог и номенклатура. На web force + loadNomenclatureForce обходят кэш и дают лишний
+      // json/сеть на главном потоке — используем обычные пути ProductStore (см. комментарии там).
+      if (kIsWeb) {
+        await Future.wait([
+          productStore.loadProducts(force: false).catchError((_) {}),
+          productStore.loadNomenclature(dataEstablishmentId).catchError((_) {}),
+        ]);
+      } else {
+        await Future.wait([
+          productStore.loadProducts(force: true).catchError((_) {}),
+          productStore.loadNomenclatureForce(dataEstablishmentId)
+              .catchError((_) {}),
+        ]);
+      }
 
       if (establishment != null &&
           establishment.isBranch &&

@@ -192,26 +192,30 @@ Future<void> _bootstrapApp() async {
     unawaited(AccountUiSyncService.instance.applyAfterLogin(syncedEmployee));
   }
 
-  // Холодный старт с сохранённой сессией: не ждём первого кадра Home — сразу грузим каталог и ТТК.
-  final accWarm = AccountManagerSupabase();
-  if (accWarm.isLoggedInSync && accWarm.establishment != null) {
-    final est = accWarm.establishment!;
-    final dataId = est.dataEstablishmentId.trim();
-    if (dataId.isNotEmpty) {
-      EstablishmentLocalHydrationService.instance.ensurePeriodicSyncStarted();
-      unawaited(
-        EstablishmentDataWarmupService.instance.runForEstablishment(
-          dataEstablishmentId: dataId,
-          techCards: TechCardServiceSupabase(),
-          productStore: ProductStoreSupabase(),
-          translationService: TranslationService(
-            aiService: AiServiceSupabase(),
-            supabase: SupabaseService(),
+  // Холодный старт с сохранённой сессией: на iOS/Android сразу грузим каталог (не ждём Home).
+  // На web тот же прогрев даёт второй проход вместе с HomeScreen и конкурирует с первым кадром —
+  // оставляем один вызов из [HomeScreen] после кадра.
+  if (!kIsWeb) {
+    final accWarm = AccountManagerSupabase();
+    if (accWarm.isLoggedInSync && accWarm.establishment != null) {
+      final est = accWarm.establishment!;
+      final dataId = est.dataEstablishmentId.trim();
+      if (dataId.isNotEmpty) {
+        EstablishmentLocalHydrationService.instance.ensurePeriodicSyncStarted();
+        unawaited(
+          EstablishmentDataWarmupService.instance.runForEstablishment(
+            dataEstablishmentId: dataId,
+            techCards: TechCardServiceSupabase(),
+            productStore: ProductStoreSupabase(),
+            translationService: TranslationService(
+              aiService: AiServiceSupabase(),
+              supabase: SupabaseService(),
+            ),
+            localization: LocalizationService(),
+            establishment: est,
           ),
-          localization: LocalizationService(),
-          establishment: est,
-        ),
-      );
+        );
+      }
     }
   }
 
