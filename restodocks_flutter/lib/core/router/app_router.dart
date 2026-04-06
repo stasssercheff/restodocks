@@ -1393,7 +1393,13 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Единый кадр с логотипом (в т.ч. web): без спиннеров — освежение сессии идёт в фоне.
+    // Web: логотип уже показан в index.html до первого кадра; здесь только тот же фон — без второй картинки.
+    if (kIsWeb) {
+      return const Scaffold(
+        backgroundColor: AppTheme.primaryColor,
+        body: SizedBox.expand(),
+      );
+    }
     return const Scaffold(
       backgroundColor: AppTheme.primaryColor,
       body: BrandedAuthLoading(fullscreenLogo: true),

@@ -256,16 +256,23 @@ class _StartupGateState extends State<_StartupGate> {
       return _BootstrapFailureApp(message: _error!);
     }
     if (!_ready) {
+      // Web: тот же логотип уже на #loading-screen в index.html до первого кадра Flutter —
+      // не дублируем welcome_logo.png (иначе визуальное «двойное маркето»).
       return MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFAD292C)),
           useMaterial3: true,
         ),
-        home: const Scaffold(
-          backgroundColor: AppTheme.primaryColor,
-          body: BrandedAuthLoading(fullscreenLogo: true),
-        ),
+        home: kIsWeb
+            ? const Scaffold(
+                backgroundColor: AppTheme.primaryColor,
+                body: SizedBox.expand(),
+              )
+            : const Scaffold(
+                backgroundColor: AppTheme.primaryColor,
+                body: BrandedAuthLoading(fullscreenLogo: true),
+              ),
       );
     }
     return const RestodocksApp();
