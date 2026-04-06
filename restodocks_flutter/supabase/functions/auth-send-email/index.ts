@@ -98,19 +98,6 @@ Deno.serve(async (req) => {
     };
 
     const { token_hash, redirect_to, email_action_type } = email_data;
-    const actionType = (email_action_type ?? "").trim().toLowerCase();
-    // Регистрация: письмо со ссылкой уже шлёт send-registration-email (confirmation_only) из приложения.
-    // Иначе три письма: Hook + «данные» + Edge-подтверждение.
-    if (actionType === "signup") {
-      console.log(
-        "auth-send-email: skip Resend for signup (send-registration-email confirmation_only)",
-      );
-      return new Response(JSON.stringify({}), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
     // Supabase GET /verify ожидает параметр "token" (значение = token_hash). token_hash= не работает.
     const verifyUrl = `${SUPABASE_URL}/auth/v1/verify?token=${encodeURIComponent(token_hash)}&type=${encodeURIComponent(email_action_type)}&redirect_to=${encodeURIComponent(redirect_to)}`;
 
@@ -120,7 +107,7 @@ Deno.serve(async (req) => {
     const confirmClickBase = `${clickOrigin}/auth/confirm-click`;
 
     const confirmClickHref =
-      actionType === "magiclink"
+      email_action_type === "signup" || email_action_type === "magiclink"
         ? `${confirmClickBase}?token_hash=${encodeURIComponent(token_hash)}&type=${encodeURIComponent(email_action_type)}&lang=${encodeURIComponent(lang)}`
         : verifyUrl;
     const i18n = copy(lang);

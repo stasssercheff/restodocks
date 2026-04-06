@@ -87,11 +87,6 @@ function extractTokenHashFromActionLink(actionLink: string): { token_hash: strin
   return null;
 }
 
-/** Смоки/watchdog (scripts/smoke_*.sh) — не тратить Resend на несуществующие ящики. */
-function isNoopEmailRecipient(to: string): boolean {
-  return to.trim().toLowerCase().endsWith("@invalid.restodocks");
-}
-
 export async function handleRequest(req: Request): Promise<Response> {
   const cors = resolveCorsHeaders(req);
   if (req.method !== "POST") {
@@ -142,20 +137,6 @@ export async function handleRequest(req: Request): Promise<Response> {
     const appBaseUrl = resolveAppBaseUrl(req, body);
     const redirectUrl = `${appBaseUrl}/auth/confirm?lang=${encodeURIComponent(lang)}`;
     const confirmClickUrl = `${appBaseUrl}/auth/confirm-click`;
-
-    if (to && isNoopEmailRecipient(to)) {
-      return new Response(
-        JSON.stringify({
-          id: "noop-no-send",
-          ok: true,
-          skipped: true,
-        }),
-        {
-          status: 200,
-          headers: { ...cors, "Content-Type": "application/json" },
-        },
-      );
-    }
 
     if (type === "confirmation_only" && to) {
       const supabaseUrl = Deno.env.get("SUPABASE_URL");
