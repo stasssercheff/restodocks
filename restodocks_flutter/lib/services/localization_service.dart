@@ -381,13 +381,23 @@ class LocalizationService extends ChangeNotifier {
   /// Проверка, выбран ли язык
   bool get isLanguageSelected => true; // Пока всегда true
 
-  /// Получение названия языка (подписи в `localizable.json`: `lang_name_*`).
+  /// Название языка **на самом языке** (для списков выбора: понятно любому пользователю).
+  /// Не зависит от текущей локали UI (в отличие от старых `lang_name_*` в JSON).
+  static const Map<String, String> _languageNativeNames = {
+    'ru': 'Русский',
+    'en': 'English',
+    'es': 'Español',
+    'it': 'Italiano',
+    'tr': 'Türkçe',
+    'vi': 'Tiếng Việt',
+    'de': 'Deutsch',
+    'fr': 'Français',
+  };
+
+  /// Получение названия языка для отображения в селекторах (логин, настройки, регистрация, экспорт и т.д.).
   String getLanguageName(String languageCode) {
     final code = languageCode.trim().toLowerCase();
-    final key = 'lang_name_$code';
-    final v = t(key);
-    if (v != key) return v;
-    return code;
+    return _languageNativeNames[code] ?? code;
   }
 
   /// Получение списка доступных языков
