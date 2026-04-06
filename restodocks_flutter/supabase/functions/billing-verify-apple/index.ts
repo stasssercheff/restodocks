@@ -368,6 +368,49 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const { data: estRow, error: estErr } = await supabase
+      .from("establishments")
+      .select("id, owner_id")
+      .eq("id", establishmentId)
+      .maybeSingle();
+    if (estErr) {
+      return new Response(JSON.stringify({ error: estErr.message }), {
+        status: 500,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+    const ownerId = String(estRow?.owner_id ?? "").trim();
+    if (!ownerId) {
+      return new Response(JSON.stringify({ error: "Establishment owner not found" }), {
+        status: 404,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    let claimsOwnerScoped = true;
+    const ownerProbe = await supabase
+      .from("apple_iap_subscription_claims")
+      .select("owner_id")
+      .limit(1);
+    if (ownerProbe.error) {
+      const msg = String(ownerProbe.error.message ?? "").toLowerCase();
+      const details = String(ownerProbe.error.details ?? "").toLowerCase();
+      const ownerMissing =
+        msg.includes("owner_id") ||
+        details.includes("owner_id") ||
+        ownerProbe.error.code === "PGRST204" ||
+        ownerProbe.error.code === "42703";
+      if (!ownerMissing && !isMissingRelationError(ownerProbe.error)) {
+        return new Response(JSON.stringify({ error: ownerProbe.error.message }), {
+          status: 500,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+      claimsOwnerScoped = !ownerMissing;
+    }
+    const claimScopeField = claimsOwnerScoped ? "owner_id" : "establishment_id";
+    const claimScopeValue = claimsOwnerScoped ? ownerId : establishmentId;
+
     const testIds = parseTestEstablishmentIds();
     const isTestEst = testIds.includes(establishmentId.toLowerCase());
     const resetMin = testResetMinutes();
@@ -381,7 +424,10 @@ Deno.serve(async (req: Request) => {
       if (!stErr && st?.last_success_at) {
         const elapsed = Date.now() - new Date(String(st.last_success_at)).getTime();
         if (elapsed >= resetMin * 60 * 1000) {
-          const c1 = await supabase.from("apple_iap_subscription_claims").delete().eq("establishment_id", establishmentId);
+          const c1 = await supabase
+            .from("apple_iap_subscription_claims")
+            .delete()
+            .eq(claimScopeField, claimScopeValue);
           if (c1.error && !isMissingRelationError(c1.error)) {
             return new Response(JSON.stringify({ error: c1.error.message }), {
               status: 500,
@@ -492,7 +538,7 @@ Deno.serve(async (req: Request) => {
     if (isActive && originalTransactionId && originalTransactionId.length > 0) {
       const { data: rowByOtid, error: errByOtid } = await supabase
         .from("apple_iap_subscription_claims")
-        .select("establishment_id")
+        .select(claimScopeField)
         .eq("original_transaction_id", originalTransactionId)
         .maybeSingle();
       if (errByOtid) {
@@ -505,23 +551,32 @@ Deno.serve(async (req: Request) => {
             headers: { ...cors, "Content-Type": "application/json" },
           });
         }
-      } else if (claimsEnforced && rowByOtid && !estIdsEqual(String(rowByOtid.establishment_id), establishmentId)) {
+      } else if (claimsEnforced && rowByOtid) {
+        const linkedValue = String((rowByOtid as Record<string, unknown>)[claimScopeField] ?? "");
+        const isSameLink = claimsOwnerScoped
+          ? linkedValue === ownerId
+          : estIdsEqual(linkedValue, establishmentId);
+        if (isSameLink) {
+          // ok
+        } else {
         return new Response(
           JSON.stringify({
             error: "apple_subscription_already_linked",
-            linked_establishment_id: rowByOtid.establishment_id,
+            linked_owner_id: claimsOwnerScoped ? linkedValue : null,
+            linked_establishment_id: claimsOwnerScoped ? null : linkedValue,
           }),
           {
             status: 409,
             headers: { ...cors, "Content-Type": "application/json" },
           },
         );
+        }
       }
 
       const { error: delMine } = await supabase
         .from("apple_iap_subscription_claims")
         .delete()
-        .eq("establishment_id", establishmentId);
+        .eq(claimScopeField, claimScopeValue);
       if (delMine) {
         if (isMissingRelationError(delMine)) {
           claimsEnforced = false;
@@ -534,10 +589,13 @@ Deno.serve(async (req: Request) => {
         }
       }
       if (claimsEnforced) {
-        const { error: insErr } = await supabase.from("apple_iap_subscription_claims").insert({
+        const insertPayload: Record<string, unknown> = {
           original_transaction_id: originalTransactionId,
-          establishment_id: establishmentId,
-        });
+        };
+        insertPayload[claimScopeField] = claimScopeValue;
+        const { error: insErr } = await supabase
+          .from("apple_iap_subscription_claims")
+          .insert(insertPayload);
         if (insErr) {
           if (isMissingRelationError(insErr)) {
             claimsEnforced = false;
@@ -586,7 +644,7 @@ Deno.serve(async (req: Request) => {
       } else if (originalTransactionId && originalTransactionId.length > 0) {
         const { data: clRow, error: errCl } = await supabase
           .from("apple_iap_subscription_claims")
-          .select("establishment_id")
+          .select(claimScopeField)
           .eq("original_transaction_id", originalTransactionId)
           .maybeSingle();
         if (errCl && !isMissingRelationError(errCl)) {
@@ -595,8 +653,14 @@ Deno.serve(async (req: Request) => {
             headers: { ...cors, "Content-Type": "application/json" },
           });
         }
-        if (clRow && estIdsEqual(String(clRow.establishment_id), establishmentId)) {
+        if (clRow) {
+          const linkedValue = String((clRow as Record<string, unknown>)[claimScopeField] ?? "");
+          const same = claimsOwnerScoped
+            ? linkedValue === ownerId
+            : estIdsEqual(linkedValue, establishmentId);
+          if (same) {
           allowDowngradeUpdate = true;
+          }
         }
       }
       if (!allowDowngradeUpdate) {
@@ -625,7 +689,7 @@ Deno.serve(async (req: Request) => {
           .from("apple_iap_subscription_claims")
           .delete()
           .eq("original_transaction_id", originalTransactionId)
-          .eq("establishment_id", establishmentId);
+          .eq(claimScopeField, claimScopeValue);
         if (delExp && !isMissingRelationError(delExp)) {
           return new Response(JSON.stringify({ error: delExp.message }), {
             status: 500,

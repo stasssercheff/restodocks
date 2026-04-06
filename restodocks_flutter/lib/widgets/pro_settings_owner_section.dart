@@ -630,25 +630,15 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
         FutureBuilder<EstablishmentPromoInfo>(
           future: _promoFuture,
           builder: (context, promoSnap) {
-            final promo = promoSnap.data;
             return ListenableBuilder(
               listenable: widget.accountManager,
               builder: (context, _) {
-                final paidPro = widget.accountManager.hasPaidProSubscription;
-                final fromPromoOnly = promo?.isPromoGrantActive ?? false;
                 if (!AppleIapService.isIOSPlatform) {
                   return const SizedBox.shrink();
                 }
-                final titleKey = (paidPro && !fromPromoOnly)
-                    ? 'pro_cancel_subscription_title'
-                    : 'pro_payment_open_apple_subscriptions';
-                final subtitleKey = (paidPro && !fromPromoOnly)
-                    ? 'pro_cancel_subscription_subtitle'
-                    : 'pro_payment_hub_restore_hint';
                 return ListTile(
                   leading: const Icon(Icons.cancel_outlined),
-                  title: Text(loc.t(titleKey)),
-                  subtitle: Text(loc.t(subtitleKey)),
+                  title: Text(loc.t('pro_payment_open_apple_subscriptions')),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => unawaited(_openAppleSubscriptionsSettings()),
                 );
