@@ -1,5 +1,6 @@
 // Edge Function: удаление сотрудника с подтверждением PIN.
 // Удаляет запись employees, auth.users (для повторного использования email), создаёт уведомление.
+// Самоудаление: caller === target, PIN, письмо руководителю подразделения (или владельцу).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -11,7 +12,66 @@ function corsHeaders(origin: string | null): Record<string, string> {
   };
 }
 
-const MANAGER_ROLES = ["owner", "executive_chef", "sous_chef", "bar_manager", "floor_manager"];
+const MANAGER_ROLES = ["owner", "executive_chef", "sous_chef", "bar_manager", "floor_manager", "general_manager"];
+
+type EmpRow = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  establishment_id: string;
+  roles: string[] | null;
+  department: string | null;
+};
+
+function rolesArray(r: unknown): string[] {
+  return Array.isArray(r) ? (r as string[]) : [];
+}
+
+/** Руководитель подразделения для уведомления и FK deleted_by (не удаляемый сотрудник). */
+function pickDepartmentManager(
+  staff: EmpRow[],
+  department: string,
+  excludeId: string,
+): EmpRow | null {
+  const rolePriority: Record<string, string[]> = {
+    kitchen: ["executive_chef", "sous_chef"],
+    bar: ["bar_manager"],
+    dining_room: ["floor_manager"],
+    management: ["general_manager", "owner"],
+  };
+  const order = rolePriority[department] ?? ["owner"];
+  for (const role of order) {
+    const m = staff.find((e) => e.id !== excludeId && rolesArray(e.roles).includes(role));
+    if (m?.email) return m;
+  }
+  const owner = staff.find((e) => e.id !== excludeId && rolesArray(e.roles).includes("owner"));
+  return owner ?? null;
+}
+
+async function sendManagerEmail(
+  to: string,
+  subject: string,
+  html: string,
+): Promise<void> {
+  const resendKey = Deno.env.get("RESEND_API_KEY")?.trim();
+  if (!resendKey) {
+    console.warn("[delete-employee] RESEND_API_KEY not set, skip email");
+    return;
+  }
+  const from = Deno.env.get("RESEND_FROM_EMAIL")?.trim() || "Restodocks <noreply@restodocks.com>";
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${resendKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ from, to: [to], subject, html }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("[delete-employee] Resend failed:", res.status, err);
+  }
+}
 
 Deno.serve(async (req: Request) => {
   const cors = corsHeaders(req.headers.get("Origin"));
@@ -52,11 +112,10 @@ Deno.serve(async (req: Request) => {
     if (!employeeId || !pinCode) {
       return new Response(
         JSON.stringify({ error: "employee_id and pin_code are required" }),
-        { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
+        { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
       );
     }
 
-    // 1. Проверяем текущего пользователя (кто удаляет)
     const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
@@ -65,10 +124,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 2. Загружаем сотрудника-удаляющего и его заведение
     const { data: callerEmp, error: callerErr } = await supabase
       .from("employees")
-      .select("id, full_name, establishment_id, roles")
+      .select("id, full_name, establishment_id, roles, department, email")
       .eq("id", user.id)
       .limit(1)
       .single();
@@ -80,18 +138,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const hasManagerRole = (callerEmp.roles as string[] | null)?.some((r: string) => MANAGER_ROLES.includes(r)) ?? false;
-    if (!hasManagerRole) {
-      return new Response(JSON.stringify({ error: "Only owner or department manager can delete employees" }), {
-        status: 403,
-        headers: { ...cors, "Content-Type": "application/json" },
-      });
-    }
-
-    // 3. Проверяем PIN заведения
     const { data: est, error: estErr } = await supabase
       .from("establishments")
-      .select("id, pin_code")
+      .select("id, name, pin_code, owner_id")
       .eq("id", callerEmp.establishment_id)
       .limit(1)
       .single();
@@ -111,10 +160,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 4. Загружаем удаляемого сотрудника (тот же establishment_id)
     const { data: targetEmp, error: targetErr } = await supabase
       .from("employees")
-      .select("id, full_name, email, establishment_id, roles")
+      .select("id, full_name, email, establishment_id, roles, department")
       .eq("id", employeeId)
       .eq("establishment_id", callerEmp.establishment_id)
       .limit(1)
@@ -127,8 +175,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 5. Нельзя удалить владельца
-    const targetRoles = (targetEmp as { roles?: string[] }).roles ?? [];
+    const targetRoles = rolesArray(targetEmp.roles);
     if (targetRoles.includes("owner")) {
       return new Response(JSON.stringify({ error: "Cannot delete owner" }), {
         status: 400,
@@ -136,29 +183,92 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 6. Вставляем уведомление об удалении (до удаления employee)
-    await supabase.from("employee_deletion_notifications").insert({
+    const selfDelete = callerEmp.id === targetEmp.id;
+
+    if (!selfDelete) {
+      const hasManagerRole = rolesArray(callerEmp.roles).some((r: string) => MANAGER_ROLES.includes(r));
+      if (!hasManagerRole) {
+        return new Response(JSON.stringify({ error: "Only owner or department manager can delete employees" }), {
+          status: 403,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    const { data: staffRaw, error: staffErr } = await supabase
+      .from("employees")
+      .select("id, full_name, email, establishment_id, roles, department")
+      .eq("establishment_id", callerEmp.establishment_id)
+      .eq("is_active", true);
+
+    if (staffErr) {
+      console.error("[delete-employee] staff load:", staffErr);
+    }
+    const staff = (staffRaw ?? []) as EmpRow[];
+
+    let deletedById: string = callerEmp.id as string;
+    let deletedByName: string = (callerEmp.full_name as string) ?? "—";
+    let isSelfDeletion = false;
+    let emailTo: string | null = null;
+
+    if (selfDelete) {
+      isSelfDeletion = true;
+      const dept = String(targetEmp.department ?? "management");
+      const mgr = pickDepartmentManager(staff, dept, targetEmp.id);
+      if (mgr) {
+        deletedById = mgr.id;
+        deletedByName = mgr.full_name ?? "—";
+        emailTo = mgr.email?.trim() || null;
+      } else if (est.owner_id) {
+        const { data: ownerEmp } = await supabase
+          .from("employees")
+          .select("id, full_name, email")
+          .eq("id", est.owner_id)
+          .limit(1)
+          .maybeSingle();
+        if (ownerEmp && ownerEmp.id !== targetEmp.id) {
+          deletedById = ownerEmp.id as string;
+          deletedByName = (ownerEmp.full_name as string) ?? "—";
+          emailTo = (ownerEmp.email as string)?.trim() || null;
+        }
+      }
+    }
+
+    const insertRow: Record<string, unknown> = {
       establishment_id: callerEmp.establishment_id,
       deleted_employee_id: targetEmp.id,
       deleted_employee_name: targetEmp.full_name ?? "—",
       deleted_employee_email: targetEmp.email ?? null,
-      deleted_by_employee_id: callerEmp.id,
-      deleted_by_name: callerEmp.full_name ?? "—",
-    });
+      deleted_by_employee_id: deletedById,
+      deleted_by_name: deletedByName,
+    };
+    if (isSelfDeletion) {
+      insertRow.is_self_deletion = true;
+    }
 
-    // 7. Удаляем связанные данные и сотрудника (FK: employees.id = auth.users.id)
+    await supabase.from("employee_deletion_notifications").insert(insertRow);
+
+    if (selfDelete && emailTo) {
+      const name = targetEmp.full_name ?? "—";
+      const estName = (est as { name?: string }).name ?? "";
+      const subj = `Restodocks: сотрудник удалил профиль — ${name}`;
+      await sendManagerEmail(
+        emailTo,
+        subj,
+        `<p>Сотрудник <strong>${name}</strong> (${targetEmp.email ?? "—"}) удалил свой профиль в приложении Restodocks.</p>
+<p>Заведение: ${estName}</p>`,
+      );
+    }
+
     await supabase.from("password_reset_tokens").delete().eq("employee_id", targetEmp.id);
-    // employee_direct_messages: удаляем где сотрудник отправитель или получатель
     await supabase.from("employee_direct_messages").delete().eq("sender_employee_id", targetEmp.id);
     await supabase.from("employee_direct_messages").delete().eq("recipient_employee_id", targetEmp.id);
-    // Групповые чаты: удаляем участника и его сообщения (если таблицы есть)
     try {
       await supabase.from("chat_room_messages").delete().eq("sender_employee_id", targetEmp.id);
       await supabase.from("chat_room_members").delete().eq("employee_id", targetEmp.id);
     } catch {
-      // Таблицы могут отсутствовать в старых проектах
+      // tables may be missing
     }
-    // co_owner_invitations.invited_by — без ON DELETE, удаляем вручную
     await supabase.from("co_owner_invitations").delete().eq("invited_by", targetEmp.id);
     const { error: delEmpErr } = await supabase.from("employees").delete().eq("id", targetEmp.id);
 
@@ -170,11 +280,9 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 8. Удаляем пользователя из auth.users (чтобы email можно было использовать снова)
     const { error: authDelErr } = await supabase.auth.admin.deleteUser(targetEmp.id);
     if (authDelErr) {
-      console.warn("[delete-employee] auth.admin.deleteUser failed (employee already deleted):", authDelErr.message);
-      // Не возвращаем ошибку — employee уже удалён, уведомление создано
+      console.warn("[delete-employee] auth.admin.deleteUser failed:", authDelErr.message);
     }
 
     return new Response(JSON.stringify({ ok: true }), {

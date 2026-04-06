@@ -36,39 +36,14 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  List<Establishment> _ownerEstablishments = [];
-  int _maxEstablishmentsPerOwner = 5;
-  bool _loadingEstablishments = false;
-
   @override
   void initState() {
     super.initState();
-    _loadOwnerEstablishments();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final acc = context.read<AccountManagerSupabase>();
       final est = acc.establishment;
       if (est != null) context.read<HaccpConfigService>().load(est.id);
     });
-  }
-
-  Future<void> _loadOwnerEstablishments() async {
-    final accountManager = context.read<AccountManagerSupabase>();
-    if (accountManager.currentEmployee?.hasRole('owner') != true) return;
-    setState(() => _loadingEstablishments = true);
-    try {
-      final results = await Future.wait([
-        accountManager.getEstablishmentsForOwner(),
-        accountManager.getMaxEstablishmentsPerOwner(),
-      ]);
-      if (mounted)
-        setState(() {
-          _ownerEstablishments = results[0] as List<Establishment>;
-          _maxEstablishmentsPerOwner = results[1] as int;
-          _loadingEstablishments = false;
-        });
-    } catch (_) {
-      if (mounted) setState(() => _loadingEstablishments = false);
-    }
   }
 
   String _homeButtonActionLabel(
@@ -288,159 +263,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
-  }
-
-  void _showDeleteEstablishmentConfirm(BuildContext context,
-      LocalizationService loc, Establishment establishment) {
-    final account = context.read<AccountManagerSupabase>();
-    final ownerEmail = account.currentEmployee?.email ?? '';
-    final pinController = TextEditingController();
-    final emailController = TextEditingController(text: ownerEmail);
-    final formKey = GlobalKey<FormState>();
-    showDialog<String?>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('delete_establishment') ?? 'Удалить заведение?'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                '${establishment.name}\n\n${loc.t('delete_establishment_enter_pin_email') ?? 'Введите PIN и email для подтверждения:'}',
-                style: Theme.of(ctx).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 12),
-              Form(
-                key: formKey,
-                child: Column(
-                  children: [
-                    TextFormField(
-                      controller: pinController,
-                      obscureText: true,
-                      autofocus: true,
-                      textCapitalization: TextCapitalization.characters,
-                      decoration: InputDecoration(
-                        labelText: loc.t('company_pin') ?? 'PIN компании',
-                        hintText: loc.t('enter_company_pin') ??
-                            'Введите PIN компании',
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty)
-                          return loc.t('company_pin_required') ??
-                              'PIN обязателен';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      autocorrect: false,
-                      decoration: InputDecoration(
-                        labelText: loc.t('email'),
-                        hintText: loc.t('enter_email') ?? 'Введите email',
-                      ),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty)
-                          return loc.t('email_required') ?? 'Email обязателен';
-                        return null;
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              final pin = pinController.text.trim();
-              final email = emailController.text.trim();
-              if (!establishment.verifyPinCode(pin)) {
-                ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(
-                      content: Text(loc.t('delete_establishment_wrong_pin') ??
-                          'Неверный PIN')),
-                );
-                return;
-              }
-              Navigator.of(ctx).pop('$pin|$email');
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: Text(loc.t('delete_establishment') ?? 'Удалить'),
-          ),
-        ],
-      ),
-    ).then((result) async {
-      pinController.dispose();
-      emailController.dispose();
-      if (result == null || !context.mounted) return;
-      final parts = result.split('|');
-      if (parts.length != 2) return;
-      final pin = parts[0];
-      final email = parts[1];
-      final accountManager = context.read<AccountManagerSupabase>();
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          content: Row(
-            children: [
-              const CircularProgressIndicator(),
-              const SizedBox(width: 16),
-              Text(loc.t('delete_establishment_progress') ??
-                  'Удаление заведения...'),
-            ],
-          ),
-        ),
-      );
-      try {
-        await accountManager.deleteEstablishment(
-          establishmentId: establishment.id,
-          pinCode: pin,
-          email: email,
-        );
-        if (context.mounted && Navigator.of(context).canPop())
-          Navigator.of(context).pop();
-        if (context.mounted) {
-          final remaining = await accountManager.getEstablishmentsForOwner();
-          if (remaining.isEmpty) {
-            await accountManager.logout();
-            if (context.mounted) context.go('/login');
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                  content: Text(loc.t('delete_establishment_done') ??
-                      'Заведение удалено'),
-                  backgroundColor: Colors.green),
-            );
-            setState(() => _ownerEstablishments = remaining);
-            if (context.mounted) context.go('/home');
-          }
-        }
-      } catch (e) {
-        if (context.mounted && Navigator.of(context).canPop())
-          Navigator.of(context).pop();
-        if (context.mounted) {
-          final msg = e.toString();
-          String snack =
-              loc.t('delete_establishment_wrong_pin') ?? 'Неверный PIN';
-          if (msg.contains('Email') || msg.contains('email'))
-            snack = loc.t('delete_establishment_wrong_email') ??
-                'Email не совпадает';
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(snack), backgroundColor: Colors.red));
-        }
-      }
-    });
   }
 
   void _showClearAllTtkConfirm(BuildContext context, LocalizationService loc) {
@@ -1790,96 +1612,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 8),
             if (currentEmployee.hasRole('owner')) ...[
-              Text(
-                localization.t('establishment') ?? 'Заведение',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+              ListTile(
+                leading: const Icon(Icons.storefront),
+                title: Text(localization.t('establishments')),
+                subtitle: Text(localization.t('establishments_manage_subtitle')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/establishments'),
               ),
-              if (_loadingEstablishments)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Center(
-                      child: SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2))),
-                )
-              else if (_ownerEstablishments.length > 1) ...[
-                ..._ownerEstablishments.map((est) {
-                  final parentName =
-                      est.isBranch && est.parentEstablishmentId != null
-                          ? _ownerEstablishments
-                              .where((e) => e.id == est.parentEstablishmentId)
-                              .firstOrNull
-                              ?.name
-                          : null;
-                  return ListTile(
-                    leading: Icon(
-                      est.id == establishment?.id
-                          ? Icons.check_circle
-                          : (est.isBranch ? Icons.account_tree : Icons.store),
-                      color: est.id == establishment?.id
-                          ? Theme.of(context).colorScheme.primary
-                          : null,
-                    ),
-                    title: Text(est.name),
-                    subtitle: est.id == establishment?.id
-                        ? Text(localization.t('current') ?? 'Текущее')
-                        : (est.isBranch && parentName != null
-                            ? Text(
-                                '${localization.t('branch_of') ?? 'Филиал'}: $parentName')
-                            : (est.isMain
-                                ? Text(localization.t('main_establishment') ??
-                                    'Основное')
-                                : null)),
-                    trailing: est.id == establishment?.id
-                        ? const Icon(Icons.check, color: Colors.green)
-                        : null,
-                    onTap: est.id == establishment?.id
-                        ? null
-                        : () async {
-                            await accountManager.switchEstablishment(est);
-                            if (context.mounted) context.go('/home');
-                          },
-                  );
-                }),
-                const SizedBox(height: 8),
-              ],
-              if (!accountManager.isViewOnlyOwner) ...[
-                ListTile(
-                  leading: const Icon(Icons.add_business),
-                  title: Text(localization.t('add_establishment') ??
-                      'Добавить заведение'),
-                  subtitle: Text(
-                    (localization.t('establishments_counter') ??
-                            '{current} из {max}')
-                        .replaceAll('{current}',
-                            '${(_ownerEstablishments.length - 1).clamp(0, _maxEstablishmentsPerOwner)}')
-                        .replaceAll('{max}', '$_maxEstablishmentsPerOwner'),
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: (_ownerEstablishments.length - 1) >=
-                          _maxEstablishmentsPerOwner
-                      ? null
-                      : () => context.push('/add-establishment'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.delete_forever, color: Colors.red),
-                  title: Text(
-                    localization.t('delete_establishment') ??
-                        'Удалить заведение',
-                    style: const TextStyle(color: Colors.red),
-                  ),
-                  subtitle: Text(localization.t('delete_establishment_hint') ??
-                      'Удалить заведение и все связанные данные безвозвратно'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: establishment != null
-                      ? () => _showDeleteEstablishmentConfirm(
-                          context, localization, establishment!)
-                      : null,
-                ),
-              ],
               const Divider(),
             ],
             ExpansionTile(

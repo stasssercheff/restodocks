@@ -349,6 +349,7 @@ class InboxService {
           deletedEmployeeName: m['deleted_employee_name']?.toString() ?? '—',
           deletedEmployeeEmail: m['deleted_employee_email']?.toString(),
           deletedByName: m['deleted_by_name']?.toString() ?? '—',
+          isSelfDeletion: m['is_self_deletion'] == true,
           createdAt: DateTime.tryParse(m['created_at']?.toString() ?? '') ?? DateTime.now(),
         );
       }).toList();
@@ -382,6 +383,7 @@ class EmployeeDeletionNotification {
   final String deletedEmployeeName;
   final String? deletedEmployeeEmail;
   final String deletedByName;
+  final bool isSelfDeletion;
   final DateTime createdAt;
 
   EmployeeDeletionNotification({
@@ -389,6 +391,7 @@ class EmployeeDeletionNotification {
     required this.deletedEmployeeName,
     this.deletedEmployeeEmail,
     required this.deletedByName,
+    required this.isSelfDeletion,
     required this.createdAt,
   });
 }

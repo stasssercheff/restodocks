@@ -14,6 +14,7 @@ export 'product_upload_screen.dart';
 export 'menu_screen.dart';
 export 'profile_screen.dart';
 export 'settings_screen.dart';
+export 'establishments_management_screen.dart';
 export 'inventory_screen.dart';
 export 'inventory_pf_screen.dart';
 export 'inventory_received_screen.dart';

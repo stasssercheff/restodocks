@@ -142,7 +142,10 @@ class AppShell extends StatelessWidget {
 
   int _indexForLocation(String location, HomeButtonAction action, bool noDataAccess, [bool isKitchenNoData = false, Employee? employee]) {
     if (location == '/home' || location == '/') return 0;
-    if (location.startsWith('/personal-cabinet') || location.startsWith('/profile') || location.startsWith('/settings')) return 2;
+    if (location.startsWith('/personal-cabinet') ||
+        location.startsWith('/profile') ||
+        location.startsWith('/settings') ||
+        location.startsWith('/establishments')) return 2;
 
     final middleRoute = noDataAccess ? '/schedule' : action.routeFor(employee);
     if (location.startsWith(middleRoute)) return 1;

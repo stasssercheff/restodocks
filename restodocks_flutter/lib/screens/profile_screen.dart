@@ -169,6 +169,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildChangePasswordSection(localization),
             const SizedBox(height: 24),
 
+            if (isOwner) ...[
+              ListTile(
+                leading: const Icon(Icons.storefront_outlined),
+                title: Text(localization.t('establishments')),
+                subtitle: Text(localization.t('delete_profile_owner_hint')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/establishments'),
+              ),
+              const SizedBox(height: 24),
+            ] else ...[
+              _buildDeleteProfileSection(localization, accountManager, currentEmployee),
+              const SizedBox(height: 24),
+            ],
+
             // Выход
             _buildLogoutSection(localization),
           ],
@@ -516,6 +530,118 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildDeleteProfileSection(
+    LocalizationService loc,
+    AccountManagerSupabase account,
+    Employee employee,
+  ) {
+    return ListTile(
+      leading: const Icon(Icons.person_off, color: Colors.red),
+      title: Text(
+        loc.t('delete_profile'),
+        style: const TextStyle(color: Colors.red),
+      ),
+      subtitle: Text(loc.t('delete_profile_hint')),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: () => _confirmDeleteEmployeeProfile(context, loc, account, employee),
+    );
+  }
+
+  Future<void> _confirmDeleteEmployeeProfile(
+    BuildContext context,
+    LocalizationService loc,
+    AccountManagerSupabase account,
+    Employee employee,
+  ) async {
+    final pinController = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('delete_profile_confirm_title')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(loc.t('delete_profile_confirm_body')),
+            const SizedBox(height: 12),
+            TextField(
+              controller: pinController,
+              obscureText: true,
+              autofocus: true,
+              textCapitalization: TextCapitalization.characters,
+              decoration: InputDecoration(
+                labelText: loc.t('company_pin'),
+                hintText: loc.t('enter_company_pin'),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(loc.t('delete_profile')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) {
+      pinController.dispose();
+      return;
+    }
+    final pin = pinController.text.trim();
+    pinController.dispose();
+    if (pin.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('company_pin_required'))),
+      );
+      return;
+    }
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 16),
+            Expanded(child: Text(loc.t('delete_profile_progress'))),
+          ],
+        ),
+      ),
+    );
+    try {
+      await account.deleteEmployeeWithPin(employeeId: employee.id, pinCode: pin);
+      if (context.mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      await account.logout();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('delete_profile_done'))),
+        );
+        context.go('/login');
+      }
+    } catch (e) {
+      if (context.mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${loc.t('error')}: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildChangePasswordSection(LocalizationService localization) {

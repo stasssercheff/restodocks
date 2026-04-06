@@ -1144,7 +1144,9 @@ class _InboxScreenState extends State<InboxScreen> {
                       color: Theme.of(context).colorScheme.onErrorContainer),
                 ),
                 title: Text(
-                  '${n.deletedEmployeeName} ${loc.t('employee_deleted_by') ?? 'удалён (удалил:'} ${n.deletedByName})',
+                  n.isSelfDeletion
+                      ? loc.t('employee_deleted_self_inbox').replaceAll('%s', n.deletedEmployeeName)
+                      : '${n.deletedEmployeeName} ${loc.t('employee_deleted_by')} ${n.deletedByName})',
                   style: Theme.of(context)
                       .textTheme
                       .bodyMedium

@@ -497,6 +497,13 @@ class AppRouter {
                 _slideTransitionPage(state, const AddEstablishmentScreen()),
           ),
           GoRoute(
+            path: '/establishments',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const EstablishmentsManagementScreen(),
+            ),
+          ),
+          GoRoute(
             path: '/confirm-establishment-clone',
             pageBuilder: (context, state) {
               final token = state.queryParameters['token'];
