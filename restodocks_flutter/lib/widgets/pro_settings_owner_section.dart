@@ -96,12 +96,14 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
       final err = iap.lastError!;
       final msg = _iapFailureMessage(loc, err);
       final restore = _iapOfferRestoreSnackAction(err);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 20),
-          behavior: SnackBarBehavior.fixed,
-          content: restore
-              ? Column(
+      unawaited(
+        showDialog<void>(
+          context: context,
+          barrierDismissible: true,
+          builder: (dialogContext) {
+            return AlertDialog(
+              content: SingleChildScrollView(
+                child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -109,20 +111,26 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                       msg,
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 14),
-                    FilledButton(
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                        unawaited(iap.restorePurchases());
-                      },
-                      child: Text(loc.t('pro_iap_restore')),
+                    if (restore) ...[
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        onPressed: () {
+                          Navigator.of(dialogContext).pop();
+                          unawaited(iap.restorePurchases());
+                        },
+                        child: Text(loc.t('pro_iap_restore')),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: Text(loc.t('close')),
                     ),
                   ],
-                )
-              : Text(
-                  msg,
-                  textAlign: TextAlign.center,
                 ),
+              ),
+            );
+          },
         ),
       );
     }
