@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 import '../../models/models.dart';
 import '../../services/schedule_storage_service.dart';
 import '../../services/services.dart';
+import '../../utils/translit_utils.dart';
 import '../../widgets/app_bar_home_button.dart';
 
 /// График: слоты (должности/имена) задаются вручную, можно выбрать сотрудника из списка или вписать имя.
@@ -116,7 +117,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return byId.values.toList();
   }
 
-  String _slotDisplayName(ScheduleSlot slot) {
+  String _slotDisplayName(ScheduleSlot slot, {required bool translit}) {
     if (slot.employeeId == null) return slot.name;
     final emp = _employees.where((e) => e.id == slot.employeeId).firstOrNull;
     if (emp == null) return slot.name;
@@ -125,7 +126,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final surnameLetter = emp.surname?.trim().isNotEmpty == true
         ? ' ${emp.surname!.trim()[0].toUpperCase()}.'
         : (parts.length > 1 ? ' ${parts.last[0].toUpperCase()}.' : '');
-    return '$first$surnameLetter'.trim();
+    final shortName = '$first$surnameLetter'.trim();
+    return translit ? cyrillicToLatin(shortName) : shortName;
   }
 
   /// Должность для отображения в графике. Собственник — не должность; если есть должность — показываем её (напр. «Шеф»), иначе null.
@@ -662,6 +664,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
     final acc = context.watch<AccountManagerSupabase>();
+    final showTranslit =
+        context.watch<ScreenLayoutPreferenceService>().showNameTranslit;
     final canEdit = (acc.currentEmployee?.canEditSchedule ?? false) ||
         (widget.personalOnly &&
             (acc.currentEmployee?.canEditOwnSchedule ?? false));
@@ -821,7 +825,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                _slotDisplayName(slot),
+                _slotDisplayName(slot, translit: showTranslit),
                 style: TextStyle(fontSize: isMobile ? 11 : 12),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,

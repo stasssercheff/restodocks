@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../core/config/roles_config.dart';
 import '../models/models.dart';
 import '../utils/number_format_utils.dart';
+import '../utils/employee_display_utils.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
@@ -77,6 +78,8 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
     final acc = context.watch<AccountManagerSupabase>();
+    final showTranslit =
+        context.watch<ScreenLayoutPreferenceService>().showNameTranslit;
     final canEdit = _canEditEmployees(acc.currentEmployee);
 
     return Scaffold(
@@ -87,11 +90,16 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
         ],
       ),
-      body: _buildBody(loc, theme, canEdit),
+      body: _buildBody(loc, theme, canEdit, showTranslit),
     );
   }
 
-  Widget _buildBody(LocalizationService loc, ThemeData theme, bool canEdit) {
+  Widget _buildBody(
+    LocalizationService loc,
+    ThemeData theme,
+    bool canEdit,
+    bool showTranslit,
+  ) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       return Center(
@@ -147,6 +155,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         ...List.generate(_list.length, (i) => _EmployeeCard(
         employee: _list[i],
         loc: loc,
+        showTranslit: showTranslit,
         canEdit: canEdit,
         onEdit: () => _openEditEmployee(context, _list[i]),
         onDelete: () => _deleteEmployee(context, _list[i]),
@@ -328,6 +337,7 @@ class _EmployeeCard extends StatelessWidget {
   const _EmployeeCard({
     required this.employee,
     required this.loc,
+    required this.showTranslit,
     required this.canEdit,
     required this.onEdit,
     required this.onDelete,
@@ -335,6 +345,7 @@ class _EmployeeCard extends StatelessWidget {
 
   final Employee employee;
   final LocalizationService loc;
+  final bool showTranslit;
   final bool canEdit;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -370,6 +381,7 @@ class _EmployeeCard extends StatelessWidget {
         ? loc.departmentDisplayName(employee.department)
         : employee.departmentDisplayName;
     final deptStr = sectionStr != null ? '$deptLabel · $sectionStr' : deptLabel;
+    final displayName = employeeDisplayName(employee, translit: showTranslit);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 6),
@@ -392,7 +404,7 @@ class _EmployeeCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      employee.fullName,
+                      displayName,
                       style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -496,6 +508,7 @@ class _EmployeeCard extends StatelessWidget {
     final deptStr = sectionStr != null ? '$deptLabel · $sectionStr' : deptLabel;
     final posStr = positionDisplay(employee, loc);
     final subStyle = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    final displayName = employeeDisplayName(employee, translit: showTranslit);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -517,7 +530,7 @@ class _EmployeeCard extends StatelessWidget {
                   children: [
                     // Имя
                     Text(
-                      employee.fullName,
+                      displayName,
                       style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                     ),
                     if (employee.email.isNotEmpty) ...[
