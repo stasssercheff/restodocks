@@ -11,6 +11,12 @@ import '../utils/dev_log.dart';
 import 'account_manager_supabase.dart';
 import 'edge_function_http.dart';
 
+enum _IapPurchasePreflight {
+  proceed,
+  blockedConflict,
+  alreadyActivated,
+}
+
 /// In-App Purchase (iOS): подписка Pro → Edge `billing-verify-apple` → `establishments`.
 class AppleIapService extends ChangeNotifier {
   AppleIapService({
@@ -503,6 +509,54 @@ class AppleIapService extends ChangeNotifier {
     }
   }
 
+  /// Перед открытием листа оплаты App Store: если в локальном чеке уже подписка,
+  /// привязанная к другому владельцу — не вызывать покупку (снижает риск лишнего списания).
+  Future<_IapPurchasePreflight> _preflightBeforeStoreKitPurchase() async {
+    final est = _account.establishment;
+    final emp = _account.currentEmployee;
+    if (est == null || emp == null || !emp.hasRole('owner')) {
+      return _IapPurchasePreflight.proceed;
+    }
+
+    final receiptData = await _appReceiptBase64ForProSync();
+    if (receiptData == null || receiptData.isEmpty) {
+      return _IapPurchasePreflight.proceed;
+    }
+
+    final res = await _postBillingVerifyApple(
+      establishmentId: est.id,
+      receiptData: receiptData,
+    );
+
+    if (res.status == 409) {
+      final d = res.data;
+      final buf = StringBuffer('verify_failed_http_409_preflight');
+      if (d != null && d['error'] != null) {
+        buf.write('|');
+        buf.write(
+          d['error'].toString().trim().replaceAll('|', '/'),
+        );
+      }
+      _lastError = buf.toString();
+      return _IapPurchasePreflight.blockedConflict;
+    }
+
+    if (res.status == 200) {
+      try {
+        await _account.syncEstablishmentAccessFromServer();
+      } catch (e, st) {
+        devLog('IAP preflight sync: $e $st');
+      }
+      if (_account.establishment?.hasPaidProAccess ?? false) {
+        _lastError = null;
+        _successToken++;
+        return _IapPurchasePreflight.alreadyActivated;
+      }
+    }
+
+    return _IapPurchasePreflight.proceed;
+  }
+
   /// Оформить подписку (автопродление).
   Future<bool> purchasePro() async {
     if (!isIOSPlatform) return false;
@@ -531,6 +585,19 @@ class AppleIapService extends ChangeNotifier {
         notifyListeners();
         return false;
       }
+
+      final pre = await _preflightBeforeStoreKitPurchase();
+      if (pre == _IapPurchasePreflight.blockedConflict) {
+        _busy = false;
+        notifyListeners();
+        return false;
+      }
+      if (pre == _IapPurchasePreflight.alreadyActivated) {
+        _busy = false;
+        notifyListeners();
+        return false;
+      }
+
       // Один Apple ID → один owner_id: Pro на все заведения этого владельца (см. billing-verify-apple).
       final param = PurchaseParam(
         productDetails: _product!,

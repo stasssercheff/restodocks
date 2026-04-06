@@ -1023,8 +1023,9 @@
     "pro_payment_hub_restore_hint": "Если подписку уже оформляли в App Store — «Восстановить покупки», чтобы привязать её к этому заведению.",
     "pro_payment_hub_loading": "Подключение к App Store…",
     "pro_payment_hub_load_error": "Не удалось загрузить данные подписки. Повторите попытку.",
-    "pro_iap_apple_account_hint": "Подписка оформляется в App Store под Apple ID (это не оплата картой «Apple Pay» отдельно). В Restodocks активная подписка App Store закрепляется за одной компанией (заведением): новый аккаунт с тем же Apple ID не получит эту подписку для другой компании бесплатно. Несколько заведений на тарифе и другие способы оплаты — в планах. Пробные 72 часа на сервере — отдельно от покупки в Apple. Если покупка уже есть у Apple ID — подписки в настройках или «Восстановить покупки».",
-    "pro_iap_subscription_linked_other_account": "Эта подписка App Store уже привязана к другой компании в Restodocks. Одна оплата Apple — одно заведение: войдите в тот аккаунт или используйте другой Apple ID для новой компании.",
+    "pro_iap_apple_account_hint": "Подписка оформляется в App Store с вашим Apple ID (это не то же самое, что оплата картой через Apple Pay). В Restodocks одна активная подписка App Store закрепляется за одной учётной записью собственника — все его заведения могут быть на одной подписке; другой владелец с тем же Apple ID не получит эту подписку бесплатно. Пробные 72 часа на сервере — отдельно от покупки в Apple. Если подписка уже есть — подписки Apple ID в настройках или «Восстановить покупки».",
+    "pro_iap_subscription_linked_other_account": "Эта подписка App Store в Restodocks уже привязана к другой учётной записи собственника. Одна подписка App Store — на одного владельца (все его заведения входят в неё). Войдите в тот аккаунт Restodocks или используйте другой Apple ID, если это другой владелец.",
+    "pro_iap_409_preflight_footer": "Экран оплаты App Store не открывался — за эту попытку списания не было. Если подписка у этого Apple ID уже оформлена, нажмите «Восстановить покупки» ниже, повторно не оплачивайте.",
     "pro_conditions_title": "PRO — условия пользования",
     "pro_conditions_subtitle": "Ограничения бесплатного тарифа и Pro",
     "pro_required_expenses": "Раздел «Расходы» доступен по подписке Pro.",
@@ -3691,8 +3692,9 @@
     "pro_payment_hub_restore_hint": "If you already subscribed in the App Store, tap Restore purchases to link it to this establishment.",
     "pro_payment_hub_loading": "Connecting to App Store…",
     "pro_payment_hub_load_error": "Could not load subscription data. Please try again.",
-    "pro_iap_apple_account_hint": "You subscribe in the App Store with your Apple ID (this is not the same as paying with the Apple Pay card alone). Restodocks links one active App Store subscription to one company (establishment): a new account with the same Apple ID does not get that subscription for free for a different company. Multi-establishment plans and more payment methods are planned. The 72-hour server trial is separate from an Apple purchase. If Apple ID already has the subscription, use Settings → subscriptions or Restore purchases.",
-    "pro_iap_subscription_linked_other_account": "This App Store subscription is already linked to another company in Restodocks. One Apple subscription applies to one establishment: sign in to that account or use a different Apple ID for a new company.",
+    "pro_iap_apple_account_hint": "You subscribe in the App Store with your Apple ID (not the same as paying with a card via Apple Pay alone). In Restodocks, one active App Store subscription is tied to one owner account — all of that owner's establishments can share it; another owner cannot get the same subscription for free with the same Apple ID. The 72-hour server trial is separate from an Apple purchase. If you already have the subscription, use Apple ID subscriptions or Restore purchases.",
+    "pro_iap_subscription_linked_other_account": "This App Store subscription is already linked to another owner account in Restodocks. One App Store subscription covers one owner — all of that owner's establishments are included. Sign in to that Restodocks account, or use a different Apple ID if this is a different owner.",
+    "pro_iap_409_preflight_footer": "The App Store payment sheet was not opened — you were not charged for this attempt. If this Apple ID already has the subscription, tap Restore purchases below; do not pay again.",
     "pro_conditions_title": "PRO — terms of use",
     "pro_conditions_subtitle": "Free plan and Pro limits",
     "pro_required_expenses": "The Expenses section requires a Pro subscription.",
@@ -8328,7 +8330,9 @@
     "pro_payment_hub_line_promo_active": "Código promocional activo",
     "admin_promo_who_used": "Usado por:",
     "admin_promo_usage_line": "{name} · {email} · {date}",
-    "pro_iap_apple_account_hint": "La suscripción se contrata en el App Store con tu Apple ID (no es lo mismo que pagar solo con la tarjeta Apple Pay). En Restodocks, una suscripción activa del App Store queda vinculada a una sola empresa (local): una cuenta nueva con el mismo Apple ID no obtiene esa suscripción gratis para otra empresa. Los planes con varios locales y otros métodos de pago están previstos. La prueba de 72 horas en el servidor es independiente de la compra en Apple. Si el Apple ID ya tiene la suscripción: Ajustes → suscripciones o Restaurar compras."
+    "pro_iap_apple_account_hint": "La suscripción se contrata en el App Store con tu Apple ID (no es lo mismo que pagar solo con la tarjeta Apple Pay). En Restodocks, una suscripción activa del App Store queda vinculada a una cuenta de titular: todos sus locales pueden compartirla; otro titular con el mismo Apple ID no obtiene esa suscripción gratis. La prueba de 72 horas en el servidor es independiente de la compra en Apple. Si el Apple ID ya tiene la suscripción: Ajustes → suscripciones o Restaurar compras.",
+    "pro_iap_subscription_linked_other_account": "Esta suscripción del App Store ya está vinculada a otra cuenta de titular en Restodocks. Una suscripción del App Store cubre a un titular — todos sus establecimientos están incluidos. Inicia sesión en esa cuenta de Restodocks o usa otro Apple ID si es otro titular.",
+    "pro_iap_409_preflight_footer": "No se abrió la pantalla de pago del App Store: no se te cobró por este intento. Si este Apple ID ya tiene la suscripción, pulsa Restaurar compras abajo; no vuelvas a pagar."
   },
   "de": {
     "app_name": "Restodocks",
@@ -16627,7 +16631,9 @@
     "pro_payment_hub_line_promo_active": "Codice promo attivo",
     "admin_promo_who_used": "Utilizzato da:",
     "admin_promo_usage_line": "{name} · {email} · {date}",
-    "pro_iap_apple_account_hint": "L'abbonamento si attiva sull'App Store con il tuo Apple ID (non equivale al solo pagamento con carta Apple Pay). Restodocks collega un abbonamento App Store attivo a un'azienda (esercizio): un nuovo account con lo stesso Apple ID non riceve quell'abbonamento gratis per un'altra azienda. Piani multi-sede e altri metodi di pagamento sono in programma. La prova di 72 ore sul server è separata dall'acquisto Apple. Se l'Apple ID ha già l'abbonamento: Impostazioni → abbonamenti o Ripristina acquisti."
+    "pro_iap_apple_account_hint": "L'abbonamento si attiva sull'App Store con il tuo Apple ID (non equivale al solo pagamento con carta Apple Pay). In Restodocks un abbonamento App Store attivo è legato a un account titolare: tutti i suoi esercizi possono condividerlo; un altro titolare con lo stesso Apple ID non lo ottiene gratis. La prova di 72 ore sul server è separata dall'acquisto Apple. Se l'Apple ID ha già l'abbonamento: Impostazioni → abbonamenti o Ripristina acquisti.",
+    "pro_iap_subscription_linked_other_account": "Questo abbonamento App Store è già collegato a un altro account titolare in Restodocks. Un abbonamento App Store vale per un titolare — tutti i suoi esercizi sono inclusi. Accedi a quell'account Restodocks o usa un altro Apple ID se è un altro titolare.",
+    "pro_iap_409_preflight_footer": "La schermata di pagamento dell'App Store non è stata aperta: per questo tentativo non è stato addebitato nulla. Se questo Apple ID ha già l'abbonamento, tocca Ripristina acquisti qui sotto; non pagare di nuovo."
   },
   "tr": {
     "app_name": "Yeniden stoklamalar",
@@ -19402,7 +19408,9 @@
     "pro_payment_hub_line_promo_active": "Promosyon kodu etkin",
     "admin_promo_who_used": "Kullanan:",
     "admin_promo_usage_line": "{name} · {email} · {date}",
-    "pro_iap_apple_account_hint": "Abonelik App Store'da Apple ID'nizle yapılır (yalnızca Apple Pay kartıyla ödeme ile aynı değildir). Restodocks, aktif bir App Store aboneliğini tek bir işletmeye bağlar: aynı Apple ID ile yeni bir hesap, başka bir şirket için bu aboneliği ücretsiz alamaz. Çoklu işletme planları ve diğer ödeme yöntemleri planlanıyor. Sunucudaki 72 saatlik deneme, Apple satın alımından ayrıdır. Apple ID'de abonelik zaten varsa: Ayarlar → abonelikler veya Satın alımları geri yükle."
+    "pro_iap_apple_account_hint": "Abonelik App Store'da Apple ID'nizle yapılır (yalnızca Apple Pay kartıyla ödeme ile aynı değildir). Restodocks'ta aktif bir App Store aboneliği tek bir işletme sahibi hesabına bağlanır — tüm işletmeleri kapsayabilir; aynı Apple ID ile başka bir sahip bu aboneliği ücretsiz alamaz. Sunucudaki 72 saatlik deneme, Apple satın alımından ayrıdır. Apple ID'de abonelik zaten varsa: Ayarlar → abonelikler veya Satın alımları geri yükle.",
+    "pro_iap_subscription_linked_other_account": "Bu App Store aboneliği Restodocks'ta başka bir işletme sahibi hesabına zaten bağlı. Bir App Store aboneliği bir sahibi kapsar — o sahibin tüm işletmeleri dahildir. O Restodocks hesabında oturum açın veya başka bir sahipse farklı bir Apple ID kullanın.",
+    "pro_iap_409_preflight_footer": "App Store ödeme ekranı açılmadı — bu deneme için ücret alınmadı. Bu Apple ID'de abonelik zaten varsa aşağıdan Satın alımları geri yükle'ye dokunun; tekrar ödeme yapmayın."
   },
   "vi": {
     "app_name": "Khôi phục lại",
@@ -22177,6 +22185,8 @@
     "pro_payment_hub_line_promo_active": "Mã khuyến mãi đang hoạt động",
     "admin_promo_who_used": "Đã dùng:",
     "admin_promo_usage_line": "{name} · {email} · {date}",
-    "pro_iap_apple_account_hint": "Gói đăng ký được mua trên App Store bằng Apple ID (không giống chỉ thanh toán bằng thẻ Apple Pay). Restodocks gắn một gói App Store đang hoạt động với một doanh nghiệp (cơ sở): tài khoản mới cùng Apple ID không được gói đó miễn phí cho doanh nghiệp khác. Gói nhiều cơ sở và phương thức thanh toán khác đang được lên kế hoạch. Dùng thử 72 giờ trên máy chủ tách biệt với mua trên Apple. Nếu Apple ID đã có gói: Cài đặt → đăng ký hoặc Khôi phục mua hàng."
+    "pro_iap_apple_account_hint": "Gói đăng ký được mua trên App Store bằng Apple ID (không giống chỉ thanh toán bằng thẻ Apple Pay). Trong Restodocks, một gói App Store đang hoạt động gắn với một tài khoản chủ sở hữu — tất cả cơ sở của họ có thể dùng chung; chủ sở hữu khác cùng Apple ID không được gói đó miễn phí. Dùng thử 72 giờ trên máy chủ tách biệt với mua trên Apple. Nếu Apple ID đã có gói: Cài đặt → đăng ký hoặc Khôi phục mua hàng.",
+    "pro_iap_subscription_linked_other_account": "Gói App Store này đã được liên kết với tài khoản chủ sở hữu khác trong Restodocks. Một gói App Store áp dụng cho một chủ sở hữu — tất cả cơ sở của họ đều nằm trong gói. Đăng nhập tài khoản Restodocks đó hoặc dùng Apple ID khác nếu là chủ sở hữu khác.",
+    "pro_iap_409_preflight_footer": "Màn hình thanh toán App Store chưa mở — lần thử này không bị trừ tiền. Nếu Apple ID này đã có gói, chạm Khôi phục mua hàng bên dưới; đừng thanh toán lại."
   }
 }

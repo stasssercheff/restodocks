@@ -100,7 +100,16 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
         SnackBar(
           duration: const Duration(seconds: 14),
           behavior: SnackBarBehavior.floating,
-          content: Text(msg),
+          content: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  msg,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
           action: restore
               ? SnackBarAction(
                   label: loc.t('pro_iap_restore'),
@@ -116,6 +125,8 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
   /// Apple мог уже списать деньги, а Pro на нашем сервере не активировался — не вводить в заблуждение.
   bool _shouldAppendAppleChargedHint(String code) {
     final c = code.toLowerCase();
+    // Preflight: экран оплаты Apple не открывался — не добавлять текст про «уже списали».
+    if (c.contains('409_preflight')) return false;
     if (c.contains('iap_session_unavailable_pre_store')) return false;
     if (c.contains('missing_user_jwt')) return false;
     if (c.contains('not_owner')) return false;
@@ -133,6 +144,8 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
   bool _iapOfferRestoreSnackAction(String code) {
     final c = code.toLowerCase();
     if (c.contains('no_receipt')) return true;
+    // Preflight: конфликт до листа оплаты — «Восстановить» всё равно уместно.
+    if (c.contains('409_preflight')) return true;
     return _shouldAppendAppleChargedHint(code);
   }
 
@@ -180,7 +193,10 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
         c.contains('only owner can verify')) {
       return loc.t('pro_iap_forbidden');
     }
-    // Подписка Apple уже привязана к другому заведению в Restodocks.
+    // 409: подписка Apple уже у другого владельца (preflight — до листа оплаты; иначе — после попытки).
+    if (c.contains('409_preflight')) {
+      return '${loc.t('pro_iap_subscription_linked_other_account')}\n\n${loc.t('pro_iap_409_preflight_footer')}';
+    }
     if (c.contains('verify_failed_http_409') ||
         c.contains('apple_subscription_already_linked')) {
       return loc.t('pro_iap_subscription_linked_other_account');
