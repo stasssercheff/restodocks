@@ -1110,6 +1110,29 @@ class AccountManagerSupabase extends ChangeNotifier {
           devLog('🔐 owner_has_pending_registration_without_company: $e');
         }
 
+        // Fallback: тот же признак, что и RPC, но прямой SELECT (старый деплой RPC / сбой).
+        try {
+          final pendingRow = await _supabase.client
+              .from('pending_owner_registrations')
+              .select('establishment_id')
+              .eq('auth_user_id', authUserId)
+              .maybeSingle();
+          final dynamic estRaw = pendingRow?['establishment_id'];
+          final bool noEstablishmentYet = pendingRow != null &&
+              (estRaw == null ||
+                  (estRaw is String && estRaw.isEmpty));
+          if (noEstablishmentYet) {
+            _needsCompanyRegistration = true;
+            lastLoginError = 'needs_company_registration';
+            devLog(
+              '🔐 Login: pending without establishment (table select) — company registration',
+            );
+            return null;
+          }
+        } catch (e) {
+          devLog('🔐 pending_owner_registrations select: $e');
+        }
+
         await _supabase.signOut();
         throw Exception('employee_not_found');
       }
