@@ -154,19 +154,18 @@ class _EstablishmentsManagementScreenState
                                 : (est.isMain
                                     ? Text(loc.t('main_establishment'))
                                     : null)),
-                        trailing: isCurrent
-                            ? null
-                            : Row(
+                        trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  IconButton(
-                                    tooltip: loc.t('establishments_switch'),
-                                    icon: const Icon(Icons.swap_horiz),
-                                    onPressed: () async {
-                                      await accountManager.switchEstablishment(est);
-                                      if (mounted) context.go('/home');
-                                    },
-                                  ),
+                                  if (!isCurrent)
+                                    IconButton(
+                                      tooltip: loc.t('establishments_switch'),
+                                      icon: const Icon(Icons.swap_horiz),
+                                      onPressed: () async {
+                                        await accountManager.switchEstablishment(est);
+                                        if (mounted) context.go('/home');
+                                      },
+                                    ),
                                   if (!viewOnly)
                                     IconButton(
                                       tooltip: loc.t('delete_establishment'),

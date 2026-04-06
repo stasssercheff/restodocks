@@ -177,6 +177,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/establishments'),
               ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: const Icon(Icons.delete_forever, color: Colors.red),
+                title: Text(
+                  localization.t('delete_profile'),
+                  style: const TextStyle(color: Colors.red),
+                ),
+                subtitle: Text(localization.t('delete_owner_account_hint')),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _confirmDeleteOwnerAccount(context, localization, accountManager),
+              ),
               const SizedBox(height: 24),
             ] else ...[
               _buildDeleteProfileSection(localization, accountManager, currentEmployee),
@@ -530,6 +541,216 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  static List<Establishment> _ownerDeletionRoots(List<Establishment> all) {
+    final ids = all.map((e) => e.id).toSet();
+    final roots = all.where((e) {
+      final p = e.parentEstablishmentId;
+      if (p == null || p.isEmpty) return true;
+      return !ids.contains(p);
+    }).toList();
+    roots.sort((a, b) => a.name.compareTo(b.name));
+    return roots;
+  }
+
+  Map<ShortcutActivator, Intent> get _noPasteShortcuts =>
+      <ShortcutActivator, Intent>{
+        const SingleActivator(LogicalKeyboardKey.keyV, control: true):
+            const DoNothingAndStopPropagationIntent(),
+        const SingleActivator(LogicalKeyboardKey.keyV, meta: true):
+            const DoNothingAndStopPropagationIntent(),
+        const SingleActivator(LogicalKeyboardKey.insert, shift: true):
+            const DoNothingAndStopPropagationIntent(),
+      };
+
+  Widget _buildManualOnlyWebInput({required Widget child}) {
+    if (!kIsWeb) return child;
+    return Shortcuts(
+      shortcuts: _noPasteShortcuts,
+      child: child,
+    );
+  }
+
+  Future<void> _confirmDeleteOwnerAccount(
+    BuildContext context,
+    LocalizationService loc,
+    AccountManagerSupabase account,
+  ) async {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+    List<Establishment> list;
+    try {
+      list = await account.getEstablishmentsForOwner();
+    } catch (e) {
+      if (context.mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${loc.t('error')}: $e')),
+        );
+      }
+      return;
+    }
+    if (!context.mounted) return;
+    if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+
+    final roots = _ownerDeletionRoots(list);
+    final emailController = TextEditingController(
+      text: (account.currentEmployee?.email ??
+              Supabase.instance.client.auth.currentUser?.email ??
+              '')
+          .trim(),
+    );
+    final passwordController = TextEditingController();
+    final pinControllers = <String, TextEditingController>{
+      for (final r in roots) r.id: TextEditingController(),
+    };
+
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('delete_owner_account_confirm_title')),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(loc.t('delete_owner_account_confirm_body')),
+              const SizedBox(height: 12),
+              _buildManualOnlyWebInput(
+                child: TextField(
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  enableInteractiveSelection: !kIsWeb,
+                  decoration: InputDecoration(
+                    labelText: loc.t('delete_owner_account_email_label'),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildManualOnlyWebInput(
+                child: TextField(
+                  controller: passwordController,
+                  obscureText: true,
+                  enableInteractiveSelection: !kIsWeb,
+                  decoration: InputDecoration(
+                    labelText: loc.t('password'),
+                    hintText: loc.t('enter_password'),
+                  ),
+                ),
+              ),
+              ...roots.map((r) {
+                return Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: TextField(
+                    controller: pinControllers[r.id],
+                    obscureText: true,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: InputDecoration(
+                      labelText: loc.t('delete_owner_account_pin_for').replaceAll('%s', r.name),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(loc.t('delete_owner_account')),
+          ),
+        ],
+      ),
+    );
+
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+    final pins = <String, String>{};
+    for (final r in roots) {
+      pins[r.id] = pinControllers[r.id]!.text.trim();
+    }
+    emailController.dispose();
+    passwordController.dispose();
+    for (final c in pinControllers.values) {
+      c.dispose();
+    }
+
+    if (ok != true || !context.mounted) return;
+
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('delete_owner_account_email_required'))),
+      );
+      return;
+    }
+    if (password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('password_required'))),
+      );
+      return;
+    }
+    for (final r in roots) {
+      if ((pins[r.id] ?? '').isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('company_pin_required'))),
+        );
+        return;
+      }
+    }
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 16),
+            Expanded(child: Text(loc.t('delete_owner_account_progress'))),
+          ],
+        ),
+      ),
+    );
+    try {
+      await account.deleteOwnerAccount(
+        email: email,
+        password: password,
+        pinsByEstablishmentId: pins,
+      );
+      if (context.mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('delete_owner_account_done'))),
+        );
+        context.go('/login');
+      }
+    } catch (e) {
+      if (context.mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${loc.t('error')}: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildDeleteProfileSection(

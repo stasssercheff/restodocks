@@ -1852,6 +1852,43 @@ class AccountManagerSupabase extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Удаление аккаунта владельца: RPC удаляет все заведения и данные, Edge — auth.users.
+  Future<void> deleteOwnerAccount({
+    required String email,
+    required String password,
+    required Map<String, String> pinsByEstablishmentId,
+  }) async {
+    final authRes = await _supabase.client.auth.signInWithPassword(
+      email: email.trim(),
+      password: password,
+    );
+    if (authRes.user == null) {
+      throw Exception('Invalid email or password');
+    }
+    final pinsJson = <String, dynamic>{};
+    pinsByEstablishmentId.forEach((k, v) {
+      pinsJson[k] = v.trim().toUpperCase();
+    });
+    await _supabase.client.rpc(
+      'delete_owner_account_data',
+      params: {
+        'p_email': email.trim(),
+        'p_pins': pinsJson,
+      },
+    );
+    final res = await _supabase.client.functions.invoke(
+      'purge-owner-auth',
+      body: const {},
+    );
+    if (res.status != 200) {
+      final err = (res.data is Map && (res.data as Map)['error'] != null)
+          ? (res.data as Map)['error'].toString()
+          : 'HTTP ${res.status}';
+      throw Exception(err);
+    }
+    await logout();
+  }
+
   /// Обновить данные заведения
   Future<void> updateEstablishment(Establishment establishment) async {
     try {

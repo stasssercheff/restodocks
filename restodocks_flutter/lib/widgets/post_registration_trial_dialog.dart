@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -70,6 +71,32 @@ Future<void> showPostRegistrationTrialDialog(BuildContext context) async {
             Text(
               loc.t('post_registration_trial_footer'),
               style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              alignment: WrapAlignment.start,
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (context.mounted) context.push('/legal/privacy');
+                    });
+                  },
+                  child: Text(loc.t('privacy_policy')),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (context.mounted) context.push('/legal/offer');
+                    });
+                  },
+                  child: Text(loc.t('public_offer')),
+                ),
+              ],
             ),
           ],
         ),
