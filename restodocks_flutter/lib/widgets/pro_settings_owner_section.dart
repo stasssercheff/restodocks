@@ -98,24 +98,31 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
       final restore = _iapOfferRestoreSnackAction(err);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          duration: const Duration(seconds: 14),
-          behavior: SnackBarBehavior.floating,
-          content: Row(
-            children: [
-              Expanded(
-                child: Text(
+          duration: const Duration(seconds: 20),
+          behavior: SnackBarBehavior.fixed,
+          content: restore
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      msg,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 14),
+                    FilledButton(
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                        unawaited(iap.restorePurchases());
+                      },
+                      child: Text(loc.t('pro_iap_restore')),
+                    ),
+                  ],
+                )
+              : Text(
                   msg,
                   textAlign: TextAlign.center,
                 ),
-              ),
-            ],
-          ),
-          action: restore
-              ? SnackBarAction(
-                  label: loc.t('pro_iap_restore'),
-                  onPressed: () => iap.restorePurchases(),
-                )
-              : null,
         ),
       );
     }
@@ -125,6 +132,8 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
   /// Apple мог уже списать деньги, а Pro на нашем сервере не активировался — не вводить в заблуждение.
   bool _shouldAppendAppleChargedHint(String code) {
     final c = code.toLowerCase();
+    // Подписка уже есть у Apple ID / конфликт привязки — не дублировать про списание.
+    if (c.contains('apple_subscription_already_linked')) return false;
     // Preflight: экран оплаты Apple не открывался — не добавлять текст про «уже списали».
     if (c.contains('409_preflight')) return false;
     if (c.contains('iap_session_unavailable_pre_store')) return false;
@@ -144,6 +153,8 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
   bool _iapOfferRestoreSnackAction(String code) {
     final c = code.toLowerCase();
     if (c.contains('no_receipt')) return true;
+    // Подписка уже оформлена у Apple ID — нужен «Восстановить покупки».
+    if (c.contains('apple_subscription_already_linked')) return true;
     // Preflight: конфликт до листа оплаты — «Восстановить» всё равно уместно.
     if (c.contains('409_preflight')) return true;
     return _shouldAppendAppleChargedHint(code);
@@ -193,12 +204,11 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
         c.contains('only owner can verify')) {
       return loc.t('pro_iap_forbidden');
     }
-    // 409: подписка Apple уже у другого владельца (preflight — до листа оплаты; иначе — после попытки).
-    if (c.contains('409_preflight')) {
-      return '${loc.t('pro_iap_subscription_linked_other_account')}\n\n${loc.t('pro_iap_409_preflight_footer')}';
+    // 409: сервер подтвердил активную подписку Apple ID, но привязка OTID к другому заведению.
+    if (c.contains('apple_subscription_already_linked')) {
+      return loc.t('pro_iap_409_subscription_restore_guidance');
     }
-    if (c.contains('verify_failed_http_409') ||
-        c.contains('apple_subscription_already_linked')) {
+    if (c.contains('verify_failed_http_409')) {
       return loc.t('pro_iap_subscription_linked_other_account');
     }
     // Конфиг сервера: нет APPLE_IAP_SHARED_SECRET и т.п.

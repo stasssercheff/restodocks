@@ -442,7 +442,7 @@ Email: info@restodocks.com
 Пользователь вправе:
 - использовать оплаченный/доступный функционал Сервиса;
 - получать поддержку в пределах выбранного уровня обслуживания;
-- экспортировать доступные данные/отчеты в предусмотренных форматах.
+- при наличии подписки Pro — экспортировать доступные данные и отчёты в предусмотренных форматах в пределах выбранного уровня обслуживания (без подписки Pro экспорт не предоставляется).
 
 8. Права и обязанности Исполнителя
 Исполнитель вправе:
@@ -530,6 +530,7 @@ Where applicable, payment is made within the procedures and deadlines set by Pro
 
 7. User Rights and Obligations
 User must use the Service lawfully, not violate third-party rights, not upload harmful code, and not attempt unauthorized access.
+User may use paid or available Service features; receive support within the selected service level; and, with an active Pro subscription, export available data and reports in the provided formats within that level (export is not available without Pro).
 
 8. Provider Rights and Obligations
 Provider may update/improve the Service, introduce technical limits for security, and perform maintenance.
@@ -591,7 +592,8 @@ El Usuario debe proporcionar datos veraces y proteger sus credenciales.
 Las condiciones de pago se publican en la interfaz/sitio o documento separado.
 
 7. Derechos y obligaciones del Usuario
-Uso licito, sin violar derechos de terceros ni intentar acceso no autorizado.
+El Usuario debe usar el Servicio de forma licita, sin violar derechos de terceros ni intentar acceso no autorizado.
+El Usuario puede utilizar la funcionalidad pagada o disponible; recibir soporte dentro del nivel de servicio elegido; y, con suscripcion Pro activa, exportar datos e informes disponibles en los formatos previstos dentro de ese nivel (sin Pro la exportacion no esta disponible).
 
 8. Derechos y obligaciones del Prestador
 Actualizar/mejorar el Servicio, introducir limites tecnicos y realizar mantenimiento.
@@ -654,6 +656,7 @@ Tarifeler ve odeme kosullari arayuzde/sitede veya ayri belgede yayinlanir.
 
 7. Kullanici Hak ve Yukumlulukleri
 Hizmet yasalara uygun kullanilmali; ucuncu taraf haklari ihlal edilmemeli; yetkisiz erisim girisiminde bulunulmamalidir.
+Kullanici, odemeli veya erisilebilir ozellikleri kullanabilir; secilen hizmet seviyesi cercevesinde destek alabilir; aktif Pro aboneligi varsa, ongorulen formatlarda mevcut verileri ve raporlari bu seviye cercevesinde disa aktarabilir (Pro olmadan disa aktarma sunulmaz).
 
 8. Saglayici Hak ve Yukumlulukleri
 Hizmeti guncelleme/gelistirme, teknik sinirlar koyma ve bakim yapma hakki.
@@ -715,7 +718,8 @@ Nguoi dung phai cung cap thong tin chinh xac va bao mat thong tin dang nhap.
 Dieu kien gia/phi duoc cong bo tren giao dien/trang web hoac tai lieu rieng.
 
 7. Quyen va nghia vu cua Nguoi dung
-Su dung hop phap, khong xam pham quyen ben thu ba, khong co hanh vi truy cap trai phep.
+Nguoi dung phai su dung hop phap, khong xam pham quyen ben thu ba, khong co hanh vi truy cap trai phep.
+Nguoi dung duoc su dung tinh nang tra phi/kha dung; nhan ho tro trong pham vi muc dich vu da chon; neu co goi Pro dang hoat dong, duoc xuat du lieu va bao cao kha dung theo dinh dang quy dinh trong pham vi do (khong co Pro thi khong co chuc nang xuat).
 
 8. Quyen va nghia vu cua Ben cung cap
 Cap nhat/cai tien dich vu, dat gioi han ky thuat de bao mat, bao tri he thong.
