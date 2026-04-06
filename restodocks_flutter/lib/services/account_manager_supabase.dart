@@ -1068,6 +1068,11 @@ class AccountManagerSupabase extends ChangeNotifier {
           return (employee: employee, establishment: establishment);
         }
 
+        final completedPending = await completePendingOwnerRegistration();
+        if (completedPending != null) {
+          return completedPending;
+        }
+
         try {
           final fixRes = await _supabase.client.rpc(
               'fix_owner_without_employee',
@@ -1087,6 +1092,22 @@ class AccountManagerSupabase extends ChangeNotifier {
           }
         } catch (fixErr) {
           devLog('🔐 fix_owner_without_employee failed: $fixErr');
+        }
+
+        // Owner-first: email подтверждён, заведение ещё не создано — не signOut и не SQL-скрипт.
+        try {
+          final pendingNoCompany = await _supabase.client
+              .rpc('owner_has_pending_registration_without_company');
+          if (pendingNoCompany == true) {
+            _needsCompanyRegistration = true;
+            lastLoginError = 'needs_company_registration';
+            devLog(
+              '🔐 Login: pending owner without establishment — session kept, go to company registration',
+            );
+            return null;
+          }
+        } catch (e) {
+          devLog('🔐 owner_has_pending_registration_without_company: $e');
         }
 
         await _supabase.signOut();
