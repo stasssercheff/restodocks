@@ -564,8 +564,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const DoNothingAndStopPropagationIntent(),
       };
 
-  Widget _buildManualOnlyWebInput({required Widget child}) {
-    if (!kIsWeb) return child;
+  bool get _disablePasteForDeleteConfirm =>
+      kIsWeb || defaultTargetPlatform == TargetPlatform.iOS;
+
+  Widget _buildManualOnlyRestrictedInput({required Widget child}) {
+    if (!_disablePasteForDeleteConfirm) return child;
     return Shortcuts(
       shortcuts: _noPasteShortcuts,
       child: child,
@@ -623,22 +626,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               Text(loc.t('delete_owner_account_confirm_body')),
               const SizedBox(height: 12),
-              _buildManualOnlyWebInput(
+              _buildManualOnlyRestrictedInput(
                 child: TextField(
                   controller: emailController,
                   keyboardType: TextInputType.emailAddress,
-                  enableInteractiveSelection: !kIsWeb,
+                  enableInteractiveSelection: !_disablePasteForDeleteConfirm,
                   decoration: InputDecoration(
                     labelText: loc.t('delete_owner_account_email_label'),
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-              _buildManualOnlyWebInput(
+              _buildManualOnlyRestrictedInput(
                 child: TextField(
                   controller: passwordController,
                   obscureText: true,
-                  enableInteractiveSelection: !kIsWeb,
+                  enableInteractiveSelection: !_disablePasteForDeleteConfirm,
                   decoration: InputDecoration(
                     labelText: loc.t('password'),
                     hintText: loc.t('enter_password'),
