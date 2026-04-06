@@ -627,6 +627,32 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
             );
           },
         ),
+        FutureBuilder<EstablishmentPromoInfo>(
+          future: _promoFuture,
+          builder: (context, promoSnap) {
+            final promo = promoSnap.data;
+            return ListenableBuilder(
+              listenable: widget.accountManager,
+              builder: (context, _) {
+                final paidPro = widget.accountManager.hasPaidProSubscription;
+                final fromPromoOnly = promo?.isPromoGrantActive ?? false;
+                final showCancel = AppleIapService.isIOSPlatform &&
+                    paidPro &&
+                    !fromPromoOnly;
+                if (!showCancel) {
+                  return const SizedBox.shrink();
+                }
+                return ListTile(
+                  leading: const Icon(Icons.cancel_outlined),
+                  title: Text(loc.t('pro_cancel_subscription_title')),
+                  subtitle: Text(loc.t('pro_cancel_subscription_subtitle')),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => unawaited(_openAppleSubscriptionsSettings()),
+                );
+              },
+            );
+          },
+        ),
         ListTile(
           leading: const Icon(Icons.description_outlined),
           title: Text(loc.t('pro_conditions_title')),
@@ -845,6 +871,15 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
                                 height: 1.35,
                               ),
                             ),
+                            const SizedBox(height: 10),
+                            Text(
+                              loc.t('pro_cancel_anytime_notice'),
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                                height: 1.35,
+                              ),
+                            ),
                           ] else ...[
                             const SizedBox(height: 12),
                             Text(
@@ -880,6 +915,25 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
                           ),
                           const SizedBox(height: 10),
                         ],
+                        if (paid) ...[
+                          OutlinedButton(
+                            onPressed: () async {
+                              Navigator.pop(context);
+                              await widget.onOpenAppleSubs();
+                            },
+                            child: Text(loc.t('pro_cancel_subscription_title')),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            loc.t('pro_cancel_subscription_subtitle'),
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                              height: 1.35,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         OutlinedButton(
                           onPressed: () async {
                             Navigator.pop(context);
@@ -887,14 +941,15 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
                           },
                           child: Text(loc.t('pro_iap_restore')),
                         ),
-                        TextButton(
-                          onPressed: () async {
-                            await widget.onOpenAppleSubs();
-                          },
-                          child: Text(
-                            loc.t('pro_payment_open_apple_subscriptions'),
+                        if (!paid)
+                          TextButton(
+                            onPressed: () async {
+                              await widget.onOpenAppleSubs();
+                            },
+                            child: Text(
+                              loc.t('pro_payment_open_apple_subscriptions'),
+                            ),
                           ),
-                        ),
                         TextButton(
                           onPressed: () => Navigator.pop(context),
                           child: Text(loc.t('close')),

@@ -72,6 +72,11 @@ Future<void> showPostRegistrationTrialDialog(BuildContext context) async {
               loc.t('post_registration_trial_footer'),
               style: theme.textTheme.bodyMedium,
             ),
+            const SizedBox(height: 10),
+            Text(
+              loc.t('pro_cancel_anytime_notice'),
+              style: theme.textTheme.bodySmall?.copyWith(height: 1.35),
+            ),
             const SizedBox(height: 12),
             Wrap(
               alignment: WrapAlignment.start,
