@@ -97,9 +97,23 @@ class _AuthConfirmClickScreenState extends State<AuthConfirmClickScreen> {
             router.go('/home');
             return;
           }
+          // Как [AuthConfirmScreen]: JWT есть, заведения ещё нет (owner-first) — не на /login.
+          if (account.needsCompanyRegistration) {
+            await _applyLocaleAfterAuth(account);
+            if (!mounted) return;
+            router.go('/register-company-details?ownerFirst=1');
+            return;
+          }
           if (i < 3) {
             await Future.delayed(Duration(milliseconds: 400 * (i + 2))); // 800, 1200, 1600 ms
           }
+        }
+        if (!mounted) return;
+        if (account.needsCompanyRegistration) {
+          await _applyLocaleAfterAuth(account);
+          if (!mounted) return;
+          router.go('/register-company-details?ownerFirst=1');
+          return;
         }
       }
     } catch (_) {
