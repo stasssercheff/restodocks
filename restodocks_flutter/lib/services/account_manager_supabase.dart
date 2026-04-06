@@ -941,6 +941,22 @@ class AccountManagerSupabase extends ChangeNotifier {
     );
   }
 
+  /// Pending owner-first: заведение ещё не создано — не вызывать [completePendingOwnerRegistration] (иначе 400 на старой БД без миграции).
+  Future<bool> _pendingOwnerAwaitingCompanyOnly(String authUserId) async {
+    try {
+      final row = await _supabase.client
+          .from('pending_owner_registrations')
+          .select('establishment_id')
+          .eq('auth_user_id', authUserId)
+          .maybeSingle();
+      if (row == null) return false;
+      final dynamic e = row['establishment_id'];
+      return e == null || (e is String && e.isEmpty);
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Завершить регистрацию владельца (authenticated, после confirm). Возвращает null если pending нет.
   Future<({Employee employee, Establishment establishment})?>
       completePendingOwnerRegistration() async {
@@ -1073,9 +1089,11 @@ class AccountManagerSupabase extends ChangeNotifier {
           return (employee: employee, establishment: establishment);
         }
 
-        final completedPending = await completePendingOwnerRegistration();
-        if (completedPending != null) {
-          return completedPending;
+        if (!await _pendingOwnerAwaitingCompanyOnly(authUserId)) {
+          final completedPending = await completePendingOwnerRegistration();
+          if (completedPending != null) {
+            return completedPending;
+          }
         }
 
         try {
@@ -1932,7 +1950,10 @@ class AccountManagerSupabase extends ChangeNotifier {
 
       final rows = rawList is List ? rawList : <dynamic>[];
       if (rows.isEmpty) {
-        var completed = await completePendingOwnerRegistration();
+        ({Employee employee, Establishment establishment})? completed;
+        if (!await _pendingOwnerAwaitingCompanyOnly(authUserId)) {
+          completed = await completePendingOwnerRegistration();
+        }
         completed ??= await PendingCoOwnerRegistration.tryComplete(this);
         completed ??= await _tryFixOwnerWithoutEmployee();
         if (completed != null) {

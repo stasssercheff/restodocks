@@ -156,7 +156,10 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
 
       if (!mounted) return;
       if (signUpResult.hasSession) {
-        final result = await accSupabase.completePendingOwnerRegistration();
+        // Owner-first: в pending нет establishment_id — RPC complete_pending не вызываем (избегаем 400 до миграции).
+        final result = _ownerFirst
+            ? null
+            : await accSupabase.completePendingOwnerRegistration();
         if (result != null) {
           await accountManager.login(
             result.employee,
