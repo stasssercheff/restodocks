@@ -1,6 +1,5 @@
--- Регрессия после 20260502214000: убрали IF establishment_id IS NULL RETURN NULL.
--- Owner-first pending с NULL → INSERT employees с NULL establishment_id → NOT NULL violation → HTTP 400,
--- вход показывал «неверный пароль» (fallback на authenticate-employee).
+-- Регрессия от 20260502214000: убрали проверку establishment_id IS NULL.
+-- При owner-first (pending без заведения) вызов complete_pending делал INSERT с NULL → 400 от PostgREST.
 
 CREATE OR REPLACE FUNCTION public.complete_pending_owner_registration()
 RETURNS jsonb
@@ -97,6 +96,3 @@ BEGIN
   );
 END;
 $$;
-
-COMMENT ON FUNCTION public.complete_pending_owner_registration() IS
-  'Завершает pending при непустом establishment_id; при NULL (owner-first до компании) — RETURN NULL без INSERT.';

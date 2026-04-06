@@ -23,7 +23,7 @@ Deno.serve(async (req: Request) => {
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const appUrl = Deno.env.get("APP_URL")?.trim() || "https://restodocks.app";
+  const appUrl = (Deno.env.get("APP_URL")?.trim() || "https://restodocks.com").replace(/\/$/, "");
   const resendKey = Deno.env.get("RESEND_API_KEY")?.trim();
 
   if (!resendKey) {
@@ -43,6 +43,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const from = Deno.env.get("RESEND_FROM_EMAIL")?.trim() || "Restodocks <noreply@restodocks.com>";
 
     const { data: employees, error: empErr } = await supabase
       .from("employees")
@@ -50,7 +51,45 @@ Deno.serve(async (req: Request) => {
       .ilike("email", email.trim())
       .eq("is_active", true);
 
+    // Нет сотрудника (owner-first / только auth.users) — письмо через Supabase recovery, не через password_reset_tokens.
     if (empErr || !employees?.length) {
+      const { data: linkData, error: genErr } = await supabase.auth.admin.generateLink({
+        type: "recovery",
+        email: email.trim(),
+        options: {
+          redirectTo: `${appUrl}/auth/confirm`,
+        },
+      });
+      if (genErr || !linkData?.properties?.action_link) {
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        });
+      }
+      const recoveryUrl = linkData.properties.action_link as string;
+      const emailRes = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${resendKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from,
+          to: [email.trim()],
+          subject: "Восстановление доступа — Restodocks",
+          html: `
+<p>Здравствуйте!</p>
+<p>Вы запросили восстановление доступа к Restodocks.</p>
+<p>Перейдите по ссылке для смены пароля:</p>
+<p><a href="${recoveryUrl}">${recoveryUrl}</a></p>
+<p>Если вы не запрашивали сброс пароля, проигнорируйте это письмо.</p>
+<p>С уважением,<br>Команда Restodocks</p>
+          `.trim(),
+        }),
+      });
+      if (!emailRes.ok) {
+        const errData = await emailRes.json();
+        throw new Error(errData?.message || emailRes.statusText);
+      }
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
@@ -66,8 +105,6 @@ Deno.serve(async (req: Request) => {
     });
 
     const resetUrl = `${appUrl}/reset-password?token=${encodeURIComponent(token)}`;
-
-    const from = Deno.env.get("RESEND_FROM_EMAIL")?.trim() || "Restodocks <noreply@restodocks.com>";
 
     const emailRes = await fetch("https://api.resend.com/emails", {
       method: "POST",
