@@ -3,8 +3,7 @@ import { Webhook } from "https://esm.sh/standardwebhooks@1.0.0";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "https://osglfptwbuqqmqunttha.supabase.co";
-// Как в send-registration-email: веб открывает /auth/confirm-click → verifyOTP(token_hash), без «съедания» токена prefetch-ом.
-const CONFIRM_CLICK_URL = "https://restodocks.com/auth/confirm-click";
+const DEFAULT_SITE_ORIGIN = "https://restodocks.com";
 
 type Lang = "ru" | "en" | "es" | "it" | "tr" | "vi";
 
@@ -14,14 +13,26 @@ function normalizeLanguage(input?: string): Lang {
   return "en";
 }
 
-function languageFromRedirect(urlRaw?: string): Lang {
-  if (!urlRaw) return "en";
-  try {
-    const u = new URL(urlRaw);
-    return normalizeLanguage(u.searchParams.get("lang") ?? undefined);
-  } catch (_) {
-    return "en";
+/** Origin кнопки «Подтвердить»: тот же, что в redirect_to при signUp (бэта/прод/iOS через PUBLIC_APP_ORIGIN). */
+function originForConfirmClick(redirectTo: string, siteUrl?: string): string {
+  for (const raw of [redirectTo, siteUrl]) {
+    if (!raw) continue;
+    try {
+      return new URL(raw).origin;
+    } catch (_) {}
   }
+  return DEFAULT_SITE_ORIGIN;
+}
+
+function languageForConfirmEmail(redirectTo: string | undefined, metadataLang: Lang): Lang {
+  if (!redirectTo) return metadataLang;
+  try {
+    const u = new URL(redirectTo);
+    if (u.searchParams.has("lang")) {
+      return normalizeLanguage(u.searchParams.get("lang") ?? undefined);
+    }
+  } catch (_) {}
+  return metadataLang;
 }
 
 function copy(lang: Lang) {
@@ -90,14 +101,15 @@ Deno.serve(async (req) => {
     // Supabase GET /verify ожидает параметр "token" (значение = token_hash). token_hash= не работает.
     const verifyUrl = `${SUPABASE_URL}/auth/v1/verify?token=${encodeURIComponent(token_hash)}&type=${encodeURIComponent(email_action_type)}&redirect_to=${encodeURIComponent(redirect_to)}`;
 
+    const metadataLang = normalizeLanguage(user.user_metadata?.["interface_language"]?.toString());
+    const lang = languageForConfirmEmail(redirect_to, metadataLang);
+    const clickOrigin = originForConfirmClick(redirect_to, email_data.site_url);
+    const confirmClickBase = `${clickOrigin}/auth/confirm-click`;
+
     const confirmClickHref =
       email_action_type === "signup" || email_action_type === "magiclink"
-        ? `${CONFIRM_CLICK_URL}?token_hash=${encodeURIComponent(token_hash)}&type=${encodeURIComponent(email_action_type)}`
+        ? `${confirmClickBase}?token_hash=${encodeURIComponent(token_hash)}&type=${encodeURIComponent(email_action_type)}&lang=${encodeURIComponent(lang)}`
         : verifyUrl;
-
-    const metadataLang = normalizeLanguage(user.user_metadata?.["interface_language"]?.toString());
-    const redirectLang = languageFromRedirect(redirect_to);
-    const lang = redirectLang || metadataLang;
     const i18n = copy(lang);
     const subject = i18n.subjects[email_action_type] ?? "Restodocks";
 

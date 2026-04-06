@@ -6,7 +6,45 @@ import {
   resolveCorsHeaders,
 } from "../_shared/security.ts";
 
-function resolveAppBaseUrl(req: Request): string {
+function normalizeBaseUrl(raw: string): string {
+  return raw.replace(/\/+$/, "");
+}
+
+/** Как Flutter [isPublicAppHost] + origin из APP_URL — ссылки в письме не уводят на чужой хост. */
+function isAllowedAppOrigin(origin: string): boolean {
+  let host: string;
+  try {
+    host = new URL(origin).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  if (host === "restodocks.com" || host === "www.restodocks.com") return true;
+  if (host === "restodocks.ru" || host === "www.restodocks.ru") return true;
+  if (
+    host === "restodocks.pages.dev" ||
+    host === "www.restodocks.pages.dev" ||
+    host.endsWith(".restodocks.pages.dev")
+  ) {
+    return true;
+  }
+  const envUrl = Deno.env.get("APP_URL")?.trim();
+  if (envUrl) {
+    try {
+      if (new URL(envUrl).origin === origin) return true;
+    } catch (_) {}
+  }
+  return false;
+}
+
+/** База для ссылок в письме: тело запроса appBaseUrl (iOS/anon без Origin), иначе Origin, APP_URL, прод. */
+function resolveAppBaseUrl(req: Request, body?: { appBaseUrl?: string }): string {
+  const raw = body?.appBaseUrl?.trim();
+  if (raw) {
+    try {
+      const o = new URL(raw).origin;
+      if (isAllowedAppOrigin(o)) return o;
+    } catch (_) {}
+  }
   const origin = req.headers.get("origin")?.trim();
   if (origin && /^https:\/\/([a-z0-9-]+\.)*restodocks\.pages\.dev$/i.test(origin)) {
     return origin;
@@ -14,9 +52,12 @@ function resolveAppBaseUrl(req: Request): string {
   if (origin && /^https:\/\/(www\.)?restodocks\.com$/i.test(origin)) {
     return origin;
   }
+  if (origin && /^https:\/\/(www\.)?restodocks\.ru$/i.test(origin)) {
+    return origin;
+  }
   const envUrl = Deno.env.get("APP_URL")?.trim();
   if (envUrl && (envUrl.startsWith("https://") || envUrl.startsWith("http://"))) {
-    return envUrl.replace(/\/+$/, "");
+    return normalizeBaseUrl(envUrl);
   }
   return "https://restodocks.com";
 }
@@ -88,11 +129,12 @@ export async function handleRequest(req: Request): Promise<Response> {
       pinCode?: string;
       password?: string;
       language?: string;
+      appBaseUrl?: string;
     };
 
     const { type, to, companyName, email, fullName, pinCode, password } = body;
     const lang = normalizeLanguage(body.language);
-    const appBaseUrl = resolveAppBaseUrl(req);
+    const appBaseUrl = resolveAppBaseUrl(req, body);
     const redirectUrl = `${appBaseUrl}/auth/confirm?lang=${encodeURIComponent(lang)}`;
     const confirmClickUrl = `${appBaseUrl}/auth/confirm-click`;
 

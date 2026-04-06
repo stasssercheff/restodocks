@@ -14,6 +14,15 @@ class EmailService {
 
   SupabaseClient get _client => Supabase.instance.client;
 
+  /// База для ссылок в send-registration-email: совпадает с окружением регистрации (веб/iOS).
+  static String _appBaseUrlForEdge([String? explicit]) {
+    final e = explicit?.trim();
+    if (e != null && e.isNotEmpty) {
+      return e.replaceAll(RegExp(r'/$'), '');
+    }
+    return publicAppOriginForEmailRedirect;
+  }
+
   /// Прямой HTTP POST к Edge Function send-email (retry при 5xx/сети).
   Future<({int status, Map<String, dynamic>? data})> _invokeSendEmailHttp(Map<String, dynamic> body) async {
     return postEdgeFunctionWithRetry('send-email', body);
@@ -107,11 +116,13 @@ class EmailService {
     String? pinCode,
     String? passwordForConfirmation,
     String? languageCode,
+    String? appBaseUrl,
   }) async {
     try {
       final body = {
         'type': isCoOwner ? 'co_owner' : (isOwner ? 'owner' : 'employee'),
         'to': to.trim(),
+        'appBaseUrl': _appBaseUrlForEdge(appBaseUrl),
         'companyName': companyName,
         'email': email,
         if (fullName != null && fullName.trim().isNotEmpty) 'fullName': fullName.trim(),
@@ -155,11 +166,13 @@ class EmailService {
     String to, {
     String? languageCode,
     String? password,
+    String? appBaseUrl,
   }) async {
     try {
       final res = await _invokeSendRegistrationEmail({
         'type': 'confirmation_only',
         'to': to.trim(),
+        'appBaseUrl': _appBaseUrlForEdge(appBaseUrl),
         if (languageCode != null && languageCode.trim().isNotEmpty)
           'language': languageCode.trim().toLowerCase(),
         if (password != null && password.isNotEmpty) 'password': password,
