@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Watchdog: проверка всплесков 401/429/5xx на публичной цепочке регистрации.
 # Не проверяет бизнес-данные, только стабильность доступности и авторизации Edge-эндпоинтов.
+# send-registration-email с *@invalid.restodocks не вызывает Resend (noop в Edge).
 
 set -euo pipefail
 

@@ -45,7 +45,8 @@ if [[ "${code}" == "401" ]]; then
 fi
 
 echo ""
-echo "== send-registration-email confirmation_only (ожидаем не 401; часто 400/500 без реального пользователя/Resend) =="
+echo "== send-registration-email confirmation_only (ожидаем не 401; @invalid.restodocks — без Resend) =="
+# Домен invalid.restodocks зарезервирован: Edge не шлёт письмо в Resend (экономия лимитов).
 BODY_MAIL='{"type":"confirmation_only","to":"smoke-anon-check@invalid.restodocks","language":"en"}'
 code=$(curl -sS -o /tmp/rd_smoke_send_registration_email.json -w "%{http_code}" -X POST \
   "${BASE}/functions/v1/send-registration-email" "${HDR[@]}" -d "${BODY_MAIL}")
