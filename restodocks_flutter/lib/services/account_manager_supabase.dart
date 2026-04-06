@@ -945,20 +945,25 @@ class AccountManagerSupabase extends ChangeNotifier {
   Future<({Employee employee, Establishment establishment})?>
       completePendingOwnerRegistration() async {
     if (!_supabase.isAuthenticated) return null;
-    final res =
-        await _supabase.client.rpc('complete_pending_owner_registration');
-    if (res == null) return null;
-    final m = Map<String, dynamic>.from(res as Map);
-    final emp = m['employee'];
-    final est = m['establishment'];
-    if (emp == null || est == null) return null;
-    final empData = Map<String, dynamic>.from(emp);
-    empData['password'] = '';
-    empData['password_hash'] = '';
-    return (
-      employee: Employee.fromJson(empData),
-      establishment: Establishment.fromJson(Map<String, dynamic>.from(est)),
-    );
+    try {
+      final res =
+          await _supabase.client.rpc('complete_pending_owner_registration');
+      if (res == null) return null;
+      final m = Map<String, dynamic>.from(res as Map);
+      final emp = m['employee'];
+      final est = m['establishment'];
+      if (emp == null || est == null) return null;
+      final empData = Map<String, dynamic>.from(emp);
+      empData['password'] = '';
+      empData['password_hash'] = '';
+      return (
+        employee: Employee.fromJson(empData),
+        establishment: Establishment.fromJson(Map<String, dynamic>.from(est)),
+      );
+    } catch (e, st) {
+      devLog('completePendingOwnerRegistration: $e\n$st');
+      return null;
+    }
   }
 
   /// Fallback: создать employee для auth user через fix_owner_without_employee (когда complete_pending не сработал).
