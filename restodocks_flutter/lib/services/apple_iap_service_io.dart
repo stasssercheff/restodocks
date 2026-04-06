@@ -175,9 +175,10 @@ class AppleIapService extends ChangeNotifier {
       return false;
     }
 
-    final res = await _postBillingVerifyApple(
+    final res = await _verifyReceiptWithRetries(
       establishmentId: est.id,
       receiptData: receiptData,
+      aggressive: true,
     );
     if (res.status != 200) {
       devLog(
@@ -306,6 +307,53 @@ class AppleIapService extends ChangeNotifier {
     }
   }
 
+  bool _isRetryableVerifyStatus(int status) =>
+      status == 400 || status == 401 || status == 403 || status == 429 || status >= 500;
+
+  bool _isRetryableVerifyError(String? code) {
+    final c = (code ?? '').trim().toLowerCase();
+    if (c.isEmpty) return false;
+    return c.contains('receipt_missing_app_account_binding') ||
+        c.contains('receipt_bound_to_other_establishment') ||
+        c.contains('iap_session_unavailable') ||
+        c.contains('apple receipt validation') ||
+        c.contains('too many requests');
+  }
+
+  /// Повторяем verify с короткими паузами: после покупки App Store может
+  /// отдать чек/привязку не сразу, особенно в TestFlight/Sandbox.
+  Future<({int status, Map<String, dynamic>? data})> _verifyReceiptWithRetries({
+    required String establishmentId,
+    required String receiptData,
+    bool aggressive = false,
+  }) async {
+    final delays = aggressive
+        ? <int>[0, 1200, 2400, 4200, 6500]
+        : <int>[0, 900, 1800];
+    ({int status, Map<String, dynamic>? data}) last = (status: 599, data: null);
+
+    for (var i = 0; i < delays.length; i++) {
+      if (delays[i] > 0) {
+        await Future<void>.delayed(Duration(milliseconds: delays[i]));
+      }
+      if (i > 0) {
+        await _ensureSessionForPayment(aggressive: true);
+      }
+      final res = await _postBillingVerifyApple(
+        establishmentId: establishmentId,
+        receiptData: receiptData,
+      );
+      last = res;
+      if (res.status == 200) return res;
+
+      final errCode = res.data?['error']?.toString();
+      if (!_isRetryableVerifyStatus(res.status) && !_isRetryableVerifyError(errCode)) {
+        return res;
+      }
+    }
+    return last;
+  }
+
   Future<void> init() async {
     if (!isIOSPlatform) return;
     if (_ready) return;
@@ -429,22 +477,11 @@ class AppleIapService extends ChangeNotifier {
         return;
       }
 
-      var res = await _postBillingVerifyApple(
+      final res = await _verifyReceiptWithRetries(
         establishmentId: est.id,
         receiptData: receiptData,
+        aggressive: true,
       );
-
-      if (res.status != 200 &&
-          (res.status == 401 || res.status == 403)) {
-        devLog(
-          'IAP billing-verify-apple ${res.status} → aggressive session + one retry',
-        );
-        await _ensureSessionForPayment(aggressive: true);
-        res = await _postBillingVerifyApple(
-          establishmentId: est.id,
-          receiptData: receiptData,
-        );
-      }
 
       if (res.status != 200) {
         devLog('IAP billing-verify-apple failed: ${res.status} ${res.data}');
@@ -454,6 +491,16 @@ class AppleIapService extends ChangeNotifier {
         if (_paidProActiveOnServer) {
           devLog(
             'IAP verify HTTP ${res.status} but Pro already active — ignoring spurious failure (duplicate StoreKit / race)',
+          );
+          await _finalizeVerifiedPurchase(purchase, countAsNewSuccess: false);
+          return;
+        }
+        // Дополнительный fallback: если чек уже на сервере, но текущая verify попытка дала
+        // временный binding/session ответ, пробуем синхронизацию из app receipt.
+        final synced = await trySyncProFromStoreReceipt(silentFailures: true);
+        if (synced || _paidProActiveOnServer) {
+          devLog(
+            'IAP verify HTTP ${res.status} recovered by trySyncProFromStoreReceipt',
           );
           await _finalizeVerifiedPurchase(purchase, countAsNewSuccess: false);
           return;
@@ -623,6 +670,9 @@ class AppleIapService extends ChangeNotifier {
     notifyListeners();
     try {
       await _iap.restorePurchases();
+      // В ряде сценариев StoreKit не присылает restored event сразу.
+      // Дотягиваем server-state напрямую по app receipt, чтобы убрать ложное "не удалось".
+      await trySyncProFromStoreReceipt(silentFailures: true);
     } finally {
       _busy = false;
       notifyListeners();
