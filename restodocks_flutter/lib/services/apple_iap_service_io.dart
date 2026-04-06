@@ -30,6 +30,7 @@ class AppleIapService extends ChangeNotifier {
 
   final InAppPurchase _iap = InAppPurchase.instance;
   StreamSubscription<List<PurchaseDetails>>? _sub;
+  Timer? _busyWatchdog;
 
   bool _ready = false;
   bool _busy = false;
@@ -42,6 +43,24 @@ class AppleIapService extends ChangeNotifier {
   bool get busy => _busy;
   ProductDetails? get product => _product;
   String? get lastError => _lastError;
+
+  void _setBusy(bool value, {bool notify = true}) {
+    if (value) {
+      _busy = true;
+      _busyWatchdog?.cancel();
+      _busyWatchdog = Timer(const Duration(seconds: 30), () {
+        if (!_busy) return;
+        devLog('IAP watchdog: force-stop busy state after timeout');
+        _busy = false;
+        notifyListeners();
+      });
+    } else {
+      _busy = false;
+      _busyWatchdog?.cancel();
+      _busyWatchdog = null;
+    }
+    if (notify) notifyListeners();
+  }
 
   /// Увеличивается после успешной проверки чека и обновления заведения (для SnackBar в UI).
   int get successToken => _successToken;
@@ -400,13 +419,11 @@ class AppleIapService extends ChangeNotifier {
       }
       if (p.status == PurchaseStatus.error) {
         _lastError = p.error?.message ?? 'purchase_error';
-        _busy = false;
-        notifyListeners();
+        _setBusy(false);
         continue;
       }
       if (p.status == PurchaseStatus.canceled) {
-        _busy = false;
-        notifyListeners();
+        _setBusy(false);
         continue;
       }
 
@@ -436,7 +453,7 @@ class AppleIapService extends ChangeNotifier {
       } catch (_) {}
     }
     _lastError = null;
-    _busy = false;
+    _setBusy(false, notify: false);
     if (countAsNewSuccess) {
       _successToken++;
     }
@@ -453,7 +470,7 @@ class AppleIapService extends ChangeNotifier {
     final emp = _account.currentEmployee;
     if (est == null || emp == null || !emp.hasRole('owner')) {
       _lastError = 'not_owner';
-      _busy = false;
+      _setBusy(false, notify: false);
       await _iap.completePurchase(purchase);
       notifyListeners();
       return;
@@ -471,8 +488,7 @@ class AppleIapService extends ChangeNotifier {
           return;
         }
         _lastError = 'no_receipt';
-        _busy = false;
-        notifyListeners();
+        _setBusy(false);
         await _iap.completePurchase(purchase);
         return;
       }
@@ -521,8 +537,7 @@ class AppleIapService extends ChangeNotifier {
           }
         }
         _lastError = buf.toString();
-        _busy = false;
-        notifyListeners();
+        _setBusy(false);
         await _iap.completePurchase(purchase);
         return;
       }
@@ -540,8 +555,7 @@ class AppleIapService extends ChangeNotifier {
       }
       _lastError =
           'iap_client_exception|${e.runtimeType}|${e.toString().replaceAll('|', '/')}';
-      _busy = false;
-      notifyListeners();
+      _setBusy(false);
       try {
         await _iap.completePurchase(purchase);
       } catch (_) {}
@@ -613,35 +627,31 @@ class AppleIapService extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    _busy = true;
+    _setBusy(true, notify: false);
     _lastError = null;
     notifyListeners();
     try {
       if (!await _ensureSessionForPayment()) {
         if (!await _ensureSessionForPayment(aggressive: true)) {
           _lastError = 'iap_session_unavailable_pre_store';
-          _busy = false;
-          notifyListeners();
+          _setBusy(false);
           return false;
         }
       }
       final est = _account.establishment;
       if (est == null) {
         _lastError = 'not_owner';
-        _busy = false;
-        notifyListeners();
+        _setBusy(false);
         return false;
       }
 
       final pre = await _preflightBeforeStoreKitPurchase();
       if (pre == _IapPurchasePreflight.blockedConflict) {
-        _busy = false;
-        notifyListeners();
+        _setBusy(false);
         return false;
       }
       if (pre == _IapPurchasePreflight.alreadyActivated) {
-        _busy = false;
-        notifyListeners();
+        _setBusy(false);
         return false;
       }
 
@@ -654,8 +664,7 @@ class AppleIapService extends ChangeNotifier {
       return true;
     } catch (e) {
       _lastError = e.toString();
-      _busy = false;
-      notifyListeners();
+      _setBusy(false);
       return false;
     }
   }
@@ -665,22 +674,28 @@ class AppleIapService extends ChangeNotifier {
     if (!isIOSPlatform) return;
     await init();
     if (!_ready) return;
-    _busy = true;
+    _setBusy(true, notify: false);
     _lastError = null;
     notifyListeners();
     try {
-      await _iap.restorePurchases();
+      await _iap.restorePurchases().timeout(
+        const Duration(seconds: 35),
+        onTimeout: () {
+          devLog('IAP restorePurchases timeout: continue with receipt sync');
+        },
+      );
       // В ряде сценариев StoreKit не присылает restored event сразу.
       // Дотягиваем server-state напрямую по app receipt, чтобы убрать ложное "не удалось".
       await trySyncProFromStoreReceipt(silentFailures: true);
     } finally {
-      _busy = false;
-      notifyListeners();
+      _setBusy(false);
     }
   }
 
   @override
   void dispose() {
+    _busyWatchdog?.cancel();
+    _busyWatchdog = null;
     unawaited(_sub?.cancel());
     _sub = null;
     super.dispose();
