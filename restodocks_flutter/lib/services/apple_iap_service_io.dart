@@ -48,7 +48,7 @@ class AppleIapService extends ChangeNotifier {
     if (value) {
       _busy = true;
       _busyWatchdog?.cancel();
-      _busyWatchdog = Timer(const Duration(seconds: 30), () {
+      _busyWatchdog = Timer(const Duration(seconds: 10), () {
         if (!_busy) return;
         devLog('IAP watchdog: force-stop busy state after timeout');
         _busy = false;
@@ -679,7 +679,7 @@ class AppleIapService extends ChangeNotifier {
     notifyListeners();
     try {
       await _iap.restorePurchases().timeout(
-        const Duration(seconds: 35),
+        const Duration(seconds: 12),
         onTimeout: () {
           devLog('IAP restorePurchases timeout: continue with receipt sync');
         },
