@@ -1864,18 +1864,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/haccp-documentation'),
               ),
-              ListTile(
-                leading: const Icon(Icons.gavel_outlined),
-                title: Text(localization.t('public_offer')),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/legal/offer'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.privacy_tip_outlined),
-                title: Text(localization.t('privacy_policy')),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/legal/privacy'),
-              ),
               ExpansionTile(
                 initiallyExpanded: false,
                 leading: const Icon(Icons.assignment),
@@ -2144,6 +2132,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               subtitle: Text(localization.t('contact_support_subtitle')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showSupportEmailForm(context, localization),
+            ),
+            ListTile(
+              leading: const Icon(Icons.gavel_outlined),
+              title: Text(localization.t('public_offer')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/legal/offer'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.privacy_tip_outlined),
+              title: Text(localization.t('privacy_policy')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/legal/privacy'),
             ),
             const Divider(),
             ListTile(
