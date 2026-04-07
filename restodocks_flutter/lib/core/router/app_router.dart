@@ -193,10 +193,13 @@ class AppRouter {
       if (kIsWeb && loc.isNotEmpty && loc != '/' && loc != '/splash') {
         initial_loc.savePathForRefresh(loc);
       }
-      // Production: POS скрыт при IS_BETA=false (см. FeatureFlags.posModuleEnabled)
+      // Production: POS скрыт при IS_BETA=false (см. FeatureFlags.posModuleEnabled).
+      // Исключение: /pos/procurement/:department используется как "Закупка" и в проде
+      // (без POS-подсистемы: только Заказ продуктов + Поставщики).
       if (account.isLoggedInSync && !FeatureFlags.posModuleEnabled) {
         final p = loc.split('?').first;
-        if (p.startsWith('/pos') ||
+        final isProcurementInProd = p.startsWith('/pos/procurement/');
+        if ((p.startsWith('/pos') && !isProcurementInProd) ||
             p == '/settings/orders-display' ||
             p == '/settings/fiscal-tax' ||
             p == '/settings/fiscal-outbox') {
