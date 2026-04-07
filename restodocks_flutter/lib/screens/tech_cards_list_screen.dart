@@ -23,6 +23,7 @@ import '../widgets/scroll_to_top_app_bar_title.dart';
 import '../widgets/subscription_required_dialog.dart';
 import '../services/ai_service.dart';
 import '../services/ai_service_supabase.dart';
+import '../services/free_ocr_service.dart';
 import '../services/services.dart';
 import '../services/excel_export_service.dart';
 import '../services/tech_card_cost_hydrator.dart';
@@ -3074,19 +3075,32 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           ? await imageService.takePhotoWithCamera()
           : await imageService.pickImageFromGallery();
       if (xFile == null || !mounted) return;
-      final bytes = await imageService.xFileToBytes(xFile);
-      if (bytes == null || bytes.isEmpty || !mounted) return;
       final ai = context.read<AiService>();
-      final result = await ai.recognizeTechCardFromImage(bytes);
+      final freeOcr = FreeOcrService();
+      final ocrText = await freeOcr.extractTextFromImage(xFile);
       if (!mounted) return;
-      if (result == null) {
+      if (ocrText == null || ocrText.trim().isEmpty) {
+        final fallbackMessage = kIsWeb
+            ? (loc.t('ai_tech_card_recognize_empty') ??
+                'В web бесплатный OCR недоступен в этой сборке. Используйте импорт из файла или вставку текста.')
+            : (loc.t('ai_tech_card_recognize_empty') ??
+                'Не удалось распознать текст на фото ТТК.');
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(loc.t('ai_tech_card_recognize_empty') ??
-                  'Не удалось распознать ТТК.')),
+          SnackBar(content: Text(fallbackMessage)),
         );
         return;
       }
+      final list = await ai.parseTechCardsFromText(ocrText);
+      if (!mounted) return;
+      if (list.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(loc.t('ai_tech_card_excel_format_hint') ??
+                  'Не удалось распознать структуру ТТК из текста фото.')),
+        );
+        return;
+      }
+      final result = list.first;
       final sig = ai is AiServiceSupabase
           ? AiServiceSupabase.lastParseHeaderSignature
           : null;
