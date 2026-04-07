@@ -147,16 +147,10 @@ class ManagementHomeContent extends StatelessWidget {
               onTap: () => context.go('/nomenclature/$dept')),
         if (!FeatureFlags.posModuleEnabled) ...[
           HomeFeatureTile(
-            icon: Icons.add_business,
-            title: loc.t('suppliers') ??
-                loc.t('order_tab_suppliers') ??
-                'Поставщики',
-            onTap: () => context.push('/suppliers/$dept')),
-          HomeFeatureTile(
-            icon: Icons.shopping_cart,
-            title: loc.t('product_order'),
-            onTap: () => context.go(
-                '/product-order?department=${_deptForRoute(employee.department)}')),
+            icon: Icons.local_shipping,
+            title: loc.t('pos_nav_procurement') ?? 'Закупка',
+            onTap: () => context.push('/pos/procurement/$dept'),
+          ),
         ],
         if (FeatureFlags.posModuleEnabled && dept == 'hall') ...[
           HomeFeatureTile(

@@ -335,7 +335,14 @@ class LocalizationService extends ChangeNotifier {
   /// То же для заданного языка (экспорт PDF и т.п.). Пустая строка — пустая ячейка.
   String displayPersonNameForLanguage(String? name, String languageCode) {
     if (name == null || name.isEmpty) return '';
-    if (languageCode == 'ru') return name;
+    if (languageCode == 'ru') {
+      // Для ru UI пытаемся вернуть кириллицу даже если в БД имя латиницей.
+      if (!RegExp(r'[А-Яа-яЁё]').hasMatch(name) &&
+          RegExp(r'[A-Za-z]').hasMatch(name)) {
+        return transliterateLatinToRuBestEffort(name);
+      }
+      return name;
+    }
     if (!RegExp(r'[А-Яа-яЁё]').hasMatch(name)) return name;
     return transliterateRuToLatin(name);
   }

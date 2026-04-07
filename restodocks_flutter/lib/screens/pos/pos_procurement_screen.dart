@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/services.dart';
+import '../../core/feature_flags.dart';
 import '../../utils/pos_order_department.dart';
 import '../../widgets/app_bar_home_button.dart';
 import 'procurement_receiving_tab.dart';
@@ -35,11 +36,15 @@ class _PosProcurementScreenState extends State<PosProcurementScreen> {
     final title =
         '${loc.t('pos_procurement_title')} ${deptLabel.toLowerCase()}';
 
+    final showReceiving = FeatureFlags.posModuleEnabled;
     final tabs = [
       loc.t('pos_procurement_tab_product_order'),
-      loc.t('pos_procurement_tab_receiving'),
+      if (showReceiving) loc.t('pos_procurement_tab_receiving'),
       loc.t('order_tab_suppliers'),
     ];
+    if (_tabIndex >= tabs.length) {
+      _tabIndex = tabs.length - 1;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -52,7 +57,7 @@ class _PosProcurementScreenState extends State<PosProcurementScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
             child: Row(
-              children: List.generate(3, (i) {
+              children: List.generate(tabs.length, (i) {
                 final selected = _tabIndex == i;
                 return Expanded(
                   child: Padding(
@@ -99,7 +104,7 @@ class _PosProcurementScreenState extends State<PosProcurementScreen> {
               sizing: StackFit.expand,
               children: [
                 OrderListsScreen(embeddedInTab: true, department: _dept),
-                ProcurementReceivingTab(department: _dept),
+                if (showReceiving) ProcurementReceivingTab(department: _dept),
                 SuppliersScreen(embedded: true, department: _dept),
               ],
             ),
