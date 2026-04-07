@@ -160,20 +160,22 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 title: loc.t('nomenclature'),
                 onTap: () => context.go('/nomenclature/kitchen')),
             'home-nomenclature-kitchen'),
-        _wrap(
-            HomeFeatureTile(
-                icon: Icons.add_business,
-                title: loc.t('suppliers') ??
-                    loc.t('order_tab_suppliers') ??
-                    'Поставщики',
-                onTap: () => context.push('/suppliers/kitchen')),
-            'home-suppliers-kitchen'),
-        _wrap(
-            HomeFeatureTile(
-                icon: Icons.shopping_cart,
-                title: loc.t('product_order'),
-                onTap: () => context.go('/product-order?department=kitchen')),
-            'home-order-kitchen'),
+        if (!FeatureFlags.posModuleEnabled) ...[
+          _wrap(
+              HomeFeatureTile(
+                  icon: Icons.add_business,
+                  title: loc.t('suppliers') ??
+                      loc.t('order_tab_suppliers') ??
+                      'Поставщики',
+                  onTap: () => context.push('/suppliers/kitchen')),
+              'home-suppliers-kitchen'),
+          _wrap(
+              HomeFeatureTile(
+                  icon: Icons.shopping_cart,
+                  title: loc.t('product_order'),
+                  onTap: () => context.go('/product-order?department=kitchen')),
+              'home-order-kitchen'),
+        ],
         if (FeatureFlags.posModuleEnabled) ...[
           _wrap(
               HomeFeatureTile(
@@ -240,20 +242,22 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                   title: loc.t('nomenclature'),
                   onTap: () => context.go('/nomenclature/bar')),
               'home-nomenclature-bar'),
-          _wrap(
-              HomeFeatureTile(
-                  icon: Icons.add_business,
-                  title: loc.t('suppliers') ??
-                      loc.t('order_tab_suppliers') ??
-                      'Поставщики',
-                  onTap: () => context.push('/suppliers/bar')),
-              'home-suppliers-bar'),
-          _wrap(
-              HomeFeatureTile(
-                  icon: Icons.shopping_cart,
-                  title: loc.t('product_order'),
-                  onTap: () => context.go('/product-order?department=bar')),
-              'home-order-bar'),
+          if (!FeatureFlags.posModuleEnabled) ...[
+            _wrap(
+                HomeFeatureTile(
+                    icon: Icons.add_business,
+                    title: loc.t('suppliers') ??
+                        loc.t('order_tab_suppliers') ??
+                        'Поставщики',
+                    onTap: () => context.push('/suppliers/bar')),
+                'home-suppliers-bar'),
+            _wrap(
+                HomeFeatureTile(
+                    icon: Icons.shopping_cart,
+                    title: loc.t('product_order'),
+                    onTap: () => context.go('/product-order?department=bar')),
+                'home-order-bar'),
+          ],
           if (FeatureFlags.posModuleEnabled) ...[
             _wrap(
                 HomeFeatureTile(
@@ -315,20 +319,22 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                   title: loc.t('checklists'),
                   onTap: () => context.go('/checklists?department=hall')),
               'home-checklists-hall'),
-          _wrap(
-              HomeFeatureTile(
-                  icon: Icons.add_business,
-                  title: loc.t('suppliers') ??
-                      loc.t('order_tab_suppliers') ??
-                      'Поставщики',
-                  onTap: () => context.push('/suppliers/hall')),
-              'home-suppliers-hall'),
-          _wrap(
-              HomeFeatureTile(
-                  icon: Icons.shopping_cart,
-                  title: loc.t('product_order'),
-                  onTap: () => context.go('/product-order?department=hall')),
-              'home-order-hall'),
+          if (!FeatureFlags.posModuleEnabled) ...[
+            _wrap(
+                HomeFeatureTile(
+                    icon: Icons.add_business,
+                    title: loc.t('suppliers') ??
+                        loc.t('order_tab_suppliers') ??
+                        'Поставщики',
+                    onTap: () => context.push('/suppliers/hall')),
+                'home-suppliers-hall'),
+            _wrap(
+                HomeFeatureTile(
+                    icon: Icons.shopping_cart,
+                    title: loc.t('product_order'),
+                    onTap: () => context.go('/product-order?department=hall')),
+                'home-order-hall'),
+          ],
           if (FeatureFlags.posModuleEnabled) ...[
             _wrap(
                 HomeFeatureTile(
@@ -381,6 +387,13 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                       'Сводно по заведению',
                   onTap: () => context.push('/pos/warehouse/establishment')),
               'home-pos-wh-est'),
+          _wrap(
+              HomeFeatureTile(
+                  icon: Icons.dashboard_customize_outlined,
+                  title: loc.t('pos_operations_hub_title'),
+                  subtitle: loc.t('pos_operations_hub_hint'),
+                  onTap: () => context.push('/pos/operations/establishment')),
+              'home-pos-ops-est'),
         ],
         if (screenPref.showBanquetCatering) ...[
           const SizedBox(height: 16),

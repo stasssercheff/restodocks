@@ -1504,7 +1504,13 @@ class _DocumentTile extends StatelessWidget {
                 } else if (document.type == DocumentType.writeoff) {
                   context.push('/inbox/writeoff/${document.id}');
                 } else if (document.type == DocumentType.productOrder) {
-                  context.push('/inbox/order/${document.id}');
+                  final rh = document.metadata?['header'];
+                  final isReceipt = rh is Map && rh['receipt'] == true;
+                  if (isReceipt) {
+                    context.push('/inbox/procurement-receipt/${document.id}');
+                  } else {
+                    context.push('/inbox/order/${document.id}');
+                  }
                 } else if (document.type == DocumentType.checklistSubmission) {
                   context.push('/inbox/checklist/${document.id}');
                 } else if (document.type == DocumentType.iikoInventory) {
@@ -1571,7 +1577,13 @@ class _DocumentTile extends StatelessWidget {
       return;
     }
     if (document.type == DocumentType.productOrder) {
-      context.push('/inbox/order/${document.id}');
+      final rh = document.metadata?['header'];
+      final isReceipt = rh is Map && rh['receipt'] == true;
+      if (isReceipt) {
+        context.push('/inbox/procurement-receipt/${document.id}');
+      } else {
+        context.push('/inbox/order/${document.id}');
+      }
       return;
     }
     if (document.type == DocumentType.checklistSubmission) {

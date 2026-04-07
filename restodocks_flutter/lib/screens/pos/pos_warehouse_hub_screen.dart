@@ -83,6 +83,11 @@ class PosWarehouseHubScreen extends StatelessWidget {
               icon: const Icon(Icons.table_chart_outlined),
               label: Text(loc.t('pos_stock_open_movements')),
             ),
+            const SizedBox(height: 24),
+            TextButton(
+              onPressed: () => context.push('/pos/operations/$scope'),
+              child: Text(loc.t('pos_operations_all_operations')),
+            ),
           ],
         ),
       ),

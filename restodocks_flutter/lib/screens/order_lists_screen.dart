@@ -11,9 +11,18 @@ import '../widgets/scroll_to_top_app_bar_title.dart';
 /// Экран «Заказ продуктов» — сохранённые заказы. Поставщики — через иконку в AppBar и при создании заказа.
 /// [department] = kitchen|bar|hall для фильтрации по подразделению.
 class OrderListsScreen extends StatefulWidget {
-  const OrderListsScreen({super.key, this.embedded = false, this.department = 'kitchen'});
+  const OrderListsScreen({
+    super.key,
+    this.embedded = false,
+    this.embeddedInTab = false,
+    this.department = 'kitchen',
+  });
 
+  /// Скрыть кнопку «назад» в AppBar (вложенный сценарий).
   final bool embedded;
+
+  /// Без AppBar и Scaffold — только тело (вкладка внутри закупки).
+  final bool embeddedInTab;
   final String department;
 
   @override
@@ -98,16 +107,9 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: widget.embedded ? null : appBarBackButton(context),
-        title: ScrollToTopAppBarTitle(
-          child: Text(loc.t('product_order')),
-        ),
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _OrderListsTab(
+    final body = _loading
+        ? const Center(child: CircularProgressIndicator())
+        : _OrderListsTab(
                         orders: _filteredOrders,
                         searchController: _orderSearchController,
                         onSearchChanged: (v) => setState(() => _orderSearchQuery = v.trim().toLowerCase()),
@@ -125,7 +127,18 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
                           if (mounted) _load();
                         },
                         loc: loc,
-                      ),
+                      );
+    if (widget.embeddedInTab) {
+      return body;
+    }
+    return Scaffold(
+      appBar: AppBar(
+        leading: widget.embedded ? null : appBarBackButton(context),
+        title: ScrollToTopAppBarTitle(
+          child: Text(loc.t('product_order')),
+        ),
+      ),
+      body: body,
     );
   }
 

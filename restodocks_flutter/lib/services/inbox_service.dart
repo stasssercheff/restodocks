@@ -64,17 +64,21 @@ class InboxService {
           : Future<List<dynamic>>.value([]);
 
       final ordersFuture = OrderDocumentService().listForEstablishment(establishmentId);
+      final receiptsFuture =
+          ProcurementReceiptService.instance.listDeduped(establishmentId);
 
       final results = await Future.wait([
         inventoryFuture,
         checklistFuture,
         missedFuture,
         ordersFuture,
+        receiptsFuture,
       ]);
       final rawList = results[0] as List<Map<String, dynamic>>;
       final subList = results[1];
       final missed = results[2];
       final orderDocs = results[3] as List<Map<String, dynamic>>;
+      final receiptDocs = results[4] as List<Map<String, dynamic>>;
 
       for (final doc in rawList) {
         final payload = doc['payload'] as Map<String, dynamic>? ?? {};
@@ -214,6 +218,33 @@ class InboxService {
           id: doc['id']?.toString() ?? '',
           type: DocumentType.productOrder,
           title: 'Заказ $supplierName',
+          description: employeeName,
+          createdAt: createdAt,
+          employeeId: doc['created_by_employee_id']?.toString() ?? '',
+          employeeName: employeeName,
+          department: docDept,
+          fileUrl: null,
+          metadata: payload,
+        ));
+      }
+
+      for (final doc in receiptDocs) {
+        final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+        final header = payload['header'] as Map<String, dynamic>? ?? {};
+        if (header['receipt'] != true) continue;
+        final supplierName = header['supplierName']?.toString() ?? '—';
+        final employeeName = header['employeeName']?.toString() ?? '—';
+        final docDept = header['department']?.toString() ??
+            _mapSectionToDepartment(currentEmployee.department);
+        final createdAt = doc['created_at'] != null
+            ? (DateTime.tryParse(doc['created_at'].toString()) ?? DateTime.now())
+                .toLocal()
+            : DateTime.now();
+
+        documents.add(InboxDocument(
+          id: doc['id']?.toString() ?? '',
+          type: DocumentType.productOrder,
+          title: 'Приёмка $supplierName',
           description: employeeName,
           createdAt: createdAt,
           employeeId: doc['created_by_employee_id']?.toString() ?? '',

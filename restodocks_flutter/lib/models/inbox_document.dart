@@ -101,6 +101,10 @@ class InboxDocument extends Equatable {
         return '${loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko'} $date';
       case DocumentType.productOrder:
         final supplier = metadata?['header']?['supplierName']?.toString() ?? '—';
+        final hdr = metadata?['header'];
+        if (hdr is Map && hdr['receipt'] == true) {
+          return loc.t('inbox_title_procurement_receipt').replaceFirst('%s', supplier);
+        }
         return loc.t('inbox_title_order').replaceFirst('%s', supplier);
       case DocumentType.checklistSubmission:
         final colonIdx = title.indexOf(': ');

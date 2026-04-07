@@ -89,6 +89,21 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
       );
       ch.subscribe();
       _channels.add(ch);
+      final chPr = client
+          .channel('inbox_notif_procurement_${emp.id}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'procurement_receipt_documents',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'establishment_id',
+              value: est.id,
+            ),
+            callback: (p) => _onNewProcurementReceiptDocument(p),
+          );
+      chPr.subscribe();
+      _channels.add(chPr);
     }
 
     // 3. Инвентаризация и списания (одна таблица inventory_documents)
@@ -335,6 +350,35 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
         category: 'orders',
         displayText: display,
         onTap: () => _go('/inbox/order/$id'),
+      );
+    });
+  }
+
+  void _onNewProcurementReceiptDocument(dynamic payload) {
+    final newRow = payload.newRecord;
+    final id = newRow['id']?.toString();
+    if (id == null) return;
+    final pl = newRow['payload'];
+    final header = pl is Map ? pl['header'] : null;
+    final isReceipt = header is Map && header['receipt'] == true;
+    if (!isReceipt) return;
+    final supplier =
+        (header is Map ? header['supplierName'] : null)?.toString() ?? '—';
+    final createdBy = newRow['created_by_employee_id']?.toString();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final loc = context.read<LocalizationService>();
+      final acc = context.read<AccountManagerSupabase>();
+      final typeLabel = loc.t('inbox_notif_type_procurement_receipt');
+      final who = await _resolveEmployeeName(createdBy, acc);
+      final display = who.isNotEmpty
+          ? loc.t('inbox_notif_order_line', args: {'type': typeLabel, 'supplier': supplier, 'who': who})
+          : '$typeLabel · $supplier';
+      await _presentInAppNotification(
+        category: 'orders',
+        displayText: display,
+        onTap: () => _go('/inbox/procurement-receipt/$id'),
       );
     });
   }

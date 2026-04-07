@@ -39,9 +39,16 @@ EdgeInsets _supplierDialogOuterInsets(BuildContext context) {
 /// Экран «Поставщики» — только карточки поставщиков со списком продуктов, без заказов.
 /// Для каждого подразделения (кухня, бар, зал) свои поставщики.
 class SuppliersScreen extends StatefulWidget {
-  const SuppliersScreen({super.key, required this.department});
+  const SuppliersScreen({
+    super.key,
+    required this.department,
+    this.embedded = false,
+  });
 
   final String department;
+
+  /// Вкладка внутри закупки: без верхней панели, полоса обновления в теле.
+  final bool embedded;
 
   @override
   State<SuppliersScreen> createState() => _SuppliersScreenState();
@@ -576,19 +583,22 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     final productStore = context.watch<ProductStoreSupabase>();
 
     return Scaffold(
-      appBar: AppBar(
-        leading: appBarBackButton(context),
-        title: ScrollToTopAppBarTitle(
-          child: Text('${loc.t('order_tab_suppliers') ?? 'Поставщики'} — ${_departmentLabel(loc)}'),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loading ? null : _load,
-            tooltip: loc.t('refresh'),
-          ),
-        ],
-      ),
+      appBar: widget.embedded
+          ? null
+          : AppBar(
+              leading: appBarBackButton(context),
+              title: ScrollToTopAppBarTitle(
+                child: Text(
+                    '${loc.t('order_tab_suppliers') ?? 'Поставщики'} — ${_departmentLabel(loc)}'),
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _loading ? null : _load,
+                  tooltip: loc.t('refresh'),
+                ),
+              ],
+            ),
       // Одна кнопка «Создать» в пустом состоянии; FAB — только когда список не пуст
       floatingActionButton: !_loading && _error == null && _suppliers.isNotEmpty
           ? FloatingActionButton.extended(
@@ -601,6 +611,18 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           ? _buildBody(loc, productStore)
           : Column(
               children: [
+                if (widget.embedded)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: _loading ? null : _load,
+                        tooltip: loc.t('refresh'),
+                      ),
+                    ),
+                  ),
                 if (_suppliers.isNotEmpty) _buildSearchAndSortPanel(loc),
                 Expanded(child: _buildBody(loc, productStore)),
               ],

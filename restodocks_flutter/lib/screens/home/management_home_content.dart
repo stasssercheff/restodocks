@@ -145,17 +145,19 @@ class ManagementHomeContent extends StatelessWidget {
               icon: Icons.assignment,
               title: loc.t('nomenclature'),
               onTap: () => context.go('/nomenclature/$dept')),
-        HomeFeatureTile(
+        if (!FeatureFlags.posModuleEnabled) ...[
+          HomeFeatureTile(
             icon: Icons.add_business,
             title: loc.t('suppliers') ??
                 loc.t('order_tab_suppliers') ??
                 'Поставщики',
             onTap: () => context.push('/suppliers/$dept')),
-        HomeFeatureTile(
+          HomeFeatureTile(
             icon: Icons.shopping_cart,
             title: loc.t('product_order'),
             onTap: () => context.go(
                 '/product-order?department=${_deptForRoute(employee.department)}')),
+        ],
         if (FeatureFlags.posModuleEnabled && dept == 'hall') ...[
           HomeFeatureTile(
             icon: Icons.receipt_long,
@@ -207,6 +209,12 @@ class ManagementHomeContent extends StatelessWidget {
             icon: Icons.local_shipping,
             title: loc.t('pos_nav_procurement') ?? 'Закупка',
             onTap: () => context.push('/pos/procurement/$dept'),
+          ),
+          HomeFeatureTile(
+            icon: Icons.dashboard_customize_outlined,
+            title: loc.t('pos_operations_hub_title'),
+            subtitle: loc.t('pos_operations_hub_hint'),
+            onTap: () => context.push('/pos/operations/$dept'),
           ),
         ],
         HomeFeatureTile(

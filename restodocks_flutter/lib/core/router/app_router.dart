@@ -575,6 +575,16 @@ class AppRouter {
                 },
               ),
               GoRoute(
+                path: 'procurement-receipt/:id',
+                pageBuilder: (context, state) {
+                  final id = state.pathParameters['id'] ?? '';
+                  return _slideTransitionPage(
+                    state,
+                    ProcurementReceiptInboxDetailScreen(documentId: id),
+                  );
+                },
+              ),
+              GoRoute(
                 path: 'checklist/:id',
                 pageBuilder: (context, state) {
                   final id = state.pathParameters['id'] ?? '';
@@ -817,6 +827,16 @@ class AppRouter {
             },
           ),
           GoRoute(
+            path: '/pos/operations/:department',
+            pageBuilder: (context, state) {
+              final dept = state.pathParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(
+                state,
+                PosOperationsHubScreen(department: dept),
+              );
+            },
+          ),
+          GoRoute(
             path: '/pos/shift-report',
             pageBuilder: (context, state) => _slideTransitionPage(
               state,
@@ -1004,6 +1024,22 @@ class AppRouter {
               final dept = state.queryParameters['department'] ?? 'kitchen';
               return _slideTransitionPage(
                   state, OrderListsScreen(department: dept));
+            },
+          ),
+          GoRoute(
+            path: '/procurement-receipt',
+            pageBuilder: (context, state) {
+              final dept = state.queryParameters['department'] ?? 'kitchen';
+              final orderId = state.queryParameters['orderDocumentId'];
+              final manual = state.queryParameters['manual'] == '1';
+              return _slideTransitionPage(
+                state,
+                ProcurementReceiptScreen(
+                  department: dept,
+                  orderDocumentId: orderId,
+                  manualOffSystem: manual,
+                ),
+              );
             },
           ),
           GoRoute(
