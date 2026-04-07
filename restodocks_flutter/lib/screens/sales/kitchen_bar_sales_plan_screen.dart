@@ -116,17 +116,32 @@ class _KitchenBarSalesPlanScreenState extends State<KitchenBarSalesPlanScreen> {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final hPad = 12.0;
+          const hPad = 12.0;
           const minCell = 40.0;
           const gap = 4.0;
           final gridMinW = 7 * minCell + 6 * gap + hPad * 2;
           final viewportW = constraints.maxWidth;
           final gridW = math.max(viewportW, gridMinW);
+          final rowCount = ((lead + lastDay) / 7).ceil();
+          const monthBarH = 44.0;
+          const modeBarH = 52.0;
+          const adjustBtnH = 44.0;
+          const topBottomChrome = monthBarH + modeBarH + adjustBtnH + 28.0;
+          final safeBottom = MediaQuery.paddingOf(context).bottom;
+          final availableForGrid = math.max(
+            220.0,
+            constraints.maxHeight - topBottomChrome - safeBottom,
+          );
+          final cellH = ((availableForGrid - ((rowCount - 1) * gap) - 20.0) /
+                  math.max(1, rowCount))
+              .clamp(34.0, 84.0);
+          final cellW = (gridW - hPad * 2 - 6 * gap) / 7;
+          final cellAspect = cellW / cellH;
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -160,7 +175,7 @@ class _KitchenBarSalesPlanScreenState extends State<KitchenBarSalesPlanScreen> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: ConstrainedBox(
@@ -213,28 +228,24 @@ class _KitchenBarSalesPlanScreenState extends State<KitchenBarSalesPlanScreen> {
                   child: Text(loc.t('sales_plan_adjust') ?? ''),
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Expanded(
                 child: Scrollbar(
                   thumbVisibility: viewportW < gridMinW,
-                  child: SingleChildScrollView(
-                    primary: false,
-                    scrollDirection: Axis.vertical,
-                    padding: EdgeInsets.only(
-                      bottom: MediaQuery.paddingOf(context).bottom,
-                    ),
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
                     child: SingleChildScrollView(
                       primary: false,
                       scrollDirection: Axis.horizontal,
                       child: SizedBox(
                         width: gridW,
                         child: GridView.builder(
-                          padding: EdgeInsets.fromLTRB(hPad, 8, hPad, 12),
+                          padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 8),
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 7,
-                            childAspectRatio: 1.0,
+                            childAspectRatio: cellAspect,
                             crossAxisSpacing: gap,
                             mainAxisSpacing: gap,
                           ),
@@ -314,19 +325,19 @@ class _MonthDayCell extends StatelessWidget {
             label = '${nf.format(fact.round())} / ${nf.format(daily.round())}';
           }
           return Padding(
-            padding: const EdgeInsets.all(4),
+            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   '${day.day}',
-                  style: Theme.of(context).textTheme.titleSmall,
+                  style: Theme.of(context).textTheme.labelLarge,
                 ),
                 Text(
                   label,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodySmall,
-                  maxLines: 2,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],

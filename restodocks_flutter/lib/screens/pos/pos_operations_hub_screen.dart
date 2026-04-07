@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/services.dart';
-import '../../utils/pos_order_department.dart';
 import '../../widgets/app_bar_home_button.dart';
 
 /// Единая точка входа: столы (зал), заказы, склад, закупка и смежные экраны POS.
@@ -27,53 +26,19 @@ class PosOperationsHubScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final dept = _normalizeDept();
-    final String deptLabel;
-    if (dept == 'establishment') {
-      deptLabel = loc.t('pos_warehouse_establishment_section');
-    } else {
-      final deptKey = posDepartmentLabelKeyForRoute(dept);
-      deptLabel = deptKey != null ? loc.t(deptKey) : dept;
-    }
-
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(loc.t('pos_operations_hub_title')),
-            Text(
-              deptLabel,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-            ),
-          ],
-        ),
+        title: Text(loc.t('pos_operations_hub_title')),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text(
-            dept == 'establishment'
-                ? loc.t('pos_warehouse_establishment_hub_hint')
-                : loc.t('pos_operations_hub_hint'),
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-          ),
-          const SizedBox(height: 16),
           if (dept == 'establishment') ...[
             _OpTile(
               icon: Icons.warehouse,
               title: loc.t('pos_warehouse_establishment_title'),
               onTap: () => context.push('/pos/warehouse/establishment'),
-            ),
-            _OpTile(
-              icon: Icons.inventory_2_outlined,
-              title: loc.t('pos_stock_title'),
-              onTap: () => context.push('/pos/stock'),
             ),
           ] else if (dept == 'hall') ...[
             _OpTile(
