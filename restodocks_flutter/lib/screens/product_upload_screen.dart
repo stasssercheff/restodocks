@@ -124,7 +124,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       final sid = widget.supplierOrderListId?.trim();
       if (sid != null && sid.isNotEmpty) {
         final acc = context.read<AccountManagerSupabase>();
-        if (!acc.hasPaidProSubscription) return;
+        if (!acc.hasProSubscription) return;
       }
       final m = (widget.initialMethod ?? '').trim().toLowerCase();
       if (m == 'text') {
@@ -298,7 +298,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       final supplierId = widget.supplierOrderListId?.trim();
       if (supplierId != null &&
           supplierId.isNotEmpty &&
-          !account.hasPaidProSubscription) {
+          !account.hasProSubscription) {
         return Scaffold(
           appBar: AppBar(
             title: Text(loc.t('upload_products')),

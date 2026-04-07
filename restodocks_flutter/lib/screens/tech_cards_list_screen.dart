@@ -19,6 +19,7 @@ import '../services/page_tour_service.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/tour_tooltip.dart';
 import '../widgets/scroll_to_top_app_bar_title.dart';
+import '../widgets/subscription_required_dialog.dart';
 import '../services/ai_service.dart';
 import '../services/ai_service_supabase.dart';
 import '../services/services.dart';
@@ -2586,6 +2587,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   Future<void> _createFromExcel(
       BuildContext context, LocalizationService loc) async {
+    final acc = context.read<AccountManagerSupabase>();
+    if (!acc.hasProSubscription) {
+      await showSubscriptionRequiredDialog(context);
+      return;
+    }
     _TtkImportMode dialogMode = _TtkImportMode.single;
     // Возвращаем (mode, files) — FilePicker вызывается внутри onPressed, без Navigator.pop перед ним,
     // чтобы сохранить «user gesture» и сработать на мобильных (Safari/Chrome требуют прямой вызов из tap).
@@ -2950,6 +2956,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   Future<void> _createFromText(
       BuildContext context, LocalizationService loc) async {
+    final acc = context.read<AccountManagerSupabase>();
+    if (!acc.hasProSubscription) {
+      await showSubscriptionRequiredDialog(context);
+      return;
+    }
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
@@ -3230,7 +3241,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 : loc.t('tech_cards'),
           ),
         ),
-        actions: _buildAppBarActions(loc, canEdit),
+        actions: _buildAppBarActions(
+            loc, canEdit, accountManager.hasProSubscription),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3350,7 +3362,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     if (mounted && needRefresh == true) _load(showLoading: false);
   }
 
-  List<Widget> _buildAppBarActions(LocalizationService loc, bool canEdit) {
+  List<Widget> _buildAppBarActions(
+      LocalizationService loc, bool canEdit, bool hasProSubscription) {
     final ctrl = _ttkTourController;
     Widget wrap(String id, Widget w) =>
         ctrl != null ? SpotlightTarget(id: id, controller: ctrl, child: w) : w;
@@ -3384,7 +3397,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             onPressed: _loading ? null : () => _onTapCreateTechCard(loc),
           )
         : null;
-    final importWidget = canEdit
+    final importWidget = canEdit && hasProSubscription
         ? PopupMenuButton<String>(
             icon: const Icon(Icons.upload),
             tooltip: loc.t('ttk_import_file'),

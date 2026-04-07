@@ -254,6 +254,8 @@ class TechCard extends Equatable {
     'ru',
     'en',
     'es',
+    'de',
+    'fr',
     'it',
     'tr',
     'vi',

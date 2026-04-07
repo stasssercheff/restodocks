@@ -1245,6 +1245,25 @@ class _InventoryScreenState extends State<InventoryScreen>
         );
         final bytes = _buildExcelBytes(payloadForExport, loc);
         if (bytes != null && bytes.isNotEmpty && mounted) {
+          try {
+            await account.trialIncrementUsageOrThrow(
+              establishmentId: establishment.id,
+              kind: 'inventory_export',
+            );
+          } catch (e) {
+            if (!mounted) return;
+            final es = e.toString();
+            if (es.contains('TRIAL_INVENTORY_EXPORT_CAP')) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(loc.t('trial_inventory_export_cap')),
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                ),
+              );
+              return;
+            }
+            rethrow;
+          }
           await _downloadExcel(bytes, payloadForExport, loc, 'xlsx');
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

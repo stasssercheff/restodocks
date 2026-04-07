@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../widgets/subscription_required_dialog.dart';
 import '../widgets/widgets.dart';
 
 /// Экран кухни
@@ -264,6 +265,11 @@ class _KitchenScreenState extends State<KitchenScreen> {
   }
 
   void _navigateToInventory(BuildContext context) {
+    final am = context.read<AccountManagerSupabase>();
+    if (!am.hasProSubscription) {
+      showSubscriptionRequiredDialog(context);
+      return;
+    }
     context.push('/inventory');
   }
 

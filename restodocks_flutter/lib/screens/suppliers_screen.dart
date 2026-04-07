@@ -89,9 +89,9 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     }
   }
 
-  /// Загрузка списка к поставщику — тариф Pro / Premium или промокод ([hasPaidProAccess]), не окно 72ч trial.
+  /// Загрузка списка к поставщику — Pro / промо или первые 72 ч триала ([hasProSubscription]).
   bool _canUploadSupplierProductList(AccountManagerSupabase acc) =>
-      acc.hasPaidProSubscription;
+      acc.hasProSubscription;
 
   OrderList _draftFromSupplierFields(
     OrderList s,

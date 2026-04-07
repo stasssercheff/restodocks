@@ -108,7 +108,7 @@ RU_FROM_EN: dict[str, str] = {
     "weight_g": "Вес, г",
 }
 
-SUPPORTED = ("ru", "en", "es", "it", "tr", "vi")
+SUPPORTED = ("ru", "en", "es", "de", "fr", "it", "tr", "vi")
 
 
 def main() -> None:
@@ -137,21 +137,12 @@ def main() -> None:
             if k not in block:
                 block[k] = en.get(k) or ru.get(k) or k
 
-    # de/fr: добиваем недостающие ключи английским (языки не в supportedLocales, но файл единый)
-    for lang in ("de", "fr"):
-        if lang not in data:
-            continue
-        block = data[lang]
-        for k in master:
-            if k not in block:
-                block[k] = en.get(k) or k
-
     JSON_PATH.write_text(
         json.dumps(data, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
     print("OK:", JSON_PATH)
-    for lang in SUPPORTED + ("de", "fr"):
+    for lang in SUPPORTED:
         if lang in data:
             print(f"  {lang}: {len(data[lang])} keys")
 

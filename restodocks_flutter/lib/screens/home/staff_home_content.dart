@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/feature_flags.dart';
 import '../../services/services.dart';
+import '../../widgets/home_feature_tile.dart';
 import '../../services/home_layout_config_service.dart';
 import '../../services/screen_layout_preference_service.dart';
 import '../../models/models.dart';
@@ -24,10 +25,11 @@ class StaffHomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final subOk = context.watch<AccountManagerSupabase>().hasProSubscription;
 
     // Без доступа к данным (в т.ч. временный с истёкшим периодом)
     if (!employee.hasRole('owner') && !employee.effectiveDataAccess) {
-      final firstTile = _Tile(
+      final firstTile = HomeFeatureTile(
         icon: Icons.calendar_month,
         title: loc.t('personal_schedule'),
         onTap: () => context.go('/schedule?personal=1'),
@@ -42,7 +44,7 @@ class StaffHomeContent extends StatelessWidget {
                 child: firstTile)
           else
             firstTile,
-          _Tile(
+          HomeFeatureTile(
             icon: Icons.chat_bubble_outline,
             title: loc.t('inbox_tab_messages') ?? 'Сообщения',
             onTap: () => context.go('/notifications?tab=messages'),
@@ -64,41 +66,41 @@ class StaffHomeContent extends StatelessWidget {
     final screenPref = context.watch<ScreenLayoutPreferenceService>();
     final order = layoutSvc.getOrder(employee.id);
     final tiles = <HomeTileId, Widget>{
-      HomeTileId.messages: _Tile(
+      HomeTileId.messages: HomeFeatureTile(
         icon: Icons.chat_bubble_outline,
         title: loc.t('inbox_tab_messages') ?? 'Сообщения',
         onTap: () => context.go('/notifications?tab=messages'),
       ),
-      HomeTileId.documentation: _Tile(
+      HomeTileId.documentation: HomeFeatureTile(
         icon: Icons.description_outlined,
         title: loc.t('documentation') ?? 'Документация',
         onTap: () => context.go('/documentation'),
       ),
-      HomeTileId.schedule: _Tile(
+      HomeTileId.schedule: HomeFeatureTile(
         icon: Icons.calendar_month,
         title: loc.t('schedule'),
         onTap: () =>
             context.go('/schedule/${_deptForRoute(employee.department)}'),
       ),
-      HomeTileId.productOrder: _Tile(
+      HomeTileId.productOrder: HomeFeatureTile(
         icon: Icons.shopping_cart,
         title: loc.t('product_order'),
         onTap: () => context.go(
             '/product-order?department=${_deptForRoute(employee.department)}'),
       ),
-      HomeTileId.suppliers: _Tile(
+      HomeTileId.suppliers: HomeFeatureTile(
         icon: Icons.add_business,
         title:
             loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики',
         onTap: () =>
             context.push('/suppliers/${_deptForRoute(employee.department)}'),
       ),
-      HomeTileId.menu: _Tile(
+      HomeTileId.menu: HomeFeatureTile(
         icon: Icons.restaurant_menu,
         title: loc.t('menu'),
         onTap: () => context.go('/menu/${_deptForRoute(employee.department)}'),
       ),
-      HomeTileId.ttk: _Tile(
+      HomeTileId.ttk: HomeFeatureTile(
         icon: Icons.description,
         title: employee.department == 'bar'
             ? loc.t('ttk_bar')
@@ -109,48 +111,50 @@ class StaffHomeContent extends StatelessWidget {
         onTap: () =>
             context.go('/tech-cards/${_deptForRoute(employee.department)}'),
       ),
-      HomeTileId.checklists: _Tile(
+      HomeTileId.checklists: HomeFeatureTile(
         icon: Icons.checklist,
         title: loc.t('checklists'),
         onTap: () => context
             .go('/checklists?department=${_deptForRoute(employee.department)}'),
       ),
-      HomeTileId.nomenclature: _Tile(
+      HomeTileId.nomenclature: HomeFeatureTile(
         icon: Icons.assignment,
         title: loc.t('nomenclature'),
         onTap: () =>
             context.go('/nomenclature/${_deptForRoute(employee.department)}'),
       ),
-      HomeTileId.inventory: _Tile(
+      HomeTileId.inventory: HomeFeatureTile(
           icon: Icons.assignment,
           title: loc.t('inventory_blank'),
+          subscriptionLocked: !subOk,
           onTap: () => context.push('/inventory')),
-      HomeTileId.writeoffs: _Tile(
+      HomeTileId.writeoffs: HomeFeatureTile(
           icon: Icons.remove_circle_outline,
           title: loc.t('writeoffs') ?? 'Списания',
+          subscriptionLocked: !subOk,
           onTap: () => context.push('/writeoffs')),
-      HomeTileId.hallOrders: _Tile(
+      HomeTileId.hallOrders: HomeFeatureTile(
         icon: Icons.receipt_long,
         title: loc.t('order_tab_orders') ?? 'Заказы',
         onTap: () => context.push('/pos/hall/orders'),
       ),
-      HomeTileId.hallCashRegister: _Tile(
+      HomeTileId.hallCashRegister: HomeFeatureTile(
         icon: Icons.point_of_sale,
         title: loc.t('pos_nav_cash_register') ?? 'Касса',
         onTap: () => context.push('/pos/hall/cash-register'),
       ),
-      HomeTileId.hallTables: _Tile(
+      HomeTileId.hallTables: HomeFeatureTile(
         icon: Icons.table_restaurant,
         title: loc.t('pos_nav_tables') ?? 'Столы',
         onTap: () => context.push('/pos/hall/tables'),
       ),
-      HomeTileId.departmentOrders: _Tile(
+      HomeTileId.departmentOrders: HomeFeatureTile(
         icon: Icons.receipt_long,
         title: loc.t('order_tab_orders') ?? 'Заказы',
         onTap: () =>
             context.push('/pos/orders/${_deptForRoute(employee.department)}'),
       ),
-      HomeTileId.departmentSales: _Tile(
+      HomeTileId.departmentSales: HomeFeatureTile(
         icon: Icons.point_of_sale_outlined,
         title: loc.t('sales_title') ?? 'Продажи',
         onTap: () =>
@@ -236,27 +240,3 @@ class StaffHomeContent extends StatelessWidget {
   }
 }
 
-class _Tile extends StatelessWidget {
-  const _Tile({
-    required this.icon,
-    required this.title,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Icon(icon),
-        title: Text(title),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
-      ),
-    );
-  }
-}

@@ -58,7 +58,7 @@ import '../../services/services.dart';
 import '../../widgets/app_shell.dart';
 import '../../widgets/branded_auth_loading.dart';
 import '../../widgets/inbox_notification_listener.dart';
-import '../../widgets/pro_required_screen.dart';
+import '../../widgets/subscription_or_trial_gate.dart';
 import '../feature_flags.dart';
 import '../theme/app_theme.dart';
 
@@ -354,29 +354,49 @@ class AppRouter {
       // Списания — без нижней панели
       GoRoute(
         path: '/writeoffs',
-        pageBuilder: (context, state) =>
-            _slideTransitionPage(state, const WriteoffsScreen()),
+        pageBuilder: (context, state) => _slideTransitionPage(
+          state,
+          const SubscriptionOrTrialGate(
+            child: WriteoffsScreen(),
+          ),
+        ),
       ),
-      // Инвентаризация — без нижней панели
+      // Инвентаризация — без нижней панели (ТЗ: после триала без подписки недоступна)
       GoRoute(
         path: '/inventory',
-        pageBuilder: (context, state) =>
-            _slideTransitionPage(state, const InventoryScreen()),
+        pageBuilder: (context, state) => _slideTransitionPage(
+          state,
+          const SubscriptionOrTrialGate(
+            child: InventoryScreen(),
+          ),
+        ),
       ),
       GoRoute(
         path: '/inventory-pf',
-        pageBuilder: (context, state) =>
-            _slideTransitionPage(state, const InventoryScreen()),
+        pageBuilder: (context, state) => _slideTransitionPage(
+          state,
+          const SubscriptionOrTrialGate(
+            child: InventoryScreen(),
+          ),
+        ),
       ),
       GoRoute(
         path: '/inventory-received',
-        pageBuilder: (context, state) =>
-            _slideTransitionPage(state, const InventoryReceivedScreen()),
+        pageBuilder: (context, state) => _slideTransitionPage(
+          state,
+          const SubscriptionOrTrialGate(
+            child: InventoryReceivedScreen(),
+          ),
+        ),
       ),
       GoRoute(
         path: '/inventory-iiko',
-        pageBuilder: (context, state) =>
-            _slideTransitionPage(state, const InventoryIikoScreen()),
+        pageBuilder: (context, state) => _slideTransitionPage(
+          state,
+          const SubscriptionOrTrialGate(
+            child: InventoryIikoScreen(),
+          ),
+        ),
       ),
 
       // Регистрация соучредителя после принятия приглашения
@@ -676,27 +696,23 @@ class AppRouter {
           ),
           GoRoute(
             path: '/expenses',
-            pageBuilder: (context, state) {
-              final pro =
-                  context.read<AccountManagerSupabase>().hasProSubscription;
-              return _slideTransitionPage(
-                state,
-                pro ? const ExpensesScreen() : const ProRequiredScreen(),
-              );
-            },
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const SubscriptionOrTrialGate(
+                child: ExpensesScreen(),
+              ),
+            ),
           ),
           GoRoute(
             path: '/expenses/salary',
             pageBuilder: (context, state) {
-              final pro =
-                  context.read<AccountManagerSupabase>().hasProSubscription;
               final department = state.queryParameters[
                   'department']; // kitchen|bar|hall для ФЗП по подразделению
               return _slideTransitionPage(
                 state,
-                pro
-                    ? SalaryExpenseScreen(departmentFilter: department)
-                    : const ProRequiredScreen(),
+                SubscriptionOrTrialGate(
+                  child: SalaryExpenseScreen(departmentFilter: department),
+                ),
               );
             },
           ),
@@ -1117,8 +1133,12 @@ class AppRouter {
           ),
           GoRoute(
             path: '/haccp-journals',
-            pageBuilder: (context, state) =>
-                _slideTransitionPage(state, const HaccpJournalsScreen()),
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const SubscriptionOrTrialGate(
+                child: HaccpJournalsScreen(),
+              ),
+            ),
             routes: [
               GoRoute(
                 path: ':logType',
@@ -1169,8 +1189,12 @@ class AppRouter {
           ),
           GoRoute(
             path: '/haccp-documentation',
-            pageBuilder: (context, state) =>
-                _slideTransitionPage(state, const HaccpDocumentationScreen()),
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const SubscriptionOrTrialGate(
+                child: HaccpDocumentationScreen(),
+              ),
+            ),
           ),
           GoRoute(
             path: '/tech-cards',

@@ -8,6 +8,7 @@ import '../../services/screen_layout_preference_service.dart';
 import '../../models/models.dart';
 import '../../core/feature_flags.dart';
 import '../../utils/pos_hall_permissions.dart';
+import '../../widgets/home_feature_tile.dart';
 import 'expandable_banquet_section.dart';
 
 /// Домашняя страница менеджмента (шеф, барменеджер, менеджер зала, управляющий).
@@ -26,6 +27,7 @@ class ManagementHomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final subOk = context.watch<AccountManagerSupabase>().hasProSubscription;
     final screenPref = context.watch<ScreenLayoutPreferenceService>();
     final roles = employee.roles;
     final isChef = roles.contains('executive_chef');
@@ -47,7 +49,7 @@ class ManagementHomeContent extends StatelessWidget {
 
     // Без доступа к данным
     if (!employee.hasRole('owner') && !employee.effectiveDataAccess) {
-      final firstTile = _Tile(
+      final firstTile = HomeFeatureTile(
         icon: Icons.calendar_month,
         title: loc.t('personal_schedule'),
         onTap: () => context.go('/schedule?personal=1'),
@@ -62,7 +64,7 @@ class ManagementHomeContent extends StatelessWidget {
                 child: firstTile)
           else
             firstTile,
-          _Tile(
+          HomeFeatureTile(
             icon: Icons.chat_bubble_outline,
             title: loc.t('inbox_tab_messages') ?? 'Сообщения',
             onTap: () => context.go('/notifications?tab=messages'),
@@ -80,7 +82,7 @@ class ManagementHomeContent extends StatelessWidget {
       );
     }
 
-    final firstTile = _Tile(
+    final firstTile = HomeFeatureTile(
         icon: Icons.calendar_month,
         title: loc.t('schedule'),
         onTap: () =>
@@ -93,23 +95,24 @@ class ManagementHomeContent extends StatelessWidget {
               id: 'home-content', controller: tourController!, child: firstTile)
         else
           firstTile,
-        _Tile(
+        HomeFeatureTile(
             icon: Icons.description_outlined,
             title: loc.t('documentation') ?? 'Документация',
             onTap: () => context.go('/documentation')),
-        _Tile(
+        HomeFeatureTile(
             icon: Icons.assignment,
             title: loc.t('haccp_journals') ?? 'Журналы и ХАССП',
+            subscriptionLocked: !subOk,
             onTap: () => context.go('/haccp-journals')),
-        _Tile(
+        HomeFeatureTile(
             icon: Icons.chat_bubble_outline,
             title: loc.t('inbox_tab_messages') ?? 'Сообщения',
             onTap: () => context.go('/notifications?tab=messages')),
-        _Tile(
+        HomeFeatureTile(
             icon: Icons.inbox,
             title: loc.t('inbox'),
             onTap: () => context.go('/inbox')),
-        _Tile(
+        HomeFeatureTile(
             icon: Icons.people,
             title: loc.t('employees'),
             onTap: () => context.go('/employees')),
@@ -119,18 +122,18 @@ class ManagementHomeContent extends StatelessWidget {
             roles.contains('sous_chef') ||
             employee.department == 'bar' ||
             employee.department == 'dining_room')
-          _Tile(
+          HomeFeatureTile(
               icon: Icons.checklist,
               title: loc.t('checklists'),
               onTap: () => context.go(
                   '/checklists?department=${_deptForRoute(employee.department)}')),
         if (showMenu)
-          _Tile(
+          HomeFeatureTile(
               icon: Icons.restaurant_menu,
               title: loc.t('menu'),
               onTap: () => context.go('/menu/$dept')),
         if (showTtk)
-          _Tile(
+          HomeFeatureTile(
             icon: Icons.description,
             title: dept == 'bar'
                 ? loc.t('ttk_bar')
@@ -138,56 +141,56 @@ class ManagementHomeContent extends StatelessWidget {
             onTap: () => context.go('/tech-cards/$dept'),
           ),
         if (showNomenclature)
-          _Tile(
+          HomeFeatureTile(
               icon: Icons.assignment,
               title: loc.t('nomenclature'),
               onTap: () => context.go('/nomenclature/$dept')),
-        _Tile(
+        HomeFeatureTile(
             icon: Icons.add_business,
             title: loc.t('suppliers') ??
                 loc.t('order_tab_suppliers') ??
                 'Поставщики',
             onTap: () => context.push('/suppliers/$dept')),
-        _Tile(
+        HomeFeatureTile(
             icon: Icons.shopping_cart,
             title: loc.t('product_order'),
             onTap: () => context.go(
                 '/product-order?department=${_deptForRoute(employee.department)}')),
         if (FeatureFlags.posModuleEnabled && dept == 'hall') ...[
-          _Tile(
+          HomeFeatureTile(
             icon: Icons.receipt_long,
             title: loc.t('order_tab_orders') ?? 'Заказы',
             onTap: () => context.push('/pos/hall/orders'),
           ),
-          _Tile(
+          HomeFeatureTile(
             icon: Icons.point_of_sale,
             title: loc.t('pos_nav_cash_register') ?? 'Касса',
             onTap: () => context.push('/pos/hall/cash-register'),
           ),
-          _Tile(
+          HomeFeatureTile(
             icon: Icons.table_restaurant,
             title: loc.t('pos_nav_tables') ?? 'Столы',
             onTap: () => context.push('/pos/hall/tables'),
           ),
           if (posCanViewPosShiftReport(employee))
-            _Tile(
+            HomeFeatureTile(
               icon: Icons.summarize_outlined,
               title: loc.t('pos_shift_report_title'),
               onTap: () => context.push('/pos/shift-report'),
             ),
         ],
         if (FeatureFlags.posModuleEnabled && (dept == 'kitchen' || dept == 'bar')) ...[
-          _Tile(
+          HomeFeatureTile(
             icon: Icons.receipt_long,
             title: loc.t('order_tab_orders') ?? 'Заказы',
             onTap: () => context.push('/pos/orders/$dept'),
           ),
-          _Tile(
+          HomeFeatureTile(
             icon: Icons.point_of_sale_outlined,
             title: loc.t('sales_title') ?? 'Продажи',
             onTap: () => context.push('/sales/$dept'),
           ),
-          _Tile(
+          HomeFeatureTile(
             icon: Icons.tv_outlined,
             title: loc.t('pos_kds_title'),
             subtitle: loc.t('pos_kds_hint'),
@@ -195,24 +198,26 @@ class ManagementHomeContent extends StatelessWidget {
           ),
         ],
         if (FeatureFlags.posModuleEnabled) ...[
-          _Tile(
+          HomeFeatureTile(
             icon: Icons.warehouse,
             title: loc.t('pos_nav_warehouse') ?? 'Склад',
             onTap: () => context.push('/pos/warehouse/$dept'),
           ),
-          _Tile(
+          HomeFeatureTile(
             icon: Icons.local_shipping,
             title: loc.t('pos_nav_procurement') ?? 'Закупка',
             onTap: () => context.push('/pos/procurement/$dept'),
           ),
         ],
-        _Tile(
+        HomeFeatureTile(
             icon: Icons.assignment,
             title: loc.t('inventory_blank'),
+            subscriptionLocked: !subOk,
             onTap: () => context.push('/inventory')),
-        _Tile(
+        HomeFeatureTile(
             icon: Icons.remove_circle_outline,
             title: loc.t('writeoffs') ?? 'Списания',
+            subscriptionLocked: !subOk,
             onTap: () => context.push('/writeoffs')),
         if ((isChef || roles.contains('sous_chef')) &&
             screenPref.showBanquetCatering) ...[
@@ -224,55 +229,32 @@ class ManagementHomeContent extends StatelessWidget {
           ExpandableBanquetSection(loc: loc, department: 'bar'),
         ],
         if (isGeneral) ...[
-          _Tile(
+          HomeFeatureTile(
               icon: Icons.savings,
-              title: '${loc.t('expenses')} (${loc.t('pro')})',
+              title: loc.t('expenses'),
+              subscriptionLocked: !subOk,
               onTap: () => context.go('/expenses')),
         ],
         // ФЗП подразделения для руководителей: шеф/су-шеф (кухня), менеджер зала (зал), барменеджер (бар)
         if ((isChef || roles.contains('sous_chef')) && !isGeneral)
-          _Tile(
+          HomeFeatureTile(
               icon: Icons.payments,
               title: loc.t('salary_tab_fzp') ?? 'ФЗП',
+              subscriptionLocked: !subOk,
               onTap: () => context.go('/expenses/salary?department=kitchen')),
         if (roles.contains('floor_manager') && !isGeneral)
-          _Tile(
+          HomeFeatureTile(
               icon: Icons.payments,
               title: loc.t('salary_tab_fzp') ?? 'ФЗП',
+              subscriptionLocked: !subOk,
               onTap: () => context.go('/expenses/salary?department=hall')),
         if (isBarManager && !isGeneral)
-          _Tile(
+          HomeFeatureTile(
               icon: Icons.payments,
               title: loc.t('salary_tab_fzp') ?? 'ФЗП',
+              subscriptionLocked: !subOk,
               onTap: () => context.go('/expenses/salary?department=bar')),
       ],
-    );
-  }
-}
-
-class _Tile extends StatelessWidget {
-  const _Tile(
-      {required this.icon,
-      required this.title,
-      this.subtitle,
-      required this.onTap});
-
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Icon(icon),
-        title: Text(title),
-        subtitle: subtitle != null ? Text(subtitle!) : null,
-        trailing: const Icon(Icons.chevron_right),
-        onTap: onTap,
-      ),
     );
   }
 }

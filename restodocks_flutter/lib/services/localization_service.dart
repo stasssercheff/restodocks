@@ -28,6 +28,8 @@ class LocalizationService extends ChangeNotifier {
     Locale('ru', 'RU'),
     Locale('en', 'US'),
     Locale('es', 'ES'),
+    Locale('de', 'DE'),
+    Locale('fr', 'FR'),
     Locale('it', 'IT'),
     Locale('tr', 'TR'),
     Locale('vi', 'VN'),
@@ -38,9 +40,11 @@ class LocalizationService extends ChangeNotifier {
     'ru',
     'en',
     'es',
+    'de',
+    'fr',
     'it',
     'tr',
-    'vi'
+    'vi',
   ];
 
   /// Emoji для языка интерфейса (с запасными шрифтами см. [flagEmojiTextStyle]).

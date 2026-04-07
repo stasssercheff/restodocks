@@ -101,8 +101,8 @@ class Establishment extends Equatable {
     return trial != null && DateTime.now().isBefore(trial);
   }
 
-  /// Платный Pro/Premium или пробное окно 72 ч (для проверок «как раньше»).
-  /// Для разных лимитов trial vs paid используйте [hasPaidProAccess] и [isProTrialWindowActive].
+  /// Платный Pro/Premium или пробное окно 72 ч — то же, что «нужна подписка или триал» для закрытых разделов.
+  /// Для отличия «только оплата» от триала: [hasPaidProAccess] и [isProTrialWindowActive].
   bool get hasEffectiveProAccess => hasPaidProAccess || isProTrialWindowActive;
 
   /// Основное заведение (не филиал)

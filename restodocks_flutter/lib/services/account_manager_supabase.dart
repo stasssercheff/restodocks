@@ -91,6 +91,13 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// Pro/Premium или активное окно 72 ч (см. establishments.pro_trial_ends_at).
   bool get hasProSubscription => _establishment?.hasEffectiveProAccess ?? false;
 
+  /// Активное окно 72 ч без оплаченного Pro — лимиты триала (инвентаризация, импорт ТТК).
+  bool get isTrialOnlyWithoutPaid {
+    final e = _establishment;
+    if (e == null) return false;
+    return e.isProTrialWindowActive && !e.hasPaidProAccess;
+  }
+
   /// Co-owner с view_only: только просмотр (при >1 заведении у пригласившего)
   bool get isViewOnlyOwner => _currentEmployee?.isViewOnlyOwner ?? false;
 
@@ -530,6 +537,36 @@ class AccountManagerSupabase extends ChangeNotifier {
     // Дефолтный стол — в register_company_with_promo (см. registerCompanyWithoutPromo).
     registerMetadataBestEffort(est.id);
     return est;
+  }
+
+  /// Лимиты первых 72 ч (ТЗ): счётчики выгрузки инвентаризации / импорта ТТК. Для оплаты или после триала — no-op на сервере.
+  Future<void> trialIncrementUsageOrThrow({
+    required String establishmentId,
+    required String kind,
+    int delta = 1,
+  }) async {
+    await _supabase.client.rpc(
+      'trial_increment_usage',
+      params: {
+        'p_establishment_id': establishmentId,
+        'p_kind': kind,
+        'p_delta': delta,
+      },
+    );
+  }
+
+  /// Счётчик импортированных в триале карточек ТТК (для предпроверки лимита 10 за 72 ч).
+  Future<int> fetchTrialTtkImportCardsUsed(String establishmentId) async {
+    final row = await _supabase.client
+        .from('establishment_trial_usage')
+        .select('ttk_import_cards')
+        .eq('establishment_id', establishmentId)
+        .maybeSingle();
+    if (row == null) return 0;
+    final v = row['ttk_import_cards'];
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return 0;
   }
 
   /// Первое заведение после шага «только владелец» (сессия auth, pending без establishment_id).

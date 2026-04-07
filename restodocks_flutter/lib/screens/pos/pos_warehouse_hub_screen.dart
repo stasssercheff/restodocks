@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../services/services.dart';
 import '../../utils/pos_order_department.dart';
 import '../../widgets/app_bar_home_button.dart';
+import '../../widgets/subscription_required_dialog.dart';
 
 /// Склад из POS: переход в модуль остатков (общий по заведению).
 class PosWarehouseHubScreen extends StatelessWidget {
@@ -65,7 +66,14 @@ class PosWarehouseHubScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
-              onPressed: () => context.push('/inventory'),
+              onPressed: () {
+                final am = context.read<AccountManagerSupabase>();
+                if (!am.hasProSubscription) {
+                  showSubscriptionRequiredDialog(context);
+                  return;
+                }
+                context.push('/inventory');
+              },
               icon: const Icon(Icons.inventory_2_outlined),
               label: Text(loc.t('pos_warehouse_open_inventory')),
             ),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:feature_spotlight/feature_spotlight.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +10,7 @@ import '../services/localization_service.dart';
 import '../services/account_manager_supabase.dart';
 import '../services/home_button_config_service.dart';
 import '../services/page_tour_service.dart';
+import 'subscription_required_dialog.dart';
 
 /// Оболочка с нижней навигацией для всех рабочих экранов (кроме инвентаризации).
 class AppShell extends StatelessWidget {
@@ -184,6 +187,15 @@ class AppShell extends StatelessWidget {
       case 0:
         context.go('/home', extra: extra);
       case 1:
+        if (!noDataAccess) {
+          final am = context.read<AccountManagerSupabase>();
+          if (!am.hasProSubscription &&
+              (action == HomeButtonAction.inventory ||
+                  action == HomeButtonAction.expenses)) {
+            unawaited(showSubscriptionRequiredDialog(context));
+            return;
+          }
+        }
         context.go(middleRoute, extra: extra);
       case 2:
         context.go('/personal-cabinet', extra: extra);

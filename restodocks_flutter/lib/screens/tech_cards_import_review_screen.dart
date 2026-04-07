@@ -11,6 +11,7 @@ import '../services/services.dart';
 import '../utils/dev_log.dart';
 import '../utils/product_name_utils.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/subscription_required_dialog.dart';
 
 enum _ImportDuplicateAction { createDuplicate, editExisting, deleteExisting }
 
@@ -750,6 +751,29 @@ class _TechCardsImportReviewScreenState
     }
     final loc = context.read<LocalizationService>();
     final lang = loc.currentLanguageCode;
+    final trialOnly = acc.isTrialOnlyWithoutPaid;
+
+    if (!acc.hasProSubscription) {
+      if (mounted) await showSubscriptionRequiredDialog(context);
+      return;
+    }
+
+    if (trialOnly) {
+      final used = await acc.fetchTrialTtkImportCardsUsed(est.id);
+      final toCreate = _items.where((i) => !i.alreadySaved).length;
+      if (used + toCreate > 10) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(loc.t('trial_ttk_import_cap')),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
     setState(() => _saving = true);
     try {
       final svc = context.read<TechCardServiceSupabase>();
@@ -1050,6 +1074,30 @@ class _TechCardsImportReviewScreenState
         if (abortAfterDuplicateAction) break;
       }
       if (abortAfterDuplicateAction) return;
+
+      if (created > 0 && trialOnly) {
+        try {
+          await acc.trialIncrementUsageOrThrow(
+            establishmentId: est.id,
+            kind: 'ttk_import_cards',
+            delta: created,
+          );
+        } catch (e) {
+          if (!mounted) return;
+          final es = e.toString();
+          if (es.contains('TRIAL_TTK_IMPORT_CAP')) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(loc.t('trial_ttk_import_cap')),
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+            );
+          } else {
+            rethrow;
+          }
+        }
+      }
+
       // Обучение: обратный маппинг по скорректированным данным. Таймаут 10 с — при плохой сети не блокируем.
       final sig =
           widget.headerSignature ?? AiServiceSupabase.lastParseHeaderSignature;
