@@ -9,6 +9,7 @@ import '../utils/number_format_utils.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -65,7 +66,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   String? _prefetchListenerLang;
   late final VoidCallback _localizationPrefetchListener;
 
-  String _tcListName(TechCard tc, String lang) => tc.getDisplayNameInLists(lang);
+  String _tcListName(TechCard tc, String lang) =>
+      tc.getDisplayNameInLists(lang);
 
   /// Id всех ТТК заведения + вложенные ПФ по `sourceTechCardId`, чтобы оверлей покрывал состав.
   List<String> _techCardIdsForTranslationOverlay(List<TechCard> all) {
@@ -130,7 +132,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         });
       }
 
-      final fromDb = await ts.fetchTechCardDishNameTranslationsForTargetLanguage(
+      final fromDb =
+          await ts.fetchTechCardDishNameTranslationsForTargetLanguage(
         techCardIds: ids,
         targetLanguage: lang,
         onChunkProgress: (chunkDone, chunkTotal) {
@@ -189,7 +192,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     try {
       final ts = context.read<TranslationService>();
       final ids = _techCardIdsForTranslationOverlay(allEstablishmentCards);
-      final fromDb = await ts.fetchTechCardDishNameTranslationsForTargetLanguage(
+      final fromDb =
+          await ts.fetchTechCardDishNameTranslationsForTargetLanguage(
         techCardIds: ids,
         targetLanguage: lang,
       );
@@ -290,8 +294,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       final lang = LocalizationService().currentLanguageCode;
       if (_prefetchListenerLang == lang) return;
       _prefetchListenerLang = lang;
-      unawaited(_prefetchDishNameTranslationOverlay(
-          _techCardsById.values.toList()));
+      unawaited(
+          _prefetchDishNameTranslationOverlay(_techCardsById.values.toList()));
     };
     LocalizationService().addListener(_localizationPrefetchListener);
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowTtkTour());
@@ -964,8 +968,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     if (query.isNotEmpty) {
       final lang = loc.currentLanguageCode;
       result = result
-          .where((tc) =>
-              _tcListName(tc, lang).toLowerCase().contains(query))
+          .where((tc) => _tcListName(tc, lang).toLowerCase().contains(query))
           .toList();
     }
     if (_filterSection != null) {
@@ -1485,8 +1488,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                       items: m.candidates
                                           .map((c) => DropdownMenuItem<String>(
                                                 value: c.id,
-                                                child: Text(
-                                                    _tcListName(c, lang)),
+                                                child:
+                                                    Text(_tcListName(c, lang)),
                                               ))
                                           .toList(),
                                       onChanged: saving
@@ -1504,7 +1507,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                         onPressed: () =>
                                             _showTechCardCompositionDialog(
                                                 ctx2, selPf, lang),
-                                        child: Text(loc.t('ttk_composition_short')),
+                                        child: Text(
+                                            loc.t('ttk_composition_short')),
                                       ),
                                     ),
                                   ],
@@ -1517,10 +1521,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                             if (ambiguousMatches.isNotEmpty)
                               const SizedBox(height: 16),
                             Text(
-                              loc
-                                  .t('ttk_review_no_price_section')
-                                  .replaceFirst(
-                                      '%s', '${missingPriceIngredients.length}'),
+                              loc.t('ttk_review_no_price_section').replaceFirst(
+                                  '%s', '${missingPriceIngredients.length}'),
                               style:
                                   Theme.of(ctx2).textTheme.titleSmall?.copyWith(
                                         fontWeight: FontWeight.w600,
@@ -1563,10 +1565,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                 missingPriceIngredients.isNotEmpty)
                               const SizedBox(height: 16),
                             Text(
-                              loc
-                                  .t('ttk_review_weight_section')
-                                  .replaceFirst(
-                                      '%s', '${missingWeightIssues.length}'),
+                              loc.t('ttk_review_weight_section').replaceFirst(
+                                  '%s', '${missingWeightIssues.length}'),
                               style:
                                   Theme.of(ctx2).textTheme.titleSmall?.copyWith(
                                         fontWeight: FontWeight.w600,
@@ -1612,8 +1612,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                             Text(
                               loc
                                   .t('ttk_review_technology_section')
-                                  .replaceFirst(
-                                      '%s',
+                                  .replaceFirst('%s',
                                       '${missingTechnologyIssues.length}'),
                               style:
                                   Theme.of(ctx2).textTheme.titleSmall?.copyWith(
@@ -1695,8 +1694,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                                     .firstWhere((x) =>
                                                         x.id == pickedId),
                                           );
-                                          final display =
-                                              _tcListName(pf, lang);
+                                          final display = _tcListName(pf, lang);
                                           return ing.copyWith(
                                             sourceTechCardId: pf.id,
                                             sourceTechCardName: display,
@@ -3041,6 +3039,77 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
   }
 
+  Future<void> _createFromPhoto(
+      BuildContext context, LocalizationService loc) async {
+    final acc = context.read<AccountManagerSupabase>();
+    if (!acc.hasProSubscription) {
+      await showSubscriptionRequiredDialog(context);
+      return;
+    }
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: Text(loc.t('photo_from_camera')),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: Text(loc.t('photo_from_gallery')),
+              onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || source == null) return;
+    setState(() => _loadingExcel = true);
+    try {
+      final imageService = ImageService();
+      final xFile = source == ImageSource.camera
+          ? await imageService.takePhotoWithCamera()
+          : await imageService.pickImageFromGallery();
+      if (xFile == null || !mounted) return;
+      final bytes = await imageService.xFileToBytes(xFile);
+      if (bytes == null || bytes.isEmpty || !mounted) return;
+      final ai = context.read<AiService>();
+      final result = await ai.recognizeTechCardFromImage(bytes);
+      if (!mounted) return;
+      if (result == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(loc.t('ai_tech_card_recognize_empty') ??
+                  'Не удалось распознать ТТК.')),
+        );
+        return;
+      }
+      final sig = ai is AiServiceSupabase
+          ? AiServiceSupabase.lastParseHeaderSignature
+          : null;
+      final sourceRows =
+          ai is AiServiceSupabase ? AiServiceSupabase.lastParsedRows : null;
+      final hasMeta = sig != null && sig.isNotEmpty;
+      context.push(
+        widget.department == 'bar'
+            ? '/tech-cards/new?department=bar'
+            : '/tech-cards/new',
+        extra: hasMeta || sourceRows != null
+            ? {
+                'result': result,
+                'headerSignature': sig,
+                'sourceRows': sourceRows
+              }
+            : result,
+      );
+    } finally {
+      if (mounted) setState(() => _loadingExcel = false);
+    }
+  }
+
   /// Диалог выбора листа Excel при нескольких листах в файле. Возвращает индекс (0-based) или null при отмене.
   static Future<int?> _showSheetPicker(BuildContext context,
       LocalizationService loc, String fileName, List<String> sheetNames) async {
@@ -3271,7 +3340,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                               '(${(_translationProgressDone * 100 / _translationProgressTotal).round()}%)'
                           : loc.t('ttk_loading_name_translations'),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                     ),
                   ),
@@ -3284,10 +3354,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 _buildBody(loc, canEdit, showCost),
                 if (_loadingExcel)
                   ColoredBox(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surface
-                        .withOpacity(0.7),
+                    color:
+                        Theme.of(context).colorScheme.surface.withOpacity(0.7),
                     child: Center(
                       child: Card(
                         child: Padding(
@@ -3298,8 +3366,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                               const SizedBox(
                                   height: 24,
                                   width: 24,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2)),
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2)),
                               const SizedBox(height: 16),
                               Text(_loadingTtkIsPdf
                                   ? loc.t('loading_ttk_pdf')
@@ -3404,6 +3472,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             onSelected: (value) async {
               if (value == 'excel') await _createFromExcel(context, loc);
               if (value == 'text') await _createFromText(context, loc);
+              if (value == 'photo') await _createFromPhoto(context, loc);
             },
             itemBuilder: (_) => [
               PopupMenuItem(
@@ -3427,6 +3496,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                           fontWeight: FontWeight.w500,
                         ),
                   )),
+              PopupMenuItem(
+                value: 'photo',
+                child: Text(
+                  loc.t('ai_tech_card_from_photo'),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
+              ),
             ],
           )
         : null;
@@ -3450,8 +3529,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       itemBuilder: (context, index) {
                         final techCard = _list[index];
                         return ListTile(
-                          title: Text(_tcListName(
-                              techCard, l.currentLanguageCode)),
+                          title: Text(
+                              _tcListName(techCard, l.currentLanguageCode)),
                           subtitle: Text(techCard.isSemiFinished
                               ? l.t('ttk_semi_finished')
                               : l.t('ttk_dish_label')),
@@ -3711,8 +3790,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       final loc = context.read<LocalizationService>();
       final lang = loc.currentLanguageCode;
       return list
-          .where((tc) =>
-              _tcListName(tc, lang).toLowerCase().contains(query))
+          .where((tc) => _tcListName(tc, lang).toLowerCase().contains(query))
           .toList();
     }
 
