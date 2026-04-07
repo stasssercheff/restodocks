@@ -1833,18 +1833,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 children: [
                   Consumer<ScreenLayoutPreferenceService>(
-                    builder: (_, screenPref, __) => SwitchListTile(
-                      secondary: const Icon(Icons.translate),
-                      title: Text(localization.t('show_name_translit') ??
-                          'Показывать имена транслитом'),
-                      subtitle: Text(localization
-                              .t('show_name_translit_hint') ??
-                          'Отображать ФИО сотрудников латиницей (например, Иванов → Ivanov)'),
-                      value: screenPref.showNameTranslit,
-                      onChanged: (v) => screenPref.setShowNameTranslit(v),
-                    ),
-                  ),
-                  Consumer<ScreenLayoutPreferenceService>(
                     builder: (_, screenPref, __) {
                       final days = screenPref.birthdayNotifyDays;
                       return ListTile(
