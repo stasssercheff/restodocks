@@ -27,7 +27,7 @@ String _expensesRpcErrorMessage(Object e, LocalizationService loc) {
   return s;
 }
 
-/// Экран «Расходы» для собственника: вкладки «ФЗП», «Заказы продуктов», «Списания».
+/// Экран «Расходы» для собственника: вкладки «ФЗП», «Заказы продуктов», «Списания», «Поставки».
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key});
 
@@ -35,7 +35,7 @@ class ExpensesScreen extends StatefulWidget {
   State<ExpensesScreen> createState() => _ExpensesScreenState();
 }
 
-enum _ExpensesTab { fzp, productOrders, writeoffs }
+enum _ExpensesTab { fzp, productOrders, writeoffs, procurementReceipts }
 
 class _ExpensesScreenState extends State<ExpensesScreen> {
   _ExpensesTab _selectedTab = _ExpensesTab.fzp;
@@ -70,6 +70,12 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   _buildTabChip(_ExpensesTab.productOrders, loc.t('expenses_tab_product_orders') ?? 'Заказы продуктов', loc),
                   const SizedBox(width: 8),
                   _buildTabChip(_ExpensesTab.writeoffs, loc.t('expenses_tab_writeoffs') ?? 'Списания', loc),
+                  const SizedBox(width: 8),
+                  _buildTabChip(
+                    _ExpensesTab.procurementReceipts,
+                    loc.t('expenses_tab_procurement') ?? 'Поставки',
+                    loc,
+                  ),
                 ],
               ),
             ),
@@ -79,7 +85,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 ? const SalaryExpenseScreen(embedInScaffold: false)
                 : _selectedTab == _ExpensesTab.productOrders
                     ? const _ProductOrdersTab()
-                    : const _WriteoffsTab(),
+                    : _selectedTab == _ExpensesTab.writeoffs
+                        ? const _WriteoffsTab()
+                        : const _ProcurementReceiptsTab(),
           ),
         ],
       ),
@@ -458,7 +466,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
     // 3. Выбор языка
     final selectedLang = await showDialog<String>(
       context: context,
-      builder: (ctx) => _ProductOrdersExportLanguageDialog(loc: loc),
+      builder: (ctx) => _ExpensesExportLanguageDialog(loc: loc),
     );
     if (selectedLang == null || !mounted) return;
 
@@ -812,6 +820,736 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
                           child: Text(
                             (loc.t('expenses_orders_excluded_from_total') ?? 'Не включено в итог: %s').replaceAll('%s', '$excludedCount'),
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Вкладка «Поставки»: приёмки с ценами и строками; Excel/PDF по текущим фильтрам.
+class _ProcurementReceiptsTab extends StatefulWidget {
+  const _ProcurementReceiptsTab();
+
+  @override
+  State<_ProcurementReceiptsTab> createState() =>
+      _ProcurementReceiptsTabState();
+}
+
+class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
+  List<Map<String, dynamic>> _allDocs = [];
+  bool _loading = true;
+  String? _error;
+  late DateTime _dateStart;
+  late DateTime _dateEnd;
+  Set<String> _selectedSupplierNames = {};
+  Set<String> _excludedFromTotalIds = {};
+  static const String _prefsKeyPrefix = 'expenses_procurement_excluded_';
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _dateStart = DateTime(now.year, now.month, 1);
+    _dateEnd = DateTime(now.year, now.month + 1, 0);
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final account = context.read<AccountManagerSupabase>();
+      final establishmentId = account.establishment?.id;
+      if (establishmentId == null) {
+        setState(() {
+          _loading = false;
+          _error = 'Заведение не выбрано';
+        });
+        return;
+      }
+      final docs = await ProcurementReceiptService.instance
+          .listDeduped(establishmentId);
+      if (mounted) {
+        final excluded = await _loadExcludedIds(establishmentId);
+        setState(() {
+          _allDocs = docs;
+          _excludedFromTotalIds = excluded;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        final loc = context.read<LocalizationService>();
+        setState(() {
+          _loading = false;
+          _error = _expensesRpcErrorMessage(e, loc);
+        });
+      }
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredDocs {
+    final dayStart =
+        DateTime(_dateStart.year, _dateStart.month, _dateStart.day);
+    final dayEnd =
+        DateTime(_dateEnd.year, _dateEnd.month, _dateEnd.day, 23, 59, 59);
+    return _allDocs.where((d) {
+      final createdAt = DateTime.tryParse(d['created_at']?.toString() ?? '');
+      if (createdAt == null) return false;
+      if (createdAt.isBefore(dayStart) || createdAt.isAfter(dayEnd)) {
+        return false;
+      }
+      if (_selectedSupplierNames.isNotEmpty) {
+        final payload = d['payload'] as Map<String, dynamic>? ?? {};
+        final header = payload['header'] as Map<String, dynamic>? ?? {};
+        final supplier = (header['supplierName'] as String? ?? '').trim();
+        if (!_selectedSupplierNames.contains(supplier)) return false;
+      }
+      return true;
+    }).toList();
+  }
+
+  Set<String> get _uniqueSupplierNames {
+    final names = <String>{};
+    for (final d in _allDocs) {
+      final payload = d['payload'] as Map<String, dynamic>? ?? {};
+      final header = payload['header'] as Map<String, dynamic>? ?? {};
+      final s = (header['supplierName'] as String? ?? '').trim();
+      if (s.isNotEmpty) names.add(s);
+    }
+    return names;
+  }
+
+  Future<Set<String>> _loadExcludedIds(String establishmentId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final key = '$_prefsKeyPrefix$establishmentId';
+      final json = prefs.getString(key);
+      if (json == null) return {};
+      final list = jsonDecode(json) as List<dynamic>?;
+      return list?.map((e) => e.toString()).toSet() ?? {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<void> _setIncludedInTotal(String docId, bool include) async {
+    final id = docId.toString();
+    setState(() {
+      if (include) {
+        _excludedFromTotalIds.remove(id);
+      } else {
+        _excludedFromTotalIds.add(id);
+      }
+    });
+    final establishmentId =
+        context.read<AccountManagerSupabase>().establishment?.id;
+    if (establishmentId == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        '$_prefsKeyPrefix$establishmentId',
+        jsonEncode(_excludedFromTotalIds.toList()),
+      );
+    } catch (_) {}
+  }
+
+  double _docGrand(Map<String, dynamic> doc) {
+    final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    return (payload['grandTotal'] as num?)?.toDouble() ??
+        (header['receivedGrandTotal'] as num?)?.toDouble() ??
+        0.0;
+  }
+
+  int _linesCount(Map<String, dynamic> doc) {
+    final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final items = payload['items'] as List<dynamic>? ?? [];
+    return items.length;
+  }
+
+  Future<void> _showDateRangePicker(LocalizationService loc) async {
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      initialDateRange: DateTimeRange(start: _dateStart, end: _dateEnd),
+      helpText: loc.t('expenses_orders_date_range') ?? 'Диапазон дат',
+    );
+    if (range != null && mounted) {
+      setState(() {
+        _dateStart =
+            DateTime(range.start.year, range.start.month, range.start.day);
+        _dateEnd = DateTime(range.end.year, range.end.month, range.end.day);
+      });
+    }
+  }
+
+  Future<void> _showSupplierFilter(LocalizationService loc) async {
+    final suppliers = _uniqueSupplierNames.toList()..sort();
+    var showAll = _selectedSupplierNames.isEmpty;
+    var selected = Set<String>.from(_selectedSupplierNames);
+    if (showAll) selected = Set.from(suppliers);
+
+    final result = await showDialog<Set<String>>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: Text(
+                loc.t('expenses_orders_filter_suppliers') ?? 'Поставщики',
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CheckboxListTile(
+                      title: Text(
+                        loc.t('expenses_orders_all_suppliers') ?? 'Все',
+                      ),
+                      value: showAll,
+                      onChanged: (v) {
+                        setDialogState(() {
+                          showAll = v ?? true;
+                          if (showAll) selected = {};
+                        });
+                      },
+                    ),
+                    const Divider(),
+                    ...suppliers.map(
+                      (s) => CheckboxListTile(
+                        title: Text(s, overflow: TextOverflow.ellipsis),
+                        value: showAll || selected.contains(s),
+                        tristate: false,
+                        onChanged: showAll
+                            ? null
+                            : (v) {
+                                setDialogState(() {
+                                  if (v == true) {
+                                    selected.add(s);
+                                  } else {
+                                    selected.remove(s);
+                                  }
+                                });
+                              },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(null),
+                  child: Text(loc.t('cancel') ?? 'Отмена'),
+                ),
+                FilledButton(
+                  onPressed: () =>
+                      Navigator.of(ctx).pop(showAll ? {} : selected),
+                  child: Text(loc.t('apply') ?? 'Применить'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (result != null && mounted) {
+      setState(() => _selectedSupplierNames = result);
+    }
+  }
+
+  Future<void> _export(LocalizationService loc) async {
+    final filtered = _filteredDocs;
+    if (filtered.isEmpty) return;
+    final account = context.read<AccountManagerSupabase>();
+    final currency = account.establishment?.defaultCurrency ?? 'VND';
+
+    final format = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          loc.t('expenses_procurement_export_dialog_title') ?? 'Выгрузить',
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              loc.t('expenses_procurement_export_format_title') ?? 'Формат',
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.table_chart_outlined),
+              title: Text(
+                loc.t('expenses_procurement_export_excel') ?? 'Excel',
+              ),
+              onTap: () => Navigator.of(ctx).pop('excel'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: Text(loc.t('expenses_procurement_export_pdf') ?? 'PDF'),
+              onTap: () => Navigator.of(ctx).pop('pdf'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('cancel') ?? 'Отмена'),
+          ),
+        ],
+      ),
+    );
+    if (format == null || !mounted) return;
+
+    final selectedLang = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _ExpensesExportLanguageDialog(
+        loc: loc,
+        titleKey: 'expenses_procurement_export_dialog_title',
+        confirmLabelKey: 'expenses_procurement_export_btn',
+      ),
+    );
+    if (selectedLang == null || !mounted) return;
+
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Center(
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(loc.t('expenses_orders_export_loading') ?? '…'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final t = (String key) => loc.tForLanguage(selectedLang, key);
+      final dateFormat = DateFormat('dd.MM.yyyy');
+      final Uint8List bytes;
+      final String ext;
+      if (format == 'pdf') {
+        bytes = await ProcurementReceiptExportService.buildPdfBytes(
+          documents: filtered,
+          t: t,
+          currency: currency,
+          lang: selectedLang,
+        );
+        ext = 'pdf';
+      } else {
+        bytes = await ProcurementReceiptExportService.buildExcelBytes(
+          documents: filtered,
+          t: t,
+          currency: currency,
+          lang: selectedLang,
+        );
+        ext = 'xlsx';
+      }
+      final fileName =
+          'procurement_receipts_${dateFormat.format(_dateStart)}_${dateFormat.format(_dateEnd)}.$ext';
+      await saveFileBytes(fileName, bytes);
+
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '${loc.t('expenses_procurement_export_saved') ?? 'OK'}: $fileName',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      scaffoldMessenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '${loc.t('expenses_procurement_export_error') ?? 'Error'}: $e',
+          ),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
+    final account = context.watch<AccountManagerSupabase>();
+    final currency = account.establishment?.defaultCurrency ?? 'VND';
+    final dateFormat = DateFormat('dd.MM.yyyy');
+
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _load,
+                child: Text(loc.t('retry') ?? 'Повторить'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final filtered = _filteredDocs;
+    double totalSum = 0;
+    for (final doc in filtered) {
+      final docId = doc['id']?.toString() ?? '';
+      if (_excludedFromTotalIds.contains(docId)) continue;
+      totalSum += _docGrand(doc);
+    }
+
+    if (_allDocs.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.local_shipping_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.outline,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              loc.t('expenses_procurement_empty') ?? '',
+              style: Theme.of(context).textTheme.bodyLarge,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      InkWell(
+                        onTap: () => _showDateRangePicker(loc),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.date_range,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      loc.t('expenses_orders_date_range') ??
+                                          'Диапазон дат',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall,
+                                    ),
+                                    Text(
+                                      '${dateFormat.format(_dateStart)} — ${dateFormat.format(_dateEnd)}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right),
+                            ],
+                          ),
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () => _showSupplierFilter(loc),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.store_outlined,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      loc.t('order_tab_suppliers') ??
+                                          'Поставщики',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall,
+                                    ),
+                                    Text(
+                                      _selectedSupplierNames.isEmpty
+                                          ? (loc.t('expenses_orders_all_suppliers') ??
+                                              'Все')
+                                          : '${_selectedSupplierNames.length} ${loc.t('expenses_orders_selected') ?? ''}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton.filled(
+                  icon: const Icon(Icons.download),
+                  onPressed: () => _export(loc),
+                  tooltip:
+                      loc.t('expenses_procurement_export_btn') ?? 'Сохранить',
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: filtered.isEmpty
+                ? Center(
+                    child: Text(
+                      loc.t('expenses_orders_empty_filter') ?? '',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final doc = filtered[i];
+                      final docId = doc['id']?.toString() ?? '';
+                      final payload =
+                          doc['payload'] as Map<String, dynamic>? ?? {};
+                      final header =
+                          payload['header'] as Map<String, dynamic>? ?? {};
+                      final createdAt = DateTime.tryParse(
+                            doc['created_at']?.toString() ?? '',
+                          ) ??
+                          DateTime.now();
+                      final dateStr = dateFormat.format(createdAt);
+                      final supplier = header['supplierName'] ?? '—';
+                      final employee = header['employeeName'] ?? '—';
+                      final grand = _docGrand(doc);
+                      final sumStr =
+                          NumberFormatUtils.formatSum(grand, currency);
+                      final lines = _linesCount(doc);
+                      final included = !_excludedFromTotalIds.contains(docId);
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: InkWell(
+                          onTap: () => context.push(
+                            '/inbox/procurement-receipt/$docId',
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Tooltip(
+                                  message: loc.t(
+                                        'expenses_orders_include_in_total_hint',
+                                      ) ??
+                                      '',
+                                  child: SizedBox(
+                                    width: 40,
+                                    child: Checkbox(
+                                      value: included,
+                                      onChanged: (v) => _setIncludedInTotal(
+                                        docId,
+                                        v ?? true,
+                                      ),
+                                      materialTapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                      fillColor:
+                                          WidgetStateProperty.resolveWith(
+                                        (states) {
+                                          if (!included) {
+                                            return Theme.of(context)
+                                                .colorScheme
+                                                .outline;
+                                          }
+                                          return null;
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        '$dateStr · $supplier',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleSmall,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${loc.t('inbox_header_employee') ?? ''}: $employee · ${(loc.t('expenses_procurement_n_lines') ?? '').replaceFirst('%s', '$lines')}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  sumStr,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 4,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        loc.t('salary_total_all') ?? 'Итого',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      Text(
+                        NumberFormatUtils.formatSum(totalSum, currency),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                      ),
+                    ],
+                  ),
+                  if (filtered.isNotEmpty) ...[
+                    Builder(
+                      builder: (_) {
+                        final excludedCount = filtered
+                            .where(
+                              (o) => _excludedFromTotalIds
+                                  .contains(o['id']?.toString()),
+                            )
+                            .length;
+                        if (excludedCount == 0) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            (loc.t('expenses_orders_excluded_from_total') ??
+                                    '')
+                                .replaceAll('%s', '$excludedCount'),
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
                           ),
                         );
                       },
@@ -1349,38 +2087,52 @@ class _ProductIdsMergeExportPickerDialogState
   }
 }
 
-/// Диалог выбора языка для выгрузки заказов продуктов.
-class _ProductOrdersExportLanguageDialog extends StatelessWidget {
-  const _ProductOrdersExportLanguageDialog({required this.loc});
+/// Диалог выбора языка для выгрузки (заказы продуктов, приёмки и т.д.).
+class _ExpensesExportLanguageDialog extends StatelessWidget {
+  const _ExpensesExportLanguageDialog({
+    required this.loc,
+    this.titleKey,
+    this.confirmLabelKey,
+  });
 
   final LocalizationService loc;
+  /// Ключ заголовка; по умолчанию — выгрузка заказов продуктов.
+  final String? titleKey;
+  /// Ключ текста кнопки подтверждения; по умолчанию — как у заказов продуктов.
+  final String? confirmLabelKey;
 
   @override
   Widget build(BuildContext context) {
     String selectedLang = loc.currentLanguageCode;
+    final title = loc.t(titleKey ?? 'expenses_orders_export_dialog_title') ??
+        'Выгрузить';
     return StatefulBuilder(
       builder: (context, setState) => AlertDialog(
-        title: Text(loc.t('expenses_orders_export_dialog_title') ?? 'Выгрузить заказы продуктов'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              loc.t('salary_export_lang') ?? 'Язык сохранения:',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: ['ru', 'en', 'es'].map((code) {
-                return ChoiceChip(
-                  label: Text(loc.getLanguageName(code)),
-                  selected: selectedLang == code,
-                  onSelected: (_) => setState(() => selectedLang = code),
-                );
-              }).toList(),
-            ),
-          ],
+        title: Text(title),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                loc.t('salary_export_lang') ?? 'Язык сохранения:',
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: LocalizationService.supportedLocales.map((locale) {
+                  final code = locale.languageCode;
+                  return ChoiceChip(
+                    label: Text(loc.getLanguageName(code)),
+                    selected: selectedLang == code,
+                    onSelected: (_) => setState(() => selectedLang = code),
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -1389,7 +2141,10 @@ class _ProductOrdersExportLanguageDialog extends StatelessWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(selectedLang),
-            child: Text(loc.t('expenses_orders_export_btn') ?? 'Выгрузить'),
+            child: Text(
+              loc.t(confirmLabelKey ?? 'expenses_orders_export_btn') ??
+                  'Выгрузить',
+            ),
           ),
         ],
       ),
