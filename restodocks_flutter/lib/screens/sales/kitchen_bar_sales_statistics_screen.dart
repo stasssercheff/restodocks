@@ -12,6 +12,7 @@ import '../../services/inventory_download.dart';
 import '../../services/kitchen_bar_sales_service.dart';
 import '../../services/localization_service.dart';
 import '../../services/sales_financial_visibility_service.dart';
+import '../../utils/adaptive_time_picker.dart';
 import '../../utils/pos_order_department.dart';
 import '../../widgets/app_bar_home_button.dart';
 
@@ -42,8 +43,12 @@ class _KitchenBarSalesStatisticsScreenState
   DateTime? _customStart;
   DateTime? _customEnd;
   bool _timeFilter = false;
-  TimeOfDay _timeStart = const TimeOfDay(hour: 10, minute: 0);
-  TimeOfDay _timeEnd = const TimeOfDay(hour: 22, minute: 0);
+  List<({TimeOfDay start, TimeOfDay end})> _timeRanges = [
+    (
+      start: const TimeOfDay(hour: 10, minute: 0),
+      end: const TimeOfDay(hour: 22, minute: 0),
+    ),
+  ];
 
   String? _filterSubValue;
   String? _filterTypeValue;
@@ -82,6 +87,23 @@ class _KitchenBarSalesStatisticsScreenState
             _showType = j['show_type'] as bool? ?? true;
             _showCost = j['show_cost'] as bool? ?? true;
             _showSelling = j['show_selling'] as bool? ?? true;
+            _timeFilter = j['time_filter'] as bool? ?? false;
+            final tr = j['time_ranges'];
+            if (tr is List && tr.isNotEmpty) {
+              final parsed = <({TimeOfDay start, TimeOfDay end})>[];
+              for (final e in tr) {
+                if (e is Map) {
+                  final s = _parseTimeStr(e['start']?.toString());
+                  final en = _parseTimeStr(e['end']?.toString());
+                  if (s != null && en != null) {
+                    parsed.add((start: s, end: en));
+                  }
+                }
+              }
+              if (parsed.isNotEmpty && parsed.length <= 5) {
+                _timeRanges = parsed;
+              }
+            }
           });
         }
       } catch (_) {}
@@ -89,7 +111,7 @@ class _KitchenBarSalesStatisticsScreenState
     await _reload();
   }
 
-  Future<void> _saveColumnPrefs() async {
+  Future<void> _saveStatisticsPrefs() async {
     final est =
         context.read<AccountManagerSupabase>().establishment?.id;
     if (est == null || est.isEmpty) return;
@@ -102,9 +124,33 @@ class _KitchenBarSalesStatisticsScreenState
           'show_type': _showType,
           'show_cost': _showCost,
           'show_selling': _showSelling,
+          'time_filter': _timeFilter,
+          'time_ranges': [
+            for (final r in _timeRanges)
+              {
+                'start': _timeToStr(r.start),
+                'end': _timeToStr(r.end),
+              },
+          ],
         }),
       );
     } catch (_) {}
+  }
+
+  String _timeToStr(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  TimeOfDay? _parseTimeStr(String? s) {
+    if (s == null || !s.contains(':')) return null;
+    final p = s.split(':');
+    if (p.length < 2) return null;
+    final h = int.tryParse(p[0].trim());
+    final m = int.tryParse(p[1].trim());
+    if (h == null || m == null) return null;
+    return TimeOfDay(
+      hour: h.clamp(0, 23),
+      minute: m.clamp(0, 59),
+    );
   }
 
   Future<void> _reload() async {
@@ -130,11 +176,7 @@ class _KitchenBarSalesStatisticsScreenState
     final endUtc = endL.toUtc();
 
     bool paidInTimeWindow(DateTime local) {
-      return kitchenBarTimeOfDayInRange(
-        local,
-        start: _timeStart,
-        end: _timeEnd,
-      );
+      return kitchenBarTimeOfDayInAnyRange(local, _timeRanges);
     }
 
     try {
@@ -433,54 +475,130 @@ class _KitchenBarSalesStatisticsScreenState
                     value: _timeFilter,
                     onChanged: (v) {
                       setState(() => _timeFilter = v);
+                      _saveStatisticsPrefs();
                       _reload();
                     },
                   ),
-                  if (_timeFilter)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ListTile(
-                            title: Text(
-                              MaterialLocalizations.of(context).formatTimeOfDay(
-                                _timeStart,
-                                alwaysUse24HourFormat: true,
+                  if (_timeFilter) ...[
+                    for (var i = 0; i < _timeRanges.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () async {
+                                  final t = await showAdaptiveTimePicker(
+                                    context,
+                                    initialTime: _timeRanges[i].start,
+                                  );
+                                  if (t == null || !mounted) return;
+                                  setState(() {
+                                    final old = _timeRanges[i];
+                                    _timeRanges = [
+                                      for (var j = 0;
+                                          j < _timeRanges.length;
+                                          j++)
+                                        if (j == i)
+                                          (start: t, end: old.end)
+                                        else
+                                          _timeRanges[j],
+                                    ];
+                                  });
+                                  await _saveStatisticsPrefs();
+                                  _reload();
+                                },
+                                child: Text(
+                                  MaterialLocalizations.of(context)
+                                      .formatTimeOfDay(
+                                    _timeRanges[i].start,
+                                    alwaysUse24HourFormat: true,
+                                  ),
+                                ),
                               ),
                             ),
-                            onTap: () async {
-                              final t = await showTimePicker(
-                                context: context,
-                                initialTime: _timeStart,
-                              );
-                              if (t != null) {
-                                setState(() => _timeStart = t);
-                                _reload();
-                              }
-                            },
-                          ),
-                        ),
-                        Expanded(
-                          child: ListTile(
-                            title: Text(
-                              MaterialLocalizations.of(context).formatTimeOfDay(
-                                _timeEnd,
-                                alwaysUse24HourFormat: true,
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 6),
+                              child: Text(
+                                '—',
+                                style: Theme.of(context).textTheme.titleMedium,
                               ),
                             ),
-                            onTap: () async {
-                              final t = await showTimePicker(
-                                context: context,
-                                initialTime: _timeEnd,
-                              );
-                              if (t != null) {
-                                setState(() => _timeEnd = t);
-                                _reload();
-                              }
-                            },
-                          ),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () async {
+                                  final t = await showAdaptiveTimePicker(
+                                    context,
+                                    initialTime: _timeRanges[i].end,
+                                  );
+                                  if (t == null || !mounted) return;
+                                  setState(() {
+                                    final old = _timeRanges[i];
+                                    _timeRanges = [
+                                      for (var j = 0;
+                                          j < _timeRanges.length;
+                                          j++)
+                                        if (j == i)
+                                          (start: old.start, end: t)
+                                        else
+                                          _timeRanges[j],
+                                    ];
+                                  });
+                                  await _saveStatisticsPrefs();
+                                  _reload();
+                                },
+                                child: Text(
+                                  MaterialLocalizations.of(context)
+                                      .formatTimeOfDay(
+                                    _timeRanges[i].end,
+                                    alwaysUse24HourFormat: true,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (_timeRanges.length > 1)
+                              IconButton(
+                                tooltip: loc.t('sales_time_remove_range'),
+                                icon:
+                                    const Icon(Icons.remove_circle_outline),
+                                onPressed: () {
+                                  setState(() {
+                                    _timeRanges = [
+                                      for (var j = 0;
+                                          j < _timeRanges.length;
+                                          j++)
+                                        if (j != i) _timeRanges[j],
+                                    ];
+                                  });
+                                  _saveStatisticsPrefs();
+                                  _reload();
+                                },
+                              ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    if (_timeRanges.length < 5)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _timeRanges = [
+                                ..._timeRanges,
+                                (
+                                  start: const TimeOfDay(hour: 10, minute: 0),
+                                  end: const TimeOfDay(hour: 22, minute: 0),
+                                ),
+                              ];
+                            });
+                            _saveStatisticsPrefs();
+                          },
+                          icon: const Icon(Icons.add),
+                          label: Text(loc.t('sales_time_add_range')),
+                        ),
+                      ),
+                  ],
                   ExpansionTile(
                     title: Text(loc.t('sales_columns_expand') ?? 'Колонки таблицы'),
                     children: [
@@ -489,7 +607,7 @@ class _KitchenBarSalesStatisticsScreenState
                         value: _showSub,
                         onChanged: (v) {
                           setState(() => _showSub = v ?? true);
-                          _saveColumnPrefs();
+                          _saveStatisticsPrefs();
                         },
                       ),
                       CheckboxListTile(
@@ -497,7 +615,7 @@ class _KitchenBarSalesStatisticsScreenState
                         value: _showType,
                         onChanged: (v) {
                           setState(() => _showType = v ?? true);
-                          _saveColumnPrefs();
+                          _saveStatisticsPrefs();
                         },
                       ),
                       if (seeFin) ...[
@@ -506,7 +624,7 @@ class _KitchenBarSalesStatisticsScreenState
                           value: _showCost,
                           onChanged: (v) {
                             setState(() => _showCost = v ?? true);
-                            _saveColumnPrefs();
+                            _saveStatisticsPrefs();
                           },
                         ),
                         CheckboxListTile(
@@ -514,12 +632,13 @@ class _KitchenBarSalesStatisticsScreenState
                           value: _showSelling,
                           onChanged: (v) {
                             setState(() => _showSelling = v ?? true);
-                            _saveColumnPrefs();
+                            _saveStatisticsPrefs();
                           },
                         ),
                       ],
                     ],
                   ),
+                  const SizedBox(height: 12),
                   DropdownButtonFormField<String?>(
                     isExpanded: true,
                     value: _filterSubValue,
@@ -546,6 +665,7 @@ class _KitchenBarSalesStatisticsScreenState
                         ? null
                         : (v) => setState(() => _filterSubValue = v),
                   ),
+                  const SizedBox(height: 12),
                   DropdownButtonFormField<String?>(
                     isExpanded: true,
                     value: _filterTypeValue,
@@ -572,6 +692,7 @@ class _KitchenBarSalesStatisticsScreenState
                         ? null
                         : (v) => setState(() => _filterTypeValue = v),
                   ),
+                  const SizedBox(height: 12),
                   DropdownButtonFormField<String?>(
                     isExpanded: true,
                     value: _filterNameValue,

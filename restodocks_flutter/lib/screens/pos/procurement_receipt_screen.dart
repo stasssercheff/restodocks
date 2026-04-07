@@ -201,6 +201,12 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
     setState(_syncManualTrailingEmptyInPlace);
   }
 
+  String _localizedUnit(LocalizationService loc, String unit) {
+    final code = loc.currentLanguageCode.toLowerCase();
+    final lang = code.startsWith('ru') ? 'ru' : 'en';
+    return CulinaryUnits.displayName(unit, lang);
+  }
+
   double _lineTotal(_ReceiptLineEdit l) {
     final rec = _parse(l.received.text);
     final price = _parse(l.actualPrice.text);
@@ -413,7 +419,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         widget.manualOffSystem ? _onManualChanged : () => setState(() {});
 
     Widget cell(Widget w) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           child: w,
         );
 
@@ -515,7 +521,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         ),
         cell(
           Text(
-            '${nf.format(l.orderedQty)} ${l.unit}',
+            '${nf.format(l.orderedQty)} ${_localizedUnit(loc, l.unit)}',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),

@@ -260,3 +260,21 @@ bool kitchenBarTimeOfDayInRange(
   }
   return minutes >= a || minutes <= b;
 }
+
+/// Несколько интервалов «начало—конец»; достаточно попасть в любой (до 5 в UI).
+bool kitchenBarTimeOfDayInAnyRange(
+  DateTime localInstant,
+  List<({TimeOfDay start, TimeOfDay end})> ranges,
+) {
+  if (ranges.isEmpty) return true;
+  for (final r in ranges) {
+    if (kitchenBarTimeOfDayInRange(
+      localInstant,
+      start: r.start,
+      end: r.end,
+    )) {
+      return true;
+    }
+  }
+  return false;
+}
