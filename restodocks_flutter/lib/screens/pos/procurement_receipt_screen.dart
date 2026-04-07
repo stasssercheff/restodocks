@@ -136,9 +136,9 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         _syncManualTrailingEmptyInPlace();
       });
       if (widget.manualOffSystem && !_photoFlowInitialized) {
+        final location = GoRouterState.of(context).location;
         final fromPhoto =
-            (GoRouterState.of(context).uri.queryParameters['photo'] ?? '') ==
-                '1';
+            (Uri.tryParse(location)?.queryParameters['photo'] ?? '') == '1';
         if (fromPhoto) {
           _photoFlowInitialized = true;
           WidgetsBinding.instance
