@@ -1,6 +1,6 @@
-// Supabase Edge Function: распознавание ТТК по таблице (Excel, текст). Фото отключены.
+// Supabase Edge Function: распознавание ТТК по фото или таблице (Excel, текст).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { chatText } from "../_shared/ai_provider.ts";
+import { chatText, chatWithVision } from "../_shared/ai_provider.ts";
 
 function corsHeaders(origin: string | null) {
   return {
@@ -28,10 +28,80 @@ Deno.serve(async (req: Request) => {
 
     const hasTextProvider = Deno.env.get("GROQ_API_KEY")?.trim() || Deno.env.get("GEMINI_API_KEY")?.trim() || Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() || Deno.env.get("OPENAI_API_KEY")?.trim();
 
+    const normalizeJson = (content: string): string => {
+      let c = content.trim();
+      c = c.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```$/i, "").trim();
+      const s = c.indexOf("{");
+      const e = c.lastIndexOf("}");
+      if (s >= 0 && e > s) return c.slice(s, e + 1);
+      return c;
+    };
+
     if (imageBase64 && typeof imageBase64 === "string") {
-      // Фото отключены: тяжело грузить с телефона, жрут лимиты vision API.
-      return new Response(JSON.stringify({ error: "PHOTO_DISABLED", message: "Photo upload is disabled. Please use Excel (.xlsx) file." }), {
-        status: 400,
+      if (!hasTextProvider) {
+        return new Response(JSON.stringify({ error: "AI_PROVIDER_MISSING", message: "Set GROQ_API_KEY or OPENAI_API_KEY for photo OCR." }), {
+          status: 500,
+          headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
+        });
+      }
+      const imageUrl = imageBase64.startsWith("data:")
+        ? imageBase64
+        : `data:image/jpeg;base64,${imageBase64}`;
+      const systemPrompt = `You parse ONE Russian tech card image (ТТК).
+Return ONLY strict JSON:
+{
+  "dishName": string|null,
+  "technologyText": string|null,
+  "isSemiFinished": boolean|null,
+  "ingredients": [
+    {
+      "productName": string,
+      "grossGrams": number|null,
+      "primaryWastePct": number|null,
+      "netGrams": number|null,
+      "cookingMethod": string|null,
+      "cookingLossPct": number|null,
+      "unit": string|null
+    }
+  ]
+}
+Rules:
+- Extract ingredients from recipe table.
+- Ignore section numbering and prose headers.
+- Convert decimal commas to dot in numbers.
+- unit for gram entries: "g".
+- If unknown value, use null.`;
+      const content = await chatWithVision({
+        messages: [
+          { role: "system", content: systemPrompt },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Extract one tech card from this photo. Return JSON only." },
+              { type: "image_url", image_url: { url: imageUrl } },
+            ],
+          },
+        ],
+        maxTokens: 2048,
+      });
+      const parsed = JSON.parse(normalizeJson(content)) as Record<string, unknown>;
+      const ingredientsFromImage = Array.isArray(parsed.ingredients)
+        ? (parsed.ingredients as Record<string, unknown>[]).map((i) => ({
+            productName: String(i.productName ?? ""),
+            grossGrams: i.grossGrams != null ? Number(i.grossGrams) : undefined,
+            netGrams: i.netGrams != null ? Number(i.netGrams) : undefined,
+            unit: i.unit != null ? String(i.unit) : undefined,
+            cookingMethod: i.cookingMethod != null ? String(i.cookingMethod) : undefined,
+            primaryWastePct: i.primaryWastePct != null ? Number(i.primaryWastePct) : undefined,
+            cookingLossPct: i.cookingLossPct != null ? Number(i.cookingLossPct) : undefined,
+          })).filter((x) => x.productName.trim().length > 0)
+        : [];
+      return new Response(JSON.stringify({
+        dishName: parsed.dishName != null ? String(parsed.dishName) : null,
+        technologyText: parsed.technologyText != null ? String(parsed.technologyText) : null,
+        ingredients: ingredientsFromImage,
+        isSemiFinished: typeof parsed.isSemiFinished === "boolean" ? parsed.isSemiFinished : undefined,
+      }), {
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
     }
@@ -65,7 +135,7 @@ No markdown.`;
         });
       }
 
-      const parsed = JSON.parse(content) as Record<string, unknown>;
+      const parsed = JSON.parse(normalizeJson(content)) as Record<string, unknown>;
       const ingredientsFromRows = Array.isArray(parsed.ingredients)
         ? (parsed.ingredients as Record<string, unknown>[]).map((i) => ({
             productName: String(i.productName ?? ""),
