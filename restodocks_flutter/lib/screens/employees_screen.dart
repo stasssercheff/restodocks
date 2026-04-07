@@ -78,8 +78,8 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
     final acc = context.watch<AccountManagerSupabase>();
-    final showTranslit =
-        context.watch<ScreenLayoutPreferenceService>().showNameTranslit;
+    final showTranslit = context.watch<ScreenLayoutPreferenceService>().showNameTranslit ||
+        loc.currentLanguageCode != 'ru';
     final canEdit = _canEditEmployees(acc.currentEmployee);
 
     return Scaffold(
