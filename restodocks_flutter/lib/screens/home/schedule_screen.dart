@@ -223,7 +223,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }).toList();
     if (mgmtDeptSlots.isNotEmpty) {
       addDept('dept_management', loc.t('dept_management'));
-      addSection('management', loc.t('employees'), mgmtDeptSlots);
+      addSection('management', loc.t('management'), mgmtDeptSlots);
     }
 
     // Кухня: управление (по department сотрудника) + цеха
@@ -776,7 +776,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final sectionBg = theme.colorScheme.secondaryContainer.withOpacity(0.6);
     final sectionFg = theme.colorScheme.onSecondaryContainer;
     final deptHeaderBg = theme.colorScheme.primary.withOpacity(0.25);
-    final deptHeaderFg = theme.colorScheme.onPrimary;
+    final deptHeaderFg = theme.colorScheme.primary;
 
     for (final block in blocks) {
       if (block.isDeptHeader) {
