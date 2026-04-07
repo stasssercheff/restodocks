@@ -8,7 +8,9 @@ import 'package:uuid/uuid.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../utils/order_list_units.dart';
+import '../../utils/supplier_contact_validation.dart';
 import '../../widgets/app_bar_home_button.dart';
+import '../../widgets/nomenclature_product_picker_dialog.dart';
 
 /// Приёмка поставки по документу заказа или вручную (вне системы).
 class ProcurementReceiptScreen extends StatefulWidget {
@@ -41,11 +43,11 @@ class _ReceiptLineEdit {
     this.nameReadOnly = false,
   }) : nameCtrl = TextEditingController(text: productName);
 
-  final String? productId;
+  String? productId;
   final TextEditingController nameCtrl;
-  final String unit;
+  String unit;
   final double orderedQty;
-  final double referencePricePerUnit;
+  double referencePricePerUnit;
   final TextEditingController received;
   final TextEditingController actualPrice;
   final TextEditingController discountPercent;
@@ -57,12 +59,22 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
   String? _error;
   Map<String, dynamic>? _orderDoc;
   final _supplierCtrl = TextEditingController();
+  final _supplierContactCtrl = TextEditingController();
+  final _supplierEmailCtrl = TextEditingController();
+  final _supplierPhoneCtrl = TextEditingController();
+  List<OrderList> _supplierTemplates = [];
   List<_ReceiptLineEdit> _lines = [];
   bool _saving = false;
+
+  String get _nomenclatureDepartment =>
+      widget.department == 'bar' ? 'bar' : 'kitchen';
 
   @override
   void dispose() {
     _supplierCtrl.dispose();
+    _supplierContactCtrl.dispose();
+    _supplierEmailCtrl.dispose();
+    _supplierPhoneCtrl.dispose();
     for (final l in _lines) {
       l.nameCtrl.dispose();
       l.received.dispose();
@@ -80,8 +92,19 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
 
   Future<void> _load() async {
     if (widget.manualOffSystem || widget.orderDocumentId == null) {
+      final acc = context.read<AccountManagerSupabase>();
+      final estId = acc.establishment?.id;
+      var templates = <OrderList>[];
+      if (estId != null) {
+        try {
+          templates =
+              await loadOrderLists(estId, department: widget.department);
+        } catch (_) {}
+      }
+      if (!mounted) return;
       setState(() {
         _loading = false;
+        _supplierTemplates = templates;
         _lines = [_createEmptyLine(), _createEmptyLine()];
         _syncManualTrailingEmptyInPlace();
       });
@@ -207,6 +230,306 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
     return CulinaryUnits.displayName(unit, lang);
   }
 
+  bool get _manualNewSupplier {
+    if (!widget.manualOffSystem) return false;
+    final n = _supplierCtrl.text.trim();
+    if (n.isEmpty) return false;
+    return !_supplierTemplates.any(
+      (s) => s.supplierName.toLowerCase() == n.toLowerCase(),
+    );
+  }
+
+  Future<void> _showSupplierPicker() async {
+    final loc = context.read<LocalizationService>();
+    final names = _supplierTemplates.map((e) => e.supplierName).toSet().toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) {
+        var q = '';
+        return StatefulBuilder(
+          builder: (ctx, setSt) {
+            final filtered = q.isEmpty
+                ? names
+                : names
+                    .where((n) => n.toLowerCase().contains(q.toLowerCase()))
+                    .toList();
+            return DraggableScrollableSheet(
+              expand: false,
+              initialChildSize: 0.55,
+              maxChildSize: 0.9,
+              minChildSize: 0.35,
+              builder: (_, scrollCtrl) => Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: TextField(
+                      decoration: InputDecoration(
+                        labelText: loc.t('search'),
+                        prefixIcon: const Icon(Icons.search),
+                        border: const OutlineInputBorder(),
+                      ),
+                      onChanged: (v) => setSt(() => q = v),
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollCtrl,
+                      itemCount: filtered.length,
+                      itemBuilder: (_, i) => ListTile(
+                        title: Text(filtered[i]),
+                        onTap: () => Navigator.pop(ctx, filtered[i]),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    if (picked != null && mounted) {
+      setState(() => _supplierCtrl.text = picked);
+    }
+  }
+
+  Future<void> _pickNomenclatureProduct(int lineIndex) async {
+    final acc = context.read<AccountManagerSupabase>();
+    final store = context.read<ProductStoreSupabase>();
+    final loc = context.read<LocalizationService>();
+    final est = acc.establishment;
+    final nomEstId = est?.productsEstablishmentId;
+    if (nomEstId == null) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+    List<Product> products = [];
+    try {
+      await store.loadProducts();
+      products = await store.loadNomenclatureProductsDirect(
+        nomEstId,
+        department: _nomenclatureDepartment,
+      );
+    } finally {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+    }
+    if (!mounted) return;
+    if (products.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${loc.t('nomenclature')}: ${loc.t('no_products')}',
+          ),
+        ),
+      );
+      return;
+    }
+    final dynamic result = await showDialog<dynamic>(
+      context: context,
+      builder: (ctx) => NomenclatureProductPickerDialog(
+        products: products,
+        lang: loc.currentLanguageCode,
+      ),
+    );
+    if (!mounted) return;
+    if (result == '__new__') {
+      await _createNewNomenclatureProduct(lineIndex);
+      return;
+    }
+    if (result is Product) {
+      final e = acc.establishment;
+      if (e == null) return;
+      _applyProductFromNomenclature(
+        lineIndex,
+        result,
+        store,
+        e.productsEstablishmentId,
+        loc.currentLanguageCode,
+      );
+    }
+  }
+
+  void _applyProductFromNomenclature(
+    int lineIndex,
+    Product p,
+    ProductStoreSupabase store,
+    String productsEstablishmentId,
+    String lang,
+  ) {
+    final line = _lines[lineIndex];
+    final ref =
+        store.getEstablishmentPrice(p.id, productsEstablishmentId)?.$1 ?? 0;
+    setState(() {
+      line.productId = p.id;
+      line.nameCtrl.text = p.getLocalizedName(lang);
+      line.unit = p.unit ?? 'kg';
+      line.referencePricePerUnit = ref;
+    });
+    _onManualChanged();
+  }
+
+  static const _newProductUnits = [
+    'g',
+    'kg',
+    'ml',
+    'l',
+    'pcs',
+    'pack',
+    'can',
+    'box',
+    'bottle',
+  ];
+
+  Future<void> _createNewNomenclatureProduct(int lineIndex) async {
+    final loc = context.read<LocalizationService>();
+    final acc = context.read<AccountManagerSupabase>();
+    final store = context.read<ProductStoreSupabase>();
+    final est = acc.establishment;
+    final nomEstId = est?.productsEstablishmentId;
+    if (nomEstId == null) return;
+
+    final nameCtrl = TextEditingController();
+    final priceCtrl = TextEditingController();
+    var unitChoice = 'kg';
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) {
+          return AlertDialog(
+            title: Text(loc.t('procurement_create_product_title')),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      labelText: loc.t('product_name'),
+                      border: const OutlineInputBorder(),
+                    ),
+                    textCapitalization: TextCapitalization.sentences,
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: _newProductUnits.contains(unitChoice)
+                        ? unitChoice
+                        : 'kg',
+                    decoration: InputDecoration(
+                      labelText: loc.t('order_list_unit'),
+                      border: const OutlineInputBorder(),
+                    ),
+                    items: _newProductUnits
+                        .map(
+                          (id) => DropdownMenuItem(
+                            value: id,
+                            child: Text(
+                              CulinaryUnits.displayName(
+                                id,
+                                loc.currentLanguageCode.startsWith('ru')
+                                    ? 'ru'
+                                    : 'en',
+                              ),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) =>
+                        setSt(() => unitChoice = v ?? unitChoice),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: priceCtrl,
+                    decoration: InputDecoration(
+                      labelText:
+                          loc.t('procurement_create_product_price_hint'),
+                      border: const OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(loc.t('cancel')),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(loc.t('save')),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    final name = nameCtrl.text.trim();
+    final price = double.tryParse(
+      priceCtrl.text.replaceFirst(',', '.').trim(),
+    );
+    nameCtrl.dispose();
+    priceCtrl.dispose();
+
+    if (ok != true || !mounted) return;
+    if (name.isEmpty) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      final product = Product(
+        id: const Uuid().v4(),
+        name: name,
+        category: 'misc',
+        unit: unitChoice,
+      );
+      final saved = await store.addProduct(product);
+      await store.addToNomenclature(
+        nomEstId,
+        saved.id,
+        price: price,
+        currency: est!.defaultCurrency,
+      );
+      await store.loadNomenclatureForce(nomEstId);
+      if (!mounted) return;
+      _applyProductFromNomenclature(
+        lineIndex,
+        saved,
+        store,
+        nomEstId,
+        loc.currentLanguageCode,
+      );
+      if (price != null &&
+          _lines[lineIndex].actualPrice.text.trim().isEmpty) {
+        setState(() {
+          _lines[lineIndex].actualPrice.text = _formatPriceForField(price);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$e')),
+        );
+      }
+    } finally {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+    }
+  }
+
+  String _formatPriceForField(double p) {
+    if (p == p.roundToDouble()) return '${p.round()}';
+    return p.toString();
+  }
+
   double _lineTotal(_ReceiptLineEdit l) {
     final rec = _parse(l.received.text);
     final price = _parse(l.actualPrice.text);
@@ -263,6 +586,21 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         SnackBar(content: Text(loc.t('procurement_receipt_supplier_required'))),
       );
       return;
+    }
+
+    if (widget.manualOffSystem && _manualNewSupplier) {
+      if (!isValidSupplierEmail(_supplierEmailCtrl.text)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('supplier_invalid_email'))),
+        );
+        return;
+      }
+      if (!isValidSupplierPhone(_supplierPhoneCtrl.text)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('supplier_invalid_phone'))),
+        );
+        return;
+      }
     }
 
     setState(() => _saving = true);
@@ -349,6 +687,17 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
           establishmentId: est.id,
           supplierName: supplierName,
           items: itemsPayload,
+          contactPerson: _manualNewSupplier
+              ? (_supplierContactCtrl.text.trim().isEmpty
+                  ? null
+                  : _supplierContactCtrl.text.trim())
+              : null,
+          email: _manualNewSupplier
+              ? normalizedSupplierEmailOrNull(_supplierEmailCtrl.text)
+              : null,
+          phone: _manualNewSupplier
+              ? normalizedSupplierPhoneOrNull(_supplierPhoneCtrl.text)
+              : null,
         );
       }
 
@@ -381,14 +730,12 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
     required String establishmentId,
     required String supplierName,
     required List<Map<String, dynamic>> items,
+    String? contactPerson,
+    String? email,
+    String? phone,
   }) async {
     final lists = await loadOrderLists(establishmentId,
         department: widget.department);
-    if (lists.any((s) =>
-        !s.isSavedWithQuantities &&
-        s.supplierName.toLowerCase() == supplierName.toLowerCase())) {
-      return;
-    }
     final orderItems = items
         .map(
           (m) => OrderListItem(
@@ -399,15 +746,50 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
           ),
         )
         .toList();
-    final draft = OrderList(
-      id: const Uuid().v4(),
-      name: supplierName,
-      supplierName: supplierName,
-      items: orderItems,
-      department: widget.department,
+
+    final idx = lists.indexWhere(
+      (s) =>
+          !s.isSavedWithQuantities &&
+          s.supplierName.toLowerCase() == supplierName.toLowerCase(),
     );
-    await saveOrderLists(establishmentId, [...lists, draft],
-        department: widget.department);
+
+    if (idx >= 0) {
+      final existing = lists[idx];
+      final merged = List<OrderListItem>.from(existing.items);
+      for (final oi in orderItems) {
+        if (oi.productId != null &&
+            oi.productId!.isNotEmpty &&
+            !merged.any((x) => x.productId == oi.productId)) {
+          merged.add(oi);
+        } else if ((oi.productId == null || oi.productId!.isEmpty) &&
+            oi.productName.trim().isNotEmpty &&
+            !merged.any(
+              (x) =>
+                  x.productName.toLowerCase() == oi.productName.toLowerCase(),
+            )) {
+          merged.add(oi);
+        }
+      }
+      lists[idx] = existing.copyWith(
+        items: merged,
+        contactPerson: contactPerson ?? existing.contactPerson,
+        email: email ?? existing.email,
+        phone: phone ?? existing.phone,
+      );
+    } else {
+      final draft = OrderList(
+        id: const Uuid().v4(),
+        name: supplierName,
+        supplierName: supplierName,
+        contactPerson: contactPerson,
+        email: email,
+        phone: phone,
+        items: orderItems,
+        department: widget.department,
+      );
+      lists.add(draft);
+    }
+    await saveOrderLists(establishmentId, lists, department: widget.department);
   }
 
   Widget _buildReceiptTable(LocalizationService loc, String currency) {
@@ -512,12 +894,46 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall,
                 )
-              : TextField(
-                  controller: l.nameCtrl,
-                  decoration: const InputDecoration(isDense: true),
-                  style: Theme.of(context).textTheme.bodySmall,
-                  onChanged: (_) => onField(),
-                ),
+              : widget.manualOffSystem
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: l.nameCtrl,
+                            decoration: const InputDecoration(isDense: true),
+                            style: Theme.of(context).textTheme.bodySmall,
+                            onChanged: (_) => onField(),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.search, size: 22),
+                          tooltip: loc.t('procurement_pick_product'),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 36,
+                          ),
+                          onPressed: () => _pickNomenclatureProduct(i),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle_outline, size: 22),
+                          tooltip: loc.t('procurement_product_new'),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 36,
+                          ),
+                          onPressed: () => _createNewNomenclatureProduct(i),
+                        ),
+                      ],
+                    )
+                  : TextField(
+                      controller: l.nameCtrl,
+                      decoration: const InputDecoration(isDense: true),
+                      style: Theme.of(context).textTheme.bodySmall,
+                      onChanged: (_) => onField(),
+                    ),
         ),
         cell(
           Text(
@@ -613,14 +1029,88 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.all(12),
-            child: TextField(
-              controller: _supplierCtrl,
-              decoration: InputDecoration(
-                labelText: loc.t('procurement_receipt_supplier'),
-                border: const OutlineInputBorder(),
-              ),
-              textCapitalization: TextCapitalization.words,
-            ),
+            child: widget.manualOffSystem
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _supplierCtrl,
+                              decoration: InputDecoration(
+                                labelText: loc.t('procurement_receipt_supplier'),
+                                border: const OutlineInputBorder(),
+                              ),
+                              textCapitalization: TextCapitalization.words,
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          IconButton.filledTonal(
+                            onPressed: _showSupplierPicker,
+                            icon: const Icon(Icons.list_alt),
+                            tooltip: loc.t('procurement_pick_supplier'),
+                          ),
+                        ],
+                      ),
+                      if (_manualNewSupplier) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          loc.t('procurement_supplier_new_hint'),
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
+                              ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _supplierContactCtrl,
+                          decoration: InputDecoration(
+                            labelText: loc.t('supplier_contact_person'),
+                            border: const OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          textCapitalization: TextCapitalization.words,
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _supplierEmailCtrl,
+                          decoration: InputDecoration(
+                            labelText: loc.t('order_list_contact_email'),
+                            border: const OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _supplierPhoneCtrl,
+                          decoration: InputDecoration(
+                            labelText: loc.t('order_list_contact_phone'),
+                            border: const OutlineInputBorder(),
+                            isDense: true,
+                            counterText: '',
+                          ),
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          maxLength: 15,
+                        ),
+                      ],
+                    ],
+                  )
+                : TextField(
+                    controller: _supplierCtrl,
+                    decoration: InputDecoration(
+                      labelText: loc.t('procurement_receipt_supplier'),
+                      border: const OutlineInputBorder(),
+                    ),
+                    textCapitalization: TextCapitalization.words,
+                  ),
           ),
           Expanded(
             child: _buildReceiptTable(loc, currency),
