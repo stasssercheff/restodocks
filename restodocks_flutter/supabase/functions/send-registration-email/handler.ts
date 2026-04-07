@@ -87,6 +87,17 @@ function extractTokenHashFromActionLink(actionLink: string): { token_hash: strin
   return null;
 }
 
+/**
+ * Смок/watchdog: адреса *@invalid.restodocks не вызывают Resend (см. scripts/watch_edge_status_spikes.sh).
+ * События смотрите в Supabase → Edge Functions → Logs, поиск по `send_registration_email_noop`.
+ */
+function isResendNoopRecipient(raw: string): boolean {
+  const t = raw.trim().toLowerCase();
+  const at = t.lastIndexOf("@");
+  if (at < 1) return false;
+  return t.slice(at + 1) === "invalid.restodocks";
+}
+
 export async function handleRequest(req: Request): Promise<Response> {
   const cors = resolveCorsHeaders(req);
   if (req.method !== "POST") {
@@ -108,16 +119,6 @@ export async function handleRequest(req: Request): Promise<Response> {
     });
   }
 
-  const apiKey = Deno.env.get("RESEND_API_KEY")?.trim();
-  if (!apiKey) {
-    return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), {
-      status: 500,
-      headers: { ...cors, "Content-Type": "application/json" },
-    });
-  }
-
-  const from = Deno.env.get("RESEND_FROM_EMAIL")?.trim() || "Restodocks <noreply@restodocks.com>";
-
   try {
     const body = (await req.json()) as {
       type: "owner" | "employee" | "co_owner" | "registration_confirmed" | "confirmation_only";
@@ -135,6 +136,30 @@ export async function handleRequest(req: Request): Promise<Response> {
     const { type, to, companyName, email, fullName, pinCode, password } = body;
     const lang = normalizeLanguage(body.language);
     const appBaseUrl = resolveAppBaseUrl(req, body);
+
+    if (to && isResendNoopRecipient(to)) {
+      console.log(
+        JSON.stringify({
+          event: "send_registration_email_noop",
+          message:
+            "Resend skipped (test domain invalid.restodocks). See scripts/watch_edge_status_spikes.sh",
+          type: type ?? null,
+        }),
+      );
+      return new Response(JSON.stringify({ ok: true, noop: true }), {
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    const apiKey = Deno.env.get("RESEND_API_KEY")?.trim();
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), {
+        status: 500,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    const from = Deno.env.get("RESEND_FROM_EMAIL")?.trim() || "Restodocks <noreply@restodocks.com>";
     const redirectUrl = `${appBaseUrl}/auth/confirm?lang=${encodeURIComponent(lang)}`;
     const confirmClickUrl = `${appBaseUrl}/auth/confirm-click`;
 
