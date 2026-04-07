@@ -23,7 +23,6 @@ import '../widgets/scroll_to_top_app_bar_title.dart';
 import '../widgets/subscription_required_dialog.dart';
 import '../services/ai_service.dart';
 import '../services/ai_service_supabase.dart';
-import '../services/free_ocr_service.dart';
 import '../services/services.dart';
 import '../services/excel_export_service.dart';
 import '../services/tech_card_cost_hydrator.dart';
@@ -3035,90 +3034,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               'sourceRows': sourceRows,
             });
       }
-    } finally {
-      if (mounted) setState(() => _loadingExcel = false);
-    }
-  }
-
-  Future<void> _createFromPhoto(
-      BuildContext context, LocalizationService loc) async {
-    final acc = context.read<AccountManagerSupabase>();
-    if (!acc.hasProSubscription) {
-      await showSubscriptionRequiredDialog(context);
-      return;
-    }
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: Text(loc.t('photo_from_camera')),
-              onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: Text(loc.t('photo_from_gallery')),
-              onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (!mounted || source == null) return;
-    setState(() => _loadingExcel = true);
-    try {
-      final imageService = ImageService();
-      final xFile = source == ImageSource.camera
-          ? await imageService.takePhotoWithCamera()
-          : await imageService.pickImageFromGallery();
-      if (xFile == null || !mounted) return;
-      final ai = context.read<AiService>();
-      final freeOcr = FreeOcrService();
-      final ocrText = await freeOcr.extractTextFromImage(xFile);
-      if (!mounted) return;
-      if (ocrText == null || ocrText.trim().isEmpty) {
-        final fallbackMessage = kIsWeb
-            ? (loc.t('ai_tech_card_recognize_empty') ??
-                'В web бесплатный OCR недоступен в этой сборке. Используйте импорт из файла или вставку текста.')
-            : (loc.t('ai_tech_card_recognize_empty') ??
-                'Не удалось распознать текст на фото ТТК.');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(fallbackMessage)),
-        );
-        return;
-      }
-      final list = await ai.parseTechCardsFromText(ocrText);
-      if (!mounted) return;
-      if (list.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(loc.t('ai_tech_card_excel_format_hint') ??
-                  'Не удалось распознать структуру ТТК из текста фото.')),
-        );
-        return;
-      }
-      final result = list.first;
-      final sig = ai is AiServiceSupabase
-          ? AiServiceSupabase.lastParseHeaderSignature
-          : null;
-      final sourceRows =
-          ai is AiServiceSupabase ? AiServiceSupabase.lastParsedRows : null;
-      final hasMeta = sig != null && sig.isNotEmpty;
-      context.push(
-        widget.department == 'bar'
-            ? '/tech-cards/new?department=bar'
-            : '/tech-cards/new',
-        extra: hasMeta || sourceRows != null
-            ? {
-                'result': result,
-                'headerSignature': sig,
-                'sourceRows': sourceRows
-              }
-            : result,
-      );
     } finally {
       if (mounted) setState(() => _loadingExcel = false);
     }
