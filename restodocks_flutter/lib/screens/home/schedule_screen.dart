@@ -223,7 +223,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }).toList();
     if (mgmtDeptSlots.isNotEmpty) {
       addDept('dept_management', loc.t('dept_management'));
-      addSection('management', loc.t('management'), mgmtDeptSlots);
+      addSection('management', loc.t('employees'), mgmtDeptSlots);
     }
 
     // Кухня: управление (по department сотрудника) + цеха
@@ -664,8 +664,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
     final acc = context.watch<AccountManagerSupabase>();
-    final showTranslit = context.watch<ScreenLayoutPreferenceService>().showNameTranslit ||
-        loc.currentLanguageCode != 'ru';
+    final showTranslit =
+        context.watch<ScreenLayoutPreferenceService>().showNameTranslit ||
+            loc.currentLanguageCode != 'ru';
     final canEdit = (acc.currentEmployee?.canEditSchedule ?? false) ||
         (widget.personalOnly &&
             (acc.currentEmployee?.canEditOwnSchedule ?? false));
