@@ -223,7 +223,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }).toList();
     if (mgmtDeptSlots.isNotEmpty) {
       addDept('dept_management', loc.t('dept_management'));
-      addSection('management', loc.t('management'), mgmtDeptSlots);
+      addSection('management', '', mgmtDeptSlots);
     }
 
     // Кухня: управление (по department сотрудника) + цеха
@@ -803,19 +803,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       }
       if (sectionSlots.isEmpty) continue;
 
-      leftCells.add(leftCell(
-        Text(block.sectionLabel,
-            style: TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w600, color: sectionFg),
-            overflow: TextOverflow.ellipsis),
-        height: _rowHeight,
-        decoration: BoxDecoration(
-          color: sectionBg,
-          border: Border(
-              right: BorderSide(color: borderColor),
-              bottom: BorderSide(color: borderColor)),
-        ),
-      ));
+      if (block.sectionLabel.trim().isNotEmpty) {
+        leftCells.add(leftCell(
+          Text(block.sectionLabel,
+              style: TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.w600, color: sectionFg),
+              overflow: TextOverflow.ellipsis),
+          height: _rowHeight,
+          decoration: BoxDecoration(
+            color: sectionBg,
+            border: Border(
+                right: BorderSide(color: borderColor),
+                bottom: BorderSide(color: borderColor)),
+          ),
+        ));
+      }
 
       for (final slot in sectionSlots) {
         final position = _slotPosition(slot, loc);
@@ -895,9 +897,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         }
         if (sectionSlots.isEmpty) continue;
 
-        // Объединённая строка раздела: без правой границы между ячейками (mergeRight), чтобы визуально сливались
-        columnChildren.add(rightCell(const SizedBox.shrink(),
-            bg: sectionBg, mergeRight: !isLastColumn));
+        if (block.sectionLabel.trim().isNotEmpty) {
+          // Объединённая строка раздела: без правой границы между ячейками (mergeRight), чтобы визуально сливались
+          columnChildren.add(rightCell(const SizedBox.shrink(),
+              bg: sectionBg, mergeRight: !isLastColumn));
+        }
 
         for (final slot in sectionSlots) {
           final val = _cellValue(slot.id, d);
