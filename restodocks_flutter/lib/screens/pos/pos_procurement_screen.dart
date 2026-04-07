@@ -37,8 +37,8 @@ class _PosProcurementScreenState extends State<PosProcurementScreen> {
 
     final tabs = [
       loc.t('pos_procurement_tab_product_order'),
-      loc.t('order_tab_suppliers'),
       loc.t('pos_procurement_tab_receiving'),
+      loc.t('order_tab_suppliers'),
     ];
 
     return Scaffold(
@@ -99,8 +99,8 @@ class _PosProcurementScreenState extends State<PosProcurementScreen> {
               sizing: StackFit.expand,
               children: [
                 OrderListsScreen(embeddedInTab: true, department: _dept),
-                SuppliersScreen(embedded: true, department: _dept),
                 ProcurementReceivingTab(department: _dept),
+                SuppliersScreen(embedded: true, department: _dept),
               ],
             ),
           ),

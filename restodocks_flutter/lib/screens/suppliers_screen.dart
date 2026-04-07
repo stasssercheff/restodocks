@@ -335,6 +335,32 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     await saveOrderLists(estId, merged, department: dept);
   }
 
+  Future<void> _deleteSupplier(OrderList s) async {
+    final loc = context.read<LocalizationService>();
+    final acc = context.read<AccountManagerSupabase>();
+    final messenger = ScaffoldMessenger.of(context);
+    final estId = acc.establishment?.id;
+    if (estId == null) return;
+    try {
+      final lists =
+          await loadOrderLists(estId, department: widget.department);
+      final next = lists.where((l) => l.id != s.id).toList();
+      await saveOrderLists(estId, next, department: widget.department);
+      if (!mounted) return;
+      setState(() {
+        _suppliers.removeWhere((x) => x.id == s.id);
+      });
+      messenger.showSnackBar(
+        SnackBar(content: Text(loc.t('supplier_deleted'))),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(content: Text('${loc.t('error_short')}: $e')),
+      );
+    }
+  }
+
   Future<void> _editSupplier(OrderList s) async {
     final loc = context.read<LocalizationService>();
     final acc = context.read<AccountManagerSupabase>();
@@ -410,6 +436,53 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                           FilteringTextInputFormatter.digitsOnly,
                         ],
                         maxLength: 15,
+                      ),
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: () async {
+                            final confirm = await showDialog<bool>(
+                              context: dialogContext,
+                              builder: (ctx) => AlertDialog(
+                                title: Text(loc.t('supplier_delete_title')),
+                                content: Text(
+                                  loc.t(
+                                    'supplier_delete_confirm',
+                                    args: {'name': s.supplierName},
+                                  ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.of(ctx).pop(false),
+                                    child: Text(loc.t('cancel')),
+                                  ),
+                                  FilledButton(
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor:
+                                          Theme.of(ctx).colorScheme.error,
+                                      foregroundColor:
+                                          Theme.of(ctx).colorScheme.onError,
+                                    ),
+                                    onPressed: () =>
+                                        Navigator.of(ctx).pop(true),
+                                    child: Text(loc.t('supplier_delete')),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirm != true || !dialogContext.mounted) {
+                              return;
+                            }
+                            Navigator.of(dialogContext).pop();
+                            await _deleteSupplier(s);
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: theme.colorScheme.error,
+                          ),
+                          child: Text(loc.t('supplier_delete')),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Row(

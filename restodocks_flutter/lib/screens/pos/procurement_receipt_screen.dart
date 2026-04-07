@@ -82,19 +82,8 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
     if (widget.manualOffSystem || widget.orderDocumentId == null) {
       setState(() {
         _loading = false;
-        _lines = [
-          _ReceiptLineEdit(
-            productId: null,
-            productName: '',
-            unit: 'kg',
-            orderedQty: 0,
-            referencePricePerUnit: 0,
-            received: TextEditingController(),
-            actualPrice: TextEditingController(),
-            discountPercent: TextEditingController(text: '0'),
-            nameReadOnly: false,
-          ),
-        ];
+        _lines = [_createEmptyLine(), _createEmptyLine()];
+        _syncManualTrailingEmptyInPlace();
       });
       return;
     }
@@ -156,6 +145,61 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
 
   double _parse(String s) =>
       double.tryParse(s.replaceFirst(',', '.').trim()) ?? 0;
+
+  _ReceiptLineEdit _createEmptyLine() => _ReceiptLineEdit(
+        productId: null,
+        productName: '',
+        unit: 'kg',
+        orderedQty: 0,
+        referencePricePerUnit: 0,
+        received: TextEditingController(),
+        actualPrice: TextEditingController(),
+        discountPercent: TextEditingController(text: '0'),
+        nameReadOnly: false,
+      );
+
+  void _disposeLine(_ReceiptLineEdit l) {
+    l.nameCtrl.dispose();
+    l.received.dispose();
+    l.actualPrice.dispose();
+    l.discountPercent.dispose();
+  }
+
+  bool _isLineEmpty(_ReceiptLineEdit l) {
+    final name = l.nameCtrl.text.trim().isEmpty;
+    final rec = _parse(l.received.text);
+    final price = _parse(l.actualPrice.text);
+    final disc = _parse(l.discountPercent.text);
+    return name && rec <= 0 && price <= 0 && disc <= 0;
+  }
+
+  bool _lineHasMeaningfulContent(_ReceiptLineEdit l) {
+    if (l.nameCtrl.text.trim().isNotEmpty) return true;
+    if (_parse(l.received.text) > 0) return true;
+    if (_parse(l.actualPrice.text) > 0) return true;
+    if (_parse(l.discountPercent.text) > 0.0001) return true;
+    return false;
+  }
+
+  void _syncManualTrailingEmptyInPlace() {
+    if (!widget.manualOffSystem) return;
+    while (_lines.length < 2) {
+      _lines.add(_createEmptyLine());
+    }
+    if (_lineHasMeaningfulContent(_lines.last)) {
+      _lines.add(_createEmptyLine());
+    }
+    while (_lines.length > 2 &&
+        _isLineEmpty(_lines.last) &&
+        _isLineEmpty(_lines[_lines.length - 2])) {
+      final removed = _lines.removeLast();
+      _disposeLine(removed);
+    }
+  }
+
+  void _onManualChanged() {
+    setState(_syncManualTrailingEmptyInPlace);
+  }
 
   double _lineTotal(_ReceiptLineEdit l) {
     final rec = _parse(l.received.text);
@@ -360,22 +404,172 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         department: widget.department);
   }
 
-  void _addEmptyLine() {
-    setState(() {
-        _lines.add(
-        _ReceiptLineEdit(
-          productId: null,
-          productName: '',
-          unit: 'kg',
-          orderedQty: 0,
-          referencePricePerUnit: 0,
-          received: TextEditingController(),
-          actualPrice: TextEditingController(),
-          discountPercent: TextEditingController(text: '0'),
-          nameReadOnly: false,
+  Widget _buildReceiptTable(LocalizationService loc, String currency) {
+    final thStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.w600,
+        );
+    final nf = NumberFormat('#0.##', 'ru');
+    final onField =
+        widget.manualOffSystem ? _onManualChanged : () => setState(() {});
+
+    Widget cell(Widget w) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+          child: w,
+        );
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 1000),
+        child: Table(
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          border: TableBorder.all(
+            color: Theme.of(context).dividerColor.withValues(alpha: 0.45),
+          ),
+          columnWidths: const {
+            0: FixedColumnWidth(32),
+            1: FlexColumnWidth(2.4),
+            2: FixedColumnWidth(72),
+            3: FixedColumnWidth(84),
+            4: FixedColumnWidth(72),
+            5: FixedColumnWidth(84),
+            6: FixedColumnWidth(88),
+            7: FixedColumnWidth(56),
+          },
+          children: [
+            TableRow(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              ),
+              children: [
+                cell(Text(loc.t('procurement_receipt_col_no'), style: thStyle)),
+                cell(Text(loc.t('product_name'), style: thStyle)),
+                cell(Text(loc.t('procurement_receipt_ordered'), style: thStyle)),
+                cell(Text(loc.t('procurement_receipt_ref_price'), style: thStyle)),
+                cell(
+                    Text(loc.t('procurement_receipt_received_qty'), style: thStyle)),
+                cell(
+                    Text(loc.t('procurement_receipt_actual_price'), style: thStyle)),
+                cell(Text(loc.t('procurement_receipt_line_total'), style: thStyle)),
+                cell(Text(loc.t('procurement_receipt_discount'), style: thStyle)),
+              ],
+            ),
+            ...List.generate(
+              _lines.length,
+              (i) => _tableDataRow(
+                    i,
+                    loc,
+                    currency,
+                    cell,
+                    onField,
+                    nf,
+                  ),
+            ),
+          ],
         ),
-      );
-    });
+      ),
+    );
+  }
+
+  TableRow _tableDataRow(
+    int i,
+    LocalizationService loc,
+    String currency,
+    Widget Function(Widget) cell,
+    VoidCallback onField,
+    NumberFormat nf,
+  ) {
+    final l = _lines[i];
+    final ref = l.referencePricePerUnit;
+    final act = _parse(l.actualPrice.text);
+    final Color? priceColor = ref <= 0
+        ? null
+        : (act < ref * 0.999
+            ? Colors.green
+            : (act > ref * 1.001 ? Colors.red : null));
+
+    return TableRow(
+      children: [
+        cell(
+          Text(
+            '${i + 1}',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        cell(
+          l.nameReadOnly
+              ? Text(
+                  l.nameCtrl.text.isEmpty ? '—' : l.nameCtrl.text,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                )
+              : TextField(
+                  controller: l.nameCtrl,
+                  decoration: const InputDecoration(isDense: true),
+                  style: Theme.of(context).textTheme.bodySmall,
+                  onChanged: (_) => onField(),
+                ),
+        ),
+        cell(
+          Text(
+            '${nf.format(l.orderedQty)} ${l.unit}',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        cell(
+          Text(
+            ref > 0 ? '${nf.format(ref)} $currency' : '—',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+        cell(
+          TextField(
+            controller: l.received,
+            decoration: const InputDecoration(isDense: true),
+            style: Theme.of(context).textTheme.bodySmall,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+            ],
+            onChanged: (_) => onField(),
+          ),
+        ),
+        cell(
+          TextField(
+            controller: l.actualPrice,
+            style: TextStyle(
+              color: priceColor,
+              fontSize: 13,
+            ),
+            decoration: const InputDecoration(isDense: true),
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+            ],
+            onChanged: (_) => onField(),
+          ),
+        ),
+        cell(
+          Text(
+            '${nf.format(_lineTotal(l))} $currency',
+            style: Theme.of(context).textTheme.bodySmall,
+            textAlign: TextAlign.right,
+          ),
+        ),
+        cell(
+          TextField(
+            controller: l.discountPercent,
+            decoration: const InputDecoration(isDense: true),
+            style: Theme.of(context).textTheme.bodySmall,
+            keyboardType: TextInputType.number,
+            onChanged: (_) => onField(),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -409,12 +603,6 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         leading: appBarBackButton(context),
         title: Text(loc.t('procurement_receipt_title')),
       ),
-      floatingActionButton: widget.manualOffSystem
-          ? FloatingActionButton(
-              onPressed: _addEmptyLine,
-              child: const Icon(Icons.add),
-            )
-          : null,
       body: Column(
         children: [
           Padding(
@@ -429,118 +617,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              itemCount: _lines.length,
-              itemBuilder: (_, i) {
-                final l = _lines[i];
-                final ref = l.referencePricePerUnit;
-                final act = _parse(l.actualPrice.text);
-                final color = ref <= 0
-                    ? null
-                    : (act < ref * 0.999
-                        ? Colors.green
-                        : (act > ref * 1.001 ? Colors.red : null));
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (l.nameReadOnly)
-                          Text(
-                            '${i + 1}. ${l.nameCtrl.text.isEmpty ? "—" : l.nameCtrl.text}',
-                            style: Theme.of(context).textTheme.titleSmall,
-                          )
-                        else
-                          TextField(
-                            controller: l.nameCtrl,
-                            decoration: InputDecoration(
-                              labelText: loc.t('product_name'),
-                            ),
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                '${loc.t('procurement_receipt_ordered')}: ${l.orderedQty} ${l.unit}',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                '${loc.t('procurement_receipt_ref_price')}: $ref $currency',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: l.received,
-                                decoration: InputDecoration(
-                                  labelText:
-                                      loc.t('procurement_receipt_received_qty'),
-                                  isDense: true,
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.allow(
-                                      RegExp(r'[\d.,]')),
-                                ],
-                                onChanged: (_) => setState(() {}),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: l.actualPrice,
-                                style: TextStyle(color: color),
-                                decoration: InputDecoration(
-                                  labelText:
-                                      loc.t('procurement_receipt_actual_price'),
-                                  isDense: true,
-                                ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.allow(
-                                      RegExp(r'[\d.,]')),
-                                ],
-                                onChanged: (_) => setState(() {}),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: l.discountPercent,
-                                decoration: InputDecoration(
-                                  labelText:
-                                      loc.t('procurement_receipt_discount'),
-                                  isDense: true,
-                                ),
-                                keyboardType: TextInputType.number,
-                                onChanged: (_) => setState(() {}),
-                              ),
-                            ),
-                          ],
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            '${loc.t('procurement_receipt_line_total')}: ${NumberFormat('#0.##', 'ru').format(_lineTotal(l))} $currency',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+            child: _buildReceiptTable(loc, currency),
           ),
           Padding(
             padding: const EdgeInsets.all(16),

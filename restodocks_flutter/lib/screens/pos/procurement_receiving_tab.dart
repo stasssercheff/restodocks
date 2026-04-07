@@ -27,6 +27,9 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
   DateTime? _orderDateTo;
   DateTime? _deliveryDateFrom;
   DateTime? _deliveryDateTo;
+  /// Пока false — без явных дат в фильтре: вчера, сегодня и завтра (заказ и/или привоз).
+  bool _useCustomDateFilters = false;
+  List<String> _templateSupplierNames = [];
 
   @override
   void dispose() {
@@ -53,9 +56,21 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
     setState(() => _loading = true);
     try {
       final list = await OrderDocumentService().listForEstablishment(estId);
+      var templateNames = <String>[];
+      try {
+        final templates = await loadOrderLists(estId, department: widget.department);
+        final set = <String>{};
+        for (final t in templates) {
+          final n = t.supplierName.trim();
+          if (n.isNotEmpty) set.add(n);
+        }
+        templateNames = set.toList()
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      } catch (_) {}
       if (!mounted) return;
       setState(() {
         _rawDocs = _dedupeByPayload(list);
+        _templateSupplierNames = templateNames;
         _loading = false;
       });
     } catch (_) {
@@ -110,6 +125,26 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
     return (header['supplierName'] ?? '—').toString();
   }
 
+  DateTime _dayOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  /// Вчера, сегодня, завтра — для раннего привоза или задержки.
+  bool _dateInDefaultThreeDayWindow(DateTime? dt) {
+    if (dt == null) return false;
+    final day = _dayOnly(dt);
+    final now = DateTime.now();
+    final start = _dayOnly(now).subtract(const Duration(days: 1));
+    final end = _dayOnly(now).add(const Duration(days: 1));
+    return !day.isBefore(start) && !day.isAfter(end);
+  }
+
+  bool _matchesDefaultThreeDayWindow(Map<String, dynamic> doc) {
+    final od = _parseOrderDate(doc);
+    final dd = _parseDeliveryDate(doc);
+    if (_dateInDefaultThreeDayWindow(dd)) return true;
+    if (_dateInDefaultThreeDayWindow(od)) return true;
+    return false;
+  }
+
   bool _matchesProductSearch(Map<String, dynamic> doc, String q) {
     if (q.isEmpty) return true;
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
@@ -133,39 +168,43 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
     if (q.isNotEmpty) {
       list = list.where((d) => _matchesProductSearch(d, q)).toList();
     }
-    if (_orderDateFrom != null) {
-      list = list.where((d) {
-        final dt = _parseOrderDate(d);
-        if (dt == null) return false;
-        return !dt.isBefore(
-            DateTime(_orderDateFrom!.year, _orderDateFrom!.month, _orderDateFrom!.day));
-      }).toList();
-    }
-    if (_orderDateTo != null) {
-      final end = DateTime(
-          _orderDateTo!.year, _orderDateTo!.month, _orderDateTo!.day, 23, 59, 59);
-      list = list.where((d) {
-        final dt = _parseOrderDate(d);
-        if (dt == null) return false;
-        return !dt.isAfter(end);
-      }).toList();
-    }
-    if (_deliveryDateFrom != null) {
-      list = list.where((d) {
-        final dt = _parseDeliveryDate(d);
-        if (dt == null) return false;
-        return !dt.isBefore(DateTime(_deliveryDateFrom!.year,
-            _deliveryDateFrom!.month, _deliveryDateFrom!.day));
-      }).toList();
-    }
-    if (_deliveryDateTo != null) {
-      final end = DateTime(_deliveryDateTo!.year, _deliveryDateTo!.month,
-          _deliveryDateTo!.day, 23, 59, 59);
-      list = list.where((d) {
-        final dt = _parseDeliveryDate(d);
-        if (dt == null) return false;
-        return !dt.isAfter(end);
-      }).toList();
+    if (_useCustomDateFilters) {
+      if (_orderDateFrom != null) {
+        list = list.where((d) {
+          final dt = _parseOrderDate(d);
+          if (dt == null) return false;
+          return !dt.isBefore(DateTime(_orderDateFrom!.year, _orderDateFrom!.month,
+              _orderDateFrom!.day));
+        }).toList();
+      }
+      if (_orderDateTo != null) {
+        final end = DateTime(
+            _orderDateTo!.year, _orderDateTo!.month, _orderDateTo!.day, 23, 59, 59);
+        list = list.where((d) {
+          final dt = _parseOrderDate(d);
+          if (dt == null) return false;
+          return !dt.isAfter(end);
+        }).toList();
+      }
+      if (_deliveryDateFrom != null) {
+        list = list.where((d) {
+          final dt = _parseDeliveryDate(d);
+          if (dt == null) return false;
+          return !dt.isBefore(DateTime(_deliveryDateFrom!.year,
+              _deliveryDateFrom!.month, _deliveryDateFrom!.day));
+        }).toList();
+      }
+      if (_deliveryDateTo != null) {
+        final end = DateTime(_deliveryDateTo!.year, _deliveryDateTo!.month,
+            _deliveryDateTo!.day, 23, 59, 59);
+        list = list.where((d) {
+          final dt = _parseDeliveryDate(d);
+          if (dt == null) return false;
+          return !dt.isAfter(end);
+        }).toList();
+      }
+    } else {
+      list = list.where(_matchesDefaultThreeDayWindow).toList();
     }
     list.sort((a, b) {
       final ta = _parseOrderDate(a) ?? DateTime(0);
@@ -175,13 +214,18 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
     return list;
   }
 
-  Set<String> get _supplierNames {
+  List<String> get _supplierNamesSorted {
     final s = <String>{};
+    for (final n in _templateSupplierNames) {
+      if (n.isNotEmpty) s.add(n);
+    }
     for (final d in _rawDocs.where(_docMatchesDepartment)) {
       final name = _supplierName(d);
       if (name.isNotEmpty && name != '—') s.add(name);
     }
-    return s;
+    final list = s.toList();
+    list.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return list;
   }
 
   Future<void> _pickDate(bool delivery, bool isStart) async {
@@ -194,6 +238,7 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
     );
     if (d == null || !mounted) return;
     setState(() {
+      _useCustomDateFilters = true;
       if (delivery) {
         if (isStart) {
           _deliveryDateFrom = d;
@@ -252,7 +297,7 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
                           value: null,
                           child: Text(loc.t('pos_procurement_filter_all')),
                         ),
-                        ..._supplierNames.map(
+                        ..._supplierNamesSorted.map(
                           (n) => DropdownMenuItem(value: n, child: Text(n)),
                         ),
                       ],
@@ -302,6 +347,7 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
                   _orderDateTo = null;
                   _deliveryDateFrom = null;
                   _deliveryDateTo = null;
+                  _useCustomDateFilters = false;
                 }),
                 icon: const Icon(Icons.clear_all),
               ),
