@@ -165,7 +165,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
               HomeFeatureTile(
                   icon: Icons.local_shipping,
                   title: loc.t('pos_nav_procurement') ?? 'Закупка',
-                  onTap: () => context.push('/pos/procurement/kitchen')),
+                  onTap: () => context.push('/procurement/kitchen')),
               'home-procurement-kitchen'),
         ],
         if (FeatureFlags.posModuleEnabled) ...[
@@ -239,7 +239,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 HomeFeatureTile(
                     icon: Icons.local_shipping,
                     title: loc.t('pos_nav_procurement') ?? 'Закупка',
-                    onTap: () => context.push('/pos/procurement/bar')),
+                    onTap: () => context.push('/procurement/bar')),
                 'home-procurement-bar'),
           ],
           if (FeatureFlags.posModuleEnabled) ...[
@@ -308,7 +308,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 HomeFeatureTile(
                     icon: Icons.local_shipping,
                     title: loc.t('pos_nav_procurement') ?? 'Закупка',
-                    onTap: () => context.push('/pos/procurement/hall')),
+                    onTap: () => context.push('/procurement/hall')),
                 'home-procurement-hall'),
           ],
           if (FeatureFlags.posModuleEnabled) ...[

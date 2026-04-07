@@ -820,6 +820,16 @@ class AppRouter {
             ),
           ),
           GoRoute(
+            path: '/procurement/:department',
+            pageBuilder: (context, state) {
+              final dept = state.pathParameters['department'] ?? 'kitchen';
+              return _slideTransitionPage(
+                state,
+                PosProcurementScreen(department: dept),
+              );
+            },
+          ),
+          GoRoute(
             path: '/pos/procurement/:department',
             pageBuilder: (context, state) {
               final dept = state.pathParameters['department'] ?? 'kitchen';

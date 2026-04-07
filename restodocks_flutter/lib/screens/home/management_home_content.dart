@@ -149,7 +149,7 @@ class ManagementHomeContent extends StatelessWidget {
           HomeFeatureTile(
             icon: Icons.local_shipping,
             title: loc.t('pos_nav_procurement') ?? 'Закупка',
-            onTap: () => context.push('/pos/procurement/$dept'),
+            onTap: () => context.push('/procurement/$dept'),
           ),
         ],
         if (FeatureFlags.posModuleEnabled && dept == 'hall') ...[
