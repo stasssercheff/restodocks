@@ -2111,6 +2111,12 @@ class AccountManagerSupabase extends ChangeNotifier {
     if (est == null || emp == null || !emp.hasRole('owner')) {
       return const EstablishmentPromoInfo();
     }
+    final authUid = _supabase.client.auth.currentUser?.id;
+    if (authUid == null || est.ownerId != authUid) {
+      // Avoid noisy 400 from owner-only RPC when current auth session
+      // does not match establishment.owner_id (e.g., delegated owner role).
+      return const EstablishmentPromoInfo();
+    }
     try {
       final res = await _supabase.client.rpc(
         'get_establishment_promo_for_owner',
