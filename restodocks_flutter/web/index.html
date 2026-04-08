@@ -121,6 +121,7 @@
       overflow-x: hidden;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
       background: #f7f4f4;
     }
     @supports (min-height: 100svh) { html, body { min-height: 100svh; } }
@@ -134,6 +135,7 @@
       border-radius: 0 !important;
       box-shadow: none !important;
       background: transparent !important;
+      touch-action: pan-y !important;
     }
     /* Keep a real document scroll range so mobile browser chrome can collapse. */
     #safari-scroll-spacer {
@@ -230,7 +232,6 @@
       if (window.navigator.standalone) return;
       var ticking = false;
       var warmup;
-      var touchY = null;
       function nudge() {
         if (ticking) return;
         ticking = true;
@@ -247,13 +248,6 @@
           ticking = false;
         });
       }
-      function hardNudge(dir) {
-        try {
-          var y = window.scrollY || 0;
-          var delta = dir < 0 ? -2 : 2;
-          window.scrollTo(0, Math.max(1, y + delta));
-        } catch (_) {}
-      }
       function startWarmup() {
         var t = 0;
         clearInterval(warmup);
@@ -266,24 +260,12 @@
       window.addEventListener('flutter-first-frame', startWarmup);
       window.addEventListener('pageshow', startWarmup);
       window.addEventListener('focus', startWarmup);
-      document.addEventListener('touchstart', function (e) {
-        touchY = (e.touches && e.touches[0]) ? e.touches[0].clientY : null;
+      document.addEventListener('touchstart', function () {
         nudge();
       }, { passive: true });
-      window.addEventListener('touchmove', function (e) {
-        var y = (e.touches && e.touches[0]) ? e.touches[0].clientY : null;
-        if (touchY != null && y != null) {
-          // emulate slight page scroll in same direction as finger movement
-          hardNudge(y < touchY ? 1 : -1);
-          touchY = y;
-        } else {
-          nudge();
-        }
-      }, { passive: true });
-      window.addEventListener('scroll', nudge, { passive: true });
       window.addEventListener('orientationchange', function () {
         var spacer = document.getElementById('safari-scroll-spacer');
-        if (spacer) spacer.style.height = (window.innerWidth > window.innerHeight) ? '180px' : '140px';
+        if (spacer) spacer.style.height = (window.innerWidth > window.innerHeight) ? '220px' : '140px';
         setTimeout(nudge, 120);
         setTimeout(nudge, 360);
         setTimeout(startWarmup, 450);
