@@ -1,10 +1,15 @@
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:excel/excel.dart' hide Border;
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../services/excel_file_saver_stub.dart'
+    if (dart.library.html) '../services/excel_file_saver_web.dart' as file_saver;
 import '../utils/number_format_utils.dart';
 import 'menu_foodcost_panel.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -413,6 +418,255 @@ class _MenuScreenState extends State<MenuScreen> {
     }
   }
 
+  Future<void> _openDeviceExportDialog() async {
+    final loc = context.read<LocalizationService>();
+    final isFoodcostTab = _menuSegment == 1;
+    final allDishes = List<TechCard>.from(_displayDishes);
+    if (allDishes.isEmpty) return;
+
+    var exportSelectedOnly = false;
+    var exportFormat = 'pdf'; // pdf | xlsx
+    var exportLang = loc.currentLanguageCode;
+    var selectedIds = <String>{};
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(loc.t('download')),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(loc.t('save_to_device') ?? 'Сохранить на устройство'),
+                const SizedBox(height: 10),
+                RadioListTile<bool>(
+                  dense: true,
+                  value: false,
+                  groupValue: exportSelectedOnly,
+                  title: Text(loc.t('ttk_export_all') ?? 'Все позиции'),
+                  onChanged: (v) => setLocal(() => exportSelectedOnly = v ?? false),
+                ),
+                RadioListTile<bool>(
+                  dense: true,
+                  value: true,
+                  groupValue: exportSelectedOnly,
+                  title: Text(loc.t('ttk_export_selected') ?? 'Выбранные позиции'),
+                  onChanged: (v) => setLocal(() => exportSelectedOnly = v ?? false),
+                ),
+                if (exportSelectedOnly)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () async {
+                        final picked = await _pickDishIdsForExport(allDishes, selectedIds);
+                        if (picked == null) return;
+                        setLocal(() => selectedIds = picked);
+                      },
+                      icon: const Icon(Icons.checklist),
+                      label: Text(
+                        selectedIds.isEmpty
+                            ? (loc.t('ttk_select_for_export') ?? 'Выбрать позиции')
+                            : '${loc.t('ttk_select_for_export') ?? 'Выбрано'}: ${selectedIds.length}',
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 6),
+                Text(loc.t('salary_export_lang') ?? 'Язык сохранения:'),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  value: exportLang,
+                  items: const [
+                    DropdownMenuItem(value: 'ru', child: Text('🇷🇺 Русский')),
+                    DropdownMenuItem(value: 'en', child: Text('🇺🇸 English')),
+                    DropdownMenuItem(value: 'es', child: Text('🇪🇸 Español')),
+                    DropdownMenuItem(value: 'it', child: Text('🇮🇹 Italiano')),
+                    DropdownMenuItem(value: 'tr', child: Text('🇹🇷 Türkçe')),
+                  ],
+                  onChanged: (v) => setLocal(() => exportLang = v ?? exportLang),
+                ),
+                const SizedBox(height: 10),
+                Text(loc.t('expenses_procurement_export_format_title') ?? 'Формат'),
+                const SizedBox(height: 6),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'pdf', label: Text('PDF')),
+                    ButtonSegment(value: 'xlsx', label: Text('Excel')),
+                  ],
+                  selected: {exportFormat},
+                  onSelectionChanged: (s) => setLocal(() => exportFormat = s.first),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  isFoodcostTab
+                      ? (loc.t('menu_tab_foodcost') ?? 'Фудкост')
+                      : (loc.t('menu_tab_list') ?? 'Список'),
+                  style: Theme.of(ctx).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(loc.t('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(loc.t('save') ?? 'Сохранить'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final selected = exportSelectedOnly
+        ? allDishes.where((d) => selectedIds.contains(d.id)).toList()
+        : allDishes;
+    if (selected.isEmpty) {
+      AppToastService.show(loc.t('ttk_none_selected') ?? 'Ничего не выбрано');
+      return;
+    }
+    await _exportMenuOrFoodcost(
+      dishes: selected,
+      exportLang: exportLang,
+      exportFormat: exportFormat,
+      isFoodcost: isFoodcostTab,
+    );
+  }
+
+  Future<Set<String>?> _pickDishIdsForExport(
+      List<TechCard> dishes, Set<String> preselected) async {
+    final loc = context.read<LocalizationService>();
+    final selected = {...preselected};
+    return showDialog<Set<String>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(loc.t('ttk_select_for_export') ?? 'Выберите позиции'),
+          content: SizedBox(
+            width: 520,
+            height: 420,
+            child: ListView.builder(
+              itemCount: dishes.length,
+              itemBuilder: (_, i) {
+                final tc = dishes[i];
+                final checked = selected.contains(tc.id);
+                return CheckboxListTile(
+                  dense: true,
+                  value: checked,
+                  title: Text(tc.dishName),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  onChanged: (v) {
+                    setLocal(() {
+                      if (v == true) {
+                        selected.add(tc.id);
+                      } else {
+                        selected.remove(tc.id);
+                      }
+                    });
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: Text(loc.t('cancel')),
+            ),
+            TextButton(
+              onPressed: () {
+                setLocal(() {
+                  selected
+                    ..clear()
+                    ..addAll(dishes.map((e) => e.id));
+                });
+              },
+              child: Text(loc.t('select_all') ?? 'Выбрать все'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(selected),
+              child: Text(loc.t('apply') ?? 'Применить'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportMenuOrFoodcost({
+    required List<TechCard> dishes,
+    required String exportLang,
+    required String exportFormat,
+    required bool isFoodcost,
+  }) async {
+    final loc = context.read<LocalizationService>();
+    try {
+      if (exportFormat == 'pdf') {
+        final sym = context.read<AccountManagerSupabase>().establishment?.currencySymbol ?? '₽';
+        final fileName = await MenuExportService.saveMenuPdf(
+          dishes: dishes,
+          t: (k) => loc.tForLanguage(exportLang, k),
+          lang: exportLang,
+          currencySym: sym,
+          productStore: context.read<ProductStoreSupabase>(),
+        );
+        if (mounted) AppToastService.show('${loc.t('saved') ?? 'Сохранено'}: $fileName');
+        return;
+      }
+
+      final excel = Excel.createExcel();
+      final sheet = excel['Export'];
+      sheet.appendRow(_textRow([
+        loc.tForLanguage(exportLang, 'number_sign') ?? '№',
+        loc.tForLanguage(exportLang, 'dish') ?? 'Блюдо',
+        loc.tForLanguage(exportLang, 'category') ?? 'Категория',
+        loc.tForLanguage(exportLang, 'foodcost_cost') ?? 'Себестоимость',
+        isFoodcost
+            ? (loc.tForLanguage(exportLang, 'foodcost_mode_markup') ?? 'Наценка')
+            : (loc.tForLanguage(exportLang, 'selling_price') ?? 'Цена меню'),
+        loc.tForLanguage(exportLang, 'selling_price') ?? 'Цена меню',
+      ]));
+      var idx = 1;
+      for (final tc in dishes) {
+        final ingredients = tc.ingredients.where((i) => !i.isPlaceholder || i.hasData);
+        final cost = ingredients.fold<double>(0, (s, i) => s + i.cost);
+        final menuPrice = tc.sellingPrice;
+        final markupPct = cost > 0 ? ((menuPrice - cost) / cost) * 100 : 0.0;
+        sheet.appendRow(_textRow([
+          '$idx',
+          tc.dishName,
+          _categoryLabel(tc.category, exportLang),
+          cost.toStringAsFixed(2),
+          isFoodcost ? '${markupPct.toStringAsFixed(1)}%' : menuPrice.toStringAsFixed(2),
+          menuPrice.toStringAsFixed(2),
+        ]));
+        idx++;
+      }
+      final bytes = excel.encode();
+      if (bytes == null) throw Exception('Excel encoding failed');
+      final day = DateTime.now();
+      final fileName =
+          '${isFoodcost ? 'foodcost' : 'menu'}_${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.xlsx';
+      file_saver.saveExcelBytes(Uint8List.fromList(bytes), fileName);
+      if (mounted) AppToastService.show('${loc.t('saved') ?? 'Сохранено'}: $fileName');
+    } catch (e) {
+      if (mounted) {
+        AppToastService.show(
+          '${loc.t('error_short')}: $e',
+          duration: const Duration(seconds: 4),
+        );
+      }
+    }
+  }
+
+  List<TextCellValue> _textRow(List<String> values) {
+    return values.map((v) => TextCellValue(v)).toList();
+  }
+
   /// Контент раскрытой карточки: полная ТТК с ценой / полная ТТК без цены / описание для зала.
   Widget _buildExpandedContent(Employee? emp, LocalizationService loc,
       TechCard tc, String lang, String currencySym, String currencyCode) {
@@ -550,6 +804,12 @@ class _MenuScreenState extends State<MenuScreen> {
               )
             : null,
         actions: [
+          if (_displayDishes.isNotEmpty && !_loading)
+            IconButton(
+              icon: const Icon(Icons.save_alt),
+              tooltip: loc.t('save_to_device') ?? 'Сохранить на устройство',
+              onPressed: _openDeviceExportDialog,
+            ),
           if (menuSeg == 0 && _downloadableDishes.isNotEmpty && !_loading)
             PopupMenuButton<String>(
               icon: const Icon(Icons.download),

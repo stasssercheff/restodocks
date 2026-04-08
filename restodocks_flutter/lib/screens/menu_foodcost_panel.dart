@@ -331,9 +331,9 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               ),
               child: Text(
                 tc.getDisplayNameInLists(widget.langCode),
-                maxLines: narrow ? 1 : 4,
+                maxLines: null,
                 softWrap: true,
-                overflow: TextOverflow.fade,
+                overflow: TextOverflow.visible,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                   decoration: TextDecoration.underline,
@@ -590,7 +590,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       horizontalMargin: narrow ? 3 : 10,
       headingRowHeight: narrow ? 30 : 38,
       dataRowMinHeight: narrow ? 22 : 38,
-      dataRowMaxHeight: narrow ? 32 : 54,
+      dataRowMaxHeight: narrow ? 140 : 180,
       showBottomBorder: true,
       border: TableBorder(
         horizontalInside: BorderSide(
@@ -712,10 +712,10 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                   prefixIcon: const Icon(Icons.search),
                   border: const OutlineInputBorder(),
                   isDense: true,
-                  isCollapsed: true,
                   contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                 ),
+                textAlignVertical: TextAlignVertical.center,
                 onChanged: (v) => setState(() => _query = v),
               ),
             ],
