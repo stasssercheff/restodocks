@@ -3,10 +3,14 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:excel/excel.dart' hide Border;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 
 import '../models/models.dart';
 import '../services/services.dart';
@@ -565,6 +569,7 @@ class _MenuScreenState extends State<MenuScreen> {
       exportLang: exportLang,
       exportFormat: exportFormat,
       isFoodcost: isFoodcostTab,
+      foodcostConfig: fcConfig,
     );
   }
 
@@ -633,18 +638,36 @@ class _MenuScreenState extends State<MenuScreen> {
     required String exportLang,
     required String exportFormat,
     required bool isFoodcost,
+    required ({FoodcostPricingMode mode, double? globalPct, Map<String, double> customPct}) foodcostConfig,
   }) async {
     final loc = context.read<LocalizationService>();
+    final account = context.read<AccountManagerSupabase>();
+    final est = account.establishment;
+    final emp = account.currentEmployee;
+    final currencyCode =
+        account.currentEmployee?.currency ?? est?.defaultCurrency ?? 'RUB';
+    final currencySym = est?.currencySymbol ??
+        account.currentEmployee?.currencySymbol ??
+        Establishment.currencySymbolFor(currencyCode);
+    final chefName = (emp?.fullName.trim().isNotEmpty ?? false) ? emp!.fullName : '—';
+    final estName = (est?.name.trim().isNotEmpty ?? false) ? est!.name : '—';
+    final dateStr = DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now());
     try {
       if (exportFormat == 'pdf') {
-        final sym = context.read<AccountManagerSupabase>().establishment?.currencySymbol ?? '₽';
-        final fileName = await MenuExportService.saveMenuPdf(
+        final bytes = await _buildSimpleMenuPdfBytes(
           dishes: dishes,
-          t: (k) => loc.tForLanguage(exportLang, k),
-          lang: exportLang,
-          currencySym: sym,
-          productStore: context.read<ProductStoreSupabase>(),
+          isFoodcost: isFoodcost,
+          exportLang: exportLang,
+          dateStr: dateStr,
+          chefName: chefName,
+          establishmentName: estName,
+          currencyCode: currencyCode,
+          currencySym: currencySym,
+          cfg: foodcostConfig,
         );
+        final fileName =
+            '${isFoodcost ? 'foodcost' : 'menu'}_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.pdf';
+        await saveFileBytes(fileName, bytes);
         if (mounted) AppToastService.show('${loc.t('saved') ?? 'Сохранено'}: $fileName');
         return;
       }
@@ -652,39 +675,59 @@ class _MenuScreenState extends State<MenuScreen> {
       final excel = Excel.createExcel();
       final sheet = excel['Export'];
       sheet.appendRow(_textRow([
-        loc.tForLanguage(exportLang, 'number_sign') ?? '№',
-        loc.tForLanguage(exportLang, 'dish') ?? 'Блюдо',
-        loc.tForLanguage(exportLang, 'category') ?? 'Категория',
-        loc.tForLanguage(exportLang, 'foodcost_cost') ?? 'Себестоимость',
+        'Дата',
+        dateStr,
+      ]));
+      sheet.appendRow(_textRow([
+        'Заведение',
+        estName,
+      ]));
+      sheet.appendRow(_textRow([
+        'Шеф',
+        chefName,
+      ]));
+      sheet.appendRow(_textRow(['']));
+      sheet.appendRow(_textRow([
+        '№',
+        'Блюдо',
+        if (isFoodcost) 'Себестоимость',
         isFoodcost
-            ? (loc.tForLanguage(exportLang, 'foodcost_mode_markup') ?? 'Наценка')
-            : (loc.tForLanguage(exportLang, 'selling_price') ?? 'Цена меню'),
-        loc.tForLanguage(exportLang, 'selling_price') ?? 'Цена меню',
+            ? (foodcostConfig.mode == FoodcostPricingMode.markupOnCost
+                ? 'Наценка'
+                : '% себестоимости')
+            : '',
+        if (isFoodcost) 'С наценкой',
+        if (isFoodcost) 'В меню',
       ]));
       var idx = 1;
       for (final tc in dishes) {
-        final ingredients = tc.ingredients.where((i) => !i.isPlaceholder || i.hasData);
-        final cost = ingredients.fold<double>(0, (s, i) => s + i.cost);
+        final cost = _portionCostForFoodcost(tc);
         final menuPrice = tc.sellingPrice;
         final menuPriceValue = menuPrice ?? 0.0;
-        final markupPct = (cost > 0 && menuPrice != null && menuPrice > 0)
-            ? ((menuPrice - cost) / cost) * 100
-            : 0.0;
+        final actualPct = _actualPct(tc, foodcostConfig.mode);
+        final targetPct = foodcostConfig.customPct[tc.id] ?? foodcostConfig.globalPct;
+        final optimal = _optimalPriceForMode(cost, targetPct, foodcostConfig.mode);
         sheet.appendRow(_textRow([
           '$idx',
           tc.dishName,
-          _categoryLabel(tc.category, exportLang),
-          cost.toStringAsFixed(2),
+          if (isFoodcost)
+            (cost > 0
+                ? NumberFormatUtils.formatSumWithSymbol(
+                    cost, currencyCode, currencySym)
+                : '—'),
           isFoodcost
-              ? (menuPrice != null && menuPrice > 0
-                  ? '${markupPct.toStringAsFixed(1)}%'
-                  : '—')
-              : (menuPrice != null && menuPrice > 0
-                  ? menuPriceValue.toStringAsFixed(2)
-                  : '—'),
-          menuPrice != null && menuPrice > 0
-              ? menuPriceValue.toStringAsFixed(2)
-              : '—',
+              ? (actualPct != null ? '${actualPct.toStringAsFixed(1)}%' : '—')
+              : '',
+          if (isFoodcost)
+            (optimal != null
+                ? NumberFormatUtils.formatSumWithSymbol(
+                    optimal, currencyCode, currencySym)
+                : '—'),
+          if (isFoodcost)
+            (menuPrice != null && menuPrice > 0
+                ? NumberFormatUtils.formatSumWithSymbol(
+                    menuPriceValue, currencyCode, currencySym)
+                : '—'),
         ]));
         idx++;
       }
@@ -707,6 +750,113 @@ class _MenuScreenState extends State<MenuScreen> {
 
   List<TextCellValue> _textRow(List<String> values) {
     return values.map((v) => TextCellValue(v)).toList();
+  }
+
+  Future<Uint8List> _buildSimpleMenuPdfBytes({
+    required List<TechCard> dishes,
+    required bool isFoodcost,
+    required String exportLang,
+    required String dateStr,
+    required String chefName,
+    required String establishmentName,
+    required String currencyCode,
+    required String currencySym,
+    required ({FoodcostPricingMode mode, double? globalPct, Map<String, double> customPct}) cfg,
+  }) async {
+    final baseData = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
+    final boldData = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
+    final regular = pw.Font.ttf(baseData);
+    final bold = pw.Font.ttf(boldData);
+    final doc = pw.Document(
+      theme: pw.ThemeData.withFont(base: regular, bold: bold),
+    );
+
+    final headers = <String>[
+      '№',
+      'Блюдо',
+      if (isFoodcost) 'Себестоимость',
+      if (isFoodcost)
+        (cfg.mode == FoodcostPricingMode.markupOnCost ? 'Наценка' : '% себестоимости'),
+      if (isFoodcost) 'С наценкой',
+      if (isFoodcost) 'В меню',
+    ];
+
+    final rows = <List<String>>[];
+    var idx = 1;
+    for (final tc in dishes) {
+      final cost = _portionCostForFoodcost(tc);
+      final actualPct = _actualPct(tc, cfg.mode);
+      final targetPct = cfg.customPct[tc.id] ?? cfg.globalPct;
+      final optimal = _optimalPriceForMode(cost, targetPct, cfg.mode);
+      rows.add([
+        '$idx',
+        tc.getDisplayNameInLists(exportLang),
+        if (isFoodcost)
+          (cost > 0
+              ? NumberFormatUtils.formatSumWithSymbol(cost, currencyCode, currencySym)
+              : '—'),
+        if (isFoodcost) (actualPct != null ? '${actualPct.toStringAsFixed(1)}%' : '—'),
+        if (isFoodcost)
+          (optimal != null
+              ? NumberFormatUtils.formatSumWithSymbol(optimal, currencyCode, currencySym)
+              : '—'),
+        if (isFoodcost)
+          (tc.sellingPrice != null && tc.sellingPrice! > 0
+              ? NumberFormatUtils.formatSumWithSymbol(
+                  tc.sellingPrice!, currencyCode, currencySym)
+              : '—'),
+      ]);
+      idx++;
+    }
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        build: (_) => [
+          pw.Text(isFoodcost ? 'Фудкост меню' : 'Меню',
+              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 6),
+          pw.Text('Дата: $dateStr'),
+          pw.Text('Заведение: $establishmentName'),
+          pw.Text('Шеф: $chefName'),
+          pw.SizedBox(height: 12),
+          pw.TableHelper.fromTextArray(
+            headers: headers,
+            data: rows,
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9),
+            cellStyle: const pw.TextStyle(fontSize: 8.5),
+            cellAlignment: pw.Alignment.centerLeft,
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
+            border: pw.TableBorder.all(color: PdfColors.grey400),
+            columnWidths: {
+              0: const pw.FixedColumnWidth(24),
+              1: const pw.FlexColumnWidth(2.2),
+            },
+          ),
+        ],
+      ),
+    );
+    return doc.save();
+  }
+
+  double? _actualPct(TechCard tc, FoodcostPricingMode mode) {
+    final sell = tc.sellingPrice;
+    final cost = _portionCostForFoodcost(tc);
+    if (sell == null || sell <= 0 || cost <= 0) return null;
+    if (mode == FoodcostPricingMode.markupOnCost) {
+      return (sell / cost - 1) * 100;
+    }
+    return (cost / sell) * 100;
+  }
+
+  double? _optimalPriceForMode(double cost, double? targetPct, FoodcostPricingMode mode) {
+    if (targetPct == null || cost <= 0) return null;
+    if (mode == FoodcostPricingMode.markupOnCost) {
+      return cost * (1 + targetPct / 100);
+    }
+    if (targetPct >= 100) return null;
+    return cost * 100 / targetPct;
   }
 
   Future<({FoodcostPricingMode mode, double? globalPct, Map<String, double> customPct})>
