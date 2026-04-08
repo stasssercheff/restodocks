@@ -133,13 +133,17 @@
           #AD292C 0,
           #AD292C 84px,
           #f7f4f4 84px,
-          #f7f4f4 calc(100% - 64px),
-          #f7e9e9 calc(100% - 64px),
+          #f7f4f4 calc(100% - 72px),
+          #f7e9e9 calc(100% - 72px),
           #f7e9e9 100%
         );
       }
       flt-glass-pane, flt-scene, flutter-view, #flt-glass-pane {
         background: transparent !important;
+      }
+      /* Avoid white/gray gutters around iOS bottom safe area in landscape. */
+      body {
+        padding-bottom: env(safe-area-inset-bottom, 0px);
       }
     }
     /* Keep a real document scroll range so mobile browser chrome can collapse. */
