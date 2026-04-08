@@ -1243,10 +1243,10 @@ class _MenuScreenState extends State<MenuScreen> {
       if (_error == null &&
           !_loading &&
           !_emptyReloadInProgress &&
-          _emptyReloadAttempts < 1) {
+          _emptyReloadAttempts < 3) {
         _emptyReloadInProgress = true;
         Future.microtask(() async {
-          await Future<void>.delayed(const Duration(milliseconds: 600));
+          await Future<void>.delayed(const Duration(milliseconds: 700));
           if (!mounted) return;
           _emptyReloadAttempts += 1;
           await _load();
