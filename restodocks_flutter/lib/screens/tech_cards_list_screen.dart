@@ -249,6 +249,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   bool _reviewCacheScheduled = false;
   int _listVersion = 0;
   Timer? _searchDebounceTimer;
+  /// Применённый к фильтрам запрос (после debounce), чтобы не пересчитывать список на каждый символ.
+  String _appliedSearchQuery = '';
+  /// Кэш `id → lower(name)` для быстрого поиска без повторных вызовов `getDisplayNameInLists` на каждый кадр.
+  ({int listVersion, String lang})? _lowerSearchNameKey;
+  Map<String, String> _lowerSearchNameById = {};
+  /// Версия списка, для которой построен индекс ПФ для «На проверку» (не перестраивать при смене только поиска).
+  int _pfIndexBuiltForListVersion = -1;
   Timer? _reconcileTimer;
   TechCardsReconcileNotifier? _reconcileNotifier;
   int _lastReconcileNotifierVersion = 0;
@@ -959,16 +966,35 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       }
     }
     _pfCandidatesByNormalizedName = map;
+    _pfIndexBuiltForListVersion = _listVersion;
+  }
+
+  void _ensureLowerSearchNameCache(LocalizationService loc) {
+    if (_list.isEmpty) {
+      _lowerSearchNameById = {};
+      _lowerSearchNameKey = null;
+      return;
+    }
+    final lang = loc.currentLanguageCode;
+    final key = (listVersion: _listVersion, lang: lang);
+    if (_lowerSearchNameKey == key && _lowerSearchNameById.isNotEmpty) return;
+    final map = <String, String>{};
+    for (final tc in _list) {
+      map[tc.id] = _tcListName(tc, lang).toLowerCase();
+    }
+    _lowerSearchNameById = map;
+    _lowerSearchNameKey = key;
   }
 
   /// Отфильтрованный список для вкладки «На проверку».
   List<TechCard> _getReviewFilteredList(LocalizationService loc) {
-    final query = _searchController.text.trim().toLowerCase();
+    _ensureLowerSearchNameCache(loc);
+    final query = _appliedSearchQuery;
     var result = _list;
     if (query.isNotEmpty) {
-      final lang = loc.currentLanguageCode;
+      final names = _lowerSearchNameById;
       result = result
-          .where((tc) => _tcListName(tc, lang).toLowerCase().contains(query))
+          .where((tc) => (names[tc.id] ?? '').contains(query))
           .toList();
     }
     if (_filterSection != null) {
@@ -988,20 +1014,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   }
 
   /// Ключ для инвалидации кэша «На проверку» — меняется при смене списка/фильтров.
-  Object _reviewCacheKey(List<TechCard> reviewFiltered) =>
-      (_listVersion, _filterSection, _filterCategory, _searchController.text);
+  Object _reviewCacheKey() =>
+      (_listVersion, _filterSection, _filterCategory, _appliedSearchQuery);
 
   /// Тяжёлые вычисления для вкладки «На проверку» — в след. кадре, чтобы не блокировать UI.
   void _ensureReviewCache(
       LocalizationService loc, List<TechCard> reviewFiltered) {
-    final key = _reviewCacheKey(reviewFiltered);
+    final key = _reviewCacheKey();
     if (_lastReviewCacheKey == key) return;
     if (_reviewCacheScheduled) return;
     _reviewCacheScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _reviewCacheScheduled = false;
       if (!mounted) return;
-      _rebuildPfCandidatesIndex(loc);
+      if (_pfIndexBuiltForListVersion != _listVersion) {
+        _rebuildPfCandidatesIndex(loc);
+      }
       final list = reviewFiltered
           .map((tc) {
             final issues = _reviewIssuesCount(tc, loc);
@@ -3750,7 +3778,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
 
     // Разделяем список на ПФ и Блюда, фильтруем по поиску, цеху и категории
-    final query = _searchController.text.trim().toLowerCase();
+    _ensureLowerSearchNameCache(loc);
+    final query = _appliedSearchQuery;
     final catOrder = (widget.department == 'bar' ||
             widget.department == 'banquet-catering-bar')
         ? _barCategoryOrder
@@ -3776,10 +3805,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
     List<TechCard> filterBySearch(List<TechCard> list) {
       if (query.isEmpty) return list;
-      final loc = context.read<LocalizationService>();
-      final lang = loc.currentLanguageCode;
+      final names = _lowerSearchNameById;
       return list
-          .where((tc) => _tcListName(tc, lang).toLowerCase().contains(query))
+          .where((tc) => (names[tc.id] ?? '').contains(query))
           .toList();
     }
 
@@ -3951,33 +3979,46 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextField(
-                controller: _searchController,
-                focusNode: _searchFocusNode,
-                decoration: InputDecoration(
-                  hintText: loc.t('ttk_search_hint'),
-                  isDense: true,
-                  prefixIcon: const Icon(Icons.search, size: 20),
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, size: 20),
-                          onPressed: () {
-                            _searchController.clear();
-                            _searchDebounceTimer?.cancel();
-                            setState(() {});
-                          },
-                        )
-                      : null,
-                  border: const OutlineInputBorder(),
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-                onChanged: (_) {
-                  _searchDebounceTimer?.cancel();
-                  _searchDebounceTimer = Timer(
-                    const Duration(milliseconds: 150),
-                    () {
-                      if (mounted) setState(() {});
+              ListenableBuilder(
+                listenable: _searchController,
+                builder: (context, _) {
+                  return TextField(
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    decoration: InputDecoration(
+                      hintText: loc.t('ttk_search_hint'),
+                      isDense: true,
+                      prefixIcon: const Icon(Icons.search, size: 20),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, size: 20),
+                              onPressed: () {
+                                _searchDebounceTimer?.cancel();
+                                _searchController.clear();
+                                setState(() {
+                                  _appliedSearchQuery = '';
+                                });
+                              },
+                            )
+                          : null,
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                    ),
+                    onChanged: (_) {
+                      _searchDebounceTimer?.cancel();
+                      _searchDebounceTimer = Timer(
+                        const Duration(milliseconds: 320),
+                        () {
+                          if (!mounted) return;
+                          final q =
+                              _searchController.text.trim().toLowerCase();
+                          if (q == _appliedSearchQuery) return;
+                          setState(() {
+                            _appliedSearchQuery = q;
+                          });
+                        },
+                      );
                     },
                   );
                 },
@@ -4047,7 +4088,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 canEdit,
                 showCost,
                 isDishesTab: false,
-                hasActiveFilters: _searchController.text.trim().isNotEmpty ||
+                hasActiveFilters: _appliedSearchQuery.isNotEmpty ||
                     _filterSection != null ||
                     _filterCategory != null,
               ),
@@ -4057,7 +4098,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 canEdit,
                 showCost,
                 isDishesTab: true,
-                hasActiveFilters: _searchController.text.trim().isNotEmpty ||
+                hasActiveFilters: _appliedSearchQuery.isNotEmpty ||
                     _filterSection != null ||
                     _filterCategory != null,
               ),
