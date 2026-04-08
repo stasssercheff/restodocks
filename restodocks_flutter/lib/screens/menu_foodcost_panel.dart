@@ -25,12 +25,14 @@ class MenuFoodcostPanel extends StatefulWidget {
     required this.dataEstablishmentId,
     required this.currencySym,
     required this.langCode,
+    this.openCardInEditMode = false,
   });
 
   final List<TechCard> dishes;
   final String dataEstablishmentId;
   final String currencySym;
   final String langCode;
+  final bool openCardInEditMode;
 
   @override
   State<MenuFoodcostPanel> createState() => _MenuFoodcostPanelState();
@@ -122,8 +124,11 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
   }
 
   double _portionCost(TechCard tc) {
+    final totalCost = tc.totalCost > 0
+        ? tc.totalCost
+        : tc.ingredients.fold<double>(0, (s, i) => s + i.cost);
     if (tc.portionWeight <= 0 || tc.yield <= 0) return 0;
-    return tc.totalCost * tc.portionWeight / tc.yield;
+    return totalCost * tc.portionWeight / tc.yield;
   }
 
   double? _parseTargetPct() {
@@ -166,7 +171,11 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
           SizedBox(
             width: narrow ? 110 : 220,
             child: InkWell(
-              onTap: () => context.push('/tech-cards/${tc.id}?view=1'),
+              onTap: () => context.push(
+                widget.openCardInEditMode
+                    ? '/tech-cards/${tc.id}'
+                    : '/tech-cards/${tc.id}?view=1',
+              ),
               child: Text(
                 tc.getDisplayNameInLists(widget.langCode),
                 maxLines: narrow ? 5 : 4,
@@ -310,16 +319,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      for (final g in groups) ...[
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12, bottom: 8),
-                          child: Text(
-                            techCardSectionGroupLabel(g.section, loc),
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  color: Theme.of(context).colorScheme.primary,
-                                ),
-                          ),
-                        ),
+                      if (groups.isNotEmpty)
                         DataTable(
                           columnSpacing: narrow ? 8 : 16,
                           horizontalMargin: narrow ? 6 : 12,
@@ -360,7 +360,9 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                             DataColumn(
                               numeric: true,
                               label: Text(
-                                loc.t('foodcost_price_optimal') ?? 'Цена опт.',
+                                widget.langCode == 'ru'
+                                    ? 'Цена по цели'
+                                    : 'Target price',
                                 style: const TextStyle(fontWeight: FontWeight.w600),
                               ),
                             ),
@@ -373,12 +375,33 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                             ),
                           ],
                           rows: [
-                            for (final tc in g.cards)
-                              _buildRow(loc, tc, ++rowNum, targetPct,
-                                  narrow: narrow),
+                            for (final g in groups) ...[
+                              DataRow(
+                                color: WidgetStatePropertyAll(
+                                  Theme.of(context)
+                                      .colorScheme
+                                      .surfaceContainerHighest
+                                      .withValues(alpha: 0.6),
+                                ),
+                                cells: [
+                                  const DataCell(Text('')),
+                                  DataCell(
+                                    Text(
+                                      techCardSectionGroupLabel(g.section, loc),
+                                      style: const TextStyle(fontWeight: FontWeight.w700),
+                                    ),
+                                  ),
+                                  const DataCell(Text('')),
+                                  const DataCell(Text('')),
+                                  const DataCell(Text('')),
+                                  const DataCell(Text('')),
+                                ],
+                              ),
+                              for (final tc in g.cards)
+                                _buildRow(loc, tc, ++rowNum, targetPct, narrow: narrow),
+                            ],
                           ],
                         ),
-                      ],
                       if (groups.isEmpty)
                         Padding(
                           padding: const EdgeInsets.all(24),

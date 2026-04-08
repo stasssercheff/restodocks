@@ -261,6 +261,54 @@ class _MenuScreenState extends State<MenuScreen> {
     return d.isNotEmpty || c.isNotEmpty;
   }
 
+  bool _isViewOnlyCardForEmployee(TechCard tc, Employee? emp) {
+    final est = context.read<AccountManagerSupabase>().establishment;
+    final branchReadOnly = est != null && est.isBranch && tc.establishmentId != est.id;
+    if (branchReadOnly) return true;
+    if (emp == null) return true;
+    if (emp.hasRole('owner') || emp.hasRole('general_manager')) return false;
+    if ((emp.hasRole('executive_chef') || emp.hasRole('sous_chef')) && !_isBarDish(tc)) return false;
+    if (emp.hasRole('bar_manager') && _isBarDish(tc)) return false;
+    final mgmtEditor = emp.department == 'management' &&
+        (emp.hasRole('manager') || emp.hasRole('assistant_manager'));
+    return !mgmtEditor;
+  }
+
+  Future<void> _openTechCardFromMenu(TechCard tc) async {
+    final emp = context.read<AccountManagerSupabase>().currentEmployee;
+    final viewOnly = _isViewOnlyCardForEmployee(tc, emp);
+    final viewPath = '/tech-cards/${tc.id}?view=1';
+    final editPath = '/tech-cards/${tc.id}';
+    if (viewOnly) {
+      await context.push(viewPath);
+      return;
+    }
+    if (!mounted) return;
+    final loc = context.read<LocalizationService>();
+    final mode = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: Text(loc.t('edit')),
+              onTap: () => Navigator.of(ctx).pop('edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.visibility_outlined),
+              title: Text(loc.t('ttk_view')),
+              onTap: () => Navigator.of(ctx).pop('view'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || mode == null) return;
+    await context.push(mode == 'edit' ? editPath : viewPath);
+  }
+
   String _buildSubtitleText(LocalizationService loc, TechCard tc, String lang, double totalCost, String currencySym) {
     final emp = context.read<AccountManagerSupabase>().currentEmployee;
     final cat = _categoryLabel(tc.category, lang);
@@ -522,11 +570,16 @@ class _MenuScreenState extends State<MenuScreen> {
     final showFoodcost = _showFoodcostTab(emp);
     final menuSeg = showFoodcost ? _menuSegment : 0;
     if (showFoodcost && menuSeg == 1 && estId != null) {
+      final canOpenFoodcostInEdit = emp != null &&
+          (emp.hasRole('owner') ||
+              emp.hasRole('general_manager') ||
+              emp.department == 'management');
       return MenuFoodcostPanel(
         dishes: _displayDishes,
         dataEstablishmentId: estId,
         currencySym: currencySym,
         langCode: loc.currentLanguageCode,
+        openCardInEditMode: canOpenFoodcostInEdit,
       );
     }
     final dishesToShow = _displayDishes;
@@ -559,9 +612,12 @@ class _MenuScreenState extends State<MenuScreen> {
         itemCount: dishesToShow.length,
         itemBuilder: (context, index) {
           final tc = dishesToShow[index];
+          final tcTotalCost = tc.totalCost > 0
+              ? tc.totalCost
+              : tc.ingredients.fold<double>(0, (s, i) => s + i.cost);
           final costForSubtitle = (tc.portionWeight > 0 && tc.yield > 0)
-              ? tc.totalCost * tc.portionWeight / tc.yield
-              : tc.totalCost;
+              ? tcTotalCost * tc.portionWeight / tc.yield
+              : tcTotalCost;
           final lang = loc.currentLanguageCode;
           final dishDept = _dishDepartment(tc);
           final stopGoSvc = context.read<MenuStopGoService>();
@@ -606,6 +662,72 @@ class _MenuScreenState extends State<MenuScreen> {
                   ),
                 )
               : null;
+          if (!_isHallMenu) {
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                onTap: () => _openTechCardFromMenu(tc),
+                leading: GestureDetector(
+                  onTap: photoUrl != null
+                      ? () => _showPhotoFullscreen(context, photoUrls)
+                      : null,
+                  child: SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: photoUrl != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: _LazyPhoto(url: photoUrl, fallback: fallbackIcon),
+                          )
+                        : fallbackIcon,
+                  ),
+                ),
+                title: Text(tc.getDisplayNameInLists(lang), style: titleStyle),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 2),
+                    Text(
+                      _buildSubtitleText(loc, tc, lang, costForSubtitle, currencySym),
+                      style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (_canEditStopGo) ...[
+                      const SizedBox(height: 6),
+                      _StopGoChips(
+                        currentStatus: status,
+                        onSelect: (s) async {
+                          final est = context.read<AccountManagerSupabase>().establishment;
+                          if (est == null) return;
+                          try {
+                            await stopGoSvc.setStatus(
+                              establishmentId: est.dataEstablishmentId,
+                              techCardId: tc.id,
+                              department: dishDept,
+                              status: s,
+                            );
+                            if (mounted) {
+                              setState(() {
+                                final k = '${tc.id}_$dishDept';
+                                if (s == null) {
+                                  _stopGoMap.remove(k);
+                                } else {
+                                  _stopGoMap[k] = s;
+                                }
+                              });
+                            }
+                          } catch (_) {}
+                        },
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          }
+
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
             child: ExpansionTile(
@@ -632,17 +754,7 @@ class _MenuScreenState extends State<MenuScreen> {
                   ],
                   Expanded(
                     child: InkWell(
-                      onTap: _isHallMenu
-                          ? null
-                          : () {
-                              final emp = context
-                                  .read<AccountManagerSupabase>()
-                                  .currentEmployee;
-                              final useHallView =
-                                  _isHallMenu && !_canSeeFullTtkView(emp, tc);
-                              context.push(
-                                  '/tech-cards/${tc.id}?view=1${useHallView ? '&hall=1' : ''}');
-                            },
+                      onTap: null,
                       child: Text(
                         tc.getDisplayNameInLists(lang),
                         style: titleStyle,
@@ -656,17 +768,7 @@ class _MenuScreenState extends State<MenuScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   InkWell(
-                    onTap: _isHallMenu
-                        ? null
-                        : () {
-                            final emp = context
-                                .read<AccountManagerSupabase>()
-                                .currentEmployee;
-                            final useHallView =
-                                _isHallMenu && !_canSeeFullTtkView(emp, tc);
-                            context.push(
-                                '/tech-cards/${tc.id}?view=1${useHallView ? '&hall=1' : ''}');
-                          },
+                    onTap: null,
                     child: Text(
                       _buildSubtitleText(loc, tc, lang, costForSubtitle, currencySym),
                       style: TextStyle(fontSize: 13, color: Colors.grey[600]),

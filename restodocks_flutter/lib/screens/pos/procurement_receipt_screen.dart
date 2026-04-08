@@ -1395,11 +1395,11 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final narrow = constraints.maxWidth < 560;
-        final hPad = narrow ? 4.0 : 8.0;
-        final minW = narrow ? 720.0 : 1040.0;
+        final hPad = narrow ? 3.0 : 8.0;
+        final minW = narrow ? 650.0 : 1040.0;
 
         Widget cell(Widget w) => Padding(
-              padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 6),
+              padding: EdgeInsets.symmetric(horizontal: hPad, vertical: narrow ? 4 : 6),
               child: w,
             );
 
@@ -1414,15 +1414,15 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                 color: Theme.of(context).dividerColor.withValues(alpha: 0.45),
               ),
               columnWidths: {
-                0: FixedColumnWidth(narrow ? 26 : 32),
-                1: FlexColumnWidth(narrow ? 1.5 : 2.0),
-                2: FixedColumnWidth(narrow ? 52 : 56),
-                3: FixedColumnWidth(narrow ? 68 : 72),
-                4: FixedColumnWidth(narrow ? 76 : 84),
-                5: FixedColumnWidth(narrow ? 64 : 72),
-                6: FixedColumnWidth(narrow ? 76 : 84),
-                7: FixedColumnWidth(narrow ? 80 : 88),
-                8: FixedColumnWidth(narrow ? 48 : 56),
+                0: FixedColumnWidth(narrow ? 22 : 32),
+                1: FlexColumnWidth(narrow ? 1.3 : 2.0),
+                2: FixedColumnWidth(narrow ? 46 : 56),
+                3: FixedColumnWidth(narrow ? 56 : 72),
+                4: FixedColumnWidth(narrow ? 64 : 84),
+                5: FixedColumnWidth(narrow ? 56 : 72),
+                6: FixedColumnWidth(narrow ? 64 : 84),
+                7: FixedColumnWidth(narrow ? 68 : 88),
+                8: FixedColumnWidth(narrow ? 40 : 56),
               },
               children: [
                 TableRow(
@@ -1521,22 +1521,22 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.search, size: 22),
+                          icon: Icon(Icons.search, size: narrow ? 18 : 22),
                           tooltip: loc.t('procurement_pick_product'),
                           padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 36,
-                            minHeight: 36,
+                          constraints: BoxConstraints(
+                            minWidth: narrow ? 28 : 36,
+                            minHeight: narrow ? 28 : 36,
                           ),
                           onPressed: () => _pickNomenclatureProduct(i),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.add_circle_outline, size: 22),
+                          icon: Icon(Icons.add_circle_outline, size: narrow ? 18 : 22),
                           tooltip: loc.t('procurement_product_new'),
                           padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 36,
-                            minHeight: 36,
+                          constraints: BoxConstraints(
+                            minWidth: narrow ? 28 : 36,
+                            minHeight: narrow ? 28 : 36,
                           ),
                           onPressed: () => _createNewNomenclatureProduct(i),
                         ),
