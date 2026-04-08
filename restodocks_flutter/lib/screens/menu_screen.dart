@@ -697,7 +697,10 @@ class _MenuScreenState extends State<MenuScreen> {
                 ? 'Наценка'
                 : '% себестоимости')
             : '',
-        if (isFoodcost) 'С наценкой',
+        if (isFoodcost)
+          (foodcostConfig.mode == FoodcostPricingMode.markupOnCost
+              ? 'Наценка'
+              : 'С наценкой'),
         if (isFoodcost) 'В меню',
       ]));
       var idx = 1;
@@ -708,6 +711,7 @@ class _MenuScreenState extends State<MenuScreen> {
         final actualPct = _actualPct(tc, foodcostConfig.mode);
         final targetPct = foodcostConfig.customPct[tc.id] ?? foodcostConfig.globalPct;
         final optimal = _optimalPriceForMode(cost, targetPct, foodcostConfig.mode);
+        final markupAmount = _markupAmount(cost, optimal);
         sheet.appendRow(_textRow([
           '$idx',
           tc.dishName,
@@ -720,10 +724,15 @@ class _MenuScreenState extends State<MenuScreen> {
               ? (actualPct != null ? '${actualPct.toStringAsFixed(1)}%' : '—')
               : '',
           if (isFoodcost)
-            (optimal != null
-                ? NumberFormatUtils.formatSumWithSymbol(
-                    optimal, currencyCode, currencySym)
-                : '—'),
+            (foodcostConfig.mode == FoodcostPricingMode.markupOnCost
+                ? (markupAmount != null
+                    ? NumberFormatUtils.formatSumWithSymbol(
+                        markupAmount, currencyCode, currencySym)
+                    : '—')
+                : (optimal != null
+                    ? NumberFormatUtils.formatSumWithSymbol(
+                        optimal, currencyCode, currencySym)
+                    : '—')),
           if (isFoodcost)
             (menuPrice != null && menuPrice > 0
                 ? NumberFormatUtils.formatSumWithSymbol(
@@ -809,7 +818,7 @@ class _MenuScreenState extends State<MenuScreen> {
       if (isFoodcost) 'Себестоимость',
       if (isFoodcost)
         (cfg.mode == FoodcostPricingMode.markupOnCost ? 'Наценка' : '% себестоимости'),
-      if (isFoodcost) 'С наценкой',
+      if (isFoodcost) (cfg.mode == FoodcostPricingMode.markupOnCost ? 'Наценка' : 'С наценкой'),
       if (isFoodcost) 'В меню',
     ];
 
@@ -820,6 +829,7 @@ class _MenuScreenState extends State<MenuScreen> {
       final actualPct = _actualPct(tc, cfg.mode);
       final targetPct = cfg.customPct[tc.id] ?? cfg.globalPct;
       final optimal = _optimalPriceForMode(cost, targetPct, cfg.mode);
+      final markupAmount = _markupAmount(cost, optimal);
       rows.add([
         '$idx',
         tc.getDisplayNameInLists(exportLang),
@@ -829,9 +839,15 @@ class _MenuScreenState extends State<MenuScreen> {
               : '—'),
         if (isFoodcost) (actualPct != null ? '${actualPct.toStringAsFixed(1)}%' : '—'),
         if (isFoodcost)
-          (optimal != null
-              ? NumberFormatUtils.formatSumWithSymbol(optimal, currencyCode, currencySym)
-              : '—'),
+          (cfg.mode == FoodcostPricingMode.markupOnCost
+              ? (markupAmount != null
+                  ? NumberFormatUtils.formatSumWithSymbol(
+                      markupAmount, currencyCode, currencySym)
+                  : '—')
+              : (optimal != null
+                  ? NumberFormatUtils.formatSumWithSymbol(
+                      optimal, currencyCode, currencySym)
+                  : '—')),
         if (isFoodcost)
           (tc.sellingPrice != null && tc.sellingPrice! > 0
               ? NumberFormatUtils.formatSumWithSymbol(
@@ -889,6 +905,11 @@ class _MenuScreenState extends State<MenuScreen> {
     }
     if (targetPct >= 100) return null;
     return cost * 100 / targetPct;
+  }
+
+  double? _markupAmount(double cost, double? optimalPrice) {
+    if (optimalPrice == null || cost <= 0 || optimalPrice <= cost) return null;
+    return optimalPrice - cost;
   }
 
   Future<({FoodcostPricingMode mode, double? globalPct, Map<String, double> customPct})>

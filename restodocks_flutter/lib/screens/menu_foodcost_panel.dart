@@ -26,6 +26,26 @@ class _DishTargetState {
   String pctText;
 }
 
+class _FoodcostColumnWidths {
+  const _FoodcostColumnWidths({
+    required this.no,
+    required this.dish,
+    required this.cost,
+    required this.metric,
+    required this.withMarkup,
+    required this.menu,
+    required this.pct,
+  });
+
+  final double no;
+  final double dish;
+  final double cost;
+  final double metric;
+  final double withMarkup;
+  final double menu;
+  final double pct;
+}
+
 /// Табличный фудкост: цеха, с/с порции, наценка / доля с/с, оптимальная и фактическая цена.
 class MenuFoodcostPanel extends StatefulWidget {
   const MenuFoodcostPanel({
@@ -329,6 +349,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     int rowNum,
     double? globalTargetPct, {
     required bool narrow,
+    required _FoodcostColumnWidths w,
   }) {
     final cost = _portionCost(tc);
     final sell = tc.sellingPrice;
@@ -343,21 +364,24 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     final st = _dishTargets[tc.id]!;
     final ctrl = _dishPctControllers[tc.id]!;
 
-    Widget centeredValue(String value, {double? fontSize}) => Align(
-          alignment: Alignment.center,
-          child: Text(
-            value,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: fontSize),
+    Widget centeredValue(String value, double width, {double? fontSize}) => SizedBox(
+          width: width,
+          child: Align(
+            alignment: Alignment.center,
+            child: Text(
+              value,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: fontSize),
+            ),
           ),
         );
 
     return DataRow(
       cells: [
-        DataCell(centeredValue('$rowNum', fontSize: narrow ? 11.5 : null)),
+        DataCell(centeredValue('$rowNum', w.no, fontSize: narrow ? 11.5 : null)),
         DataCell(
           SizedBox(
-            width: narrow ? 124 : 216,
+            width: w.dish,
             child: InkWell(
               onTap: () => context.push(
                 widget.openCardInEditMode
@@ -384,6 +408,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               ? NumberFormatUtils.formatSumWithSymbol(
                   cost, widget.currencyCode, widget.currencySym)
               : '—',
+          w.cost,
           fontSize: narrow ? 11.5 : null,
         )),
         DataCell(centeredValue(
@@ -394,6 +419,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               : (shareAct != null
                   ? '${shareAct.toStringAsFixed(1)}%'
                   : '—'),
+          w.metric,
           fontSize: narrow ? 11.5 : null,
         )),
         DataCell(centeredValue(
@@ -401,6 +427,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               ? NumberFormatUtils.formatSumWithSymbol(
                   opt, widget.currencyCode, widget.currencySym)
               : '—',
+          w.withMarkup,
           fontSize: narrow ? 11.5 : null,
         )),
         DataCell(centeredValue(
@@ -408,12 +435,15 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               ? NumberFormatUtils.formatSumWithSymbol(
                   sell, widget.currencyCode, widget.currencySym)
               : (loc.t('foodcost_no_selling_price') ?? '—'),
+          w.menu,
           fontSize: narrow ? 11.5 : null,
         )),
         DataCell(
-          Align(
-            alignment: Alignment.center,
-            child: narrow
+          SizedBox(
+            width: w.pct,
+            child: Align(
+              alignment: Alignment.center,
+              child: narrow
                 ? Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -576,9 +606,25 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                       ),
                     ],
                   ),
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  _FoodcostColumnWidths _resolveColumnWidths(bool narrow) {
+    final metricW = _mode == FoodcostPricingMode.costShareOfPrice
+        ? (narrow ? 86.0 : 112.0)
+        : (narrow ? 70.0 : 96.0);
+    return _FoodcostColumnWidths(
+      no: narrow ? 26 : 36,
+      dish: narrow ? 164 : 260,
+      cost: narrow ? 98 : 132,
+      metric: metricW,
+      withMarkup: narrow ? 100 : 136,
+      menu: narrow ? 96 : 132,
+      pct: narrow ? 88 : 118,
     );
   }
 
@@ -619,28 +665,33 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
           ),
         );
 
+    final w = _resolveColumnWidths(narrow);
+
     final tableColumns = [
-      DataColumn(label: headerLabel('№')),
-      DataColumn(label: headerLabel('Блюдо')),
+      DataColumn(label: SizedBox(width: w.no, child: headerLabel('№'))),
+      DataColumn(label: SizedBox(width: w.dish, child: headerLabel('Блюдо'))),
       DataColumn(
         numeric: true,
-        label: headerLabel('Себестоимость'),
-      ),
-      DataColumn(
-        label: _mode == FoodcostPricingMode.markupOnCost
-            ? headerLabel('Наценка')
-            : headerLabel('%\nсебестоимости'),
-      ),
-      DataColumn(
-        numeric: true,
-        label: headerLabel('С наценкой'),
-      ),
-      DataColumn(
-        label: headerLabel('В меню'),
+        label: SizedBox(width: w.cost, child: headerLabel('Себестоимость')),
       ),
       DataColumn(
         label: SizedBox(
-          width: narrow ? 34 : 44,
+          width: w.metric,
+          child: _mode == FoodcostPricingMode.markupOnCost
+              ? headerLabel('Наценка')
+              : headerLabel('%\nсебестоимости'),
+        ),
+      ),
+      DataColumn(
+        numeric: true,
+        label: SizedBox(width: w.withMarkup, child: headerLabel('С наценкой')),
+      ),
+      DataColumn(
+        label: SizedBox(width: w.menu, child: headerLabel('В меню')),
+      ),
+      DataColumn(
+        label: SizedBox(
+          width: w.pct,
           child: headerLabel('%'),
         ),
       ),
@@ -668,22 +719,25 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                 .withValues(alpha: 0.6),
           ),
           cells: [
-            const DataCell(Text('')),
+            DataCell(SizedBox(width: w.no)),
             DataCell(
-              Text(
-                techCardSectionGroupLabel(g.section, loc),
-                style: const TextStyle(fontWeight: FontWeight.w700),
+              SizedBox(
+                width: w.dish,
+                child: Text(
+                  techCardSectionGroupLabel(g.section, loc),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
               ),
             ),
-            const DataCell(Text('')),
-            const DataCell(Text('')),
-            const DataCell(Text('')),
-            const DataCell(Text('')),
-            const DataCell(Text('')),
+            DataCell(SizedBox(width: w.cost)),
+            DataCell(SizedBox(width: w.metric)),
+            DataCell(SizedBox(width: w.withMarkup)),
+            DataCell(SizedBox(width: w.menu)),
+            DataCell(SizedBox(width: w.pct)),
           ],
         ),
         for (final tc in g.cards)
-          _buildRow(loc, tc, ++rowNum, targetPct, narrow: narrow),
+          _buildRow(loc, tc, ++rowNum, targetPct, narrow: narrow, w: w),
       ],
     ];
 
