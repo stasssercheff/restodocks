@@ -118,9 +118,13 @@
       min-height: -webkit-fill-available;
       height: 100dvh;
       max-height: 100dvh;
-      overflow: hidden;
+      overflow-x: hidden;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
       background: #AD292C;
     }
+    /* 1px spacer gives Safari a tiny document scroll range to collapse browser bars. */
+    #safari-scroll-spacer { height: 1px; width: 100%; pointer-events: none; }
     flt-glass-pane, flt-scene, flutter-view, #flt-glass-pane {
       background: #AD292C !important;
     }
@@ -137,6 +141,7 @@
 </head>
 <body>
   <div id="loading-screen"></div>
+  <div id="safari-scroll-spacer" aria-hidden="true"></div>
   <script>
     (function () {
       // Force-drop stale SW/caches so web always loads the latest splash/assets.
@@ -201,6 +206,28 @@
         });
       } catch (e) {}
     });
+  </script>
+  <script>
+    // Keep Safari top UI collapsible while user scrolls Flutter content.
+    (function () {
+      if (!/iPhone|iPad|iPod/i.test(navigator.userAgent)) return;
+      if (window.navigator.standalone) return;
+      var ticking = false;
+      function nudge() {
+        if (ticking) return;
+        ticking = true;
+        requestAnimationFrame(function () {
+          try {
+            if ((window.scrollY || 0) < 1) window.scrollTo(0, 1);
+          } catch (_) {}
+          ticking = false;
+        });
+      }
+      window.addEventListener('touchmove', nudge, { passive: true });
+      window.addEventListener('orientationchange', function () {
+        setTimeout(nudge, 120);
+      });
+    })();
   </script>
   <script>
     // iOS Safari/Chrome: кнопки ▲▼ над клавиатурой.

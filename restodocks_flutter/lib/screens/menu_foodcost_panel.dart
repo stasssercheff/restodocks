@@ -310,10 +310,10 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
 
     return DataRow(
       cells: [
-        DataCell(Text('$rowNum', style: TextStyle(fontSize: narrow ? 13 : null))),
+        DataCell(Text('$rowNum', style: TextStyle(fontSize: narrow ? 12 : null))),
         DataCell(
           SizedBox(
-            width: narrow ? 180 : 220,
+            width: narrow ? 160 : 220,
             child: InkWell(
               onTap: () => context.push(
                 widget.openCardInEditMode
@@ -322,13 +322,13 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               ),
               child: Text(
                 tc.getDisplayNameInLists(widget.langCode),
-                maxLines: narrow ? 4 : 4,
+                maxLines: narrow ? 3 : 4,
                 softWrap: true,
                 overflow: TextOverflow.fade,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                   decoration: TextDecoration.underline,
-                  fontSize: narrow ? 13 : null,
+                  fontSize: narrow ? 12 : null,
                   height: narrow ? 1.2 : null,
                 ),
               ),
@@ -340,7 +340,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               ? NumberFormatUtils.formatSumWithSymbol(
                   cost, widget.currencyCode, widget.currencySym)
               : '—',
-          style: TextStyle(fontSize: narrow ? 13 : null),
+          style: TextStyle(fontSize: narrow ? 12 : null),
         )),
         DataCell(Text(
           _mode == FoodcostPricingMode.markupOnCost
@@ -350,21 +350,21 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               : (shareAct != null
                   ? '${shareAct.toStringAsFixed(1)}%'
                   : '—'),
-          style: TextStyle(fontSize: narrow ? 13 : null),
+          style: TextStyle(fontSize: narrow ? 12 : null),
         )),
         DataCell(Text(
           opt != null
               ? NumberFormatUtils.formatSumWithSymbol(
                   opt, widget.currencyCode, widget.currencySym)
               : '—',
-          style: TextStyle(fontSize: narrow ? 13 : null),
+          style: TextStyle(fontSize: narrow ? 12 : null),
         )),
         DataCell(Text(
           sell != null && sell > 0
               ? NumberFormatUtils.formatSumWithSymbol(
                   sell, widget.currencyCode, widget.currencySym)
               : (loc.t('foodcost_no_selling_price') ?? '—'),
-          style: TextStyle(fontSize: narrow ? 13 : null),
+          style: TextStyle(fontSize: narrow ? 12 : null),
         )),
         DataCell(
           Align(
@@ -571,7 +571,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
           text,
           style: TextStyle(
             fontWeight: FontWeight.w600,
-            fontSize: narrow ? 12 : 13,
+            fontSize: narrow ? 11 : 13,
           ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -580,11 +580,11 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
 
     rowNum = 0;
     final foodcostTable = DataTable(
-      columnSpacing: narrow ? 8 : 14,
-      horizontalMargin: narrow ? 8 : 12,
-      headingRowHeight: narrow ? 34 : 40,
-      dataRowMinHeight: narrow ? 36 : 40,
-      dataRowMaxHeight: narrow ? 108 : 56,
+      columnSpacing: narrow ? 6 : 14,
+      horizontalMargin: narrow ? 6 : 12,
+      headingRowHeight: narrow ? 32 : 40,
+      dataRowMinHeight: narrow ? 34 : 40,
+      dataRowMaxHeight: narrow ? 94 : 56,
       columns: [
         DataColumn(label: headerLabel('№')),
         DataColumn(label: headerLabel(loc.t('foodcost_col_name') ?? 'Блюдо')),
