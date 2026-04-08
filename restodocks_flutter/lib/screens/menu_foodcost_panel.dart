@@ -263,6 +263,10 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
   void _onTableVScroll() {
     if (!_vScroll.hasClients) return;
     final p = _vScroll.position.pixels;
+    if (_lastVScrollPixels == 0 && p > 0) {
+      _lastVScrollPixels = p;
+      return;
+    }
     final d = p - _lastVScrollPixels;
     _lastVScrollPixels = p;
     if (p <= 8) {
@@ -271,7 +275,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       }
       return;
     }
-    if (d > 8 && !_hideControlsOnScroll) {
+    if (p > 36 && d > 8 && !_hideControlsOnScroll) {
       setState(() => _hideControlsOnScroll = true);
     } else if (d < -8 && _hideControlsOnScroll) {
       setState(() => _hideControlsOnScroll = false);
@@ -934,26 +938,27 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       ),
     );
 
+    final compactControls = isPhoneLayout;
     final controls = Padding(
       padding: EdgeInsets.fromLTRB(narrow ? 8 : 14, 0, narrow ? 8 : 14, 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (shortViewport)
+          if (compactControls)
             Row(
               children: [
-                if (menuSegment != null) ...[
+                if (shortViewport && menuSegment != null) ...[
                   Flexible(fit: FlexFit.loose, child: menuSegment),
                   const SizedBox(width: 4),
                 ],
-                Flexible(fit: FlexFit.loose, child: modeSegment),
+                Expanded(child: modeSegment),
                 const SizedBox(width: 4),
                 pctField,
               ],
             )
           else
             modeSegment,
-          if (!shortViewport) ...[
+          if (!compactControls) ...[
             const SizedBox(height: 6),
             Align(
               alignment: narrow ? Alignment.center : Alignment.centerLeft,
@@ -980,15 +985,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ClipRect(
-          child: AnimatedAlign(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOutCubic,
-            heightFactor: _hideControlsOnScroll ? 0 : 1,
-            alignment: Alignment.topCenter,
-            child: controls,
-          ),
-        ),
+        if (!_hideControlsOnScroll) controls,
         Expanded(
           child: tableArea,
         ),
