@@ -1005,6 +1005,56 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
     await saveOrderLists(establishmentId, lists, department: widget.department);
   }
 
+  /// Короткие подписи колонок на узком экране (одна строка, без разрыва слова).
+  String _tableHeaderLabel(
+    LocalizationService loc,
+    bool narrow,
+    String fullKey,
+    String shortRu,
+    String shortEn,
+  ) {
+    if (!narrow) return loc.t(fullKey);
+    final lang = loc.currentLanguageCode.toLowerCase();
+    if (lang.startsWith('ru')) return shortRu;
+    if (lang.startsWith('en')) return shortEn;
+    return loc.t(fullKey);
+  }
+
+  Widget _tableHeaderCell(
+    LocalizationService loc,
+    bool narrow,
+    String fullKey,
+    String shortRu,
+    String shortEn,
+    TextStyle? thStyle,
+  ) {
+    final full = loc.t(fullKey);
+    final text = _tableHeaderLabel(loc, narrow, fullKey, shortRu, shortEn);
+    final w = Text(
+      text,
+      style: thStyle,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      softWrap: false,
+    );
+    if (full != text) {
+      return Tooltip(message: full, child: w);
+    }
+    return w;
+  }
+
+  static const EdgeInsets _denseInputPadding =
+      EdgeInsets.symmetric(horizontal: 8, vertical: 4);
+
+  InputDecoration _denseFieldDecoration(BuildContext context) {
+    return InputDecoration(
+      isDense: true,
+      contentPadding: _denseInputPadding,
+      border: const OutlineInputBorder(),
+      isCollapsed: false,
+    );
+  }
+
   Widget _buildReceiptTable(LocalizationService loc, String currency) {
     final thStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
           fontWeight: FontWeight.w600,
@@ -1016,17 +1066,19 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final narrow = constraints.maxWidth < 560;
-        final hPad = narrow ? 3.0 : 8.0;
-        final minW = narrow ? 650.0 : 1040.0;
+        final thStyleUse = thStyle?.copyWith(fontSize: narrow ? 10 : 12);
+        final hPad = narrow ? 2.0 : 8.0;
+        final vPad = narrow ? 2.0 : 6.0;
+        final minW = narrow ? 720.0 : 1040.0;
 
         Widget cell(Widget w) => Padding(
-              padding: EdgeInsets.symmetric(horizontal: hPad, vertical: narrow ? 4 : 6),
+              padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
               child: w,
             );
 
         return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
+          padding: const EdgeInsets.only(left: 8, right: 8, bottom: 4),
           child: ConstrainedBox(
             constraints: BoxConstraints(minWidth: minW),
             child: Table(
@@ -1036,14 +1088,14 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
               ),
               columnWidths: {
                 0: FixedColumnWidth(narrow ? 22 : 32),
-                1: FlexColumnWidth(narrow ? 1.3 : 2.0),
-                2: FixedColumnWidth(narrow ? 46 : 56),
-                3: FixedColumnWidth(narrow ? 56 : 72),
-                4: FixedColumnWidth(narrow ? 64 : 84),
-                5: FixedColumnWidth(narrow ? 56 : 72),
-                6: FixedColumnWidth(narrow ? 64 : 84),
-                7: FixedColumnWidth(narrow ? 68 : 88),
-                8: FixedColumnWidth(narrow ? 40 : 56),
+                1: FlexColumnWidth(narrow ? 1.35 : 2.0),
+                2: FixedColumnWidth(narrow ? 44 : 56),
+                3: FixedColumnWidth(narrow ? 52 : 72),
+                4: FixedColumnWidth(narrow ? 56 : 84),
+                5: FixedColumnWidth(narrow ? 52 : 72),
+                6: FixedColumnWidth(narrow ? 56 : 84),
+                7: FixedColumnWidth(narrow ? 56 : 88),
+                8: FixedColumnWidth(narrow ? 36 : 56),
               },
               children: [
                 TableRow(
@@ -1051,21 +1103,24 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                     color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   ),
                   children: [
-                    cell(Text(loc.t('procurement_receipt_col_no'), style: thStyle)),
-                    cell(Text(loc.t('product_name'), style: thStyle)),
-                    cell(Text(loc.t('procurement_receipt_col_unit'), style: thStyle)),
-                    cell(
-                        Text(loc.t('procurement_receipt_ordered'), style: thStyle)),
-                    cell(Text(loc.t('procurement_receipt_ref_price'),
-                        style: thStyle)),
-                    cell(Text(loc.t('procurement_receipt_received_qty'),
-                        style: thStyle)),
-                    cell(Text(loc.t('procurement_receipt_actual_price'),
-                        style: thStyle)),
-                    cell(Text(loc.t('procurement_receipt_line_total'),
-                        style: thStyle)),
-                    cell(Text(loc.t('procurement_receipt_discount'),
-                        style: thStyle)),
+                    cell(_tableHeaderCell(loc, narrow, 'procurement_receipt_col_no',
+                        '№', '№', thStyleUse)),
+                    cell(_tableHeaderCell(
+                        loc, narrow, 'product_name', 'Наимен.', 'Name', thStyleUse)),
+                    cell(_tableHeaderCell(loc, narrow,
+                        'procurement_receipt_col_unit', 'Ед.', 'U.', thStyleUse)),
+                    cell(_tableHeaderCell(loc, narrow,
+                        'procurement_receipt_ordered', 'Заказ', 'Ord.', thStyleUse)),
+                    cell(_tableHeaderCell(loc, narrow,
+                        'procurement_receipt_ref_price', 'Карточка', 'Ref.', thStyleUse)),
+                    cell(_tableHeaderCell(loc, narrow,
+                        'procurement_receipt_received_qty', 'Принято', 'Recv', thStyleUse)),
+                    cell(_tableHeaderCell(loc, narrow,
+                        'procurement_receipt_actual_price', 'Цена', 'Price', thStyleUse)),
+                    cell(_tableHeaderCell(loc, narrow,
+                        'procurement_receipt_line_total', 'Сумма', 'Sum', thStyleUse)),
+                    cell(_tableHeaderCell(loc, narrow,
+                        'procurement_receipt_discount', 'Ск.%', 'Disc.%', thStyleUse)),
                   ],
                 ),
                 ...List.generate(
@@ -1111,63 +1166,77 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
             ? Colors.green
             : (act > ref * 1.001 ? Colors.red : null));
 
+    final scrollPad = EdgeInsets.only(
+      bottom: 140,
+      top: 72,
+      left: 12,
+      right: 12,
+    );
+    final rowStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+          fontSize: narrow ? 12 : null,
+        );
+    final iconBtnStyle = IconButton.styleFrom(
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+      minimumSize: const Size(30, 30),
+      padding: const EdgeInsets.all(2),
+    );
+
     return TableRow(
       children: [
         cell(
           Text(
             '${i + 1}',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall,
+            style: rowStyle,
           ),
         ),
         cell(
           l.nameReadOnly
               ? Text(
                   l.nameCtrl.text.isEmpty ? '—' : l.nameCtrl.text,
-                  maxLines: narrow ? 5 : 4,
+                  maxLines: narrow ? 3 : 4,
                   overflow: TextOverflow.fade,
-                  style: Theme.of(context).textTheme.bodySmall,
+                  style: rowStyle,
                 )
               : widget.manualOffSystem
                   ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Expanded(
                           child: TextField(
                             controller: l.nameCtrl,
-                            decoration: const InputDecoration(isDense: true),
-                            style: Theme.of(context).textTheme.bodySmall,
-                            maxLines: narrow ? 3 : 2,
+                            decoration: _denseFieldDecoration(context),
+                            style: rowStyle,
+                            maxLines: 1,
+                            minLines: 1,
+                            textInputAction: TextInputAction.next,
+                            scrollPadding: scrollPad,
                             onChanged: (_) => onField(),
                           ),
                         ),
                         IconButton(
-                          icon: Icon(Icons.search, size: narrow ? 18 : 22),
+                          icon: Icon(Icons.search, size: narrow ? 17 : 22),
                           tooltip: loc.t('procurement_pick_product'),
-                          padding: EdgeInsets.zero,
-                          constraints: BoxConstraints(
-                            minWidth: narrow ? 28 : 36,
-                            minHeight: narrow ? 28 : 36,
-                          ),
+                          style: iconBtnStyle,
                           onPressed: () => _pickNomenclatureProduct(i),
                         ),
                         IconButton(
-                          icon: Icon(Icons.add_circle_outline, size: narrow ? 18 : 22),
+                          icon: Icon(Icons.add_circle_outline,
+                              size: narrow ? 17 : 22),
                           tooltip: loc.t('procurement_product_new'),
-                          padding: EdgeInsets.zero,
-                          constraints: BoxConstraints(
-                            minWidth: narrow ? 28 : 36,
-                            minHeight: narrow ? 28 : 36,
-                          ),
+                          style: iconBtnStyle,
                           onPressed: () => _createNewNomenclatureProduct(i),
                         ),
                       ],
                     )
                   : TextField(
                       controller: l.nameCtrl,
-                      decoration: const InputDecoration(isDense: true),
-                      style: Theme.of(context).textTheme.bodySmall,
-                      maxLines: narrow ? 3 : 2,
+                      decoration: _denseFieldDecoration(context),
+                      style: rowStyle,
+                      maxLines: 1,
+                      minLines: 1,
+                      scrollPadding: scrollPad,
                       onChanged: (_) => onField(),
                     ),
         ),
@@ -1176,15 +1245,18 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
               ? DropdownButton<String>(
                   isDense: true,
                   isExpanded: true,
+                  itemHeight: narrow ? 40 : kMinInteractiveDimension,
                   value: _kgGDropdownValue(l),
                   items: [
                     DropdownMenuItem(
                       value: 'kg',
-                      child: Text(_localizedUnit(loc, 'kg')),
+                      child: Text(_localizedUnit(loc, 'kg'),
+                          style: rowStyle),
                     ),
                     DropdownMenuItem(
                       value: 'g',
-                      child: Text(_localizedUnit(loc, 'g')),
+                      child:
+                          Text(_localizedUnit(loc, 'g'), style: rowStyle),
                     ),
                   ],
                   onChanged: (v) {
@@ -1195,30 +1267,31 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                 )
               : Text(
                   _localizedUnit(loc, l.unit),
-                  style: Theme.of(context).textTheme.bodySmall,
+                  style: rowStyle,
                 ),
         ),
         cell(
           Text(
             nf.format(l.orderedQty),
-            style: Theme.of(context).textTheme.bodySmall,
+            style: rowStyle,
           ),
         ),
         cell(
           Text(
             ref > 0 ? '${nf.format(ref)} $currency' : '—',
-            style: Theme.of(context).textTheme.bodySmall,
+            style: rowStyle,
           ),
         ),
         cell(
           TextField(
             controller: l.received,
-            decoration: const InputDecoration(isDense: true),
-            style: Theme.of(context).textTheme.bodySmall,
-            keyboardType: TextInputType.number,
+            decoration: _denseFieldDecoration(context),
+            style: rowStyle,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
             ],
+            scrollPadding: scrollPad,
             onChanged: (_) => onField(),
           ),
         ),
@@ -1227,29 +1300,31 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
             controller: l.actualPrice,
             style: TextStyle(
               color: priceColor,
-              fontSize: 13,
+              fontSize: narrow ? 12 : 13,
             ),
-            decoration: const InputDecoration(isDense: true),
-            keyboardType: TextInputType.number,
+            decoration: _denseFieldDecoration(context),
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [
               FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
             ],
+            scrollPadding: scrollPad,
             onChanged: (_) => onField(),
           ),
         ),
         cell(
           Text(
             '${nf.format(_lineTotal(l))} $currency',
-            style: Theme.of(context).textTheme.bodySmall,
+            style: rowStyle,
             textAlign: TextAlign.right,
           ),
         ),
         cell(
           TextField(
             controller: l.discountPercent,
-            decoration: const InputDecoration(isDense: true),
-            style: Theme.of(context).textTheme.bodySmall,
-            keyboardType: TextInputType.number,
+            decoration: _denseFieldDecoration(context),
+            style: rowStyle,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            scrollPadding: scrollPad,
             onChanged: (_) => onField(),
           ),
         ),
@@ -1285,21 +1360,31 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
       );
     }
 
+    final mq = MediaQuery.of(context);
+    final narrowScreen = mq.size.width < 560;
+    final keyboardOpen = mq.viewInsets.bottom > 0;
+    final hdrPad = EdgeInsets.symmetric(
+      horizontal: narrowScreen ? 8 : 12,
+      vertical: narrowScreen ? 6 : 12,
+    );
+
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(loc.t('procurement_receipt_title')),
+        toolbarHeight: narrowScreen ? 48 : kToolbarHeight,
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: hdrPad,
             child: widget.manualOffSystem
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Expanded(
                             child: TextField(
@@ -1308,36 +1393,64 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                                 labelText:
                                     loc.t('procurement_receipt_supplier'),
                                 border: const OutlineInputBorder(),
+                                isDense: narrowScreen,
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: narrowScreen ? 8 : 12,
+                                ),
+                              ),
+                              style: TextStyle(
+                                fontSize: narrowScreen ? 14 : 16,
                               ),
                               textCapitalization: TextCapitalization.words,
                               onChanged: (_) => setState(() {}),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           IconButton.filledTonal(
                             onPressed: _showSupplierPicker,
-                            icon: const Icon(Icons.list_alt),
+                            icon: Icon(
+                              Icons.list_alt,
+                              size: narrowScreen ? 20 : 24,
+                            ),
+                            style: IconButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              padding: const EdgeInsets.all(8),
+                            ),
                             tooltip: loc.t('procurement_pick_supplier'),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
-                      InkWell(
-                        onTap: () => _pickExternalReceiptDate(loc),
-                        child: InputDecorator(
-                          decoration: InputDecoration(
-                            labelText:
-                                loc.t('procurement_external_receipt_date'),
-                            border: const OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          child: Text(
-                            _externalReceiptDate != null
-                                ? DateFormat.yMMMd(
-                                    Localizations.localeOf(context)
-                                        .toString(),
-                                  ).format(_externalReceiptDate!)
-                                : loc.t('procurement_external_receipt_date_hint'),
+                      SizedBox(height: narrowScreen ? 6 : 10),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => _pickExternalReceiptDate(loc),
+                          borderRadius: BorderRadius.circular(4),
+                          child: InputDecorator(
+                            decoration: InputDecoration(
+                              labelText:
+                                  loc.t('procurement_external_receipt_date'),
+                              border: const OutlineInputBorder(),
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                            ),
+                            child: Text(
+                              _externalReceiptDate != null
+                                  ? DateFormat.yMMMd(
+                                      Localizations.localeOf(context)
+                                          .toString(),
+                                    ).format(_externalReceiptDate!)
+                                  : loc.t(
+                                      'procurement_external_receipt_date_hint'),
+                              style: TextStyle(
+                                fontSize: narrowScreen ? 13 : 14,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -1395,27 +1508,53 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                     decoration: InputDecoration(
                       labelText: loc.t('procurement_receipt_supplier'),
                       border: const OutlineInputBorder(),
+                      isDense: narrowScreen,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: narrowScreen ? 8 : 12,
+                      ),
                     ),
+                    style: TextStyle(fontSize: narrowScreen ? 14 : 16),
                     textCapitalization: TextCapitalization.words,
                   ),
           ),
           Expanded(
-            child: _buildReceiptTable(loc, currency),
+            child: SingleChildScrollView(
+              keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
+              child: _buildReceiptTable(loc, currency),
+            ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(16),
+          AnimatedPadding(
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOut,
+            padding: EdgeInsets.fromLTRB(
+              narrowScreen ? 12 : 16,
+              keyboardOpen ? 6 : 10,
+              narrowScreen ? 12 : 16,
+              keyboardOpen ? 10 : 16,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   '${loc.t('procurement_receipt_total_ordered')}: ${NumberFormat('#0.##', 'ru').format(_totalOrdered)} $currency',
+                  style: TextStyle(fontSize: keyboardOpen ? 12 : 14),
                 ),
                 Text(
                   '${loc.t('procurement_receipt_total_received')}: ${NumberFormat('#0.##', 'ru').format(_totalReceived)} $currency',
+                  style: TextStyle(fontSize: keyboardOpen ? 12 : 14),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: keyboardOpen ? 6 : 10),
                 FilledButton(
                   onPressed: _saving ? null : _submit,
+                  style: FilledButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                      vertical: keyboardOpen ? 10 : 14,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                  ),
                   child: _saving
                       ? const SizedBox(
                           height: 22,

@@ -310,10 +310,10 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
 
     return DataRow(
       cells: [
-        DataCell(Text('$rowNum')),
+        DataCell(Text('$rowNum', style: TextStyle(fontSize: narrow ? 12 : null))),
         DataCell(
           SizedBox(
-            width: narrow ? 110 : 220,
+            width: narrow ? 168 : 220,
             child: InkWell(
               onTap: () => context.push(
                 widget.openCardInEditMode
@@ -322,13 +322,14 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               ),
               child: Text(
                 tc.getDisplayNameInLists(widget.langCode),
-                maxLines: narrow ? 5 : 4,
+                maxLines: narrow ? 3 : 4,
                 softWrap: true,
                 overflow: TextOverflow.fade,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                   decoration: TextDecoration.underline,
-                  fontSize: narrow ? 12.5 : null,
+                  fontSize: narrow ? 12 : null,
+                  height: narrow ? 1.2 : null,
                 ),
               ),
             ),
@@ -339,6 +340,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               ? NumberFormatUtils.formatSumWithSymbol(
                   cost, widget.currencyCode, widget.currencySym)
               : '—',
+          style: TextStyle(fontSize: narrow ? 11.5 : null),
         )),
         DataCell(Text(
           _mode == FoodcostPricingMode.markupOnCost
@@ -348,18 +350,21 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               : (shareAct != null
                   ? '${shareAct.toStringAsFixed(1)}%'
                   : '—'),
+          style: TextStyle(fontSize: narrow ? 11.5 : null),
         )),
         DataCell(Text(
           opt != null
               ? NumberFormatUtils.formatSumWithSymbol(
                   opt, widget.currencyCode, widget.currencySym)
               : '—',
+          style: TextStyle(fontSize: narrow ? 11.5 : null),
         )),
         DataCell(Text(
           sell != null && sell > 0
               ? NumberFormatUtils.formatSumWithSymbol(
                   sell, widget.currencyCode, widget.currencySym)
               : (loc.t('foodcost_no_selling_price') ?? '—'),
+          style: TextStyle(fontSize: narrow ? 11.5 : null),
         )),
         DataCell(
           Align(
@@ -370,7 +375,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       SizedBox(
-                        width: 76,
+                        width: 72,
                         child: TextField(
                           controller: ctrl,
                           decoration: InputDecoration(
@@ -378,13 +383,13 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                                 ? _globalTargetHint(globalTargetPct)
                                 : null,
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 8,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: narrow ? 4 : 8,
                             ),
                             border: const OutlineInputBorder(),
                           ),
-                          style: const TextStyle(fontSize: 13),
+                          style: TextStyle(fontSize: narrow ? 12 : 13),
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
@@ -406,7 +411,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                           },
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: narrow ? 2 : 4),
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -438,10 +443,10 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                               child: InkWell(
                                 onTap: () => _showCustomTargetInfoDialog(loc),
                                 child: Padding(
-                                  padding: const EdgeInsets.all(6),
+                                  padding: EdgeInsets.all(narrow ? 4 : 6),
                                   child: Icon(
                                     Icons.info_outline,
-                                    size: 18,
+                                    size: narrow ? 16 : 18,
                                     color:
                                         Theme.of(context).colorScheme.primary,
                                   ),
@@ -562,6 +567,96 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     final groups = groupTechCardsBySection(filtered);
     var rowNum = 0;
 
+    String hdr(String fullKey, String shortRu, String shortEn) {
+      if (!narrow) return loc.t(fullKey) ?? '';
+      final lang = loc.currentLanguageCode.toLowerCase();
+      if (lang.startsWith('ru')) return shortRu;
+      if (lang.startsWith('en')) return shortEn;
+      return loc.t(fullKey) ?? '';
+    }
+
+    Widget headerLabel(String fullKey, String shortRu, String shortEn) {
+      final full = loc.t(fullKey) ?? '';
+      final text = hdr(fullKey, shortRu, shortEn);
+      final style = TextStyle(
+        fontWeight: FontWeight.w600,
+        fontSize: narrow ? 11 : 13,
+      );
+      final w = Text(
+        text,
+        style: style,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        softWrap: false,
+      );
+      if (full.isNotEmpty && full != text) {
+        return Tooltip(message: full, child: w);
+      }
+      return w;
+    }
+
+    rowNum = 0;
+    final foodcostTable = DataTable(
+      columnSpacing: narrow ? 4 : 14,
+      horizontalMargin: narrow ? 4 : 12,
+      headingRowHeight: narrow ? 30 : 40,
+      dataRowMinHeight: narrow ? 30 : 40,
+      dataRowMaxHeight: narrow ? 92 : 56,
+      columns: [
+        DataColumn(label: headerLabel('foodcost_col_num', '№', '#')),
+        DataColumn(label: headerLabel('foodcost_col_name', 'Блюдо', 'Dish')),
+        DataColumn(
+          numeric: true,
+          label: headerLabel('foodcost_col_cost', 'С/с', 'Cost'),
+        ),
+        DataColumn(
+          numeric: true,
+          label: _mode == FoodcostPricingMode.markupOnCost
+              ? headerLabel('foodcost_col_markup_actual', 'Факт %', 'Act %')
+              : headerLabel('foodcost_col_cost_share_actual', 'Доля %', 'Shr %'),
+        ),
+        DataColumn(
+          numeric: true,
+          label: headerLabel('foodcost_price_optimal', 'Целевая', 'Target'),
+        ),
+        DataColumn(
+          numeric: true,
+          label: headerLabel('foodcost_price_actual', 'В меню', 'Menu'),
+        ),
+        DataColumn(
+          label: headerLabel('foodcost_col_dish_target_pct', '% блюда', '% dish'),
+        ),
+      ],
+      rows: [
+        for (final g in groups) ...[
+          DataRow(
+            color: WidgetStatePropertyAll(
+              Theme.of(context)
+                  .colorScheme
+                  .surfaceContainerHighest
+                  .withValues(alpha: 0.6),
+            ),
+            cells: [
+              const DataCell(Text('')),
+              DataCell(
+                Text(
+                  techCardSectionGroupLabel(g.section, loc),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              const DataCell(Text('')),
+              const DataCell(Text('')),
+              const DataCell(Text('')),
+              const DataCell(Text('')),
+              const DataCell(Text('')),
+            ],
+          ),
+          for (final tc in g.cards)
+            _buildRow(loc, tc, ++rowNum, targetPct, narrow: narrow),
+        ],
+      ],
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -589,35 +684,27 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                 },
               ),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _targetPctController,
-                      decoration: InputDecoration(
-                        labelText: loc.t('foodcost_target_pct') ?? 'Целевой %',
-                        border: const OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                      ],
-                      onChanged: (_) => setState(() {}),
-                      onSubmitted: (_) => _persistTarget(),
-                      onEditingComplete: _persistTarget,
+              Align(
+                alignment: Alignment.centerLeft,
+                child: SizedBox(
+                  width: narrow ? 88 : 104,
+                  child: TextField(
+                    controller: _targetPctController,
+                    decoration: const InputDecoration(
+                      labelText: '%',
+                      border: OutlineInputBorder(),
+                      isDense: true,
                     ),
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(4),
+                    ],
+                    onChanged: (_) => setState(() {}),
+                    onSubmitted: (_) => _persistTarget(),
+                    onEditingComplete: _persistTarget,
                   ),
-                  const SizedBox(width: 12),
-                  Flexible(
-                    child: Text(
-                      _mode == FoodcostPricingMode.markupOnCost
-                          ? (loc.t('foodcost_mode_markup_hint') ?? 'к с/с')
-                          : (loc.t('foodcost_mode_cost_share_hint') ?? '% от цены'),
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                ],
+                ),
               ),
               const SizedBox(height: 8),
               TextField(
@@ -635,114 +722,43 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         Expanded(
           child: Scrollbar(
             child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: SingleChildScrollView(
-                  child: Padding(
-                  padding: EdgeInsets.fromLTRB(narrow ? 8 : 16, 0, narrow ? 8 : 16, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (groups.isNotEmpty)
-                        DataTable(
-                          columnSpacing: narrow ? 8 : 16,
-                          horizontalMargin: narrow ? 6 : 12,
-                          headingRowHeight: narrow ? 36 : 40,
-                          dataRowMinHeight: narrow ? 36 : 40,
-                          dataRowMaxHeight: narrow ? 132 : 56,
-                          columns: [
-                            DataColumn(
-                              label: Text(
-                                loc.t('foodcost_col_num') ?? '#',
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                loc.t('foodcost_col_name') ?? 'Блюдо',
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                            DataColumn(
-                              numeric: true,
-                              label: Text(
-                                loc.t('foodcost_col_cost') ?? 'С/с порции',
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                            DataColumn(
-                              numeric: true,
-                              label: Text(
-                                _mode == FoodcostPricingMode.markupOnCost
-                                    ? (loc.t('foodcost_col_markup_actual') ??
-                                        'Наценка факт %')
-                                    : (loc.t('foodcost_col_cost_share_actual') ??
-                                        'С/с от цены факт %'),
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                            DataColumn(
-                              numeric: true,
-                              label: Text(
-                                loc.t('foodcost_price_optimal'),
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                            DataColumn(
-                              numeric: true,
-                              label: Text(
-                                loc.t('foodcost_price_actual'),
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                            DataColumn(
-                              label: Text(
-                                loc.t('foodcost_col_dish_target_pct'),
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                                textAlign: TextAlign.end,
-                              ),
-                            ),
-                          ],
-                          rows: [
-                            for (final g in groups) ...[
-                              DataRow(
-                                color: WidgetStatePropertyAll(
-                                  Theme.of(context)
-                                      .colorScheme
-                                      .surfaceContainerHighest
-                                      .withValues(alpha: 0.6),
+              padding: EdgeInsets.fromLTRB(narrow ? 6 : 16, 0, narrow ? 6 : 16, 24),
+              child: narrow
+                  ? FittedBox(
+                      fit: BoxFit.fitWidth,
+                      alignment: Alignment.topLeft,
+                      child: SizedBox(
+                        width: 760,
+                        child: groups.isNotEmpty
+                            ? foodcostTable
+                            : Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Text(
+                                  loc.t('menu_empty_dishes') ?? '',
+                                  style: Theme.of(context).textTheme.bodyLarge,
                                 ),
-                                cells: [
-                                  const DataCell(Text('')),
-                                  DataCell(
-                                    Text(
-                                      techCardSectionGroupLabel(g.section, loc),
-                                      style: const TextStyle(fontWeight: FontWeight.w700),
-                                    ),
-                                  ),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                  const DataCell(Text('')),
-                                ],
                               ),
-                              for (final tc in g.cards)
-                                _buildRow(loc, tc, ++rowNum, targetPct, narrow: narrow),
-                            ],
-                          ],
-                        ),
-                      if (groups.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            loc.t('menu_empty_dishes') ?? '',
-                            style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (groups.isNotEmpty)
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: foodcostTable,
                           ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
+                        if (groups.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Text(
+                              loc.t('menu_empty_dishes') ?? '',
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
+                          ),
+                      ],
+                    ),
             ),
           ),
         ),

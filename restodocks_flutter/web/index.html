@@ -47,7 +47,8 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <!-- interactive-widget: Chrome Android — клавиатура/панели не перекрывают вёрстку; 100dvh в CSS — высота под динамические панели -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content">
 
   <!-- SEO Meta Tags (default: English for international reach) -->
   <meta name="description" content="Professional restaurant tool. Smart recipe import from iiko/Excel, multi-user inventory merging, and automated food cost tracking.">
@@ -109,7 +110,18 @@
   <link rel="manifest" href="manifest.json">
   <script src="theme-icons.js" defer></script>
   <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #AD292C; }
+    /* 100dvh / fill-available: высота под мобильные панели браузера; без жёсткого 100vh «лишней» полосы в альбоме */
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      min-height: 100%;
+      min-height: -webkit-fill-available;
+      height: 100dvh;
+      max-height: 100dvh;
+      overflow: hidden;
+      background: #AD292C;
+    }
     flt-glass-pane, flt-scene, flutter-view, #flt-glass-pane {
       background: #AD292C !important;
     }
@@ -175,6 +187,21 @@
     // Do not hide by canvas mutation: it may fire before first painted frame and causes white flash.
     // Last resort: remove after 20s
     setTimeout(hideLoadingScreen, 20000);
+  </script>
+  <script>
+    // iOS Safari: лёгкий сдвиг scroll иногда помогает свернуть адресную строку после первого кадра (без поломки вёрстки).
+    window.addEventListener('flutter-first-frame', function () {
+      try {
+        if (!/iPhone|iPad|iPod/i.test(navigator.userAgent) || window.navigator.standalone) return;
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            var y = window.scrollY || 0;
+            window.scrollTo(0, y + 1);
+            window.scrollTo(0, y);
+          });
+        });
+      } catch (e) {}
+    });
   </script>
   <script>
     // iOS Safari/Chrome: кнопки ▲▼ над клавиатурой.

@@ -12,17 +12,77 @@ import '../services/home_button_config_service.dart';
 import '../services/page_tour_service.dart';
 import 'subscription_required_dialog.dart';
 
+const _kDataAccessRequiredPaths = [
+  '/tech-cards', '/nomenclature', '/inventory', '/checklists',
+  '/product-order', '/menu', '/suppliers', '/order-lists',
+  '/expenses', '/haccp-journals', '/inbox',
+];
+
 /// Оболочка с нижней навигацией для всех рабочих экранов (кроме инвентаризации).
-class AppShell extends StatelessWidget {
+class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.child});
 
   final Widget child;
 
-  static const _dataAccessRequiredPaths = [
-    '/tech-cards', '/nomenclature', '/inventory', '/checklists',
-    '/product-order', '/menu', '/suppliers', '/order-lists',
-    '/expenses', '/haccp-journals', '/inbox',
-  ];
+  @override
+  State<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends State<AppShell> {
+  /// В альбоме на телефоне скрываем нижнюю панель при прокрутке вниз (больше места под контент).
+  bool _hideBottomBar = false;
+  double _lastScrollPixels = 0;
+  String? _lastPath;
+
+  static const _navBarHeight = 56.0;
+
+  bool _landscapeNarrowPhone(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    return mq.orientation == Orientation.landscape &&
+        mq.size.shortestSide < 600;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final path = GoRouterState.of(context).matchedLocation;
+    if (_lastPath != path) {
+      _lastPath = path;
+      _lastScrollPixels = 0;
+      if (_hideBottomBar) {
+        setState(() => _hideBottomBar = false);
+      }
+    }
+  }
+
+  bool _onScroll(ScrollNotification n) {
+    if (!_landscapeNarrowPhone(context)) {
+      if (_hideBottomBar) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _hideBottomBar = false);
+        });
+      }
+      return false;
+    }
+    if (n is! ScrollUpdateNotification) return false;
+    if (n.metrics.axis != Axis.vertical) return false;
+
+    final p = n.metrics.pixels;
+    final delta = p - _lastScrollPixels;
+    _lastScrollPixels = p;
+
+    if (p <= 12) {
+      if (_hideBottomBar) setState(() => _hideBottomBar = false);
+      return false;
+    }
+
+    if (delta > 10 && p > 48) {
+      if (!_hideBottomBar) setState(() => _hideBottomBar = true);
+    } else if (delta < -10) {
+      if (_hideBottomBar) setState(() => _hideBottomBar = false);
+    }
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +90,7 @@ class AppShell extends StatelessWidget {
     final accountManager = context.watch<AccountManagerSupabase>();
     final currentEmployee = accountManager.currentEmployee;
 
-    if (currentEmployee == null) return child;
+    if (currentEmployee == null) return widget.child;
 
     final isOwner = currentEmployee.hasRole('owner');
     final homeBtnConfig = context.watch<HomeButtonConfigService>();
@@ -45,18 +105,22 @@ class AppShell extends StatelessWidget {
     final location = GoRouterState.of(context).matchedLocation;
     final selectedIndex = _indexForLocation(location, middleAction, noDataAccess, isKitchenNoData, currentEmployee);
 
-    final isDataRequiredRoute = _dataAccessRequiredPaths.any((p) => location.startsWith(p));
+    final isDataRequiredRoute =
+        _kDataAccessRequiredPaths.any((p) => location.startsWith(p));
     final showAccessPendingStub = noDataAccess && isDataRequiredRoute;
 
     final tourController = context.watch<PageTourService>().homeTourController;
     final navBar = NavigationBarTheme(
         data: const NavigationBarThemeData(
-          height: 56,
+          height: _navBarHeight,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
         ),
         child: NavigationBar(
           selectedIndex: selectedIndex,
-          onDestinationSelected: (i) => _onTap(context, i, middleAction, noDataAccess, isKitchenNoData, currentEmployee, selectedIndex),
+          onDestinationSelected: (i) {
+            setState(() => _hideBottomBar = false);
+            _onTap(context, i, middleAction, noDataAccess, isKitchenNoData, currentEmployee, selectedIndex);
+          },
           destinations: [
             NavigationDestination(
               icon: const Icon(Icons.home_outlined),
@@ -112,9 +176,28 @@ class AppShell extends StatelessWidget {
           )
         : navBar;
 
+    final landscapeNarrow = _landscapeNarrowPhone(context);
+    final hideNav = landscapeNarrow && _hideBottomBar;
+
+    final bodyChild = showAccessPendingStub ? _AccessPendingPlaceholder(loc: loc) : widget.child;
+
     return Scaffold(
-      body: showAccessPendingStub ? _AccessPendingPlaceholder(loc: loc) : child,
-      bottomNavigationBar: bottomBar,
+      body: NotificationListener<ScrollNotification>(
+        onNotification: _onScroll,
+        child: bodyChild,
+      ),
+      bottomNavigationBar: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        height: hideNav ? 0 : _navBarHeight,
+        child: ClipRect(
+          child: Align(
+            alignment: Alignment.topCenter,
+            heightFactor: hideNav ? 0 : 1,
+            child: bottomBar,
+          ),
+        ),
+      ),
     );
   }
 
