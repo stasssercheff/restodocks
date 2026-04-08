@@ -127,23 +127,23 @@
     @supports (min-height: 100lvh) { html, body { min-height: 100lvh; } }
     /* Landscape on phones: keep top area red, table/page area light to screen edges. */
     @media (orientation: landscape) {
+      :root {
+        --rd-top-zone: 84px;
+        --rd-footer-zone: calc(56px + env(safe-area-inset-bottom, 0px));
+      }
       html, body {
         background: linear-gradient(
           to bottom,
           #AD292C 0,
-          #AD292C 84px,
-          #f7f4f4 84px,
-          #f7f4f4 calc(100% - 72px),
-          #f7e9e9 calc(100% - 72px),
+          #AD292C var(--rd-top-zone),
+          #f7f4f4 var(--rd-top-zone),
+          #f7f4f4 calc(100% - var(--rd-footer-zone)),
+          #f7e9e9 calc(100% - var(--rd-footer-zone)),
           #f7e9e9 100%
         );
       }
       flt-glass-pane, flt-scene, flutter-view, #flt-glass-pane {
         background: transparent !important;
-      }
-      /* Avoid white/gray gutters around iOS bottom safe area in landscape. */
-      body {
-        padding-bottom: env(safe-area-inset-bottom, 0px);
       }
     }
     /* Keep a real document scroll range so mobile browser chrome can collapse. */

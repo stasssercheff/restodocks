@@ -262,22 +262,32 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
 
   void _onTableVScroll() {
     if (!_vScroll.hasClients) return;
+    if (!mounted) return;
     final p = _vScroll.position.pixels;
+    if (p < 0) return;
+    final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+    if (keyboardOpen) {
+      _lastVScrollPixels = p;
+      if (_hideControlsOnScroll) {
+        setState(() => _hideControlsOnScroll = false);
+      }
+      return;
+    }
     if (_lastVScrollPixels == 0 && p > 0) {
       _lastVScrollPixels = p;
       return;
     }
     final d = p - _lastVScrollPixels;
     _lastVScrollPixels = p;
-    if (p <= 8) {
+    if (p <= 2) {
       if (_hideControlsOnScroll) {
         setState(() => _hideControlsOnScroll = false);
       }
       return;
     }
-    if (p > 36 && d > 8 && !_hideControlsOnScroll) {
+    if (p > 40 && d > 10 && !_hideControlsOnScroll) {
       setState(() => _hideControlsOnScroll = true);
-    } else if (d < -8 && _hideControlsOnScroll) {
+    } else if (d < -10 && _hideControlsOnScroll) {
       setState(() => _hideControlsOnScroll = false);
     }
   }
