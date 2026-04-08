@@ -942,7 +942,7 @@ class _MenuScreenState extends State<MenuScreen> {
           if (_displayDishes.isNotEmpty && !_loading)
             IconButton(
               icon: const Icon(Icons.save_alt),
-              tooltip: loc.t('save_to_device') ?? 'Сохранить на устройство',
+              tooltip: 'Скачать',
               onPressed: _openDeviceExportDialog,
             ),
           if (menuSeg == 0 && _downloadableDishes.isNotEmpty && !_loading)

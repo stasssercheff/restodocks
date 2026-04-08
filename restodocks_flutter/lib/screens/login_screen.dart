@@ -285,14 +285,14 @@ class _LoginScreenState extends State<LoginScreen> {
       Center(
         child: InkWell(
           onTap: () async {
-            final addr = loc.t('login_footer_email');
+            const addr = 'info@restodocks.com';
             final uri = Uri(scheme: 'mailto', path: addr);
             if (await canLaunchUrl(uri)) {
               await launchUrl(uri);
             }
           },
           child: Text(
-            loc.t('login_footer_email'),
+            'info@restodocks.com',
             style: TextStyle(
               color: Theme.of(context).colorScheme.primary,
               decoration: TextDecoration.underline,
