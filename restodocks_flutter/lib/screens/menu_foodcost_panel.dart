@@ -273,22 +273,17 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       }
       return;
     }
-    if (_lastVScrollPixels == 0 && p > 0) {
-      _lastVScrollPixels = p;
-      return;
-    }
-    final d = p - _lastVScrollPixels;
     _lastVScrollPixels = p;
-    if (p <= 2) {
+    // Stable hysteresis: hide once after meaningful down-scroll,
+    // show only when user returns close to top.
+    if (p <= 14) {
       if (_hideControlsOnScroll) {
         setState(() => _hideControlsOnScroll = false);
       }
       return;
     }
-    if (p > 40 && d > 10 && !_hideControlsOnScroll) {
+    if (p >= 72 && !_hideControlsOnScroll) {
       setState(() => _hideControlsOnScroll = true);
-    } else if (d < -10 && _hideControlsOnScroll) {
-      setState(() => _hideControlsOnScroll = false);
     }
   }
 

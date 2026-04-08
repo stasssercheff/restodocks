@@ -132,17 +132,19 @@
         --rd-footer-zone: calc(56px + env(safe-area-inset-bottom, 0px));
       }
       html, body {
-        background: linear-gradient(
-          to bottom,
-          #AD292C 0,
-          #AD292C var(--rd-top-zone),
-          #f7f4f4 var(--rd-top-zone),
-          #f7f4f4 calc(100% - var(--rd-footer-zone)),
-          #f7e9e9 calc(100% - var(--rd-footer-zone)),
-          #f7e9e9 100%
-        );
+        width: 100vw;
+        min-width: 100vw;
+        max-width: 100vw;
+        overflow-x: hidden;
+        background:
+          linear-gradient(#AD292C, #AD292C) top / 100% var(--rd-top-zone) no-repeat,
+          linear-gradient(#f7e9e9, #f7e9e9) bottom / 100% var(--rd-footer-zone) no-repeat,
+          #f7f4f4;
       }
       flt-glass-pane, flt-scene, flutter-view, #flt-glass-pane {
+        width: 100vw !important;
+        min-width: 100vw !important;
+        max-width: 100vw !important;
         background: transparent !important;
       }
     }
