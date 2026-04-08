@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
-/// Согласование цен номенклатуры по факту приёмки (шеф во входящих).
+/// Согласование изменения цен в номенклатуре (приёмка уже сохранена; шеф во входящих).
 class ProcurementPriceApprovalInboxDetailScreen extends StatefulWidget {
   const ProcurementPriceApprovalInboxDetailScreen({
     super.key,

@@ -19,7 +19,7 @@ enum DocumentType {
   writeoff,
   /// Изменение ТТК на согласовании у владельца
   techCardChangeRequest,
-  /// Согласование цен номенклатуры после приёмки (не-шеф → шефу во входящие).
+  /// Согласование изменения цен в номенклатуре (приёмка уже сохранена; не-шеф → шефу во входящие).
   procurementPriceApproval,
 }
 
@@ -136,7 +136,7 @@ class InboxDocument extends Equatable {
         final supplier =
             metadata?['receiptSupplier']?.toString() ?? '—';
         return (loc.t('inbox_title_procurement_price_approval') ??
-                'Цены по приёмке: %s')
+                'Согласование цен: %s')
             .replaceFirst('%s', supplier);
     }
   }
