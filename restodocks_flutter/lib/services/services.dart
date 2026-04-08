@@ -49,6 +49,7 @@ export 'tech_card_change_request_service.dart';
 export 'tech_cards_reconcile_notifier.dart';
 export 'order_document_service.dart';
 export 'procurement_receipt_service.dart';
+export 'procurement_price_approval_service.dart';
 export 'procurement_receipt_export_service.dart';
 export 'employee_message_service.dart';
 export 'group_chat_service.dart';

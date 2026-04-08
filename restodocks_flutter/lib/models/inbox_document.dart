@@ -19,6 +19,8 @@ enum DocumentType {
   writeoff,
   /// Изменение ТТК на согласовании у владельца
   techCardChangeRequest,
+  /// Согласование цен номенклатуры после приёмки (не-шеф → шефу во входящие).
+  procurementPriceApproval,
 }
 
 /// Модель документа во входящих
@@ -82,6 +84,8 @@ class InboxDocument extends Equatable {
         return Icons.remove_circle_outline;
       case DocumentType.techCardChangeRequest:
         return Icons.restaurant_menu;
+      case DocumentType.procurementPriceApproval:
+        return Icons.price_change_outlined;
     }
   }
 
@@ -128,6 +132,12 @@ class InboxDocument extends Equatable {
         return '${loc.t('writeoffs') ?? 'Списания'} ($catName) $date';
       case DocumentType.techCardChangeRequest:
         return title;
+      case DocumentType.procurementPriceApproval:
+        final supplier =
+            metadata?['receiptSupplier']?.toString() ?? '—';
+        return (loc.t('inbox_title_procurement_price_approval') ??
+                'Цены по приёмке: %s')
+            .replaceFirst('%s', supplier);
     }
   }
 
@@ -154,6 +164,9 @@ class InboxDocument extends Equatable {
         return loc.t('writeoffs') ?? 'Списания';
       case DocumentType.techCardChangeRequest:
         return loc.t('doc_type_ttk_change');
+      case DocumentType.procurementPriceApproval:
+        return loc.t('doc_type_procurement_price_approval') ??
+            'Согласование цен';
     }
   }
 

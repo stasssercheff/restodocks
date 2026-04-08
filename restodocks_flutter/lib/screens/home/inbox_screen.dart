@@ -399,7 +399,13 @@ class _InboxScreenState extends State<InboxScreen> {
         _InboxTypeTab.notifications =>
           DocumentType.checklistMissedDeadline, // unreachable, handled above
       };
-      return docsByDept.where((d) => d.type == docType).toList();
+      return docsByDept.where((d) {
+        if (_selectedTypeTab == _InboxTypeTab.order) {
+          return d.type == DocumentType.productOrder ||
+              d.type == DocumentType.procurementPriceApproval;
+        }
+        return d.type == docType;
+      }).toList();
     }
     // Остальные: по типу документа
     switch (_selectedTab) {
@@ -411,7 +417,9 @@ class _InboxScreenState extends State<InboxScreen> {
             .toList();
       case _InboxTab.order:
         return _documents
-            .where((d) => d.type == DocumentType.productOrder)
+            .where((d) =>
+                d.type == DocumentType.productOrder ||
+                d.type == DocumentType.procurementPriceApproval)
             .toList();
       case _InboxTab.inventory:
         return _documents
@@ -633,7 +641,9 @@ class _InboxScreenState extends State<InboxScreen> {
         return _unreadMessagesCount;
       case _InboxTypeTab.order:
         return docsByDept
-            .where((d) => d.type == DocumentType.productOrder)
+            .where((d) =>
+                d.type == DocumentType.productOrder ||
+                d.type == DocumentType.procurementPriceApproval)
             .length;
       case _InboxTypeTab.inventory:
         return docsByDept.where((d) => d.type == DocumentType.inventory).length;
@@ -668,7 +678,9 @@ class _InboxScreenState extends State<InboxScreen> {
         return _unreadMessagesCount;
       case _InboxTab.order:
         return docsUnviewed
-            .where((d) => d.type == DocumentType.productOrder)
+            .where((d) =>
+                d.type == DocumentType.productOrder ||
+                d.type == DocumentType.procurementPriceApproval)
             .length;
       case _InboxTab.inventory:
         return docsUnviewed
@@ -1503,6 +1515,10 @@ class _DocumentTile extends StatelessWidget {
                   context.push('/inbox/inventory/${document.id}');
                 } else if (document.type == DocumentType.writeoff) {
                   context.push('/inbox/writeoff/${document.id}');
+                } else if (document.type ==
+                    DocumentType.procurementPriceApproval) {
+                  context.push(
+                      '/inbox/procurement-price-approval/${document.id}');
                 } else if (document.type == DocumentType.productOrder) {
                   final rh = document.metadata?['header'];
                   final isReceipt = rh is Map && rh['receipt'] == true;
@@ -1574,6 +1590,10 @@ class _DocumentTile extends StatelessWidget {
     }
     if (document.type == DocumentType.writeoff) {
       context.push('/inbox/writeoff/${document.id}');
+      return;
+    }
+    if (document.type == DocumentType.procurementPriceApproval) {
+      context.push('/inbox/procurement-price-approval/${document.id}');
       return;
     }
     if (document.type == DocumentType.productOrder) {

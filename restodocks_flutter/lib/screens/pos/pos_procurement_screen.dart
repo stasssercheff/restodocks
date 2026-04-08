@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/services.dart';
-import '../../core/feature_flags.dart';
 import '../../utils/pos_order_department.dart';
 import '../../widgets/app_bar_home_button.dart';
 import 'procurement_receiving_tab.dart';
@@ -36,7 +35,8 @@ class _PosProcurementScreenState extends State<PosProcurementScreen> {
     final title =
         '${loc.t('pos_procurement_title')} ${deptLabel.toLowerCase()}';
 
-    final showReceiving = FeatureFlags.posModuleEnabled;
+    // «Приём поставок» доступен и при выключенном POS на прод-витрине (см. FeatureFlags.posModuleEnabled).
+    final showReceiving = true;
     final tabs = [
       loc.t('pos_procurement_tab_product_order'),
       if (showReceiving) loc.t('pos_procurement_tab_receiving'),

@@ -66,6 +66,8 @@ class InboxService {
       final ordersFuture = OrderDocumentService().listForEstablishment(establishmentId);
       final receiptsFuture =
           ProcurementReceiptService.instance.listDeduped(establishmentId);
+      final priceApprovalFuture =
+          ProcurementPriceApprovalService.instance.listPending(establishmentId);
 
       final results = await Future.wait([
         inventoryFuture,
@@ -73,12 +75,14 @@ class InboxService {
         missedFuture,
         ordersFuture,
         receiptsFuture,
+        priceApprovalFuture,
       ]);
       final rawList = results[0] as List<Map<String, dynamic>>;
       final subList = results[1];
       final missed = results[2];
       final orderDocs = results[3] as List<Map<String, dynamic>>;
       final receiptDocs = results[4] as List<Map<String, dynamic>>;
+      final priceApprovalRows = results[5] as List<Map<String, dynamic>>;
 
       for (final doc in rawList) {
         final payload = doc['payload'] as Map<String, dynamic>? ?? {};
@@ -253,6 +257,95 @@ class InboxService {
           fileUrl: null,
           metadata: payload,
         ));
+      }
+
+      if (priceApprovalRows.isNotEmpty) {
+        final receiptIds = priceApprovalRows
+            .map((r) => r['receipt_document_id']?.toString())
+            .whereType<String>()
+            .toSet()
+            .toList();
+        final receiptById = <String, Map<String, dynamic>>{};
+        if (receiptIds.isNotEmpty) {
+          try {
+            final recData = await _supabase.client
+                .from('procurement_receipt_documents')
+                .select('id, payload')
+                .inFilter('id', receiptIds);
+            for (final r in (recData as List? ?? [])) {
+              if (r is Map) {
+                final m = Map<String, dynamic>.from(r);
+                final id = m['id']?.toString();
+                if (id != null) receiptById[id] = m;
+              }
+            }
+          } catch (e) {
+            devLog('InboxService: procurement receipts for price approval $e');
+          }
+        }
+        final authorIds = priceApprovalRows
+            .map((r) => r['created_by_employee_id']?.toString())
+            .whereType<String>()
+            .toSet()
+            .toList();
+        final nameByEmp = <String, String>{};
+        if (authorIds.isNotEmpty) {
+          try {
+            final empData = await _supabase.client
+                .from('employees')
+                .select('id, full_name, surname')
+                .inFilter('id', authorIds);
+            for (final e in (empData as List? ?? [])) {
+              if (e is Map) {
+                final m = Map<String, dynamic>.from(e);
+                final id = m['id']?.toString();
+                if (id == null) continue;
+                final fn = m['full_name']?.toString() ?? '';
+                final sn = m['surname']?.toString() ?? '';
+                nameByEmp[id] = fn.trim().isNotEmpty ? fn : sn;
+              }
+            }
+          } catch (e) {
+            devLog('InboxService: employees for price approval $e');
+          }
+        }
+
+        for (final row in priceApprovalRows) {
+          final recId = row['receipt_document_id']?.toString();
+          final rec =
+              recId != null ? receiptById[recId] : null;
+          final p = rec?['payload'] as Map<String, dynamic>?;
+          final header = p?['header'] as Map<String, dynamic>? ?? {};
+          final docDept = _mapSectionToDepartment(
+            header['department']?.toString() ?? 'kitchen',
+          );
+          if (!ProcurementPriceApprovalService.canSeePriceApproval(
+              currentEmployee, docDept)) {
+            continue;
+          }
+          final supplier = header['supplierName']?.toString() ?? '—';
+          final createdBy = row['created_by_employee_id']?.toString() ?? '';
+          final authorName = nameByEmp[createdBy] ?? '—';
+          final createdAt = row['created_at'] != null
+              ? (DateTime.tryParse(row['created_at'].toString()) ??
+                      DateTime.now())
+                  .toLocal()
+              : DateTime.now();
+          final meta = Map<String, dynamic>.from(row);
+          meta['receiptSupplier'] = supplier;
+          documents.add(InboxDocument(
+            id: row['id']?.toString() ?? '',
+            type: DocumentType.procurementPriceApproval,
+            title: supplier,
+            description: authorName,
+            createdAt: createdAt,
+            employeeId: createdBy,
+            employeeName: authorName,
+            department: docDept,
+            fileUrl: null,
+            metadata: meta,
+          ));
+        }
       }
 
       documents.sort((a, b) => b.createdAt.compareTo(a.createdAt));

@@ -950,6 +950,104 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
     return 'same';
   }
 
+  /// Строки, где фактическая цена за ед. (с учётом скидки) отличается от цены в номенклатуре.
+  List<Map<String, dynamic>> _collectPriceChangeLines(
+    ProductStoreSupabase store,
+    Establishment est,
+  ) {
+    final nomId = est.productsEstablishmentId;
+    final currency = est.defaultCurrency ?? 'RUB';
+    final out = <Map<String, dynamic>>[];
+    for (final l in _lines) {
+      final rec = _parse(l.received.text);
+      if (rec <= 0) continue;
+      final pid = l.productId;
+      if (pid == null || pid.isEmpty) continue;
+      final actPrice = _parse(l.actualPrice.text);
+      final disc = _parse(l.discountPercent.text).clamp(0, 100);
+      final effectiveNew = actPrice * (1 - disc / 100);
+      if (effectiveNew <= 0) continue;
+      final old = store.getEstablishmentPrice(pid, nomId)?.$1;
+      if (old != null && (old - effectiveNew).abs() <= 0.001) continue;
+      out.add({
+        'productId': pid,
+        'productName':
+            l.nameCtrl.text.trim().isEmpty ? '—' : l.nameCtrl.text.trim(),
+        'unit': l.unit,
+        'oldPricePerUnit': old,
+        'newPricePerUnit': effectiveNew,
+        'currency': currency,
+      });
+    }
+    return out;
+  }
+
+  /// Возвращает список productId для обновления; пустой — не обновлять цены.
+  Future<List<String>> _showPriceApprovalDialog(
+    List<Map<String, dynamic>> lines,
+  ) async {
+    final loc = context.read<LocalizationService>();
+    final selected = <String>{
+      for (final l in lines)
+        if (l['productId'] != null) l['productId'].toString(),
+    };
+    final result = await showDialog<List<String>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSt) {
+            return AlertDialog(
+              title: Text(loc.t('procurement_receipt_price_confirm_title')),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(loc.t('procurement_receipt_price_confirm_hint')),
+                    const SizedBox(height: 8),
+                    ...lines.map((line) {
+                      final pid = line['productId']?.toString() ?? '';
+                      final oldP = line['oldPricePerUnit'];
+                      final newP = line['newPricePerUnit'];
+                      final oldStr = oldP == null ? '—' : oldP.toString();
+                      final newStr = newP == null ? '—' : newP.toString();
+                      return CheckboxListTile(
+                        value: selected.contains(pid),
+                        onChanged: (v) {
+                          setSt(() {
+                            if (v == true) {
+                              selected.add(pid);
+                            } else {
+                              selected.remove(pid);
+                            }
+                          });
+                        },
+                        title: Text(line['productName']?.toString() ?? '—'),
+                        subtitle: Text('$oldStr → $newStr'),
+                      );
+                    }),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, <String>[]),
+                  child: Text(loc.t('procurement_receipt_price_skip')),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, selected.toList()),
+                  child: Text(loc.t('procurement_receipt_price_apply')),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    return result ?? <String>[];
+  }
+
   Future<void> _submit() async {
     final loc = context.read<LocalizationService>();
     final acc = context.read<AccountManagerSupabase>();
@@ -1052,12 +1150,31 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         'grandTotal': _totalReceived,
       };
 
-      final ok = await ProcurementReceiptService.instance.saveViaEdge(
-        establishmentId: est.id,
-        createdByEmployeeId: emp.id,
-        payload: payload,
-        sourceOrderDocumentId: widget.orderDocumentId,
+      final priceLines = _collectPriceChangeLines(store, est);
+      final approveOnDevice =
+          ProcurementPriceApprovalService.canApproveOnReceiptDevice(
+        emp,
+        widget.department,
       );
+
+      final Map<String, dynamic>? ok;
+      if (!approveOnDevice && priceLines.isNotEmpty) {
+        ok = await ProcurementReceiptService.instance.saveViaEdge(
+          establishmentId: est.id,
+          createdByEmployeeId: emp.id,
+          payload: payload,
+          sourceOrderDocumentId: widget.orderDocumentId,
+          priceApprovalLines: priceLines,
+          nomenclatureEstablishmentId: est.productsEstablishmentId,
+        );
+      } else {
+        ok = await ProcurementReceiptService.instance.saveViaEdge(
+          establishmentId: est.id,
+          createdByEmployeeId: emp.id,
+          payload: payload,
+          sourceOrderDocumentId: widget.orderDocumentId,
+        );
+      }
 
       if (widget.manualOffSystem && ok != null) {
         await _ensureSupplierTemplate(
@@ -1081,6 +1198,25 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
       if (!mounted) return;
       setState(() => _saving = false);
       if (ok != null) {
+        if (approveOnDevice && priceLines.isNotEmpty) {
+          final pick = await _showPriceApprovalDialog(priceLines);
+          if (pick.isNotEmpty) {
+            final pickSet = pick.toSet();
+            for (final line in priceLines) {
+              final pid = line['productId'] as String?;
+              if (pid == null || !pickSet.contains(pid)) continue;
+              final newP = (line['newPricePerUnit'] as num?)?.toDouble();
+              if (newP == null) continue;
+              await store.setEstablishmentPrice(
+                est.productsEstablishmentId,
+                pid,
+                newP,
+                line['currency'] as String? ?? est.defaultCurrency ?? 'RUB',
+              );
+            }
+          }
+        }
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(loc.t('procurement_receipt_saved'))),
         );

@@ -16,6 +16,8 @@ class ProcurementReceiptService {
     required String createdByEmployeeId,
     required Map<String, dynamic> payload,
     String? sourceOrderDocumentId,
+    List<Map<String, dynamic>>? priceApprovalLines,
+    String? nomenclatureEstablishmentId,
   }) async {
     try {
       final res = await _supabase.client.functions.invoke(
@@ -26,6 +28,11 @@ class ProcurementReceiptService {
           'payload': payload,
           if (sourceOrderDocumentId != null && sourceOrderDocumentId.isNotEmpty)
             'sourceOrderDocumentId': sourceOrderDocumentId,
+          if (priceApprovalLines != null && priceApprovalLines.isNotEmpty)
+            'priceApprovalLines': priceApprovalLines,
+          if (nomenclatureEstablishmentId != null &&
+              nomenclatureEstablishmentId.isNotEmpty)
+            'nomenclatureEstablishmentId': nomenclatureEstablishmentId,
         },
       );
       final data = res.data;

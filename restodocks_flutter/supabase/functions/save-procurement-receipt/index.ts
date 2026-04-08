@@ -9,6 +9,15 @@ import {
   resolveCorsHeaders,
 } from "../_shared/security.ts";
 
+function isApproverOnDevice(roles: unknown, department: string): boolean {
+  const r = Array.isArray(roles) ? (roles as string[]) : [];
+  if (r.includes("executive_chef") || r.includes("sous_chef")) return true;
+  if (r.includes("owner") || r.includes("general_manager")) return true;
+  const d = (department || "kitchen").toLowerCase();
+  if (d === "bar" && r.includes("bar_manager")) return true;
+  return false;
+}
+
 Deno.serve(async (req: Request) => {
   const corsHeaders = resolveCorsHeaders(req);
   if (req.method === "OPTIONS") {
@@ -44,9 +53,19 @@ Deno.serve(async (req: Request) => {
       createdByEmployeeId?: string;
       payload?: Record<string, unknown>;
       sourceOrderDocumentId?: string | null;
+      /** Строки для согласования цен (только если приёмку делает не шеф/не владелец с полномочиями на устройстве). */
+      priceApprovalLines?: unknown[];
+      nomenclatureEstablishmentId?: string | null;
     };
 
-    const { establishmentId, createdByEmployeeId, payload, sourceOrderDocumentId } = body;
+    const {
+      establishmentId,
+      createdByEmployeeId,
+      payload,
+      sourceOrderDocumentId,
+      priceApprovalLines,
+      nomenclatureEstablishmentId,
+    } = body;
 
     if (!establishmentId || !createdByEmployeeId || !payload || typeof payload !== "object") {
       return new Response(
@@ -160,8 +179,40 @@ Deno.serve(async (req: Request) => {
     }
 
     const firstId = Array.isArray(inserted) && inserted.length > 0 ? (inserted[0] as { id: string })?.id : null;
+
+    let priceApprovalInserted = false;
+    const lines = Array.isArray(priceApprovalLines) ? priceApprovalLines : [];
+    const nomEst =
+      typeof nomenclatureEstablishmentId === "string" && nomenclatureEstablishmentId.length > 0
+        ? nomenclatureEstablishmentId
+        : null;
+    if (lines.length > 0 && nomEst && firstId) {
+      const { data: creatorEmp } = await supabase
+        .from("employees")
+        .select("roles")
+        .eq("id", createdByEmployeeId)
+        .maybeSingle();
+      const payloadHeader = (payload?.header ?? {}) as Record<string, unknown>;
+      const dept = String(payloadHeader["department"] ?? "kitchen");
+      if (!isApproverOnDevice(creatorEmp?.roles, dept)) {
+        const { error: apprErr } = await supabase.from("procurement_price_approval_requests").insert({
+          establishment_id: establishmentId,
+          receipt_document_id: firstId,
+          nomenclature_establishment_id: nomEst,
+          created_by_employee_id: createdByEmployeeId,
+          status: "pending",
+          lines,
+        });
+        if (apprErr) {
+          console.error("procurement_price_approval_requests insert:", apprErr);
+        } else {
+          priceApprovalInserted = true;
+        }
+      }
+    }
+
     return new Response(
-      JSON.stringify({ ok: true, id: firstId }),
+      JSON.stringify({ ok: true, id: firstId, priceApprovalInserted }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

@@ -588,6 +588,16 @@ class AppRouter {
                 },
               ),
               GoRoute(
+                path: 'procurement-price-approval/:id',
+                pageBuilder: (context, state) {
+                  final id = state.pathParameters['id'] ?? '';
+                  return _slideTransitionPage(
+                    state,
+                    ProcurementPriceApprovalInboxDetailScreen(approvalId: id),
+                  );
+                },
+              ),
+              GoRoute(
                 path: 'checklist/:id',
                 pageBuilder: (context, state) {
                   final id = state.pathParameters['id'] ?? '';
