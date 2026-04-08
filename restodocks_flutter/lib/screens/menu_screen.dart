@@ -1073,8 +1073,8 @@ class _MenuScreenState extends State<MenuScreen> {
         Establishment.currencySymbolFor(currencyCode);
     final showFoodcost = _showFoodcostTab(emp);
     final menuSeg = showFoodcost ? _menuSegment : 0;
-    final narrow = MediaQuery.sizeOf(context).width < 560;
-    final hideTopFoodcostSwitch = narrow && showFoodcost && menuSeg == 1;
+    final isPhoneLayout = MediaQuery.sizeOf(context).shortestSide < 600;
+    final hideTopFoodcostSwitch = isPhoneLayout && showFoodcost && menuSeg == 1;
     final hallChips = _isHallMenu &&
         !_loading &&
         (_dishesBar.isNotEmpty || _dishesKitchen.isNotEmpty) &&
@@ -1112,16 +1112,29 @@ class _MenuScreenState extends State<MenuScreen> {
                                 segments: [
                                   ButtonSegment<int>(
                                     value: 0,
-                                    label: Text(loc.t('menu') ?? 'Меню'),
+                                    label: Text(
+                                      loc.t('menu') ?? 'Меню',
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      overflow: TextOverflow.fade,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
                                   ),
                                   ButtonSegment<int>(
                                     value: 1,
-                                    label: Text(loc.t('menu_tab_foodcost')),
+                                    label: Text(
+                                      loc.t('menu_tab_foodcost'),
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      overflow: TextOverflow.fade,
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
                                   ),
                                 ],
                                 selected: {menuSeg},
                                 onSelectionChanged: (s) =>
                                     setState(() => _menuSegment = s.first),
+                                showSelectedIcon: false,
                               ),
                             ),
                           ),

@@ -636,6 +636,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final narrow = MediaQuery.sizeOf(context).width < 560;
+    final isPhoneLayout = MediaQuery.sizeOf(context).shortestSide < 600;
     final shortViewport = MediaQuery.sizeOf(context).height < 560;
     if (_busy) {
       return const Center(child: CircularProgressIndicator());
@@ -819,11 +820,23 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       segments: [
         ButtonSegment<FoodcostPricingMode>(
           value: FoodcostPricingMode.markupOnCost,
-          label: Text(loc.t('foodcost_mode_markup') ?? 'Наценка к с/с'),
+          label: Text(
+            loc.t('foodcost_mode_markup') ?? 'Наценка к с/с',
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.fade,
+            style: TextStyle(fontSize: isPhoneLayout ? 12 : 13),
+          ),
         ),
         ButtonSegment<FoodcostPricingMode>(
           value: FoodcostPricingMode.costShareOfPrice,
-          label: Text(loc.t('foodcost_mode_cost_share') ?? 'Доля с/с в цене'),
+          label: Text(
+            loc.t('foodcost_mode_cost_share') ?? 'Доля с/с в цене',
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.fade,
+            style: TextStyle(fontSize: isPhoneLayout ? 12 : 13),
+          ),
         ),
       ],
       selected: {_mode},
@@ -832,25 +845,39 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         setState(() => _mode = m);
         unawaited(_persistMode(m));
       },
+      showSelectedIcon: false,
     );
 
     final menuSegment =
-        (narrow &&
+        (isPhoneLayout &&
                 widget.onMenuSegmentChanged != null &&
                 widget.menuSegmentValue != null)
             ? SegmentedButton<int>(
                 segments: [
                   ButtonSegment<int>(
                     value: 0,
-                    label: Text(loc.t('menu') ?? 'Меню'),
+                    label: Text(
+                      loc.t('menu') ?? 'Меню',
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.fade,
+                      style: const TextStyle(fontSize: 12),
+                    ),
                   ),
                   ButtonSegment<int>(
                     value: 1,
-                    label: Text(loc.t('menu_tab_foodcost')),
+                    label: Text(
+                      loc.t('menu_tab_foodcost'),
+                      maxLines: 1,
+                      softWrap: false,
+                      overflow: TextOverflow.fade,
+                      style: const TextStyle(fontSize: 12),
+                    ),
                   ),
                 ],
                 selected: {widget.menuSegmentValue!},
                 onSelectionChanged: (s) => widget.onMenuSegmentChanged!(s.first),
+                showSelectedIcon: false,
               )
             : null;
 
@@ -859,7 +886,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (narrow && menuSegment != null)
+          if (isPhoneLayout && menuSegment != null)
             Row(
               children: [
                 Expanded(child: menuSegment),
