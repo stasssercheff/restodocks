@@ -97,6 +97,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
   bool _syncingHScroll = false;
   double _lastVScrollPixels = 0;
   bool _hideControlsOnScroll = false;
+  int _lastControlsToggleMs = 0;
 
   final Map<String, _DishTargetState> _dishTargets = {};
   final Map<String, TextEditingController> _dishPctControllers = {};
@@ -274,15 +275,18 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       return;
     }
     _lastVScrollPixels = p;
-    // Stable hysteresis: hide once after meaningful down-scroll,
-    // show only when user returns close to top.
+    // Stable hysteresis with cooldown to avoid flicker on iOS momentum.
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final canToggle = (now - _lastControlsToggleMs) > 180;
     if (p <= 14) {
-      if (_hideControlsOnScroll) {
+      if (_hideControlsOnScroll && canToggle) {
+        _lastControlsToggleMs = now;
         setState(() => _hideControlsOnScroll = false);
       }
       return;
     }
-    if (p >= 72 && !_hideControlsOnScroll) {
+    if (p >= 72 && !_hideControlsOnScroll && canToggle) {
+      _lastControlsToggleMs = now;
       setState(() => _hideControlsOnScroll = true);
     }
   }
