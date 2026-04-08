@@ -213,6 +213,7 @@
       if (!/iPhone|iPad|iPod/i.test(navigator.userAgent)) return;
       if (window.navigator.standalone) return;
       var ticking = false;
+      var warmup;
       function nudge() {
         if (ticking) return;
         ticking = true;
@@ -223,6 +224,19 @@
           ticking = false;
         });
       }
+      function startWarmup() {
+        var t = 0;
+        clearInterval(warmup);
+        warmup = setInterval(function () {
+          t += 1;
+          nudge();
+          if (t > 40) clearInterval(warmup);
+        }, 120);
+      }
+      window.addEventListener('flutter-first-frame', startWarmup);
+      window.addEventListener('pageshow', startWarmup);
+      window.addEventListener('focus', startWarmup);
+      document.addEventListener('touchstart', nudge, { passive: true });
       window.addEventListener('touchmove', nudge, { passive: true });
       window.addEventListener('orientationchange', function () {
         setTimeout(nudge, 120);

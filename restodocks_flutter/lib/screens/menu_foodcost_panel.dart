@@ -310,10 +310,10 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
 
     return DataRow(
       cells: [
-        DataCell(Text('$rowNum', style: TextStyle(fontSize: narrow ? 12 : null))),
+        DataCell(Text('$rowNum', style: TextStyle(fontSize: narrow ? 11.5 : null))),
         DataCell(
           SizedBox(
-            width: narrow ? 160 : 220,
+            width: narrow ? 148 : 216,
             child: InkWell(
               onTap: () => context.push(
                 widget.openCardInEditMode
@@ -322,13 +322,13 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               ),
               child: Text(
                 tc.getDisplayNameInLists(widget.langCode),
-                maxLines: narrow ? 3 : 4,
+                maxLines: narrow ? 2 : 4,
                 softWrap: true,
                 overflow: TextOverflow.fade,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                   decoration: TextDecoration.underline,
-                  fontSize: narrow ? 12 : null,
+                  fontSize: narrow ? 11.5 : null,
                   height: narrow ? 1.2 : null,
                 ),
               ),
@@ -340,7 +340,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               ? NumberFormatUtils.formatSumWithSymbol(
                   cost, widget.currencyCode, widget.currencySym)
               : '—',
-          style: TextStyle(fontSize: narrow ? 12 : null),
+          style: TextStyle(fontSize: narrow ? 11.5 : null),
         )),
         DataCell(Text(
           _mode == FoodcostPricingMode.markupOnCost
@@ -350,21 +350,21 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               : (shareAct != null
                   ? '${shareAct.toStringAsFixed(1)}%'
                   : '—'),
-          style: TextStyle(fontSize: narrow ? 12 : null),
+          style: TextStyle(fontSize: narrow ? 11.5 : null),
         )),
         DataCell(Text(
           opt != null
               ? NumberFormatUtils.formatSumWithSymbol(
                   opt, widget.currencyCode, widget.currencySym)
               : '—',
-          style: TextStyle(fontSize: narrow ? 12 : null),
+          style: TextStyle(fontSize: narrow ? 11.5 : null),
         )),
         DataCell(Text(
           sell != null && sell > 0
               ? NumberFormatUtils.formatSumWithSymbol(
                   sell, widget.currencyCode, widget.currencySym)
               : (loc.t('foodcost_no_selling_price') ?? '—'),
-          style: TextStyle(fontSize: narrow ? 12 : null),
+          style: TextStyle(fontSize: narrow ? 11.5 : null),
         )),
         DataCell(
           Align(
@@ -375,7 +375,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       SizedBox(
-                        width: 72,
+                        width: 66,
                         child: TextField(
                           controller: ctrl,
                           decoration: InputDecoration(
@@ -384,12 +384,12 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                                 : null,
                             isDense: true,
                             contentPadding: EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: narrow ? 4 : 8,
+                              horizontal: 5,
+                              vertical: narrow ? 3 : 8,
                             ),
                             border: const OutlineInputBorder(),
                           ),
-                          style: TextStyle(fontSize: narrow ? 12 : 13),
+                          style: TextStyle(fontSize: narrow ? 11 : 13),
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
@@ -580,11 +580,22 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
 
     rowNum = 0;
     final foodcostTable = DataTable(
-      columnSpacing: narrow ? 6 : 14,
-      horizontalMargin: narrow ? 6 : 12,
-      headingRowHeight: narrow ? 32 : 40,
-      dataRowMinHeight: narrow ? 34 : 40,
-      dataRowMaxHeight: narrow ? 94 : 56,
+      columnSpacing: narrow ? 4 : 12,
+      horizontalMargin: narrow ? 4 : 10,
+      headingRowHeight: narrow ? 30 : 38,
+      dataRowMinHeight: narrow ? 30 : 38,
+      dataRowMaxHeight: narrow ? 82 : 54,
+      showBottomBorder: true,
+      border: TableBorder(
+        horizontalInside: BorderSide(
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.35),
+          width: 0.6,
+        ),
+        verticalInside: BorderSide(
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.18),
+          width: 0.5,
+        ),
+      ),
       columns: [
         DataColumn(label: headerLabel('№')),
         DataColumn(label: headerLabel(loc.t('foodcost_col_name') ?? 'Блюдо')),
@@ -644,7 +655,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: EdgeInsets.fromLTRB(narrow ? 12 : 16, 0, narrow ? 12 : 16, 8),
+          padding: EdgeInsets.fromLTRB(narrow ? 8 : 14, 0, narrow ? 8 : 14, 6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -666,11 +677,11 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                   unawaited(_persistMode(m));
                 },
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Align(
                 alignment: Alignment.centerLeft,
                 child: SizedBox(
-                  width: narrow ? 88 : 104,
+                  width: narrow ? 82 : 96,
                   child: TextField(
                     controller: _targetPctController,
                     decoration: const InputDecoration(
@@ -689,7 +700,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               TextField(
                 decoration: InputDecoration(
                   labelText: loc.t('foodcost_search_hint') ?? 'Поиск',
@@ -705,7 +716,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         Expanded(
           child: Scrollbar(
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(narrow ? 8 : 16, 0, narrow ? 8 : 16, 24),
+              padding: EdgeInsets.fromLTRB(narrow ? 6 : 14, 0, narrow ? 6 : 14, 18),
               child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
