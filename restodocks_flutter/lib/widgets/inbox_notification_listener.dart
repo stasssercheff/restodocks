@@ -106,6 +106,25 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
       _channels.add(chPr);
     }
 
+    if (prefs.shouldNotifyFor('orders') &&
+        (_hasInboxOrders(emp) || emp.hasRole('bar_manager'))) {
+      final chPa = client
+          .channel('inbox_notif_price_appr_${emp.id}')
+          .onPostgresChanges(
+            event: PostgresChangeEvent.insert,
+            schema: 'public',
+            table: 'procurement_price_approval_requests',
+            filter: PostgresChangeFilter(
+              type: PostgresChangeFilterType.eq,
+              column: 'establishment_id',
+              value: est.id,
+            ),
+            callback: (p) => _onNewProcurementPriceApproval(p),
+          );
+      chPa.subscribe();
+      _channels.add(chPa);
+    }
+
     // 3. Инвентаризация и списания (одна таблица inventory_documents)
     final needInventoryChannel = _hasInboxInventory(emp) &&
         (prefs.shouldNotifyFor('inventory') ||
@@ -350,6 +369,41 @@ class _InboxNotificationListenerState extends State<InboxNotificationListener> {
         category: 'orders',
         displayText: display,
         onTap: () => _go('/inbox/order/$id'),
+      );
+    });
+  }
+
+  void _onNewProcurementPriceApproval(dynamic payload) {
+    final newRow = payload.newRecord;
+    final id = newRow['id']?.toString();
+    if (id == null) return;
+    if (newRow['status']?.toString() != 'pending') return;
+    final receiptId = newRow['receipt_document_id']?.toString();
+    if (receiptId == null) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final acc = context.read<AccountManagerSupabase>();
+      final emp = acc.currentEmployee;
+      if (emp == null) return;
+      try {
+        final doc = await ProcurementReceiptService.instance.getById(receiptId);
+        if (!mounted) return;
+        final p = doc?['payload'];
+        final header = p is Map ? p['header'] : null;
+        final dept = (header is Map ? header['department'] : null)?.toString() ?? 'kitchen';
+        if (!ProcurementPriceApprovalService.canSeePriceApproval(emp, dept)) {
+          return;
+        }
+      } catch (_) {
+        return;
+      }
+      final loc = context.read<LocalizationService>();
+      final typeLabel = loc.t('inbox_notif_type_procurement_price_approval');
+      await _presentInAppNotification(
+        category: 'orders',
+        displayText: typeLabel,
+        onTap: () => _go('/inbox/procurement-price-approval/$id'),
       );
     });
   }
