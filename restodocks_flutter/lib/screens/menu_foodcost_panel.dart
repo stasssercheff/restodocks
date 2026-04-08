@@ -673,6 +673,8 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     final narrow = MediaQuery.sizeOf(context).shortestSide < 600;
     final isPhoneLayout = MediaQuery.sizeOf(context).shortestSide < 600;
     final shortViewport = MediaQuery.sizeOf(context).height < 560;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
     if (_busy) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -788,7 +790,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     final foodcostHeaderTable = DataTable(
       columnSpacing: narrow ? 3 : 10,
       horizontalMargin: narrow ? 3 : 10,
-      headingRowHeight: narrow ? 30 : 38,
+      headingRowHeight: narrow ? (isLandscape ? 26 : 30) : 38,
       dataRowMinHeight: 0,
       dataRowMaxHeight: 0,
       showBottomBorder: true,
@@ -801,8 +803,8 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       columnSpacing: narrow ? 3 : 10,
       horizontalMargin: narrow ? 3 : 10,
       headingRowHeight: 0.01,
-      dataRowMinHeight: narrow ? 18 : 30,
-      dataRowMaxHeight: narrow ? 45 : 64,
+      dataRowMinHeight: narrow ? (isLandscape ? 14 : 18) : 30,
+      dataRowMaxHeight: narrow ? (isLandscape ? 34 : 45) : 64,
       showBottomBorder: true,
       border: tableBorder,
       columns: tableColumns,
@@ -917,7 +919,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         : null;
 
     final pctField = SizedBox(
-      width: narrow ? 82 : 96,
+      width: narrow ? (isLandscape ? 74 : 82) : 96,
       child: TextField(
         controller: _targetPctController,
         decoration: const InputDecoration(
@@ -925,7 +927,10 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
           border: OutlineInputBorder(),
           isDense: true,
           isCollapsed: true,
-          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: isLandscape ? 4 : 6,
+          ),
         ),
         keyboardType: TextInputType.number,
         inputFormatters: [
@@ -940,7 +945,8 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
 
     final compactControls = isPhoneLayout;
     final controls = Padding(
-      padding: EdgeInsets.fromLTRB(narrow ? 8 : 14, 0, narrow ? 8 : 14, 6),
+      padding: EdgeInsets.fromLTRB(
+          narrow ? 8 : 14, 0, narrow ? 8 : 14, isLandscape ? 4 : 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -949,10 +955,10 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               children: [
                 if (shortViewport && menuSegment != null) ...[
                   Flexible(fit: FlexFit.loose, child: menuSegment),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 3),
                 ],
                 Expanded(child: modeSegment),
-                const SizedBox(width: 4),
+                const SizedBox(width: 3),
                 pctField,
               ],
             )
@@ -965,7 +971,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               child: pctField,
             ),
           ],
-          SizedBox(height: shortViewport ? 4 : 6),
+          SizedBox(height: shortViewport ? 2 : 6),
           TextField(
             decoration: InputDecoration(
               labelText: loc.t('foodcost_search_hint') ?? 'Поиск',
@@ -973,7 +979,9 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               border: const OutlineInputBorder(),
               isDense: true,
               contentPadding: EdgeInsets.symmetric(
-                  horizontal: 10, vertical: shortViewport ? 7 : 10),
+                horizontal: 10,
+                vertical: isLandscape ? 6 : (shortViewport ? 7 : 10),
+              ),
             ),
             textAlignVertical: TextAlignVertical.center,
             onChanged: (v) => setState(() => _query = v),
