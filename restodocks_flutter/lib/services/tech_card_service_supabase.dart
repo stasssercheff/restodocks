@@ -185,9 +185,14 @@ class TechCardServiceSupabase {
           );
         }
       }
-      final cachedCards = cached
+      var cachedCards = cached
           .map((e) => TechCard.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
+      if (includeIngredients &&
+          cachedCards.any((c) => c.ingredients.isEmpty)) {
+        cachedCards = await _mergeBulkIngredientFill(cachedCards);
+        await _saveTechCardsCache(establishmentId, cachedCards);
+      }
       final skipBgRefresh = !kIsWeb &&
           await _offlineCache.isKeyFresh(cacheKey, _mobileTechCardsCacheTtl);
       if (!skipBgRefresh) {
@@ -253,12 +258,14 @@ class TechCardServiceSupabase {
       if (list.isEmpty && rawCount > 0) {
         list = await _fetchWithoutEmbed();
       }
+      list = await _mergeBulkIngredientFill(list);
       await _saveTechCardsCache(establishmentId, list);
       _scheduleWarmDetailCaches(list);
       return list;
     } catch (e) {
       try {
-        final list = await _fetchWithoutEmbed();
+        var list = await _fetchWithoutEmbed();
+        list = await _mergeBulkIngredientFill(list);
         await _saveTechCardsCache(establishmentId, list);
         _scheduleWarmDetailCaches(list);
         return list;
@@ -527,6 +534,17 @@ class TechCardServiceSupabase {
     } catch (_) {
       return [];
     }
+  }
+
+  /// Embed `tt_ingredients` или кэш без строк состава — без этого фудкост/меню видят «—», хотя в редакторе ТТК строки есть.
+  Future<List<TechCard>> _mergeBulkIngredientFill(List<TechCard> cards) async {
+    final empty = cards.where((c) => c.ingredients.isEmpty).toList();
+    if (empty.isEmpty) return cards;
+    final filled = await fillIngredientsForCardsBulk(empty);
+    final byId = {for (final c in filled) c.id: c};
+    return cards
+        .map((tc) => byId[tc.id] ?? tc)
+        .toList(growable: false);
   }
 
   /// Догрузить ингредиенты для карточек с пустым составом (bulk-запрос иногда возвращает tt_ingredients пустыми).

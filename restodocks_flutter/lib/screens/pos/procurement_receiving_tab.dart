@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/feature_flags.dart';
 import '../../services/services.dart';
 
 /// Вкладка «Приём поставок»: заказы из «Заказ продуктов» (order_documents) с фильтрами.
@@ -369,40 +368,16 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: FeatureFlags.procurementPhotoReceiptEnabled
-              ? Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: () => context.push(
-                          '/procurement-receipt?department=${widget.department}&manual=1',
-                        ),
-                        icon: const Icon(Icons.add_task_outlined),
-                        label: Text(loc.t('pos_procurement_receiving_create')),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () => context.push(
-                          '/procurement-receipt?department=${widget.department}&manual=1&photo=1',
-                        ),
-                        icon: const Icon(Icons.document_scanner_outlined),
-                        label: Text(loc.t('pos_procurement_receiving_create_photo')),
-                      ),
-                    ),
-                  ],
-                )
-              : SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () => context.push(
-                      '/procurement-receipt?department=${widget.department}&manual=1',
-                    ),
-                    icon: const Icon(Icons.add_task_outlined),
-                    label: Text(loc.t('pos_procurement_receiving_create')),
-                  ),
-                ),
+          child: SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => context.push(
+                '/procurement-receipt?department=${widget.department}&manual=1',
+              ),
+              icon: const Icon(Icons.add_task_outlined),
+              label: Text(loc.t('pos_procurement_receiving_create')),
+            ),
+          ),
         ),
         const SizedBox(height: 8),
         Expanded(

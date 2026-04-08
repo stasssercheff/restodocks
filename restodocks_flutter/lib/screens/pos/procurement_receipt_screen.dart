@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../core/feature_flags.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../utils/order_list_units.dart';
@@ -57,30 +55,6 @@ class _ReceiptLineEdit {
   final bool nameReadOnly;
 }
 
-class _PhotoParseLineDraft {
-  _PhotoParseLineDraft({
-    required this.name,
-    required this.quantity,
-    required this.unit,
-    this.pricePerUnit,
-  });
-
-  String name;
-  double quantity;
-  String unit;
-  double? pricePerUnit;
-}
-
-class _PhotoParseDraft {
-  _PhotoParseDraft({
-    required this.supplierName,
-    required this.lines,
-  });
-
-  String supplierName;
-  List<_PhotoParseLineDraft> lines;
-}
-
 class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
   bool _loading = true;
   String? _error;
@@ -92,8 +66,6 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
   List<OrderList> _supplierTemplates = [];
   List<_ReceiptLineEdit> _lines = [];
   bool _saving = false;
-  bool _photoRecognizing = false;
-  bool _photoFlowInitialized = false;
   /// Дата фактической приёмки (вне системы), опционально.
   DateTime? _externalReceiptDate;
 
@@ -139,18 +111,6 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         _lines = [_createEmptyLine(), _createEmptyLine()];
         _syncManualTrailingEmptyInPlace();
       });
-      if (widget.manualOffSystem &&
-          !_photoFlowInitialized &&
-          FeatureFlags.procurementPhotoReceiptEnabled) {
-        final location = GoRouterState.of(context).location;
-        final fromPhoto =
-            (Uri.tryParse(location)?.queryParameters['photo'] ?? '') == '1';
-        if (fromPhoto) {
-          _photoFlowInitialized = true;
-          WidgetsBinding.instance
-              .addPostFrameCallback((_) => _startPhotoRecognitionFlow());
-        }
-      }
       return;
     }
     setState(() {
@@ -625,345 +585,6 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
   String _formatQtyForField(double value) {
     if (value == value.roundToDouble()) return '${value.round()}';
     return value.toString();
-  }
-
-  String _guessSupplierName(String? rawText) {
-    if (rawText == null || rawText.trim().isEmpty) return '';
-    final lines = rawText
-        .split('\n')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .take(8)
-        .toList();
-    for (final line in lines) {
-      if (line.length < 3 || line.length > 40) continue;
-      if (RegExp(r'\d').hasMatch(line)) continue;
-      if (line.contains(':')) continue;
-      return line;
-    }
-    return '';
-  }
-
-  Future<ImageSource?> _pickPhotoSource(LocalizationService loc) async {
-    return showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: Text(loc.t('procurement_receipt_photo_take')),
-              onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: Text(loc.t('procurement_receipt_photo_gallery')),
-              onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<bool?> _showPhotoPreviewDialog(
-      LocalizationService loc, _PhotoParseDraft draft) {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('procurement_receipt_photo_preview_title')),
-        content: SizedBox(
-          width: 440,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${loc.t('procurement_receipt_supplier')}: ${draft.supplierName.isEmpty ? '—' : draft.supplierName}',
-              ),
-              const SizedBox(height: 12),
-              Text(
-                loc
-                    .t('procurement_receipt_photo_recognized_lines')
-                    .replaceAll('%s', '${draft.lines.length}'),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 8),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: draft.lines.length,
-                  itemBuilder: (_, i) {
-                    final l = draft.lines[i];
-                    final price =
-                        l.pricePerUnit != null ? ' · ${l.pricePerUnit}' : '';
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Text(
-                        '${i + 1}. ${l.name} · ${l.quantity} ${l.unit}$price',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(loc.t('procurement_receipt_fix')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(loc.t('procurement_receipt_continue')),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<_PhotoParseDraft?> _showPhotoEditDialog(
-      LocalizationService loc, _PhotoParseDraft draft) async {
-    final supplierCtrl = TextEditingController(text: draft.supplierName);
-    final rows = draft.lines
-        .map(
-          (e) => (
-            name: TextEditingController(text: e.name),
-            qty: TextEditingController(text: _formatQtyForField(e.quantity)),
-            unit: TextEditingController(text: e.unit),
-            price: TextEditingController(
-              text: e.pricePerUnit == null
-                  ? ''
-                  : _formatPriceForField(e.pricePerUnit!),
-            ),
-          ),
-        )
-        .toList();
-    final result = await showDialog<_PhotoParseDraft>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('procurement_receipt_fix')),
-        content: SizedBox(
-          width: 520,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: supplierCtrl,
-                  decoration: InputDecoration(
-                    labelText: loc.t('procurement_receipt_supplier'),
-                    border: const OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                for (var i = 0; i < rows.length; i++) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 5,
-                        child: TextField(
-                          controller: rows[i].name,
-                          decoration: InputDecoration(
-                            labelText: loc.t('product_name'),
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 2,
-                        child: TextField(
-                          controller: rows[i].qty,
-                          decoration: InputDecoration(
-                            labelText:
-                                loc.t('procurement_receipt_received_qty'),
-                            isDense: true,
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 2,
-                        child: TextField(
-                          controller: rows[i].unit,
-                          decoration: InputDecoration(
-                            labelText: loc.t('order_list_unit'),
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 3,
-                        child: TextField(
-                          controller: rows[i].price,
-                          decoration: InputDecoration(
-                            labelText:
-                                loc.t('procurement_receipt_actual_price'),
-                            isDense: true,
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                ],
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(loc.t('cancel')),
-          ),
-          FilledButton(
-            onPressed: () {
-              final updatedLines = <_PhotoParseLineDraft>[];
-              for (final row in rows) {
-                final name = row.name.text.trim();
-                if (name.isEmpty) continue;
-                final qty = _parse(row.qty.text);
-                final unit =
-                    row.unit.text.trim().isEmpty ? 'kg' : row.unit.text.trim();
-                final price = _parse(row.price.text);
-                updatedLines.add(
-                  _PhotoParseLineDraft(
-                    name: name,
-                    quantity: qty <= 0 ? 1 : qty,
-                    unit: unit,
-                    pricePerUnit: price > 0 ? price : null,
-                  ),
-                );
-              }
-              Navigator.of(ctx).pop(
-                _PhotoParseDraft(
-                  supplierName: supplierCtrl.text.trim(),
-                  lines: updatedLines,
-                ),
-              );
-            },
-            child: Text(loc.t('procurement_receipt_continue')),
-          ),
-        ],
-      ),
-    );
-    supplierCtrl.dispose();
-    for (final row in rows) {
-      row.name.dispose();
-      row.qty.dispose();
-      row.unit.dispose();
-      row.price.dispose();
-    }
-    return result;
-  }
-
-  void _applyPhotoDraft(_PhotoParseDraft draft) {
-    final newLines = <_ReceiptLineEdit>[];
-    for (final line in draft.lines) {
-      newLines.add(
-        _ReceiptLineEdit(
-          productId: null,
-          productName: line.name,
-          unit: line.unit,
-          initialOrderedQty: 0,
-          referencePricePerUnit: 0,
-          received:
-              TextEditingController(text: _formatQtyForField(line.quantity)),
-          actualPrice: TextEditingController(
-            text: line.pricePerUnit == null
-                ? ''
-                : _formatPriceForField(line.pricePerUnit!),
-          ),
-          discountPercent: TextEditingController(text: '0'),
-          nameReadOnly: false,
-        ),
-      );
-    }
-    if (newLines.isEmpty) {
-      newLines.add(_createEmptyLine());
-    }
-    while (newLines.length < 2) {
-      newLines.add(_createEmptyLine());
-    }
-    if (mounted) {
-      for (final l in _lines) {
-        _disposeLine(l);
-      }
-      setState(() {
-        if (draft.supplierName.isNotEmpty) {
-          _supplierCtrl.text = draft.supplierName;
-        }
-        _lines = newLines;
-        _syncManualTrailingEmptyInPlace();
-      });
-    }
-  }
-
-  Future<void> _startPhotoRecognitionFlow() async {
-    if (!FeatureFlags.procurementPhotoReceiptEnabled) return;
-    if (!widget.manualOffSystem || _photoRecognizing) return;
-    final loc = context.read<LocalizationService>();
-    final source = await _pickPhotoSource(loc);
-    if (source == null || !mounted) return;
-    setState(() => _photoRecognizing = true);
-    try {
-      final imageService = ImageService();
-      final XFile? photo = source == ImageSource.camera
-          ? await imageService.takePhotoWithCamera()
-          : await imageService.pickImageFromGallery();
-      if (photo == null || !mounted) return;
-      final bytes = await imageService.xFileToBytes(photo);
-      if (bytes == null || bytes.isEmpty || !mounted) return;
-      final ai = context.read<AiService>();
-      final result = await ai.recognizeReceipt(bytes);
-      if (!mounted) return;
-      if (result == null || result.lines.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('inventory_receipt_scan_empty'))),
-        );
-        return;
-      }
-      final draft = _PhotoParseDraft(
-        supplierName: _guessSupplierName(result.rawText),
-        lines: result.lines
-            .where((e) => e.productName.trim().isNotEmpty)
-            .map(
-              (e) => _PhotoParseLineDraft(
-                name: e.productName.trim(),
-                quantity: e.quantity > 0 ? e.quantity : 1,
-                unit: (e.unit ?? 'kg').trim().isEmpty ? 'kg' : e.unit!.trim(),
-                pricePerUnit: e.price,
-              ),
-            )
-            .toList(),
-      );
-      if (draft.lines.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('inventory_receipt_scan_empty'))),
-        );
-        return;
-      }
-      final proceed = await _showPhotoPreviewDialog(loc, draft);
-      if (!mounted || proceed == null) return;
-      if (proceed) {
-        _applyPhotoDraft(draft);
-      } else {
-        final edited = await _showPhotoEditDialog(loc, draft);
-        if (edited != null && edited.lines.isNotEmpty) {
-          _applyPhotoDraft(edited);
-        }
-      }
-    } finally {
-      if (mounted) setState(() => _photoRecognizing = false);
-    }
   }
 
   double _lineTotal(_ReceiptLineEdit l) {
@@ -1793,22 +1414,6 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                   '${loc.t('procurement_receipt_total_received')}: ${NumberFormat('#0.##', 'ru').format(_totalReceived)} $currency',
                 ),
                 const SizedBox(height: 12),
-                if (widget.manualOffSystem &&
-                    FeatureFlags.procurementPhotoReceiptEnabled) ...[
-                  OutlinedButton.icon(
-                    onPressed:
-                        _photoRecognizing ? null : _startPhotoRecognitionFlow,
-                    icon: _photoRecognizing
-                        ? const SizedBox(
-                            height: 16,
-                            width: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.document_scanner_outlined),
-                    label: Text(loc.t('procurement_receipt_fill_from_photo')),
-                  ),
-                  const SizedBox(height: 8),
-                ],
                 FilledButton(
                   onPressed: _saving ? null : _submit,
                   child: _saving
