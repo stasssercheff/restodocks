@@ -22,14 +22,18 @@ class MenuFoodcostPanel extends StatefulWidget {
   const MenuFoodcostPanel({
     super.key,
     required this.dishes,
-    required this.dataEstablishmentId,
+    /// `establishment_products.establishment_id`: у филиала — id филиала, у головы — id данных.
+    required this.nomenclatureEstablishmentId,
+    /// Ключ настроек (целевой %, режим) — id текущего заведения в аккаунте.
+    required this.prefsScopeEstablishmentId,
     required this.currencySym,
     required this.langCode,
     this.openCardInEditMode = false,
   });
 
   final List<TechCard> dishes;
-  final String dataEstablishmentId;
+  final String nomenclatureEstablishmentId;
+  final String prefsScopeEstablishmentId;
   final String currencySym;
   final String langCode;
   final bool openCardInEditMode;
@@ -58,7 +62,8 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
   void didUpdateWidget(MenuFoodcostPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.dishes != widget.dishes ||
-        oldWidget.dataEstablishmentId != widget.dataEstablishmentId) {
+        oldWidget.nomenclatureEstablishmentId !=
+            widget.nomenclatureEstablishmentId) {
       _bootstrap();
     }
   }
@@ -68,16 +73,16 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       _busy = true;
     });
     final store = context.read<ProductStoreSupabase>();
-    final est = widget.dataEstablishmentId;
+    final prefsScope = widget.prefsScopeEstablishmentId;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final m = prefs.getString(_prefsKeyMode(est));
+      final m = prefs.getString(_prefsKeyMode(prefsScope));
       if (m == 'cost_share') {
         _mode = FoodcostPricingMode.costShareOfPrice;
       } else {
         _mode = FoodcostPricingMode.markupOnCost;
       }
-      final t = prefs.getString(_prefsKeyTarget(est));
+      final t = prefs.getString(_prefsKeyTarget(prefsScope));
       if (t != null && t.isNotEmpty) {
         _targetPctController.text = t;
       } else if (_mode == FoodcostPricingMode.costShareOfPrice) {
@@ -88,7 +93,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     final h = TechCardCostHydrator.hydrate(
       List<TechCard>.from(widget.dishes),
       store,
-      est,
+      widget.nomenclatureEstablishmentId,
     );
     if (!mounted) return;
     setState(() {
@@ -101,7 +106,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
-        _prefsKeyMode(widget.dataEstablishmentId),
+        _prefsKeyMode(widget.prefsScopeEstablishmentId),
         mode == FoodcostPricingMode.costShareOfPrice ? 'cost_share' : 'markup',
       );
     } catch (_) {}
@@ -111,7 +116,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(
-        _prefsKeyTarget(widget.dataEstablishmentId),
+        _prefsKeyTarget(widget.prefsScopeEstablishmentId),
         _targetPctController.text.trim(),
       );
     } catch (_) {}

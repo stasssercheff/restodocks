@@ -42,9 +42,11 @@ class _MenuScreenState extends State<MenuScreen> {
     final Map<String, Map<String, String>> categoryTranslations = {
       'sauce': {'ru': 'Соус', 'en': 'Sauce'},
       'vegetables': {'ru': 'Овощи', 'en': 'Vegetables'},
+      'zagotovka': {'ru': 'Заготовка', 'en': 'Preparation'},
       'salad': {'ru': 'Салат', 'en': 'Salad'},
       'meat': {'ru': 'Мясо', 'en': 'Meat'},
       'seafood': {'ru': 'Рыба', 'en': 'Seafood'},
+      'poultry': {'ru': 'Птица', 'en': 'Poultry'},
       'side': {'ru': 'Гарнир', 'en': 'Side dish'},
       'subside': {'ru': 'Подгарнир', 'en': 'Sub-side dish'},
       'bakery': {'ru': 'Выпечка', 'en': 'Bakery'},
@@ -53,6 +55,18 @@ class _MenuScreenState extends State<MenuScreen> {
       'soup': {'ru': 'Суп', 'en': 'Soup'},
       'misc': {'ru': 'Разное', 'en': 'Misc'},
       'beverages': {'ru': 'Напитки', 'en': 'Beverages'},
+      'alcoholic_cocktails': {
+        'ru': 'Алкогольные коктейли',
+        'en': 'Alcoholic cocktails'
+      },
+      'non_alcoholic_drinks': {
+        'ru': 'Безалкогольные напитки',
+        'en': 'Non-alcoholic drinks'
+      },
+      'hot_drinks': {'ru': 'Горячие напитки', 'en': 'Hot drinks'},
+      'drinks_pure': {'ru': 'Напитки в чистом виде', 'en': 'Drinks (neat)'},
+      'snacks': {'ru': 'Снеки', 'en': 'Snacks'},
+      'zakuska': {'ru': 'Закуска', 'en': 'Appetizer'},
       'banquet': {'ru': 'Банкет', 'en': 'Banquet'},
       'catering': {'ru': 'Кейтеринг', 'en': 'Catering'},
     };
@@ -73,7 +87,12 @@ class _MenuScreenState extends State<MenuScreen> {
       final stopGoSvc = context.read<MenuStopGoService>();
       await productStore.loadProducts();
       final stopGoMap = await stopGoSvc.loadStopGoMap(est.dataEstablishmentId);
-      await productStore.loadNomenclature(est.dataEstablishmentId);
+      if (est.isBranch) {
+        await productStore.loadNomenclatureForBranch(
+            est.id, est.dataEstablishmentId);
+      } else {
+        await productStore.loadNomenclature(est.dataEstablishmentId);
+      }
       final emp = acc.currentEmployee;
       final allTcs = await techCardService.getTechCardsForEstablishment(est.dataEstablishmentId);
       // Банкет/кейтеринг: только блюда с категорией banquet или catering
@@ -110,7 +129,8 @@ class _MenuScreenState extends State<MenuScreen> {
       final enriched = <TechCard>[];
       for (final tc in tcs) {
         if (!tc.isSemiFinished) {
-          enriched.add(_enrichWithCosts(tc, productStore, est.dataEstablishmentId, currency));
+          enriched.add(_enrichWithCosts(
+              tc, productStore, est.productsEstablishmentId, currency));
         }
       }
       if (mounted) {
@@ -285,10 +305,11 @@ class _MenuScreenState extends State<MenuScreen> {
     }
     if (!mounted) return;
     final loc = context.read<LocalizationService>();
-    final mode = await showModalBottomSheet<String>(
+    final mode = await showDialog<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
+      builder: (ctx) => AlertDialog(
+        contentPadding: EdgeInsets.zero,
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
@@ -303,25 +324,26 @@ class _MenuScreenState extends State<MenuScreen> {
             ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('cancel')),
+          ),
+        ],
       ),
     );
     if (!mounted || mode == null) return;
     await context.push(mode == 'edit' ? editPath : viewPath);
   }
 
-  String _buildSubtitleText(LocalizationService loc, TechCard tc, String lang, double totalCost, String currencySym) {
-    final emp = context.read<AccountManagerSupabase>().currentEmployee;
+  String _buildSubtitleText(LocalizationService loc, TechCard tc, String lang) {
     final cat = _categoryLabel(tc.category, lang);
-    if (_canSeeFullTtkView(emp, tc)) {
-      return '${cat} • ${loc.t('cost_price')}: ${totalCost.toStringAsFixed(2)} $currencySym';
-    }
     // Меню зала: только описание для зала (без просмотра ТТК/состава/цен).
     if (_isHallMenu) {
       final d = tc.descriptionForHall?.trim() ?? '';
       if (d.isNotEmpty) return d;
       return cat;
     }
-    // Кухня/бар: повары и сотрудники — без цен
     return cat;
   }
 
@@ -566,13 +588,14 @@ class _MenuScreenState extends State<MenuScreen> {
     }
     final account = context.read<AccountManagerSupabase>();
     final emp = account.currentEmployee;
-    final estId = account.dataEstablishmentId;
+    final est = account.establishment;
     final showFoodcost = _showFoodcostTab(emp);
     final menuSeg = showFoodcost ? _menuSegment : 0;
-    if (showFoodcost && menuSeg == 1 && estId != null) {
+    if (showFoodcost && menuSeg == 1 && est != null) {
       return MenuFoodcostPanel(
         dishes: _displayDishes,
-        dataEstablishmentId: estId,
+        nomenclatureEstablishmentId: est.productsEstablishmentId,
+        prefsScopeEstablishmentId: est.id,
         currencySym: currencySym,
         langCode: loc.currentLanguageCode,
         // Вкладка фудкост только у ролей с правом на ценообразование — открываем ТТК без view=1.
@@ -609,12 +632,6 @@ class _MenuScreenState extends State<MenuScreen> {
         itemCount: dishesToShow.length,
         itemBuilder: (context, index) {
           final tc = dishesToShow[index];
-          final tcTotalCost = tc.totalCost > 0
-              ? tc.totalCost
-              : tc.ingredients.fold<double>(0, (s, i) => s + i.cost);
-          final costForSubtitle = (tc.portionWeight > 0 && tc.yield > 0)
-              ? tcTotalCost * tc.portionWeight / tc.yield
-              : tcTotalCost;
           final lang = loc.currentLanguageCode;
           final dishDept = _dishDepartment(tc);
           final stopGoSvc = context.read<MenuStopGoService>();
@@ -686,7 +703,7 @@ class _MenuScreenState extends State<MenuScreen> {
                   children: [
                     const SizedBox(height: 2),
                     Text(
-                      _buildSubtitleText(loc, tc, lang, costForSubtitle, currencySym),
+                      _buildSubtitleText(loc, tc, lang),
                       style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -767,7 +784,7 @@ class _MenuScreenState extends State<MenuScreen> {
                   InkWell(
                     onTap: null,
                     child: Text(
-                      _buildSubtitleText(loc, tc, lang, costForSubtitle, currencySym),
+                      _buildSubtitleText(loc, tc, lang),
                       style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                       maxLines: _isHallMenu ? 3 : 1,
                       overflow: TextOverflow.ellipsis,
