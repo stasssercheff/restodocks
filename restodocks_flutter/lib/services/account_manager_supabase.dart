@@ -336,16 +336,19 @@ class AccountManagerSupabase extends ChangeNotifier {
     String? pinCode,
     String? parentEstablishmentId,
   }) async {
+    // Всегда передаём p_parent_establishment_id (в т.ч. null), иначе PostgREST не выбирает
+    // перегрузку между (5) и (6) аргументами (PGRST203).
     final params = <String, dynamic>{
       'p_name': name,
       'p_address': address,
       'p_phone': phone,
       'p_email': email,
       'p_pin_code': pinCode,
+      'p_parent_establishment_id': (parentEstablishmentId != null &&
+              parentEstablishmentId.isNotEmpty)
+          ? parentEstablishmentId
+          : null,
     };
-    if (parentEstablishmentId != null && parentEstablishmentId.isNotEmpty) {
-      params['p_parent_establishment_id'] = parentEstablishmentId;
-    }
     final raw = await _supabase.client.rpc(
       'add_establishment_for_owner',
       params: params,
