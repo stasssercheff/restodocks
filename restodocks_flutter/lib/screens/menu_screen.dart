@@ -570,16 +570,13 @@ class _MenuScreenState extends State<MenuScreen> {
     final showFoodcost = _showFoodcostTab(emp);
     final menuSeg = showFoodcost ? _menuSegment : 0;
     if (showFoodcost && menuSeg == 1 && estId != null) {
-      final canOpenFoodcostInEdit = emp != null &&
-          (emp.hasRole('owner') ||
-              emp.hasRole('general_manager') ||
-              emp.department == 'management');
       return MenuFoodcostPanel(
         dishes: _displayDishes,
         dataEstablishmentId: estId,
         currencySym: currencySym,
         langCode: loc.currentLanguageCode,
-        openCardInEditMode: canOpenFoodcostInEdit,
+        // Вкладка фудкост только у ролей с правом на ценообразование — открываем ТТК без view=1.
+        openCardInEditMode: true,
       );
     }
     final dishesToShow = _displayDishes;

@@ -355,10 +355,18 @@ class Employee extends Equatable {
     return hasRole('executive_chef') || hasRole('sous_chef');
   }
 
-  /// Создание и редактирование чеклистов, ТТК, карточек блюд: владелец (не view_only), шеф, су-шеф.
+  /// Создание и редактирование чеклистов, ТТК, карточек блюд: владелец (не view_only), шеф, су-шеф,
+  /// ген. директор, бар/зал, менеджмент офиса — те же роли, что видят фудкост и должны править карточки/цены.
   bool get canEditChecklistsAndTechCards {
     if (hasRole('owner') && !isViewOnlyOwner) return true;
-    return hasRole('executive_chef') || hasRole('sous_chef');
+    if (hasRole('executive_chef') || hasRole('sous_chef')) return true;
+    if (hasRole('general_manager')) return true;
+    if (hasRole('bar_manager') || hasRole('floor_manager')) return true;
+    if (department == 'management' &&
+        (hasRole('manager') || hasRole('assistant_manager'))) {
+      return true;
+    }
+    return false;
   }
 
   /// Создание и редактирование документации: владелец и менеджмент (шеф, су-шеф, барменеджер, менеджер зала, управляющий)
