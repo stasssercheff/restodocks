@@ -121,42 +121,19 @@
       overflow-x: hidden;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
-      background: #AD292C;
+      background: #f7f4f4;
     }
     @supports (min-height: 100svh) { html, body { min-height: 100svh; } }
     @supports (min-height: 100lvh) { html, body { min-height: 100lvh; } }
-    /* Landscape on phones: keep top area red, table/page area light to screen edges. */
-    @media (orientation: landscape) {
-      :root {
-        --rd-top-zone: 84px;
-      }
-      html, body {
-        width: 100vw;
-        min-width: 100vw;
-        max-width: 100vw;
-        overflow-x: hidden;
-        background: linear-gradient(
-          to bottom,
-          #AD292C 0,
-          #AD292C var(--rd-top-zone),
-          #f7f4f4 var(--rd-top-zone),
-          #f7f4f4 100%
-        );
-      }
-      flt-glass-pane, flt-scene, flutter-view, #flt-glass-pane {
-        width: 100vw !important;
-        min-width: 100vw !important;
-        max-width: 100vw !important;
-        border-radius: 0 !important;
-        box-shadow: none !important;
-        background: transparent !important;
-      }
-      flutter-view, #flt-glass-pane, flt-glass-pane {
-        position: fixed !important;
-        inset: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
+    flutter-view, #flt-glass-pane, flt-glass-pane {
+      width: 100vw !important;
+      min-width: 100vw !important;
+      max-width: 100vw !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      background: transparent !important;
     }
     /* Keep a real document scroll range so mobile browser chrome can collapse. */
     #safari-scroll-spacer {

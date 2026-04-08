@@ -1183,6 +1183,18 @@ class _MenuScreenState extends State<MenuScreen> {
         Establishment.currencySymbolFor(currencyCode);
     final showFoodcost = _showFoodcostTab(emp);
     final menuSeg = showFoodcost ? _menuSegment : 0;
+    final isPhoneLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape &&
+            MediaQuery.sizeOf(context).shortestSide < 600;
+    final compactTopSegmentStyle = isPhoneLandscape
+        ? const ButtonStyle(
+            minimumSize: WidgetStatePropertyAll(Size(0, 32)),
+            padding: WidgetStatePropertyAll(
+                EdgeInsets.symmetric(horizontal: 10, vertical: 0)),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity(horizontal: -1, vertical: -2),
+          )
+        : null;
     final shortViewport = MediaQuery.sizeOf(context).height < 560;
     final hideTopFoodcostSwitch = shortViewport && showFoodcost && menuSeg == 1;
     final hallChips = _isHallMenu &&
@@ -1241,7 +1253,9 @@ class _MenuScreenState extends State<MenuScreen> {
                                           maxLines: 1,
                                           softWrap: false,
                                           overflow: TextOverflow.fade,
-                                          style: const TextStyle(fontSize: 12),
+                                          style: TextStyle(
+                                              fontSize:
+                                                  isPhoneLandscape ? 10.5 : 12),
                                         ),
                                       ),
                                       ButtonSegment<int>(
@@ -1251,7 +1265,9 @@ class _MenuScreenState extends State<MenuScreen> {
                                           maxLines: 1,
                                           softWrap: false,
                                           overflow: TextOverflow.fade,
-                                          style: const TextStyle(fontSize: 12),
+                                          style: TextStyle(
+                                              fontSize:
+                                                  isPhoneLandscape ? 10.5 : 12),
                                         ),
                                       ),
                                     ],
@@ -1259,6 +1275,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                     onSelectionChanged: (s) =>
                                         setState(() => _menuSegment = s.first),
                                     showSelectedIcon: false,
+                                    style: compactTopSegmentStyle,
                                   ),
                                 ),
                               ),

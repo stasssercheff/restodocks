@@ -706,6 +706,16 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     final shortViewport = MediaQuery.sizeOf(context).height < 560;
     final isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
+    final landscapePhone = isPhoneLayout && isLandscape;
+    final compactSegmentStyle = landscapePhone
+        ? const ButtonStyle(
+            minimumSize: WidgetStatePropertyAll(Size(0, 32)),
+            padding: WidgetStatePropertyAll(
+                EdgeInsets.symmetric(horizontal: 10, vertical: 0)),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity(horizontal: -1, vertical: -2),
+          )
+        : null;
     if (_busy) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -894,7 +904,8 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
             maxLines: 1,
             softWrap: false,
             overflow: TextOverflow.fade,
-            style: TextStyle(fontSize: isPhoneLayout ? 11 : 13),
+            style: TextStyle(
+                fontSize: landscapePhone ? 10.5 : (isPhoneLayout ? 11 : 13)),
           ),
         ),
         ButtonSegment<FoodcostPricingMode>(
@@ -904,7 +915,8 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
             maxLines: 1,
             softWrap: false,
             overflow: TextOverflow.fade,
-            style: TextStyle(fontSize: isPhoneLayout ? 11 : 13),
+            style: TextStyle(
+                fontSize: landscapePhone ? 10.5 : (isPhoneLayout ? 11 : 13)),
           ),
         ),
       ],
@@ -915,6 +927,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         unawaited(_persistMode(m));
       },
       showSelectedIcon: false,
+      style: compactSegmentStyle,
     );
 
     final menuSegment = (shortViewport &&
@@ -929,7 +942,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                   maxLines: 1,
                   softWrap: false,
                   overflow: TextOverflow.fade,
-                  style: const TextStyle(fontSize: 11),
+                  style: TextStyle(fontSize: landscapePhone ? 10.5 : 11),
                 ),
               ),
               ButtonSegment<int>(
@@ -939,13 +952,14 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                   maxLines: 1,
                   softWrap: false,
                   overflow: TextOverflow.fade,
-                  style: const TextStyle(fontSize: 11),
+                  style: TextStyle(fontSize: landscapePhone ? 10.5 : 11),
                 ),
               ),
             ],
             selected: {widget.menuSegmentValue!},
             onSelectionChanged: (s) => widget.onMenuSegmentChanged!(s.first),
             showSelectedIcon: false,
+            style: compactSegmentStyle,
           )
         : null;
 

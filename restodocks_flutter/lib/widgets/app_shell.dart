@@ -201,8 +201,16 @@ class _AppShellState extends State<AppShell> {
     final mq = MediaQuery.of(context);
     final patchedMq = (landscapeNarrow || landscapeWeb)
         ? mq.copyWith(
-            padding: mq.padding.copyWith(bottom: 0),
-            viewPadding: mq.viewPadding.copyWith(bottom: 0),
+            padding: mq.padding.copyWith(
+              left: landscapeWeb ? 0 : mq.padding.left,
+              right: landscapeWeb ? 0 : mq.padding.right,
+              bottom: 0,
+            ),
+            viewPadding: mq.viewPadding.copyWith(
+              left: landscapeWeb ? 0 : mq.viewPadding.left,
+              right: landscapeWeb ? 0 : mq.viewPadding.right,
+              bottom: 0,
+            ),
           )
         : mq;
 
