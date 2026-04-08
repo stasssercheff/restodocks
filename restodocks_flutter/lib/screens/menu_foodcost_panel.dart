@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +16,13 @@ import '../utils/tech_card_section_display.dart';
 enum FoodcostPricingMode {
   markupOnCost,
   costShareOfPrice,
+}
+
+class _DishTargetState {
+  _DishTargetState({this.useCustom = false, this.pctText = ''});
+
+  bool useCustom;
+  String pctText;
 }
 
 /// Табличный фудкост: цеха, с/с порции, наценка / доля с/с, оптимальная и фактическая цена.
@@ -49,8 +57,13 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
   FoodcostPricingMode _mode = FoodcostPricingMode.markupOnCost;
   final _targetPctController = TextEditingController(text: '100');
 
+  final Map<String, _DishTargetState> _dishTargets = {};
+  final Map<String, TextEditingController> _dishPctControllers = {};
+
   static String _prefsKeyMode(String est) => 'restodocks_foodcost_mode_$est';
   static String _prefsKeyTarget(String est) => 'restodocks_foodcost_target_$est';
+  static String _prefsKeyDishOverrides(String est) =>
+      'restodocks_foodcost_dish_overrides_$est';
 
   @override
   void initState() {
@@ -90,6 +103,19 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       }
     } catch (_) {}
 
+    await _loadDishOverridesFromPrefs(prefsScope);
+
+    for (final c in _dishPctControllers.values) {
+      c.dispose();
+    }
+    _dishPctControllers.clear();
+
+    for (final tc in widget.dishes) {
+      _dishTargets.putIfAbsent(tc.id, () => _DishTargetState());
+      final st = _dishTargets[tc.id]!;
+      _dishPctControllers[tc.id] = TextEditingController(text: st.pctText);
+    }
+
     final h = TechCardCostHydrator.hydrate(
       List<TechCard>.from(widget.dishes),
       store,
@@ -100,6 +126,44 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       _hydrated = h;
       _busy = false;
     });
+  }
+
+  Future<void> _loadDishOverridesFromPrefs(String prefsScope) async {
+    _dishTargets.clear();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefsKeyDishOverrides(prefsScope));
+      if (raw == null || raw.isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return;
+      for (final e in decoded.entries) {
+        final v = e.value;
+        if (v is! Map<String, dynamic>) continue;
+        _dishTargets[e.key] = _DishTargetState(
+          useCustom: v['u'] == true,
+          pctText: v['p']?.toString() ?? '',
+        );
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistDishOverrides() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final out = <String, dynamic>{};
+      for (final tc in widget.dishes) {
+        final id = tc.id;
+        final st = _dishTargets[id];
+        final text = _dishPctControllers[id]?.text.trim() ?? '';
+        final u = st?.useCustom ?? false;
+        if (!u && text.isEmpty) continue;
+        out[id] = {'u': u, 'p': text};
+      }
+      await prefs.setString(
+        _prefsKeyDishOverrides(widget.prefsScopeEstablishmentId),
+        jsonEncode(out),
+      );
+    } catch (_) {}
   }
 
   Future<void> _persistMode(FoodcostPricingMode mode) async {
@@ -124,6 +188,10 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
 
   @override
   void dispose() {
+    for (final c in _dishPctControllers.values) {
+      c.dispose();
+    }
+    _dishPctControllers.clear();
     _targetPctController.dispose();
     super.dispose();
   }
@@ -136,11 +204,48 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     return totalCost * tc.portionWeight / tc.yield;
   }
 
-  double? _parseTargetPct() {
-    final raw = _targetPctController.text.trim().replaceAll(',', '.');
-    final v = double.tryParse(raw);
+  double? _parsePctString(String raw) {
+    final t = raw.trim().replaceAll(',', '.');
+    final v = double.tryParse(t);
     if (v == null || v <= 0) return null;
     return v;
+  }
+
+  double? _parseTargetPct() {
+    return _parsePctString(_targetPctController.text);
+  }
+
+  double? _effectiveTargetPctForDish(TechCard tc) {
+    final st = _dishTargets[tc.id];
+    if (st != null && st.useCustom) {
+      final fromCtrl = _dishPctControllers[tc.id]?.text ?? '';
+      return _parsePctString(fromCtrl.isNotEmpty ? fromCtrl : st.pctText);
+    }
+    return _parseTargetPct();
+  }
+
+  void _showCustomTargetInfoDialog(LocalizationService loc) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('foodcost_custom_target_info_title')),
+        content: SingleChildScrollView(
+          child: Text(loc.t('foodcost_custom_target_info_body')),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('tour_done')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String? _globalTargetHint(double? globalPct) {
+    if (globalPct == null) return null;
+    if (globalPct % 1 == 0) return globalPct.toInt().toString();
+    return globalPct.toString();
   }
 
   double? _optimalPrice(double cost, double? targetPct) {
@@ -156,7 +261,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     LocalizationService loc,
     TechCard tc,
     int rowNum,
-    double? targetPct, {
+    double? globalTargetPct, {
     required bool narrow,
   }) {
     final cost = _portionCost(tc);
@@ -167,7 +272,10 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       markupAct = (sell / cost - 1) * 100;
       shareAct = (cost / sell) * 100;
     }
-    final opt = _optimalPrice(cost, targetPct);
+    final effectivePct = _effectiveTargetPctForDish(tc);
+    final opt = _optimalPrice(cost, effectivePct);
+    final st = _dishTargets[tc.id]!;
+    final ctrl = _dishPctControllers[tc.id]!;
 
     return DataRow(
       cells: [
@@ -219,6 +327,181 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               ? '${sell.toStringAsFixed(2)} ${widget.currencySym}'
               : (loc.t('foodcost_no_selling_price') ?? '—'),
         )),
+        DataCell(
+          Align(
+            alignment: Alignment.centerRight,
+            child: narrow
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      SizedBox(
+                        width: 76,
+                        child: TextField(
+                          controller: ctrl,
+                          decoration: InputDecoration(
+                            hintText: !st.useCustom
+                                ? _globalTargetHint(globalTargetPct)
+                                : null,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 8,
+                            ),
+                            border: const OutlineInputBorder(),
+                          ),
+                          style: const TextStyle(fontSize: 13),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                          ],
+                          onChanged: (_) {
+                            if (st.useCustom) setState(() {});
+                          },
+                          onEditingComplete: () {
+                            st.pctText = ctrl.text.trim();
+                            setState(() {});
+                            unawaited(_persistDishOverrides());
+                          },
+                          onSubmitted: (_) {
+                            st.pctText = ctrl.text.trim();
+                            setState(() {});
+                            unawaited(_persistDishOverrides());
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Semantics(
+                            label: loc.t('foodcost_custom_target_checkbox_a11y'),
+                            child: Checkbox(
+                              value: st.useCustom,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                              onChanged: (v) {
+                                if (v == null) return;
+                                setState(() {
+                                  st.useCustom = v;
+                                  st.pctText = ctrl.text.trim();
+                                });
+                                unawaited(_persistDishOverrides());
+                              },
+                            ),
+                          ),
+                          Tooltip(
+                            message: loc.t('foodcost_custom_target_info_title'),
+                            child: Material(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
+                              shape: const CircleBorder(),
+                              clipBehavior: Clip.antiAlias,
+                              child: InkWell(
+                                onTap: () => _showCustomTargetInfoDialog(loc),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(6),
+                                  child: Icon(
+                                    Icons.info_outline,
+                                    size: 18,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 68,
+                        child: TextField(
+                          controller: ctrl,
+                          decoration: InputDecoration(
+                            hintText: !st.useCustom
+                                ? _globalTargetHint(globalTargetPct)
+                                : null,
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 8,
+                            ),
+                            border: const OutlineInputBorder(),
+                          ),
+                          style: const TextStyle(fontSize: 13),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                          ],
+                          onChanged: (_) {
+                            if (st.useCustom) setState(() {});
+                          },
+                          onEditingComplete: () {
+                            st.pctText = ctrl.text.trim();
+                            setState(() {});
+                            unawaited(_persistDishOverrides());
+                          },
+                          onSubmitted: (_) {
+                            st.pctText = ctrl.text.trim();
+                            setState(() {});
+                            unawaited(_persistDishOverrides());
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Semantics(
+                        label: loc.t('foodcost_custom_target_checkbox_a11y'),
+                        child: Checkbox(
+                          value: st.useCustom,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                          onChanged: (v) {
+                            if (v == null) return;
+                            setState(() {
+                              st.useCustom = v;
+                              st.pctText = ctrl.text.trim();
+                            });
+                            unawaited(_persistDishOverrides());
+                          },
+                        ),
+                      ),
+                      Tooltip(
+                        message: loc.t('foodcost_custom_target_info_title'),
+                        child: Material(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
+                          shape: const CircleBorder(),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            onTap: () => _showCustomTargetInfoDialog(loc),
+                            child: Padding(
+                              padding: const EdgeInsets.all(6),
+                              child: Icon(
+                                Icons.info_outline,
+                                size: 18,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
       ],
     );
   }
@@ -286,6 +569,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                       ],
+                      onChanged: (_) => setState(() {}),
                       onSubmitted: (_) => _persistTarget(),
                       onEditingComplete: _persistTarget,
                     ),
@@ -330,7 +614,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                           horizontalMargin: narrow ? 6 : 12,
                           headingRowHeight: narrow ? 36 : 40,
                           dataRowMinHeight: narrow ? 36 : 40,
-                          dataRowMaxHeight: narrow ? 80 : 56,
+                          dataRowMaxHeight: narrow ? 132 : 56,
                           columns: [
                             DataColumn(
                               label: Text(
@@ -376,6 +660,13 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                                 style: const TextStyle(fontWeight: FontWeight.w600),
                               ),
                             ),
+                            DataColumn(
+                              label: Text(
+                                loc.t('foodcost_col_dish_target_pct'),
+                                style: const TextStyle(fontWeight: FontWeight.w600),
+                                textAlign: TextAlign.end,
+                              ),
+                            ),
                           ],
                           rows: [
                             for (final g in groups) ...[
@@ -394,6 +685,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                                       style: const TextStyle(fontWeight: FontWeight.w700),
                                     ),
                                   ),
+                                  const DataCell(Text('')),
                                   const DataCell(Text('')),
                                   const DataCell(Text('')),
                                   const DataCell(Text('')),
