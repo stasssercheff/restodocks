@@ -360,16 +360,14 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                             DataColumn(
                               numeric: true,
                               label: Text(
-                                widget.langCode == 'ru'
-                                    ? 'Цена по цели'
-                                    : 'Target price',
+                                loc.t('foodcost_price_optimal'),
                                 style: const TextStyle(fontWeight: FontWeight.w600),
                               ),
                             ),
                             DataColumn(
                               numeric: true,
                               label: Text(
-                                loc.t('foodcost_price_actual') ?? 'Цена факт.',
+                                loc.t('foodcost_price_actual'),
                                 style: const TextStyle(fontWeight: FontWeight.w600),
                               ),
                             ),
