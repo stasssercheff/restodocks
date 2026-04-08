@@ -635,14 +635,25 @@ class _MenuScreenState extends State<MenuScreen> {
         final ingredients = tc.ingredients.where((i) => !i.isPlaceholder || i.hasData);
         final cost = ingredients.fold<double>(0, (s, i) => s + i.cost);
         final menuPrice = tc.sellingPrice;
-        final markupPct = cost > 0 ? ((menuPrice - cost) / cost) * 100 : 0.0;
+        final menuPriceValue = menuPrice ?? 0.0;
+        final markupPct = (cost > 0 && menuPrice != null && menuPrice > 0)
+            ? ((menuPrice - cost) / cost) * 100
+            : 0.0;
         sheet.appendRow(_textRow([
           '$idx',
           tc.dishName,
           _categoryLabel(tc.category, exportLang),
           cost.toStringAsFixed(2),
-          isFoodcost ? '${markupPct.toStringAsFixed(1)}%' : menuPrice.toStringAsFixed(2),
-          menuPrice.toStringAsFixed(2),
+          isFoodcost
+              ? (menuPrice != null && menuPrice > 0
+                  ? '${markupPct.toStringAsFixed(1)}%'
+                  : '—')
+              : (menuPrice != null && menuPrice > 0
+                  ? menuPriceValue.toStringAsFixed(2)
+                  : '—'),
+          menuPrice != null && menuPrice > 0
+              ? menuPriceValue.toStringAsFixed(2)
+              : '—',
         ]));
         idx++;
       }
