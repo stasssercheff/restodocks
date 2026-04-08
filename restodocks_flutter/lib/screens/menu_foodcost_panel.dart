@@ -922,7 +922,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       width: narrow ? (isLandscape ? 74 : 82) : 96,
       child: TextField(
         controller: _targetPctController,
-        decoration: const InputDecoration(
+        decoration: InputDecoration(
           labelText: '%',
           border: OutlineInputBorder(),
           isDense: true,
