@@ -13,9 +13,17 @@ import '../services/page_tour_service.dart';
 import 'subscription_required_dialog.dart';
 
 const _kDataAccessRequiredPaths = [
-  '/tech-cards', '/nomenclature', '/inventory', '/checklists',
-  '/product-order', '/menu', '/suppliers', '/order-lists',
-  '/expenses', '/haccp-journals', '/inbox',
+  '/tech-cards',
+  '/nomenclature',
+  '/inventory',
+  '/checklists',
+  '/product-order',
+  '/menu',
+  '/suppliers',
+  '/order-lists',
+  '/expenses',
+  '/haccp-journals',
+  '/inbox',
 ];
 
 /// Оболочка с нижней навигацией для всех рабочих экранов (кроме инвентаризации).
@@ -97,13 +105,15 @@ class _AppShellState extends State<AppShell> {
     final middleAction = homeBtnConfig.effectiveAction(currentEmployee,
         hasProSubscription: accountManager.hasProSubscription);
     final noDataAccess = !isOwner && !currentEmployee.effectiveDataAccess;
-    final isKitchenNoData = noDataAccess && currentEmployee.department == 'kitchen';
+    final isKitchenNoData =
+        noDataAccess && currentEmployee.department == 'kitchen';
     final middleLabel = noDataAccess
         ? (isKitchenNoData ? loc.t('schedule') : loc.t('personal_schedule'))
         : _labelForAction(loc, middleAction, currentEmployee);
 
     final location = GoRouterState.of(context).matchedLocation;
-    final selectedIndex = _indexForLocation(location, middleAction, noDataAccess, isKitchenNoData, currentEmployee);
+    final selectedIndex = _indexForLocation(
+        location, middleAction, noDataAccess, isKitchenNoData, currentEmployee);
 
     final isDataRequiredRoute =
         _kDataAccessRequiredPaths.any((p) => location.startsWith(p));
@@ -111,35 +121,39 @@ class _AppShellState extends State<AppShell> {
 
     final tourController = context.watch<PageTourService>().homeTourController;
     final navBar = NavigationBarTheme(
-        data: const NavigationBarThemeData(
-          height: _navBarHeight,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
-        ),
-        child: NavigationBar(
-          selectedIndex: selectedIndex,
-          onDestinationSelected: (i) {
-            setState(() => _hideBottomBar = false);
-            _onTap(context, i, middleAction, noDataAccess, isKitchenNoData, currentEmployee, selectedIndex);
-          },
-          destinations: [
-            NavigationDestination(
-              icon: const Icon(Icons.home_outlined),
-              selectedIcon: const Icon(Icons.home),
-              label: loc.t('home'),
-            ),
-            NavigationDestination(
-              icon: Icon(noDataAccess ? Icons.calendar_month_outlined : middleAction.iconOutlined),
-              selectedIcon: Icon(noDataAccess ? Icons.calendar_month : middleAction.icon),
-              label: middleLabel,
-            ),
-            NavigationDestination(
-              icon: const Icon(Icons.person_outline),
-              selectedIcon: const Icon(Icons.person),
-              label: loc.t('personal_cabinet'),
-            ),
-          ],
-        ),
-      );
+      data: const NavigationBarThemeData(
+        height: _navBarHeight,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+      ),
+      child: NavigationBar(
+        selectedIndex: selectedIndex,
+        onDestinationSelected: (i) {
+          setState(() => _hideBottomBar = false);
+          _onTap(context, i, middleAction, noDataAccess, isKitchenNoData,
+              currentEmployee, selectedIndex);
+        },
+        destinations: [
+          NavigationDestination(
+            icon: const Icon(Icons.home_outlined),
+            selectedIcon: const Icon(Icons.home),
+            label: loc.t('home'),
+          ),
+          NavigationDestination(
+            icon: Icon(noDataAccess
+                ? Icons.calendar_month_outlined
+                : middleAction.iconOutlined),
+            selectedIcon:
+                Icon(noDataAccess ? Icons.calendar_month : middleAction.icon),
+            label: middleLabel,
+          ),
+          NavigationDestination(
+            icon: const Icon(Icons.person_outline),
+            selectedIcon: const Icon(Icons.person),
+            label: loc.t('personal_cabinet'),
+          ),
+        ],
+      ),
+    );
 
     final bottomBar = tourController != null
         ? Stack(
@@ -179,29 +193,42 @@ class _AppShellState extends State<AppShell> {
     final landscapeNarrow = _landscapeNarrowPhone(context);
     final hideNav = landscapeNarrow && _hideBottomBar;
 
-    final bodyChild = showAccessPendingStub ? _AccessPendingPlaceholder(loc: loc) : widget.child;
+    final bodyChild = showAccessPendingStub
+        ? _AccessPendingPlaceholder(loc: loc)
+        : widget.child;
+    final mq = MediaQuery.of(context);
+    final patchedMq = landscapeNarrow
+        ? mq.copyWith(
+            padding: mq.padding.copyWith(bottom: 0),
+            viewPadding: mq.viewPadding.copyWith(bottom: 0),
+          )
+        : mq;
 
-    return Scaffold(
-      body: NotificationListener<ScrollNotification>(
-        onNotification: _onScroll,
-        child: bodyChild,
-      ),
-      bottomNavigationBar: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        height: hideNav ? 0 : _navBarHeight,
-        child: ClipRect(
-          child: Align(
-            alignment: Alignment.topCenter,
-            heightFactor: hideNav ? 0 : 1,
-            child: bottomBar,
+    return MediaQuery(
+      data: patchedMq,
+      child: Scaffold(
+        body: NotificationListener<ScrollNotification>(
+          onNotification: _onScroll,
+          child: bodyChild,
+        ),
+        bottomNavigationBar: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          height: hideNav ? 0 : _navBarHeight,
+          child: ClipRect(
+            child: Align(
+              alignment: Alignment.topCenter,
+              heightFactor: hideNav ? 0 : 1,
+              child: bottomBar,
+            ),
           ),
         ),
       ),
     );
   }
 
-  String _labelForAction(LocalizationService loc, HomeButtonAction action, Employee? employee) {
+  String _labelForAction(
+      LocalizationService loc, HomeButtonAction action, Employee? employee) {
     switch (action) {
       case HomeButtonAction.inbox:
         return loc.t('inbox');
@@ -226,7 +253,9 @@ class _AppShellState extends State<AppShell> {
     }
   }
 
-  int _indexForLocation(String location, HomeButtonAction action, bool noDataAccess, [bool isKitchenNoData = false, Employee? employee]) {
+  int _indexForLocation(
+      String location, HomeButtonAction action, bool noDataAccess,
+      [bool isKitchenNoData = false, Employee? employee]) {
     if (location == '/home' || location == '/') return 0;
     if (location.startsWith('/personal-cabinet') ||
         location.startsWith('/profile') ||
@@ -253,14 +282,22 @@ class _AppShellState extends State<AppShell> {
     return 0;
   }
 
-  void _onTap(BuildContext context, int index, HomeButtonAction action, bool noDataAccess, bool isKitchenNoData, Employee? employee, int currentIndex) {
-
+  void _onTap(
+      BuildContext context,
+      int index,
+      HomeButtonAction action,
+      bool noDataAccess,
+      bool isKitchenNoData,
+      Employee? employee,
+      int currentIndex) {
     // Если переходим на вкладку с меньшим индексом — анимируем как «назад» (вправо)
     final isBackward = index < currentIndex;
     final extra = isBackward ? {'back': true} : null;
 
     String middleRoute = action.routeFor(employee);
-    if (!noDataAccess && action == HomeButtonAction.inbox && (employee?.hasInboxDocuments ?? true) == false) {
+    if (!noDataAccess &&
+        action == HomeButtonAction.inbox &&
+        (employee?.hasInboxDocuments ?? true) == false) {
       middleRoute = '/notifications?tab=messages';
     } else if (noDataAccess) {
       middleRoute = isKitchenNoData ? '/schedule' : '/schedule?personal=1';
@@ -304,23 +341,24 @@ class _AccessPendingPlaceholder extends StatelessWidget {
             Icon(
               Icons.hourglass_empty_rounded,
               size: 72,
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
+              color:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
             ),
             const SizedBox(height: 24),
             Text(
               loc.t('account_awaiting_confirmation'),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
             const SizedBox(height: 12),
             Text(
               loc.t('account_awaiting_confirmation_subtitle'),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
           ],
         ),

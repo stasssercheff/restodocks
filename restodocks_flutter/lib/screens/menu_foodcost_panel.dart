@@ -98,6 +98,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
   double _lastVScrollPixels = 0;
   bool _hideControlsOnScroll = false;
   int _lastControlsToggleMs = 0;
+  Timer? _controlsToggleTimer;
 
   final Map<String, _DishTargetState> _dishTargets = {};
   final Map<String, TextEditingController> _dishPctControllers = {};
@@ -247,6 +248,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
 
   @override
   void dispose() {
+    _controlsToggleTimer?.cancel();
     _vScroll.removeListener(_onTableVScroll);
     _headerHScroll.removeListener(_syncHeaderToBody);
     _bodyHScroll.removeListener(_syncBodyToHeader);
@@ -261,6 +263,25 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     super.dispose();
   }
 
+  void _scheduleControlsVisibility(bool hide) {
+    _controlsToggleTimer?.cancel();
+    _controlsToggleTimer = Timer(const Duration(milliseconds: 120), () {
+      if (!mounted || !_vScroll.hasClients) return;
+      final p = _vScroll.position.pixels;
+      final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+      if (keyboardOpen) return;
+      if (hide) {
+        if (p >= 72 && !_hideControlsOnScroll) {
+          setState(() => _hideControlsOnScroll = true);
+        }
+      } else {
+        if (p <= 8 && _hideControlsOnScroll) {
+          setState(() => _hideControlsOnScroll = false);
+        }
+      }
+    });
+  }
+
   void _onTableVScroll() {
     if (!_vScroll.hasClients) return;
     if (!mounted) return;
@@ -268,6 +289,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     if (p < 0) return;
     final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
     if (keyboardOpen) {
+      _controlsToggleTimer?.cancel();
       _lastVScrollPixels = p;
       if (_hideControlsOnScroll) {
         setState(() => _hideControlsOnScroll = false);
@@ -275,19 +297,19 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       return;
     }
     _lastVScrollPixels = p;
-    // Stable hysteresis with cooldown to avoid flicker on iOS momentum.
+    // Stabilize transitions on iOS momentum scroll.
     final now = DateTime.now().millisecondsSinceEpoch;
     final canToggle = (now - _lastControlsToggleMs) > 180;
     if (p <= 14) {
       if (_hideControlsOnScroll && canToggle) {
         _lastControlsToggleMs = now;
-        setState(() => _hideControlsOnScroll = false);
+        _scheduleControlsVisibility(false);
       }
       return;
     }
     if (p >= 72 && !_hideControlsOnScroll && canToggle) {
       _lastControlsToggleMs = now;
-      setState(() => _hideControlsOnScroll = true);
+      _scheduleControlsVisibility(true);
     }
   }
 
