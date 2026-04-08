@@ -3,7 +3,7 @@ import '../utils/dev_log.dart';
 import 'product_store_supabase.dart';
 import 'supabase_service.dart';
 
-/// Согласование обновления цен номенклатуры после приёмки (ожидает шефа во входящих).
+/// Согласование изменения цен в номенклатуре по факту закупки (приёмка уже сохранена; очередь во входящих для шефа).
 class ProcurementPriceApprovalService {
   ProcurementPriceApprovalService._();
   static final ProcurementPriceApprovalService instance =

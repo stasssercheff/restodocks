@@ -53,7 +53,7 @@ Deno.serve(async (req: Request) => {
       createdByEmployeeId?: string;
       payload?: Record<string, unknown>;
       sourceOrderDocumentId?: string | null;
-      /** Строки для согласования цен (только если приёмку делает не шеф/не владелец с полномочиями на устройстве). */
+      /** Строки для согласования изменения цен в номенклатуре (приёмка уже в payload; очередь только если на устройстве нет полномочий согласовать цены). */
       priceApprovalLines?: unknown[];
       nomenclatureEstablishmentId?: string | null;
     };

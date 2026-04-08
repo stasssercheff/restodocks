@@ -73,7 +73,7 @@ CREATE INDEX IF NOT EXISTS idx_proc_price_approval_receipt
   ON public.procurement_price_approval_requests(receipt_document_id);
 
 COMMENT ON TABLE public.procurement_price_approval_requests IS
-  'Очередь согласования цен номенклатуры после приёмки. lines: [{productId, productName, unit, oldPricePerUnit, newPricePerUnit}].';
+  'Согласование изменения цен в номенклатуре (приёмка уже зафиксирована в procurement_receipt_documents). lines: [{productId, productName, unit, oldPricePerUnit, newPricePerUnit}].';
 
 ALTER TABLE public.procurement_price_approval_requests ENABLE ROW LEVEL SECURITY;
 
