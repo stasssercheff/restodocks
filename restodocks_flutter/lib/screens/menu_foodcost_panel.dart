@@ -11,6 +11,7 @@ import '../models/models.dart';
 import '../services/localization_service.dart';
 import '../services/product_store_supabase.dart';
 import '../services/tech_card_cost_hydrator.dart';
+import '../utils/number_format_utils.dart';
 import '../utils/tech_card_section_display.dart';
 
 enum FoodcostPricingMode {
@@ -36,6 +37,8 @@ class MenuFoodcostPanel extends StatefulWidget {
     this.nomenclatureMergeParentEstablishmentId,
     /// Ключ настроек (целевой %, режим) — id текущего заведения в аккаунте.
     required this.prefsScopeEstablishmentId,
+    /// ISO 4217 (как в заведении/сотруднике): для VND и др. — без копеек, разделитель тысяч.
+    required this.currencyCode,
     required this.currencySym,
     required this.langCode,
     this.openCardInEditMode = false,
@@ -45,6 +48,7 @@ class MenuFoodcostPanel extends StatefulWidget {
   final String nomenclatureEstablishmentId;
   final String? nomenclatureMergeParentEstablishmentId;
   final String prefsScopeEstablishmentId;
+  final String currencyCode;
   final String currencySym;
   final String langCode;
   final bool openCardInEditMode;
@@ -332,7 +336,8 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         ),
         DataCell(Text(
           cost > 0
-              ? '${cost.toStringAsFixed(2)} ${widget.currencySym}'
+              ? NumberFormatUtils.formatSumWithSymbol(
+                  cost, widget.currencyCode, widget.currencySym)
               : '—',
         )),
         DataCell(Text(
@@ -346,12 +351,14 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         )),
         DataCell(Text(
           opt != null
-              ? '${opt.toStringAsFixed(2)} ${widget.currencySym}'
+              ? NumberFormatUtils.formatSumWithSymbol(
+                  opt, widget.currencyCode, widget.currencySym)
               : '—',
         )),
         DataCell(Text(
           sell != null && sell > 0
-              ? '${sell.toStringAsFixed(2)} ${widget.currencySym}'
+              ? NumberFormatUtils.formatSumWithSymbol(
+                  sell, widget.currencyCode, widget.currencySym)
               : (loc.t('foodcost_no_selling_price') ?? '—'),
         )),
         DataCell(

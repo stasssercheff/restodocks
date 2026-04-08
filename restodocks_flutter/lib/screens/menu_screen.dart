@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../utils/number_format_utils.dart';
 import 'menu_foodcost_panel.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/scroll_to_top_app_bar_title.dart';
@@ -413,7 +414,8 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   /// Контент раскрытой карточки: полная ТТК с ценой / полная ТТК без цены / описание для зала.
-  Widget _buildExpandedContent(Employee? emp, LocalizationService loc, TechCard tc, String lang, String currencySym) {
+  Widget _buildExpandedContent(Employee? emp, LocalizationService loc,
+      TechCard tc, String lang, String currencySym, String currencyCode) {
     if (_isHallMenu) {
       return _HallDishContent(
         loc: loc,
@@ -433,6 +435,7 @@ class _MenuScreenState extends State<MenuScreen> {
       techCard: tc,
       ingredients: tc.ingredients.where((i) => !i.isPlaceholder || i.hasData).toList(),
       technology: tc.getLocalizedTechnology(lang),
+      currencyCode: currencyCode,
       currencySym: currencySym,
       showCost: showCost,
       productStore: context.read<ProductStoreSupabase>(),
@@ -461,7 +464,13 @@ class _MenuScreenState extends State<MenuScreen> {
     final loc = context.watch<LocalizationService>();
     final accountManager = context.read<AccountManagerSupabase>();
     final emp = accountManager.currentEmployee;
-    final sym = accountManager.establishment?.currencySymbol ?? accountManager.currentEmployee?.currencySymbol ?? Establishment.currencySymbolFor(accountManager.establishment?.defaultCurrency ?? 'VND');
+    final estForCur = accountManager.establishment;
+    final empForCur = accountManager.currentEmployee;
+    final currencyCode =
+        empForCur?.currency ?? estForCur?.defaultCurrency ?? 'RUB';
+    final sym = estForCur?.currencySymbol ??
+        empForCur?.currencySymbol ??
+        Establishment.currencySymbolFor(currencyCode);
     final showFoodcost = _showFoodcostTab(emp);
     final menuSeg = showFoodcost ? _menuSegment : 0;
     final hallChips = _isHallMenu &&
@@ -557,7 +566,7 @@ class _MenuScreenState extends State<MenuScreen> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
         ],
       ),
-      body: _buildBody(loc, sym),
+      body: _buildBody(loc, sym, currencyCode),
     );
   }
 
@@ -568,7 +577,8 @@ class _MenuScreenState extends State<MenuScreen> {
     return _dishes;
   }
 
-  Widget _buildBody(LocalizationService loc, String currencySym) {
+  Widget _buildBody(
+      LocalizationService loc, String currencySym, String currencyCode) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
       final errorText = _error == 'no_establishment' ? loc.t('no_establishment') : _error!;
@@ -598,6 +608,7 @@ class _MenuScreenState extends State<MenuScreen> {
         nomenclatureMergeParentEstablishmentId:
             est.isBranch ? est.dataEstablishmentId : null,
         prefsScopeEstablishmentId: est.id,
+        currencyCode: currencyCode,
         currencySym: currencySym,
         langCode: loc.currentLanguageCode,
         // Вкладка фудкост только у ролей с правом на ценообразование — открываем ТТК без view=1.
@@ -825,7 +836,14 @@ class _MenuScreenState extends State<MenuScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-                  child: _buildExpandedContent(context.read<AccountManagerSupabase>().currentEmployee, loc, tc, lang, currencySym),
+                  child: _buildExpandedContent(
+                    context.read<AccountManagerSupabase>().currentEmployee,
+                    loc,
+                    tc,
+                    lang,
+                    currencySym,
+                    currencyCode,
+                  ),
                 ),
               ],
             ),
@@ -991,6 +1009,7 @@ class _MenuDishTable extends StatelessWidget {
     required this.techCard,
     required this.ingredients,
     required this.technology,
+    required this.currencyCode,
     required this.currencySym,
     this.showCost = true,
     this.productStore,
@@ -1001,6 +1020,7 @@ class _MenuDishTable extends StatelessWidget {
   final TechCard techCard;
   final List<TTIngredient> ingredients;
   final String technology;
+  final String currencyCode;
   final String currencySym;
   final bool showCost;
   final ProductStoreSupabase? productStore;
@@ -1050,7 +1070,14 @@ class _MenuDishTable extends StatelessWidget {
       _cell(context, ing.netWeight > 0 ? ing.netWeight.toStringAsFixed(0) : ''),
       _cell(context, ing.cookingProcessName ?? loc.t('dash')),
       _cell(context, ing.outputWeight > 0 ? ing.outputWeight.toStringAsFixed(0) : ''),
-      if (showCost) _cell(context, ing.cost > 0 ? '${ing.cost.toStringAsFixed(2)} $currencySym' : ''),
+      if (showCost)
+        _cell(
+          context,
+          ing.cost > 0
+              ? NumberFormatUtils.formatSumWithSymbol(
+                  ing.cost, currencyCode, currencySym)
+              : '',
+        ),
     ];
 
     List<Widget> totalCells() => [
@@ -1059,7 +1086,13 @@ class _MenuDishTable extends StatelessWidget {
       _cell(context, ''),
       _cell(context, ''),
       _cell(context, '${totalOutput.toStringAsFixed(0)} ${loc.t('gram')}', bold: true),
-      if (showCost) _cell(context, '${totalCost.toStringAsFixed(2)} $currencySym', bold: true),
+      if (showCost)
+        _cell(
+          context,
+          NumberFormatUtils.formatSumWithSymbol(
+              totalCost, currencyCode, currencySym),
+          bold: true,
+        ),
     ];
 
     final tableScroll = SingleChildScrollView(
