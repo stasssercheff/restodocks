@@ -567,12 +567,14 @@ class AiServiceSupabase implements AiService {
   }
 
   /// Текст → строки (split по \n, каждая строка по \t).
+  /// Строку целиком не trim — иначе теряется ведущий таб («объединённая» колонка A в Excel): `\\tМолоко\\t130`.
   List<List<String>> _textToRows(String text) {
-    final lines = text.split(RegExp(r'\r?\n')).map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    final lines = text.split(RegExp(r'\r?\n'));
     final rows = <List<String>>[];
     for (final line in lines) {
       final cells = line.split('\t').map((s) => s.trim()).toList();
-      if (cells.any((c) => c.isNotEmpty)) rows.add(cells);
+      if (cells.every((c) => c.isEmpty)) continue;
+      rows.add(cells);
     }
     return rows;
   }
@@ -1951,6 +1953,81 @@ class AiServiceSupabase implements AiService {
     ];
   }
 
+  /// Таблица с объединённой колонкой названия: строка 1 — [блюдо | продукт | г], далее — [пусто | продукт | г]; опционально «Итого».
+  static List<TechCardRecognitionResult> _tryParseMergedDishColumnBlock(List<List<String>> rows) {
+    if (rows.length < 2) return [];
+    rows = _normalizeRowLengths(rows);
+    final width = rows.fold<int>(0, (m, r) => r.length > m ? r.length : m);
+    if (width < 3) return [];
+
+    String tc(dynamic c) => (c ?? '').toString().trim();
+
+    final r0 = rows[0].map(tc).toList();
+    while (r0.length < 3) r0.add('');
+    final dishName = r0[0];
+    if (dishName.isEmpty || !_isValidDishName(dishName)) return [];
+    final p0 = r0[1];
+    if (p0.isEmpty || _isJunkProductName(p0)) return [];
+    final g0 = _parseNum(r0[2]);
+    if (g0 == null || g0 <= 0) return [];
+
+    for (var i = 1; i < rows.length; i++) {
+      final row = rows[i].map(tc).toList();
+      while (row.length < 3) row.add('');
+      if (row[0].isNotEmpty) return [];
+    }
+
+    final ingredients = <TechCardIngredientLine>[];
+    double? yieldGrams;
+
+    void addLine(String productName, double grams) {
+      if (_isJunkProductName(productName)) return;
+      final gross = grams;
+      final net = grams;
+      ingredients.add(TechCardIngredientLine(
+        productName: productName.replaceFirst(RegExp(r'^П/Ф\s*', caseSensitive: false), '').trim(),
+        grossGrams: gross,
+        netGrams: net,
+        outputGrams: net,
+        primaryWastePct: null,
+        unit: 'g',
+        ingredientType: RegExp(r'^П/Ф\s', caseSensitive: false).hasMatch(productName) ? 'semi_finished' : 'product',
+      ));
+    }
+
+    addLine(p0, g0.toDouble());
+
+    for (var i = 1; i < rows.length; i++) {
+      final row = rows[i].map(tc).toList();
+      while (row.length < 3) row.add('');
+      final c1 = row[1];
+      final c2 = row[2];
+      final low = c1.toLowerCase();
+      if (low == 'итого' || low.startsWith('всего')) {
+        yieldGrams = _parseNum(c2)?.toDouble();
+        break;
+      }
+      if (c1.isEmpty) continue;
+      final gn = _parseNum(c2);
+      if (gn == null || gn <= 0) continue;
+      addLine(c1, gn.toDouble());
+    }
+
+    if (ingredients.isEmpty) return [];
+    final sumOut = ingredients.fold<double>(0, (s, i) {
+      final v = (i.outputGrams ?? i.netGrams ?? i.grossGrams ?? 0);
+      return s + v;
+    });
+    return [
+      TechCardRecognitionResult(
+        dishName: dishName,
+        ingredients: ingredients,
+        isSemiFinished: dishName.toLowerCase().contains('пф'),
+        yieldGrams: yieldGrams ?? (sumOut > 0 ? sumOut : null),
+      ),
+    ];
+  }
+
   /// Парсинг ТТК по шаблону (Наименование, Продукт, Брутто, Нетто...) — без вызова ИИ.
   /// [errors] — при non-null: try-catch на каждую строку, битые карточки в errors, цикл продолжается.
   static List<TechCardRecognitionResult> parseTtkByTemplate(
@@ -1967,6 +2044,9 @@ class AiServiceSupabase implements AiService {
     // ГОСТ 2-row: явная обработка — чтобы локальный парсер стабильно работал
     final gost2 = _tryParseGost2RowHeader(rows);
     if (gost2.isNotEmpty && gost2.first.ingredients.isNotEmpty) return gost2;
+
+    final mergedDishCol = _tryParseMergedDishColumnBlock(rows);
+    if (mergedDishCol.isNotEmpty) return mergedDishCol;
 
     // Стандартный заголовок ровно «Наименование | Продукт | Брутто | Нетто» (кол.0 и 1) — разбирает только keyword-парсер. Иначе iiko (№|Наименование продукта|...) попадал бы под skip пф гц.
     final firstRowLower = rows.isNotEmpty ? rows[0].map((c) => (c ?? '').toString().trim().toLowerCase()).toList() : <String>[];
