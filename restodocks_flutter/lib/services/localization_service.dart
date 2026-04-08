@@ -116,24 +116,73 @@ class LocalizationService extends ChangeNotifier {
 
   /// Загрузка переводов
   Future<void> _loadTranslations() async {
-    try {
-      final jsonString =
-          await rootBundle.loadString('assets/translations/localizable.json');
-      final Map<String, dynamic> jsonData = json.decode(jsonString);
+    final candidates = <String>[
+      'assets/translations/localizable.json',
+      // Web fallback: в некоторых сборках/кешах путь резолвится с префиксом assets/.
+      'assets/assets/translations/localizable.json',
+      // Резервный файл в корне flutter-проекта (для совместимости со старыми пайплайнами).
+      'localizable.json',
+    ];
 
-      _translations = {};
-      // Структура: {"ru": {"key": "value"}, "en": {"key": "value"}}
-      jsonData.forEach((languageCode, translations) {
-        if (translations is Map<String, dynamic>) {
-          final Map<String, String> languageTranslations = {};
-          translations.forEach((key, value) {
-            languageTranslations[key] = value.toString();
-          });
-          _translations[languageCode] = languageTranslations;
+    Map<String, Map<String, String>>? parsed;
+    Object? lastError;
+
+    for (final path in candidates) {
+      try {
+        final jsonString = await rootBundle.loadString(path);
+        final Map<String, dynamic> jsonData = json.decode(jsonString);
+        final next = <String, Map<String, String>>{};
+        // Структура: {"ru": {"key": "value"}, "en": {"key": "value"}}
+        jsonData.forEach((languageCode, translations) {
+          if (translations is Map<String, dynamic>) {
+            final languageTranslations = <String, String>{};
+            translations.forEach((key, value) {
+              languageTranslations[key] = value.toString();
+            });
+            next[languageCode] = languageTranslations;
+          }
+        });
+        if (next.isNotEmpty) {
+          parsed = next;
+          break;
         }
-      });
-    } catch (e) {
-      devLog('Ошибка загрузки переводов: $e');
+      } catch (e) {
+        lastError = e;
+      }
+    }
+
+    if (parsed != null) {
+      _translations = parsed;
+      return;
+    }
+
+    if (_translations.isEmpty) {
+      devLog('Ошибка загрузки переводов: $lastError');
+      // Минимальный аварийный словарь для экрана входа, чтобы UI не показывал ключи.
+      _translations = {
+        'ru': {
+          'language': 'Язык',
+          'login': 'Вход',
+          'welcome': 'Добро пожаловать',
+          'enter_credentials': 'Введите свои учетные данные',
+          'email': 'Email',
+          'password': 'Пароль',
+          'forgot_password': 'Забыли пароль?',
+          'register_owner': 'Регистрация собственника',
+          'register_employee': 'Регистрация сотрудника',
+        },
+        'en': {
+          'language': 'Language',
+          'login': 'Login',
+          'welcome': 'Welcome',
+          'enter_credentials': 'Enter your credentials',
+          'email': 'Email',
+          'password': 'Password',
+          'forgot_password': 'Forgot password?',
+          'register_owner': 'Register owner',
+          'register_employee': 'Register employee',
+        },
+      };
     }
   }
 
