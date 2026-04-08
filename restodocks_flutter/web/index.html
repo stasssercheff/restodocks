@@ -116,15 +116,14 @@
       width: 100%;
       min-height: 100%;
       min-height: -webkit-fill-available;
-      height: 100dvh;
-      max-height: 100dvh;
+      height: auto;
       overflow-x: hidden;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
       background: #AD292C;
     }
-    /* 1px spacer gives Safari a tiny document scroll range to collapse browser bars. */
-    #safari-scroll-spacer { height: 1px; width: 100%; pointer-events: none; }
+    /* Keep a small real document scroll range so mobile browser chrome can collapse. */
+    #safari-scroll-spacer { height: 56px; width: 100%; pointer-events: none; }
     flt-glass-pane, flt-scene, flutter-view, #flt-glass-pane {
       background: #AD292C !important;
     }
@@ -208,9 +207,11 @@
     });
   </script>
   <script>
-    // Keep Safari top UI collapsible while user scrolls Flutter content.
+    // Keep Safari/Chrome mobile top UI collapsible while user scrolls Flutter content.
     (function () {
-      if (!/iPhone|iPad|iPod/i.test(navigator.userAgent)) return;
+      var ua = navigator.userAgent || '';
+      var isMobile = /iPhone|iPad|iPod|Android/i.test(ua);
+      if (!isMobile) return;
       if (window.navigator.standalone) return;
       var ticking = false;
       var warmup;
@@ -219,7 +220,9 @@
         ticking = true;
         requestAnimationFrame(function () {
           try {
-            if ((window.scrollY || 0) < 1) window.scrollTo(0, 1);
+            var y = window.scrollY || 0;
+            // Keep tiny document offset so browser bars stay collapsible.
+            if (y < 1 || y > 3) window.scrollTo(0, 1);
           } catch (_) {}
           ticking = false;
         });
@@ -238,8 +241,10 @@
       window.addEventListener('focus', startWarmup);
       document.addEventListener('touchstart', nudge, { passive: true });
       window.addEventListener('touchmove', nudge, { passive: true });
+      window.addEventListener('scroll', nudge, { passive: true });
       window.addEventListener('orientationchange', function () {
         setTimeout(nudge, 120);
+        setTimeout(nudge, 360);
       });
     })();
   </script>
