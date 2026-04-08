@@ -632,6 +632,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final narrow = MediaQuery.sizeOf(context).width < 560;
+    final shortViewport = MediaQuery.sizeOf(context).height < 560;
     if (_busy) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -765,114 +766,132 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       rows: tableRows,
     );
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(narrow ? 8 : 14, 0, narrow ? 8 : 14, 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SegmentedButton<FoodcostPricingMode>(
-                segments: [
-                  ButtonSegment<FoodcostPricingMode>(
-                    value: FoodcostPricingMode.markupOnCost,
-                    label: Text(loc.t('foodcost_mode_markup') ?? 'Наценка к с/с'),
-                  ),
-                  ButtonSegment<FoodcostPricingMode>(
-                    value: FoodcostPricingMode.costShareOfPrice,
-                    label: Text(loc.t('foodcost_mode_cost_share') ?? 'Доля с/с в цене'),
-                  ),
-                ],
-                selected: {_mode},
-                onSelectionChanged: (s) {
-                  final m = s.first;
-                  setState(() => _mode = m);
-                  unawaited(_persistMode(m));
-                },
+    final tableArea = Scrollbar(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(narrow ? 6 : 14, 0, narrow ? 6 : 14, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (groups.isNotEmpty)
+              SingleChildScrollView(
+                controller: _headerHScroll,
+                scrollDirection: Axis.horizontal,
+                child: foodcostHeaderTable,
               ),
-              const SizedBox(height: 6),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: SizedBox(
-                  width: narrow ? 82 : 96,
-                  child: TextField(
-                    controller: _targetPctController,
-                    decoration: const InputDecoration(
-                      labelText: '%',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                      isCollapsed: true,
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    ),
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(4),
-                    ],
-                    onChanged: (_) => setState(() {}),
-                    onSubmitted: (_) => _persistTarget(),
-                    onEditingComplete: _persistTarget,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-              TextField(
-                decoration: InputDecoration(
-                  labelText: loc.t('foodcost_search_hint') ?? 'Поиск',
-                  prefixIcon: const Icon(Icons.search),
-                  border: const OutlineInputBorder(),
-                  isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                ),
-                textAlignVertical: TextAlignVertical.center,
-                onChanged: (v) => setState(() => _query = v),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: Scrollbar(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(narrow ? 6 : 14, 0, narrow ? 6 : 14, 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (groups.isNotEmpty)
-                    SingleChildScrollView(
-                      controller: _headerHScroll,
-                      scrollDirection: Axis.horizontal,
-                      child: foodcostHeaderTable,
-                    ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (groups.isNotEmpty)
-                            SingleChildScrollView(
-                              controller: _bodyHScroll,
-                              scrollDirection: Axis.horizontal,
-                              child: foodcostBodyTable,
-                            ),
-                          if (groups.isEmpty)
-                            Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Text(
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (groups.isNotEmpty)
+                      SingleChildScrollView(
+                        controller: _bodyHScroll,
+                        scrollDirection: Axis.horizontal,
+                        child: foodcostBodyTable,
+                      ),
+                    if (groups.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: widget.dishes.isEmpty
+                            ? const Center(child: CircularProgressIndicator())
+                            : Text(
                                 loc.t('menu_empty_dishes') ?? '',
                                 style: Theme.of(context).textTheme.bodyLarge,
                               ),
-                            ),
-                        ],
                       ),
-                    ),
-                  ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final controls = Padding(
+      padding: EdgeInsets.fromLTRB(narrow ? 8 : 14, 0, narrow ? 8 : 14, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SegmentedButton<FoodcostPricingMode>(
+            segments: [
+              ButtonSegment<FoodcostPricingMode>(
+                value: FoodcostPricingMode.markupOnCost,
+                label: Text(loc.t('foodcost_mode_markup') ?? 'Наценка к с/с'),
+              ),
+              ButtonSegment<FoodcostPricingMode>(
+                value: FoodcostPricingMode.costShareOfPrice,
+                label: Text(loc.t('foodcost_mode_cost_share') ?? 'Доля с/с в цене'),
+              ),
+            ],
+            selected: {_mode},
+            onSelectionChanged: (s) {
+              final m = s.first;
+              setState(() => _mode = m);
+              unawaited(_persistMode(m));
+            },
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              width: narrow ? 82 : 96,
+              child: TextField(
+                controller: _targetPctController,
+                decoration: const InputDecoration(
+                  labelText: '%',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  isCollapsed: true,
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                ),
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(4),
                 ],
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _persistTarget(),
+                onEditingComplete: _persistTarget,
               ),
             ),
           ),
+          const SizedBox(height: 6),
+          TextField(
+            decoration: InputDecoration(
+              labelText: loc.t('foodcost_search_hint') ?? 'Поиск',
+              prefixIcon: const Icon(Icons.search),
+              border: const OutlineInputBorder(),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            ),
+            textAlignVertical: TextAlignVertical.center,
+            onChanged: (v) => setState(() => _query = v),
+          ),
+        ],
+      ),
+    );
+
+    if (shortViewport) {
+      return SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            controls,
+            SizedBox(height: 420, child: tableArea),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        controls,
+        Expanded(
+          child: tableArea,
         ),
       ],
     );
