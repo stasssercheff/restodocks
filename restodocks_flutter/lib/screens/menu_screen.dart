@@ -14,6 +14,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../models/models.dart';
 import '../services/services.dart';
+import '../services/inventory_download.dart';
 import '../services/excel_file_saver_stub.dart'
     if (dart.library.html) '../services/excel_file_saver_web.dart' as file_saver;
 import '../utils/number_format_utils.dart';
@@ -666,7 +667,7 @@ class _MenuScreenState extends State<MenuScreen> {
           cfg: foodcostConfig,
         );
         final fileName =
-            '${isFoodcost ? 'foodcost' : 'menu'}_${DateFormat('yyyy-MM-dd').format(DateTime.now())}.pdf';
+            '${_exportFileBaseName(isFoodcost: isFoodcost, exportLang: exportLang, establishmentName: estName)}.pdf';
         await saveFileBytes(fileName, bytes);
         if (mounted) AppToastService.show('${loc.t('saved') ?? 'Сохранено'}: $fileName');
         return;
@@ -733,9 +734,8 @@ class _MenuScreenState extends State<MenuScreen> {
       }
       final bytes = excel.encode();
       if (bytes == null) throw Exception('Excel encoding failed');
-      final day = DateTime.now();
       final fileName =
-          '${isFoodcost ? 'foodcost' : 'menu'}_${day.year}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}.xlsx';
+          '${_exportFileBaseName(isFoodcost: isFoodcost, exportLang: exportLang, establishmentName: estName)}.xlsx';
       file_saver.saveExcelBytes(Uint8List.fromList(bytes), fileName);
       if (mounted) AppToastService.show('${loc.t('saved') ?? 'Сохранено'}: $fileName');
     } catch (e) {
@@ -750,6 +750,38 @@ class _MenuScreenState extends State<MenuScreen> {
 
   List<TextCellValue> _textRow(List<String> values) {
     return values.map((v) => TextCellValue(v)).toList();
+  }
+
+  String _exportFileBaseName({
+    required bool isFoodcost,
+    required String exportLang,
+    required String establishmentName,
+  }) {
+    final date = DateFormat('dd-MM-yyyy').format(DateTime.now());
+    final prefix = _localizedExportPrefix(
+      isFoodcost: isFoodcost,
+      lang: exportLang,
+    );
+    final safeEst = establishmentName
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '_')
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
+    return '${prefix}_${safeEst.isEmpty ? 'establishment' : safeEst}_$date';
+  }
+
+  String _localizedExportPrefix({
+    required bool isFoodcost,
+    required String lang,
+  }) {
+    const map = <String, ({String menu, String foodcost})>{
+      'ru': (menu: 'меню', foodcost: 'фудкост'),
+      'en': (menu: 'menu', foodcost: 'foodcost'),
+      'es': (menu: 'menu', foodcost: 'coste'),
+      'it': (menu: 'menu', foodcost: 'foodcost'),
+      'tr': (menu: 'menu', foodcost: 'maliyet'),
+    };
+    final labels = map[lang] ?? map['en']!;
+    return isFoodcost ? labels.foodcost : labels.menu;
   }
 
   Future<Uint8List> _buildSimpleMenuPdfBytes({
@@ -865,7 +897,7 @@ class _MenuScreenState extends State<MenuScreen> {
     if (estId == null || estId.isEmpty) {
       return (
         mode: FoodcostPricingMode.markupOnCost,
-        globalPct: 100,
+        globalPct: 100.0,
         customPct: <String, double>{},
       );
     }
@@ -876,7 +908,8 @@ class _MenuScreenState extends State<MenuScreen> {
     final mode = modeRaw == 'cost_share'
         ? FoodcostPricingMode.costShareOfPrice
         : FoodcostPricingMode.markupOnCost;
-    final globalPct = _parsePct(targetRaw) ?? (mode == FoodcostPricingMode.costShareOfPrice ? 35 : 100);
+    final globalPct =
+        _parsePct(targetRaw) ?? (mode == FoodcostPricingMode.costShareOfPrice ? 35.0 : 100.0);
     final custom = <String, double>{};
     if (overridesRaw != null && overridesRaw.isNotEmpty) {
       try {
