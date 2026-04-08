@@ -21,6 +21,8 @@ enum DocumentType {
   techCardChangeRequest,
   /// Согласование изменения цен в номенклатуре (приёмка уже сохранена; не-шеф → шефу во входящие).
   procurementPriceApproval,
+  /// Документ приёмки товара (procurement_receipt_documents), отдельно от заказов.
+  procurementGoodsReceipt,
 }
 
 /// Модель документа во входящих
@@ -86,6 +88,8 @@ class InboxDocument extends Equatable {
         return Icons.restaurant_menu;
       case DocumentType.procurementPriceApproval:
         return Icons.price_change_outlined;
+      case DocumentType.procurementGoodsReceipt:
+        return Icons.inventory_2_outlined;
     }
   }
 
@@ -105,11 +109,10 @@ class InboxDocument extends Equatable {
         return '${loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko'} $date';
       case DocumentType.productOrder:
         final supplier = metadata?['header']?['supplierName']?.toString() ?? '—';
-        final hdr = metadata?['header'];
-        if (hdr is Map && hdr['receipt'] == true) {
-          return loc.t('inbox_title_procurement_receipt').replaceFirst('%s', supplier);
-        }
         return loc.t('inbox_title_order').replaceFirst('%s', supplier);
+      case DocumentType.procurementGoodsReceipt:
+        final supplier = metadata?['header']?['supplierName']?.toString() ?? '—';
+        return loc.t('inbox_title_procurement_receipt').replaceFirst('%s', supplier);
       case DocumentType.checklistSubmission:
         final colonIdx = title.indexOf(': ');
         final name = colonIdx >= 0 ? title.substring(colonIdx + 2) : title;
@@ -167,6 +170,9 @@ class InboxDocument extends Equatable {
       case DocumentType.procurementPriceApproval:
         return loc.t('doc_type_procurement_price_approval') ??
             'Согласование цен';
+      case DocumentType.procurementGoodsReceipt:
+        return loc.t('doc_type_procurement_goods_receipt') ??
+            'Приёмка товара';
     }
   }
 

@@ -9,6 +9,7 @@ class CloudDraftService {
   static final CloudDraftService instance = CloudDraftService._();
 
   final SupabaseService _supabase = SupabaseService();
+  bool _draftTableUnavailable = false;
   Timer? _throttle;
   String? _pendingKey;
   Map<String, dynamic>? _pendingPayload;
@@ -16,6 +17,7 @@ class CloudDraftService {
   /// Отложенная запись (не дёргать Supabase на каждый символ).
   void scheduleUpsert(String draftKey, Map<String, dynamic> payload) {
     if (!_supabase.isAuthenticated) return;
+    if (_draftTableUnavailable) return;
     _pendingKey = draftKey;
     _pendingPayload = Map<String, dynamic>.from(payload);
     _throttle?.cancel();
@@ -39,6 +41,7 @@ class CloudDraftService {
 
   Future<Map<String, dynamic>?> fetchPayload(String draftKey) async {
     if (!_supabase.isAuthenticated) return null;
+    if (_draftTableUnavailable) return null;
     final uid = _supabase.currentUser?.id;
     if (uid == null) return null;
     try {
@@ -54,6 +57,7 @@ class CloudDraftService {
       if (p is Map) return Map<String, dynamic>.from(p);
       return null;
     } catch (e) {
+      if (_isDraftTableUnavailableError(e)) _draftTableUnavailable = true;
       devLog('CloudDraft fetchPayload: $e');
       return null;
     }
@@ -61,6 +65,7 @@ class CloudDraftService {
 
   Future<DateTime?> fetchUpdatedAt(String draftKey) async {
     if (!_supabase.isAuthenticated) return null;
+    if (_draftTableUnavailable) return null;
     final uid = _supabase.currentUser?.id;
     if (uid == null) return null;
     try {
@@ -74,13 +79,16 @@ class CloudDraftService {
       final s = row['updated_at']?.toString();
       return s != null ? DateTime.tryParse(s) : null;
     } catch (e) {
+      if (_isDraftTableUnavailableError(e)) _draftTableUnavailable = true;
       devLog('CloudDraft fetchUpdatedAt: $e');
       return null;
     }
   }
 
-  Future<void> upsertPayload(String draftKey, Map<String, dynamic> payload) async {
+  Future<void> upsertPayload(
+      String draftKey, Map<String, dynamic> payload) async {
     if (!_supabase.isAuthenticated) return;
+    if (_draftTableUnavailable) return;
     final uid = _supabase.currentUser?.id;
     if (uid == null) return;
     final copy = Map<String, dynamic>.from(payload);
@@ -96,12 +104,14 @@ class CloudDraftService {
         onConflict: 'user_id,draft_key',
       );
     } catch (e) {
+      if (_isDraftTableUnavailableError(e)) _draftTableUnavailable = true;
       devLog('CloudDraft upsert: $e');
     }
   }
 
   Future<void> deleteDraft(String draftKey) async {
     if (!_supabase.isAuthenticated) return;
+    if (_draftTableUnavailable) return;
     final uid = _supabase.currentUser?.id;
     if (uid == null) return;
     try {
@@ -111,7 +121,16 @@ class CloudDraftService {
           .eq('user_id', uid)
           .eq('draft_key', draftKey);
     } catch (e) {
+      if (_isDraftTableUnavailableError(e)) _draftTableUnavailable = true;
       devLog('CloudDraft delete: $e');
     }
+  }
+
+  bool _isDraftTableUnavailableError(Object e) {
+    final msg = e.toString().toLowerCase();
+    return msg.contains('account_form_drafts') &&
+        (msg.contains('404') ||
+            msg.contains('does not exist') ||
+            msg.contains('pgrst'));
   }
 }

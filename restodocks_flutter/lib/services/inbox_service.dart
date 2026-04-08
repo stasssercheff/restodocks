@@ -247,7 +247,7 @@ class InboxService {
 
         documents.add(InboxDocument(
           id: doc['id']?.toString() ?? '',
-          type: DocumentType.productOrder,
+          type: DocumentType.procurementGoodsReceipt,
           title: 'Приёмка $supplierName',
           description: employeeName,
           createdAt: createdAt,

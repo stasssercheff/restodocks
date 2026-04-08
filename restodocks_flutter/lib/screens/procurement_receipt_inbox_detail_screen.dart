@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../models/models.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
@@ -20,6 +21,7 @@ class _ProcurementReceiptInboxDetailScreenState
     extends State<ProcurementReceiptInboxDetailScreen> {
   Map<String, dynamic>? _doc;
   bool _loading = true;
+  bool _confirming = false;
 
   @override
   void initState() {
@@ -36,11 +38,58 @@ class _ProcurementReceiptInboxDetailScreenState
     });
   }
 
+  bool _canConfirmManagement(Employee? e) {
+    if (e == null) return false;
+    return e.hasRole('owner') ||
+        e.hasRole('executive_chef') ||
+        e.hasRole('sous_chef') ||
+        e.hasRole('bar_manager') ||
+        e.hasRole('floor_manager') ||
+        e.hasRole('general_manager');
+  }
+
+  Future<void> _confirmManagement() async {
+    final doc = _doc;
+    final acc = context.read<AccountManagerSupabase>();
+    final emp = acc.currentEmployee;
+    if (doc == null || emp == null) return;
+    final payload = Map<String, dynamic>.from(doc['payload'] as Map? ?? {});
+    final header = Map<String, dynamic>.from(payload['header'] as Map? ?? {});
+    setState(() => _confirming = true);
+    try {
+      header['pendingManagementApproval'] = false;
+      header['managementApprovedAt'] = DateTime.now().toUtc().toIso8601String();
+      header['managementApprovedByEmployeeId'] = emp.id;
+      payload['header'] = header;
+      final ok = await ProcurementReceiptService.instance
+          .updatePayload(widget.documentId, payload);
+      if (!mounted) return;
+      if (ok) {
+        final loc = context.read<LocalizationService>();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('procurement_receipt_saved'))),
+        );
+        await _load();
+      } else {
+        final loc = context.read<LocalizationService>();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(loc.t('procurement_receipt_save_error')),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _confirming = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final currency =
         context.watch<AccountManagerSupabase>().establishment?.defaultCurrency ?? '—';
+    final emp = context.watch<AccountManagerSupabase>().currentEmployee;
 
     if (_loading) {
       return Scaffold(
@@ -61,6 +110,12 @@ class _ProcurementReceiptInboxDetailScreenState
     final supplier = header['supplierName']?.toString() ?? '—';
     final ordered = header['orderedGrandTotal'];
     final received = header['receivedGrandTotal'];
+    final extRaw = header['externalReceiptDate']?.toString();
+    DateTime? extDate;
+    if (extRaw != null && extRaw.isNotEmpty) {
+      extDate = DateTime.tryParse(extRaw);
+    }
+    final pendingMgmt = header['pendingManagementApproval'] == true;
     final created = _doc!['created_at'] != null
         ? DateTime.tryParse(_doc!['created_at'].toString())?.toLocal()
         : null;
@@ -76,10 +131,27 @@ class _ProcurementReceiptInboxDetailScreenState
           Text('${loc.t('inbox_header_supplier')}: $supplier'),
           if (created != null)
             Text('${loc.t('inbox_header_date')}: ${DateFormat('dd.MM.yyyy HH:mm').format(created)}'),
+          if (extDate != null)
+            Text(
+              '${loc.t('procurement_external_receipt_date')}: ${DateFormat('dd.MM.yyyy').format(extDate.toLocal())}',
+            ),
           if (ordered != null)
             Text('${loc.t('procurement_receipt_total_ordered')}: $ordered $currency'),
           if (received != null)
             Text('${loc.t('procurement_receipt_total_received')}: $received $currency'),
+          if (pendingMgmt && _canConfirmManagement(emp)) ...[
+            const SizedBox(height: 16),
+            FilledButton(
+              onPressed: _confirming ? null : _confirmManagement,
+              child: _confirming
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(loc.t('procurement_confirm_goods_receipt')),
+            ),
+          ],
           const Divider(height: 24),
           ...items.map((raw) {
             if (raw is! Map) return const SizedBox.shrink();

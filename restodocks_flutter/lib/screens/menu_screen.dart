@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import 'menu_foodcost_panel.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/scroll_to_top_app_bar_title.dart';
 
@@ -32,6 +33,8 @@ class _MenuScreenState extends State<MenuScreen> {
   String? _error;
   /// Для зала: выбранная вкладка (bar | kitchen).
   String _hallTab = 'bar';
+  /// 0 — список меню, 1 — фудкост (таблица).
+  int _menuSegment = 0;
   /// Stop/Go статусы: ключ 'techCardId_department', значение 'stop' | 'go'.
   Map<String, String> _stopGoMap = {};
 
@@ -198,13 +201,43 @@ class _MenuScreenState extends State<MenuScreen> {
   /// Подразделение блюда для stop/go: bar или kitchen.
   String _dishDepartment(TechCard tc) => _isBarDish(tc) ? 'bar' : 'kitchen';
 
-  /// Полный вид ТТК (себестоимость, состав, технология): только руководство — собственник, шеф, су-шеф (кухня), барменеджер (бар).
+  /// Полный вид ТТК (себестоимость, состав, технология): руководство подразделения + ген. директор; в меню зала — менеджер зала.
   bool _canSeeFullTtkView(Employee? emp, TechCard tc) {
     if (emp == null) return false;
     if (emp.hasRole('owner')) return true;
+    if (emp.hasRole('general_manager')) return true;
+    if (emp.hasRole('floor_manager') && _isHallMenu) return true;
     if ((emp.hasRole('executive_chef') || emp.hasRole('sous_chef')) && !_isBarDish(tc)) return true;
     if (emp.hasRole('bar_manager') && _isBarDish(tc)) return true;
     return false;
+  }
+
+  /// Вкладка «Фудкост»: шеф/су-шеф, барменеджер, менеджер зала, ген. директор, собственник, руководство (офис).
+  bool _showFoodcostTab(Employee? emp) {
+    if (emp == null) return false;
+    if (widget.department == 'banquet-catering' ||
+        widget.department == 'banquet-catering-bar') {
+      return false;
+    }
+    if (emp.hasRole('owner')) return true;
+    if (emp.hasRole('general_manager')) return true;
+    final mgmtFoodcost = emp.department == 'management' &&
+        (emp.hasRole('manager') ||
+            emp.hasRole('assistant_manager') ||
+            emp.hasRole('executive_chef') ||
+            emp.hasRole('bar_manager') ||
+            emp.hasRole('floor_manager'));
+    switch (widget.department) {
+      case 'bar':
+        return emp.hasRole('bar_manager') || mgmtFoodcost;
+      case 'hall':
+      case 'dining_room':
+        return emp.hasRole('floor_manager') || mgmtFoodcost;
+      default:
+        return emp.hasRole('executive_chef') ||
+            emp.hasRole('sous_chef') ||
+            mgmtFoodcost;
+    }
   }
 
   /// Скачать карточку блюда могут только руководители подразделения.
@@ -357,8 +390,21 @@ class _MenuScreenState extends State<MenuScreen> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final accountManager = context.read<AccountManagerSupabase>();
-    final currency = accountManager.currentEmployee?.currency ?? accountManager.establishment?.defaultCurrency ?? 'RUB';
+    final emp = accountManager.currentEmployee;
     final sym = accountManager.establishment?.currencySymbol ?? accountManager.currentEmployee?.currencySymbol ?? Establishment.currencySymbolFor(accountManager.establishment?.defaultCurrency ?? 'VND');
+    final showFoodcost = _showFoodcostTab(emp);
+    final menuSeg = showFoodcost ? _menuSegment : 0;
+    final hallChips = _isHallMenu &&
+        !_loading &&
+        (_dishesBar.isNotEmpty || _dishesKitchen.isNotEmpty) &&
+        menuSeg == 0;
+    double? bottomHeight;
+    if (showFoodcost || hallChips) {
+      var h = 16.0;
+      if (showFoodcost) h += 52;
+      if (hallChips) h += 48;
+      bottomHeight = h;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -366,36 +412,66 @@ class _MenuScreenState extends State<MenuScreen> {
           child: Text(loc.t('menu')),
         ),
         leading: appBarBackButton(context),
-        bottom: _isHallMenu && !_loading && (_dishesBar.isNotEmpty || _dishesKitchen.isNotEmpty)
+        bottom: bottomHeight != null
             ? PreferredSize(
-                preferredSize: const Size.fromHeight(48),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _HallTabChip(
-                          label: loc.t('dept_bar'),
-                          selected: _hallTab == 'bar',
-                          onTap: () => setState(() => _hallTab = 'bar'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _HallTabChip(
-                          label: loc.t('dept_kitchen'),
-                          selected: _hallTab == 'kitchen',
-                          onTap: () => setState(() => _hallTab = 'kitchen'),
-                        ),
-                      ),
-                    ],
+                preferredSize: Size.fromHeight(bottomHeight),
+                child: Material(
+                  color: Theme.of(context).colorScheme.surface,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (showFoodcost)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8, bottom: 4),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: SegmentedButton<int>(
+                                segments: [
+                                  ButtonSegment<int>(
+                                    value: 0,
+                                    label: Text(loc.t('menu_tab_list')),
+                                  ),
+                                  ButtonSegment<int>(
+                                    value: 1,
+                                    label: Text(loc.t('menu_tab_foodcost')),
+                                  ),
+                                ],
+                                selected: {menuSeg},
+                                onSelectionChanged: (s) =>
+                                    setState(() => _menuSegment = s.first),
+                              ),
+                            ),
+                          ),
+                        if (hallChips)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _HallTabChip(
+                                  label: loc.t('dept_bar'),
+                                  selected: _hallTab == 'bar',
+                                  onTap: () => setState(() => _hallTab = 'bar'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _HallTabChip(
+                                  label: loc.t('dept_kitchen'),
+                                  selected: _hallTab == 'kitchen',
+                                  onTap: () => setState(() => _hallTab = 'kitchen'),
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               )
             : null,
         actions: [
-          if (_downloadableDishes.isNotEmpty && !_loading)
+          if (menuSeg == 0 && _downloadableDishes.isNotEmpty && !_loading)
             PopupMenuButton<String>(
               icon: const Icon(Icons.download),
               tooltip: loc.t('download'),
@@ -440,6 +516,19 @@ class _MenuScreenState extends State<MenuScreen> {
         ),
       );
     }
+    final account = context.read<AccountManagerSupabase>();
+    final emp = account.currentEmployee;
+    final estId = account.dataEstablishmentId;
+    final showFoodcost = _showFoodcostTab(emp);
+    final menuSeg = showFoodcost ? _menuSegment : 0;
+    if (showFoodcost && menuSeg == 1 && estId != null) {
+      return MenuFoodcostPanel(
+        dishes: _displayDishes,
+        dataEstablishmentId: estId,
+        currencySym: currencySym,
+        langCode: loc.currentLanguageCode,
+      );
+    }
     final dishesToShow = _displayDishes;
     if (dishesToShow.isEmpty) {
       return Center(
@@ -470,7 +559,9 @@ class _MenuScreenState extends State<MenuScreen> {
         itemCount: dishesToShow.length,
         itemBuilder: (context, index) {
           final tc = dishesToShow[index];
-          final totalCost = tc.totalCost;
+          final costForSubtitle = (tc.portionWeight > 0 && tc.yield > 0)
+              ? tc.totalCost * tc.portionWeight / tc.yield
+              : tc.totalCost;
           final lang = loc.currentLanguageCode;
           final dishDept = _dishDepartment(tc);
           final stopGoSvc = context.read<MenuStopGoService>();
@@ -577,7 +668,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                 '/tech-cards/${tc.id}?view=1${useHallView ? '&hall=1' : ''}');
                           },
                     child: Text(
-                      _buildSubtitleText(loc, tc, lang, totalCost, currencySym),
+                      _buildSubtitleText(loc, tc, lang, costForSubtitle, currencySym),
                       style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                       maxLines: _isHallMenu ? 3 : 1,
                       overflow: TextOverflow.ellipsis,

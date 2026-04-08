@@ -34,6 +34,7 @@ class InboxScreen extends StatefulWidget {
 enum _InboxTab {
   checklist,
   order,
+  goodsReceipt,
   inventory,
   iikoInventory,
   writeoff,
@@ -48,6 +49,7 @@ enum _InboxDeptTab { kitchen, bar, hall }
 enum _InboxTypeTab {
   checklist,
   order,
+  goodsReceipt,
   inventory,
   iikoInventory,
   writeoff,
@@ -156,6 +158,7 @@ class _InboxScreenState extends State<InboxScreen> {
     if (hasDocs) {
       tabs.add(_InboxTab.order);
       if (isOwner || isManagement) {
+        tabs.add(_InboxTab.goodsReceipt);
         tabs.add(_InboxTab.inventory);
         tabs.add(_InboxTab.writeoff);
         if (employee.hasRole('executive_chef') ||
@@ -390,6 +393,7 @@ class _InboxScreenState extends State<InboxScreen> {
       }
       final docType = switch (_selectedTypeTab!) {
         _InboxTypeTab.order => DocumentType.productOrder,
+        _InboxTypeTab.goodsReceipt => DocumentType.procurementGoodsReceipt,
         _InboxTypeTab.inventory => DocumentType.inventory,
         _InboxTypeTab.iikoInventory => DocumentType.iikoInventory,
         _InboxTypeTab.writeoff => DocumentType.writeoff,
@@ -403,6 +407,9 @@ class _InboxScreenState extends State<InboxScreen> {
         if (_selectedTypeTab == _InboxTypeTab.order) {
           return d.type == DocumentType.productOrder ||
               d.type == DocumentType.procurementPriceApproval;
+        }
+        if (_selectedTypeTab == _InboxTypeTab.goodsReceipt) {
+          return d.type == DocumentType.procurementGoodsReceipt;
         }
         return d.type == docType;
       }).toList();
@@ -420,6 +427,10 @@ class _InboxScreenState extends State<InboxScreen> {
             .where((d) =>
                 d.type == DocumentType.productOrder ||
                 d.type == DocumentType.procurementPriceApproval)
+            .toList();
+      case _InboxTab.goodsReceipt:
+        return _documents
+            .where((d) => d.type == DocumentType.procurementGoodsReceipt)
             .toList();
       case _InboxTab.inventory:
         return _documents
@@ -645,6 +656,10 @@ class _InboxScreenState extends State<InboxScreen> {
                 d.type == DocumentType.productOrder ||
                 d.type == DocumentType.procurementPriceApproval)
             .length;
+      case _InboxTypeTab.goodsReceipt:
+        return docsByDept
+            .where((d) => d.type == DocumentType.procurementGoodsReceipt)
+            .length;
       case _InboxTypeTab.inventory:
         return docsByDept.where((d) => d.type == DocumentType.inventory).length;
       case _InboxTypeTab.iikoInventory:
@@ -681,6 +696,10 @@ class _InboxScreenState extends State<InboxScreen> {
             .where((d) =>
                 d.type == DocumentType.productOrder ||
                 d.type == DocumentType.procurementPriceApproval)
+            .length;
+      case _InboxTab.goodsReceipt:
+        return docsUnviewed
+            .where((d) => d.type == DocumentType.procurementGoodsReceipt)
             .length;
       case _InboxTab.inventory:
         return docsUnviewed
@@ -814,8 +833,14 @@ class _InboxScreenState extends State<InboxScreen> {
             _buildTypeChip(
                 _InboxTypeTab.order, loc.t('inbox_tab_order') ?? 'Заказы', loc),
             const SizedBox(width: 8),
+            _buildTypeChip(
+                _InboxTypeTab.goodsReceipt,
+                loc.t('inbox_tab_goods_receipt') ?? 'Приёмка товара',
+                loc),
+            const SizedBox(width: 8),
             _buildTypeChip(_InboxTypeTab.inventory,
                 loc.t('inbox_tab_inventory') ?? 'Инвентаризация', loc),
+            const SizedBox(width: 8),
             _buildTypeChip(
                 _InboxTypeTab.writeoff, loc.t('writeoffs') ?? 'Списания', loc),
             if (!isHall) ...[
@@ -873,6 +898,8 @@ class _InboxScreenState extends State<InboxScreen> {
         return loc.t('inbox_tab_checklist');
       case _InboxTab.order:
         return loc.t('inbox_tab_order');
+      case _InboxTab.goodsReceipt:
+        return loc.t('inbox_tab_goods_receipt') ?? 'Приёмка товара';
       case _InboxTab.inventory:
         return loc.t('inbox_tab_inventory');
       case _InboxTab.iikoInventory:
@@ -1439,7 +1466,8 @@ class _DocumentTile extends StatelessWidget {
         .getViewedIdsSync(estId)
         .contains(document.id);
     final dateFormat = DateFormat('dd.MM.yyyy HH:mm', 'ru');
-    final grandTotal = document.type == DocumentType.productOrder
+    final grandTotal = (document.type == DocumentType.productOrder ||
+            document.type == DocumentType.procurementGoodsReceipt)
         ? (document.metadata?['grandTotal'] as num?)?.toDouble()
         : null;
     final currency =
@@ -1519,6 +1547,9 @@ class _DocumentTile extends StatelessWidget {
                     DocumentType.procurementPriceApproval) {
                   context.push(
                       '/inbox/procurement-price-approval/${document.id}');
+                } else if (document.type ==
+                    DocumentType.procurementGoodsReceipt) {
+                  context.push('/inbox/procurement-receipt/${document.id}');
                 } else if (document.type == DocumentType.productOrder) {
                   final rh = document.metadata?['header'];
                   final isReceipt = rh is Map && rh['receipt'] == true;
@@ -1594,6 +1625,10 @@ class _DocumentTile extends StatelessWidget {
     }
     if (document.type == DocumentType.procurementPriceApproval) {
       context.push('/inbox/procurement-price-approval/${document.id}');
+      return;
+    }
+    if (document.type == DocumentType.procurementGoodsReceipt) {
+      context.push('/inbox/procurement-receipt/${document.id}');
       return;
     }
     if (document.type == DocumentType.productOrder) {

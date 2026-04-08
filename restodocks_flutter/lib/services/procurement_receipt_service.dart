@@ -51,6 +51,19 @@ class ProcurementReceiptService {
     }
   }
 
+  /// Обновить JSON payload документа приёмки (например подтверждение руководством).
+  Future<bool> updatePayload(String documentId, Map<String, dynamic> payload) async {
+    try {
+      await _supabase.client.from(_table).update({
+        'payload': payload,
+      }).eq('id', documentId);
+      return true;
+    } catch (e) {
+      devLog('ProcurementReceiptService.updatePayload: $e');
+      return false;
+    }
+  }
+
   Future<Map<String, dynamic>?> getById(String id) async {
     try {
       final data = await _supabase.client

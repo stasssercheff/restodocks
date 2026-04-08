@@ -44,4 +44,5 @@ const _$DocumentTypeEnumMap = {
   DocumentType.writeoff: 'writeoff',
   DocumentType.techCardChangeRequest: 'techCardChangeRequest',
   DocumentType.procurementPriceApproval: 'procurementPriceApproval',
+  DocumentType.procurementGoodsReceipt: 'procurementGoodsReceipt',
 };

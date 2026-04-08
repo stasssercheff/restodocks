@@ -66,4 +66,9 @@ class FeatureFlags {
   /// iOS / Android / web — одни и те же правила, чтобы не было «на сайте есть, в приложении нет».
   static bool get showSystemErrorsJournal =>
       isBeta && !_isProdMarketingHost;
+
+  /// Приёмка по фото (ИИ): только бета / не-прод веб / ENABLE_POS; не на restodocks.com и не в прод-сборках без флагов.
+  static bool get procurementPhotoReceiptEnabled =>
+      !_isProdMarketingHost &&
+      (isBeta || _posModuleEnabledFromDefine || _posModuleEnabledWebNonProdHost);
 }

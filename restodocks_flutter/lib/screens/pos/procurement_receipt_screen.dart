@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/feature_flags.dart';
 import '../../models/models.dart';
 import '../../services/services.dart';
 import '../../utils/order_list_units.dart';
@@ -36,18 +37,19 @@ class _ReceiptLineEdit {
     required this.productId,
     required String productName,
     required this.unit,
-    required this.orderedQty,
+    required double initialOrderedQty,
     required this.referencePricePerUnit,
     required this.received,
     required this.actualPrice,
     required this.discountPercent,
     this.nameReadOnly = false,
-  }) : nameCtrl = TextEditingController(text: productName);
+  })  : orderedQty = initialOrderedQty,
+        nameCtrl = TextEditingController(text: productName);
 
   String? productId;
   final TextEditingController nameCtrl;
   String unit;
-  final double orderedQty;
+  double orderedQty;
   double referencePricePerUnit;
   final TextEditingController received;
   final TextEditingController actualPrice;
@@ -92,6 +94,8 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
   bool _saving = false;
   bool _photoRecognizing = false;
   bool _photoFlowInitialized = false;
+  /// Дата фактической приёмки (вне системы), опционально.
+  DateTime? _externalReceiptDate;
 
   String get _nomenclatureDepartment =>
       widget.department == 'bar' ? 'bar' : 'kitchen';
@@ -135,7 +139,9 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         _lines = [_createEmptyLine(), _createEmptyLine()];
         _syncManualTrailingEmptyInPlace();
       });
-      if (widget.manualOffSystem && !_photoFlowInitialized) {
+      if (widget.manualOffSystem &&
+          !_photoFlowInitialized &&
+          FeatureFlags.procurementPhotoReceiptEnabled) {
         final location = GoRouterState.of(context).location;
         final fromPhoto =
             (Uri.tryParse(location)?.queryParameters['photo'] ?? '') == '1';
@@ -179,7 +185,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
             productId: pid,
             productName: name,
             unit: unit,
-            orderedQty: q,
+            initialOrderedQty: q,
             referencePricePerUnit: ref,
             received: TextEditingController(),
             actualPrice: TextEditingController(),
@@ -210,7 +216,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         productId: null,
         productName: '',
         unit: 'kg',
-        orderedQty: 0,
+        initialOrderedQty: 0,
         referencePricePerUnit: 0,
         received: TextEditingController(),
         actualPrice: TextEditingController(),
@@ -265,6 +271,58 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
     final code = loc.currentLanguageCode.toLowerCase();
     final lang = code.startsWith('ru') ? 'ru' : 'en';
     return CulinaryUnits.displayName(unit, lang);
+  }
+
+  bool _isKgOrG(String unit) {
+    final u = unit.toLowerCase().trim();
+    return u == 'kg' || u == 'g' || u == 'г';
+  }
+
+  void _convertLineWeightUnit(_ReceiptLineEdit line, String newUnit) {
+    final old = line.unit.toLowerCase().trim();
+    final nu = newUnit.toLowerCase().trim();
+    final o = old == 'г' ? 'g' : old;
+    final n = nu == 'г' ? 'g' : nu;
+    if (o == n) {
+      line.unit = n;
+      return;
+    }
+    if ((o != 'kg' && o != 'g') || (n != 'kg' && n != 'g')) return;
+
+    final toG = o == 'kg' && n == 'g';
+    final factorQty = toG ? 1000.0 : 0.001;
+    final factorPrice = toG ? 0.001 : 1000.0;
+
+    line.unit = n;
+
+    final r = _parse(line.received.text);
+    if (r > 0) {
+      line.received.text = _formatQtyForField(r * factorQty);
+    }
+    if (line.orderedQty > 0) {
+      line.orderedQty *= factorQty;
+    }
+    if (line.referencePricePerUnit > 0) {
+      line.referencePricePerUnit *= factorPrice;
+    }
+    final ap = _parse(line.actualPrice.text);
+    if (ap > 0) {
+      line.actualPrice.text = _formatPriceForField(ap * factorPrice);
+    }
+  }
+
+  Future<void> _pickExternalReceiptDate(LocalizationService loc) async {
+    final now = DateTime.now();
+    final initial = _externalReceiptDate ?? now;
+    final d = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(now.year - 2),
+      lastDate: DateTime(now.year + 1),
+    );
+    if (d != null && mounted) {
+      setState(() => _externalReceiptDate = d);
+    }
   }
 
   bool get _manualNewSupplier {
@@ -815,7 +873,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
           productId: null,
           productName: line.name,
           unit: line.unit,
-          orderedQty: 0,
+          initialOrderedQty: 0,
           referencePricePerUnit: 0,
           received:
               TextEditingController(text: _formatQtyForField(line.quantity)),
@@ -850,6 +908,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
   }
 
   Future<void> _startPhotoRecognitionFlow() async {
+    if (!FeatureFlags.procurementPhotoReceiptEnabled) return;
     if (!widget.manualOffSystem || _photoRecognizing) return;
     final loc = context.read<LocalizationService>();
     final source = await _pickPhotoSource(loc);
@@ -1133,7 +1192,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         }
       }
 
-      final header = {
+      final header = <String, dynamic>{
         'supplierName': supplierName,
         'employeeName': emp.fullName,
         'establishmentName': est.name,
@@ -1142,6 +1201,13 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         'receipt': true,
         'orderedGrandTotal': _totalOrdered,
         'receivedGrandTotal': _totalReceived,
+        if (widget.manualOffSystem) 'pendingManagementApproval': true,
+        if (widget.manualOffSystem && _externalReceiptDate != null)
+          'externalReceiptDate': DateTime.utc(
+            _externalReceiptDate!.year,
+            _externalReceiptDate!.month,
+            _externalReceiptDate!.day,
+          ).toIso8601String(),
       };
 
       final payload = {
@@ -1156,6 +1222,19 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         emp,
         widget.department,
       );
+
+      for (final l in _lines) {
+        final pid = l.productId;
+        if (pid == null || pid.isEmpty) continue;
+        final p = store.allProducts.where((x) => x.id == pid).firstOrNull;
+        if (p == null) continue;
+        final uCard = (p.unit ?? '').toLowerCase().trim();
+        final uLine = l.unit.toLowerCase().trim();
+        if (uCard == uLine) continue;
+        if (uCard == 'г' && uLine == 'g') continue;
+        if (uCard == 'g' && uLine == 'г') continue;
+        await store.updateProduct(p.copyWith(unit: l.unit));
+      }
 
       final Map<String, dynamic>? ok;
       if (!approveOnDevice && priceLines.isNotEmpty) {
@@ -1313,68 +1392,84 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
     final onField =
         widget.manualOffSystem ? _onManualChanged : () => setState(() {});
 
-    Widget cell(Widget w) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: w,
-        );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = constraints.maxWidth < 560;
+        final hPad = narrow ? 4.0 : 8.0;
+        final minW = narrow ? 720.0 : 1040.0;
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minWidth: 1000),
-        child: Table(
-          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-          border: TableBorder.all(
-            color: Theme.of(context).dividerColor.withValues(alpha: 0.45),
-          ),
-          columnWidths: const {
-            0: FixedColumnWidth(32),
-            1: FlexColumnWidth(2.4),
-            2: FixedColumnWidth(72),
-            3: FixedColumnWidth(84),
-            4: FixedColumnWidth(72),
-            5: FixedColumnWidth(84),
-            6: FixedColumnWidth(88),
-            7: FixedColumnWidth(56),
-          },
-          children: [
-            TableRow(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        Widget cell(Widget w) => Padding(
+              padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 6),
+              child: w,
+            );
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: minW),
+            child: Table(
+              defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+              border: TableBorder.all(
+                color: Theme.of(context).dividerColor.withValues(alpha: 0.45),
               ),
+              columnWidths: {
+                0: FixedColumnWidth(narrow ? 26 : 32),
+                1: FlexColumnWidth(narrow ? 1.5 : 2.0),
+                2: FixedColumnWidth(narrow ? 52 : 56),
+                3: FixedColumnWidth(narrow ? 68 : 72),
+                4: FixedColumnWidth(narrow ? 76 : 84),
+                5: FixedColumnWidth(narrow ? 64 : 72),
+                6: FixedColumnWidth(narrow ? 76 : 84),
+                7: FixedColumnWidth(narrow ? 80 : 88),
+                8: FixedColumnWidth(narrow ? 48 : 56),
+              },
               children: [
-                cell(Text(loc.t('procurement_receipt_col_no'), style: thStyle)),
-                cell(Text(loc.t('product_name'), style: thStyle)),
-                cell(
-                    Text(loc.t('procurement_receipt_ordered'), style: thStyle)),
-                cell(Text(loc.t('procurement_receipt_ref_price'),
-                    style: thStyle)),
-                cell(Text(loc.t('procurement_receipt_received_qty'),
-                    style: thStyle)),
-                cell(Text(loc.t('procurement_receipt_actual_price'),
-                    style: thStyle)),
-                cell(Text(loc.t('procurement_receipt_line_total'),
-                    style: thStyle)),
-                cell(Text(loc.t('procurement_receipt_discount'),
-                    style: thStyle)),
+                TableRow(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  ),
+                  children: [
+                    cell(Text(loc.t('procurement_receipt_col_no'), style: thStyle)),
+                    cell(Text(loc.t('product_name'), style: thStyle)),
+                    cell(Text(loc.t('procurement_receipt_col_unit'), style: thStyle)),
+                    cell(
+                        Text(loc.t('procurement_receipt_ordered'), style: thStyle)),
+                    cell(Text(loc.t('procurement_receipt_ref_price'),
+                        style: thStyle)),
+                    cell(Text(loc.t('procurement_receipt_received_qty'),
+                        style: thStyle)),
+                    cell(Text(loc.t('procurement_receipt_actual_price'),
+                        style: thStyle)),
+                    cell(Text(loc.t('procurement_receipt_line_total'),
+                        style: thStyle)),
+                    cell(Text(loc.t('procurement_receipt_discount'),
+                        style: thStyle)),
+                  ],
+                ),
+                ...List.generate(
+                  _lines.length,
+                  (i) => _tableDataRow(
+                    i,
+                    loc,
+                    currency,
+                    cell,
+                    onField,
+                    nf,
+                    narrow,
+                  ),
+                ),
               ],
             ),
-            ...List.generate(
-              _lines.length,
-              (i) => _tableDataRow(
-                i,
-                loc,
-                currency,
-                cell,
-                onField,
-                nf,
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
+  }
+
+  String _kgGDropdownValue(_ReceiptLineEdit l) {
+    final u = l.unit.toLowerCase().trim();
+    return u == 'kg' ? 'kg' : 'g';
   }
 
   TableRow _tableDataRow(
@@ -1384,6 +1479,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
     Widget Function(Widget) cell,
     VoidCallback onField,
     NumberFormat nf,
+    bool narrow,
   ) {
     final l = _lines[i];
     final ref = l.referencePricePerUnit;
@@ -1407,8 +1503,8 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
           l.nameReadOnly
               ? Text(
                   l.nameCtrl.text.isEmpty ? '—' : l.nameCtrl.text,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: narrow ? 5 : 4,
+                  overflow: TextOverflow.fade,
                   style: Theme.of(context).textTheme.bodySmall,
                 )
               : widget.manualOffSystem
@@ -1420,6 +1516,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                             controller: l.nameCtrl,
                             decoration: const InputDecoration(isDense: true),
                             style: Theme.of(context).textTheme.bodySmall,
+                            maxLines: narrow ? 3 : 2,
                             onChanged: (_) => onField(),
                           ),
                         ),
@@ -1449,12 +1546,40 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                       controller: l.nameCtrl,
                       decoration: const InputDecoration(isDense: true),
                       style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: narrow ? 3 : 2,
                       onChanged: (_) => onField(),
                     ),
         ),
         cell(
+          _isKgOrG(l.unit)
+              ? DropdownButton<String>(
+                  isDense: true,
+                  isExpanded: true,
+                  value: _kgGDropdownValue(l),
+                  items: [
+                    DropdownMenuItem(
+                      value: 'kg',
+                      child: Text(_localizedUnit(loc, 'kg')),
+                    ),
+                    DropdownMenuItem(
+                      value: 'g',
+                      child: Text(_localizedUnit(loc, 'g')),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() => _convertLineWeightUnit(l, v));
+                    onField();
+                  },
+                )
+              : Text(
+                  _localizedUnit(loc, l.unit),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+        ),
+        cell(
           Text(
-            '${nf.format(l.orderedQty)} ${_localizedUnit(loc, l.unit)}',
+            nf.format(l.orderedQty),
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ),
@@ -1575,6 +1700,26 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                      InkWell(
+                        onTap: () => _pickExternalReceiptDate(loc),
+                        child: InputDecorator(
+                          decoration: InputDecoration(
+                            labelText:
+                                loc.t('procurement_external_receipt_date'),
+                            border: const OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          child: Text(
+                            _externalReceiptDate != null
+                                ? DateFormat.yMMMd(
+                                    Localizations.localeOf(context)
+                                        .toString(),
+                                  ).format(_externalReceiptDate!)
+                                : loc.t('procurement_external_receipt_date_hint'),
+                          ),
+                        ),
+                      ),
                       if (_manualNewSupplier) ...[
                         const SizedBox(height: 10),
                         Text(
@@ -1648,7 +1793,8 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                   '${loc.t('procurement_receipt_total_received')}: ${NumberFormat('#0.##', 'ru').format(_totalReceived)} $currency',
                 ),
                 const SizedBox(height: 12),
-                if (widget.manualOffSystem) ...[
+                if (widget.manualOffSystem &&
+                    FeatureFlags.procurementPhotoReceiptEnabled) ...[
                   OutlinedButton.icon(
                     onPressed:
                         _photoRecognizing ? null : _startPhotoRecognitionFlow,

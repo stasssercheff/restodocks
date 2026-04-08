@@ -17,7 +17,8 @@ import 'account_manager_supabase.dart';
 bool _isLikelyGatewayOrNetworkError(Object e) {
   if (e is PostgrestException) {
     final c = e.code;
-    if (c != null && const {'502', '503', '504', '522'}.contains(c)) return true;
+    if (c != null && const {'502', '503', '504', '522'}.contains(c))
+      return true;
   }
   final msg = e.toString().toLowerCase();
   return msg.contains('502') ||
@@ -186,6 +187,7 @@ class ProductStoreSupabase {
 
   Future<void> _scheduleNutritionBackfillAfterCatalogLoad() async {
     await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (kIsWeb) return;
     if (!AccountManagerSupabase().isLoggedInSync) return;
     try {
       final client = Supabase.instance.client;
@@ -320,7 +322,8 @@ class ProductStoreSupabase {
             final oa = sugarQueryOverlapScore(q, _productNameBlobLower(a));
             final ob = sugarQueryOverlapScore(q, _productNameBlobLower(b));
             if (oa != ob) return ob.compareTo(oa);
-            return _ingredientProductScore(b).compareTo(_ingredientProductScore(a));
+            return _ingredientProductScore(b)
+                .compareTo(_ingredientProductScore(a));
           });
           candidates.add(sugarHits.first);
         }
@@ -626,8 +629,7 @@ class ProductStoreSupabase {
 
   /// Обновить продукт
   Future<void> updateProduct(Product updatedProduct) async {
-    final other =
-        await _fetchProductByNormalizedName(updatedProduct.name);
+    final other = await _fetchProductByNormalizedName(updatedProduct.name);
     if (other != null &&
         other.id.toLowerCase() != updatedProduct.id.toLowerCase()) {
       throw const DuplicateProductNameException();
@@ -674,8 +676,7 @@ class ProductStoreSupabase {
     try {
       await _supabase.client
           .from('establishment_products')
-          .update({'currency': c})
-          .eq('establishment_id', establishmentId);
+          .update({'currency': c}).eq('establishment_id', establishmentId);
     } catch (e, st) {
       devLog('❌ syncEstablishmentNomenclatureCurrency: $e\n$st');
       rethrow;
@@ -729,17 +730,19 @@ class ProductStoreSupabase {
     const chunkSize = 500;
     final client = _supabase.client;
     for (var i = 0; i < missing.length; i += chunkSize) {
-      final end = i + chunkSize > missing.length ? missing.length : i + chunkSize;
+      final end =
+          i + chunkSize > missing.length ? missing.length : i + chunkSize;
       final chunk = missing.sublist(i, end);
       try {
-        final data = await client.from('products').select().inFilter('id', chunk);
+        final data =
+            await client.from('products').select().inFilter('id', chunk);
         final rows = data as List;
         for (final row in rows) {
           final m = Map<String, dynamic>.from(row as Map);
           try {
             final p = Product.fromJson(m);
-            final idx = _allProducts.indexWhere(
-                (e) => e.id.toLowerCase() == p.id.toLowerCase());
+            final idx = _allProducts
+                .indexWhere((e) => e.id.toLowerCase() == p.id.toLowerCase());
             if (idx >= 0) {
               _allProducts[idx] = p;
             } else {
@@ -780,7 +783,8 @@ class ProductStoreSupabase {
       // Web: ждём сеть — иначе при быстром переходе виден рассинхрон.
       // Mobile: при свежем локальном кэше не блокируем UI; устаревший — фоновое обновление.
       if (!kIsWeb &&
-          await _offlineCache.isKeyFresh(cacheKey, _mobileNomenclatureCacheTtl)) {
+          await _offlineCache.isKeyFresh(
+              cacheKey, _mobileNomenclatureCacheTtl)) {
         return;
       }
       if (!kIsWeb) {
@@ -805,7 +809,8 @@ class ProductStoreSupabase {
   }
 
   /// Сырой список строк establishment_products (без изменения кэша в памяти).
-  Future<List<dynamic>> _fetchNomenclatureRowsRaw(String establishmentId) async {
+  Future<List<dynamic>> _fetchNomenclatureRowsRaw(
+      String establishmentId) async {
     dynamic response;
     try {
       response = await _supabase.client
@@ -815,7 +820,8 @@ class ProductStoreSupabase {
           .limit(10000);
     } catch (e) {
       if (_isLikelyGatewayOrNetworkError(e)) {
-        devLog('⚠️ ProductStore: establishment_products aborted (gateway/network), no schema fallbacks: $e');
+        devLog(
+            '⚠️ ProductStore: establishment_products aborted (gateway/network), no schema fallbacks: $e');
         rethrow;
       }
       devLog(
@@ -871,8 +877,7 @@ class ProductStoreSupabase {
       try {
         await _loadNomenclatureFallback(establishmentId);
       } catch (fallbackError) {
-        devLog(
-            '❌ ProductStore: Fallback loading also failed: $fallbackError');
+        devLog('❌ ProductStore: Fallback loading also failed: $fallbackError');
         _nomenclatureIds.clear();
         _nomenclatureDeptByProduct.clear();
         _priceCache
@@ -910,7 +915,8 @@ class ProductStoreSupabase {
         return;
       }
       if (!kIsWeb &&
-          await _offlineCache.isKeyFresh(cacheKey, _mobileNomenclatureCacheTtl)) {
+          await _offlineCache.isKeyFresh(
+              cacheKey, _mobileNomenclatureCacheTtl)) {
         return;
       }
       if (!kIsWeb) {
@@ -937,7 +943,8 @@ class ProductStoreSupabase {
           .limit(10000);
       mainList = mainResp is List ? mainResp : [];
     } catch (e) {
-      devLog('⚠️ ProductStore: Failed to load main nomenclature (with department): $e');
+      devLog(
+          '⚠️ ProductStore: Failed to load main nomenclature (with department): $e');
       try {
         final mainResp = await _supabase.client
             .from('establishment_products')
@@ -1451,8 +1458,7 @@ class ProductStoreSupabase {
 
   /// Продукты в номенклатуре заведения
   List<Product> getNomenclatureProducts(String establishmentId) {
-    final idSet =
-        _nomenclatureIds.map((id) => id.toLowerCase()).toSet();
+    final idSet = _nomenclatureIds.map((id) => id.toLowerCase()).toSet();
     return _allProducts
         .where((p) => idSet.contains(p.id.toLowerCase()))
         .toList();
