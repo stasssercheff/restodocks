@@ -1,10 +1,12 @@
 import 'dart:typed_data';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:excel/excel.dart' hide Border;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
@@ -424,38 +426,60 @@ class _MenuScreenState extends State<MenuScreen> {
     final allDishes = List<TechCard>.from(_displayDishes);
     if (allDishes.isEmpty) return;
 
-    var exportSelectedOnly = false;
+    String t(String key, String fallback) {
+      final v = loc.t(key);
+      return v == key ? fallback : v;
+    }
+
+    var exportScope = 'all'; // all | selected | above | below
     var exportFormat = 'pdf'; // pdf | xlsx
     var exportLang = loc.currentLanguageCode;
     var selectedIds = <String>{};
+    final fcConfig = await _loadFoodcostExportConfig();
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
-          title: Text(loc.t('download')),
+          title: Text(t('download', 'Скачать')),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(loc.t('save_to_device') ?? 'Сохранить на устройство'),
+                Text(isFoodcostTab ? 'Фудкост меню' : 'Меню'),
                 const SizedBox(height: 10),
-                RadioListTile<bool>(
+                RadioListTile<String>(
                   dense: true,
-                  value: false,
-                  groupValue: exportSelectedOnly,
-                  title: Text(loc.t('ttk_export_all') ?? 'Все позиции'),
-                  onChanged: (v) => setLocal(() => exportSelectedOnly = v ?? false),
+                  value: 'all',
+                  groupValue: exportScope,
+                  title: const Text('Все'),
+                  onChanged: (v) => setLocal(() => exportScope = v ?? 'all'),
                 ),
-                RadioListTile<bool>(
+                RadioListTile<String>(
                   dense: true,
-                  value: true,
-                  groupValue: exportSelectedOnly,
-                  title: Text(loc.t('ttk_export_selected') ?? 'Выбранные позиции'),
-                  onChanged: (v) => setLocal(() => exportSelectedOnly = v ?? false),
+                  value: 'selected',
+                  groupValue: exportScope,
+                  title: const Text('Выборочно'),
+                  onChanged: (v) => setLocal(() => exportScope = v ?? 'selected'),
                 ),
-                if (exportSelectedOnly)
+                if (isFoodcostTab) ...[
+                  RadioListTile<String>(
+                    dense: true,
+                    value: 'above',
+                    groupValue: exportScope,
+                    title: const Text('Выгодно (выше цели)'),
+                    onChanged: (v) => setLocal(() => exportScope = v ?? 'above'),
+                  ),
+                  RadioListTile<String>(
+                    dense: true,
+                    value: 'below',
+                    groupValue: exportScope,
+                    title: const Text('Невыгодно (ниже цели)'),
+                    onChanged: (v) => setLocal(() => exportScope = v ?? 'below'),
+                  ),
+                ],
+                if (exportScope == 'selected')
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
@@ -473,7 +497,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     ),
                   ),
                 const SizedBox(height: 6),
-                Text(loc.t('salary_export_lang') ?? 'Язык сохранения:'),
+                const Text('Язык сохранения'),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
                   value: exportLang,
@@ -487,7 +511,7 @@ class _MenuScreenState extends State<MenuScreen> {
                   onChanged: (v) => setLocal(() => exportLang = v ?? exportLang),
                 ),
                 const SizedBox(height: 10),
-                Text(loc.t('expenses_procurement_export_format_title') ?? 'Формат'),
+                const Text('Формат файла'),
                 const SizedBox(height: 6),
                 SegmentedButton<String>(
                   segments: const [
@@ -510,11 +534,11 @@ class _MenuScreenState extends State<MenuScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: Text(loc.t('cancel')),
+              child: Text(t('cancel', 'Отмена')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(loc.t('save') ?? 'Сохранить'),
+              child: Text(t('save', 'Сохранить')),
             ),
           ],
         ),
@@ -522,9 +546,16 @@ class _MenuScreenState extends State<MenuScreen> {
     );
     if (confirmed != true || !mounted) return;
 
-    final selected = exportSelectedOnly
-        ? allDishes.where((d) => selectedIds.contains(d.id)).toList()
-        : allDishes;
+    List<TechCard> selected;
+    if (exportScope == 'selected') {
+      selected = allDishes.where((d) => selectedIds.contains(d.id)).toList();
+    } else if (exportScope == 'above') {
+      selected = allDishes.where((d) => _isDishAboveTarget(d, fcConfig)).toList();
+    } else if (exportScope == 'below') {
+      selected = allDishes.where((d) => _isDishBelowTarget(d, fcConfig)).toList();
+    } else {
+      selected = allDishes;
+    }
     if (selected.isEmpty) {
       AppToastService.show(loc.t('ttk_none_selected') ?? 'Ничего не выбрано');
       return;
@@ -676,6 +707,99 @@ class _MenuScreenState extends State<MenuScreen> {
 
   List<TextCellValue> _textRow(List<String> values) {
     return values.map((v) => TextCellValue(v)).toList();
+  }
+
+  Future<({FoodcostPricingMode mode, double? globalPct, Map<String, double> customPct})>
+      _loadFoodcostExportConfig() async {
+    final estId = context.read<AccountManagerSupabase>().establishment?.id;
+    if (estId == null || estId.isEmpty) {
+      return (
+        mode: FoodcostPricingMode.markupOnCost,
+        globalPct: 100,
+        customPct: <String, double>{},
+      );
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final modeRaw = prefs.getString('restodocks_foodcost_mode_$estId');
+    final targetRaw = prefs.getString('restodocks_foodcost_target_$estId');
+    final overridesRaw = prefs.getString('restodocks_foodcost_dish_overrides_$estId');
+    final mode = modeRaw == 'cost_share'
+        ? FoodcostPricingMode.costShareOfPrice
+        : FoodcostPricingMode.markupOnCost;
+    final globalPct = _parsePct(targetRaw) ?? (mode == FoodcostPricingMode.costShareOfPrice ? 35 : 100);
+    final custom = <String, double>{};
+    if (overridesRaw != null && overridesRaw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(overridesRaw);
+        if (decoded is Map<String, dynamic>) {
+          for (final e in decoded.entries) {
+            final v = e.value;
+            if (v is! Map<String, dynamic>) continue;
+            if (v['u'] != true) continue;
+            final p = _parsePct(v['p']?.toString());
+            if (p != null && p > 0) custom[e.key] = p;
+          }
+        }
+      } catch (_) {}
+    }
+    return (mode: mode, globalPct: globalPct, customPct: custom);
+  }
+
+  double? _parsePct(String? raw) {
+    if (raw == null) return null;
+    final v = double.tryParse(raw.trim().replaceAll(',', '.'));
+    if (v == null || v <= 0) return null;
+    return v;
+  }
+
+  double _portionCostForFoodcost(TechCard tc) {
+    var totalCost = tc.totalCost;
+    if (totalCost <= 0) {
+      totalCost = tc.ingredients.fold<double>(0, (s, i) => s + i.effectiveCost);
+    }
+    if (totalCost <= 0) return 0;
+    final yieldG = tc.yield > 0
+        ? tc.yield
+        : tc.ingredients.fold<double>(0, (s, i) => s + i.outputWeight);
+    if (yieldG <= 0) return 0;
+    final portionG = tc.portionWeight > 0 ? tc.portionWeight : yieldG;
+    return totalCost * portionG / yieldG;
+  }
+
+  bool _isDishAboveTarget(
+    TechCard tc,
+    ({FoodcostPricingMode mode, double? globalPct, Map<String, double> customPct}) cfg,
+  ) {
+    final sell = tc.sellingPrice;
+    if (sell == null || sell <= 0) return false;
+    final cost = _portionCostForFoodcost(tc);
+    if (cost <= 0) return false;
+    final targetPct = cfg.customPct[tc.id] ?? cfg.globalPct;
+    if (targetPct == null) return false;
+    if (cfg.mode == FoodcostPricingMode.markupOnCost) {
+      final actual = (sell / cost - 1) * 100;
+      return actual > targetPct;
+    }
+    final actual = (cost / sell) * 100;
+    return actual < targetPct;
+  }
+
+  bool _isDishBelowTarget(
+    TechCard tc,
+    ({FoodcostPricingMode mode, double? globalPct, Map<String, double> customPct}) cfg,
+  ) {
+    final sell = tc.sellingPrice;
+    if (sell == null || sell <= 0) return false;
+    final cost = _portionCostForFoodcost(tc);
+    if (cost <= 0) return false;
+    final targetPct = cfg.customPct[tc.id] ?? cfg.globalPct;
+    if (targetPct == null) return false;
+    if (cfg.mode == FoodcostPricingMode.markupOnCost) {
+      final actual = (sell / cost - 1) * 100;
+      return actual < targetPct;
+    }
+    final actual = (cost / sell) * 100;
+    return actual > targetPct;
   }
 
   /// Контент раскрытой карточки: полная ТТК с ценой / полная ТТК без цены / описание для зала.
