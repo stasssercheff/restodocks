@@ -191,13 +191,15 @@ class _AppShellState extends State<AppShell> {
         : navBar;
 
     final landscapeNarrow = _landscapeNarrowPhone(context);
+    final landscapeWeb =
+        kIsWeb && MediaQuery.of(context).orientation == Orientation.landscape;
     final hideNav = landscapeNarrow && _hideBottomBar;
 
     final bodyChild = showAccessPendingStub
         ? _AccessPendingPlaceholder(loc: loc)
         : widget.child;
     final mq = MediaQuery.of(context);
-    final patchedMq = landscapeNarrow
+    final patchedMq = (landscapeNarrow || landscapeWeb)
         ? mq.copyWith(
             padding: mq.padding.copyWith(bottom: 0),
             viewPadding: mq.viewPadding.copyWith(bottom: 0),

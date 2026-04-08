@@ -1189,10 +1189,12 @@ class _MenuScreenState extends State<MenuScreen> {
         !_loading &&
         (_dishesBar.isNotEmpty || _dishesKitchen.isNotEmpty) &&
         menuSeg == 0;
+    final showTopFoodcostSwitch = showFoodcost && !hideTopFoodcostSwitch;
+    final showAppBarBottom = showTopFoodcostSwitch || hallChips;
     double? bottomHeight;
-    if (showFoodcost || hallChips) {
-      var h = 16.0;
-      if (showFoodcost && !hideTopFoodcostSwitch) h += 52;
+    if (showAppBarBottom) {
+      var h = 8.0;
+      if (showTopFoodcostSwitch) h += 52;
       if (hallChips) h += 48;
       bottomHeight = h;
     }
@@ -1224,7 +1226,7 @@ class _MenuScreenState extends State<MenuScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (showFoodcost && !hideTopFoodcostSwitch)
+                            if (showTopFoodcostSwitch)
                               Padding(
                                 padding:
                                     const EdgeInsets.only(top: 8, bottom: 4),
