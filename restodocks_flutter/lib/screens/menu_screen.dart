@@ -530,7 +530,7 @@ class _MenuScreenState extends State<MenuScreen> {
                 Text(
                   isFoodcostTab
                       ? (loc.t('menu_tab_foodcost') ?? 'Фудкост')
-                      : (loc.t('menu_tab_list') ?? 'Список'),
+                      : (loc.t('menu') ?? 'Меню'),
                   style: Theme.of(ctx).textTheme.bodySmall,
                 ),
               ],
@@ -1066,6 +1066,8 @@ class _MenuScreenState extends State<MenuScreen> {
         Establishment.currencySymbolFor(currencyCode);
     final showFoodcost = _showFoodcostTab(emp);
     final menuSeg = showFoodcost ? _menuSegment : 0;
+    final narrow = MediaQuery.sizeOf(context).width < 560;
+    final hideTopFoodcostSwitch = narrow && showFoodcost && menuSeg == 1;
     final hallChips = _isHallMenu &&
         !_loading &&
         (_dishesBar.isNotEmpty || _dishesKitchen.isNotEmpty) &&
@@ -1073,7 +1075,7 @@ class _MenuScreenState extends State<MenuScreen> {
     double? bottomHeight;
     if (showFoodcost || hallChips) {
       var h = 16.0;
-      if (showFoodcost) h += 52;
+      if (showFoodcost && !hideTopFoodcostSwitch) h += 52;
       if (hallChips) h += 48;
       bottomHeight = h;
     }
@@ -1094,7 +1096,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (showFoodcost)
+                        if (showFoodcost && !hideTopFoodcostSwitch)
                           Padding(
                             padding: const EdgeInsets.only(top: 8, bottom: 4),
                             child: Align(
@@ -1103,7 +1105,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                 segments: [
                                   ButtonSegment<int>(
                                     value: 0,
-                                    label: Text(loc.t('menu_tab_list')),
+                                    label: Text(loc.t('menu') ?? 'Меню'),
                                   ),
                                   ButtonSegment<int>(
                                     value: 1,
@@ -1212,6 +1214,8 @@ class _MenuScreenState extends State<MenuScreen> {
         langCode: loc.currentLanguageCode,
         // Вкладка фудкост только у ролей с правом на ценообразование — открываем ТТК без view=1.
         openCardInEditMode: true,
+        menuSegmentValue: menuSeg,
+        onMenuSegmentChanged: (v) => setState(() => _menuSegment = v),
       );
     }
     final dishesToShow = _displayDishes;

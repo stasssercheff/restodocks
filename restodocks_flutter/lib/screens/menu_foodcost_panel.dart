@@ -62,6 +62,8 @@ class MenuFoodcostPanel extends StatefulWidget {
     required this.currencySym,
     required this.langCode,
     this.openCardInEditMode = false,
+    this.menuSegmentValue,
+    this.onMenuSegmentChanged,
   });
 
   final List<TechCard> dishes;
@@ -72,6 +74,8 @@ class MenuFoodcostPanel extends StatefulWidget {
   final String currencySym;
   final String langCode;
   final bool openCardInEditMode;
+  final int? menuSegmentValue;
+  final ValueChanged<int>? onMenuSegmentChanged;
 
   @override
   State<MenuFoodcostPanel> createState() => _MenuFoodcostPanelState();
@@ -685,7 +689,12 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       ),
       DataColumn(
         numeric: true,
-        label: SizedBox(width: w.withMarkup, child: headerLabel('С наценкой')),
+        label: SizedBox(
+          width: w.withMarkup,
+          child: headerLabel(
+            _mode == FoodcostPricingMode.markupOnCost ? 'Наценка' : 'С наценкой',
+          ),
+        ),
       ),
       DataColumn(
         label: SizedBox(width: w.menu, child: headerLabel('В меню')),
@@ -808,32 +817,64 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       ),
     );
 
+    final modeSegment = SegmentedButton<FoodcostPricingMode>(
+      segments: [
+        ButtonSegment<FoodcostPricingMode>(
+          value: FoodcostPricingMode.markupOnCost,
+          label: Text(loc.t('foodcost_mode_markup') ?? 'Наценка к с/с'),
+        ),
+        ButtonSegment<FoodcostPricingMode>(
+          value: FoodcostPricingMode.costShareOfPrice,
+          label: Text(loc.t('foodcost_mode_cost_share') ?? 'Доля с/с в цене'),
+        ),
+      ],
+      selected: {_mode},
+      onSelectionChanged: (s) {
+        final m = s.first;
+        setState(() => _mode = m);
+        unawaited(_persistMode(m));
+      },
+    );
+
+    final menuSegment =
+        (widget.onMenuSegmentChanged != null && widget.menuSegmentValue != null)
+            ? SegmentedButton<int>(
+                segments: [
+                  ButtonSegment<int>(
+                    value: 0,
+                    label: Text(loc.t('menu') ?? 'Меню'),
+                  ),
+                  ButtonSegment<int>(
+                    value: 1,
+                    label: Text(loc.t('menu_tab_foodcost')),
+                  ),
+                ],
+                selected: {widget.menuSegmentValue!},
+                onSelectionChanged: (s) => widget.onMenuSegmentChanged!(s.first),
+              )
+            : null;
+
     final controls = Padding(
       padding: EdgeInsets.fromLTRB(narrow ? 8 : 14, 0, narrow ? 8 : 14, 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SegmentedButton<FoodcostPricingMode>(
-            segments: [
-              ButtonSegment<FoodcostPricingMode>(
-                value: FoodcostPricingMode.markupOnCost,
-                label: Text(loc.t('foodcost_mode_markup') ?? 'Наценка к с/с'),
-              ),
-              ButtonSegment<FoodcostPricingMode>(
-                value: FoodcostPricingMode.costShareOfPrice,
-                label: Text(loc.t('foodcost_mode_cost_share') ?? 'Доля с/с в цене'),
-              ),
-            ],
-            selected: {_mode},
-            onSelectionChanged: (s) {
-              final m = s.first;
-              setState(() => _mode = m);
-              unawaited(_persistMode(m));
-            },
-          ),
+          if (narrow && menuSegment != null)
+            Row(
+              children: [
+                Expanded(child: menuSegment),
+                const SizedBox(width: 6),
+                Expanded(child: modeSegment),
+              ],
+            )
+          else ...[
+            if (menuSegment != null) menuSegment,
+            if (menuSegment != null) const SizedBox(height: 6),
+            modeSegment,
+          ],
           const SizedBox(height: 6),
           Align(
-            alignment: Alignment.centerLeft,
+            alignment: Alignment.center,
             child: SizedBox(
               width: narrow ? 82 : 96,
               child: TextField(
