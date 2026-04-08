@@ -331,9 +331,9 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               ),
               child: Text(
                 tc.getDisplayNameInLists(widget.langCode),
-                maxLines: null,
+                maxLines: narrow ? 3 : 4,
                 softWrap: true,
-                overflow: TextOverflow.visible,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.primary,
                   decoration: TextDecoration.underline,
@@ -590,7 +590,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       horizontalMargin: narrow ? 3 : 10,
       headingRowHeight: narrow ? 30 : 38,
       dataRowMinHeight: narrow ? 22 : 38,
-      dataRowMaxHeight: narrow ? 140 : 180,
+      dataRowMaxHeight: narrow ? 56 : 80,
       showBottomBorder: true,
       border: TableBorder(
         horizontalInside: BorderSide(
