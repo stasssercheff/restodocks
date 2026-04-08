@@ -881,6 +881,28 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               )
             : null;
 
+    final pctField = SizedBox(
+      width: narrow ? 82 : 96,
+      child: TextField(
+        controller: _targetPctController,
+        decoration: const InputDecoration(
+          labelText: '%',
+          border: OutlineInputBorder(),
+          isDense: true,
+          isCollapsed: true,
+          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        ),
+        keyboardType: TextInputType.number,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(4),
+        ],
+        onChanged: (_) => setState(() {}),
+        onSubmitted: (_) => _persistTarget(),
+        onEditingComplete: _persistTarget,
+      ),
+    );
+
     final controls = Padding(
       padding: EdgeInsets.fromLTRB(narrow ? 8 : 14, 0, narrow ? 8 : 14, 6),
       child: Column(
@@ -889,9 +911,13 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
           if (isPhoneLayout && menuSegment != null)
             Row(
               children: [
-                Expanded(child: menuSegment),
+                Flexible(fit: FlexFit.loose, child: menuSegment),
                 const SizedBox(width: 6),
-                Expanded(child: modeSegment),
+                Flexible(fit: FlexFit.loose, child: modeSegment),
+                if (shortViewport) ...[
+                  const SizedBox(width: 6),
+                  pctField,
+                ],
               ],
             )
           else ...[
@@ -899,33 +925,14 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
             if (menuSegment != null) const SizedBox(height: 6),
             modeSegment,
           ],
-          const SizedBox(height: 6),
-          Align(
-            alignment: narrow ? Alignment.center : Alignment.centerLeft,
-            child: SizedBox(
-              width: narrow ? 82 : 96,
-              child: TextField(
-                controller: _targetPctController,
-                decoration: const InputDecoration(
-                  labelText: '%',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                  isCollapsed: true,
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                ),
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(4),
-                ],
-                onChanged: (_) => setState(() {}),
-                onSubmitted: (_) => _persistTarget(),
-                onEditingComplete: _persistTarget,
-              ),
+          if (!shortViewport) ...[
+            const SizedBox(height: 6),
+            Align(
+              alignment: narrow ? Alignment.center : Alignment.centerLeft,
+              child: pctField,
             ),
-          ),
-          const SizedBox(height: 6),
+          ],
+          SizedBox(height: shortViewport ? 4 : 6),
           TextField(
             decoration: InputDecoration(
               labelText: loc.t('foodcost_search_hint') ?? 'Поиск',
@@ -933,7 +940,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               border: const OutlineInputBorder(),
               isDense: true,
               contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  EdgeInsets.symmetric(horizontal: 10, vertical: shortViewport ? 7 : 10),
             ),
             textAlignVertical: TextAlignVertical.center,
             onChanged: (v) => setState(() => _query = v),
