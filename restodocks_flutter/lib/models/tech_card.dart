@@ -2,6 +2,18 @@ import 'package:equatable/equatable.dart';
 
 import 'tt_ingredient.dart';
 
+List<TTIngredient> _techCardIngredientsFromJson(dynamic raw) {
+  if (raw is! List<dynamic>) return const [];
+  final out = <TTIngredient>[];
+  for (final e in raw) {
+    if (e is! Map) continue;
+    try {
+      out.add(TTIngredient.fromJson(Map<String, dynamic>.from(e)));
+    } catch (_) {}
+  }
+  return out;
+}
+
 /// Технологическая карта (ТТК)
 class TechCard extends Equatable {
   /// Оверлей: язык UI → id ТТК → переведённое название (несколько языков хранятся одновременно).
@@ -156,7 +168,7 @@ class TechCard extends Equatable {
           ?.map((e) => e.toString())
           .where((s) => s.isNotEmpty)
           .toList(),
-      ingredients: const [], // Загружается отдельно через сервис
+      ingredients: _techCardIngredientsFromJson(json['ingredients']),
       establishmentId: json['establishment_id'] as String,
       createdBy: json['created_by'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
@@ -181,6 +193,7 @@ class TechCard extends Equatable {
       'composition_for_hall': compositionForHall,
       'selling_price': sellingPrice,
       'photo_urls': photoUrls ?? [],
+      'ingredients': ingredients.map((e) => e.toJson()).toList(),
       'establishment_id': establishmentId,
       'created_by': createdBy,
       'created_at': createdAt.toIso8601String(),

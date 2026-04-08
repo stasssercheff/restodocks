@@ -72,6 +72,7 @@ class TechCardServiceSupabase {
   static Map<String, dynamic> _techCardPayloadForDb(TechCard techCard,
       {bool includeHallFields = true}) {
     final data = Map<String, dynamic>.from(techCard.toJson());
+    data.remove('ingredients');
     data.remove('id');
     data.remove('section');
     if (!includeHallFields) {
@@ -167,7 +168,26 @@ class TechCardServiceSupabase {
     );
     final cached = await _offlineCache.readJsonList(cacheKey);
     if (cached != null && cached.isNotEmpty) {
-      final cachedCards = cached.map(TechCard.fromJson).toList();
+      // Старый кэш сохранял toJson() без ingredients → fromJson давал пустой состав (фудкост/себестоимость).
+      if (includeIngredients) {
+        try {
+          final first = Map<String, dynamic>.from(cached.first as Map);
+          if (!first.containsKey('ingredients')) {
+            return _fetchTechCardsFromServer(
+              establishmentId,
+              includeIngredients: true,
+            );
+          }
+        } catch (_) {
+          return _fetchTechCardsFromServer(
+            establishmentId,
+            includeIngredients: includeIngredients,
+          );
+        }
+      }
+      final cachedCards = cached
+          .map((e) => TechCard.fromJson(Map<String, dynamic>.from(e as Map)))
+          .toList();
       final skipBgRefresh = !kIsWeb &&
           await _offlineCache.isKeyFresh(cacheKey, _mobileTechCardsCacheTtl);
       if (!skipBgRefresh) {
