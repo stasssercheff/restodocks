@@ -63,6 +63,9 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
   String _query = '';
   FoodcostPricingMode _mode = FoodcostPricingMode.markupOnCost;
   final _targetPctController = TextEditingController(text: '100');
+  final _headerHScroll = ScrollController();
+  final _bodyHScroll = ScrollController();
+  bool _syncingHScroll = false;
 
   final Map<String, _DishTargetState> _dishTargets = {};
   final Map<String, TextEditingController> _dishPctControllers = {};
@@ -75,6 +78,8 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
   @override
   void initState() {
     super.initState();
+    _headerHScroll.addListener(_syncHeaderToBody);
+    _bodyHScroll.addListener(_syncBodyToHeader);
     WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
   }
 
@@ -208,12 +213,42 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
 
   @override
   void dispose() {
+    _headerHScroll.removeListener(_syncHeaderToBody);
+    _bodyHScroll.removeListener(_syncBodyToHeader);
+    _headerHScroll.dispose();
+    _bodyHScroll.dispose();
     for (final c in _dishPctControllers.values) {
       c.dispose();
     }
     _dishPctControllers.clear();
     _targetPctController.dispose();
     super.dispose();
+  }
+
+  void _syncHeaderToBody() {
+    if (_syncingHScroll || !_bodyHScroll.hasClients || !_headerHScroll.hasClients) {
+      return;
+    }
+    _syncingHScroll = true;
+    final target = _headerHScroll.offset.clamp(
+      _bodyHScroll.position.minScrollExtent,
+      _bodyHScroll.position.maxScrollExtent,
+    );
+    _bodyHScroll.jumpTo(target);
+    _syncingHScroll = false;
+  }
+
+  void _syncBodyToHeader() {
+    if (_syncingHScroll || !_headerHScroll.hasClients || !_bodyHScroll.hasClients) {
+      return;
+    }
+    _syncingHScroll = true;
+    final target = _bodyHScroll.offset.clamp(
+      _headerHScroll.position.minScrollExtent,
+      _headerHScroll.position.maxScrollExtent,
+    );
+    _headerHScroll.jumpTo(target);
+    _syncingHScroll = false;
   }
 
   /// Себестоимость порции: как в списке ТТК — если [TechCard.yield] не задан, оцениваем выход по сумме весов строк состава.
@@ -584,73 +619,96 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
           ),
         );
 
+    final tableColumns = [
+      DataColumn(label: headerLabel('№')),
+      DataColumn(label: headerLabel('Блюдо')),
+      DataColumn(
+        numeric: true,
+        label: headerLabel('Себестоимость'),
+      ),
+      DataColumn(
+        label: _mode == FoodcostPricingMode.markupOnCost
+            ? headerLabel('Наценка')
+            : headerLabel('%\nсебестоимости'),
+      ),
+      DataColumn(
+        numeric: true,
+        label: headerLabel('С наценкой'),
+      ),
+      DataColumn(
+        label: headerLabel('В меню'),
+      ),
+      DataColumn(
+        label: SizedBox(
+          width: narrow ? 34 : 44,
+          child: headerLabel('%'),
+        ),
+      ),
+    ];
+
+    final tableBorder = TableBorder(
+      horizontalInside: BorderSide(
+        color: Theme.of(context).dividerColor.withValues(alpha: 0.35),
+        width: 0.6,
+      ),
+      verticalInside: BorderSide(
+        color: Theme.of(context).dividerColor.withValues(alpha: 0.18),
+        width: 0.5,
+      ),
+    );
+
     rowNum = 0;
-    final foodcostTable = DataTable(
+    final tableRows = <DataRow>[
+      for (final g in groups) ...[
+        DataRow(
+          color: WidgetStatePropertyAll(
+            Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest
+                .withValues(alpha: 0.6),
+          ),
+          cells: [
+            const DataCell(Text('')),
+            DataCell(
+              Text(
+                techCardSectionGroupLabel(g.section, loc),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            const DataCell(Text('')),
+            const DataCell(Text('')),
+            const DataCell(Text('')),
+            const DataCell(Text('')),
+            const DataCell(Text('')),
+          ],
+        ),
+        for (final tc in g.cards)
+          _buildRow(loc, tc, ++rowNum, targetPct, narrow: narrow),
+      ],
+    ];
+
+    final foodcostHeaderTable = DataTable(
       columnSpacing: narrow ? 3 : 10,
       horizontalMargin: narrow ? 3 : 10,
       headingRowHeight: narrow ? 30 : 38,
-      dataRowMinHeight: narrow ? 22 : 38,
-      dataRowMaxHeight: narrow ? 56 : 80,
+      dataRowMinHeight: 0,
+      dataRowMaxHeight: 0,
       showBottomBorder: true,
-      border: TableBorder(
-        horizontalInside: BorderSide(
-          color: Theme.of(context).dividerColor.withValues(alpha: 0.35),
-          width: 0.6,
-        ),
-        verticalInside: BorderSide(
-          color: Theme.of(context).dividerColor.withValues(alpha: 0.18),
-          width: 0.5,
-        ),
-      ),
-      columns: [
-        DataColumn(label: headerLabel('№')),
-        DataColumn(label: headerLabel('Блюдо')),
-        DataColumn(
-          numeric: true,
-          label: headerLabel('Себестоимость'),
-        ),
-        DataColumn(
-          label: _mode == FoodcostPricingMode.markupOnCost
-              ? headerLabel('Наценка')
-              : headerLabel('%\nсебестоимости'),
-        ),
-        DataColumn(
-          numeric: true,
-          label: headerLabel('С наценкой'),
-        ),
-        DataColumn(
-          label: headerLabel('В меню'),
-        ),
-        DataColumn(label: headerLabel('%')),
-      ],
-      rows: [
-        for (final g in groups) ...[
-          DataRow(
-            color: WidgetStatePropertyAll(
-              Theme.of(context)
-                  .colorScheme
-                  .surfaceContainerHighest
-                  .withValues(alpha: 0.6),
-            ),
-            cells: [
-              const DataCell(Text('')),
-              DataCell(
-                Text(
-                  techCardSectionGroupLabel(g.section, loc),
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-              const DataCell(Text('')),
-              const DataCell(Text('')),
-              const DataCell(Text('')),
-              const DataCell(Text('')),
-              const DataCell(Text('')),
-            ],
-          ),
-          for (final tc in g.cards)
-            _buildRow(loc, tc, ++rowNum, targetPct, narrow: narrow),
-        ],
-      ],
+      border: tableBorder,
+      columns: tableColumns,
+      rows: const [],
+    );
+
+    final foodcostBodyTable = DataTable(
+      columnSpacing: narrow ? 3 : 10,
+      horizontalMargin: narrow ? 3 : 10,
+      headingRowHeight: 0.01,
+      dataRowMinHeight: narrow ? 18 : 30,
+      dataRowMaxHeight: narrow ? 45 : 64,
+      showBottomBorder: true,
+      border: tableBorder,
+      columns: tableColumns,
+      rows: tableRows,
     );
 
     return Column(
@@ -723,27 +781,42 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         ),
         Expanded(
           child: Scrollbar(
-            child: SingleChildScrollView(
+            child: Padding(
               padding: EdgeInsets.fromLTRB(narrow ? 6 : 14, 0, narrow ? 6 : 14, 18),
               child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (groups.isNotEmpty)
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: foodcostTable,
-                          ),
-                        if (groups.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Text(
-                              loc.t('menu_empty_dishes') ?? '',
-                              style: Theme.of(context).textTheme.bodyLarge,
-                            ),
-                          ),
-                      ],
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (groups.isNotEmpty)
+                    SingleChildScrollView(
+                      controller: _headerHScroll,
+                      scrollDirection: Axis.horizontal,
+                      child: foodcostHeaderTable,
                     ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (groups.isNotEmpty)
+                            SingleChildScrollView(
+                              controller: _bodyHScroll,
+                              scrollDirection: Axis.horizontal,
+                              child: foodcostBodyTable,
+                            ),
+                          if (groups.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Text(
+                                loc.t('menu_empty_dishes') ?? '',
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
