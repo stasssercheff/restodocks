@@ -1073,8 +1073,7 @@ class _MenuScreenState extends State<MenuScreen> {
         Establishment.currencySymbolFor(currencyCode);
     final showFoodcost = _showFoodcostTab(emp);
     final menuSeg = showFoodcost ? _menuSegment : 0;
-    final isPhoneLayout = MediaQuery.sizeOf(context).shortestSide < 600;
-    final hideTopFoodcostSwitch = isPhoneLayout && showFoodcost && menuSeg == 1;
+    final hideTopFoodcostSwitch = false;
     final hallChips = _isHallMenu &&
         !_loading &&
         (_dishesBar.isNotEmpty || _dishesKitchen.isNotEmpty) &&
@@ -1234,8 +1233,6 @@ class _MenuScreenState extends State<MenuScreen> {
         langCode: loc.currentLanguageCode,
         // Вкладка фудкост только у ролей с правом на ценообразование — открываем ТТК без view=1.
         openCardInEditMode: true,
-        menuSegmentValue: menuSeg,
-        onMenuSegmentChanged: (v) => setState(() => _menuSegment = v),
       );
     }
     final dishesToShow = _displayDishes;

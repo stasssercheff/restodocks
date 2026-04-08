@@ -62,8 +62,6 @@ class MenuFoodcostPanel extends StatefulWidget {
     required this.currencySym,
     required this.langCode,
     this.openCardInEditMode = false,
-    this.menuSegmentValue,
-    this.onMenuSegmentChanged,
   });
 
   final List<TechCard> dishes;
@@ -74,8 +72,6 @@ class MenuFoodcostPanel extends StatefulWidget {
   final String currencySym;
   final String langCode;
   final bool openCardInEditMode;
-  final int? menuSegmentValue;
-  final ValueChanged<int>? onMenuSegmentChanged;
 
   @override
   State<MenuFoodcostPanel> createState() => _MenuFoodcostPanelState();
@@ -635,7 +631,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
-    final narrow = MediaQuery.sizeOf(context).width < 560;
+    final narrow = MediaQuery.sizeOf(context).shortestSide < 600;
     final isPhoneLayout = MediaQuery.sizeOf(context).shortestSide < 600;
     final shortViewport = MediaQuery.sizeOf(context).height < 560;
     if (_busy) {
@@ -848,39 +844,6 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       showSelectedIcon: false,
     );
 
-    final menuSegment =
-        (isPhoneLayout &&
-                widget.onMenuSegmentChanged != null &&
-                widget.menuSegmentValue != null)
-            ? SegmentedButton<int>(
-                segments: [
-                  ButtonSegment<int>(
-                    value: 0,
-                    label: Text(
-                      loc.t('menu') ?? 'Меню',
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.fade,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ),
-                  ButtonSegment<int>(
-                    value: 1,
-                    label: Text(
-                      loc.t('menu_tab_foodcost'),
-                      maxLines: 1,
-                      softWrap: false,
-                      overflow: TextOverflow.fade,
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ),
-                ],
-                selected: {widget.menuSegmentValue!},
-                onSelectionChanged: (s) => widget.onMenuSegmentChanged!(s.first),
-                showSelectedIcon: false,
-              )
-            : null;
-
     final pctField = SizedBox(
       width: narrow ? 82 : 96,
       child: TextField(
@@ -908,23 +871,16 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (isPhoneLayout && menuSegment != null)
+          if (shortViewport)
             Row(
               children: [
-                Flexible(fit: FlexFit.loose, child: menuSegment),
+                Expanded(child: modeSegment),
                 const SizedBox(width: 6),
-                Flexible(fit: FlexFit.loose, child: modeSegment),
-                if (shortViewport) ...[
-                  const SizedBox(width: 6),
-                  pctField,
-                ],
+                pctField,
               ],
             )
-          else ...[
-            if (menuSegment != null) menuSegment,
-            if (menuSegment != null) const SizedBox(height: 6),
+          else
             modeSegment,
-          ],
           if (!shortViewport) ...[
             const SizedBox(height: 6),
             Align(
