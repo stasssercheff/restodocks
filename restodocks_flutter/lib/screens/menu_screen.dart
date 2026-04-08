@@ -50,6 +50,8 @@ class _MenuScreenState extends State<MenuScreen> {
   int _menuSegment = 0;
   /// Stop/Go статусы: ключ 'techCardId_department', значение 'stop' | 'go'.
   Map<String, String> _stopGoMap = {};
+  bool _emptyReloadInProgress = false;
+  int _emptyReloadAttempts = 0;
 
   String _categoryLabel(String c, String lang) {
     final Map<String, Map<String, String>> categoryTranslations = {
@@ -87,7 +89,11 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+      _emptyReloadInProgress = false;
+    });
     try {
       final acc = context.read<AccountManagerSupabase>();
       final est = acc.establishment;
@@ -155,6 +161,7 @@ class _MenuScreenState extends State<MenuScreen> {
           _dishesKitchen = kitchenOnly;
           _stopGoMap = stopGoMap;
           _loading = false;
+          if (enriched.isNotEmpty) _emptyReloadAttempts = 0;
         });
         // Фоновый перевод для ТТК без локализованного названия
         _translateMissingDishNames(enriched, est.dataEstablishmentId);
@@ -1220,6 +1227,24 @@ class _MenuScreenState extends State<MenuScreen> {
     }
     final dishesToShow = _displayDishes;
     if (dishesToShow.isEmpty) {
+      if (_error == null &&
+          !_loading &&
+          !_emptyReloadInProgress &&
+          _emptyReloadAttempts < 1) {
+        _emptyReloadInProgress = true;
+        Future.microtask(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 600));
+          if (!mounted) return;
+          _emptyReloadAttempts += 1;
+          await _load();
+          if (mounted) {
+            setState(() => _emptyReloadInProgress = false);
+          }
+        });
+      }
+      if (_emptyReloadInProgress) {
+        return const Center(child: CircularProgressIndicator());
+      }
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
