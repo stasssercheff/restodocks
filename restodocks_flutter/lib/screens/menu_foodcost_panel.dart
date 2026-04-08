@@ -322,7 +322,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         DataCell(centeredValue('$rowNum', fontSize: narrow ? 11.5 : null)),
         DataCell(
           SizedBox(
-            width: narrow ? 130 : 216,
+            width: narrow ? 124 : 216,
             child: InkWell(
               onTap: () => context.push(
                 widget.openCardInEditMode
@@ -331,7 +331,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               ),
               child: Text(
                 tc.getDisplayNameInLists(widget.langCode),
-                maxLines: narrow ? 2 : 4,
+                maxLines: narrow ? 1 : 4,
                 softWrap: true,
                 overflow: TextOverflow.fade,
                 style: TextStyle(
@@ -383,7 +383,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       SizedBox(
-                        width: 66,
+                        width: 40,
                         child: TextField(
                           controller: ctrl,
                           decoration: InputDecoration(
@@ -392,12 +392,12 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                                 : null,
                             isDense: true,
                             contentPadding: EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: narrow ? 3 : 8,
+                              horizontal: 4,
+                              vertical: narrow ? 2 : 8,
                             ),
                             border: const OutlineInputBorder(),
                           ),
-                          style: TextStyle(fontSize: narrow ? 11 : 13),
+                          style: TextStyle(fontSize: narrow ? 10.5 : 13),
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
@@ -419,7 +419,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                           },
                         ),
                       ),
-                      const SizedBox(width: 2),
+                      const SizedBox(width: 0),
                       Semantics(
                         label: loc.t('foodcost_custom_target_checkbox_a11y'),
                         child: Checkbox(
@@ -448,10 +448,10 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                           child: InkWell(
                             onTap: () => _showCustomTargetInfoDialog(loc),
                             child: Padding(
-                              padding: EdgeInsets.all(narrow ? 3 : 6),
+                              padding: EdgeInsets.all(narrow ? 2 : 6),
                               child: Icon(
                                 Icons.info_outline,
-                                size: narrow ? 14 : 18,
+                                size: narrow ? 13 : 18,
                                 color: Theme.of(context).colorScheme.primary,
                               ),
                             ),
@@ -589,8 +589,8 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       columnSpacing: narrow ? 3 : 10,
       horizontalMargin: narrow ? 3 : 10,
       headingRowHeight: narrow ? 30 : 38,
-      dataRowMinHeight: narrow ? 28 : 38,
-      dataRowMaxHeight: narrow ? 64 : 54,
+      dataRowMinHeight: narrow ? 22 : 38,
+      dataRowMaxHeight: narrow ? 32 : 54,
       showBottomBorder: true,
       border: TableBorder(
         horizontalInside: BorderSide(
@@ -610,22 +610,18 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
           label: headerLabel('Себестоимость'),
         ),
         DataColumn(
-          numeric: true,
           label: _mode == FoodcostPricingMode.markupOnCost
-              ? headerLabel('Наценка\n%')
-              : headerLabel('% себестоимости'),
+              ? headerLabel('Наценка')
+              : headerLabel('%\nсебестоимости'),
         ),
         DataColumn(
           numeric: true,
           label: headerLabel('С наценкой'),
         ),
         DataColumn(
-          numeric: true,
           label: headerLabel('В меню'),
         ),
-        DataColumn(
-          label: headerLabel('%'),
-        ),
+        DataColumn(label: headerLabel('%')),
       ],
       rows: [
         for (final g in groups) ...[
@@ -694,6 +690,9 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                       labelText: '%',
                       border: OutlineInputBorder(),
                       isDense: true,
+                      isCollapsed: true,
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     ),
                     keyboardType: TextInputType.number,
                     inputFormatters: [
@@ -713,6 +712,9 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                   prefixIcon: const Icon(Icons.search),
                   border: const OutlineInputBorder(),
                   isDense: true,
+                  isCollapsed: true,
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 ),
                 onChanged: (v) => setState(() => _query = v),
               ),
