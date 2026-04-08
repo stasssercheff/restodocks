@@ -691,9 +691,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         numeric: true,
         label: SizedBox(
           width: w.withMarkup,
-          child: headerLabel(
-            _mode == FoodcostPricingMode.markupOnCost ? 'Наценка' : 'С наценкой',
-          ),
+          child: headerLabel('С наценкой'),
         ),
       ),
       DataColumn(
