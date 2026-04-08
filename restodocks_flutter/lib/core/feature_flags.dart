@@ -52,9 +52,14 @@ class FeatureFlags {
       const String.fromEnvironment('ENABLE_POS', defaultValue: 'false') == 'true';
 
   /// Включается если: `IS_BETA=true`, или `ENABLE_POS=true`, или открыт известный не-прод веб-хост (Cloudflare Pages и т.д.).
-  /// На **restodocks.com** / **www** POS остаётся выключенным без `IS_BETA` / `ENABLE_POS`.
-  static bool get posModuleEnabled =>
-      isBeta || _posModuleEnabledFromDefine || _posModuleEnabledWebNonProdHost;
+  ///
+  /// На **restodocks.com** / **www.restodocks.com** пункты POS в меню **никогда** не показываем — даже если в сборке
+  /// ошибочно переданы `IS_BETA` / `ENABLE_POS` (витрина и основной прод без POS в навигации).
+  /// Beta / превью / localhost — по правилам ниже.
+  static bool get posModuleEnabled {
+    if (_isProdMarketingHost) return false;
+    return isBeta || _posModuleEnabledFromDefine || _posModuleEnabledWebNonProdHost;
+  }
 
   /// Экран «Журнал ошибок»: только в beta и не на основном прод-домене **restodocks.com**
   /// (даже если в сборке ошибочно передан `IS_BETA=true`).

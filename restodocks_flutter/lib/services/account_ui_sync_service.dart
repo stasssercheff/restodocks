@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/employee.dart';
 import '../utils/dev_log.dart';
@@ -38,34 +37,8 @@ class AccountUiSyncService {
   Future<void> applyRemoteToLocal(Employee e) async {
     await ThemeService().applyFromServer(e.uiTheme);
     await OwnerViewPreferenceService().applyFromServer(e.uiViewAsOwner);
-
-    final prefs = await SharedPreferences.getInstance();
-    final userChose =
-        prefs.getBool(LocalizationService.prefsKeyLocaleUserSet) ?? false;
-    final deviceCode =
-        prefs.getString(LocalizationService.prefsKeyLocale)?.trim().toLowerCase();
-    final serverLang = e.preferredLanguage.trim().toLowerCase();
-
-    if (userChose &&
-        deviceCode != null &&
-        deviceCode.isNotEmpty &&
-        deviceCode != serverLang &&
-        LocalizationService.isSupportedLanguageCode(deviceCode)) {
-      try {
-        final res = await _supabase.client.rpc(
-          'patch_my_employee_profile',
-          params: {
-            'p_patch': {'preferred_language': deviceCode},
-          },
-        );
-        _notifyMerge(res);
-      } catch (err) {
-        devLog('AccountUiSync: push preferred_language from device: $err');
-      }
-      await _applyPreferredLanguage(deviceCode);
-      return;
-    }
-
+    // Account is the source of truth for display settings across devices.
+    // Do not push local/browser language back to profile on login.
     await _applyPreferredLanguage(e.preferredLanguage);
   }
 
@@ -78,8 +51,7 @@ class AccountUiSyncService {
   Future<void> _applyPreferredLanguage(String raw) async {
     final p = raw.trim().toLowerCase();
     if (p.isEmpty) return;
-    if (!LocalizationService.supportedLocales
-        .any((l) => l.languageCode == p)) {
+    if (!LocalizationService.supportedLocales.any((l) => l.languageCode == p)) {
       return;
     }
     final loc = LocalizationService();

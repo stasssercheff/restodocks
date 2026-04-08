@@ -351,11 +351,13 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                   onTap: () => context.push('/writeoffs')),
               'home-writeoffs-hall'),
         ],
-        if (FeatureFlags.posModuleEnabled) ...[
+        if (screenPref.showBanquetCatering) ...[
           const SizedBox(height: 16),
-          _SectionTitle(
-              title: loc.t('pos_warehouse_establishment_section') ??
-                  'Склад заведения'),
+          _ExpandableBanquetSection(loc: loc),
+        ],
+        const SizedBox(height: 16),
+        _SectionTitle(title: loc.t('expenses')),
+        if (FeatureFlags.posModuleEnabled) ...[
           _wrap(
               HomeFeatureTile(
                   icon: Icons.warehouse,
@@ -363,20 +365,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                       'Сводно по заведению',
                   onTap: () => context.push('/pos/warehouse/establishment')),
               'home-pos-wh-est'),
-          _wrap(
-              HomeFeatureTile(
-                  icon: Icons.dashboard_customize_outlined,
-                  title: loc.t('pos_operations_hub_title'),
-                  subtitle: loc.t('pos_operations_hub_hint'),
-                  onTap: () => context.push('/pos/operations/establishment')),
-              'home-pos-ops-est'),
         ],
-        if (screenPref.showBanquetCatering) ...[
-          const SizedBox(height: 16),
-          _ExpandableBanquetSection(loc: loc),
-        ],
-        const SizedBox(height: 16),
-        _SectionTitle(title: loc.t('expenses')),
         _wrap(
             HomeFeatureTile(
                 icon: Icons.payments,

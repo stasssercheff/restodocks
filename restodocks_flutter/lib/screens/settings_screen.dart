@@ -43,6 +43,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final acc = context.read<AccountManagerSupabase>();
       final est = acc.establishment;
       if (est != null) context.read<HaccpConfigService>().load(est.id);
+      // Fast pull when settings are opened on another device/browser.
+      unawaited(
+          AccountUiSyncService.instance.refreshEmployeeProfileFromServer());
     });
   }
 
@@ -741,7 +744,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       afterApplied: (code) async {
         scheduleMicrotask(() async {
           if (!context.mounted) return;
-          await context.read<AccountManagerSupabase>().savePreferredLanguage(code);
+          await context
+              .read<AccountManagerSupabase>()
+              .savePreferredLanguage(code);
           if (!context.mounted) return;
           _translateMissingForLanguage(context, code);
         });
@@ -756,10 +761,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final store = context.read<ProductStoreSupabase>();
     final techSvc = context.read<TechCardServiceSupabase>();
     final account = context.read<AccountManagerSupabase>();
-    final screenPref = context.read<ScreenLayoutPreferenceService>();
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-    final loc = context.read<LocalizationService>();
-    final showNotif = screenPref.showTranslationNotifications;
 
     Future(() async {
       await store.loadProducts(force: true);
@@ -782,8 +783,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             );
             for (final tc in cards) {
               if (tc.dishName.trim().isEmpty) continue;
-              final has = tc.dishNameLocalized?.containsKey(targetLang) == true &&
-                  (tc.dishNameLocalized![targetLang]?.trim().isNotEmpty ?? false);
+              final has =
+                  tc.dishNameLocalized?.containsKey(targetLang) == true &&
+                      (tc.dishNameLocalized![targetLang]?.trim().isNotEmpty ??
+                          false);
               if (has) continue;
               needTtk.add(tc);
             }
@@ -792,26 +795,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
 
       if (needProducts.isEmpty && needTtk.isEmpty) return;
-
-      if (showNotif) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
-                ),
-                const SizedBox(width: 12),
-                Text(loc.t('translating_products')),
-              ],
-            ),
-            duration: const Duration(hours: 1),
-          ),
-        );
-      }
 
       var updatedProducts = 0;
       for (final p in needProducts) {
@@ -836,18 +819,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
               .timeout(const Duration(seconds: 8), onTimeout: () => null);
           if (t != null && t.trim().isNotEmpty) updatedTtk++;
         } catch (_) {}
-      }
-
-      if (showNotif) {
-        scaffoldMessenger.removeCurrentSnackBar();
-        final n = updatedProducts + updatedTtk;
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-            content: Text(
-                n > 0 ? '${loc.t('translate_done')} (+$n)' : loc.t('translate_done')),
-            backgroundColor: n > 0 ? Colors.green : null,
-          ),
-        );
       }
     });
   }
@@ -1214,7 +1185,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   value: prefs.showMessageBodyInNotifications,
-                  onChanged: (v) => prefs.setShowMessageBodyInNotifications(v, empId),
+                  onChanged: (v) =>
+                      prefs.setShowMessageBodyInNotifications(v, empId),
                 ),
               ),
             ],
@@ -1528,7 +1500,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       if (userEmail.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                              content: Text(loc.t('support_missing_account_email'))),
+                              content:
+                                  Text(loc.t('support_missing_account_email'))),
                         );
                         return;
                       }
@@ -1615,7 +1588,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ListTile(
                 leading: const Icon(Icons.storefront),
                 title: Text(localization.t('establishments')),
-                subtitle: Text(localization.t('establishments_manage_subtitle')),
+                subtitle:
+                    Text(localization.t('establishments_manage_subtitle')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/establishments'),
               ),
@@ -1780,8 +1754,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 posCanConfigureOrdersDisplay(currentEmployee))
               ListTile(
                 leading: const Icon(Icons.tune),
-                title: Text(localization.t('pos_orders_display_settings_title') ??
-                    'Отображение заказов'),
+                title: Text(
+                    localization.t('pos_orders_display_settings_title') ??
+                        'Отображение заказов'),
                 subtitle: Text(
                   localization.t('pos_orders_display_settings_subtitle') ??
                       'Таймер и размеры шрифтов на экранах заказов',
@@ -1874,18 +1849,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                 ],
               ),
-            Consumer<ScreenLayoutPreferenceService>(
-              builder: (_, screenPref, __) => SwitchListTile(
-                secondary: const Icon(Icons.notifications_active_outlined),
-                title: Text(localization.t('show_translation_notifications') ??
-                    'Уведомления о переводах'),
-                subtitle: Text(
-                    localization.t('show_translation_notifications_hint') ??
-                        'Плашка «Переводы обновлены» при смене языка'),
-                value: screenPref.showTranslationNotifications,
-                onChanged: (v) => screenPref.setShowTranslationNotifications(v),
-              ),
-            ),
             // Журналы и ХАССП (включая юридическую легитимность) — для руководителей.
             if (currentEmployee.hasRole('owner') ||
                 currentEmployee.department == 'management' ||
@@ -1900,18 +1863,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: Text(localization.t('documentation_haccp_subtitle')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/haccp-documentation'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.gavel_outlined),
-                title: Text(localization.t('public_offer')),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/legal/offer'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.privacy_tip_outlined),
-                title: Text(localization.t('privacy_policy')),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/legal/privacy'),
               ),
               ExpansionTile(
                 initiallyExpanded: false,
@@ -1992,9 +1943,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Text(
                     localization.t('account_display_prefs_sync_hint'),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                   ),
                 ],
@@ -2017,9 +1966,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Text(
                       localization.t('account_display_prefs_sync_hint'),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                     ),
                   ],
@@ -2066,7 +2014,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const Icon(Icons.restaurant_menu, color: Colors.orange),
                   title: Text(
                       localization.t('clear_all_ttk') ?? 'Удалить все ТТК'),
-                  subtitle: Text(localization.t('settings_beta_admin_subtitle')),
+                  subtitle:
+                      Text(localization.t('settings_beta_admin_subtitle')),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _showClearAllTtkConfirm(context, localization),
                 ),
@@ -2162,7 +2111,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   localization.t('settings_platform_admin_title'),
                   style: const TextStyle(color: Colors.deepPurple),
                 ),
-                subtitle: Text(localization.t('settings_platform_admin_subtitle')),
+                subtitle:
+                    Text(localization.t('settings_platform_admin_subtitle')),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/admin'),
               ),
@@ -2182,6 +2132,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               subtitle: Text(localization.t('contact_support_subtitle')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showSupportEmailForm(context, localization),
+            ),
+            ListTile(
+              leading: const Icon(Icons.gavel_outlined),
+              title: Text(localization.t('public_offer')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/legal/offer'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.privacy_tip_outlined),
+              title: Text(localization.t('privacy_policy')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/legal/privacy'),
             ),
             const Divider(),
             ListTile(

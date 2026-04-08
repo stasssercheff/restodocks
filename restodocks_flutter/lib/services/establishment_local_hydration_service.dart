@@ -11,7 +11,6 @@ import '../models/models.dart';
 import '../utils/dev_log.dart';
 import 'account_manager_supabase.dart';
 import 'documentation_service_supabase.dart';
-import 'establishment_fiscal_settings_service.dart';
 import 'haccp_config_service.dart';
 import 'iiko_product_store.dart';
 import 'local_snapshot_store.dart';
@@ -87,7 +86,8 @@ class EstablishmentLocalHydrationService {
 
       final futures = <Future<void>>[
         if (includeCatalog) productStore.loadProducts(force: true),
-        if (includeCatalog) productStore.loadNomenclatureForce(dataEstablishmentId),
+        if (includeCatalog)
+          productStore.loadNomenclatureForce(dataEstablishmentId),
         _hydrateEmployees(establishmentId),
         _hydrateDocuments(establishmentId),
         loadSchedule(establishmentId),
@@ -98,7 +98,6 @@ class EstablishmentLocalHydrationService {
         _hydratePosTables(establishmentId),
         _hydrateMenuStopGo(establishmentId),
         _hydrateSalesPlans(establishmentId),
-        _hydrateFiscal(establishmentId),
         _hydrateInventoryDrafts(establishmentId),
       ];
       if (!kIsWeb) {
@@ -168,11 +167,13 @@ class EstablishmentLocalHydrationService {
   }
 
   Future<void> _hydrateEmployees(String establishmentId) async {
-    await AccountManagerSupabase().getEmployeesForEstablishment(establishmentId);
+    await AccountManagerSupabase()
+        .getEmployeesForEstablishment(establishmentId);
   }
 
   Future<void> _hydrateDocuments(String establishmentId) async {
-    await DocumentationServiceSupabase().prefetchDocumentsCacheForMobile(establishmentId);
+    await DocumentationServiceSupabase()
+        .prefetchDocumentsCacheForMobile(establishmentId);
   }
 
   Future<void> _prefetchOrderListsPrefs(String establishmentId) async {
@@ -215,7 +216,8 @@ class EstablishmentLocalHydrationService {
 
   Future<void> _hydrateTechCards(String dataEstablishmentId) async {
     try {
-      await TechCardServiceSupabase().refreshTechCardsFromServer(dataEstablishmentId);
+      await TechCardServiceSupabase()
+          .refreshTechCardsFromServer(dataEstablishmentId);
     } catch (e) {
       devLog('EstablishmentLocalHydration: tech cards $e');
     }
@@ -269,37 +271,14 @@ class EstablishmentLocalHydrationService {
 
   Future<void> _hydrateSalesPlans(String establishmentId) async {
     try {
-      final plans = await SalesPlanStorageService.instance.loadAll(establishmentId);
+      final plans =
+          await SalesPlanStorageService.instance.loadAll(establishmentId);
       await _snapshots.put(
         '$establishmentId:pos_sales_plans',
         await _encodeLarge(plans.map((e) => e.toJson()).toList()),
       );
     } catch (e) {
       devLog('EstablishmentLocalHydration: sales plans $e');
-    }
-  }
-
-  Future<void> _hydrateFiscal(String establishmentId) async {
-    try {
-      final row =
-          await EstablishmentFiscalSettingsService.instance.fetch(establishmentId);
-      if (row == null) {
-        await _snapshots.put('$establishmentId:fiscal_settings', '{}');
-        return;
-      }
-      await _snapshots.put(
-        '$establishmentId:fiscal_settings',
-        await _encodeLarge(<String, dynamic>{
-          'establishment_id': row.establishmentId,
-          'tax_region': row.taxRegion,
-          'price_tax_mode': row.priceTaxMode,
-          'vat_override_percent': row.vatOverridePercent,
-          'fiscal_section_id': row.fiscalSectionId,
-          'updated_at': row.updatedAt.toIso8601String(),
-        }),
-      );
-    } catch (e) {
-      devLog('EstablishmentLocalHydration: fiscal $e');
     }
   }
 
@@ -352,9 +331,8 @@ class EstablishmentLocalHydrationService {
         dataset: _productsCacheDataset,
         establishmentId: 'global',
       );
-      final productTtl = kIsWeb
-          ? const Duration(minutes: 25)
-          : const Duration(minutes: 120);
+      final productTtl =
+          kIsWeb ? const Duration(minutes: 25) : const Duration(minutes: 120);
       if (!await _offlineCache.isKeyFresh(pk, productTtl)) {
         await ps.loadProducts(force: true);
       }
@@ -364,9 +342,8 @@ class EstablishmentLocalHydrationService {
         establishmentId: dataId,
         suffix: 'main',
       );
-      final nomTtl = kIsWeb
-          ? const Duration(minutes: 15)
-          : const Duration(minutes: 60);
+      final nomTtl =
+          kIsWeb ? const Duration(minutes: 15) : const Duration(minutes: 60);
       if (!await _offlineCache.isKeyFresh(nk, nomTtl)) {
         await ps.loadNomenclatureForce(dataId);
       }
@@ -382,7 +359,6 @@ class EstablishmentLocalHydrationService {
         _hydratePosTables(estId),
         _hydrateMenuStopGo(estId),
         _hydrateSalesPlans(estId),
-        _hydrateFiscal(estId),
         _hydrateInventoryDrafts(estId),
       ].map((f) => f.catchError((Object e, _) {
             devLog('EstablishmentLocalHydration: delta task $e');

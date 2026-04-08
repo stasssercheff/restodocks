@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/services.dart';
-import '../../services/screen_layout_preference_service.dart';
 import '../../models/models.dart';
 import '../../core/feature_flags.dart';
 import '../../utils/pos_hall_permissions.dart';
@@ -204,12 +203,6 @@ class ManagementHomeContent extends StatelessWidget {
             title: loc.t('pos_nav_procurement') ?? 'Закупка',
             onTap: () => context.push('/pos/procurement/$dept'),
           ),
-          HomeFeatureTile(
-            icon: Icons.dashboard_customize_outlined,
-            title: loc.t('pos_operations_hub_title'),
-            subtitle: loc.t('pos_operations_hub_hint'),
-            onTap: () => context.push('/pos/operations/$dept'),
-          ),
         ],
         HomeFeatureTile(
             icon: Icons.assignment,
@@ -231,6 +224,12 @@ class ManagementHomeContent extends StatelessWidget {
           ExpandableBanquetSection(loc: loc, department: 'bar'),
         ],
         if (isGeneral) ...[
+          if (FeatureFlags.posModuleEnabled)
+            HomeFeatureTile(
+                icon: Icons.warehouse,
+                title: loc.t('pos_warehouse_establishment_title') ??
+                    'Сводно по заведению',
+                onTap: () => context.push('/pos/warehouse/establishment')),
           HomeFeatureTile(
               icon: Icons.savings,
               title: loc.t('expenses'),

@@ -223,7 +223,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }).toList();
     if (mgmtDeptSlots.isNotEmpty) {
       addDept('dept_management', loc.t('dept_management'));
-      addSection('management', loc.t('management'), mgmtDeptSlots);
+      addSection('management', '', mgmtDeptSlots);
     }
 
     // Кухня: управление (по department сотрудника) + цеха
@@ -664,8 +664,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
     final acc = context.watch<AccountManagerSupabase>();
-    final showTranslit = context.watch<ScreenLayoutPreferenceService>().showNameTranslit ||
-        loc.currentLanguageCode != 'ru';
+    final showTranslit =
+        context.watch<ScreenLayoutPreferenceService>().showNameTranslit ||
+            loc.currentLanguageCode != 'ru';
     final canEdit = (acc.currentEmployee?.canEditSchedule ?? false) ||
         (widget.personalOnly &&
             (acc.currentEmployee?.canEditOwnSchedule ?? false));
@@ -775,7 +776,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final sectionBg = theme.colorScheme.secondaryContainer.withOpacity(0.6);
     final sectionFg = theme.colorScheme.onSecondaryContainer;
     final deptHeaderBg = theme.colorScheme.primary.withOpacity(0.25);
-    final deptHeaderFg = theme.colorScheme.onPrimary;
+    final deptHeaderFg = theme.colorScheme.primary;
 
     for (final block in blocks) {
       if (block.isDeptHeader) {
@@ -802,19 +803,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       }
       if (sectionSlots.isEmpty) continue;
 
-      leftCells.add(leftCell(
-        Text(block.sectionLabel,
-            style: TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w600, color: sectionFg),
-            overflow: TextOverflow.ellipsis),
-        height: _rowHeight,
-        decoration: BoxDecoration(
-          color: sectionBg,
-          border: Border(
-              right: BorderSide(color: borderColor),
-              bottom: BorderSide(color: borderColor)),
-        ),
-      ));
+      if (block.sectionLabel.trim().isNotEmpty) {
+        leftCells.add(leftCell(
+          Text(block.sectionLabel,
+              style: TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.w600, color: sectionFg),
+              overflow: TextOverflow.ellipsis),
+          height: _rowHeight,
+          decoration: BoxDecoration(
+            color: sectionBg,
+            border: Border(
+                right: BorderSide(color: borderColor),
+                bottom: BorderSide(color: borderColor)),
+          ),
+        ));
+      }
 
       for (final slot in sectionSlots) {
         final position = _slotPosition(slot, loc);
@@ -894,9 +897,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         }
         if (sectionSlots.isEmpty) continue;
 
-        // Объединённая строка раздела: без правой границы между ячейками (mergeRight), чтобы визуально сливались
-        columnChildren.add(rightCell(const SizedBox.shrink(),
-            bg: sectionBg, mergeRight: !isLastColumn));
+        if (block.sectionLabel.trim().isNotEmpty) {
+          // Объединённая строка раздела: без правой границы между ячейками (mergeRight), чтобы визуально сливались
+          columnChildren.add(rightCell(const SizedBox.shrink(),
+              bg: sectionBg, mergeRight: !isLastColumn));
+        }
 
         for (final slot in sectionSlots) {
           final val = _cellValue(slot.id, d);

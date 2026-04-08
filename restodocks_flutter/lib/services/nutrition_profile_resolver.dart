@@ -69,14 +69,17 @@ class NutritionProfileResolver {
     var s = stripIikoPrefix(input).trim().toLowerCase();
 
     // Remove common quantity+unit patterns (e.g. "1кг", "250 г", "2 шт").
-    s = s.replaceAll(RegExp(r'\b\d+(?:[.,]\d+)?\s*(кг|г|шт|мл|л|уп|пач)\b'), ' ');
+    s = s.replaceAll(
+        RegExp(r'\b\d+(?:[.,]\d+)?\s*(кг|г|шт|мл|л|уп|пач)\b'), ' ');
 
     // Remove standalone units & service tokens.
     s = s
-        .replaceAll(RegExp(r'\bкг\b|\bг\b|\bшт\b|\bмл\b|\bл\b|\bуп\b|\bпач\b'), ' ')
-        .replaceAll(RegExp(r'\bзаказ\b|\bпоставка\b|\bпартия\b|\bупаковка\b'), ' ')
-        .replaceAll(RegExp(r'[^\p{L}\p{N}\s]',
-            unicode: true), ' '); // punctuation -> space
+        .replaceAll(
+            RegExp(r'\bкг\b|\bг\b|\bшт\b|\bмл\b|\bл\b|\bуп\b|\bпач\b'), ' ')
+        .replaceAll(
+            RegExp(r'\bзаказ\b|\bпоставка\b|\bпартия\b|\bупаковка\b'), ' ')
+        .replaceAll(RegExp(r'[^\p{L}\p{N}\s]', unicode: true),
+            ' '); // punctuation -> space
 
     // Collapse whitespace.
     s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
@@ -103,11 +106,13 @@ class NutritionProfileResolver {
     required Product product,
     required String reason,
   }) async {
-    if (_client.auth.currentSession == null || _client.auth.currentUser == null) {
+    if (_client.auth.currentSession == null ||
+        _client.auth.currentUser == null) {
       return false;
     }
     final am = AccountManagerSupabase();
     if (!am.isLoggedInSync) return false;
+    if (_client.auth.currentSession == null) return false;
     final dataEst = am.dataEstablishmentId?.trim();
     if (dataEst == null || dataEst.isEmpty) return false;
     if (!needsAnyNutrition(product)) return false;
@@ -233,7 +238,8 @@ class NutritionProfileResolver {
 
       // 3) No alias/profile: AI-normalize to canonical name, then create profile.
       final normalizedNames = await _tryAiNormalizeSingle(anyName);
-      final canonicalName = normalizedNames.isNotEmpty ? normalizedNames.first : anyName;
+      final canonicalName =
+          normalizedNames.isNotEmpty ? normalizedNames.first : anyName;
       final canonicalKey = normalizeNutritionKey(canonicalName);
       if (canonicalKey.isEmpty) return false;
 
@@ -275,7 +281,8 @@ class NutritionProfileResolver {
 
       return did;
     } catch (e) {
-      devLog('NutritionProfileResolver: resolve failed for "${product.name}": $e');
+      devLog(
+          'NutritionProfileResolver: resolve failed for "${product.name}": $e');
       return false;
     }
   }
@@ -294,7 +301,8 @@ class NutritionProfileResolver {
   Future<Map<String, dynamic>?> _fetchNutritionProfile(String profileId) async {
     final rows = await _client
         .from('nutrition_profiles')
-        .select('id, canonical_key, calories, protein, fat, carbs, contains_gluten, contains_lactose, confidence, status')
+        .select(
+            'id, canonical_key, calories, protein, fat, carbs, contains_gluten, contains_lactose, confidence, status')
         .eq('id', profileId)
         .limit(1);
     if (rows is List && rows.isNotEmpty) {
@@ -323,14 +331,16 @@ class NutritionProfileResolver {
   }) async {
     final existing = await _client
         .from('nutrition_profiles')
-        .select('id, calories, protein, fat, carbs, contains_gluten, contains_lactose, status')
+        .select(
+            'id, calories, protein, fat, carbs, contains_gluten, contains_lactose, status')
         .eq('canonical_key', canonicalKey)
         .limit(1);
     if (existing is List && existing.isNotEmpty) {
       final first = Map<String, dynamic>.from(existing.first as Map);
-      final hasAny =
-          (first['calories'] != null && (first['calories'] as num).toDouble() > 0) ||
-          (first['protein'] != null && (first['protein'] as num).toDouble() > 0) ||
+      final hasAny = (first['calories'] != null &&
+              (first['calories'] as num).toDouble() > 0) ||
+          (first['protein'] != null &&
+              (first['protein'] as num).toDouble() > 0) ||
           (first['fat'] != null && (first['fat'] as num).toDouble() > 0) ||
           (first['carbs'] != null && (first['carbs'] as num).toDouble() > 0);
       if (hasAny) return first;
@@ -365,9 +375,11 @@ class NutritionProfileResolver {
       }
     }
 
-    final saneCal = NutritionApiService.saneCaloriesForProduct(canonicalName, nutrition.calories);
+    final saneCal = NutritionApiService.saneCaloriesForProduct(
+        canonicalName, nutrition.calories);
     if (existing is List && existing.isNotEmpty) {
-      final profileId = Map<String, dynamic>.from(existing.first as Map)['id'].toString();
+      final profileId =
+          Map<String, dynamic>.from(existing.first as Map)['id'].toString();
       await _client.from('nutrition_profiles').update({
         'canonical_name': canonicalName,
         'canonical_name_ru': canonicalName,
@@ -392,24 +404,28 @@ class NutritionProfileResolver {
 
     final id = const Uuid().v4();
     try {
-      await _client.from('nutrition_profiles').insert({
-        'id': id,
-        'canonical_name': canonicalName,
-        'canonical_name_ru': canonicalName,
-        'canonical_key': canonicalKey,
-        'calories': saneCal ?? nutrition.calories,
-        'protein': nutrition.protein,
-        'fat': nutrition.fat,
-        'carbs': nutrition.carbs,
-        'contains_gluten': nutrition.containsGluten,
-        'contains_lactose': nutrition.containsLactose,
-        'source': 'openfoodfacts',
-        'source_ref': 'world.openfoodfacts.org',
-        'confidence': 0.7,
-        'status': 'external_unverified',
-        'last_verified_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
-      }).select().single();
+      await _client
+          .from('nutrition_profiles')
+          .insert({
+            'id': id,
+            'canonical_name': canonicalName,
+            'canonical_name_ru': canonicalName,
+            'canonical_key': canonicalKey,
+            'calories': saneCal ?? nutrition.calories,
+            'protein': nutrition.protein,
+            'fat': nutrition.fat,
+            'carbs': nutrition.carbs,
+            'contains_gluten': nutrition.containsGluten,
+            'contains_lactose': nutrition.containsLactose,
+            'source': 'openfoodfacts',
+            'source_ref': 'world.openfoodfacts.org',
+            'confidence': 0.7,
+            'status': 'external_unverified',
+            'last_verified_at': DateTime.now().toIso8601String(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .select()
+          .single();
     } on PostgrestException catch (e) {
       // Race condition: another request created same canonical_key first.
       if (e.code == '23505' || e.code == '409') {
@@ -429,9 +445,11 @@ class NutritionProfileResolver {
         .select()
         .eq('canonical_key', canonicalKey)
         .limit(1);
-    if (rows is List && rows.isNotEmpty) return Map<String, dynamic>.from(rows.first as Map);
+    if (rows is List && rows.isNotEmpty)
+      return Map<String, dynamic>.from(rows.first as Map);
 
-    throw Exception('Failed to create nutrition profile for canonical_key=$canonicalKey');
+    throw Exception(
+        'Failed to create nutrition profile for canonical_key=$canonicalKey');
   }
 
   Future<bool> _applyProfileToProductIfMissing({
@@ -446,16 +464,23 @@ class NutritionProfileResolver {
     required bool allowLactose,
   }) async {
     // Only fill missing fields; keep legacy values untouched if present.
-    final calories = profile['calories'] != null ? (profile['calories'] as num).toDouble() : null;
-    final protein = profile['protein'] != null ? (profile['protein'] as num).toDouble() : null;
-    final fat = profile['fat'] != null ? (profile['fat'] as num).toDouble() : null;
-    final carbs = profile['carbs'] != null ? (profile['carbs'] as num).toDouble() : null;
+    final calories = profile['calories'] != null
+        ? (profile['calories'] as num).toDouble()
+        : null;
+    final protein = profile['protein'] != null
+        ? (profile['protein'] as num).toDouble()
+        : null;
+    final fat =
+        profile['fat'] != null ? (profile['fat'] as num).toDouble() : null;
+    final carbs =
+        profile['carbs'] != null ? (profile['carbs'] as num).toDouble() : null;
 
     final containsGluten = profile['contains_gluten'] as bool?;
     final containsLactose = profile['contains_lactose'] as bool?;
 
     final updated = product.copyWith(
-      calories: allowCalories && calories != null && calories > 0 ? calories : null,
+      calories:
+          allowCalories && calories != null && calories > 0 ? calories : null,
       protein: allowProtein ? protein : null,
       fat: allowFat ? fat : null,
       carbs: allowCarbs ? carbs : null,
@@ -514,4 +539,3 @@ class NutritionProfileResolver {
     );
   }
 }
-

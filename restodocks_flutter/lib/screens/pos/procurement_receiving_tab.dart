@@ -27,6 +27,7 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
   DateTime? _orderDateTo;
   DateTime? _deliveryDateFrom;
   DateTime? _deliveryDateTo;
+
   /// Пока false — без явных дат в фильтре: вчера, сегодня и завтра (заказ и/или привоз).
   bool _useCustomDateFilters = false;
   List<String> _templateSupplierNames = [];
@@ -58,7 +59,8 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
       final list = await OrderDocumentService().listForEstablishment(estId);
       var templateNames = <String>[];
       try {
-        final templates = await loadOrderLists(estId, department: widget.department);
+        final templates =
+            await loadOrderLists(estId, department: widget.department);
         final set = <String>{};
         for (final t in templates) {
           final n = t.supplierName.trim();
@@ -161,9 +163,7 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
     var list = _rawDocs.where(_docMatchesDepartment).toList();
     final q = _productSearchCtrl.text.trim().toLowerCase();
     if (_supplierFilter != null && _supplierFilter!.isNotEmpty) {
-      list = list
-          .where((d) => _supplierName(d) == _supplierFilter)
-          .toList();
+      list = list.where((d) => _supplierName(d) == _supplierFilter).toList();
     }
     if (q.isNotEmpty) {
       list = list.where((d) => _matchesProductSearch(d, q)).toList();
@@ -173,13 +173,13 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
         list = list.where((d) {
           final dt = _parseOrderDate(d);
           if (dt == null) return false;
-          return !dt.isBefore(DateTime(_orderDateFrom!.year, _orderDateFrom!.month,
-              _orderDateFrom!.day));
+          return !dt.isBefore(DateTime(_orderDateFrom!.year,
+              _orderDateFrom!.month, _orderDateFrom!.day));
         }).toList();
       }
       if (_orderDateTo != null) {
-        final end = DateTime(
-            _orderDateTo!.year, _orderDateTo!.month, _orderDateTo!.day, 23, 59, 59);
+        final end = DateTime(_orderDateTo!.year, _orderDateTo!.month,
+            _orderDateTo!.day, 23, 59, 59);
         list = list.where((d) {
           final dt = _parseOrderDate(d);
           if (dt == null) return false;
@@ -368,12 +368,28 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: FilledButton.icon(
-            onPressed: () => context.push(
-              '/procurement-receipt?department=${widget.department}&manual=1',
-            ),
-            icon: const Icon(Icons.add_task_outlined),
-            label: Text(loc.t('pos_procurement_receiving_create')),
+          child: Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () => context.push(
+                    '/procurement-receipt?department=${widget.department}&manual=1',
+                  ),
+                  icon: const Icon(Icons.add_task_outlined),
+                  label: Text(loc.t('pos_procurement_receiving_create')),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => context.push(
+                    '/procurement-receipt?department=${widget.department}&manual=1&photo=1',
+                  ),
+                  icon: const Icon(Icons.document_scanner_outlined),
+                  label: Text(loc.t('pos_procurement_receiving_create_photo')),
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 8),
