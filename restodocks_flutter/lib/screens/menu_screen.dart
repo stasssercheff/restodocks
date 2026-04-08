@@ -595,6 +595,8 @@ class _MenuScreenState extends State<MenuScreen> {
       return MenuFoodcostPanel(
         dishes: _displayDishes,
         nomenclatureEstablishmentId: est.productsEstablishmentId,
+        nomenclatureMergeParentEstablishmentId:
+            est.isBranch ? est.dataEstablishmentId : null,
         prefsScopeEstablishmentId: est.id,
         currencySym: currencySym,
         langCode: loc.currentLanguageCode,

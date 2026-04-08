@@ -32,6 +32,8 @@ class MenuFoodcostPanel extends StatefulWidget {
     required this.dishes,
     /// `establishment_products.establishment_id`: у филиала — id филиала, у головы — id данных.
     required this.nomenclatureEstablishmentId,
+    /// У филиала — id головного заведения для [ProductStoreSupabase.loadNomenclatureForBranch]; у головы — null.
+    this.nomenclatureMergeParentEstablishmentId,
     /// Ключ настроек (целевой %, режим) — id текущего заведения в аккаунте.
     required this.prefsScopeEstablishmentId,
     required this.currencySym,
@@ -41,6 +43,7 @@ class MenuFoodcostPanel extends StatefulWidget {
 
   final List<TechCard> dishes;
   final String nomenclatureEstablishmentId;
+  final String? nomenclatureMergeParentEstablishmentId;
   final String prefsScopeEstablishmentId;
   final String currencySym;
   final String langCode;
@@ -76,7 +79,9 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.dishes != widget.dishes ||
         oldWidget.nomenclatureEstablishmentId !=
-            widget.nomenclatureEstablishmentId) {
+            widget.nomenclatureEstablishmentId ||
+        oldWidget.nomenclatureMergeParentEstablishmentId !=
+            widget.nomenclatureMergeParentEstablishmentId) {
       _bootstrap();
     }
   }
@@ -100,6 +105,17 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         _targetPctController.text = t;
       } else if (_mode == FoodcostPricingMode.costShareOfPrice) {
         _targetPctController.text = '35';
+      }
+    } catch (_) {}
+
+    try {
+      if (widget.nomenclatureMergeParentEstablishmentId != null) {
+        await store.loadNomenclatureForBranch(
+          widget.prefsScopeEstablishmentId,
+          widget.nomenclatureMergeParentEstablishmentId!,
+        );
+      } else {
+        await store.loadNomenclature(widget.nomenclatureEstablishmentId);
       }
     } catch (_) {}
 
@@ -196,12 +212,23 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     super.dispose();
   }
 
+  /// Себестоимость порции: как в списке ТТК — если [TechCard.yield] не задан, оцениваем выход по сумме весов строк состава.
   double _portionCost(TechCard tc) {
-    final totalCost = tc.totalCost > 0
-        ? tc.totalCost
-        : tc.ingredients.fold<double>(0, (s, i) => s + i.cost);
-    if (tc.portionWeight <= 0 || tc.yield <= 0) return 0;
-    return totalCost * tc.portionWeight / tc.yield;
+    var totalCost = tc.totalCost;
+    if (totalCost <= 0) {
+      totalCost = tc.ingredients.fold<double>(0, (s, i) => s + i.effectiveCost);
+    }
+    if (totalCost <= 0) return 0;
+
+    final yieldG = tc.yield > 0
+        ? tc.yield
+        : TechCardCostHydrator.sumIngredientOutputGrams(tc);
+    if (yieldG <= 0) return 0;
+
+    final portionG = tc.portionWeight > 0
+        ? tc.portionWeight
+        : yieldG;
+    return totalCost * portionG / yieldG;
   }
 
   double? _parsePctString(String raw) {

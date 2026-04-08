@@ -10,6 +10,13 @@ class TechCardCostHydrator {
     return ing.grossWeight;
   }
 
+  /// Сумма выходных весов строк состава (г), как оценка выхода рецепта, если в ТТК не задан [TechCard.yield].
+  static double sumIngredientOutputGrams(TechCard tc) {
+    return tc.ingredients
+        .where((i) => i.productName.trim().isNotEmpty)
+        .fold<double>(0, (s, i) => s + _ingredientOutput(i));
+  }
+
   static double _quantityForCost(TTIngredient ing) {
     final qty =
         ing.grossWeight > 0 ? ing.grossWeight : (ing.netWeight > 0 ? ing.netWeight : ing.outputWeight);
