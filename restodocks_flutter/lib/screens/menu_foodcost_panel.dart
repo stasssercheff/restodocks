@@ -628,7 +628,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       metric: metricW,
       withMarkup: narrow ? 100 : 136,
       menu: narrow ? 96 : 132,
-      pct: narrow ? 88 : 118,
+      pct: narrow ? 126 : 176,
     );
   }
 
@@ -835,7 +835,9 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     );
 
     final menuSegment =
-        (widget.onMenuSegmentChanged != null && widget.menuSegmentValue != null)
+        (narrow &&
+                widget.onMenuSegmentChanged != null &&
+                widget.menuSegmentValue != null)
             ? SegmentedButton<int>(
                 segments: [
                   ButtonSegment<int>(
@@ -872,7 +874,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
           ],
           const SizedBox(height: 6),
           Align(
-            alignment: Alignment.center,
+            alignment: narrow ? Alignment.center : Alignment.centerLeft,
             child: SizedBox(
               width: narrow ? 82 : 96,
               child: TextField(
