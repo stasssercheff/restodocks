@@ -2169,12 +2169,20 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       late Future<List<TechCard>> allCardsFuture;
       if (est.isBranch) {
         allCardsFuture = Future.wait([
-          svc.getTechCardsForEstablishment(est.dataEstablishmentId),
-          svc.getTechCardsForEstablishment(est.id),
+          svc.getTechCardsForEstablishment(
+            est.dataEstablishmentId,
+            includeIngredients: false,
+          ),
+          svc.getTechCardsForEstablishment(
+            est.id,
+            includeIngredients: false,
+          ),
         ]).then((results) => [...results[0], ...results[1]]);
       } else {
-        allCardsFuture =
-            svc.getTechCardsForEstablishment(est.dataEstablishmentId);
+        allCardsFuture = svc.getTechCardsForEstablishment(
+          est.dataEstablishmentId,
+          includeIngredients: false,
+        );
       }
       final customCategoriesFuture = Future.wait([
         svc.getCustomCategories(est.dataEstablishmentId, 'kitchen'),

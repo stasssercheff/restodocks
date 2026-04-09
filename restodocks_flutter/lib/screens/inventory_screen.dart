@@ -619,19 +619,20 @@ class _InventoryScreenState extends State<InventoryScreen>
         barrierDismissible: false,
         builder: (ctx) {
           final theme = Theme.of(ctx);
+          final isLandscape =
+              MediaQuery.of(ctx).orientation == Orientation.landscape;
+          final tileGap = isLandscape ? 6.0 : 8.0;
           return AlertDialog(
             title: Text(loc.t('inventory_mode_dialog_title')),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text(loc.t('back')),
-              ),
-            ],
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ListTile(
+                    dense: isLandscape,
+                    visualDensity:
+                        isLandscape ? VisualDensity.compact : VisualDensity.standard,
+                    minVerticalPadding: isLandscape ? 2 : null,
                     leading: const Icon(Icons.list_alt, color: Colors.blue),
                     title: Row(children: [
                       Text(loc.t('inventory_mode_standard')),
@@ -645,8 +646,12 @@ class _InventoryScreenState extends State<InventoryScreen>
                     tileColor: Colors.blue.withOpacity(0.05),
                     onTap: () => Navigator.of(ctx).pop('standard'),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: tileGap),
                   ListTile(
+                    dense: isLandscape,
+                    visualDensity:
+                        isLandscape ? VisualDensity.compact : VisualDensity.standard,
+                    minVerticalPadding: isLandscape ? 2 : null,
                     leading: Icon(Icons.filter_alt_outlined,
                         color: theme.colorScheme.secondary),
                     title: Row(children: [
@@ -665,8 +670,13 @@ class _InventoryScreenState extends State<InventoryScreen>
                     onTap: () => Navigator.of(ctx).pop('selective'),
                   ),
                   if (!isHall) ...[
-                    const SizedBox(height: 8),
+                    SizedBox(height: tileGap),
                     ListTile(
+                      dense: isLandscape,
+                      visualDensity: isLandscape
+                          ? VisualDensity.compact
+                          : VisualDensity.standard,
+                      minVerticalPadding: isLandscape ? 2 : null,
                       leading: Icon(Icons.table_chart_outlined,
                           color: hasIiko
                               ? theme.colorScheme.primary
@@ -691,6 +701,19 @@ class _InventoryScreenState extends State<InventoryScreen>
                           hasIiko ? () => Navigator.of(ctx).pop('iiko') : null,
                     ),
                   ],
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        minimumSize: const Size(0, 30),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(loc.t('back')),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -4735,7 +4758,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                 ],
               ),
             )
-          : Stack(
+          : GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => FocusScope.of(context).unfocus(),
+              child: Stack(
               children: [
                 Column(
                   children: [
@@ -4885,35 +4911,11 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                           return visibleRows.isEmpty
                               ? Center(
                                   child: Text(loc.t('inventory_no_positions')))
-                              : Listener(
-                                  onPointerDown: (_) {
-                                    final pf =
-                                        FocusManager.instance.primaryFocus;
-                                    final isOurInput = pf != null &&
-                                        (_iikoCellFocusNodes.contains(pf) ||
-                                            pf == _searchFocusNode);
-                                    if (!isOurInput) return;
-                                    final nodeToRestore = pf!;
-                                    Future.delayed(
-                                        const Duration(milliseconds: 100), () {
-                                      if (!mounted) return;
-                                      final current =
-                                          FocusManager.instance.primaryFocus;
-                                      if (current != null &&
-                                          (_iikoCellFocusNodes
-                                                  .contains(current) ||
-                                              current == _searchFocusNode)) {
-                                        return;
-                                      }
-                                      nodeToRestore.requestFocus();
-                                    });
-                                  },
-                                  child: _IikoInventoryTable(
-                                    rows: visibleRows,
-                                    completed: _completed,
-                                    onQuantityChanged: _setQuantity,
-                                    onFocusChange: _syncKeyboardChrome,
-                                  ),
+                              : _IikoInventoryTable(
+                                  rows: visibleRows,
+                                  completed: _completed,
+                                  onQuantityChanged: _setQuantity,
+                                  onFocusChange: _syncKeyboardChrome,
                                 );
                         },
                       ),
@@ -4956,6 +4958,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                   ],
                 ),
               ],
+            ),
             ),
     );
   }
