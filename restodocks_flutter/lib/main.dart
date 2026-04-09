@@ -460,7 +460,11 @@ class RestodocksApp extends StatelessWidget {
                           ],
                         ),
                         Center(
-                          child: SizedBox(width: canvasWidth, child: content),
+                          child: SizedBox(
+                            width: canvasWidth,
+                            height: double.infinity,
+                            child: content,
+                          ),
                         ),
                       ],
                     );

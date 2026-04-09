@@ -274,9 +274,9 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
       data: theme.copyWith(
         datePickerTheme: theme.datePickerTheme.copyWith(
           rangePickerHeaderHeadlineStyle:
-              theme.textTheme.headlineSmall?.copyWith(fontSize: 26),
+              theme.textTheme.titleLarge?.copyWith(fontSize: 14),
           rangePickerHeaderHelpStyle:
-              theme.textTheme.labelLarge?.copyWith(fontSize: 13),
+              theme.textTheme.labelMedium?.copyWith(fontSize: 12),
         ),
         inputDecorationTheme: (theme.inputDecorationTheme).copyWith(
           hintStyle: theme.textTheme.headlineSmall?.copyWith(
@@ -286,7 +286,11 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
           ),
         ),
       ),
-      child: child ?? const SizedBox.shrink(),
+      child: MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: const TextScaler.linear(0.90)),
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 

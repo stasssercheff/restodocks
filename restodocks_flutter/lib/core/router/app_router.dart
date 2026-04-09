@@ -1563,14 +1563,13 @@ class _DeferredTechCardEditState extends State<_DeferredTechCardEdit> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      final loc = context.read<LocalizationService>();
       return Scaffold(
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.pop(),
           ),
-          title: Text(loc.t('tech_cards')),
+          title: const Text('ТТК'),
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -1583,7 +1582,7 @@ class _DeferredTechCardEditState extends State<_DeferredTechCardEdit> {
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.pop(),
           ),
-          title: Text(loc.t('tech_cards')),
+          title: const Text('ТТК'),
         ),
         body: Center(
           child: Padding(
