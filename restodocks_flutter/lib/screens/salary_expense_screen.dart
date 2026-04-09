@@ -11,6 +11,7 @@ import '../models/models.dart';
 import '../services/schedule_storage_service.dart';
 import '../utils/employee_display_utils.dart';
 import '../utils/employee_name_translation_utils.dart';
+import '../utils/layout_breakpoints.dart';
 import '../utils/number_format_utils.dart';
 import '../services/salary_export_service.dart';
 import '../services/inventory_download.dart';
@@ -1072,7 +1073,8 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                       Expanded(
                         child: LayoutBuilder(
                           builder: (context, constraints) {
-                            final isDesktop = constraints.maxWidth >= 600;
+                            final isDesktop =
+                                !isHandheldNarrowLayout(context);
                             return ListView.builder(
                               padding: const EdgeInsets.all(16),
                               itemCount:

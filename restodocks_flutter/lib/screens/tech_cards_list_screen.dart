@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:excel/excel.dart' hide Border;
 
+import '../utils/layout_breakpoints.dart';
 import '../utils/number_format_utils.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -4151,7 +4152,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       );
     }
     final lang = loc.currentLanguageCode;
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = isHandheldNarrowLayout(context);
     // Показываем все цеха целиком; на мобильном расширяем колонку "Цех".
     final colSectionWidth = isMobile ? 140.0 : 180.0;
     final colCatWidth = isMobile ? 52.0 : 84.0;

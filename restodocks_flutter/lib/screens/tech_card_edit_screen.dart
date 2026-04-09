@@ -19,6 +19,7 @@ import '../services/app_toast_service.dart';
 import '../services/services.dart';
 import '../services/tech_card_cost_hydrator.dart';
 import '../services/tech_card_nutrition_hydrator.dart';
+import '../utils/layout_breakpoints.dart';
 import '../utils/number_format_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 import 'excel_style_ttk_table.dart';
@@ -4613,7 +4614,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     VoidCallback? onRemove,
     VoidCallback? onTap,
   }) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = isHandheldNarrowLayout(context);
     final size = isMobile ? double.infinity : 100.0;
 
     Widget image() {
@@ -4788,7 +4789,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         !effectiveCanEdit; // Повар - кухня без прав редактирования
 
     // Определяем, является ли устройство мобильным
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = isHandheldNarrowLayout(context);
 
     if (_isNew && !effectiveCanEdit) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

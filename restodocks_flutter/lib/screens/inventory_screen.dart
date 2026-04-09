@@ -7,6 +7,7 @@ import '../core/flutter_nav_bridge_stub.dart'
 
 import 'package:archive/archive.dart';
 import '../utils/dev_log.dart';
+import '../utils/layout_breakpoints.dart';
 
 import 'package:excel/excel.dart' hide Border, TextSpan;
 import 'package:file_picker/file_picker.dart';
@@ -1661,7 +1662,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   bool _inventoryCollapseLayout(BuildContext context) {
-    final isNarrow = MediaQuery.sizeOf(context).width < 600;
+    final isNarrow = isHandheldNarrowLayout(context);
     final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     return (_isInputMode && !isNarrow) ||
         (isNarrow &&
@@ -1682,7 +1683,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     // чтобы не мутировать state во время build — иначе на мобильной версии клавиатура закрывается.
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final isKeyboardOpen = viewInsets.bottom > 0;
-    final isNarrow = MediaQuery.sizeOf(context).width < 600;
+    final isNarrow = isHandheldNarrowLayout(context);
 
     // Обновляем _isInputMode только на десктопе — на мобильной setState при открытой клавиатуре
     // схлопывает layout и TextField теряет фокус → клавиатура закрывается.
@@ -1690,7 +1691,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted &&
             MediaQuery.viewInsetsOf(context).bottom > 0 &&
-            !(MediaQuery.sizeOf(context).width < 600)) {
+            !isHandheldNarrowLayout(context)) {
           setState(() => _isInputMode = true);
         }
       });
@@ -1751,7 +1752,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                   valueListenable: _inventoryLayoutPulse,
                   builder: (ctx, _, __) {
                     final collapseLayout = _inventoryCollapseLayout(ctx);
-                    final narrow = MediaQuery.sizeOf(ctx).width < 600;
+                    final narrow = isHandheldNarrowLayout(ctx);
                     final kbOpen = MediaQuery.viewInsetsOf(ctx).bottom > 0;
                     final hideInfo = narrow && kbOpen;
                     return Column(
@@ -1783,7 +1784,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               valueListenable: _inventoryLayoutPulse,
               builder: (ctx, _, __) {
                 final collapseLayout = _inventoryCollapseLayout(ctx);
-                final narrow = MediaQuery.sizeOf(ctx).width < 600;
+                final narrow = isHandheldNarrowLayout(ctx);
                 final kbOpen = MediaQuery.viewInsetsOf(ctx).bottom > 0;
                 if (!collapseLayout && !(narrow && kbOpen)) {
                   return DataSafetyIndicator(
@@ -1875,7 +1876,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     bool hideInfoRow = false,
   }) {
     final theme = Theme.of(context);
-    final narrow = MediaQuery.sizeOf(context).width < 420;
+    final narrow = MediaQuery.sizeOf(context).shortestSide < 420;
     final dateStr =
         '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}';
     final startStr = _startTime != null
@@ -3797,7 +3798,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   bool _keyboardActiveNow() {
     if (!mounted) return false;
     if (MediaQuery.viewInsetsOf(context).bottom > 0) return true;
-    if (MediaQuery.sizeOf(context).width >= 600) return false;
+    if (!isHandheldNarrowLayout(context)) return false;
     return _searchFocusNode.hasFocus ||
         _iikoCellFocusNodes.any((n) => n.hasFocus);
   }
