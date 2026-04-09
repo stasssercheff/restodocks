@@ -325,9 +325,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       _addDebugLog('Critical error in build: $e\n$stackTrace');
       return _buildErrorScreen(
         context.read<LocalizationService>().t(
-              'product_upload_critical_error',
-              args: {'error': '$e'},
-            ),
+          'product_upload_critical_error',
+          args: {'error': '$e'},
+        ),
       );
     }
   }
@@ -499,6 +499,16 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
               color: primary,
               onTap: _isLoading ? null : () => _uploadFromFileUnified(),
             ),
+            const SizedBox(height: 12),
+
+            // 3. Загрузить из бланка iiko (в номенклатуру без цен)
+            _UploadMethodCard(
+              icon: Icons.inventory_2_outlined,
+              title: 'Загрузить из iiko',
+              description: 'Импорт наименований из бланка iiko (без цен)',
+              color: primary,
+              onTap: _isLoading ? null : () => _importIikoToNomenclature(),
+            ),
 
             const SizedBox(height: 24),
 
@@ -535,6 +545,183 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       source: 'инвентаризационный бланк',
       mode: 'inventory',
     );
+  }
+
+  /// Импорт наименований из iiko-бланка в номенклатуру (без цен).
+  /// UX: предупреждение о ПФ -> выбор файла -> (при необходимости) выбор листа -> модерация.
+  Future<void> _importIikoToNomenclature() async {
+    final loc = context.read<LocalizationService>();
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Важно перед загрузкой'),
+        content: const Text(
+          'ПФ будут добавлены как самостоятельные продукты и не будут отображаться как "ПФ" в системе Restodocks.\n\n'
+          'Рекомендуем загружать только чистые продукты.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(loc.t('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Продолжить'),
+          ),
+        ],
+      ),
+    );
+    if (approved != true || !mounted) return;
+
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx', 'xls'],
+      withData: true,
+    );
+    if (result == null ||
+        result.files.isEmpty ||
+        result.files.single.bytes == null ||
+        !mounted) {
+      return;
+    }
+
+    try {
+      var bytes = result.files.single.bytes!;
+      bytes = IikoXlsxSanitizer.ensureDecodable(bytes);
+      final excel = Excel.decodeBytes(bytes.toList());
+      final sheetNames = excel.tables.keys.toList();
+      if (sheetNames.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('product_upload_iiko_unrecognized'))),
+        );
+        return;
+      }
+
+      String selectedSheet = sheetNames.first;
+      if (sheetNames.length > 1) {
+        final picked = await _pickIikoSheet(sheetNames);
+        if (picked == null || !mounted) return;
+        selectedSheet = picked;
+      }
+
+      final rows = _extractIikoProductNamesFromSheet(excel, selectedSheet);
+      if (rows.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('product_upload_iiko_unrecognized'))),
+        );
+        return;
+      }
+
+      await _processWithDeferredModeration(
+        rows: rows,
+        source: 'бланк iiko ($selectedSheet)',
+        mode: 'inventory',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            loc.t('product_upload_error_generic', args: {'error': '$e'}),
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<String?> _pickIikoSheet(List<String> sheetNames) async {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Выберите лист iiko'),
+        content: SizedBox(
+          width: 420,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: sheetNames.length,
+            itemBuilder: (context, index) {
+              final name = sheetNames[index];
+              return ListTile(
+                leading: const Icon(Icons.table_chart_outlined),
+                title: Text(name),
+                onTap: () => Navigator.of(ctx).pop(name),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(context.read<LocalizationService>().t('cancel')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Извлекает строки с наименованиями товаров из выбранного листа iiko.
+  /// Берем только позиции с заполненным "Код" и "Наименование".
+  List<String> _extractIikoProductNamesFromSheet(
+      Excel excel, String sheetName) {
+    final sheet = excel.tables[sheetName];
+    if (sheet == null) return const [];
+
+    String _cell(int col, int row) {
+      final v = sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row))
+          .value;
+      return _excelCellToStr(v).trim();
+    }
+
+    int colGroup = 0;
+    int colCode = 2;
+    int colName = 3;
+    int dataStart = 8;
+
+    for (var r = 0; r < sheet.maxRows && r < 20; r++) {
+      final rowCells = <int, String>{};
+      for (var c = 0;
+          c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns);
+          c++) {
+        final v = _cell(c, r).toLowerCase();
+        if (v.isNotEmpty) rowCells[c] = v;
+      }
+      final nameEntry = rowCells.entries
+          .where((e) =>
+              (e.value.contains('наименование') || e.value.contains('товар')) &&
+              e.key != colGroup)
+          .firstOrNull;
+      if (nameEntry != null) {
+        colName = nameEntry.key;
+        for (final scanRow in [r, r - 1]) {
+          if (scanRow < 0) continue;
+          for (var c = 0;
+              c < (sheet.maxColumns > 15 ? 15 : sheet.maxColumns);
+              c++) {
+            final v = _cell(c, scanRow).toLowerCase();
+            if (v.contains('код') && !v.contains('штрих')) colCode = c;
+            if (v.contains('групп')) colGroup = c;
+          }
+        }
+        dataStart = r + 1;
+        break;
+      }
+    }
+
+    if (colName == colGroup) colName = 3;
+
+    final seen = <String>{};
+    final out = <String>[];
+    for (var r = dataStart; r < sheet.maxRows; r++) {
+      final codeVal = _cell(colCode, r);
+      if (codeVal.isEmpty) continue;
+      final nameVal = _cell(colName, r);
+      if (nameVal.isEmpty || _isIikoHeaderRow(nameVal)) continue;
+      if (seen.add(nameVal)) out.add(nameVal);
+    }
+    return out;
   }
 
   /// 4. Загрузить бланк iiko: парсит xlsx 1-в-1 (без ИИ), сохраняет в iiko_products
@@ -613,8 +800,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.t('product_upload_error_generic',
-                args: {'error': '$e'})),
+            content: Text(
+                loc.t('product_upload_error_generic', args: {'error': '$e'})),
           ),
         );
       }
@@ -1389,8 +1576,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         _cancelLoadingTimeout();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.t('product_upload_error_generic',
-                args: {'error': '$e'})),
+            content: Text(
+                loc.t('product_upload_error_generic', args: {'error': '$e'})),
           ),
         );
       }
@@ -1541,8 +1728,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.t('product_upload_error_file',
-                args: {'error': '$e'})),
+            content:
+                Text(loc.t('product_upload_error_file', args: {'error': '$e'})),
           ),
         );
       }
@@ -1633,8 +1820,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.t('product_upload_error_generic',
-                args: {'error': '$e'})),
+            content: Text(
+                loc.t('product_upload_error_generic', args: {'error': '$e'})),
           ),
         );
       }
@@ -1848,8 +2035,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(loc.t('product_upload_import_error',
-              args: {'error': '$e'})),
+          content:
+              Text(loc.t('product_upload_import_error', args: {'error': '$e'})),
         ),
       );
     } finally {
@@ -2056,8 +2243,8 @@ ${text}
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(loc.t('product_upload_error_ai_text',
-              args: {'error': '$e'})),
+          content: Text(
+              loc.t('product_upload_error_ai_text', args: {'error': '$e'})),
         ),
       );
     } finally {
@@ -2335,8 +2522,8 @@ ${text}
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(loc.t('product_upload_error_file_process',
-                args: {'error': '$e'})),
+            content: Text(loc
+                .t('product_upload_error_file_process', args: {'error': '$e'})),
           ),
         );
         context.go('/nomenclature');
@@ -3087,14 +3274,20 @@ ${text}
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      '• ${loc.t('product_upload_stats_new', args: {'count': '$added'})}',
+                      '• ${loc.t('product_upload_stats_new', args: {
+                            'count': '$added'
+                          })}',
                     ),
                     Text(
-                      '• ${loc.t('product_upload_stats_prices', args: {'count': '$skipped'})}',
+                      '• ${loc.t('product_upload_stats_prices', args: {
+                            'count': '$skipped'
+                          })}',
                     ),
                     if (failed > 0)
                       Text(
-                        '• ${loc.t('product_upload_stats_errors', args: {'count': '$failed'})}',
+                        '• ${loc.t('product_upload_stats_errors', args: {
+                              'count': '$failed'
+                            })}',
                       ),
                   ],
                   const SizedBox(height: 16),
@@ -4063,7 +4256,8 @@ class _PasteTextDialogState extends State<_PasteTextDialog> {
                     final e = acc.establishment;
                     if (e == null) return const SizedBox.shrink();
                     final code = e.defaultCurrency;
-                    final preset = EstablishmentCurrencyOptions.presetForCode(code);
+                    final preset =
+                        EstablishmentCurrencyOptions.presetForCode(code);
                     final line = preset != null
                         ? '${preset['symbol']} · ${preset['code']} — ${preset['name']}'
                         : code.toUpperCase();
@@ -4096,15 +4290,15 @@ class _PasteTextDialogState extends State<_PasteTextDialog> {
                                     updatedAt: DateTime.now(),
                                   );
                                   await acc.updateEstablishment(updated);
-                                  await store.syncEstablishmentNomenclatureCurrency(
+                                  await store
+                                      .syncEstablishmentNomenclatureCurrency(
                                     updated.productsEstablishmentId,
                                     updated.defaultCurrency,
                                   );
                                   if (context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content:
-                                            Text(loc.t('currency_saved')),
+                                        content: Text(loc.t('currency_saved')),
                                       ),
                                     );
                                   }
