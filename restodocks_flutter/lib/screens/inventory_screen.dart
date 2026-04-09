@@ -1712,6 +1712,12 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   bool _inventoryCollapseLayout(BuildContext context) {
     final isNarrow = isHandheldNarrowLayout(context);
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+    if (isNarrow && isLandscape) {
+      // В узком альбомном режиме приоритет — таблица для ввода.
+      return true;
+    }
     final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     return (_isInputMode && !isNarrow) ||
         (isNarrow &&
@@ -1788,9 +1794,13 @@ class _InventoryScreenState extends State<InventoryScreen>
         // Браузерный URL-бар (Safari/Chrome) остаётся ниже неё и не перекрывает таблицу.
         bottomNavigationBar: ValueListenableBuilder<int>(
           valueListenable: _inventoryLayoutPulse,
-          builder: (ctx, _, __) =>
-              _buildFooter(loc, _inventoryCollapseLayout(ctx)) ??
-              const SizedBox.shrink(),
+          builder: (ctx, _, __) {
+            final collapse = _inventoryCollapseLayout(ctx);
+            final keepFooterInLandscape = isHandheldNarrowLayout(ctx) &&
+                MediaQuery.of(ctx).orientation == Orientation.landscape;
+            return _buildFooter(loc, collapse && !keepFooterInLandscape) ??
+                const SizedBox.shrink();
+          },
         ),
         body: Stack(
           children: [

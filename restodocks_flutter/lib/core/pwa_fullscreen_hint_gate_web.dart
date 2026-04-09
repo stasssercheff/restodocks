@@ -1,6 +1,8 @@
 // ignore_for_file: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 
+const _kPwaHintDismissedKey = 'restodocks_pwa_chrome_hint_dismissed';
+
 bool shouldShowPwaFullscreenHintAfterLogin() {
   try {
     final ua = (html.window.navigator.userAgent).toLowerCase();
@@ -16,8 +18,9 @@ bool shouldShowPwaFullscreenHintAfterLogin() {
         html.window.matchMedia('(display-mode: fullscreen)').matches;
     if (displayStandalone || displayFullscreen) return false;
 
-    if (html.window.sessionStorage['restodocks_pwa_chrome_hint_dismissed'] ==
-        '1') {
+    final dismissed = html.window.localStorage[_kPwaHintDismissedKey] == '1' ||
+        html.window.sessionStorage[_kPwaHintDismissedKey] == '1';
+    if (dismissed) {
       return false;
     }
     return true;
@@ -28,6 +31,9 @@ bool shouldShowPwaFullscreenHintAfterLogin() {
 
 void markPwaFullscreenHintDismissed() {
   try {
-    html.window.sessionStorage['restodocks_pwa_chrome_hint_dismissed'] = '1';
+    // Persist across browser restarts: show only once per device/browser.
+    html.window.localStorage[_kPwaHintDismissedKey] = '1';
+    // Keep session copy for backwards compatibility with existing checks.
+    html.window.sessionStorage[_kPwaHintDismissedKey] = '1';
   } catch (_) {}
 }
