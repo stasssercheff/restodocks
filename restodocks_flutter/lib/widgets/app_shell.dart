@@ -214,7 +214,7 @@ class _AppShellState extends State<AppShell> {
     return MediaQuery(
       data: patchedMq,
       child: Scaffold(
-        extendBody: true,
+        extendBody: false,
         backgroundColor: Theme.of(context).colorScheme.surface,
         body: NotificationListener<ScrollNotification>(
           onNotification: _onScroll,
@@ -229,8 +229,7 @@ class _AppShellState extends State<AppShell> {
                 color: Theme.of(context).navigationBarTheme.backgroundColor ??
                     Theme.of(context).colorScheme.surfaceContainerHighest,
                 child: ClipRect(
-                  child: Align(
-                    alignment: Alignment.topCenter,
+                  child: Center(
                     child: bottomBar,
                   ),
                 ),

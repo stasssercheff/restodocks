@@ -143,7 +143,7 @@ class AppTheme {
           (_) => primaryColor.withValues(alpha: 0.2)),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: Colors.white.withValues(alpha: 0.7),
+      backgroundColor: const Color(0xFFFAFAFA),
       indicatorColor: primaryColor.withValues(alpha: 0.16),
       shadowColor: Colors.black12,
       elevation: 0,
@@ -293,7 +293,7 @@ class AppTheme {
       trackOutlineColor: WidgetStateProperty.resolveWith((_) => Colors.white24),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: const Color(0xFF1E1E1E).withValues(alpha: 0.7),
+      backgroundColor: const Color(0xFF1E1E1E),
       indicatorColor: primaryColor.withValues(alpha: 0.22),
       shadowColor: Colors.black45,
       elevation: 0,
@@ -392,6 +392,7 @@ class AppTheme {
       unselectedLabelColor: primaryColor,
     ),
     navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: const Color(0xFFFAFAFA),
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
           fontSize: 12,
@@ -492,6 +493,7 @@ class AppTheme {
       unselectedLabelColor: primaryColor,
     ),
     navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: const Color(0xFF1E1E1E),
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
           fontSize: 12,
