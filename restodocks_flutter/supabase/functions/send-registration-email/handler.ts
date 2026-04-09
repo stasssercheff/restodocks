@@ -106,6 +106,35 @@ export async function handleRequest(req: Request): Promise<Response> {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   }
+
+  let body: {
+    type: "owner" | "employee" | "co_owner" | "registration_confirmed" | "confirmation_only";
+    to: string;
+    companyName?: string;
+    email?: string;
+    fullName?: string;
+    registeredAtLocal?: string;
+    pinCode?: string;
+    password?: string;
+    language?: string;
+    appBaseUrl?: string;
+  };
+  try {
+    body = (await req.json()) as typeof body;
+  } catch {
+    return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+      status: 400,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+
+  // Смок/мониторинг: не требуем auth для invalid.restodocks, чтобы не флапал 401.
+  if (body?.to && isResendNoopRecipient(body.to)) {
+    return new Response(JSON.stringify({ ok: true, noop: true }), {
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  }
+
   if (!(await hasValidApiKeyOrUser(req))) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
@@ -120,19 +149,6 @@ export async function handleRequest(req: Request): Promise<Response> {
   }
 
   try {
-    const body = (await req.json()) as {
-      type: "owner" | "employee" | "co_owner" | "registration_confirmed" | "confirmation_only";
-      to: string;
-      companyName?: string;
-      email?: string;
-      fullName?: string;
-      registeredAtLocal?: string;
-      pinCode?: string;
-      password?: string;
-      language?: string;
-      appBaseUrl?: string;
-    };
-
     const { type, to, companyName, email, fullName, pinCode, password } = body;
     const lang = normalizeLanguage(body.language);
     const appBaseUrl = resolveAppBaseUrl(req, body);
