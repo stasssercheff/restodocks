@@ -200,18 +200,12 @@ class _AppShellState extends State<AppShell> {
         ? _AccessPendingPlaceholder(loc: loc)
         : widget.child;
     final mq = MediaQuery.of(context);
+    // Низ и бока: web в альбоме или узкий телефон в альбоме (совпадает с main.dart).
     final patchedMq = (landscapeNarrow || landscapeWeb)
         ? mq.copyWith(
-            padding: mq.padding.copyWith(
-              left: landscapeWeb ? 0 : mq.padding.left,
-              right: landscapeWeb ? 0 : mq.padding.right,
-              bottom: 0,
-            ),
-            viewPadding: mq.viewPadding.copyWith(
-              left: landscapeWeb ? 0 : mq.viewPadding.left,
-              right: landscapeWeb ? 0 : mq.viewPadding.right,
-              bottom: 0,
-            ),
+            padding: mq.padding.copyWith(left: 0, right: 0, bottom: 0),
+            viewPadding:
+                mq.viewPadding.copyWith(left: 0, right: 0, bottom: 0),
           )
         : mq;
 
@@ -220,6 +214,7 @@ class _AppShellState extends State<AppShell> {
     return MediaQuery(
       data: patchedMq,
       child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
         body: NotificationListener<ScrollNotification>(
           onNotification: _onScroll,
           child: bodyChild,

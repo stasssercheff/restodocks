@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:feature_spotlight/feature_spotlight.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -376,6 +375,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         leading: GoRouter.of(context).canPop() ? appBarBackButton(context) : null,
         title: Text(loc.t('app_name')),

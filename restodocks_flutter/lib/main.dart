@@ -369,16 +369,29 @@ class RestodocksApp extends StatelessWidget {
                   (kIsWeb ||
                       defaultTargetPlatform == TargetPlatform.iOS ||
                       defaultTargetPlatform == TargetPlatform.android);
-              Widget content = c;
+              // Альбом: Safari даёт большие боковые inset'ы; контент оказывается в «окошке», по бокам
+              // полосы цвета браузера/primary. Убираем горизонтальные padding/viewPadding везде
+              // на вебе в альбоме и на телефоне в альбоме (iPad в портрете не трогаем).
+              final landscape = media.orientation == Orientation.landscape;
+              final stripLandscapeSideInsets =
+                  landscape && (kIsWeb || narrowPhone);
+              var m = media;
               if (applyMobileUiScale) {
-                final factor = uiScale.scaleFactor;
-                content = MediaQuery(
-                  data: media.copyWith(
-                    textScaler: TextScaler.linear(media.textScaleFactor * factor),
-                  ),
-                  child: c,
+                m = m.copyWith(
+                  textScaler: TextScaler.linear(
+                      media.textScaleFactor * uiScale.scaleFactor),
                 );
               }
+              if (stripLandscapeSideInsets) {
+                m = m.copyWith(
+                  padding: m.padding.copyWith(left: 0, right: 0),
+                  viewPadding: m.viewPadding.copyWith(left: 0, right: 0),
+                );
+              }
+              final needsMediaWrap =
+                  applyMobileUiScale || stripLandscapeSideInsets;
+              final content =
+                  needsMediaWrap ? MediaQuery(data: m, child: c) : c;
               return WebLocationCorrection(
                 child: AppPrimaryScrollController(child: content),
               );
