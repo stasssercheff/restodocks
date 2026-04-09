@@ -2418,7 +2418,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     };
     locSvc.addListener(_localizationListener);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _load();
+      // Даем завершиться свайп-анимации перехода, и только потом стартуем загрузку.
+      // Так переход на экран ТТК не фризит посередине.
+      unawaited(_startLoadAfterRouteTransition());
 
       // Периодическая автодосвязка вложенных ПФ (например, чтобы "йогурт"
       // появился в "соус салатный" без повторного открытия редактирования).
@@ -2430,6 +2432,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         _tryReconcileOpenCard(force: false);
       });
     });
+  }
+
+  Future<void> _startLoadAfterRouteTransition() async {
+    if (!_isNew) {
+      await Future<void>.delayed(const Duration(milliseconds: 320));
+    }
+    if (!mounted) {
+      return;
+    }
+    await _load();
   }
 
   @override
