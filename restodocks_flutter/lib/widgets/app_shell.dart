@@ -157,10 +157,6 @@ class _AppShellState extends State<AppShell> {
     final noDataAccess = !isOwner && !currentEmployee.effectiveDataAccess;
     final isKitchenNoData =
         noDataAccess && currentEmployee.department == 'kitchen';
-    final middleLabel = noDataAccess
-        ? (isKitchenNoData ? loc.t('schedule') : loc.t('personal_schedule'))
-        : _labelForAction(loc, middleAction, currentEmployee);
-
     final location = GoRouterState.of(context).matchedLocation;
     final selectedIndex = _indexForLocation(
         location, middleAction, noDataAccess, isKitchenNoData, currentEmployee);
@@ -180,125 +176,80 @@ class _AppShellState extends State<AppShell> {
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
     final navBottomInset = kIsWeb ? 0.0 : (isLandscape ? 0.0 : bottomInset);
 
-    /// M3 NavigationBar с скрытыми подписями на iOS часто визуально прижимает иконки к верху слота.
-    /// На нативе — явный Row + Center по вертикали; на web оставляем NavigationBar.
-    final Widget navBar = kIsWeb
-        ? NavigationBarTheme(
-            data: NavigationBarThemeData(
-              height: navBarHeight,
-              labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
-              backgroundColor: navBg,
-              surfaceTintColor: Colors.transparent,
-              elevation: 0,
-              shadowColor: Colors.transparent,
-            ),
-            child: NavigationBar(
-              backgroundColor: navBg,
-              surfaceTintColor: Colors.transparent,
-              elevation: 0,
-              shadowColor: Colors.transparent,
-              selectedIndex: selectedIndex,
-              onDestinationSelected: (i) {
-                setState(() => _hideBottomBar = false);
-                _onTap(context, i, middleAction, noDataAccess, isKitchenNoData,
-                    currentEmployee, selectedIndex);
-              },
-              destinations: [
-                NavigationDestination(
-                  icon: const Icon(Icons.home_outlined),
-                  selectedIcon: const Icon(Icons.home),
-                  label: loc.t('home'),
-                ),
-                NavigationDestination(
-                  icon: Icon(noDataAccess
-                      ? Icons.calendar_month_outlined
-                      : middleAction.iconOutlined),
-                  selectedIcon: Icon(
-                      noDataAccess ? Icons.calendar_month : middleAction.icon),
-                  label: middleLabel,
-                ),
-                NavigationDestination(
-                  icon: const Icon(Icons.person_outline),
-                  selectedIcon: const Icon(Icons.person),
-                  label: loc.t('personal_cabinet'),
-                ),
-              ],
-            ),
-          )
-        : Material(
-            color: navBg,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+    /// Единый кастомный футер на всех платформах:
+    /// иконки строго по центру по вертикали, без лишней «полки» под ними.
+    final Widget navBar = Material(
+      color: navBg,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: navBarHeight,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                SizedBox(
-                  height: navBarHeight,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      _NativeNavIconSlot(
-                        selected: selectedIndex == 0,
-                        outlined: Icons.home_outlined,
-                        filled: Icons.home,
-                        onTap: () {
-                          setState(() => _hideBottomBar = false);
-                          _onTap(
-                              context,
-                              0,
-                              middleAction,
-                              noDataAccess,
-                              isKitchenNoData,
-                              currentEmployee,
-                              selectedIndex);
-                        },
-                      ),
-                      _NativeNavIconSlot(
-                        selected: selectedIndex == 1,
-                        outlined: noDataAccess
-                            ? Icons.calendar_month_outlined
-                            : middleAction.iconOutlined,
-                        filled: noDataAccess
-                            ? Icons.calendar_month
-                            : middleAction.icon,
-                        onTap: () {
-                          setState(() => _hideBottomBar = false);
-                          _onTap(
-                              context,
-                              1,
-                              middleAction,
-                              noDataAccess,
-                              isKitchenNoData,
-                              currentEmployee,
-                              selectedIndex);
-                        },
-                      ),
-                      _NativeNavIconSlot(
-                        selected: selectedIndex == 2,
-                        outlined: Icons.person_outline,
-                        filled: Icons.person,
-                        onTap: () {
-                          setState(() => _hideBottomBar = false);
-                          _onTap(
-                              context,
-                              2,
-                              middleAction,
-                              noDataAccess,
-                              isKitchenNoData,
-                              currentEmployee,
-                              selectedIndex);
-                        },
-                      ),
-                    ],
-                  ),
+                _NativeNavIconSlot(
+                  selected: selectedIndex == 0,
+                  outlined: Icons.home_outlined,
+                  filled: Icons.home,
+                  onTap: () {
+                    setState(() => _hideBottomBar = false);
+                    _onTap(
+                        context,
+                        0,
+                        middleAction,
+                        noDataAccess,
+                        isKitchenNoData,
+                        currentEmployee,
+                        selectedIndex);
+                  },
                 ),
-                if (navBottomInset > 0)
-                  ColoredBox(
-                    color: navBg,
-                    child: SizedBox(
-                        height: navBottomInset, width: double.infinity),
-                  ),
+                _NativeNavIconSlot(
+                  selected: selectedIndex == 1,
+                  outlined: noDataAccess
+                      ? Icons.calendar_month_outlined
+                      : middleAction.iconOutlined,
+                  filled:
+                      noDataAccess ? Icons.calendar_month : middleAction.icon,
+                  onTap: () {
+                    setState(() => _hideBottomBar = false);
+                    _onTap(
+                        context,
+                        1,
+                        middleAction,
+                        noDataAccess,
+                        isKitchenNoData,
+                        currentEmployee,
+                        selectedIndex);
+                  },
+                ),
+                _NativeNavIconSlot(
+                  selected: selectedIndex == 2,
+                  outlined: Icons.person_outline,
+                  filled: Icons.person,
+                  onTap: () {
+                    setState(() => _hideBottomBar = false);
+                    _onTap(
+                        context,
+                        2,
+                        middleAction,
+                        noDataAccess,
+                        isKitchenNoData,
+                        currentEmployee,
+                        selectedIndex);
+                  },
+                ),
               ],
             ),
-          );
+          ),
+          if (navBottomInset > 0)
+            ColoredBox(
+              color: navBg,
+              child: SizedBox(height: navBottomInset, width: double.infinity),
+            ),
+        ],
+      ),
+    );
 
     final bottomBar = tourController != null
         ? Stack(
@@ -390,32 +341,6 @@ class _AppShellState extends State<AppShell> {
               ),
       ),
     );
-  }
-
-  String _labelForAction(
-      LocalizationService loc, HomeButtonAction action, Employee? employee) {
-    switch (action) {
-      case HomeButtonAction.inbox:
-        return loc.t('inbox');
-      case HomeButtonAction.messages:
-        return loc.t('inbox_tab_messages');
-      case HomeButtonAction.schedule:
-        return loc.t('schedule');
-      case HomeButtonAction.productOrder:
-        return loc.t('product_order');
-      case HomeButtonAction.menu:
-        return loc.t('menu');
-      case HomeButtonAction.ttk:
-        return loc.t('tech_cards');
-      case HomeButtonAction.checklists:
-        return loc.t('checklists');
-      case HomeButtonAction.nomenclature:
-        return loc.t('nomenclature');
-      case HomeButtonAction.inventory:
-        return loc.t('inventory_blank');
-      case HomeButtonAction.expenses:
-        return loc.t('expenses');
-    }
   }
 
   int _indexForLocation(
