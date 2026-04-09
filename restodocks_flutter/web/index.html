@@ -277,8 +277,8 @@
         warmup = setInterval(function () {
           t += 1;
           nudge();
-          if (t > 40) clearInterval(warmup);
-        }, 120);
+          if (t > 80) clearInterval(warmup);
+        }, 90);
       }
       window.addEventListener('flutter-first-frame', function () {
         startWarmup();
@@ -289,6 +289,9 @@
       window.addEventListener('pageshow', startWarmup);
       window.addEventListener('focus', startWarmup);
       document.addEventListener('touchstart', function () {
+        nudge();
+      }, { passive: true });
+      document.addEventListener('touchmove', function () {
         nudge();
       }, { passive: true });
       window.addEventListener('orientationchange', function () {

@@ -228,10 +228,7 @@ class _AppShellState extends State<AppShell> {
                 child: ClipRect(
                   child: Align(
                     alignment: Alignment.topCenter,
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: bottomBar,
-                    ),
+                    child: bottomBar,
                   ),
                 ),
               ),
