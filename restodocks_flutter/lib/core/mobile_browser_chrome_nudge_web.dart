@@ -78,3 +78,22 @@ void mobileBrowserChromeNudgeOnLandscapeIfPhone() {
     step(0);
   } catch (_) {}
 }
+
+/// Прокрутка документа (Safari/Chrome сворачивают адресную строку при движении страницы).
+void mobileBrowserChromeScrollDocumentBy(double deltaY) {
+  if (deltaY == 0) return;
+  try {
+    final w = html.window;
+    if (!_targetMobileBrowser(w)) return;
+
+    final doc = html.document.documentElement;
+    final sh = (doc?.scrollHeight ?? 0).toDouble();
+    final vh = (w.innerHeight ?? 0).toDouble();
+    if (sh <= vh + 4) return;
+
+    final maxY = (sh - vh).clamp(0.0, double.infinity);
+    final y = w.scrollY.toDouble();
+    final ny = (y + deltaY).clamp(0.0, maxY);
+    w.scrollTo(0, ny);
+  } catch (_) {}
+}

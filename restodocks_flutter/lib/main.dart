@@ -439,7 +439,9 @@ class RestodocksApp extends StatelessWidget {
                         theme.colorScheme.primary;
                     final middleBg = theme.colorScheme.surface;
                     final bottomBg = theme.navigationBarTheme.backgroundColor ??
-                        theme.colorScheme.surfaceContainerHighest;
+                        (theme.brightness == Brightness.dark
+                            ? AppTheme.navigationBarBackgroundDark
+                            : AppTheme.navigationBarBackgroundLight);
                     content = Stack(
                       fit: StackFit.expand,
                       children: [
@@ -452,7 +454,7 @@ class RestodocksApp extends StatelessWidget {
                             Expanded(child: ColoredBox(color: middleBg)),
                             ColoredBox(
                               color: bottomBg,
-                              child: const SizedBox(height: 66),
+                              child: const SizedBox(height: 80),
                             ),
                           ],
                         ),

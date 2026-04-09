@@ -6,6 +6,18 @@ class AppTheme {
   static const Color primaryColor = Color(0xFFAD292C);
   static const Color accentColor = Color(0xFFAD292C);
   static const Color secondaryColor = Color(0xFF4CAF50);
+  /// Нижняя панель: непрозрачный фон (как у scaffold / классической шапки), без M3 surface tint.
+  static const Color navigationBarBackgroundLight = Color(0xFFFAFAFA);
+  static const Color navigationBarBackgroundDark = Color(0xFF1E1E1E);
+
+  static final ColorScheme _lightColorScheme = ColorScheme.fromSeed(
+    seedColor: primaryColor,
+    brightness: Brightness.light,
+  );
+  static final ColorScheme _darkColorScheme = ColorScheme.fromSeed(
+    seedColor: primaryColor,
+    brightness: Brightness.dark,
+  );
 
   // Стандартный iOS-переход: push — слайд справа, pop — слайд влево.
   // Используется на всех платформах для консистентности.
@@ -23,10 +35,7 @@ class AppTheme {
   // Светлая тема (те же цвета бренда, что и тёмная)
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: primaryColor,
-      brightness: Brightness.light,
-    ),
+    colorScheme: _lightColorScheme,
     primaryColor: primaryColor,
     scaffoldBackgroundColor: const Color(0xFFFAFAFA),
     pageTransitionsTheme: _transitions,
@@ -143,9 +152,10 @@ class AppTheme {
           (_) => primaryColor.withValues(alpha: 0.2)),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: const Color(0xFFFAFAFA),
+      height: 80,
+      backgroundColor: navigationBarBackgroundLight,
       indicatorColor: primaryColor.withValues(alpha: 0.16),
-      shadowColor: Colors.black12,
+      shadowColor: Colors.transparent,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       labelTextStyle: WidgetStateProperty.resolveWith(
@@ -174,10 +184,7 @@ class AppTheme {
   // Темная тема
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: primaryColor,
-      brightness: Brightness.dark,
-    ),
+    colorScheme: _darkColorScheme,
     primaryColor: primaryColor,
     scaffoldBackgroundColor: const Color(0xFF121212),
     pageTransitionsTheme: _transitions,
@@ -293,9 +300,10 @@ class AppTheme {
       trackOutlineColor: WidgetStateProperty.resolveWith((_) => Colors.white24),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: const Color(0xFF1E1E1E),
+      height: 80,
+      backgroundColor: navigationBarBackgroundDark,
       indicatorColor: primaryColor.withValues(alpha: 0.22),
-      shadowColor: Colors.black45,
+      shadowColor: Colors.transparent,
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       labelTextStyle: WidgetStateProperty.resolveWith(
@@ -324,10 +332,7 @@ class AppTheme {
   // Классическая тема без glass-эффектов (web, Windows/Linux desktop, Android).
   static ThemeData classicLightTheme = ThemeData(
     useMaterial3: true,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: primaryColor,
-      brightness: Brightness.light,
-    ),
+    colorScheme: _lightColorScheme,
     primaryColor: primaryColor,
     scaffoldBackgroundColor: const Color(0xFFFAFAFA),
     pageTransitionsTheme: _transitions,
@@ -392,7 +397,11 @@ class AppTheme {
       unselectedLabelColor: primaryColor,
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: const Color(0xFFFAFAFA),
+      height: 80,
+      backgroundColor: navigationBarBackgroundLight,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shadowColor: Colors.transparent,
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
           fontSize: 12,
@@ -425,10 +434,7 @@ class AppTheme {
 
   static ThemeData classicDarkTheme = ThemeData(
     useMaterial3: true,
-    colorScheme: ColorScheme.fromSeed(
-      seedColor: primaryColor,
-      brightness: Brightness.dark,
-    ),
+    colorScheme: _darkColorScheme,
     primaryColor: primaryColor,
     scaffoldBackgroundColor: const Color(0xFF121212),
     pageTransitionsTheme: _transitions,
@@ -493,7 +499,11 @@ class AppTheme {
       unselectedLabelColor: primaryColor,
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: const Color(0xFF1E1E1E),
+      height: 80,
+      backgroundColor: navigationBarBackgroundDark,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shadowColor: Colors.transparent,
       labelTextStyle: WidgetStateProperty.resolveWith(
         (states) => TextStyle(
           fontSize: 12,

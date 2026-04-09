@@ -6,6 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/mobile_browser_chrome_nudge_stub.dart'
+    if (dart.library.html) '../core/mobile_browser_chrome_nudge_web.dart'
+    as browser_chrome_doc;
+import '../core/theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/localization_service.dart';
 import '../services/account_manager_supabase.dart';
@@ -44,7 +48,8 @@ class _AppShellState extends State<AppShell> {
   double _lastScrollPixels = 0;
   String? _lastPath;
 
-  static const _navBarHeight = 68.0;
+  /// Совпадает с NavigationBarTheme.height (M3 — 80): меньше даёт сжатый слот и «прилипание» иконок к верху.
+  static const _navBarHeight = 80.0;
 
   bool _landscapeNarrowPhone(BuildContext context) {
     final mq = MediaQuery.of(context);
@@ -122,41 +127,132 @@ class _AppShellState extends State<AppShell> {
     final showAccessPendingStub = noDataAccess && isDataRequiredRoute;
 
     final tourController = context.watch<PageTourService>().homeTourController;
-    final navBar = NavigationBarTheme(
-      data: NavigationBarThemeData(
-        height: _navBarHeight,
-        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
-        backgroundColor: Theme.of(context).navigationBarTheme.backgroundColor,
-      ),
-      child: NavigationBar(
-        selectedIndex: selectedIndex,
-        onDestinationSelected: (i) {
-          setState(() => _hideBottomBar = false);
-          _onTap(context, i, middleAction, noDataAccess, isKitchenNoData,
-              currentEmployee, selectedIndex);
-        },
-        destinations: [
-          NavigationDestination(
-            icon: const Icon(Icons.home_outlined),
-            selectedIcon: const Icon(Icons.home),
-            label: loc.t('home'),
-          ),
-          NavigationDestination(
-            icon: Icon(noDataAccess
-                ? Icons.calendar_month_outlined
-                : middleAction.iconOutlined),
-            selectedIcon:
-                Icon(noDataAccess ? Icons.calendar_month : middleAction.icon),
-            label: middleLabel,
-          ),
-          NavigationDestination(
-            icon: const Icon(Icons.person_outline),
-            selectedIcon: const Icon(Icons.person),
-            label: loc.t('personal_cabinet'),
-          ),
-        ],
-      ),
-    );
+    final theme = Theme.of(context);
+    final navBg = theme.navigationBarTheme.backgroundColor ??
+        (theme.brightness == Brightness.dark
+            ? AppTheme.navigationBarBackgroundDark
+            : AppTheme.navigationBarBackgroundLight);
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+
+    /// M3 NavigationBar с скрытыми подписями на iOS часто визуально прижимает иконки к верху слота.
+    /// На нативе — явный Row + Center по вертикали; на web оставляем NavigationBar.
+    final Widget navBar = kIsWeb
+        ? NavigationBarTheme(
+            data: NavigationBarThemeData(
+              height: _navBarHeight,
+              labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+              backgroundColor: navBg,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              shadowColor: Colors.transparent,
+            ),
+            child: NavigationBar(
+              backgroundColor: navBg,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              shadowColor: Colors.transparent,
+              selectedIndex: selectedIndex,
+              onDestinationSelected: (i) {
+                setState(() => _hideBottomBar = false);
+                _onTap(context, i, middleAction, noDataAccess, isKitchenNoData,
+                    currentEmployee, selectedIndex);
+              },
+              destinations: [
+                NavigationDestination(
+                  icon: const Icon(Icons.home_outlined),
+                  selectedIcon: const Icon(Icons.home),
+                  label: loc.t('home'),
+                ),
+                NavigationDestination(
+                  icon: Icon(noDataAccess
+                      ? Icons.calendar_month_outlined
+                      : middleAction.iconOutlined),
+                  selectedIcon: Icon(
+                      noDataAccess ? Icons.calendar_month : middleAction.icon),
+                  label: middleLabel,
+                ),
+                NavigationDestination(
+                  icon: const Icon(Icons.person_outline),
+                  selectedIcon: const Icon(Icons.person),
+                  label: loc.t('personal_cabinet'),
+                ),
+              ],
+            ),
+          )
+        : Material(
+            color: navBg,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: _navBarHeight,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      _NativeNavIconSlot(
+                        selected: selectedIndex == 0,
+                        outlined: Icons.home_outlined,
+                        filled: Icons.home,
+                        onTap: () {
+                          setState(() => _hideBottomBar = false);
+                          _onTap(
+                              context,
+                              0,
+                              middleAction,
+                              noDataAccess,
+                              isKitchenNoData,
+                              currentEmployee,
+                              selectedIndex);
+                        },
+                      ),
+                      _NativeNavIconSlot(
+                        selected: selectedIndex == 1,
+                        outlined: noDataAccess
+                            ? Icons.calendar_month_outlined
+                            : middleAction.iconOutlined,
+                        filled: noDataAccess
+                            ? Icons.calendar_month
+                            : middleAction.icon,
+                        onTap: () {
+                          setState(() => _hideBottomBar = false);
+                          _onTap(
+                              context,
+                              1,
+                              middleAction,
+                              noDataAccess,
+                              isKitchenNoData,
+                              currentEmployee,
+                              selectedIndex);
+                        },
+                      ),
+                      _NativeNavIconSlot(
+                        selected: selectedIndex == 2,
+                        outlined: Icons.person_outline,
+                        filled: Icons.person,
+                        onTap: () {
+                          setState(() => _hideBottomBar = false);
+                          _onTap(
+                              context,
+                              2,
+                              middleAction,
+                              noDataAccess,
+                              isKitchenNoData,
+                              currentEmployee,
+                              selectedIndex);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                if (bottomInset > 0)
+                  ColoredBox(
+                    color: navBg,
+                    child: SizedBox(
+                        height: bottomInset, width: double.infinity),
+                  ),
+              ],
+            ),
+          );
 
     final bottomBar = tourController != null
         ? Stack(
@@ -197,6 +293,8 @@ class _AppShellState extends State<AppShell> {
     final landscapeWeb =
         kIsWeb && MediaQuery.of(context).orientation == Orientation.landscape;
     final hideNav = landscapeNarrow && _hideBottomBar;
+    final bottomBarTotalHeight =
+        kIsWeb ? _navBarHeight : _navBarHeight + bottomInset;
 
     final bodyChild = showAccessPendingStub
         ? _AccessPendingPlaceholder(loc: loc)
@@ -219,7 +317,7 @@ class _AppShellState extends State<AppShell> {
     return MediaQuery(
       data: patchedMq,
       child: Scaffold(
-        extendBody: false,
+        extendBody: true,
         backgroundColor: Theme.of(context).colorScheme.surface,
         body: NotificationListener<ScrollNotification>(
           onNotification: _onScroll,
@@ -230,14 +328,20 @@ class _AppShellState extends State<AppShell> {
             : AnimatedContainer(
                 duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutCubic,
-                height: _navBarHeight,
-                color: Theme.of(context).navigationBarTheme.backgroundColor ??
-                    Theme.of(context).colorScheme.surfaceContainerHighest,
-                child: ClipRect(
-                  child: Center(
-                    child: bottomBar,
-                  ),
-                ),
+                height: bottomBarTotalHeight,
+                color: navBg,
+                child: landscapeNarrow && kIsWeb
+                    ? Listener(
+                        behavior: HitTestBehavior.translucent,
+                        onPointerMove: (e) {
+                          // Жест вверх по нижней панели — двигаем document (Safari/Chrome сворачивают UI).
+                          if (e.delta.dy >= -0.25) return;
+                          browser_chrome_doc
+                              .mobileBrowserChromeScrollDocumentBy(-e.delta.dy);
+                        },
+                        child: bottomBar,
+                      )
+                    : bottomBar,
               ),
       ),
     );
@@ -338,6 +442,43 @@ class _AppShellState extends State<AppShell> {
       default:
         context.go('/home', extra: extra);
     }
+  }
+}
+
+/// Одна кнопка нижней навигации на iOS/Android: иконка строго по центру по вертикали в слоте.
+class _NativeNavIconSlot extends StatelessWidget {
+  const _NativeNavIconSlot({
+    required this.selected,
+    required this.outlined,
+    required this.filled,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final IconData outlined;
+  final IconData filled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final inactive = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox.expand(
+            child: Center(
+              child: Icon(
+                selected ? filled : outlined,
+                size: 24,
+                color: selected ? AppTheme.primaryColor : inactive,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
