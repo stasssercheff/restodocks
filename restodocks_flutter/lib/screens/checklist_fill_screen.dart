@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 import '../utils/checklist_reminder_summary.dart';
+import '../utils/layout_breakpoints.dart';
 import '../utils/employee_display_utils.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
@@ -504,7 +505,8 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
   }
 
   Widget _buildTableHeader(LocalizationService loc, ChecklistActionConfig cfg) {
-    final statusWidth = MediaQuery.of(context).size.width < 600 ? 160.0 : 220.0;
+    final statusWidth =
+        isHandheldNarrowLayout(context) ? 160.0 : 220.0;
     final children = <Widget>[
       SizedBox(width: 28, child: Text(loc.t('checklist_number'), style: Theme.of(context).textTheme.labelLarge)),
       Expanded(child: Text(loc.t('checklist_name'), style: Theme.of(context).textTheme.labelLarge)),
@@ -542,7 +544,8 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
   }
 
   Widget _buildRow(LocalizationService loc, Checklist checklist, ChecklistActionConfig cfg, int i) {
-    final statusWidth = MediaQuery.of(context).size.width < 600 ? 160.0 : 220.0;
+    final statusWidth =
+        isHandheldNarrowLayout(context) ? 160.0 : 220.0;
     final it = checklist.items[i];
     final done = i < _done.length ? _done[i] : false;
     final numVal = i < _numericValues.length ? _numericValues[i] ?? '' : '';

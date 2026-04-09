@@ -1,21 +1,38 @@
 import 'dart:async';
 
 import 'package:feature_spotlight/feature_spotlight.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../core/mobile_browser_chrome_nudge_stub.dart'
+    if (dart.library.html) '../core/mobile_browser_chrome_nudge_web.dart'
+    as browser_chrome_doc;
+import '../core/pwa_fullscreen_hint_gate_stub.dart'
+    if (dart.library.html) '../core/pwa_fullscreen_hint_gate_web.dart'
+    as pwa_hint_gate;
+import '../core/theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/localization_service.dart';
 import '../services/account_manager_supabase.dart';
 import '../services/home_button_config_service.dart';
 import '../services/page_tour_service.dart';
 import 'subscription_required_dialog.dart';
+import '../utils/layout_breakpoints.dart';
 
 const _kDataAccessRequiredPaths = [
-  '/tech-cards', '/nomenclature', '/inventory', '/checklists',
-  '/product-order', '/menu', '/suppliers', '/order-lists',
-  '/expenses', '/haccp-journals', '/inbox',
+  '/tech-cards',
+  '/nomenclature',
+  '/inventory',
+  '/checklists',
+  '/product-order',
+  '/menu',
+  '/suppliers',
+  '/order-lists',
+  '/expenses',
+  '/haccp-journals',
+  '/inbox',
 ];
 
 /// Оболочка с нижней навигацией для всех рабочих экранов (кроме инвентаризации).
@@ -33,13 +50,19 @@ class _AppShellState extends State<AppShell> {
   bool _hideBottomBar = false;
   double _lastScrollPixels = 0;
   String? _lastPath;
-
-  static const _navBarHeight = 56.0;
+  bool _pwaHintQueued = false;
 
   bool _landscapeNarrowPhone(BuildContext context) {
     final mq = MediaQuery.of(context);
     return mq.orientation == Orientation.landscape &&
         mq.size.shortestSide < 600;
+  }
+
+  double _effectiveNavBarHeight(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final landscape = mq.orientation == Orientation.landscape;
+    final factor = landscape ? 0.70 : 0.80;
+    return AppTheme.navigationBarHeight * factor;
   }
 
   @override
@@ -53,6 +76,41 @@ class _AppShellState extends State<AppShell> {
         setState(() => _hideBottomBar = false);
       }
     }
+    _queuePwaHintIfNeeded();
+  }
+
+  void _queuePwaHintIfNeeded() {
+    if (_pwaHintQueued || !kIsWeb) return;
+    final employee = context.read<AccountManagerSupabase>().currentEmployee;
+    if (employee == null) return;
+    if (!pwa_hint_gate.shouldShowPwaFullscreenHintAfterLogin()) return;
+    _pwaHintQueued = true;
+    Future<void>.delayed(const Duration(milliseconds: 550), () {
+      if (!mounted) return;
+      _showPwaFullscreenHintDialog();
+    });
+  }
+
+  Future<void> _showPwaFullscreenHintDialog() async {
+    final loc = context.read<LocalizationService>();
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('pwa_fullscreen_hint_title')),
+        content: Text(loc.t('pwa_fullscreen_hint_body')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('ok')),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    pwa_hint_gate.markPwaFullscreenHintDismissed();
   }
 
   bool _onScroll(ScrollNotification n) {
@@ -97,49 +155,111 @@ class _AppShellState extends State<AppShell> {
     final middleAction = homeBtnConfig.effectiveAction(currentEmployee,
         hasProSubscription: accountManager.hasProSubscription);
     final noDataAccess = !isOwner && !currentEmployee.effectiveDataAccess;
-    final isKitchenNoData = noDataAccess && currentEmployee.department == 'kitchen';
-    final middleLabel = noDataAccess
-        ? (isKitchenNoData ? loc.t('schedule') : loc.t('personal_schedule'))
-        : _labelForAction(loc, middleAction, currentEmployee);
-
+    final isKitchenNoData =
+        noDataAccess && currentEmployee.department == 'kitchen';
     final location = GoRouterState.of(context).matchedLocation;
-    final selectedIndex = _indexForLocation(location, middleAction, noDataAccess, isKitchenNoData, currentEmployee);
+    final selectedIndex = _indexForLocation(
+        location, middleAction, noDataAccess, isKitchenNoData, currentEmployee);
 
     final isDataRequiredRoute =
         _kDataAccessRequiredPaths.any((p) => location.startsWith(p));
     final showAccessPendingStub = noDataAccess && isDataRequiredRoute;
 
     final tourController = context.watch<PageTourService>().homeTourController;
-    final navBar = NavigationBarTheme(
-        data: const NavigationBarThemeData(
-          height: _navBarHeight,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
-        ),
-        child: NavigationBar(
-          selectedIndex: selectedIndex,
-          onDestinationSelected: (i) {
-            setState(() => _hideBottomBar = false);
-            _onTap(context, i, middleAction, noDataAccess, isKitchenNoData, currentEmployee, selectedIndex);
-          },
-          destinations: [
-            NavigationDestination(
-              icon: const Icon(Icons.home_outlined),
-              selectedIcon: const Icon(Icons.home),
-              label: loc.t('home'),
+    final theme = Theme.of(context);
+    final navBase = theme.navigationBarTheme.backgroundColor ??
+        (theme.brightness == Brightness.dark
+            ? AppTheme.navigationBarBackgroundDark
+            : AppTheme.navigationBarBackgroundLight);
+    final navBg = Color.alphaBlend(
+      theme.colorScheme.primary.withValues(alpha: 0.06),
+      navBase,
+    );
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final navBarHeight = _effectiveNavBarHeight(context);
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final navBottomInset = kIsWeb ? 0.0 : (isLandscape ? 0.0 : bottomInset);
+
+    /// Единый кастомный футер на всех платформах:
+    /// иконки строго по центру по вертикали, без лишней «полки» под ними.
+    final Widget navBar = Material(
+      color: navBg,
+      elevation: 8,
+      shadowColor: Colors.black.withValues(alpha: 0.20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            height: 1,
+            color: theme.colorScheme.outline.withValues(alpha: 0.35),
+          ),
+          SizedBox(
+            height: navBarHeight,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                _NativeNavIconSlot(
+                  selected: selectedIndex == 0,
+                  outlined: Icons.home_outlined,
+                  filled: Icons.home,
+                  onTap: () {
+                    setState(() => _hideBottomBar = false);
+                    _onTap(
+                        context,
+                        0,
+                        middleAction,
+                        noDataAccess,
+                        isKitchenNoData,
+                        currentEmployee,
+                        selectedIndex);
+                  },
+                ),
+                _NativeNavIconSlot(
+                  selected: selectedIndex == 1,
+                  outlined: noDataAccess
+                      ? Icons.calendar_month_outlined
+                      : middleAction.iconOutlined,
+                  filled:
+                      noDataAccess ? Icons.calendar_month : middleAction.icon,
+                  onTap: () {
+                    setState(() => _hideBottomBar = false);
+                    _onTap(
+                        context,
+                        1,
+                        middleAction,
+                        noDataAccess,
+                        isKitchenNoData,
+                        currentEmployee,
+                        selectedIndex);
+                  },
+                ),
+                _NativeNavIconSlot(
+                  selected: selectedIndex == 2,
+                  outlined: Icons.person_outline,
+                  filled: Icons.person,
+                  onTap: () {
+                    setState(() => _hideBottomBar = false);
+                    _onTap(
+                        context,
+                        2,
+                        middleAction,
+                        noDataAccess,
+                        isKitchenNoData,
+                        currentEmployee,
+                        selectedIndex);
+                  },
+                ),
+              ],
             ),
-            NavigationDestination(
-              icon: Icon(noDataAccess ? Icons.calendar_month_outlined : middleAction.iconOutlined),
-              selectedIcon: Icon(noDataAccess ? Icons.calendar_month : middleAction.icon),
-              label: middleLabel,
+          ),
+          if (navBottomInset > 0)
+            ColoredBox(
+              color: navBg,
+              child: SizedBox(height: navBottomInset, width: double.infinity),
             ),
-            NavigationDestination(
-              icon: const Icon(Icons.person_outline),
-              selectedIcon: const Icon(Icons.person),
-              label: loc.t('personal_cabinet'),
-            ),
-          ],
-        ),
-      );
+        ],
+      ),
+    );
 
     final bottomBar = tourController != null
         ? Stack(
@@ -177,61 +297,80 @@ class _AppShellState extends State<AppShell> {
         : navBar;
 
     final landscapeNarrow = _landscapeNarrowPhone(context);
-    final hideNav = landscapeNarrow && _hideBottomBar;
+    final landscapeWeb =
+        kIsWeb && MediaQuery.of(context).orientation == Orientation.landscape;
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final hideForKeyboard = landscapeNarrow &&
+        (keyboardOpen ||
+            FocusManager.instance.primaryFocus != null);
+    final hideNav = landscapeNarrow && (_hideBottomBar || hideForKeyboard);
+    final bottomBarTotalHeight = navBarHeight + navBottomInset;
 
-    final bodyChild = showAccessPendingStub ? _AccessPendingPlaceholder(loc: loc) : widget.child;
+    final bodyChild = showAccessPendingStub
+        ? _AccessPendingPlaceholder(loc: loc)
+        : widget.child;
+    final mq = MediaQuery.of(context);
+    // Совпадает с main.dart: веб в альбоме — сброс боков; нативно — только без выреза
+    // (иначе сохраняем горизонтальный safe area под камеру / Dynamic Island).
+    final stripShellHorizontal = landscapeWeb || landscapeNarrow;
+    final patchedMq = stripShellHorizontal
+        ? mq.copyWith(
+            padding: mq.padding.copyWith(left: 0, right: 0, bottom: 0),
+            viewPadding: mq.viewPadding.copyWith(
+              left: 0,
+              right: 0,
+              bottom: keyboardOpen ? mq.viewPadding.bottom : 0,
+            ),
+          )
+        : mq;
 
-    return Scaffold(
-      body: NotificationListener<ScrollNotification>(
-        onNotification: _onScroll,
-        child: bodyChild,
-      ),
-      bottomNavigationBar: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        height: hideNav ? 0 : _navBarHeight,
-        child: ClipRect(
-          child: Align(
-            alignment: Alignment.topCenter,
-            heightFactor: hideNav ? 0 : 1,
-            child: bottomBar,
-          ),
+    // When hidden, omit the slot entirely — a zero-height bar still reserves
+    // theme/shadow and reads as a second strip under the real nav.
+    return MediaQuery(
+      data: patchedMq,
+      child: Scaffold(
+        // Reserve layout space for bottomNavigationBar to avoid overlapping
+        // trailing controls/lists on desktop and web pages.
+        extendBody: false,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        body: NotificationListener<ScrollNotification>(
+          onNotification: _onScroll,
+          child: bodyChild,
         ),
+        bottomNavigationBar: hideNav
+            ? null
+            : AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                height: bottomBarTotalHeight,
+                color: navBg,
+                child: landscapeNarrow && kIsWeb
+                    ? Listener(
+                        behavior: HitTestBehavior.translucent,
+                        onPointerMove: (e) {
+                          // Жест вверх по нижней панели — двигаем document (Safari/Chrome сворачивают UI).
+                          if (e.delta.dy >= -0.25) return;
+                          browser_chrome_doc
+                              .mobileBrowserChromeScrollDocumentBy(-e.delta.dy);
+                        },
+                        child: bottomBar,
+                      )
+                    : bottomBar,
+              ),
       ),
     );
   }
 
-  String _labelForAction(LocalizationService loc, HomeButtonAction action, Employee? employee) {
-    switch (action) {
-      case HomeButtonAction.inbox:
-        return loc.t('inbox');
-      case HomeButtonAction.messages:
-        return loc.t('inbox_tab_messages');
-      case HomeButtonAction.schedule:
-        return loc.t('schedule');
-      case HomeButtonAction.productOrder:
-        return loc.t('product_order');
-      case HomeButtonAction.menu:
-        return loc.t('menu');
-      case HomeButtonAction.ttk:
-        return loc.t('tech_cards');
-      case HomeButtonAction.checklists:
-        return loc.t('checklists');
-      case HomeButtonAction.nomenclature:
-        return loc.t('nomenclature');
-      case HomeButtonAction.inventory:
-        return loc.t('inventory_blank');
-      case HomeButtonAction.expenses:
-        return loc.t('expenses');
-    }
-  }
-
-  int _indexForLocation(String location, HomeButtonAction action, bool noDataAccess, [bool isKitchenNoData = false, Employee? employee]) {
+  int _indexForLocation(
+      String location, HomeButtonAction action, bool noDataAccess,
+      [bool isKitchenNoData = false, Employee? employee]) {
     if (location == '/home' || location == '/') return 0;
     if (location.startsWith('/personal-cabinet') ||
         location.startsWith('/profile') ||
         location.startsWith('/settings') ||
-        location.startsWith('/establishments')) return 2;
+        location.startsWith('/establishments')) {
+      return 2;
+    }
 
     final middleRoute = noDataAccess ? '/schedule' : action.routeFor(employee);
     if (location.startsWith(middleRoute)) return 1;
@@ -253,14 +392,22 @@ class _AppShellState extends State<AppShell> {
     return 0;
   }
 
-  void _onTap(BuildContext context, int index, HomeButtonAction action, bool noDataAccess, bool isKitchenNoData, Employee? employee, int currentIndex) {
-
+  void _onTap(
+      BuildContext context,
+      int index,
+      HomeButtonAction action,
+      bool noDataAccess,
+      bool isKitchenNoData,
+      Employee? employee,
+      int currentIndex) {
     // Если переходим на вкладку с меньшим индексом — анимируем как «назад» (вправо)
     final isBackward = index < currentIndex;
     final extra = isBackward ? {'back': true} : null;
 
     String middleRoute = action.routeFor(employee);
-    if (!noDataAccess && action == HomeButtonAction.inbox && (employee?.hasInboxDocuments ?? true) == false) {
+    if (!noDataAccess &&
+        action == HomeButtonAction.inbox &&
+        (employee?.hasInboxDocuments ?? true) == false) {
       middleRoute = '/notifications?tab=messages';
     } else if (noDataAccess) {
       middleRoute = isKitchenNoData ? '/schedule' : '/schedule?personal=1';
@@ -288,6 +435,43 @@ class _AppShellState extends State<AppShell> {
   }
 }
 
+/// Одна кнопка нижней навигации на iOS/Android: иконка строго по центру по вертикали в слоте.
+class _NativeNavIconSlot extends StatelessWidget {
+  const _NativeNavIconSlot({
+    required this.selected,
+    required this.outlined,
+    required this.filled,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final IconData outlined;
+  final IconData filled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final inactive = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox.expand(
+            child: Center(
+              child: Icon(
+                selected ? filled : outlined,
+                size: 24,
+                color: selected ? AppTheme.primaryColor : inactive,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _AccessPendingPlaceholder extends StatelessWidget {
   const _AccessPendingPlaceholder({required this.loc});
 
@@ -304,23 +488,24 @@ class _AccessPendingPlaceholder extends StatelessWidget {
             Icon(
               Icons.hourglass_empty_rounded,
               size: 72,
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
+              color:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
             ),
             const SizedBox(height: 24),
             Text(
               loc.t('account_awaiting_confirmation'),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
             const SizedBox(height: 12),
             Text(
               loc.t('account_awaiting_confirmation_subtitle'),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
           ],
         ),

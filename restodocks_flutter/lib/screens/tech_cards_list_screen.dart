@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:excel/excel.dart' hide Border;
 
+import '../utils/layout_breakpoints.dart';
 import '../utils/number_format_utils.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -249,11 +250,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   bool _reviewCacheScheduled = false;
   int _listVersion = 0;
   Timer? _searchDebounceTimer;
+
   /// Применённый к фильтрам запрос (после debounce), чтобы не пересчитывать список на каждый символ.
   String _appliedSearchQuery = '';
+
   /// Кэш `id → lower(name)` для быстрого поиска без повторных вызовов `getDisplayNameInLists` на каждый кадр.
   ({int listVersion, String lang})? _lowerSearchNameKey;
   Map<String, String> _lowerSearchNameById = {};
+
   /// Версия списка, для которой построен индекс ПФ для «На проверку» (не перестраивать при смене только поиска).
   int _pfIndexBuiltForListVersion = -1;
   Timer? _reconcileTimer;
@@ -307,6 +311,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     LocalizationService().addListener(_localizationPrefetchListener);
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowTtkTour());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Не стартуем тяжёлую загрузку в середине свайп-перехода со стартового экрана.
+      await Future<void>.delayed(const Duration(milliseconds: 320));
+      if (!mounted) return;
       await _load();
       if (!mounted) return;
       _reconcileNotifier = context.read<TechCardsReconcileNotifier>();
@@ -993,9 +1000,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     var result = _list;
     if (query.isNotEmpty) {
       final names = _lowerSearchNameById;
-      result = result
-          .where((tc) => (names[tc.id] ?? '').contains(query))
-          .toList();
+      result =
+          result.where((tc) => (names[tc.id] ?? '').contains(query)).toList();
     }
     if (_filterSection != null) {
       result = result
@@ -1690,8 +1696,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                 ? null
                                 : () async {
                                     Navigator.of(ctx2).pop();
-                                    final needRefresh = await context
-                                        .push<bool>('/tech-cards/${tc.id}');
+                                    final needRefresh =
+                                        await context.push<bool>(
+                                      '/tech-cards/${tc.id}',
+                                      extra: {'initialTechCard': tc},
+                                    );
                                     if (mounted && needRefresh == true)
                                       _load(showLoading: false);
                                   },
@@ -2166,12 +2175,20 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       late Future<List<TechCard>> allCardsFuture;
       if (est.isBranch) {
         allCardsFuture = Future.wait([
-          svc.getTechCardsForEstablishment(est.dataEstablishmentId),
-          svc.getTechCardsForEstablishment(est.id),
+          svc.getTechCardsForEstablishment(
+            est.dataEstablishmentId,
+            includeIngredients: false,
+          ),
+          svc.getTechCardsForEstablishment(
+            est.id,
+            includeIngredients: false,
+          ),
         ]).then((results) => [...results[0], ...results[1]]);
       } else {
-        allCardsFuture =
-            svc.getTechCardsForEstablishment(est.dataEstablishmentId);
+        allCardsFuture = svc.getTechCardsForEstablishment(
+          est.dataEstablishmentId,
+          includeIngredients: false,
+        );
       }
       final customCategoriesFuture = Future.wait([
         svc.getCustomCategories(est.dataEstablishmentId, 'kitchen'),
@@ -3335,7 +3352,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 ? loc
                     .t('ttk_select_count')
                     .replaceFirst('%s', '${_selectedTechCards.length}')
-                : loc.t('tech_cards'),
+                : 'ТТК',
           ),
         ),
         actions: _buildAppBarActions(
@@ -3735,7 +3752,35 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   }
 
   Widget _buildBody(LocalizationService loc, bool canEdit, bool showCost) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_loading) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LinearProgressIndicator(
+            minHeight: 3,
+            backgroundColor:
+                Theme.of(context).colorScheme.surfaceContainerHighest,
+          ),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(
+                    loc.t('loading'),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
     if (_error != null) {
       final errorText =
           _error == 'no_establishment' ? loc.t('no_establishment') : _error!;
@@ -3806,9 +3851,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     List<TechCard> filterBySearch(List<TechCard> list) {
       if (query.isEmpty) return list;
       final names = _lowerSearchNameById;
-      return list
-          .where((tc) => (names[tc.id] ?? '').contains(query))
-          .toList();
+      return list.where((tc) => (names[tc.id] ?? '').contains(query)).toList();
     }
 
     List<TechCard> filterBySectionAndCategory(List<TechCard> list) {
@@ -3859,74 +3902,80 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       });
     }
 
-    return Column(
+    final narrowLandscape = isHandheldNarrowLayout(context) &&
+        MediaQuery.orientationOf(context) == Orientation.landscape;
+
+    final tabBarView = TabBarView(
+      controller: _tabController,
       children: [
-        if (showBranchFilter)
-          FutureBuilder<List<Establishment>>(
-            future: acc.getBranchesForEstablishment(acc.establishment!.id),
-            builder: (ctx, snap) {
-              if (!snap.hasData || snap.data!.isEmpty)
-                return const SizedBox.shrink();
-              final branches = snap.data!;
-              return Consumer<TtkBranchFilterService>(
-                builder: (_, branchFilter, __) {
-                  final selId = branchFilter.selectedBranchId;
-                  final label = selId == null
-                      ? loc.t('main_establishment_short')
-                      : branches
-                              .where((b) => b.id == selId)
-                              .map((b) => b.name)
-                              .firstOrNull ??
-                          selId;
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                    child: Row(
-                      children: [
-                        FilterChip(
-                          avatar: const Icon(Icons.account_tree, size: 18),
-                          label: Text(label),
-                          selected: selId != null,
-                          onSelected: (_) => _showTtkBranchFilterPicker(
-                              context, loc, acc, branches),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        // Шапка: цех (подразделение) над вкладками ТТК/ПФ
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: _ttkTourController != null
-              ? SpotlightTarget(
-                  id: 'ttk-subdivision',
-                  controller: _ttkTourController!,
+        _buildTechCardsTable(
+          semiFinishedFiltered,
+          loc,
+          canEdit,
+          showCost,
+          isDishesTab: false,
+          hasActiveFilters: _appliedSearchQuery.isNotEmpty ||
+              _filterSection != null ||
+              _filterCategory != null,
+        ),
+        _buildTechCardsTable(
+          dishFiltered,
+          loc,
+          canEdit,
+          showCost,
+          isDishesTab: true,
+          hasActiveFilters: _appliedSearchQuery.isNotEmpty ||
+              _filterSection != null ||
+              _filterCategory != null,
+        ),
+        _buildReviewList(loc, canEdit),
+      ],
+    );
+
+    final chromeChildren = <Widget>[
+      if (showBranchFilter)
+        FutureBuilder<List<Establishment>>(
+          future: acc.getBranchesForEstablishment(acc.establishment!.id),
+          builder: (ctx, snap) {
+            if (!snap.hasData || snap.data!.isEmpty)
+              return const SizedBox.shrink();
+            final branches = snap.data!;
+            return Consumer<TtkBranchFilterService>(
+              builder: (_, branchFilter, __) {
+                final selId = branchFilter.selectedBranchId;
+                final label = selId == null
+                    ? loc.t('main_establishment_short')
+                    : branches
+                            .where((b) => b.id == selId)
+                            .map((b) => b.name)
+                            .firstOrNull ??
+                        selId;
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
                   child: Row(
                     children: [
-                      Icon(Icons.business,
-                          size: 20,
-                          color: Theme.of(context).colorScheme.primary),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '${loc.t('ttk_section')}: ${_departmentHeaderLabel(loc)}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleSmall
-                              ?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: Theme.of(context).colorScheme.onSurface,
-                              ),
-                        ),
+                      FilterChip(
+                        avatar: const Icon(Icons.account_tree, size: 18),
+                        label: Text(label),
+                        selected: selId != null,
+                        onSelected: (_) => _showTtkBranchFilterPicker(
+                            context, loc, acc, branches),
                       ),
                     ],
                   ),
-                )
-              : Row(
+                );
+              },
+            );
+          },
+        ),
+      // Шапка: цех (подразделение) над вкладками ТТК/ПФ
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: _ttkTourController != null
+            ? SpotlightTarget(
+                id: 'ttk-subdivision',
+                controller: _ttkTourController!,
+                child: Row(
                   children: [
                     Icon(Icons.business,
                         size: 20, color: Theme.of(context).colorScheme.primary),
@@ -3944,168 +3993,187 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     ),
                   ],
                 ),
-        ),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          clipBehavior: Clip.antiAlias,
-          child: TabBar(
-            controller: _tabController,
-            isScrollable: false,
-            tabAlignment: TabAlignment.center,
-            labelPadding: EdgeInsets.zero,
-            dividerColor: Colors.transparent,
-            overlayColor: WidgetStateProperty.all(Colors.transparent),
-            splashFactory: NoSplash.splashFactory,
-            indicator: const BoxDecoration(),
-            labelColor: Theme.of(context).colorScheme.primary,
-            unselectedLabelColor: Theme.of(context).colorScheme.primary,
-            onTap: (_) => _tabWasTouched = true,
-            tabs: _buildTabBarTabs(
-              loc,
-              reviewCount,
-              selectedIndex: _tabController.index,
-            ),
-          ),
-        ),
-        if (_listDetailsHydrating)
-          LinearProgressIndicator(
-            minHeight: 2,
-            backgroundColor:
-                Theme.of(context).colorScheme.surfaceContainerHighest,
-          ),
-        // Поиск и сортировка
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ListenableBuilder(
-                listenable: _searchController,
-                builder: (context, _) {
-                  return TextField(
-                    controller: _searchController,
-                    focusNode: _searchFocusNode,
-                    decoration: InputDecoration(
-                      hintText: loc.t('ttk_search_hint'),
-                      isDense: true,
-                      prefixIcon: const Icon(Icons.search, size: 20),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, size: 20),
-                              onPressed: () {
-                                _searchDebounceTimer?.cancel();
-                                _searchController.clear();
-                                setState(() {
-                                  _appliedSearchQuery = '';
-                                });
-                              },
-                            )
-                          : null,
-                      border: const OutlineInputBorder(),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 10),
-                    ),
-                    onChanged: (_) {
-                      _searchDebounceTimer?.cancel();
-                      _searchDebounceTimer = Timer(
-                        const Duration(milliseconds: 320),
-                        () {
-                          if (!mounted) return;
-                          final q =
-                              _searchController.text.trim().toLowerCase();
-                          if (q == _appliedSearchQuery) return;
-                          setState(() {
-                            _appliedSearchQuery = q;
-                          });
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-              Row(
+              )
+            : Row(
                 children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      value: _filterSection,
-                      decoration: InputDecoration(
-                        labelText: loc.t('ttk_section_label'),
-                        isDense: true,
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 8),
-                      ),
-                      items: [
-                        DropdownMenuItem(
-                            value: null, child: Text(loc.t('all') ?? 'Все')),
-                        ..._sectionOrder
-                            .where((s) => s != 'hidden' && s != 'all')
-                            .map((s) => DropdownMenuItem(
-                                  value: s,
-                                  child: Text(_sectionCodeToLabel(s, loc)),
-                                )),
-                      ],
-                      onChanged: (v) => setState(() => _filterSection = v),
-                    ),
-                  ),
+                  Icon(Icons.business,
+                      size: 20, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: DropdownButtonFormField<String>(
-                      isExpanded: true,
-                      value: _filterCategory,
-                      decoration: InputDecoration(
-                        labelText: loc.t('column_category'),
-                        isDense: true,
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 8),
-                      ),
-                      items: [
-                        DropdownMenuItem(
-                            value: null, child: Text(loc.t('all') ?? 'Все')),
-                        ...filterCatOrder.map((c) => DropdownMenuItem(
-                              value: c,
-                              child: Text(_categoryLabel(c, loc)),
-                            )),
-                      ],
-                      onChanged: (v) => setState(() => _filterCategory = v),
+                    child: Text(
+                      '${loc.t('ttk_section')}: ${_departmentHeaderLabel(loc)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(context).colorScheme.onSurface,
+                          ),
                     ),
                   ),
                 ],
               ),
-            ],
+      ),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: TabBar(
+          controller: _tabController,
+          isScrollable: false,
+          tabAlignment: TabAlignment.center,
+          labelPadding: EdgeInsets.zero,
+          dividerColor: Colors.transparent,
+          overlayColor: WidgetStateProperty.all(Colors.transparent),
+          splashFactory: NoSplash.splashFactory,
+          indicator: const BoxDecoration(),
+          labelColor: Theme.of(context).colorScheme.primary,
+          unselectedLabelColor: Theme.of(context).colorScheme.primary,
+          onTap: (_) => _tabWasTouched = true,
+          tabs: _buildTabBarTabs(
+            loc,
+            reviewCount,
+            selectedIndex: _tabController.index,
           ),
         ),
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _buildTechCardsTable(
-                semiFinishedFiltered,
-                loc,
-                canEdit,
-                showCost,
-                isDishesTab: false,
-                hasActiveFilters: _appliedSearchQuery.isNotEmpty ||
-                    _filterSection != null ||
-                    _filterCategory != null,
-              ),
-              _buildTechCardsTable(
-                dishFiltered,
-                loc,
-                canEdit,
-                showCost,
-                isDishesTab: true,
-                hasActiveFilters: _appliedSearchQuery.isNotEmpty ||
-                    _filterSection != null ||
-                    _filterCategory != null,
-              ),
-              _buildReviewList(loc, canEdit),
-            ],
-          ),
+      ),
+      if (_listDetailsHydrating)
+        LinearProgressIndicator(
+          minHeight: 2,
+          backgroundColor:
+              Theme.of(context).colorScheme.surfaceContainerHighest,
         ),
+      // Поиск и сортировка
+      Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListenableBuilder(
+              listenable: _searchController,
+              builder: (context, _) {
+                return TextField(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  decoration: InputDecoration(
+                    hintText: loc.t('ttk_search_hint'),
+                    isDense: true,
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 20),
+                            onPressed: () {
+                              _searchDebounceTimer?.cancel();
+                              _searchController.clear();
+                              setState(() {
+                                _appliedSearchQuery = '';
+                              });
+                            },
+                          )
+                        : null,
+                    border: const OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                  ),
+                  onChanged: (_) {
+                    _searchDebounceTimer?.cancel();
+                    _searchDebounceTimer = Timer(
+                      const Duration(milliseconds: 320),
+                      () {
+                        if (!mounted) return;
+                        final q = _searchController.text.trim().toLowerCase();
+                        if (q == _appliedSearchQuery) return;
+                        setState(() {
+                          _appliedSearchQuery = q;
+                        });
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    value: _filterSection,
+                    decoration: InputDecoration(
+                      labelText: loc.t('ttk_section_label'),
+                      isDense: true,
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                    ),
+                    items: [
+                      DropdownMenuItem(
+                          value: null, child: Text(loc.t('all') ?? 'Все')),
+                      ..._sectionOrder
+                          .where((s) => s != 'hidden' && s != 'all')
+                          .map((s) => DropdownMenuItem(
+                                value: s,
+                                child: Text(_sectionCodeToLabel(s, loc)),
+                              )),
+                    ],
+                    onChanged: (v) => setState(() => _filterSection = v),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    isExpanded: true,
+                    value: _filterCategory,
+                    decoration: InputDecoration(
+                      labelText: loc.t('column_category'),
+                      isDense: true,
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                    ),
+                    items: [
+                      DropdownMenuItem(
+                          value: null, child: Text(loc.t('all') ?? 'Все')),
+                      ...filterCatOrder.map((c) => DropdownMenuItem(
+                            value: c,
+                            child: Text(_categoryLabel(c, loc)),
+                          )),
+                    ],
+                    onChanged: (v) => setState(() => _filterCategory = v),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ];
+
+    if (narrowLandscape) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Flexible(
+            flex: 2,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: chromeChildren,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 5,
+            child: tabBarView,
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ...chromeChildren,
+        Expanded(child: tabBarView),
       ],
     );
   }
@@ -4151,7 +4219,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       );
     }
     final lang = loc.currentLanguageCode;
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = isHandheldNarrowLayout(context);
     // Показываем все цеха целиком; на мобильном расширяем колонку "Цех".
     final colSectionWidth = isMobile ? 140.0 : 180.0;
     final colCatWidth = isMobile ? 52.0 : 84.0;
@@ -4309,14 +4377,19 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             final path = effectiveCanEdit
                 ? '/tech-cards/${tc.id}'
                 : '/tech-cards/${tc.id}?view=1';
-            final needRefresh = await context.push<bool>(path);
+            final needRefresh = await context.push<bool>(
+              path,
+              extra: {'initialTechCard': tc},
+            );
             if (mounted && needRefresh == true) _load(showLoading: false);
           }
         },
         onLongPress: effectiveCanEdit && !_selectionMode
             ? () async {
-                final needRefresh =
-                    await context.push<bool>('/tech-cards/${tc.id}?view=1');
+                final needRefresh = await context.push<bool>(
+                  '/tech-cards/${tc.id}?view=1',
+                  extra: {'initialTechCard': tc},
+                );
                 if (mounted && needRefresh == true) _load(showLoading: false);
               }
             : null,
@@ -4398,8 +4471,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     : IconButton(
                         icon: const Icon(Icons.visibility_outlined, size: 20),
                         tooltip: loc.t('ttk_view'),
-                        onPressed: () =>
-                            context.push('/tech-cards/${tc.id}?view=1'),
+                        onPressed: () => context.push(
+                          '/tech-cards/${tc.id}?view=1',
+                          extra: {'initialTechCard': tc},
+                        ),
                         style: IconButton.styleFrom(
                           minimumSize: const Size(36, 36),
                           padding: EdgeInsets.zero,
@@ -4457,8 +4532,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                   DataCell(Text(
                       NumberFormatUtils.formatInt(_calculateCostPerKg(tc)))),
                 ],
-                onSelectChanged:
-                    _selectionMode ? null : (_) => context.push(path),
+                onSelectChanged: _selectionMode
+                    ? null
+                    : (_) => context.push(
+                          path,
+                          extra: {'initialTechCard': tc},
+                        ),
               );
             }),
           ),

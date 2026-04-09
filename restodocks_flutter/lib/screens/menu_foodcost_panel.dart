@@ -51,12 +51,16 @@ class MenuFoodcostPanel extends StatefulWidget {
   const MenuFoodcostPanel({
     super.key,
     required this.dishes,
+
     /// `establishment_products.establishment_id`: у филиала — id филиала, у головы — id данных.
     required this.nomenclatureEstablishmentId,
+
     /// У филиала — id головного заведения для [ProductStoreSupabase.loadNomenclatureForBranch]; у головы — null.
     this.nomenclatureMergeParentEstablishmentId,
+
     /// Ключ настроек (целевой %, режим) — id текущего заведения в аккаунте.
     required this.prefsScopeEstablishmentId,
+
     /// ISO 4217 (как в заведении/сотруднике): для VND и др. — без копеек, разделитель тысяч.
     required this.currencyCode,
     required this.currencySym,
@@ -89,13 +93,21 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
   final _targetPctController = TextEditingController(text: '100');
   final _headerHScroll = ScrollController();
   final _bodyHScroll = ScrollController();
+  final _vScroll = ScrollController();
   bool _syncingHScroll = false;
+  double _lastVScrollPixels = 0;
+  bool _hideControlsOnScroll = false;
+  int _lastControlsToggleMs = 0;
+  Timer? _controlsToggleTimer;
+  double _tableZoom = 1.0;
+  double _tableZoomAtScaleStart = 1.0;
 
   final Map<String, _DishTargetState> _dishTargets = {};
   final Map<String, TextEditingController> _dishPctControllers = {};
 
   static String _prefsKeyMode(String est) => 'restodocks_foodcost_mode_$est';
-  static String _prefsKeyTarget(String est) => 'restodocks_foodcost_target_$est';
+  static String _prefsKeyTarget(String est) =>
+      'restodocks_foodcost_target_$est';
   static String _prefsKeyDishOverrides(String est) =>
       'restodocks_foodcost_dish_overrides_$est';
 
@@ -104,6 +116,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     super.initState();
     _headerHScroll.addListener(_syncHeaderToBody);
     _bodyHScroll.addListener(_syncBodyToHeader);
+    _vScroll.addListener(_onTableVScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
   }
 
@@ -237,8 +250,11 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
 
   @override
   void dispose() {
+    _controlsToggleTimer?.cancel();
+    _vScroll.removeListener(_onTableVScroll);
     _headerHScroll.removeListener(_syncHeaderToBody);
     _bodyHScroll.removeListener(_syncBodyToHeader);
+    _vScroll.dispose();
     _headerHScroll.dispose();
     _bodyHScroll.dispose();
     for (final c in _dishPctControllers.values) {
@@ -249,8 +265,60 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     super.dispose();
   }
 
+  void _scheduleControlsVisibility(bool hide) {
+    _controlsToggleTimer?.cancel();
+    _controlsToggleTimer = Timer(const Duration(milliseconds: 120), () {
+      if (!mounted || !_vScroll.hasClients) return;
+      final p = _vScroll.position.pixels;
+      final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+      if (keyboardOpen) return;
+      if (hide) {
+        if (p >= 72 && !_hideControlsOnScroll) {
+          setState(() => _hideControlsOnScroll = true);
+        }
+      } else {
+        if (p <= 8 && _hideControlsOnScroll) {
+          setState(() => _hideControlsOnScroll = false);
+        }
+      }
+    });
+  }
+
+  void _onTableVScroll() {
+    if (!_vScroll.hasClients) return;
+    if (!mounted) return;
+    final p = _vScroll.position.pixels;
+    if (p < 0) return;
+    final keyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+    if (keyboardOpen) {
+      _controlsToggleTimer?.cancel();
+      _lastVScrollPixels = p;
+      if (_hideControlsOnScroll) {
+        setState(() => _hideControlsOnScroll = false);
+      }
+      return;
+    }
+    _lastVScrollPixels = p;
+    // Stabilize transitions on iOS momentum scroll.
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final canToggle = (now - _lastControlsToggleMs) > 180;
+    if (p <= 14) {
+      if (_hideControlsOnScroll && canToggle) {
+        _lastControlsToggleMs = now;
+        _scheduleControlsVisibility(false);
+      }
+      return;
+    }
+    if (p >= 72 && !_hideControlsOnScroll && canToggle) {
+      _lastControlsToggleMs = now;
+      _scheduleControlsVisibility(true);
+    }
+  }
+
   void _syncHeaderToBody() {
-    if (_syncingHScroll || !_bodyHScroll.hasClients || !_headerHScroll.hasClients) {
+    if (_syncingHScroll ||
+        !_bodyHScroll.hasClients ||
+        !_headerHScroll.hasClients) {
       return;
     }
     _syncingHScroll = true;
@@ -263,7 +331,9 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
   }
 
   void _syncBodyToHeader() {
-    if (_syncingHScroll || !_headerHScroll.hasClients || !_bodyHScroll.hasClients) {
+    if (_syncingHScroll ||
+        !_headerHScroll.hasClients ||
+        !_bodyHScroll.hasClients) {
       return;
     }
     _syncingHScroll = true;
@@ -288,9 +358,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         : TechCardCostHydrator.sumIngredientOutputGrams(tc);
     if (yieldG <= 0) return 0;
 
-    final portionG = tc.portionWeight > 0
-        ? tc.portionWeight
-        : yieldG;
+    final portionG = tc.portionWeight > 0 ? tc.portionWeight : yieldG;
     return totalCost * portionG / yieldG;
   }
 
@@ -368,7 +436,8 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     final st = _dishTargets[tc.id]!;
     final ctrl = _dishPctControllers[tc.id]!;
 
-    Widget centeredValue(String value, double width, {double? fontSize}) => SizedBox(
+    Widget centeredValue(String value, double width, {double? fontSize}) =>
+        SizedBox(
           width: width,
           child: Align(
             alignment: Alignment.center,
@@ -382,7 +451,8 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
 
     return DataRow(
       cells: [
-        DataCell(centeredValue('$rowNum', w.no, fontSize: narrow ? 11.5 : null)),
+        DataCell(
+            centeredValue('$rowNum', w.no, fontSize: narrow ? 11.5 : null)),
         DataCell(
           SizedBox(
             width: w.dish,
@@ -417,12 +487,8 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         )),
         DataCell(centeredValue(
           _mode == FoodcostPricingMode.markupOnCost
-              ? (markupAct != null
-                  ? '${markupAct.toStringAsFixed(1)}%'
-                  : '—')
-              : (shareAct != null
-                  ? '${shareAct.toStringAsFixed(1)}%'
-                  : '—'),
+              ? (markupAct != null ? '${markupAct.toStringAsFixed(1)}%' : '—')
+              : (shareAct != null ? '${shareAct.toStringAsFixed(1)}%' : '—'),
           w.metric,
           fontSize: narrow ? 11.5 : null,
         )),
@@ -448,168 +514,170 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
             child: Align(
               alignment: Alignment.center,
               child: narrow
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 40,
-                        child: TextField(
-                          controller: ctrl,
-                          decoration: InputDecoration(
-                            hintText: !st.useCustom
-                                ? _globalTargetHint(globalTargetPct)
-                                : null,
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: 4,
-                              vertical: narrow ? 2 : 8,
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 40,
+                          child: TextField(
+                            controller: ctrl,
+                            decoration: InputDecoration(
+                              hintText: !st.useCustom
+                                  ? _globalTargetHint(globalTargetPct)
+                                  : null,
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: narrow ? 2 : 8,
+                              ),
+                              border: const OutlineInputBorder(),
                             ),
-                            border: const OutlineInputBorder(),
-                          ),
-                          style: TextStyle(fontSize: narrow ? 10.5 : 13),
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                          ],
-                          onChanged: (_) {
-                            if (st.useCustom) setState(() {});
-                          },
-                          onEditingComplete: () {
-                            st.pctText = ctrl.text.trim();
-                            setState(() {});
-                            unawaited(_persistDishOverrides());
-                          },
-                          onSubmitted: (_) {
-                            st.pctText = ctrl.text.trim();
-                            setState(() {});
-                            unawaited(_persistDishOverrides());
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 0),
-                      Semantics(
-                        label: loc.t('foodcost_custom_target_checkbox_a11y'),
-                        child: Checkbox(
-                          value: st.useCustom,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                          onChanged: (v) {
-                            if (v == null) return;
-                            setState(() {
-                              st.useCustom = v;
+                            style: TextStyle(fontSize: narrow ? 10.5 : 13),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'[0-9.,]')),
+                            ],
+                            onChanged: (_) {
+                              if (st.useCustom) setState(() {});
+                            },
+                            onEditingComplete: () {
                               st.pctText = ctrl.text.trim();
-                            });
-                            unawaited(_persistDishOverrides());
-                          },
+                              setState(() {});
+                              unawaited(_persistDishOverrides());
+                            },
+                            onSubmitted: (_) {
+                              st.pctText = ctrl.text.trim();
+                              setState(() {});
+                              unawaited(_persistDishOverrides());
+                            },
+                          ),
                         ),
-                      ),
-                      Tooltip(
-                        message: loc.t('foodcost_custom_target_info_title'),
-                        child: Material(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest,
-                          shape: const CircleBorder(),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            onTap: () => _showCustomTargetInfoDialog(loc),
-                            child: Padding(
-                              padding: EdgeInsets.all(narrow ? 2 : 6),
-                              child: Icon(
-                                Icons.info_outline,
-                                size: narrow ? 13 : 18,
-                                color: Theme.of(context).colorScheme.primary,
+                        const SizedBox(width: 0),
+                        Semantics(
+                          label: loc.t('foodcost_custom_target_checkbox_a11y'),
+                          child: Checkbox(
+                            value: st.useCustom,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                            onChanged: (v) {
+                              if (v == null) return;
+                              setState(() {
+                                st.useCustom = v;
+                                st.pctText = ctrl.text.trim();
+                              });
+                              unawaited(_persistDishOverrides());
+                            },
+                          ),
+                        ),
+                        Tooltip(
+                          message: loc.t('foodcost_custom_target_info_title'),
+                          child: Material(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                            shape: const CircleBorder(),
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(
+                              onTap: () => _showCustomTargetInfoDialog(loc),
+                              child: Padding(
+                                padding: EdgeInsets.all(narrow ? 2 : 6),
+                                child: Icon(
+                                  Icons.info_outline,
+                                  size: narrow ? 13 : 18,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 68,
-                        child: TextField(
-                          controller: ctrl,
-                          decoration: InputDecoration(
-                            hintText: !st.useCustom
-                                ? _globalTargetHint(globalTargetPct)
-                                : null,
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 8,
+                      ],
+                    )
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 68,
+                          child: TextField(
+                            controller: ctrl,
+                            decoration: InputDecoration(
+                              hintText: !st.useCustom
+                                  ? _globalTargetHint(globalTargetPct)
+                                  : null,
+                              isDense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 8,
+                              ),
+                              border: const OutlineInputBorder(),
                             ),
-                            border: const OutlineInputBorder(),
-                          ),
-                          style: const TextStyle(fontSize: 13),
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                          ],
-                          onChanged: (_) {
-                            if (st.useCustom) setState(() {});
-                          },
-                          onEditingComplete: () {
-                            st.pctText = ctrl.text.trim();
-                            setState(() {});
-                            unawaited(_persistDishOverrides());
-                          },
-                          onSubmitted: (_) {
-                            st.pctText = ctrl.text.trim();
-                            setState(() {});
-                            unawaited(_persistDishOverrides());
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Semantics(
-                        label: loc.t('foodcost_custom_target_checkbox_a11y'),
-                        child: Checkbox(
-                          value: st.useCustom,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                          onChanged: (v) {
-                            if (v == null) return;
-                            setState(() {
-                              st.useCustom = v;
+                            style: const TextStyle(fontSize: 13),
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'[0-9.,]')),
+                            ],
+                            onChanged: (_) {
+                              if (st.useCustom) setState(() {});
+                            },
+                            onEditingComplete: () {
                               st.pctText = ctrl.text.trim();
-                            });
-                            unawaited(_persistDishOverrides());
-                          },
+                              setState(() {});
+                              unawaited(_persistDishOverrides());
+                            },
+                            onSubmitted: (_) {
+                              st.pctText = ctrl.text.trim();
+                              setState(() {});
+                              unawaited(_persistDishOverrides());
+                            },
+                          ),
                         ),
-                      ),
-                      Tooltip(
-                        message: loc.t('foodcost_custom_target_info_title'),
-                        child: Material(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest,
-                          shape: const CircleBorder(),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            onTap: () => _showCustomTargetInfoDialog(loc),
-                            child: Padding(
-                              padding: const EdgeInsets.all(6),
-                              child: Icon(
-                                Icons.info_outline,
-                                size: 18,
-                                color: Theme.of(context).colorScheme.primary,
+                        const SizedBox(width: 4),
+                        Semantics(
+                          label: loc.t('foodcost_custom_target_checkbox_a11y'),
+                          child: Checkbox(
+                            value: st.useCustom,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            visualDensity: VisualDensity.compact,
+                            onChanged: (v) {
+                              if (v == null) return;
+                              setState(() {
+                                st.useCustom = v;
+                                st.pctText = ctrl.text.trim();
+                              });
+                              unawaited(_persistDishOverrides());
+                            },
+                          ),
+                        ),
+                        Tooltip(
+                          message: loc.t('foodcost_custom_target_info_title'),
+                          child: Material(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                            shape: const CircleBorder(),
+                            clipBehavior: Clip.antiAlias,
+                            child: InkWell(
+                              onTap: () => _showCustomTargetInfoDialog(loc),
+                              child: Padding(
+                                padding: const EdgeInsets.all(6),
+                                child: Icon(
+                                  Icons.info_outline,
+                                  size: 18,
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
             ),
           ),
         ),
@@ -635,8 +703,30 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
-    final narrow = MediaQuery.sizeOf(context).width < 560;
+    final narrow = MediaQuery.sizeOf(context).shortestSide < 600;
+    final isPhoneLayout = MediaQuery.sizeOf(context).shortestSide < 600;
     final shortViewport = MediaQuery.sizeOf(context).height < 560;
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+    final landscapePhone = isPhoneLayout && isLandscape;
+    final compactSegmentStyle = landscapePhone
+        ? ButtonStyle(
+            minimumSize: const WidgetStatePropertyAll(Size(0, 32)),
+            padding: const WidgetStatePropertyAll(
+                EdgeInsets.symmetric(horizontal: 10, vertical: 0)),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: const VisualDensity(horizontal: -1, vertical: -2),
+            side: WidgetStateProperty.all(
+              BorderSide(
+                color: Theme.of(context)
+                    .colorScheme
+                    .outline
+                    .withValues(alpha: 0.26),
+                width: 0.5,
+              ),
+            ),
+          )
+        : null;
     if (_busy) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -752,7 +842,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     final foodcostHeaderTable = DataTable(
       columnSpacing: narrow ? 3 : 10,
       horizontalMargin: narrow ? 3 : 10,
-      headingRowHeight: narrow ? 30 : 38,
+      headingRowHeight: narrow ? (isLandscape ? 26 : 30) : 38,
       dataRowMinHeight: 0,
       dataRowMaxHeight: 0,
       showBottomBorder: true,
@@ -765,48 +855,79 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       columnSpacing: narrow ? 3 : 10,
       horizontalMargin: narrow ? 3 : 10,
       headingRowHeight: 0.01,
-      dataRowMinHeight: narrow ? 18 : 30,
-      dataRowMaxHeight: narrow ? 45 : 64,
+      dataRowMinHeight: narrow ? (isLandscape ? 14 : 18) : 30,
+      dataRowMaxHeight: narrow ? (isLandscape ? 34 : 45) : 64,
       showBottomBorder: true,
       border: tableBorder,
       columns: tableColumns,
       rows: tableRows,
     );
+    final zoomedHeaderTable = Transform.scale(
+      alignment: Alignment.topLeft,
+      scale: _tableZoom,
+      child: foodcostHeaderTable,
+    );
+    final zoomedBodyTable = Transform.scale(
+      alignment: Alignment.topLeft,
+      scale: _tableZoom,
+      child: foodcostBodyTable,
+    );
+
+    Widget hScrollTable(ScrollController c, Widget table) {
+      if (narrow) {
+        return SingleChildScrollView(
+          controller: c,
+          scrollDirection: Axis.horizontal,
+          child: table,
+        );
+      }
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            controller: c,
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraints.maxWidth),
+              child: Center(child: table),
+            ),
+          );
+        },
+      );
+    }
 
     final tableArea = Scrollbar(
       child: Padding(
         padding: EdgeInsets.fromLTRB(narrow ? 6 : 14, 0, narrow ? 6 : 14, 18),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (groups.isNotEmpty)
-              SingleChildScrollView(
-                controller: _headerHScroll,
-                scrollDirection: Axis.horizontal,
-                child: foodcostHeaderTable,
-              ),
+              hScrollTable(_headerHScroll, zoomedHeaderTable),
             Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (groups.isNotEmpty)
-                      SingleChildScrollView(
-                        controller: _bodyHScroll,
-                        scrollDirection: Axis.horizontal,
-                        child: foodcostBodyTable,
-                      ),
-                    if (groups.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: widget.dishes.isEmpty
-                            ? const Center(child: CircularProgressIndicator())
-                            : Text(
-                                loc.t('menu_empty_dishes') ?? '',
-                                style: Theme.of(context).textTheme.bodyLarge,
-                              ),
-                      ),
-                  ],
+              child: RawScrollbar(
+                controller: _bodyHScroll,
+                scrollbarOrientation: ScrollbarOrientation.bottom,
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  controller: _vScroll,
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (groups.isNotEmpty)
+                        hScrollTable(_bodyHScroll, zoomedBodyTable),
+                      if (groups.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: widget.dishes.isEmpty
+                              ? const Center(child: CircularProgressIndicator())
+                              : Text(
+                                  loc.t('menu_empty_dishes') ?? '',
+                                  style: Theme.of(context).textTheme.bodyLarge,
+                                ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -814,16 +935,43 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         ),
       ),
     );
+    final interactiveTableArea = GestureDetector(
+      onScaleStart: (_) {
+        _tableZoomAtScaleStart = _tableZoom;
+      },
+      onScaleUpdate: (details) {
+        if (details.pointerCount < 2) return;
+        final nextZoom =
+            (_tableZoomAtScaleStart * details.scale).clamp(0.75, 2.2);
+        if (nextZoom == _tableZoom) return;
+        setState(() => _tableZoom = nextZoom);
+      },
+      child: tableArea,
+    );
 
     final modeSegment = SegmentedButton<FoodcostPricingMode>(
       segments: [
         ButtonSegment<FoodcostPricingMode>(
           value: FoodcostPricingMode.markupOnCost,
-          label: Text(loc.t('foodcost_mode_markup') ?? 'Наценка к с/с'),
+          label: Text(
+            loc.t('foodcost_mode_markup') ?? 'Наценка к с/с',
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.fade,
+            style: TextStyle(
+                fontSize: landscapePhone ? 10.5 : (isPhoneLayout ? 11 : 13)),
+          ),
         ),
         ButtonSegment<FoodcostPricingMode>(
           value: FoodcostPricingMode.costShareOfPrice,
-          label: Text(loc.t('foodcost_mode_cost_share') ?? 'Доля с/с в цене'),
+          label: Text(
+            loc.t('foodcost_mode_cost_share') ?? 'Доля с/с в цене',
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.fade,
+            style: TextStyle(
+                fontSize: landscapePhone ? 10.5 : (isPhoneLayout ? 11 : 13)),
+          ),
         ),
       ],
       selected: {_mode},
@@ -832,81 +980,120 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         setState(() => _mode = m);
         unawaited(_persistMode(m));
       },
+      showSelectedIcon: false,
+      style: compactSegmentStyle,
     );
 
-    final menuSegment =
-        (narrow &&
-                widget.onMenuSegmentChanged != null &&
-                widget.menuSegmentValue != null)
-            ? SegmentedButton<int>(
-                segments: [
-                  ButtonSegment<int>(
-                    value: 0,
-                    label: Text(loc.t('menu') ?? 'Меню'),
-                  ),
-                  ButtonSegment<int>(
-                    value: 1,
-                    label: Text(loc.t('menu_tab_foodcost')),
-                  ),
-                ],
-                selected: {widget.menuSegmentValue!},
-                onSelectionChanged: (s) => widget.onMenuSegmentChanged!(s.first),
-              )
-            : null;
+    final showMenuSegmentInPanel = widget.onMenuSegmentChanged != null &&
+        widget.menuSegmentValue != null &&
+        (shortViewport || !isPhoneLayout);
 
-    final controls = Padding(
-      padding: EdgeInsets.fromLTRB(narrow ? 8 : 14, 0, narrow ? 8 : 14, 6),
+    final menuSegment = showMenuSegmentInPanel
+        ? SegmentedButton<int>(
+            segments: [
+              ButtonSegment<int>(
+                value: 0,
+                label: Text(
+                  loc.t('menu') ?? 'Меню',
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.fade,
+                  style: TextStyle(
+                      fontSize: landscapePhone ? 10.5 : (isPhoneLayout ? 11 : 13)),
+                ),
+              ),
+              ButtonSegment<int>(
+                value: 1,
+                label: Text(
+                  loc.t('menu_tab_foodcost'),
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.fade,
+                  style: TextStyle(
+                      fontSize: landscapePhone ? 10.5 : (isPhoneLayout ? 11 : 13)),
+                ),
+              ),
+            ],
+            selected: {widget.menuSegmentValue!},
+            onSelectionChanged: (s) => widget.onMenuSegmentChanged!(s.first),
+            showSelectedIcon: false,
+            style: compactSegmentStyle,
+          )
+        : null;
+
+    final pctField = SizedBox(
+      width: narrow ? (isLandscape ? 74 : 82) : 96,
+      child: TextField(
+        controller: _targetPctController,
+        decoration: InputDecoration(
+          labelText: '%',
+          border: OutlineInputBorder(),
+          isDense: true,
+          isCollapsed: true,
+          contentPadding: EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: isLandscape ? 4 : 6,
+          ),
+        ),
+        keyboardType: TextInputType.number,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(4),
+        ],
+        onChanged: (_) => setState(() {}),
+        onSubmitted: (_) => _persistTarget(),
+        onEditingComplete: _persistTarget,
+      ),
+    );
+
+    final compactControls = isPhoneLayout;
+    Widget controls = Padding(
+      padding: EdgeInsets.fromLTRB(
+          narrow ? 8 : 14, 0, narrow ? 8 : 14, isLandscape ? 4 : 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (narrow && menuSegment != null)
+          if (compactControls)
             Row(
               children: [
-                Expanded(child: menuSegment),
-                const SizedBox(width: 6),
+                if (shortViewport && menuSegment != null) ...[
+                  Flexible(fit: FlexFit.loose, child: menuSegment),
+                  const SizedBox(width: 3),
+                ],
                 Expanded(child: modeSegment),
+                const SizedBox(width: 3),
+                pctField,
               ],
             )
-          else ...[
-            if (menuSegment != null) menuSegment,
-            if (menuSegment != null) const SizedBox(height: 6),
-            modeSegment,
-          ],
-          const SizedBox(height: 6),
-          Align(
-            alignment: narrow ? Alignment.center : Alignment.centerLeft,
-            child: SizedBox(
-              width: narrow ? 82 : 96,
-              child: TextField(
-                controller: _targetPctController,
-                decoration: const InputDecoration(
-                  labelText: '%',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                  isCollapsed: true,
-                  contentPadding:
-                      EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                ),
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(4),
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (menuSegment != null) ...[
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: menuSegment,
+                  ),
+                  const SizedBox(width: 12),
                 ],
-                onChanged: (_) => setState(() {}),
-                onSubmitted: (_) => _persistTarget(),
-                onEditingComplete: _persistTarget,
-              ),
+                Expanded(child: modeSegment),
+                const SizedBox(width: 12),
+                pctField,
+              ],
             ),
-          ),
-          const SizedBox(height: 6),
+          SizedBox(height: landscapePhone
+              ? 2
+              : (shortViewport ? 2 : 6)),
           TextField(
             decoration: InputDecoration(
               labelText: loc.t('foodcost_search_hint') ?? 'Поиск',
               prefixIcon: const Icon(Icons.search),
               border: const OutlineInputBorder(),
               isDense: true,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: isLandscape ? 6 : (shortViewport ? 7 : 10),
+              ),
             ),
             textAlignVertical: TextAlignVertical.center,
             onChanged: (v) => setState(() => _query = v),
@@ -915,24 +1102,19 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       ),
     );
 
-    if (shortViewport) {
-      return SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            controls,
-            SizedBox(height: 420, child: tableArea),
-          ],
-        ),
+    if (landscapePhone) {
+      controls = Transform.translate(
+        offset: const Offset(0, -6),
+        child: controls,
       );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        controls,
+        if (!_hideControlsOnScroll) controls,
         Expanded(
-          child: tableArea,
+          child: interactiveTableArea,
         ),
       ],
     );

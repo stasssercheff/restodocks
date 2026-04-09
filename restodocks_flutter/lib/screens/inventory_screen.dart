@@ -7,6 +7,7 @@ import '../core/flutter_nav_bridge_stub.dart'
 
 import 'package:archive/archive.dart';
 import '../utils/dev_log.dart';
+import '../utils/layout_breakpoints.dart';
 
 import 'package:excel/excel.dart' hide Border, TextSpan;
 import 'package:file_picker/file_picker.dart';
@@ -34,6 +35,32 @@ const String _pfUnitPcs = 'pcs';
 
 /// Размер цифр в ячейках количества (−2 pt к body, чтобы длинные значения влезали).
 const double _kInventoryQtyFontSize = 13;
+
+enum _InventoryTableEntryType { section, row, aggregated }
+
+class _InventoryTableEntry {
+  const _InventoryTableEntry.section(this.title)
+      : type = _InventoryTableEntryType.section,
+        rowIndex = null,
+        rowNumber = null,
+        isLastRow = false;
+  const _InventoryTableEntry.row(
+      this.rowIndex, this.rowNumber, this.isLastRow)
+      : type = _InventoryTableEntryType.row,
+        title = null;
+  const _InventoryTableEntry.aggregated()
+      : type = _InventoryTableEntryType.aggregated,
+        title = null,
+        rowIndex = null,
+        rowNumber = null,
+        isLastRow = false;
+
+  final _InventoryTableEntryType type;
+  final String? title;
+  final int? rowIndex;
+  final int? rowNumber;
+  final bool isLastRow;
+}
 
 /// Строка бланка: продукт из номенклатуры, полуфабрикат (ТТК) или свободная строка (например, с чека).
 class _InventoryRow {
@@ -618,19 +645,20 @@ class _InventoryScreenState extends State<InventoryScreen>
         barrierDismissible: false,
         builder: (ctx) {
           final theme = Theme.of(ctx);
+          final isLandscape =
+              MediaQuery.of(ctx).orientation == Orientation.landscape;
+          final tileGap = isLandscape ? 6.0 : 8.0;
           return AlertDialog(
             title: Text(loc.t('inventory_mode_dialog_title')),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: Text(loc.t('back')),
-              ),
-            ],
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   ListTile(
+                    dense: isLandscape,
+                    visualDensity:
+                        isLandscape ? VisualDensity.compact : VisualDensity.standard,
+                    minVerticalPadding: isLandscape ? 2 : null,
                     leading: const Icon(Icons.list_alt, color: Colors.blue),
                     title: Row(children: [
                       Text(loc.t('inventory_mode_standard')),
@@ -644,8 +672,12 @@ class _InventoryScreenState extends State<InventoryScreen>
                     tileColor: Colors.blue.withOpacity(0.05),
                     onTap: () => Navigator.of(ctx).pop('standard'),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: tileGap),
                   ListTile(
+                    dense: isLandscape,
+                    visualDensity:
+                        isLandscape ? VisualDensity.compact : VisualDensity.standard,
+                    minVerticalPadding: isLandscape ? 2 : null,
                     leading: Icon(Icons.filter_alt_outlined,
                         color: theme.colorScheme.secondary),
                     title: Row(children: [
@@ -664,8 +696,13 @@ class _InventoryScreenState extends State<InventoryScreen>
                     onTap: () => Navigator.of(ctx).pop('selective'),
                   ),
                   if (!isHall) ...[
-                    const SizedBox(height: 8),
+                    SizedBox(height: tileGap),
                     ListTile(
+                      dense: isLandscape,
+                      visualDensity: isLandscape
+                          ? VisualDensity.compact
+                          : VisualDensity.standard,
+                      minVerticalPadding: isLandscape ? 2 : null,
                       leading: Icon(Icons.table_chart_outlined,
                           color: hasIiko
                               ? theme.colorScheme.primary
@@ -690,6 +727,19 @@ class _InventoryScreenState extends State<InventoryScreen>
                           hasIiko ? () => Navigator.of(ctx).pop('iiko') : null,
                     ),
                   ],
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        minimumSize: const Size(0, 30),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: Text(loc.t('back')),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -1661,7 +1711,13 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   bool _inventoryCollapseLayout(BuildContext context) {
-    final isNarrow = MediaQuery.sizeOf(context).width < 600;
+    final isNarrow = isHandheldNarrowLayout(context);
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+    if (isNarrow && isLandscape) {
+      // В узком альбомном режиме приоритет — таблица для ввода.
+      return true;
+    }
     final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     return (_isInputMode && !isNarrow) ||
         (isNarrow &&
@@ -1682,7 +1738,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     // чтобы не мутировать state во время build — иначе на мобильной версии клавиатура закрывается.
     final viewInsets = MediaQuery.viewInsetsOf(context);
     final isKeyboardOpen = viewInsets.bottom > 0;
-    final isNarrow = MediaQuery.sizeOf(context).width < 600;
+    final isNarrow = isHandheldNarrowLayout(context);
 
     // Обновляем _isInputMode только на десктопе — на мобильной setState при открытой клавиатуре
     // схлопывает layout и TextField теряет фокус → клавиатура закрывается.
@@ -1690,7 +1746,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted &&
             MediaQuery.viewInsetsOf(context).bottom > 0 &&
-            !(MediaQuery.sizeOf(context).width < 600)) {
+            !isHandheldNarrowLayout(context)) {
           setState(() => _isInputMode = true);
         }
       });
@@ -1738,9 +1794,19 @@ class _InventoryScreenState extends State<InventoryScreen>
         // Браузерный URL-бар (Safari/Chrome) остаётся ниже неё и не перекрывает таблицу.
         bottomNavigationBar: ValueListenableBuilder<int>(
           valueListenable: _inventoryLayoutPulse,
-          builder: (ctx, _, __) =>
-              _buildFooter(loc, _inventoryCollapseLayout(ctx)) ??
-              const SizedBox.shrink(),
+          builder: (ctx, _, __) {
+            final kbOpen = MediaQuery.viewInsetsOf(ctx).bottom > 0 ||
+                FocusManager.instance.primaryFocus != null;
+            if (kbOpen) {
+              return const SizedBox.shrink();
+            }
+            final collapse = _inventoryCollapseLayout(ctx);
+            final keepFooterInLandscape = isHandheldNarrowLayout(ctx) &&
+                MediaQuery.of(ctx).orientation == Orientation.landscape &&
+                MediaQuery.viewInsetsOf(ctx).bottom == 0;
+            return _buildFooter(loc, collapse && !keepFooterInLandscape) ??
+                const SizedBox.shrink();
+          },
         ),
         body: Stack(
           children: [
@@ -1751,7 +1817,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                   valueListenable: _inventoryLayoutPulse,
                   builder: (ctx, _, __) {
                     final collapseLayout = _inventoryCollapseLayout(ctx);
-                    final narrow = MediaQuery.sizeOf(ctx).width < 600;
+                    final narrow = isHandheldNarrowLayout(ctx);
                     final kbOpen = MediaQuery.viewInsetsOf(ctx).bottom > 0;
                     final hideInfo = narrow && kbOpen;
                     return Column(
@@ -1783,7 +1849,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               valueListenable: _inventoryLayoutPulse,
               builder: (ctx, _, __) {
                 final collapseLayout = _inventoryCollapseLayout(ctx);
-                final narrow = MediaQuery.sizeOf(ctx).width < 600;
+                final narrow = isHandheldNarrowLayout(ctx);
                 final kbOpen = MediaQuery.viewInsetsOf(ctx).bottom > 0;
                 if (!collapseLayout && !(narrow && kbOpen)) {
                   return DataSafetyIndicator(
@@ -1875,7 +1941,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     bool hideInfoRow = false,
   }) {
     final theme = Theme.of(context);
-    final narrow = MediaQuery.sizeOf(context).width < 420;
+    final narrow = MediaQuery.sizeOf(context).shortestSide < 420;
     final dateStr =
         '${_date.day.toString().padLeft(2, '0')}.${_date.month.toString().padLeft(2, '0')}.${_date.year}';
     final startStr = _startTime != null
@@ -2139,6 +2205,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       ),
       child: SafeArea(
         top: false,
+        bottom: false,
         child: Row(
           children: [
             Expanded(
@@ -2173,6 +2240,41 @@ class _InventoryScreenState extends State<InventoryScreen>
     final idx = _computeFilteredIndices(lang);
     final productIndices = idx.product;
     final pfIndices = idx.pf;
+    final entries = <_InventoryTableEntry>[];
+
+    if (_blockFilter != _InventoryBlockFilter.pfOnly &&
+        productIndices.isNotEmpty) {
+      entries.add(_InventoryTableEntry.section(loc.t('inventory_block_products')));
+      final lastIdx = pfIndices.isNotEmpty ? pfIndices.last : productIndices.last;
+      for (var i = 0; i < productIndices.length; i++) {
+        final rowIndex = productIndices[i];
+        entries.add(_InventoryTableEntry.row(
+          rowIndex,
+          i + 1,
+          rowIndex == lastIdx,
+        ));
+      }
+    }
+    if (_blockFilter != _InventoryBlockFilter.productsOnly &&
+        pfIndices.isNotEmpty) {
+      entries.add(_InventoryTableEntry.section(loc.t('inventory_block_pf')));
+      for (var i = 0; i < pfIndices.length; i++) {
+        final rowIndex = pfIndices[i];
+        final rowNum = _blockFilter == _InventoryBlockFilter.pfOnly
+            ? i + 1
+            : productIndices.length + i + 1;
+        entries.add(_InventoryTableEntry.row(
+          rowIndex,
+          rowNum,
+          rowIndex == pfIndices.last,
+        ));
+      }
+    }
+    if (_aggregatedFromFile != null && _aggregatedFromFile!.isNotEmpty) {
+      entries.add(
+          _InventoryTableEntry.section(loc.t('inventory_pf_products_title')));
+      entries.add(const _InventoryTableEntry.aggregated());
+    }
 
     return Column(
       children: [
@@ -2189,46 +2291,26 @@ class _InventoryScreenState extends State<InventoryScreen>
           ],
         ),
         Expanded(
-          child: SingleChildScrollView(
+          child: ListView.builder(
             physics: const ClampingScrollPhysics(),
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_blockFilter != _InventoryBlockFilter.pfOnly &&
-                    productIndices.isNotEmpty) ...[
-                  _buildSectionHeaderRow(
-                      loc, loc.t('inventory_block_products'), leftW),
-                  ...productIndices.asMap().entries.map((e) {
-                    final lastIdx = pfIndices.isNotEmpty
-                        ? pfIndices.last
-                        : productIndices.last;
-                    return _buildScrollableDataRow(loc, e.value, e.key + 1,
-                        isLastRow: e.value == lastIdx);
-                  }),
-                ],
-                if (_blockFilter != _InventoryBlockFilter.productsOnly &&
-                    pfIndices.isNotEmpty) ...[
-                  _buildSectionHeaderRow(
-                      loc, loc.t('inventory_block_pf'), leftW),
-                  ...pfIndices.asMap().entries.map((e) {
-                    final lastIdx = pfIndices.last;
-                    final rowNum = _blockFilter == _InventoryBlockFilter.pfOnly
-                        ? e.key + 1
-                        : productIndices.length + e.key + 1;
-                    return _buildScrollableDataRow(loc, e.value, rowNum,
-                        isLastRow: e.value == lastIdx);
-                  }),
-                ],
-                if (_aggregatedFromFile != null &&
-                    _aggregatedFromFile!.isNotEmpty) ...[
-                  _buildSectionHeaderRow(
-                      loc, loc.t('inventory_pf_products_title'), leftW),
-                  _buildAggregatedBlockRow(loc, leftW),
-                ],
-              ],
-            ),
+            itemCount: entries.length,
+            itemBuilder: (context, i) {
+              final e = entries[i];
+              switch (e.type) {
+                case _InventoryTableEntryType.section:
+                  return _buildSectionHeaderRow(loc, e.title!, leftW);
+                case _InventoryTableEntryType.aggregated:
+                  return _buildAggregatedBlockRow(loc, leftW);
+                case _InventoryTableEntryType.row:
+                  return _buildScrollableDataRow(
+                    loc,
+                    e.rowIndex!,
+                    e.rowNumber!,
+                    isLastRow: e.isLastRow,
+                  );
+              }
+            },
           ),
         ),
       ],
@@ -2254,7 +2336,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   static const double _sectionHeaderHeight = 36;
 
   /// Фиксированная высота строки данных — для выравнивания ячеек ввода с текстом.
-  static const double _dataRowHeight = 40;
+  static const double _dataRowHeight = 44;
 
   /// Ширина фиксированной части: #, Наименование, Мера, Итого (продукт зафиксирован слева).
   double _leftWidth(BuildContext context) {
@@ -2423,10 +2505,10 @@ class _InventoryScreenState extends State<InventoryScreen>
     final theme = Theme.of(context);
     final row = _rows[actualIndex];
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 52),
+    return SizedBox(
+      height: _dataRowHeight,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
           border: Border(
               bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
@@ -2448,7 +2530,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               child: Text(
                 row.productName(loc.currentLanguageCode),
                 style: theme.textTheme.bodyMedium,
-                maxLines: 4,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 softWrap: true,
               ),
@@ -3297,91 +3379,88 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
         final row = widget.row;
         final qtyCols = row.quantities.length;
 
-        return IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                  width: widget.leftWidth, child: widget.buildFixedPart()),
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: _hScroll,
-                  scrollDirection: Axis.horizontal,
-                  physics: const ClampingScrollPhysics(),
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(width: widget.leftWidth, child: widget.buildFixedPart()),
+            Expanded(
+              child: SingleChildScrollView(
+                controller: _hScroll,
+                scrollDirection: Axis.horizontal,
+                physics: const ClampingScrollPhysics(),
+                child: SizedBox(
+                  height: widget.dataRowHeight,
                   child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      border: Border(
-                          bottom: BorderSide(
-                              color: theme.dividerColor.withOpacity(0.5))),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        ...List.generate(
-                          qtyCols,
-                          (colIndex) {
-                            final isLastCell =
-                                widget.isLastRow && colIndex == qtyCols - 1;
-                            return Padding(
-                              padding: EdgeInsets.only(
-                                  right: colIndex < qtyCols - 1
-                                      ? widget.colGap
-                                      : 0),
-                              child: SizedBox(
-                                width: widget.colQtyWidth,
-                                child: Center(
-                                  child: widget.completed
-                                      ? Text(
-                                          widget.formatQty(
-                                              row.quantityDisplayAt(colIndex)),
-                                          style: theme.textTheme.bodyMedium
-                                              ?.copyWith(
-                                                  fontSize:
-                                                      _kInventoryQtyFontSize))
-                                      : _QtyCell(
-                                          key: ValueKey(
-                                              'qty_${widget.actualIndex}_$colIndex'),
-                                          value: row.quantities[colIndex],
-                                          useGrams: row.isWeightInKg,
-                                          onChanged: (v) =>
-                                              widget.onSetQuantity(
-                                                  widget.actualIndex,
-                                                  colIndex,
-                                                  v),
-                                          textInputAction: isLastCell
-                                              ? TextInputAction.done
-                                              : TextInputAction.next,
-                                          onFocusGained: () {
-                                            widget.onFocusChange(true);
-                                            if (colIndex == qtyCols - 1) {
-                                              widget.onLastCellFocused(
-                                                  widget.actualIndex);
-                                            }
-                                          },
-                                          onFocusLost: () {
-                                            widget.onFocusChange(false);
-                                            widget.onCellFocusLost(
-                                                widget.actualIndex, colIndex);
-                                            if (colIndex == qtyCols - 2 &&
-                                                row.quantities[colIndex] > 0)
-                                              _scrollToEnd();
-                                          },
-                                        ),
-                                ),
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    border: Border(
+                        bottom: BorderSide(
+                            color: theme.dividerColor.withOpacity(0.5))),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ...List.generate(
+                        qtyCols,
+                        (colIndex) {
+                          final isLastCell =
+                              widget.isLastRow && colIndex == qtyCols - 1;
+                          return Padding(
+                            padding: EdgeInsets.only(
+                                right: colIndex < qtyCols - 1
+                                    ? widget.colGap
+                                    : 0),
+                            child: SizedBox(
+                              width: widget.colQtyWidth,
+                              child: Center(
+                                child: widget.completed
+                                    ? Text(
+                                        widget.formatQty(
+                                            row.quantityDisplayAt(colIndex)),
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                                fontSize:
+                                                    _kInventoryQtyFontSize))
+                                    : _QtyCell(
+                                        key: ValueKey(
+                                            'qty_${widget.actualIndex}_$colIndex'),
+                                        value: row.quantities[colIndex],
+                                        useGrams: row.isWeightInKg,
+                                        onChanged: (v) => widget.onSetQuantity(
+                                            widget.actualIndex, colIndex, v),
+                                        textInputAction: isLastCell
+                                            ? TextInputAction.done
+                                            : TextInputAction.next,
+                                        onFocusGained: () {
+                                          widget.onFocusChange(true);
+                                          if (colIndex == qtyCols - 1) {
+                                            widget.onLastCellFocused(
+                                                widget.actualIndex);
+                                          }
+                                        },
+                                        onFocusLost: () {
+                                          widget.onFocusChange(false);
+                                          widget.onCellFocusLost(
+                                              widget.actualIndex, colIndex);
+                                          if (colIndex == qtyCols - 2 &&
+                                              row.quantities[colIndex] > 0) {
+                                            _scrollToEnd();
+                                          }
+                                        },
+                                      ),
                               ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                 ),
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
@@ -3542,7 +3621,7 @@ class _QtyCellState extends State<_QtyCell> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return SizedBox(
-      height: 54,
+      height: 40,
       child: TextField(
         controller: _controller,
         focusNode: _focus,
@@ -3555,9 +3634,9 @@ class _QtyCellState extends State<_QtyCell> {
         style: theme.textTheme.bodyMedium?.copyWith(
             fontSize: _kInventoryQtyFontSize, height: 1.2),
         decoration: InputDecoration(
-          isDense: false,
+          isDense: true,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+              const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
           filled: true,
           fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
@@ -3797,7 +3876,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   bool _keyboardActiveNow() {
     if (!mounted) return false;
     if (MediaQuery.viewInsetsOf(context).bottom > 0) return true;
-    if (MediaQuery.sizeOf(context).width >= 600) return false;
+    if (!isHandheldNarrowLayout(context)) return false;
     return _searchFocusNode.hasFocus ||
         _iikoCellFocusNodes.any((n) => n.hasFocus);
   }
@@ -4734,7 +4813,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                 ],
               ),
             )
-          : Stack(
+          : GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => FocusScope.of(context).unfocus(),
+              child: Stack(
               children: [
                 Column(
                   children: [
@@ -4884,35 +4966,11 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                           return visibleRows.isEmpty
                               ? Center(
                                   child: Text(loc.t('inventory_no_positions')))
-                              : Listener(
-                                  onPointerDown: (_) {
-                                    final pf =
-                                        FocusManager.instance.primaryFocus;
-                                    final isOurInput = pf != null &&
-                                        (_iikoCellFocusNodes.contains(pf) ||
-                                            pf == _searchFocusNode);
-                                    if (!isOurInput) return;
-                                    final nodeToRestore = pf!;
-                                    Future.delayed(
-                                        const Duration(milliseconds: 100), () {
-                                      if (!mounted) return;
-                                      final current =
-                                          FocusManager.instance.primaryFocus;
-                                      if (current != null &&
-                                          (_iikoCellFocusNodes
-                                                  .contains(current) ||
-                                              current == _searchFocusNode)) {
-                                        return;
-                                      }
-                                      nodeToRestore.requestFocus();
-                                    });
-                                  },
-                                  child: _IikoInventoryTable(
-                                    rows: visibleRows,
-                                    completed: _completed,
-                                    onQuantityChanged: _setQuantity,
-                                    onFocusChange: _syncKeyboardChrome,
-                                  ),
+                              : _IikoInventoryTable(
+                                  rows: visibleRows,
+                                  completed: _completed,
+                                  onQuantityChanged: _setQuantity,
+                                  onFocusChange: _syncKeyboardChrome,
                                 );
                         },
                       ),
@@ -4955,6 +5013,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
                   ],
                 ),
               ],
+            ),
             ),
     );
   }

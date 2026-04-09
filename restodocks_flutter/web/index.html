@@ -47,7 +47,9 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <!-- interactive-widget=resizes-content: Chrome Android подстраивает layout при появлении/скрытии панелей (частично ближе к «обычным» сайтам). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#AD292C">
 
   <!-- SEO Meta Tags (default: English for international reach) -->
   <meta name="description" content="Professional restaurant tool. Smart recipe import from iiko/Excel, multi-user inventory merging, and automated food cost tracking.">
@@ -84,6 +86,7 @@
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="RestoDocks">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
@@ -120,17 +123,23 @@
       overflow-x: hidden;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
-      background: #AD292C;
+      background: #f7f4f4;
     }
-    /* Keep a real document scroll range so mobile browser chrome can collapse. */
-    #safari-scroll-spacer {
-      height: 140px;
-      width: 100%;
-      pointer-events: none;
+    /* Запас высоты документа для window.scroll (нужен Chrome/Safari, чтобы сворачивать панель URL). */
+    @supports (min-height: 100svh) { html, body { min-height: calc(100svh + 80px); } }
+    @supports (min-height: 100lvh) { html, body { min-height: calc(100lvh + 80px); } }
+    flutter-view, #flt-glass-pane, flt-glass-pane {
+      width: 100vw !important;
+      min-width: 100vw !important;
+      max-width: 100vw !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      background: transparent !important;
     }
-    flt-glass-pane, flt-scene, flutter-view, #flt-glass-pane {
-      background: #AD292C !important;
-    }
+    flt-glass-pane, flt-scene, flutter-view, #flt-glass-pane { background: transparent !important; }
+    @supports (height: 100dvh) { html, body { min-height: calc(100dvh + 80px); } }
     #loading-screen {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: #AD292C url('welcome_logo.png?v=20260403n') center center no-repeat;
@@ -140,11 +149,48 @@
       transition: opacity 180ms ease-out;
     }
     #loading-screen.fade-out { opacity: 0; }
+    /* Подсказка: в обычной вкладке Safari/Chrome нет API «убрать строку»; PWA с главного экрана — да. */
+    #restodocks-pwa-chrome-hint {
+      display: none;
+      position: fixed;
+      left: 8px;
+      right: 8px;
+      top: max(8px, env(safe-area-inset-top, 0px));
+      z-index: 9998;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(30, 30, 30, 0.92);
+      color: #f5f5f5;
+      font: 13px/1.35 system-ui, -apple-system, sans-serif;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+      -webkit-tap-highlight-color: transparent;
+    }
+    #restodocks-pwa-chrome-hint.show { display: flex; flex-direction: column; gap: 8px; }
+    #restodocks-pwa-chrome-hint .hint-actions { display: flex; justify-content: flex-end; }
+    #restodocks-pwa-chrome-hint button {
+      padding: 6px 10px;
+      border: none;
+      border-radius: 8px;
+      background: #AD292C;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #restodocks-pwa-chrome-hint .hint-title { font-weight: 600; margin-bottom: 4px; color: #fff; }
+    #restodocks-pwa-chrome-hint .hint-body { opacity: 0.92; }
   </style>
 </head>
 <body>
   <div id="loading-screen"></div>
-  <div id="safari-scroll-spacer" aria-hidden="true"></div>
+  <div id="restodocks-pwa-chrome-hint" role="status" aria-live="polite">
+    <div class="hint-title" id="restodocks-pwa-chrome-hint-title"></div>
+    <div class="hint-body" id="restodocks-pwa-chrome-hint-body"></div>
+    <div class="hint-actions">
+      <button type="button" id="restodocks-pwa-chrome-hint-close">OK</button>
+    </div>
+  </div>
   <script>
     (function () {
       // Force-drop stale SW/caches so web always loads the latest splash/assets.
@@ -196,6 +242,142 @@
     setTimeout(hideLoadingScreen, 20000);
   </script>
   <script>
+    // Единственный надёжный способ убрать адресную строку/вкладки — открыть как PWA (с главного экрана).
+    (function () {
+      var hint = document.getElementById('restodocks-pwa-chrome-hint');
+      var titleEl = document.getElementById('restodocks-pwa-chrome-hint-title');
+      var bodyEl = document.getElementById('restodocks-pwa-chrome-hint-body');
+      var closeBtn = document.getElementById('restodocks-pwa-chrome-hint-close');
+      if (!hint || !titleEl || !bodyEl || !closeBtn) return;
+
+      /** Текущий путь приложения (hash #/… или path без хэша). */
+      function getFlutterPath() {
+        try {
+          var h = location.hash || '';
+          if (h.length > 1 && h.charAt(1) === '/') {
+            return h.substring(1).split('?')[0] || '/';
+          }
+        } catch (e) {}
+        try {
+          var p = (location.pathname || '/').split('?')[0];
+          return p || '/';
+        } catch (e2) {
+          return '/';
+        }
+      }
+
+      /** Не показывать подсказку на входе и соседних экранах (как в app_router). */
+      function isAuthOrEntryPath(path) {
+        var p = (path || '/').toLowerCase();
+        if (p === '/splash') return true;
+        if (p === '/login' || p.indexOf('/login/') === 0) return true;
+        if (p.indexOf('/register') === 0) return true;
+        if (p.indexOf('/forgot-password') === 0) return true;
+        if (p.indexOf('/reset-password') === 0) return true;
+        if (p.indexOf('/confirm-email') === 0) return true;
+        if (p.indexOf('/privacy-consent') === 0) return true;
+        if (p.indexOf('/auth/confirm') === 0) return true;
+        return false;
+      }
+
+      var PWA_HINT_I18N = {
+        en: {
+          title: 'Full screen (no address bar)',
+          body: 'Safari: Share → Add to Home Screen, then open from the icon. Chrome (Android): ⋮ → Install app / Add to Home screen. In a normal tab the browser chrome cannot be fully removed — this is a browser limitation, not the app.',
+          ok: 'OK'
+        },
+        ru: {
+          title: 'Без адресной строки и вкладок',
+          body: 'Safari: Поделиться → «На экран «Домой»» — затем открывайте сайт с иконки. Chrome (Android): меню ⋮ → «Установить приложение» или «Добавить на главный экран». В обычной вкладке панель браузера полностью скрыть нельзя — это ограничение браузера, не приложения.',
+          ok: 'Понятно'
+        },
+        uk: {
+          title: 'Без адресного рядка та вкладок',
+          body: 'Safari: Поділитися → «На екран Додому», далі відкривайте з іконки. Chrome (Android): меню ⋮ → «Встановити застосунок» або «Додати на головний екран». У звичайній вкладці панель браузера повністю сховати не можна — обмеження браузера.',
+          ok: 'Зрозуміло'
+        },
+        es: {
+          title: 'Pantalla completa (sin barra de direcciones)',
+          body: 'Safari: Compartir → Añadir a la pantalla de inicio y abrir desde el icono. Chrome (Android): ⋮ → Instalar app / Añadir a inicio. En una pestaña normal no se puede ocultar por completo la interfaz del navegador: es una limitación del navegador.',
+          ok: 'Entendido'
+        },
+        de: {
+          title: 'Vollbild (ohne Adressleiste)',
+          body: 'Safari: Teilen → Zum Home-Bildschirm, dann über das Symbol öffnen. Chrome (Android): ⋮ → App installieren / Zum Startbildschirm hinzufügen. In einem normalen Tab lässt sich die Browser-Leiste nicht vollständig ausblenden — Browser-Limitierung.',
+          ok: 'OK'
+        },
+        fr: {
+          title: 'Plein écran (sans barre d’adresse)',
+          body: 'Safari : Partager → Sur l’écran d’accueil, puis ouvrir via l’icône. Chrome (Android) : ⋮ → Installer l’app / Ajouter à l’écran d’accueil. Dans un onglet classique, l’interface du navigateur ne peut pas être entièrement masquée — limitation du navigateur.',
+          ok: 'Compris'
+        },
+        it: {
+          title: 'Schermo intero (senza barra indirizzi)',
+          body: 'Safari: Condividi → Aggiungi a Home, poi apri dall’icona. Chrome (Android): ⋮ → Installa app / Aggiungi a schermata Home. In una scheda normale non si può nascondere del tutto la barra del browser — limitazione del browser.',
+          ok: 'OK'
+        },
+        tr: {
+          title: 'Tam ekran (adres çubuğu yok)',
+          body: 'Safari: Paylaş → Ana Ekrana Ekle, ardından simgeden açın. Chrome (Android): ⋮ → Uygulamayı yükle / Ana ekrana ekle. Normal sekmede tarayıcı arayüzü tamamen gizlenemez — tarayıcı sınırıdır.',
+          ok: 'Tamam'
+        },
+        vi: {
+          title: 'Toàn màn hình (không thanh địa chỉ)',
+          body: 'Safari: Chia sẻ → Thêm vào Màn hình chính, rồi mở từ biểu tượng. Chrome (Android): ⋮ → Cài đặt ứng dụng / Thêm vào màn hình chính. Trong tab thường không thể ẩn hoàn toàn giao diện trình duyệt — đây là giới hạn của trình duyệt.',
+          ok: 'Đã hiểu'
+        }
+      };
+
+      function hintStringsForLocale() {
+        try {
+          var list = navigator.languages && navigator.languages.length
+            ? navigator.languages
+            : [navigator.language || 'en'];
+          for (var i = 0; i < list.length; i++) {
+            var base = String(list[i] || '').toLowerCase().split('-')[0];
+            if (PWA_HINT_I18N[base]) return PWA_HINT_I18N[base];
+          }
+        } catch (e) {}
+        return PWA_HINT_I18N.en;
+      }
+
+      function isStandalone() {
+        try {
+          if (window.navigator.standalone === true) return true;
+          if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
+          if (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches) return true;
+        } catch (e) {}
+        return false;
+      }
+      function isMobile() {
+        var ua = navigator.userAgent || '';
+        return /iPhone|iPad|iPod|Android/i.test(ua);
+      }
+      function showHint() {
+        try {
+          // Hint is now shown from Flutter after successful login.
+          return;
+          if (sessionStorage.getItem('restodocks_pwa_chrome_hint_dismissed') === '1') return;
+          if (!isMobile() || isStandalone()) return;
+          if (isAuthOrEntryPath(getFlutterPath())) return;
+          var s = hintStringsForLocale();
+          titleEl.textContent = s.title;
+          bodyEl.textContent = s.body;
+          closeBtn.textContent = s.ok;
+          hint.classList.add('show');
+        } catch (e) {}
+      }
+      closeBtn.addEventListener('click', function () {
+        try { sessionStorage.setItem('restodocks_pwa_chrome_hint_dismissed', '1'); } catch (e) {}
+        hint.classList.remove('show');
+      });
+      // После первого кадра Flutter — не перекрываем HTML-сплэш.
+      window.addEventListener('flutter-first-frame', function () {
+        setTimeout(showHint, 800);
+      });
+    })();
+  </script>
+  <script>
     // iOS Safari: лёгкий сдвиг scroll иногда помогает свернуть адресную строку после первого кадра (без поломки вёрстки).
     window.addEventListener('flutter-first-frame', function () {
       try {
@@ -211,66 +393,90 @@
     });
   </script>
   <script>
-    // Keep Safari/Chrome mobile top UI collapsible while user scrolls Flutter content.
+    // Докрутка document scroll — только если в настройках включено (localStorage).
     (function () {
       var ua = navigator.userAgent || '';
       var isMobile = /iPhone|iPad|iPod|Android/i.test(ua);
       if (!isMobile) return;
       if (window.navigator.standalone) return;
+
+      // Сильнее дергаем document scroll сразу в альбоме на телефоне (API «свернуть строку» нет).
+      function landscapeChromeKick() {
+        try {
+          if (!/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '')) return;
+          if (window.innerWidth <= window.innerHeight) return;
+          if (Math.min(window.innerWidth, window.innerHeight) >= 600) return;
+          var doc = document.documentElement;
+          var vh = window.innerHeight || 0;
+          var sh = doc ? doc.scrollHeight : 0;
+          if (sh <= vh + 4) return;
+          var maxY = Math.max(0, sh - vh);
+          var y0 = window.scrollY || 0;
+          function ping(i) {
+            if (i > 4) {
+              window.scrollTo(0, Math.min(y0, maxY));
+              return;
+            }
+            var bump = (i % 2 === 1) ? 2 : 3;
+            window.scrollTo(0, Math.min(y0 + bump, maxY));
+            requestAnimationFrame(function () {
+              window.scrollTo(0, Math.min(y0, maxY));
+              requestAnimationFrame(function () { ping(i + 1); });
+            });
+          }
+          ping(0);
+        } catch (_) {}
+      }
+
       var ticking = false;
-      var warmup;
-      var touchY = null;
+      var warmup = null;
       function nudge() {
         if (ticking) return;
         ticking = true;
         requestAnimationFrame(function () {
           try {
             var y = window.scrollY || 0;
-            // Keep tiny document offset so browser bars stay collapsible.
-            if (y < 1 || y > 6) window.scrollTo(0, 2);
+            if (window.innerWidth > window.innerHeight) {
+              if (y < 1 || y > 6) window.scrollTo(0, 2);
+            } else {
+              if (y < 1 || y > 6) window.scrollTo(0, 2);
+            }
           } catch (_) {}
           ticking = false;
         });
       }
-      function hardNudge(dir) {
-        try {
-          var y = window.scrollY || 0;
-          var delta = dir < 0 ? -2 : 2;
-          window.scrollTo(0, Math.max(1, y + delta));
-        } catch (_) {}
-      }
       function startWarmup() {
         var t = 0;
-        clearInterval(warmup);
+        if (warmup) clearInterval(warmup);
         warmup = setInterval(function () {
           t += 1;
           nudge();
-          if (t > 40) clearInterval(warmup);
-        }, 120);
+          if (t > 80) {
+            if (warmup) clearInterval(warmup);
+            warmup = null;
+          }
+        }, 90);
       }
-      window.addEventListener('flutter-first-frame', startWarmup);
+      window.addEventListener('flutter-first-frame', function () {
+        startWarmup();
+        setTimeout(function () {
+          if (window.innerWidth > window.innerHeight) landscapeChromeKick();
+        }, 60);
+      });
       window.addEventListener('pageshow', startWarmup);
       window.addEventListener('focus', startWarmup);
-      document.addEventListener('touchstart', function (e) {
-        touchY = (e.touches && e.touches[0]) ? e.touches[0].clientY : null;
+      document.addEventListener('touchstart', function () {
         nudge();
       }, { passive: true });
-      window.addEventListener('touchmove', function (e) {
-        var y = (e.touches && e.touches[0]) ? e.touches[0].clientY : null;
-        if (touchY != null && y != null) {
-          // emulate slight page scroll in same direction as finger movement
-          hardNudge(y < touchY ? 1 : -1);
-          touchY = y;
-        } else {
-          nudge();
-        }
+      document.addEventListener('touchmove', function () {
+        nudge();
       }, { passive: true });
-      window.addEventListener('scroll', nudge, { passive: true });
       window.addEventListener('orientationchange', function () {
-        var spacer = document.getElementById('safari-scroll-spacer');
-        if (spacer) spacer.style.height = (window.innerWidth > window.innerHeight) ? '180px' : '140px';
         setTimeout(nudge, 120);
         setTimeout(nudge, 360);
+        setTimeout(landscapeChromeKick, 40);
+        setTimeout(landscapeChromeKick, 200);
+        setTimeout(landscapeChromeKick, 450);
         setTimeout(startWarmup, 450);
       });
     })();

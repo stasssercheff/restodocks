@@ -1361,7 +1361,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
     }
 
     final mq = MediaQuery.of(context);
-    final narrowScreen = mq.size.width < 560;
+    final narrowScreen = mq.size.shortestSide < 560;
     final keyboardOpen = mq.viewInsets.bottom > 0;
     final hdrPad = EdgeInsets.symmetric(
       horizontal: narrowScreen ? 8 : 12,

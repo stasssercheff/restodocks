@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../core/config/roles_config.dart';
 import '../models/models.dart';
+import '../utils/layout_breakpoints.dart';
 import '../utils/number_format_utils.dart';
 import '../utils/employee_display_utils.dart';
 import '../services/services.dart';
@@ -305,7 +306,7 @@ class _EmployeeTableHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // На мобильном заголовок таблицы не нужен — карточки многострочные
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = isHandheldNarrowLayout(context);
     if (isMobile) return const SizedBox.shrink();
 
     final theme = Theme.of(context);
@@ -358,7 +359,7 @@ class _EmployeeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = isHandheldNarrowLayout(context);
     return isMobile ? _buildMobile(context) : _buildDesktop(context);
   }
 

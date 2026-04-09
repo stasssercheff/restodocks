@@ -19,6 +19,7 @@ import '../services/app_toast_service.dart';
 import '../services/services.dart';
 import '../services/tech_card_cost_hydrator.dart';
 import '../services/tech_card_nutrition_hydrator.dart';
+import '../utils/layout_breakpoints.dart';
 import '../utils/number_format_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 import 'excel_style_ttk_table.dart';
@@ -743,13 +744,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     with
         AutoSaveMixin<TechCardEditScreen>,
         InputChangeListenerMixin<TechCardEditScreen> {
+  static final Set<String> _openedTechCardsSession = <String>{};
   TechCard? _techCard;
   bool _loading = true;
   bool _technologyTranslating = false;
   String? _error;
 
   /// 0=подготовка, 1=полная форма. Растягиваем билд по кадрам — без замирания.
-  int _contentPhase = 0;
+  int _contentPhase = 1;
 
   /// В режиме просмотра для повара `_TtkCookTable` пересчитывает значения локально.
   /// Синхронизацию обратно в родителя и автосохранение делаем с debounce и без `setState`,
@@ -896,6 +898,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   bool _reconciling = false;
   DateTime _lastReconcileAt = DateTime.fromMillisecondsSinceEpoch(0);
   Timer? _portionWeightUpdateDebounce;
+
+  /// Только для горизонтального скролла таблицы состава — иначе [Scrollbar] цепляется к вложенному вертикальному [SingleChildScrollView] и рисуется «по центру».
+  final ScrollController _compositionTableHScrollController =
+      ScrollController();
 
   /// Время последнего пользовательского взаимодействия (ввод/тап в таблице).
   /// Используется, чтобы не запускать тяжёлый reconcile в момент, когда пользователь
@@ -1762,12 +1768,23 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       }
       final svc = context.read<TechCardServiceSupabase>();
       TechCard? tc;
+      final cardId = widget.techCardId;
+      final firstOpenInSession =
+          cardId.isNotEmpty && cardId != 'new' && _openedTechCardsSession.add(cardId);
       if (widget.initialTechCard != null) {
         tc = widget.initialTechCard;
       } else {
         tc = await svc.getTechCardById(widget.techCardId);
       }
-      if (tc != null && tc.ingredients.isEmpty) {
+      if (mounted) {
+        // Показываем экран сразу, тяжёлую догрузку выполняем уже внутри страницы.
+        setState(() {
+          _techCard = tc;
+          _loading = false;
+          _contentPhase = 1;
+        });
+      }
+      if (firstOpenInSession && tc != null && tc.ingredients.isEmpty) {
         try {
           final server = await svc.getTechCardById(
             widget.techCardId,
@@ -1776,12 +1793,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           if (server != null) tc = server;
         } catch (_) {}
       }
-      if (tc != null && tc.ingredients.isEmpty) {
+      if (firstOpenInSession && tc != null && tc.ingredients.isEmpty) {
         final filled = await svc.fillIngredientsForCardsBulk([tc]);
         if (filled.isNotEmpty) tc = filled.first;
       }
       List<TechCard> semiFinishedForCost = <TechCard>[];
-      if (tc != null) {
+      if (tc != null && firstOpenInSession) {
         var working = stripInvalidNestedPfSelfLinks(tc);
         // Нужные ПФ для расчёта цен/стоимости в таблице:
         // в режиме просмотра раньше могли не подгружаться "справочники" (loadedTechCards пустой),
@@ -2401,7 +2418,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     };
     locSvc.addListener(_localizationListener);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _load();
+      // Даем завершиться свайп-анимации перехода, и только потом стартуем загрузку.
+      // Так переход на экран ТТК не фризит посередине.
+      unawaited(_startLoadAfterRouteTransition());
 
       // Периодическая автодосвязка вложенных ПФ (например, чтобы "йогурт"
       // появился в "соус салатный" без повторного открытия редактирования).
@@ -2413,6 +2432,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         _tryReconcileOpenCard(force: false);
       });
     });
+  }
+
+  Future<void> _startLoadAfterRouteTransition() async {
+    if (!_isNew) {
+      await Future<void>.delayed(const Duration(milliseconds: 320));
+    }
+    if (!mounted) {
+      return;
+    }
+    await _load();
   }
 
   @override
@@ -2432,6 +2461,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     _descriptionForHallController.dispose();
     _compositionForHallController.dispose();
     _sellingPriceController.dispose();
+    _compositionTableHScrollController.dispose();
     super.dispose();
   }
 
@@ -4613,7 +4643,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     VoidCallback? onRemove,
     VoidCallback? onTap,
   }) {
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = isHandheldNarrowLayout(context);
     final size = isMobile ? double.infinity : 100.0;
 
     Widget image() {
@@ -4788,34 +4818,29 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         !effectiveCanEdit; // Повар - кухня без прав редактирования
 
     // Определяем, является ли устройство мобильным
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = isHandheldNarrowLayout(context);
 
     if (_isNew && !effectiveCanEdit) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) context.pushReplacement('/tech-cards');
       });
       return Scaffold(
-        appBar: AppBar(
-            leading: appBarBackButton(context),
-            title: Text(loc.t('tech_cards'))),
+        appBar:
+            AppBar(leading: appBarBackButton(context), title: const Text('ТТК')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(
-            leading: appBarBackButton(context),
-            title:
-                Text(_isNew ? loc.t('create_tech_card') : loc.t('tech_cards'))),
+        appBar:
+            AppBar(leading: appBarBackButton(context), title: const Text('ТТК')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(
-            leading: appBarBackButton(context),
-            title:
-                Text(_isNew ? loc.t('create_tech_card') : loc.t('tech_cards'))),
+        appBar:
+            AppBar(leading: appBarBackButton(context), title: const Text('ТТК')),
         body: Center(
             child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -4833,12 +4858,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
     // Фаза 0: лёгкий placeholder, полная форма — в след. кадре (без замирания)
     if (!_isNew && _contentPhase == 0) {
-      final name = _techCard?.getDisplayNameInLists(loc.currentLanguageCode) ??
-          loc.t('tech_cards');
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
-          title: Text(name),
+          title: const Text('ТТК'),
         ),
         body: Center(
           child: Column(
@@ -4881,8 +4904,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
-          title:
-              Text(_techCard!.getDisplayNameInLists(loc.currentLanguageCode)),
+          title: const Text('ТТК'),
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -4967,10 +4989,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 tooltip: loc.t('back'),
               )
             : appBarBackButton(context),
-        title: Text(_isNew
-            ? loc.t('create_tech_card')
-            : (_techCard?.getDisplayNameInLists(loc.currentLanguageCode) ??
-                loc.t('tech_cards'))),
+        title: Text(_isNew ? loc.t('create_tech_card') : 'ТТК'),
         actions: [
           if (effectiveCanEdit)
             IconButton(
@@ -5374,22 +5393,40 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                   ?.copyWith(fontWeight: FontWeight.bold)),
                           const SizedBox(height: 8),
                         ],
-                        // Таблица ТТК на странице: без «окна», при росте числа продуктов страница скроллится, технология остаётся ниже
+                        // Таблица ТТК в отдельном «окне»:
+                        // зум внутри, а горизонтальная шкала всегда в самом низу области таблицы.
                         SizedBox(
                           width: constraints.maxWidth,
-                          child: Scrollbar(
-                            thumbVisibility: true,
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              clipBehavior: Clip.hardEdge,
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.vertical,
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    minWidth: 0,
-                                    minHeight: 220,
-                                  ),
-                                  child: effectiveCanEdit
+                          child: LayoutBuilder(
+                            builder: (context, tableConstraints) {
+                              final tableViewportHeight = (isMobile
+                                      ? MediaQuery.sizeOf(context).height * 0.42
+                                      : MediaQuery.sizeOf(context).height * 0.50)
+                                  .clamp(220.0, 520.0);
+                              return SizedBox(
+                                height: tableViewportHeight,
+                                child: RawScrollbar(
+                                  controller: _compositionTableHScrollController,
+                                  scrollbarOrientation:
+                                      ScrollbarOrientation.bottom,
+                                  thumbVisibility: true,
+                                  child: SingleChildScrollView(
+                                    controller: _compositionTableHScrollController,
+                                    scrollDirection: Axis.horizontal,
+                                    clipBehavior: Clip.hardEdge,
+                                    child: SingleChildScrollView(
+                                      scrollDirection: Axis.vertical,
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          minWidth: tableConstraints.maxWidth,
+                                          minHeight: 220,
+                                        ),
+                                        child: InteractiveViewer(
+                                          panEnabled: false,
+                                          scaleEnabled: true,
+                                          minScale: 0.75,
+                                          maxScale: 2.2,
+                                          child: effectiveCanEdit
                                       ? RepaintBoundary(
                                           child: ExcelStyleTtkTable(
                                             loc: loc,
@@ -5530,10 +5567,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                               ),
                                             );
                                           },
+                                          ),
                                         ),
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
+                              );
+                            },
                           ),
                         ),
                         // Кнопка «Подстроить % отхода под целевой выход» — отдельно под таблицей, не на панели, компактная

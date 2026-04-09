@@ -77,8 +77,16 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final mq = MediaQuery.of(context);
+    final landPhone =
+        mq.orientation == Orientation.landscape && mq.size.shortestSide < 600;
+    // В Safari landscape боковые inset'ы дают «полосы»; контент формы можно тянуть на всю ширину.
+    final stripSideInsets = kIsWeb && landPhone;
+    final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
+        toolbarHeight: landPhone ? 44 : kToolbarHeight,
         leading:
             GoRouter.of(context).canPop() ? appBarBackButton(context) : null,
         title: Text(loc.t('login')),
@@ -91,13 +99,20 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
       body: SafeArea(
+        left: !stripSideInsets,
+        right: !stripSideInsets,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: EdgeInsets.fromLTRB(
+            landPhone ? 12 : 24,
+            landPhone ? 8 : 24,
+            landPhone ? 12 : 24,
+            landPhone ? 16 : 24,
+          ),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: _buildFormChildren(loc),
+              children: _buildFormChildren(loc, compact: landPhone),
             ),
           ),
         ),
@@ -105,20 +120,31 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  List<Widget> _buildFormChildren(LocalizationService loc) {
+  List<Widget> _buildFormChildren(LocalizationService loc,
+      {bool compact = false}) {
+    final welcomeStyle = compact
+        ? Theme.of(context).textTheme.titleLarge
+        : Theme.of(context).textTheme.headlineMedium;
+    final subStyle = compact
+        ? Theme.of(context).textTheme.bodyMedium
+        : Theme.of(context).textTheme.bodyLarge;
+    final fieldGap = compact ? 10.0 : 16.0;
+    final sectionGap = compact ? 14.0 : 32.0;
+    final btnVPad = compact ? 12.0 : 16.0;
+    final btnVPadOutlined = compact ? 10.0 : 14.0;
     return [
       Text(
         loc.t('welcome'),
-        style: Theme.of(context).textTheme.headlineMedium,
+        style: welcomeStyle,
         textAlign: TextAlign.center,
       ),
-      const SizedBox(height: 8),
+      SizedBox(height: compact ? 4 : 8),
       Text(
         loc.t('enter_credentials'),
-        style: Theme.of(context).textTheme.bodyLarge,
+        style: subStyle,
         textAlign: TextAlign.center,
       ),
-      const SizedBox(height: 32),
+      SizedBox(height: sectionGap),
       // Только поля входа: так Safari/Chrome на телефоне связывают username+password (как на десктопе).
       AutofillGroup(
         child: Column(
@@ -132,6 +158,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 AutofillHints.email
               ],
               decoration: InputDecoration(
+                isDense: compact,
                 labelText: loc.t('email'),
                 hintText: loc.t('enter_email'),
                 prefixIcon: const Icon(Icons.email),
@@ -150,12 +177,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 return null;
               },
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: fieldGap),
             TextFormField(
               controller: _passwordController,
               focusNode: _passwordFocusNode,
               autofillHints: const [AutofillHints.password],
               decoration: InputDecoration(
+                isDense: compact,
                 labelText: loc.t('password'),
                 hintText: loc.t('enter_password'),
                 prefixIcon: const Icon(Icons.lock),
@@ -182,7 +210,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
       ),
-      const SizedBox(height: 4),
+      SizedBox(height: compact ? 2 : 4),
       Align(
         alignment: Alignment.centerRight,
         child: TextButton(
@@ -190,7 +218,7 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Text(loc.t('forgot_password') ?? 'Забыли пароль?'),
         ),
       ),
-      const SizedBox(height: 16),
+      SizedBox(height: fieldGap),
       if (_errorMessage != null)
         Container(
           padding: const EdgeInsets.all(12),
@@ -235,11 +263,11 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
         ),
-      const SizedBox(height: 24),
+      SizedBox(height: compact ? 12 : 24),
       ElevatedButton(
         onPressed: _isLoading ? null : _login,
         style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 16)),
+            padding: EdgeInsets.symmetric(vertical: btnVPad)),
         child: _isLoading
             ? const SizedBox(
                 height: 20,
@@ -247,33 +275,33 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: CircularProgressIndicator(strokeWidth: 2))
             : Text(loc.t('login')),
       ),
-      const SizedBox(height: 16),
+      SizedBox(height: compact ? 8 : 16),
       OutlinedButton(
         onPressed: () => _showRegistrationLegalDialog(
           onContinue: () => context.push('/register-company'),
         ),
         style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14)),
+            padding: EdgeInsets.symmetric(vertical: btnVPadOutlined)),
         child: Text(loc.t('register_owner')),
       ),
-      const SizedBox(height: 12),
+      SizedBox(height: compact ? 6 : 12),
       OutlinedButton(
         onPressed: () => _showRegistrationLegalDialog(
           onContinue: () => context.push('/register'),
         ),
         style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14)),
+            padding: EdgeInsets.symmetric(vertical: btnVPadOutlined)),
         child: Text(loc.t('register_employee')),
       ),
-      const SizedBox(height: 12),
+      SizedBox(height: compact ? 6 : 12),
       OutlinedButton.icon(
         onPressed: _showPublicLegalLinksDialog,
         icon: const Icon(Icons.gavel_outlined),
         style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 14)),
+            padding: EdgeInsets.symmetric(vertical: btnVPadOutlined)),
         label: Text(loc.t('legal_offer_and_privacy_button')),
       ),
-      const SizedBox(height: 32),
+      SizedBox(height: compact ? 16 : 32),
       Text(
         loc.t('login_footer_contact'),
         textAlign: TextAlign.center,
@@ -281,7 +309,7 @@ class _LoginScreenState extends State<LoginScreen> {
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
       ),
-      const SizedBox(height: 8),
+      SizedBox(height: compact ? 4 : 8),
       Center(
         child: InkWell(
           onTap: () async {

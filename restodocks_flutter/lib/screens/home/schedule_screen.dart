@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 import '../../models/models.dart';
 import '../../services/schedule_storage_service.dart';
 import '../../services/services.dart';
+import '../../utils/layout_breakpoints.dart';
 import '../../utils/translit_utils.dart';
 import '../../widgets/app_bar_home_button.dart';
 
@@ -44,7 +45,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   static const double _rowHeight = 44;
 
   // Определяем, является ли устройство мобильным
-  bool get isMobile => MediaQuery.of(context).size.width < 600;
+  bool get isMobile => isHandheldNarrowLayout(context);
 
   final ScrollController _horizontalScrollController = ScrollController();
 
@@ -1181,7 +1182,7 @@ class _ScheduleCellDialogState extends State<_ScheduleCellDialog> {
   @override
   Widget build(BuildContext context) {
     final loc = widget.loc;
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final isMobile = isHandheldNarrowLayout(context);
 
     if (isMobile) {
       return Dialog(

@@ -1379,12 +1379,19 @@ class AppRouter {
               }
               final viewOnly = state.queryParameters['view'] == '1';
               final hallView = state.queryParameters['hall'] == '1';
+              TechCard? initialTechCard;
+              final extra = state.extra;
+              if (extra is Map && extra['initialTechCard'] is TechCard) {
+                initialTechCard = extra['initialTechCard'] as TechCard;
+              }
               return _slideTransitionPage(
                   state,
-                  _DeferredTechCardEdit(
-                      techCardId: segment,
-                      forceViewMode: viewOnly,
-                      forceHallView: hallView));
+                  TechCardEditScreen(
+                    techCardId: segment,
+                    forceViewMode: viewOnly,
+                    forceHallView: hallView,
+                    initialTechCard: initialTechCard,
+                  ));
             },
           ),
 
@@ -1486,115 +1493,6 @@ class _SplashScreenState extends State<SplashScreen> {
     return const Scaffold(
       backgroundColor: AppTheme.primaryColor,
       body: BrandedAuthLoading(fullscreenLogo: true),
-    );
-  }
-}
-
-/// Placeholder для /tech-cards/:id: загружаем ТТК в лёгком виджете, затем строим тяжёлый экран.
-/// Устраняет замирание: не строим TechCardEditScreen до получения данных.
-class _DeferredTechCardEdit extends StatefulWidget {
-  const _DeferredTechCardEdit({
-    required this.techCardId,
-    this.forceViewMode = false,
-    this.forceHallView = false,
-  });
-  final String techCardId;
-  final bool forceViewMode;
-  final bool forceHallView;
-
-  @override
-  State<_DeferredTechCardEdit> createState() => _DeferredTechCardEditState();
-}
-
-class _DeferredTechCardEditState extends State<_DeferredTechCardEdit> {
-  TechCard? _loadedCard;
-  String? _loadError;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadTechCard());
-  }
-
-  Future<void> _loadTechCard() async {
-    if (!mounted) return;
-    try {
-      final svc = context.read<TechCardServiceSupabase>();
-      var tc = await svc.getTechCardById(widget.techCardId);
-      if (tc != null && tc.ingredients.isEmpty) {
-        try {
-          final server =
-              await svc.getTechCardById(widget.techCardId, preferCache: false);
-          if (server != null) tc = server;
-        } catch (_) {}
-      }
-      if (tc != null && tc.ingredients.isEmpty) {
-        final filled = await svc.fillIngredientsForCardsBulk([tc]);
-        if (filled.isNotEmpty) tc = filled.first;
-      }
-      if (!mounted) return;
-      setState(() {
-        _loadedCard = tc;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loadError = e.toString();
-        _loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_loading) {
-      final loc = context.read<LocalizationService>();
-      return Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
-          ),
-          title: Text(loc.t('tech_cards')),
-        ),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-    if (_loadError != null) {
-      final loc = context.read<LocalizationService>();
-      return Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
-          ),
-          title: Text(loc.t('tech_cards')),
-        ),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(_loadError!),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: () => context.pop(),
-                  child: Text(loc.t('back')),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-    return TechCardEditScreen(
-      techCardId: widget.techCardId,
-      initialTechCard: _loadedCard,
-      forceViewMode: widget.forceViewMode,
-      forceHallView: widget.forceHallView,
     );
   }
 }

@@ -27,9 +27,8 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
   DateTime? _orderDateTo;
   DateTime? _deliveryDateFrom;
   DateTime? _deliveryDateTo;
-
-  /// Пока false — без явных дат в фильтре: вчера, сегодня и завтра (заказ и/или привоз).
-  bool _useCustomDateFilters = false;
+  /// Режимы фильтра дат: order_range | delivery_range.
+  String _dateFilterMode = 'order_range';
   List<String> _templateSupplierNames = [];
 
   @override
@@ -127,26 +126,6 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
     return (header['supplierName'] ?? '—').toString();
   }
 
-  DateTime _dayOnly(DateTime d) => DateTime(d.year, d.month, d.day);
-
-  /// Вчера, сегодня, завтра — для раннего привоза или задержки.
-  bool _dateInDefaultThreeDayWindow(DateTime? dt) {
-    if (dt == null) return false;
-    final day = _dayOnly(dt);
-    final now = DateTime.now();
-    final start = _dayOnly(now).subtract(const Duration(days: 1));
-    final end = _dayOnly(now).add(const Duration(days: 1));
-    return !day.isBefore(start) && !day.isAfter(end);
-  }
-
-  bool _matchesDefaultThreeDayWindow(Map<String, dynamic> doc) {
-    final od = _parseOrderDate(doc);
-    final dd = _parseDeliveryDate(doc);
-    if (_dateInDefaultThreeDayWindow(dd)) return true;
-    if (_dateInDefaultThreeDayWindow(od)) return true;
-    return false;
-  }
-
   bool _matchesProductSearch(Map<String, dynamic> doc, String q) {
     if (q.isEmpty) return true;
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
@@ -168,7 +147,7 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
     if (q.isNotEmpty) {
       list = list.where((d) => _matchesProductSearch(d, q)).toList();
     }
-    if (_useCustomDateFilters) {
+    if (_dateFilterMode == 'order_range') {
       if (_orderDateFrom != null) {
         list = list.where((d) {
           final dt = _parseOrderDate(d);
@@ -186,6 +165,7 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
           return !dt.isAfter(end);
         }).toList();
       }
+    } else if (_dateFilterMode == 'delivery_range') {
       if (_deliveryDateFrom != null) {
         list = list.where((d) {
           final dt = _parseDeliveryDate(d);
@@ -203,8 +183,6 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
           return !dt.isAfter(end);
         }).toList();
       }
-    } else {
-      list = list.where(_matchesDefaultThreeDayWindow).toList();
     }
     list.sort((a, b) {
       final ta = _parseOrderDate(a) ?? DateTime(0);
@@ -228,128 +206,184 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
     return list;
   }
 
-  Future<void> _pickDate(bool delivery, bool isStart) async {
-    final initial = DateTime.now();
-    final d = await showDatePicker(
+  Future<void> _pickOrderDateRange() async {
+    DateTimeRange? initial;
+    if (_orderDateFrom != null && _orderDateTo != null) {
+      initial = DateTimeRange(
+        start: _orderDateFrom!,
+        end: _orderDateTo!,
+      );
+    }
+    final range = await showDateRangePicker(
       context: context,
-      initialDate: initial,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
+      initialDateRange: initial,
+      builder: _buildCompactRangePicker,
     );
-    if (d == null || !mounted) return;
+    if (range == null || !mounted) return;
     setState(() {
-      _useCustomDateFilters = true;
-      if (delivery) {
-        if (isStart) {
-          _deliveryDateFrom = d;
-        } else {
-          _deliveryDateTo = d;
-        }
-      } else {
-        if (isStart) {
-          _orderDateFrom = d;
-        } else {
-          _orderDateTo = d;
-        }
+      _orderDateFrom = range.start;
+      _orderDateTo = range.end;
+    });
+  }
+
+  Future<void> _pickDeliveryDateRange() async {
+    DateTimeRange? initial;
+    if (_deliveryDateFrom != null && _deliveryDateTo != null) {
+      initial = DateTimeRange(
+        start: _deliveryDateFrom!,
+        end: _deliveryDateTo!,
+      );
+    }
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      initialDateRange: initial,
+      builder: _buildCompactRangePicker,
+    );
+    if (range == null || !mounted) return;
+    setState(() {
+      _deliveryDateFrom = range.start;
+      _deliveryDateTo = range.end;
+    });
+  }
+
+  Future<void> _selectDateMode(String mode) async {
+    setState(() {
+      _dateFilterMode = mode;
+      if (mode == 'order_range') {
+        _deliveryDateFrom = null;
+        _deliveryDateTo = null;
+      } else if (mode == 'delivery_range') {
+        _orderDateFrom = null;
+        _orderDateTo = null;
       }
     });
+    if (mode == 'order_range') {
+      await _pickOrderDateRange();
+      return;
+    }
+    await _pickDeliveryDateRange();
+  }
+
+  Widget _buildCompactRangePicker(BuildContext context, Widget? child) {
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(
+        datePickerTheme: theme.datePickerTheme.copyWith(
+          rangePickerHeaderHeadlineStyle:
+              theme.textTheme.titleMedium?.copyWith(fontSize: 12),
+          rangePickerHeaderHelpStyle:
+              theme.textTheme.labelSmall?.copyWith(fontSize: 11),
+        ),
+        inputDecorationTheme: (theme.inputDecorationTheme).copyWith(
+          hintStyle: theme.textTheme.headlineSmall?.copyWith(
+            fontSize: 13,
+            fontWeight: FontWeight.w400,
+            letterSpacing: -0.2,
+          ),
+        ),
+      ),
+      child: MediaQuery(
+        data: MediaQuery.of(context)
+            .copyWith(textScaler: const TextScaler.linear(0.78)),
+        child: child ?? const SizedBox.shrink(),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final df = DateFormat('dd.MM.yyyy');
-
-    return Column(
+    final theme = Theme.of(context);
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+    final headerContent = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
           child: Text(
             loc.t('pos_procurement_receiving_hint'),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+            style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
           ),
         ),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(
-                width: 200,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      loc.t('pos_procurement_filter_supplier'),
-                      style: Theme.of(context).textTheme.labelSmall,
+              DropdownButtonFormField<String?>(
+                initialValue: _supplierFilter,
+                decoration: InputDecoration(
+                  labelText: loc.t('pos_procurement_filter_supplier'),
+                  isDense: true,
+                ),
+                items: [
+                  DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text(loc.t('pos_procurement_filter_all')),
+                  ),
+                  ..._supplierNamesSorted
+                      .map((n) => DropdownMenuItem(value: n, child: Text(n))),
+                ],
+                onChanged: (v) => setState(() => _supplierFilter = v),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                loc.t('pos_procurement_filter_period'),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _selectDateMode('order_range'),
+                      child: Text(
+                        loc.currentLanguageCode == 'ru'
+                            ? 'Заказ дата'
+                            : loc.t('pos_procurement_filter_mode_order'),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                    const SizedBox(height: 4),
-                    DropdownButton<String?>(
-                      isExpanded: true,
-                      value: _supplierFilter,
-                      hint: Text(loc.t('pos_procurement_filter_all')),
-                      items: [
-                        DropdownMenuItem<String?>(
-                          value: null,
-                          child: Text(loc.t('pos_procurement_filter_all')),
-                        ),
-                        ..._supplierNamesSorted.map(
-                          (n) => DropdownMenuItem(value: n, child: Text(n)),
-                        ),
-                      ],
-                      onChanged: (v) => setState(() => _supplierFilter = v),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _selectDateMode('delivery_range'),
+                      child: Text(
+                        loc.currentLanguageCode == 'ru'
+                            ? 'Привоз дата'
+                            : loc.t('pos_procurement_filter_mode_delivery'),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              TextButton(
-                onPressed: () => _pickDate(false, true),
-                child: Text(
-                  _orderDateFrom != null
-                      ? '${loc.t('pos_procurement_filter_order_from')} ${df.format(_orderDateFrom!)}'
-                      : loc.t('pos_procurement_filter_order_from'),
+              const SizedBox(height: 4),
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: TextButton.icon(
+                  onPressed: () => setState(() {
+                    _supplierFilter = null;
+                    _orderDateFrom = null;
+                    _orderDateTo = null;
+                    _deliveryDateFrom = null;
+                    _deliveryDateTo = null;
+                    _dateFilterMode = 'order_range';
+                  }),
+                  icon: const Icon(Icons.clear_all, size: 20),
+                  label: Text(loc.t('pos_procurement_filter_clear')),
                 ),
-              ),
-              TextButton(
-                onPressed: () => _pickDate(false, false),
-                child: Text(
-                  _orderDateTo != null
-                      ? '${loc.t('pos_procurement_filter_order_to')} ${df.format(_orderDateTo!)}'
-                      : loc.t('pos_procurement_filter_order_to'),
-                ),
-              ),
-              TextButton(
-                onPressed: () => _pickDate(true, true),
-                child: Text(
-                  _deliveryDateFrom != null
-                      ? '${loc.t('pos_procurement_filter_delivery_from')} ${df.format(_deliveryDateFrom!)}'
-                      : loc.t('pos_procurement_filter_delivery_from'),
-                ),
-              ),
-              TextButton(
-                onPressed: () => _pickDate(true, false),
-                child: Text(
-                  _deliveryDateTo != null
-                      ? '${loc.t('pos_procurement_filter_delivery_to')} ${df.format(_deliveryDateTo!)}'
-                      : loc.t('pos_procurement_filter_delivery_to'),
-                ),
-              ),
-              IconButton(
-                tooltip: loc.t('pos_procurement_filter_clear'),
-                onPressed: () => setState(() {
-                  _supplierFilter = null;
-                  _orderDateFrom = null;
-                  _orderDateTo = null;
-                  _deliveryDateFrom = null;
-                  _deliveryDateTo = null;
-                  _useCustomDateFilters = false;
-                }),
-                icon: const Icon(Icons.clear_all),
               ),
             ],
           ),
@@ -380,6 +414,19 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
           ),
         ),
         const SizedBox(height: 8),
+      ],
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (isLandscape)
+          SizedBox(
+            height: 260,
+            child: SingleChildScrollView(child: headerContent),
+          )
+        else
+          headerContent,
         Expanded(
           child: _loading
               ? const Center(child: CircularProgressIndicator())
