@@ -21,6 +21,7 @@ import 'core/supabase_env.dart';
 import 'core/public_app_origin.dart';
 import 'core/supabase_retry_http_client.dart';
 import 'utils/dev_log.dart';
+import 'utils/layout_breakpoints.dart';
 import 'core/initial_location_stub.dart'
     if (dart.library.html) 'core/initial_location_web.dart' as initial_loc;
 import 'core/supabase_url_resolver_stub.dart'
@@ -379,17 +380,21 @@ class RestodocksApp extends StatelessWidget {
                       (kIsWeb ||
                           defaultTargetPlatform == TargetPlatform.iOS ||
                           defaultTargetPlatform == TargetPlatform.android);
-                  // Альбом: Safari даёт большие боковые inset'ы; контент оказывается в «окошке», по бокам
-                  // полосы цвета браузера/primary. Убираем горизонтальные padding/viewPadding везде
-                  // на вебе в альбоме и на телефоне в альбоме (iPad в портрете не трогаем).
+                  // Альбом: на вебе убираем боковые inset'ы (полосы браузера).
+                  // Нативно: сбрасываем только на «классических» экранах без выреза; иначе
+                  // сохраняем safe area и центрируем холст (IPA), чтобы не лезть под камеру/DI.
                   final landscape = media.orientation == Orientation.landscape;
-                  final stripLandscapeSideInsets =
-                      landscape && (kIsWeb || narrowPhone);
-                  // Для телефонов: у внешней области всегда явная заливка (без белых «пустот»).
-                  final phoneWebFill = kIsWeb && narrowPhone;
-                  // Референс «как на скрине 2»: телефон в альбоме рисуем
-                  // на центрированном холсте, чтобы не растягивать UI на всю ширину.
-                  final landscapePhoneCanvas = phoneWebFill && landscape;
+                  final nativeSensorLandscape =
+                      isNativePhoneLandscapeWithSensorHousingInsets(context);
+                  final stripLandscapeSideInsets = landscape &&
+                      (kIsWeb || (narrowPhone && !nativeSensorLandscape));
+                  // Заливка по бокам от центрированного холста: веб и натив с вырезом в альбоме.
+                  final phoneLandscapeBackdropFill =
+                      narrowPhone && (kIsWeb || nativeSensorLandscape);
+                  // Центрированный холст: мобильный веб и нативный телефон с боковым safe area.
+                  final landscapePhoneCanvas = landscape &&
+                      narrowPhone &&
+                      (kIsWeb || nativeSensorLandscape);
                   var m = media;
                   if (applyMobileUiScale) {
                     m = m.copyWith(
@@ -407,7 +412,7 @@ class RestodocksApp extends StatelessWidget {
                       applyMobileUiScale || stripLandscapeSideInsets;
                   var content =
                       needsMediaWrap ? MediaQuery(data: m, child: c) : c;
-                  if (phoneWebFill) {
+                  if (phoneLandscapeBackdropFill) {
                     content = ColoredBox(
                       color: Theme.of(context).colorScheme.surface,
                       child: content,
@@ -415,10 +420,21 @@ class RestodocksApp extends StatelessWidget {
                   }
                   if (landscapePhoneCanvas) {
                     final theme = Theme.of(context);
-                    final canvasWidth = math.min(
-                      media.size.width,
-                      (media.size.width * 0.86).clamp(740.0, 920.0),
-                    );
+                    final double canvasWidth;
+                    if (kIsWeb) {
+                      canvasWidth = math.min(
+                        media.size.width,
+                        (media.size.width * 0.86).clamp(740.0, 920.0),
+                      );
+                    } else {
+                      final usableW = media.size.width -
+                          media.padding.left -
+                          media.padding.right;
+                      canvasWidth = math.min(
+                        usableW,
+                        math.max(280.0, usableW * 0.90),
+                      );
+                    }
                     final topBg = theme.appBarTheme.backgroundColor ??
                         theme.colorScheme.primary;
                     final middleBg = theme.colorScheme.surface;

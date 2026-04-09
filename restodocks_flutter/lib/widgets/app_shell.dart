@@ -12,6 +12,7 @@ import '../services/account_manager_supabase.dart';
 import '../services/home_button_config_service.dart';
 import '../services/page_tour_service.dart';
 import 'subscription_required_dialog.dart';
+import '../utils/layout_breakpoints.dart';
 
 const _kDataAccessRequiredPaths = [
   '/tech-cards',
@@ -201,8 +202,12 @@ class _AppShellState extends State<AppShell> {
         ? _AccessPendingPlaceholder(loc: loc)
         : widget.child;
     final mq = MediaQuery.of(context);
-    // Низ и бока: web в альбоме или узкий телефон в альбоме (совпадает с main.dart).
-    final patchedMq = (landscapeNarrow || landscapeWeb)
+    // Совпадает с main.dart: веб в альбоме — сброс боков; нативно — только без выреза
+    // (иначе сохраняем горизонтальный safe area под камеру / Dynamic Island).
+    final stripShellHorizontal = landscapeWeb ||
+        (landscapeNarrow &&
+            !isNativePhoneLandscapeWithSensorHousingInsets(context));
+    final patchedMq = stripShellHorizontal
         ? mq.copyWith(
             padding: mq.padding.copyWith(left: 0, right: 0, bottom: 0),
             viewPadding: mq.viewPadding.copyWith(left: 0, right: 0, bottom: 0),
