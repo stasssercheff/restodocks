@@ -27,8 +27,8 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
   DateTime? _orderDateTo;
   DateTime? _deliveryDateFrom;
   DateTime? _deliveryDateTo;
-  /// Режимы фильтра дат: order_from | order_to | delivery_range.
-  String _dateFilterMode = 'order_from';
+  /// Режимы фильтра дат: order_range | delivery_range.
+  String _dateFilterMode = 'order_range';
   List<String> _templateSupplierNames = [];
 
   @override
@@ -147,21 +147,24 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
     if (q.isNotEmpty) {
       list = list.where((d) => _matchesProductSearch(d, q)).toList();
     }
-    if (_dateFilterMode == 'order_from' && _orderDateFrom != null) {
-      list = list.where((d) {
-        final dt = _parseOrderDate(d);
-        if (dt == null) return false;
-        return !dt.isBefore(DateTime(
-            _orderDateFrom!.year, _orderDateFrom!.month, _orderDateFrom!.day));
-      }).toList();
-    } else if (_dateFilterMode == 'order_to' && _orderDateTo != null) {
-      final end = DateTime(
-          _orderDateTo!.year, _orderDateTo!.month, _orderDateTo!.day, 23, 59, 59);
-      list = list.where((d) {
-        final dt = _parseOrderDate(d);
-        if (dt == null) return false;
-        return !dt.isAfter(end);
-      }).toList();
+    if (_dateFilterMode == 'order_range') {
+      if (_orderDateFrom != null) {
+        list = list.where((d) {
+          final dt = _parseOrderDate(d);
+          if (dt == null) return false;
+          return !dt.isBefore(DateTime(_orderDateFrom!.year,
+              _orderDateFrom!.month, _orderDateFrom!.day));
+        }).toList();
+      }
+      if (_orderDateTo != null) {
+        final end = DateTime(_orderDateTo!.year, _orderDateTo!.month,
+            _orderDateTo!.day, 23, 59, 59);
+        list = list.where((d) {
+          final dt = _parseOrderDate(d);
+          if (dt == null) return false;
+          return !dt.isAfter(end);
+        }).toList();
+      }
     } else if (_dateFilterMode == 'delivery_range') {
       if (_deliveryDateFrom != null) {
         list = list.where((d) {
@@ -203,23 +206,24 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
     return list;
   }
 
-  Future<void> _pickOrderDate(bool isStart) async {
-    final initial = isStart
-        ? (_orderDateFrom ?? DateTime.now())
-        : (_orderDateTo ?? _orderDateFrom ?? DateTime.now());
-    final d = await showDatePicker(
+  Future<void> _pickOrderDateRange() async {
+    DateTimeRange? initial;
+    if (_orderDateFrom != null && _orderDateTo != null) {
+      initial = DateTimeRange(
+        start: _orderDateFrom!,
+        end: _orderDateTo!,
+      );
+    }
+    final range = await showDateRangePicker(
       context: context,
-      initialDate: initial,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
+      initialDateRange: initial,
     );
-    if (d == null || !mounted) return;
+    if (range == null || !mounted) return;
     setState(() {
-      if (isStart) {
-        _orderDateFrom = d;
-      } else {
-        _orderDateTo = d;
-      }
+      _orderDateFrom = range.start;
+      _orderDateTo = range.end;
     });
   }
 
@@ -244,23 +248,29 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
     });
   }
 
-  void _onPeriodModeChanged(String? v) {
-    if (v == null) return;
+  Future<void> _selectDateMode(String mode) async {
     setState(() {
-      if (v == 'order_from') {
-        _orderDateTo = null;
+      _dateFilterMode = mode;
+      if (mode == 'order_range') {
         _deliveryDateFrom = null;
         _deliveryDateTo = null;
-      } else if (v == 'order_to') {
-        _orderDateFrom = null;
-        _deliveryDateFrom = null;
-        _deliveryDateTo = null;
-      } else if (v == 'delivery_range') {
+      } else if (mode == 'delivery_range') {
         _orderDateFrom = null;
         _orderDateTo = null;
       }
-      _dateFilterMode = v;
     });
+    if (mode == 'order_range') {
+      await _pickOrderDateRange();
+      return;
+    }
+    await _pickDeliveryDateRange();
+  }
+
+  String _orderRangeLabel(LocalizationService loc, DateFormat df) {
+    if (_orderDateFrom != null && _orderDateTo != null) {
+      return '${df.format(_orderDateFrom!)} — ${df.format(_orderDateTo!)}';
+    }
+    return loc.t('pos_procurement_filter_delivery_range_empty');
   }
 
   String _deliveryRangeLabel(LocalizationService loc, DateFormat df) {
@@ -311,68 +321,44 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
                 onChanged: (v) => setState(() => _supplierFilter = v),
               ),
               const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: _dateFilterMode,
-                decoration: InputDecoration(
-                  labelText: loc.t('pos_procurement_filter_period'),
-                  isDense: true,
-                ),
-                items: [
-                  DropdownMenuItem(
-                    value: 'order_from',
-                    child: Text(loc.t('pos_procurement_filter_mode_order')),
-                  ),
-                  DropdownMenuItem(
-                    value: 'order_to',
-                    child: Text(loc.t('pos_procurement_filter_mode_both')),
-                  ),
-                  DropdownMenuItem(
-                    value: 'delivery_range',
-                    child: Text(loc.t('pos_procurement_filter_mode_delivery')),
-                  ),
-                ],
-                onChanged: _onPeriodModeChanged,
-              ),
-              const SizedBox(height: 10),
               Text(
-                loc.t('pos_procurement_filter_dates_title'),
+                loc.t('pos_procurement_filter_period'),
                 style: theme.textTheme.titleSmall?.copyWith(
                   color: theme.colorScheme.primary,
                 ),
               ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () => _selectDateMode('order_range'),
+                icon: Icon(
+                  Icons.date_range_outlined,
+                  size: 20,
+                  color: _dateFilterMode == 'order_range'
+                      ? theme.colorScheme.primary
+                      : null,
+                ),
+                label: Text(
+                  '${loc.t('pos_procurement_filter_mode_order')}\n${_orderRangeLabel(loc, df)}',
+                  maxLines: 3,
+                  textAlign: TextAlign.center,
+                ),
+              ),
               const SizedBox(height: 8),
-              if (_dateFilterMode == 'order_from')
-                OutlinedButton(
-                  onPressed: () => _pickOrderDate(true),
-                  child: Text(
-                    _orderDateFrom != null
-                        ? '${loc.t('pos_procurement_filter_order_from')}\n${df.format(_orderDateFrom!)}'
-                        : loc.t('pos_procurement_filter_order_from'),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                  ),
+              OutlinedButton.icon(
+                onPressed: () => _selectDateMode('delivery_range'),
+                icon: Icon(
+                  Icons.date_range_outlined,
+                  size: 20,
+                  color: _dateFilterMode == 'delivery_range'
+                      ? theme.colorScheme.primary
+                      : null,
                 ),
-              if (_dateFilterMode == 'order_to')
-                OutlinedButton(
-                  onPressed: () => _pickOrderDate(false),
-                  child: Text(
-                    _orderDateTo != null
-                        ? '${loc.t('pos_procurement_filter_order_to')}\n${df.format(_orderDateTo!)}'
-                        : loc.t('pos_procurement_filter_order_to'),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                  ),
+                label: Text(
+                  '${loc.t('pos_procurement_filter_mode_delivery')}\n${_deliveryRangeLabel(loc, df)}',
+                  maxLines: 3,
+                  textAlign: TextAlign.center,
                 ),
-              if (_dateFilterMode == 'delivery_range')
-                OutlinedButton.icon(
-                  onPressed: _pickDeliveryDateRange,
-                  icon: const Icon(Icons.date_range_outlined, size: 20),
-                  label: Text(
-                    '${loc.t('pos_procurement_filter_delivery_range_pick')}\n${_deliveryRangeLabel(loc, df)}',
-                    maxLines: 3,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
+              ),
               const SizedBox(height: 4),
               Align(
                 alignment: AlignmentDirectional.centerEnd,
@@ -383,7 +369,7 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
                     _orderDateTo = null;
                     _deliveryDateFrom = null;
                     _deliveryDateTo = null;
-                    _dateFilterMode = 'order_from';
+                    _dateFilterMode = 'order_range';
                   }),
                   icon: const Icon(Icons.clear_all, size: 20),
                   label: Text(loc.t('pos_procurement_filter_clear')),
