@@ -54,6 +54,15 @@ class EstablishmentDataWarmupService {
     Establishment? establishment,
   }) async {
     try {
+      final techCardScopeIds = _techCardWarmupEstablishmentIds(
+        dataEstablishmentId: dataEstablishmentId,
+        establishment: establishment,
+      );
+      if (establishment != null) {
+        // Гарантируем систематическое фоновое обновление после каждого входа.
+        EstablishmentLocalHydrationService.instance.ensurePeriodicSyncStarted();
+      }
+
       if (!kIsWeb && establishment != null) {
         await EstablishmentLocalHydrationService.instance.runFullHydration(
           establishmentId: establishment.id,
@@ -62,8 +71,13 @@ class EstablishmentDataWarmupService {
           establishment: establishment,
           includeCatalog: true,
         );
-        await _syncTechCardTranslations(
-          dataEstablishmentId: dataEstablishmentId,
+        final warmCards = await _warmTechCardsScopes(
+          techCards: techCards,
+          scopeEstablishmentIds: techCardScopeIds,
+        );
+        await _syncTechCardTranslationsForCards(
+          cards: warmCards,
+          sessionEstablishmentId: dataEstablishmentId,
           techCards: techCards,
           translationService: translationService,
           localization: localization,
@@ -90,8 +104,13 @@ class EstablishmentDataWarmupService {
             .catchError((_) {});
       }
 
-      await _syncTechCardTranslations(
-        dataEstablishmentId: dataEstablishmentId,
+      final warmCards = await _warmTechCardsScopes(
+        techCards: techCards,
+        scopeEstablishmentIds: techCardScopeIds,
+      );
+      await _syncTechCardTranslationsForCards(
+        cards: warmCards,
+        sessionEstablishmentId: dataEstablishmentId,
         techCards: techCards,
         translationService: translationService,
         localization: localization,
@@ -110,24 +129,62 @@ class EstablishmentDataWarmupService {
             );
           }),
         );
+        unawaited(EstablishmentLocalHydrationService.instance.runBackgroundDeltaSync());
       }
     } catch (e, st) {
       devLog('EstablishmentDataWarmupService: $e $st');
     }
   }
 
-  Future<void> _syncTechCardTranslations({
+  List<String> _techCardWarmupEstablishmentIds({
     required String dataEstablishmentId,
+    Establishment? establishment,
+  }) {
+    final ids = <String>{dataEstablishmentId.trim()};
+    if (establishment != null &&
+        establishment.isBranch &&
+        establishment.id.trim().isNotEmpty) {
+      ids.add(establishment.id.trim());
+    }
+    ids.removeWhere((e) => e.isEmpty);
+    return ids.toList();
+  }
+
+  Future<List<TechCard>> _warmTechCardsScopes({
+    required TechCardServiceSupabase techCards,
+    required List<String> scopeEstablishmentIds,
+  }) async {
+    final byId = <String, TechCard>{};
+    for (final estId in scopeEstablishmentIds) {
+      try {
+        final cards = await techCards.getTechCardsForEstablishment(
+          estId,
+          includeIngredients: true,
+        );
+        for (final tc in cards) {
+          byId[tc.id] = tc;
+        }
+      } catch (_) {}
+    }
+    return byId.values.toList();
+  }
+
+  Future<void> _syncTechCardTranslationsForCards({
+    required List<TechCard> cards,
+    required String sessionEstablishmentId,
     required TechCardServiceSupabase techCards,
     required TranslationService translationService,
     required LocalizationService localization,
   }) async {
-    await TechCardTranslationCache.loadForEstablishment(dataEstablishmentId);
+    await TechCardTranslationCache.loadForEstablishment(sessionEstablishmentId);
     final lang = localization.currentLanguageCode;
-    final cards = await techCards.getTechCardsForEstablishment(
-      dataEstablishmentId,
-      includeIngredients: true,
-    );
+    if (cards.isEmpty) {
+      final fallback = await techCards.getTechCardsForEstablishment(
+        sessionEstablishmentId,
+        includeIngredients: true,
+      );
+      cards = fallback;
+    }
     final ids = <String>{};
     for (final tc in cards) {
       ids.add(tc.id);
@@ -136,7 +193,7 @@ class EstablishmentDataWarmupService {
         if (sid != null && sid.isNotEmpty) ids.add(sid);
       }
     }
-    if (!TechCard.translationOverlaySessionMatches(dataEstablishmentId, lang)) {
+    if (!TechCard.translationOverlaySessionMatches(sessionEstablishmentId, lang)) {
       final fromDb = await translationService
           .fetchTechCardDishNameTranslationsForTargetLanguage(
         techCardIds: ids.toList(),
@@ -150,8 +207,8 @@ class EstablishmentDataWarmupService {
       );
       TechCard.setTranslationOverlay(overlay,
           languageCode: lang, merge: true);
-      TechCard.markTranslationOverlaySession(dataEstablishmentId, lang);
-      await TechCardTranslationCache.saveForEstablishment(dataEstablishmentId);
+      TechCard.markTranslationOverlaySession(sessionEstablishmentId, lang);
+      await TechCardTranslationCache.saveForEstablishment(sessionEstablishmentId);
     }
   }
 
