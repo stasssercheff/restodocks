@@ -34,6 +34,8 @@ class AppTheme {
       backgroundColor: primaryColor.withValues(alpha: 0.92),
       foregroundColor: Colors.white,
       elevation: 0,
+      toolbarHeight: 60,
+      actionsPadding: const EdgeInsets.only(right: 8),
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
     ),
@@ -183,6 +185,8 @@ class AppTheme {
       backgroundColor: Color(0xE6202022),
       foregroundColor: Colors.white,
       elevation: 0,
+      toolbarHeight: 60,
+      actionsPadding: EdgeInsets.only(right: 8),
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
     ),
@@ -331,6 +335,8 @@ class AppTheme {
       backgroundColor: primaryColor,
       foregroundColor: Colors.white,
       elevation: 0,
+      toolbarHeight: 60,
+      actionsPadding: EdgeInsets.only(right: 8),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
@@ -429,6 +435,8 @@ class AppTheme {
       backgroundColor: Color(0xFF1E1E1E),
       foregroundColor: Colors.white,
       elevation: 0,
+      toolbarHeight: 60,
+      actionsPadding: EdgeInsets.only(right: 8),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(

@@ -43,7 +43,7 @@ class _AppShellState extends State<AppShell> {
   double _lastScrollPixels = 0;
   String? _lastPath;
 
-  static const _navBarHeight = 56.0;
+  static const _navBarHeight = 62.0;
 
   bool _landscapeNarrowPhone(BuildContext context) {
     final mq = MediaQuery.of(context);
@@ -217,7 +217,10 @@ class _AppShellState extends State<AppShell> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         body: NotificationListener<ScrollNotification>(
           onNotification: _onScroll,
-          child: bodyChild,
+          child: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: bodyChild,
+          ),
         ),
         bottomNavigationBar: hideNav
             ? null
@@ -228,7 +231,10 @@ class _AppShellState extends State<AppShell> {
                 child: ClipRect(
                   child: Align(
                     alignment: Alignment.topCenter,
-                    child: bottomBar,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: bottomBar,
+                    ),
                   ),
                 ),
               ),

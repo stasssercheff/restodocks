@@ -380,9 +380,9 @@ class RestodocksApp extends StatelessWidget {
               final landscape = media.orientation == Orientation.landscape;
               final stripLandscapeSideInsets =
                   landscape && (kIsWeb || narrowPhone);
-              // Референс «как на скрине 2»: мобильный web в альбоме рисуем
+              // Референс «как на скрине 2»: телефон в альбоме рисуем
               // на центрированном холсте, чтобы не растягивать UI на всю ширину.
-              final webLandscapePhoneCanvas = kIsWeb && landscape && narrowPhone;
+              final landscapePhoneCanvas = landscape && narrowPhone;
               var m = media;
               if (applyMobileUiScale) {
                 m = m.copyWith(
@@ -400,7 +400,7 @@ class RestodocksApp extends StatelessWidget {
                   applyMobileUiScale || stripLandscapeSideInsets;
               var content =
                   needsMediaWrap ? MediaQuery(data: m, child: c) : c;
-              if (webLandscapePhoneCanvas) {
+              if (landscapePhoneCanvas) {
                 final canvasWidth = math.min(
                   media.size.width,
                   (media.size.width * 0.86).clamp(740.0, 920.0),
