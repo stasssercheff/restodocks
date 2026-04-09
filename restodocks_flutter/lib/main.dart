@@ -24,10 +24,12 @@ import 'utils/dev_log.dart';
 import 'core/initial_location_stub.dart'
     if (dart.library.html) 'core/initial_location_web.dart' as initial_loc;
 import 'core/supabase_url_resolver_stub.dart'
-    if (dart.library.html) 'core/supabase_url_resolver_web.dart' as supabase_url;
+    if (dart.library.html) 'core/supabase_url_resolver_web.dart'
+    as supabase_url;
 import 'core/mobile_browser_chrome_nudge_stub.dart'
     if (dart.library.html) 'core/mobile_browser_chrome_nudge_web.dart'
-        as mobile_chrome;
+    as mobile_chrome;
+import 'core/mobile_web_chrome_aggressive_setting.dart';
 import 'core/web_mobile_chrome_landscape_watcher.dart';
 import 'services/fcm_push_service.dart';
 import 'services/services.dart';
@@ -48,9 +50,17 @@ Future<void> _applyLocaleFromEmployeeProfile(String profileLang) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) {
+    try {
+      await loadMobileWebChromeAggressiveLandscape();
+    } catch (e) {
+      devLog('mobile web chrome aggressive pref: $e');
+    }
+  }
   // Критично: кэшировать путь+query до ВСЕГО остального — иначе теряются token_hash/type для auth/confirm-click
   if (kIsWeb) initial_loc.getInitialLocation();
-  url_strategy.initUrlStrategy(); // после кэша — PathUrlStrategy не должен менять текущий URL
+  url_strategy
+      .initUrlStrategy(); // после кэша — PathUrlStrategy не должен менять текущий URL
   FlutterError.onError = (details) {
     devLog('FlutterError: ${details.exception}');
     devLog('Stack: ${details.stack}');
@@ -107,17 +117,20 @@ Future<void> _bootstrapApp() async {
     httpClient: createSupabaseRetryHttpClient(),
     authOptions: const FlutterAuthClientOptions(
       detectSessionInUri: true,
-      authFlowType: AuthFlowType.implicit, // сессия из hash при переходе по ссылке подтверждения
+      authFlowType: AuthFlowType
+          .implicit, // сессия из hash при переходе по ссылке подтверждения
     ),
   );
   await FcmPushService.setup();
   // Сразу обрабатываем токены из URL (Supabase redirect после confirm) — до роутера и AccountManager
   if (kIsWeb) {
     final uri = Uri.base;
-    final hasTokens = uri.fragment.contains('access_token') || uri.query.contains('access_token');
+    final hasTokens = uri.fragment.contains('access_token') ||
+        uri.query.contains('access_token');
     if (hasTokens) {
       try {
-        devLog('[Auth] getSessionFromUrl path=${uri.path} hasFragment=${uri.fragment.isNotEmpty}');
+        devLog(
+            '[Auth] getSessionFromUrl path=${uri.path} hasFragment=${uri.fragment.isNotEmpty}');
         await Supabase.instance.client.auth.getSessionFromUrl(uri);
         await Future.delayed(const Duration(milliseconds: 500));
       } catch (e) {
@@ -127,8 +140,8 @@ Future<void> _bootstrapApp() async {
   } else {
     final u = DeepLinkBootstrap.initialUri;
     if (u != null) {
-      final hasTokens =
-          u.fragment.contains('access_token') || u.query.contains('access_token');
+      final hasTokens = u.fragment.contains('access_token') ||
+          u.query.contains('access_token');
       if (hasTokens) {
         try {
           devLog(
@@ -335,138 +348,139 @@ class RestodocksApp extends StatelessWidget {
     // RestodocksApp.build() called
     return AuthSessionLifecycle(
       child: MultiProvider(
-      providers: AppProviders.providers,
-      child: _TranslationManagerConnector(
-        child: Consumer2<LocalizationService, ThemeService>(
-        builder: (context, localization, themeService, child) {
-          final uiScale = context.watch<MobileUiScaleService>();
-          // iOS + macOS: одна «стеклянная» тема; web/Android/desktop (кроме macOS) — classic.
-          final useIosGlassTheme = !kIsWeb &&
-              (defaultTargetPlatform == TargetPlatform.iOS ||
-                  defaultTargetPlatform == TargetPlatform.macOS);
-          return MaterialApp.router(
-            title: localization.t('app_name'),
-            theme: useIosGlassTheme
-                ? AppTheme.lightTheme
-                : AppTheme.classicLightTheme,
-            darkTheme: useIosGlassTheme
-                ? AppTheme.darkTheme
-                : AppTheme.classicDarkTheme,
-            themeMode: themeService.themeMode,
-            locale: localization.currentLocale,
-            supportedLocales: LocalizationService.supportedLocales,
-            localizationsDelegates: const [
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-              FlutterQuillLocalizations.delegate,
-            ],
-            routerConfig: AppRouter.router,
-            builder: (context, child) {
-              final raw = child ?? const SizedBox.shrink();
-              final c = kIsWeb ? raw : MobileDeepLinkListener(child: raw);
-              final media = MediaQuery.of(context);
-              // Телефонный масштаб: нативный iOS/Android и веб при узком экране (Safari и т.д.).
-              // Раньше веб не трогали — из‑за этого шрифты/плитки казались «раздутыми» относительно
-              // нативного приложения с тем же пресетом (0.9).
-              final narrowPhone = media.size.shortestSide < 600;
-              final applyMobileUiScale = narrowPhone &&
-                  (kIsWeb ||
-                      defaultTargetPlatform == TargetPlatform.iOS ||
-                      defaultTargetPlatform == TargetPlatform.android);
-              // Альбом: Safari даёт большие боковые inset'ы; контент оказывается в «окошке», по бокам
-              // полосы цвета браузера/primary. Убираем горизонтальные padding/viewPadding везде
-              // на вебе в альбоме и на телефоне в альбоме (iPad в портрете не трогаем).
-              final landscape = media.orientation == Orientation.landscape;
-              final stripLandscapeSideInsets =
-                  landscape && (kIsWeb || narrowPhone);
-              // Для телефонов: у внешней области всегда явная заливка (без белых «пустот»).
-              final phoneWebFill = kIsWeb && narrowPhone;
-              // Референс «как на скрине 2»: телефон в альбоме рисуем
-              // на центрированном холсте, чтобы не растягивать UI на всю ширину.
-              final landscapePhoneCanvas = phoneWebFill && landscape;
-              var m = media;
-              if (applyMobileUiScale) {
-                m = m.copyWith(
-                  textScaler: TextScaler.linear(
-                      media.textScaleFactor * uiScale.scaleFactor),
-                );
-              }
-              if (stripLandscapeSideInsets) {
-                m = m.copyWith(
-                  padding: m.padding.copyWith(left: 0, right: 0),
-                  viewPadding: m.viewPadding.copyWith(left: 0, right: 0),
-                );
-              }
-              final needsMediaWrap =
-                  applyMobileUiScale || stripLandscapeSideInsets;
-              var content =
-                  needsMediaWrap ? MediaQuery(data: m, child: c) : c;
-              if (phoneWebFill) {
-                content = ColoredBox(
-                  color: Theme.of(context).colorScheme.surface,
-                  child: content,
-                );
-              }
-              if (landscapePhoneCanvas) {
-                final theme = Theme.of(context);
-                final canvasWidth = math.min(
-                  media.size.width,
-                  (media.size.width * 0.86).clamp(740.0, 920.0),
-                );
-                final topBg =
-                    theme.appBarTheme.backgroundColor ?? theme.colorScheme.primary;
-                final middleBg = theme.colorScheme.surface;
-                final bottomBg = theme.navigationBarTheme.backgroundColor ??
-                    theme.colorScheme.surfaceContainerHighest;
-                content = Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Column(
+        providers: AppProviders.providers,
+        child: _TranslationManagerConnector(
+          child: Consumer2<LocalizationService, ThemeService>(
+            builder: (context, localization, themeService, child) {
+              final uiScale = context.watch<MobileUiScaleService>();
+              // iOS + macOS: одна «стеклянная» тема; web/Android/desktop (кроме macOS) — classic.
+              final useIosGlassTheme = !kIsWeb &&
+                  (defaultTargetPlatform == TargetPlatform.iOS ||
+                      defaultTargetPlatform == TargetPlatform.macOS);
+              return MaterialApp.router(
+                title: localization.t('app_name'),
+                theme: useIosGlassTheme
+                    ? AppTheme.lightTheme
+                    : AppTheme.classicLightTheme,
+                darkTheme: useIosGlassTheme
+                    ? AppTheme.darkTheme
+                    : AppTheme.classicDarkTheme,
+                themeMode: themeService.themeMode,
+                locale: localization.currentLocale,
+                supportedLocales: LocalizationService.supportedLocales,
+                localizationsDelegates: const [
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                  FlutterQuillLocalizations.delegate,
+                ],
+                routerConfig: AppRouter.router,
+                builder: (context, child) {
+                  final raw = child ?? const SizedBox.shrink();
+                  final c = kIsWeb ? raw : MobileDeepLinkListener(child: raw);
+                  final media = MediaQuery.of(context);
+                  // Телефонный масштаб: нативный iOS/Android и веб при узком экране (Safari и т.д.).
+                  // Раньше веб не трогали — из‑за этого шрифты/плитки казались «раздутыми» относительно
+                  // нативного приложения с тем же пресетом (0.9).
+                  final narrowPhone = media.size.shortestSide < 600;
+                  final applyMobileUiScale = narrowPhone &&
+                      (kIsWeb ||
+                          defaultTargetPlatform == TargetPlatform.iOS ||
+                          defaultTargetPlatform == TargetPlatform.android);
+                  // Альбом: Safari даёт большие боковые inset'ы; контент оказывается в «окошке», по бокам
+                  // полосы цвета браузера/primary. Убираем горизонтальные padding/viewPadding везде
+                  // на вебе в альбоме и на телефоне в альбоме (iPad в портрете не трогаем).
+                  final landscape = media.orientation == Orientation.landscape;
+                  final stripLandscapeSideInsets =
+                      landscape && (kIsWeb || narrowPhone);
+                  // Для телефонов: у внешней области всегда явная заливка (без белых «пустот»).
+                  final phoneWebFill = kIsWeb && narrowPhone;
+                  // Референс «как на скрине 2»: телефон в альбоме рисуем
+                  // на центрированном холсте, чтобы не растягивать UI на всю ширину.
+                  final landscapePhoneCanvas = phoneWebFill && landscape;
+                  var m = media;
+                  if (applyMobileUiScale) {
+                    m = m.copyWith(
+                      textScaler: TextScaler.linear(
+                          media.textScaleFactor * uiScale.scaleFactor),
+                    );
+                  }
+                  if (stripLandscapeSideInsets) {
+                    m = m.copyWith(
+                      padding: m.padding.copyWith(left: 0, right: 0),
+                      viewPadding: m.viewPadding.copyWith(left: 0, right: 0),
+                    );
+                  }
+                  final needsMediaWrap =
+                      applyMobileUiScale || stripLandscapeSideInsets;
+                  var content =
+                      needsMediaWrap ? MediaQuery(data: m, child: c) : c;
+                  if (phoneWebFill) {
+                    content = ColoredBox(
+                      color: Theme.of(context).colorScheme.surface,
+                      child: content,
+                    );
+                  }
+                  if (landscapePhoneCanvas) {
+                    final theme = Theme.of(context);
+                    final canvasWidth = math.min(
+                      media.size.width,
+                      (media.size.width * 0.86).clamp(740.0, 920.0),
+                    );
+                    final topBg = theme.appBarTheme.backgroundColor ??
+                        theme.colorScheme.primary;
+                    final middleBg = theme.colorScheme.surface;
+                    final bottomBg = theme.navigationBarTheme.backgroundColor ??
+                        theme.colorScheme.surfaceContainerHighest;
+                    content = Stack(
+                      fit: StackFit.expand,
                       children: [
-                        ColoredBox(
-                          color: topBg,
-                          child: const SizedBox(height: 60),
+                        Column(
+                          children: [
+                            ColoredBox(
+                              color: topBg,
+                              child: const SizedBox(height: 60),
+                            ),
+                            Expanded(child: ColoredBox(color: middleBg)),
+                            ColoredBox(
+                              color: bottomBg,
+                              child: const SizedBox(height: 66),
+                            ),
+                          ],
                         ),
-                        Expanded(child: ColoredBox(color: middleBg)),
-                        ColoredBox(
-                          color: bottomBg,
-                          child: const SizedBox(height: 66),
+                        Center(
+                          child: SizedBox(width: canvasWidth, child: content),
                         ),
                       ],
+                    );
+                  }
+                  // Мобильный Chrome/Safari: сворачивание адресной строки привязано к scroll документа,
+                  // а не к внутренним ListView канваса — слегка двигаем window при вертикальном скролле.
+                  if (kIsWeb) {
+                    content = NotificationListener<ScrollNotification>(
+                      onNotification: (ScrollNotification n) {
+                        if (n is! ScrollUpdateNotification) return false;
+                        if (n.metrics.axis != Axis.vertical) return false;
+                        final d = n.scrollDelta;
+                        if (d == null || d.abs() < 0.5) return false;
+                        mobile_chrome
+                            .mobileBrowserChromeNudgeFromFlutterScroll();
+                        return false;
+                      },
+                      child: content,
+                    );
+                  }
+                  return WebMobileChromeLandscapeWatcher(
+                    child: WebLocationCorrection(
+                      child: AppPrimaryScrollController(child: content),
                     ),
-                    Center(
-                      child: SizedBox(width: canvasWidth, child: content),
-                    ),
-                  ],
-                );
-              }
-              // Мобильный Chrome/Safari: сворачивание адресной строки привязано к scroll документа,
-              // а не к внутренним ListView канваса — слегка двигаем window при вертикальном скролле.
-              if (kIsWeb) {
-                content = NotificationListener<ScrollNotification>(
-                  onNotification: (ScrollNotification n) {
-                    if (n is! ScrollUpdateNotification) return false;
-                    if (n.metrics.axis != Axis.vertical) return false;
-                    final d = n.scrollDelta;
-                    if (d == null || d.abs() < 0.5) return false;
-                    mobile_chrome.mobileBrowserChromeNudgeFromFlutterScroll();
-                    return false;
-                  },
-                  child: content,
-                );
-              }
-              return WebMobileChromeLandscapeWatcher(
-                child: WebLocationCorrection(
-                  child: AppPrimaryScrollController(child: content),
-                ),
+                  );
+                },
+                debugShowCheckedModeBanner: false,
               );
             },
-            debugShowCheckedModeBanner: false,
-          );
-        },
-      ),
-      ),
+          ),
+        ),
       ),
     );
   }
@@ -478,10 +492,12 @@ class _TranslationManagerConnector extends StatefulWidget {
   const _TranslationManagerConnector({required this.child});
 
   @override
-  State<_TranslationManagerConnector> createState() => _TranslationManagerConnectorState();
+  State<_TranslationManagerConnector> createState() =>
+      _TranslationManagerConnectorState();
 }
 
-class _TranslationManagerConnectorState extends State<_TranslationManagerConnector> {
+class _TranslationManagerConnectorState
+    extends State<_TranslationManagerConnector> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();

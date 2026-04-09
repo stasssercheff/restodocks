@@ -305,12 +305,20 @@
     });
   </script>
   <script>
-    // Keep Safari/Chrome mobile top UI collapsible while user scrolls Flutter content.
+    // Докрутка document scroll — только если в настройках включено (localStorage).
     (function () {
       var ua = navigator.userAgent || '';
       var isMobile = /iPhone|iPad|iPod|Android/i.test(ua);
       if (!isMobile) return;
       if (window.navigator.standalone) return;
+
+      function aggressiveChromeOptIn() {
+        try {
+          return localStorage.getItem('restodocks_landscape_chrome_aggressive') === '1';
+        } catch (e) {
+          return false;
+        }
+      }
 
       // Сильнее дергаем document scroll сразу в альбоме на телефоне (API «свернуть строку» нет).
       function landscapeChromeKick() {
@@ -341,14 +349,13 @@
       }
 
       var ticking = false;
-      var warmup;
+      var warmup = null;
       function nudge() {
         if (ticking) return;
         ticking = true;
         requestAnimationFrame(function () {
           try {
             var y = window.scrollY || 0;
-            // Keep tiny document offset so browser bars stay collapsible.
             if (window.innerWidth > window.innerHeight) {
               if (y < 1 || y > 6) window.scrollTo(0, 2);
             } else {
@@ -359,35 +366,82 @@
         });
       }
       function startWarmup() {
+        if (!aggressiveChromeOptIn()) return;
         var t = 0;
-        clearInterval(warmup);
+        if (warmup) clearInterval(warmup);
         warmup = setInterval(function () {
+          if (!aggressiveChromeOptIn()) {
+            if (warmup) clearInterval(warmup);
+            warmup = null;
+            return;
+          }
           t += 1;
           nudge();
-          if (t > 80) clearInterval(warmup);
+          if (t > 80) {
+            if (warmup) clearInterval(warmup);
+            warmup = null;
+          }
         }, 90);
       }
-      window.addEventListener('flutter-first-frame', function () {
+      function onAggressiveFirstFrame() {
+        if (!aggressiveChromeOptIn()) return;
         startWarmup();
         setTimeout(function () {
           if (window.innerWidth > window.innerHeight) landscapeChromeKick();
         }, 60);
+      }
+      window.addEventListener('flutter-first-frame', onAggressiveFirstFrame);
+      window.addEventListener('pageshow', function () {
+        if (aggressiveChromeOptIn()) startWarmup();
       });
-      window.addEventListener('pageshow', startWarmup);
-      window.addEventListener('focus', startWarmup);
+      window.addEventListener('focus', function () {
+        if (aggressiveChromeOptIn()) startWarmup();
+      });
       document.addEventListener('touchstart', function () {
-        nudge();
+        if (aggressiveChromeOptIn()) nudge();
       }, { passive: true });
       document.addEventListener('touchmove', function () {
-        nudge();
+        if (aggressiveChromeOptIn()) nudge();
       }, { passive: true });
       window.addEventListener('orientationchange', function () {
+        if (!aggressiveChromeOptIn()) return;
         setTimeout(nudge, 120);
         setTimeout(nudge, 360);
         setTimeout(landscapeChromeKick, 40);
         setTimeout(landscapeChromeKick, 200);
         setTimeout(landscapeChromeKick, 450);
         setTimeout(startWarmup, 450);
+      });
+
+      window.restodocksApplyChromeAggressive = function (enabled) {
+        try {
+          if (enabled) {
+            localStorage.setItem('restodocks_landscape_chrome_aggressive', '1');
+          } else {
+            localStorage.removeItem('restodocks_landscape_chrome_aggressive');
+          }
+        } catch (e) {}
+        if (!enabled) {
+          if (warmup) {
+            clearInterval(warmup);
+            warmup = null;
+          }
+          return;
+        }
+        startWarmup();
+        if (window.innerWidth > window.innerHeight) {
+          landscapeChromeKick();
+          setTimeout(landscapeChromeKick, 200);
+        }
+      };
+
+      window.addEventListener('restodocks-chrome-aggressive', function (e) {
+        try {
+          var enabled = e && e.detail === true;
+          if (typeof window.restodocksApplyChromeAggressive === 'function') {
+            window.restodocksApplyChromeAggressive(enabled);
+          }
+        } catch (err) {}
       });
     })();
   </script>

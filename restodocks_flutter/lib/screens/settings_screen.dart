@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -9,11 +10,13 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/haccp_log_type.dart';
 import '../models/models.dart';
 import '../core/feature_flags.dart';
+import '../core/mobile_web_chrome_aggressive_setting.dart';
 import '../services/haccp_agreement_pdf_service.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
 import '../services/home_layout_config_service.dart';
 import '../services/screen_layout_preference_service.dart';
+import '../utils/layout_breakpoints.dart';
 import '../utils/pos_hall_permissions.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/getting_started_document.dart';
@@ -36,6 +39,9 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  bool _mobileWebChromeAggressiveReady = false;
+  bool _mobileWebChromeAggressive = false;
+
   @override
   void initState() {
     super.initState();
@@ -47,6 +53,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       unawaited(
           AccountUiSyncService.instance.refreshEmployeeProfileFromServer());
     });
+    if (kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        final v = await loadMobileWebChromeAggressiveLandscape();
+        if (mounted) {
+          setState(() {
+            _mobileWebChromeAggressive = v;
+            _mobileWebChromeAggressiveReady = true;
+          });
+        }
+      });
+    }
   }
 
   String _homeButtonActionLabel(
@@ -1978,6 +1995,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     .setThemeMode(dark ? ThemeMode.dark : ThemeMode.light),
               ),
             ),
+            if (kIsWeb &&
+                isHandheldNarrowLayout(context) &&
+                _mobileWebChromeAggressiveReady)
+              SwitchListTile(
+                secondary: const Icon(Icons.fullscreen_exit),
+                title: Text(localization
+                        .t('settings_mobile_web_chrome_landscape_title') ??
+                    'Сворачивать панель браузера в альбоме'),
+                subtitle: Text(
+                  localization
+                          .t('settings_mobile_web_chrome_landscape_subtitle') ??
+                      'Веб на телефоне: усиленная прокрутка страницы в альбомной ориентации. Не гарантирует скрытие адресной строки; надёжно — «На экран Домой».',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                isThreeLine: true,
+                value: _mobileWebChromeAggressive,
+                onChanged: (v) async {
+                  setState(() => _mobileWebChromeAggressive = v);
+                  await saveMobileWebChromeAggressiveLandscape(v);
+                },
+              ),
             // Валюта заведения — только у владельца и шеф-повара в настройках
             if (currentEmployee.hasRole('owner') ||
                 currentEmployee.hasRole('executive_chef')) ...[
