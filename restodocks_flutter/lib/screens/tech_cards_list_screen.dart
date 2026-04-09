@@ -311,6 +311,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     LocalizationService().addListener(_localizationPrefetchListener);
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowTtkTour());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // Не стартуем тяжёлую загрузку в середине свайп-перехода со стартового экрана.
+      await Future<void>.delayed(const Duration(milliseconds: 320));
+      if (!mounted) return;
       await _load();
       if (!mounted) return;
       _reconcileNotifier = context.read<TechCardsReconcileNotifier>();
