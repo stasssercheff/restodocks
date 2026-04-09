@@ -744,6 +744,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     with
         AutoSaveMixin<TechCardEditScreen>,
         InputChangeListenerMixin<TechCardEditScreen> {
+  static final Set<String> _openedTechCardsSession = <String>{};
   TechCard? _techCard;
   bool _loading = true;
   bool _technologyTranslating = false;
@@ -1767,12 +1768,23 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       }
       final svc = context.read<TechCardServiceSupabase>();
       TechCard? tc;
+      final cardId = widget.techCardId;
+      final firstOpenInSession =
+          cardId.isNotEmpty && cardId != 'new' && _openedTechCardsSession.add(cardId);
       if (widget.initialTechCard != null) {
         tc = widget.initialTechCard;
       } else {
         tc = await svc.getTechCardById(widget.techCardId);
       }
-      if (tc != null && tc.ingredients.isEmpty) {
+      if (mounted) {
+        // Показываем экран сразу, тяжёлую догрузку выполняем уже внутри страницы.
+        setState(() {
+          _techCard = tc;
+          _loading = false;
+          _contentPhase = 0;
+        });
+      }
+      if (firstOpenInSession && tc != null && tc.ingredients.isEmpty) {
         try {
           final server = await svc.getTechCardById(
             widget.techCardId,
@@ -1781,12 +1793,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           if (server != null) tc = server;
         } catch (_) {}
       }
-      if (tc != null && tc.ingredients.isEmpty) {
+      if (firstOpenInSession && tc != null && tc.ingredients.isEmpty) {
         final filled = await svc.fillIngredientsForCardsBulk([tc]);
         if (filled.isNotEmpty) tc = filled.first;
       }
       List<TechCard> semiFinishedForCost = <TechCard>[];
-      if (tc != null) {
+      if (tc != null && firstOpenInSession) {
         var working = stripInvalidNestedPfSelfLinks(tc);
         // Нужные ПФ для расчёта цен/стоимости в таблице:
         // в режиме просмотра раньше могли не подгружаться "справочники" (loadedTechCards пустой),
@@ -5372,30 +5384,40 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                   ?.copyWith(fontWeight: FontWeight.bold)),
                           const SizedBox(height: 8),
                         ],
-                        // Таблица ТТК на странице: без «окна», при росте числа продуктов страница скроллится, технология остаётся ниже
+                        // Таблица ТТК в отдельном «окне»:
+                        // зум внутри, а горизонтальная шкала всегда в самом низу области таблицы.
                         SizedBox(
                           width: constraints.maxWidth,
-                          child: RawScrollbar(
-                            controller: _compositionTableHScrollController,
-                            scrollbarOrientation: ScrollbarOrientation.bottom,
-                            thumbVisibility: true,
-                            child: SingleChildScrollView(
-                              controller: _compositionTableHScrollController,
-                              scrollDirection: Axis.horizontal,
-                              clipBehavior: Clip.hardEdge,
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.vertical,
-                                child: ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    minWidth: 0,
-                                    minHeight: 220,
-                                  ),
-                                  child: InteractiveViewer(
-                                    panEnabled: false,
-                                    scaleEnabled: true,
-                                    minScale: 0.75,
-                                    maxScale: 2.2,
-                                    child: effectiveCanEdit
+                          child: LayoutBuilder(
+                            builder: (context, tableConstraints) {
+                              final tableViewportHeight = (isMobile
+                                      ? MediaQuery.sizeOf(context).height * 0.42
+                                      : MediaQuery.sizeOf(context).height * 0.50)
+                                  .clamp(220.0, 520.0);
+                              return SizedBox(
+                                height: tableViewportHeight,
+                                child: RawScrollbar(
+                                  controller: _compositionTableHScrollController,
+                                  scrollbarOrientation:
+                                      ScrollbarOrientation.bottom,
+                                  thumbVisibility: true,
+                                  child: SingleChildScrollView(
+                                    controller: _compositionTableHScrollController,
+                                    scrollDirection: Axis.horizontal,
+                                    clipBehavior: Clip.hardEdge,
+                                    child: SingleChildScrollView(
+                                      scrollDirection: Axis.vertical,
+                                      child: ConstrainedBox(
+                                        constraints: BoxConstraints(
+                                          minWidth: tableConstraints.maxWidth,
+                                          minHeight: 220,
+                                        ),
+                                        child: InteractiveViewer(
+                                          panEnabled: false,
+                                          scaleEnabled: true,
+                                          minScale: 0.75,
+                                          maxScale: 2.2,
+                                          child: effectiveCanEdit
                                       ? RepaintBoundary(
                                           child: ExcelStyleTtkTable(
                                             loc: loc,
@@ -5536,11 +5558,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                               ),
                                             );
                                           },
+                                          ),
                                         ),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ),
+                              );
+                            },
                           ),
                         ),
                         // Кнопка «Подстроить % отхода под целевой выход» — отдельно под таблицей, не на панели, компактная

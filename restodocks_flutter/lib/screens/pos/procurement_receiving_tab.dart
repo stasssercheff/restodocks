@@ -280,8 +280,9 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
         ),
         inputDecorationTheme: (theme.inputDecorationTheme).copyWith(
           hintStyle: theme.textTheme.headlineSmall?.copyWith(
-            fontSize: 24,
+            fontSize: 16,
             fontWeight: FontWeight.w400,
+            letterSpacing: -0.1,
           ),
         ),
       ),

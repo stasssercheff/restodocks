@@ -904,29 +904,30 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
             if (groups.isNotEmpty)
               hScrollTable(_headerHScroll, zoomedHeaderTable),
             Expanded(
-              child: SingleChildScrollView(
-                controller: _vScroll,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (groups.isNotEmpty)
-                      RawScrollbar(
-                        controller: _bodyHScroll,
-                        scrollbarOrientation: ScrollbarOrientation.bottom,
-                        thumbVisibility: true,
-                        child: hScrollTable(_bodyHScroll, zoomedBodyTable),
-                      ),
-                    if (groups.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: widget.dishes.isEmpty
-                            ? const Center(child: CircularProgressIndicator())
-                            : Text(
-                                loc.t('menu_empty_dishes') ?? '',
-                                style: Theme.of(context).textTheme.bodyLarge,
-                              ),
-                      ),
-                  ],
+              child: RawScrollbar(
+                controller: _bodyHScroll,
+                scrollbarOrientation: ScrollbarOrientation.bottom,
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  controller: _vScroll,
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (groups.isNotEmpty)
+                        hScrollTable(_bodyHScroll, zoomedBodyTable),
+                      if (groups.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: widget.dishes.isEmpty
+                              ? const Center(child: CircularProgressIndicator())
+                              : Text(
+                                  loc.t('menu_empty_dishes') ?? '',
+                                  style: Theme.of(context).textTheme.bodyLarge,
+                                ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
