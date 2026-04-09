@@ -2189,6 +2189,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       ),
       child: SafeArea(
         top: false,
+        bottom: false,
         child: Row(
           children: [
             Expanded(

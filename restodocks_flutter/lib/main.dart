@@ -403,19 +403,9 @@ class RestodocksApp extends StatelessWidget {
                     );
                   }
                   if (stripLandscapeSideInsets) {
-                    final dropBottomInset = kIsWeb && landscape;
                     m = m.copyWith(
-                      padding: m.padding.copyWith(
-                        left: 0,
-                        right: 0,
-                        bottom: dropBottomInset ? 0 : m.padding.bottom,
-                      ),
-                      viewPadding: m.viewPadding.copyWith(
-                        left: 0,
-                        right: 0,
-                        bottom:
-                            dropBottomInset ? 0 : m.viewPadding.bottom,
-                      ),
+                      padding: m.padding.copyWith(left: 0, right: 0),
+                      viewPadding: m.viewPadding.copyWith(left: 0, right: 0),
                     );
                   }
                   final needsMediaWrap =
