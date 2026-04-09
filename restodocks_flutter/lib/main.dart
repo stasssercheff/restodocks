@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -379,6 +380,9 @@ class RestodocksApp extends StatelessWidget {
               final landscape = media.orientation == Orientation.landscape;
               final stripLandscapeSideInsets =
                   landscape && (kIsWeb || narrowPhone);
+              // Референс «как на скрине 2»: мобильный web в альбоме рисуем
+              // на центрированном холсте, чтобы не растягивать UI на всю ширину.
+              final webLandscapePhoneCanvas = kIsWeb && landscape && narrowPhone;
               var m = media;
               if (applyMobileUiScale) {
                 m = m.copyWith(
@@ -396,6 +400,18 @@ class RestodocksApp extends StatelessWidget {
                   applyMobileUiScale || stripLandscapeSideInsets;
               var content =
                   needsMediaWrap ? MediaQuery(data: m, child: c) : c;
+              if (webLandscapePhoneCanvas) {
+                final canvasWidth = math.min(
+                  media.size.width,
+                  (media.size.width * 0.86).clamp(740.0, 920.0),
+                );
+                content = ColoredBox(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  child: Center(
+                    child: SizedBox(width: canvasWidth, child: content),
+                  ),
+                );
+              }
               // Мобильный Chrome/Safari: сворачивание адресной строки привязано к scroll документа,
               // а не к внутренним ListView канваса — слегка двигаем window при вертикальном скролле.
               if (kIsWeb) {
