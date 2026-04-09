@@ -1795,9 +1795,14 @@ class _InventoryScreenState extends State<InventoryScreen>
         bottomNavigationBar: ValueListenableBuilder<int>(
           valueListenable: _inventoryLayoutPulse,
           builder: (ctx, _, __) {
+            final kbOpen = MediaQuery.viewInsetsOf(ctx).bottom > 0;
+            if (kbOpen) {
+              return const SizedBox.shrink();
+            }
             final collapse = _inventoryCollapseLayout(ctx);
             final keepFooterInLandscape = isHandheldNarrowLayout(ctx) &&
-                MediaQuery.of(ctx).orientation == Orientation.landscape;
+                MediaQuery.of(ctx).orientation == Orientation.landscape &&
+                MediaQuery.viewInsetsOf(ctx).bottom == 0;
             return _buildFooter(loc, collapse && !keepFooterInLandscape) ??
                 const SizedBox.shrink();
           },

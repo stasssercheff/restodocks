@@ -751,7 +751,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   String? _error;
 
   /// 0=подготовка, 1=полная форма. Растягиваем билд по кадрам — без замирания.
-  int _contentPhase = 0;
+  int _contentPhase = 1;
 
   /// В режиме просмотра для повара `_TtkCookTable` пересчитывает значения локально.
   /// Синхронизацию обратно в родителя и автосохранение делаем с debounce и без `setState`,
@@ -1781,7 +1781,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         setState(() {
           _techCard = tc;
           _loading = false;
-          _contentPhase = 0;
+          _contentPhase = 1;
         });
       }
       if (firstOpenInSession && tc != null && tc.ingredients.isEmpty) {
@@ -4977,10 +4977,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 tooltip: loc.t('back'),
               )
             : appBarBackButton(context),
-        title: Text(_isNew
-            ? loc.t('create_tech_card')
-            : (_techCard?.getDisplayNameInLists(loc.currentLanguageCode) ??
-                loc.t('tech_cards'))),
+        title: Text(_isNew ? loc.t('create_tech_card') : 'ТТК'),
         actions: [
           if (effectiveCanEdit)
             IconButton(

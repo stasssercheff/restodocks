@@ -274,21 +274,21 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
       data: theme.copyWith(
         datePickerTheme: theme.datePickerTheme.copyWith(
           rangePickerHeaderHeadlineStyle:
-              theme.textTheme.titleLarge?.copyWith(fontSize: 14),
+              theme.textTheme.titleMedium?.copyWith(fontSize: 12),
           rangePickerHeaderHelpStyle:
-              theme.textTheme.labelMedium?.copyWith(fontSize: 12),
+              theme.textTheme.labelSmall?.copyWith(fontSize: 11),
         ),
         inputDecorationTheme: (theme.inputDecorationTheme).copyWith(
           hintStyle: theme.textTheme.headlineSmall?.copyWith(
-            fontSize: 16,
+            fontSize: 13,
             fontWeight: FontWeight.w400,
-            letterSpacing: -0.1,
+            letterSpacing: -0.2,
           ),
         ),
       ),
       child: MediaQuery(
         data: MediaQuery.of(context)
-            .copyWith(textScaler: const TextScaler.linear(0.90)),
+            .copyWith(textScaler: const TextScaler.linear(0.78)),
         child: child ?? const SizedBox.shrink(),
       ),
     );

@@ -1693,8 +1693,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                 ? null
                                 : () async {
                                     Navigator.of(ctx2).pop();
-                                    final needRefresh = await context
-                                        .push<bool>('/tech-cards/${tc.id}');
+                                    final needRefresh =
+                                        await context.push<bool>(
+                                      '/tech-cards/${tc.id}',
+                                      extra: {'initialTechCard': tc},
+                                    );
                                     if (mounted && needRefresh == true)
                                       _load(showLoading: false);
                                   },
@@ -3346,7 +3349,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 ? loc
                     .t('ttk_select_count')
                     .replaceFirst('%s', '${_selectedTechCards.length}')
-                : loc.t('tech_cards'),
+                : 'ТТК',
           ),
         ),
         actions: _buildAppBarActions(
@@ -4371,14 +4374,19 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             final path = effectiveCanEdit
                 ? '/tech-cards/${tc.id}'
                 : '/tech-cards/${tc.id}?view=1';
-            final needRefresh = await context.push<bool>(path);
+            final needRefresh = await context.push<bool>(
+              path,
+              extra: {'initialTechCard': tc},
+            );
             if (mounted && needRefresh == true) _load(showLoading: false);
           }
         },
         onLongPress: effectiveCanEdit && !_selectionMode
             ? () async {
-                final needRefresh =
-                    await context.push<bool>('/tech-cards/${tc.id}?view=1');
+                final needRefresh = await context.push<bool>(
+                  '/tech-cards/${tc.id}?view=1',
+                  extra: {'initialTechCard': tc},
+                );
                 if (mounted && needRefresh == true) _load(showLoading: false);
               }
             : null,
@@ -4460,8 +4468,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     : IconButton(
                         icon: const Icon(Icons.visibility_outlined, size: 20),
                         tooltip: loc.t('ttk_view'),
-                        onPressed: () =>
-                            context.push('/tech-cards/${tc.id}?view=1'),
+                        onPressed: () => context.push(
+                          '/tech-cards/${tc.id}?view=1',
+                          extra: {'initialTechCard': tc},
+                        ),
                         style: IconButton.styleFrom(
                           minimumSize: const Size(36, 36),
                           padding: EdgeInsets.zero,
@@ -4519,8 +4529,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                   DataCell(Text(
                       NumberFormatUtils.formatInt(_calculateCostPerKg(tc)))),
                 ],
-                onSelectChanged:
-                    _selectionMode ? null : (_) => context.push(path),
+                onSelectChanged: _selectionMode
+                    ? null
+                    : (_) => context.push(
+                          path,
+                          extra: {'initialTechCard': tc},
+                        ),
               );
             }),
           ),
