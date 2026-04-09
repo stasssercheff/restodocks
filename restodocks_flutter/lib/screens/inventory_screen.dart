@@ -1795,7 +1795,8 @@ class _InventoryScreenState extends State<InventoryScreen>
         bottomNavigationBar: ValueListenableBuilder<int>(
           valueListenable: _inventoryLayoutPulse,
           builder: (ctx, _, __) {
-            final kbOpen = MediaQuery.viewInsetsOf(ctx).bottom > 0;
+            final kbOpen = MediaQuery.viewInsetsOf(ctx).bottom > 0 ||
+                FocusManager.instance.primaryFocus != null;
             if (kbOpen) {
               return const SizedBox.shrink();
             }

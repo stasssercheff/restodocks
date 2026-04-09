@@ -299,7 +299,10 @@ class _AppShellState extends State<AppShell> {
     final landscapeNarrow = _landscapeNarrowPhone(context);
     final landscapeWeb =
         kIsWeb && MediaQuery.of(context).orientation == Orientation.landscape;
-    final hideNav = landscapeNarrow && _hideBottomBar;
+    final hideForKeyboard = landscapeNarrow &&
+        (MediaQuery.viewInsetsOf(context).bottom > 0 ||
+            FocusManager.instance.primaryFocus != null);
+    final hideNav = landscapeNarrow && (_hideBottomBar || hideForKeyboard);
     final bottomBarTotalHeight = navBarHeight + navBottomInset;
 
     final bodyChild = showAccessPendingStub
@@ -323,7 +326,7 @@ class _AppShellState extends State<AppShell> {
     return MediaQuery(
       data: patchedMq,
       child: Scaffold(
-        extendBody: true,
+        extendBody: !hideNav,
         backgroundColor: Theme.of(context).colorScheme.surface,
         body: NotificationListener<ScrollNotification>(
           onNotification: _onScroll,
