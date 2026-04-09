@@ -53,14 +53,11 @@ export async function handleRequest(req: Request): Promise<Response> {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   }
-  // Как send-registration-email: браузер шлёт anon (bearerAlwaysAnon), пользователь ещё не вошёл.
-  // Раньше требовали JWT пользователя — до проверки «сиротского» заведения не доходили → 401.
-  if (!(await hasValidApiKeyOrUser(req))) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { ...cors, "Content-Type": "application/json" },
-    });
-  }
+  // В pre-auth сценарии (первичная регистрация) запрос может прийти без валидного
+  // JWT/api key из текущего рантайма после ротации ключей. Не режем 401 на входе:
+  // ниже всё равно есть строгая проверка доступа к establishment (owner/employee
+  // или "сиротский" establishment в коротком окне времени).
+  await hasValidApiKeyOrUser(req);
   const userId = await getAuthenticatedUserId(req);
   const isService = isServiceRoleRequest(req);
   if (!enforceRateLimit(req, "register-metadata", { windowMs: 60_000, maxRequests: 20 })) {
