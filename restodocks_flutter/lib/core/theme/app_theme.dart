@@ -6,9 +6,12 @@ class AppTheme {
   static const Color primaryColor = Color(0xFFAD292C);
   static const Color accentColor = Color(0xFFAD292C);
   static const Color secondaryColor = Color(0xFF4CAF50);
-  /// Нижняя панель: непрозрачный фон (как у scaffold / классической шапки), без M3 surface tint.
-  static const Color navigationBarBackgroundLight = Color(0xFFFAFAFA);
+  /// Нижняя панель: светло-розовый фон под бренд (#AD292C), без прозрачности.
+  static const Color navigationBarBackgroundLight = Color(0xFFFFF2F2);
+  /// Тёмная тема: прежний нейтральный фон футера.
   static const Color navigationBarBackgroundDark = Color(0xFF1E1E1E);
+  /// Высота слота нижней панели (веб + IPA), синхронно с AppShell и main.dart.
+  static const double navigationBarHeight = 64;
 
   static final ColorScheme _lightColorScheme = ColorScheme.fromSeed(
     seedColor: primaryColor,
@@ -152,7 +155,7 @@ class AppTheme {
           (_) => primaryColor.withValues(alpha: 0.2)),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      height: 80,
+      height: navigationBarHeight,
       backgroundColor: navigationBarBackgroundLight,
       indicatorColor: primaryColor.withValues(alpha: 0.16),
       shadowColor: Colors.transparent,
@@ -300,7 +303,7 @@ class AppTheme {
       trackOutlineColor: WidgetStateProperty.resolveWith((_) => Colors.white24),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      height: 80,
+      height: navigationBarHeight,
       backgroundColor: navigationBarBackgroundDark,
       indicatorColor: primaryColor.withValues(alpha: 0.22),
       shadowColor: Colors.transparent,
@@ -397,7 +400,7 @@ class AppTheme {
       unselectedLabelColor: primaryColor,
     ),
     navigationBarTheme: NavigationBarThemeData(
-      height: 80,
+      height: navigationBarHeight,
       backgroundColor: navigationBarBackgroundLight,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
@@ -499,7 +502,7 @@ class AppTheme {
       unselectedLabelColor: primaryColor,
     ),
     navigationBarTheme: NavigationBarThemeData(
-      height: 80,
+      height: navigationBarHeight,
       backgroundColor: navigationBarBackgroundDark,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
