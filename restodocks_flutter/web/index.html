@@ -226,6 +226,35 @@
       var isMobile = /iPhone|iPad|iPod|Android/i.test(ua);
       if (!isMobile) return;
       if (window.navigator.standalone) return;
+
+      // Сильнее дергаем document scroll сразу в альбоме на телефоне (API «свернуть строку» нет).
+      function landscapeChromeKick() {
+        try {
+          if (!/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '')) return;
+          if (window.innerWidth <= window.innerHeight) return;
+          if (Math.min(window.innerWidth, window.innerHeight) >= 600) return;
+          var doc = document.documentElement;
+          var vh = window.innerHeight || 0;
+          var sh = doc ? doc.scrollHeight : 0;
+          if (sh <= vh + 4) return;
+          var maxY = Math.max(0, sh - vh);
+          var y0 = window.scrollY || 0;
+          function ping(i) {
+            if (i > 4) {
+              window.scrollTo(0, Math.min(y0, maxY));
+              return;
+            }
+            var bump = (i % 2 === 1) ? 2 : 3;
+            window.scrollTo(0, Math.min(y0 + bump, maxY));
+            requestAnimationFrame(function () {
+              window.scrollTo(0, Math.min(y0, maxY));
+              requestAnimationFrame(function () { ping(i + 1); });
+            });
+          }
+          ping(0);
+        } catch (_) {}
+      }
+
       var ticking = false;
       var warmup;
       function nudge() {
@@ -253,7 +282,12 @@
           if (t > 40) clearInterval(warmup);
         }, 120);
       }
-      window.addEventListener('flutter-first-frame', startWarmup);
+      window.addEventListener('flutter-first-frame', function () {
+        startWarmup();
+        setTimeout(function () {
+          if (window.innerWidth > window.innerHeight) landscapeChromeKick();
+        }, 60);
+      });
       window.addEventListener('pageshow', startWarmup);
       window.addEventListener('focus', startWarmup);
       document.addEventListener('touchstart', function () {
@@ -262,6 +296,9 @@
       window.addEventListener('orientationchange', function () {
         setTimeout(nudge, 120);
         setTimeout(nudge, 360);
+        setTimeout(landscapeChromeKick, 40);
+        setTimeout(landscapeChromeKick, 200);
+        setTimeout(landscapeChromeKick, 450);
         setTimeout(startWarmup, 450);
       });
     })();

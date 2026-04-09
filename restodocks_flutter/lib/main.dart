@@ -27,6 +27,7 @@ import 'core/supabase_url_resolver_stub.dart'
 import 'core/mobile_browser_chrome_nudge_stub.dart'
     if (dart.library.html) 'core/mobile_browser_chrome_nudge_web.dart'
         as mobile_chrome;
+import 'core/web_mobile_chrome_landscape_watcher.dart';
 import 'services/fcm_push_service.dart';
 import 'services/services.dart';
 import 'services/translation_manager.dart';
@@ -410,8 +411,10 @@ class RestodocksApp extends StatelessWidget {
                   child: content,
                 );
               }
-              return WebLocationCorrection(
-                child: AppPrimaryScrollController(child: content),
+              return WebMobileChromeLandscapeWatcher(
+                child: WebLocationCorrection(
+                  child: AppPrimaryScrollController(child: content),
+                ),
               );
             },
             debugShowCheckedModeBanner: false,
