@@ -350,6 +350,8 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final lang = loc.currentLanguageCode;
+    final mq = MediaQuery.of(context);
+    final narrowPhone = mq.size.shortestSide < 600;
 
     return Scaffold(
       appBar: AppBar(
@@ -392,33 +394,32 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                   // Дата поставки
                   if (_selectedSupplier != null) ...[
                     const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                            child: Text(
-                                loc.t('order_export_order_for') ?? 'На дату')),
-                        TextButton(
-                          onPressed: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: _orderForDate ??
-                                  DateTime.now().add(const Duration(days: 1)),
-                              firstDate: DateTime.now(),
-                              lastDate:
-                                  DateTime.now().add(const Duration(days: 365)),
-                            );
-                            if (picked != null) {
-                              setState(() => _orderForDate = picked);
-                            }
-                          },
-                          child: Text(
-                            _orderForDate != null
-                                ? DateFormat('dd.MM.yyyy')
-                                    .format(_orderForDate!)
-                                : '...',
-                          ),
-                        ),
-                      ],
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: _orderForDate ??
+                              DateTime.now().add(const Duration(days: 1)),
+                          firstDate: DateTime.now(),
+                          lastDate:
+                              DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (picked != null) {
+                          setState(() => _orderForDate = picked);
+                        }
+                      },
+                      icon: const Icon(Icons.calendar_month_outlined),
+                      label: Text(
+                        _orderForDate != null
+                            ? '${loc.t('order_export_order_for') ?? 'На когда заказ'}: ${DateFormat('dd.MM.yyyy').format(_orderForDate!)}'
+                            : (loc.t('order_export_order_for') ??
+                                'На когда заказ'),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
+                      ),
                     ),
                   ],
 
@@ -575,6 +576,34 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                     ),
                   ],
 
+                  const SizedBox(height: 24),
+                  if (_canSave && narrowPhone) ...[
+                    OutlinedButton(
+                      onPressed: _saving ? null : _saveOrder,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: _saving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(
+                              loc.t('order_list_save_with_quantities') ??
+                                  'Сохранить',
+                            ),
+                    ),
+                    const SizedBox(height: 10),
+                    FilledButton.icon(
+                      onPressed: _saving ? null : _showSendSheet,
+                      icon: const Icon(Icons.send),
+                      label: Text(loc.t('order_list_send') ?? 'Отправить'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 32),
                 ],
               ),
@@ -582,7 +611,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
           ),
 
           // Нижние кнопки
-          if (_canSave)
+          if (_canSave && !narrowPhone)
             Container(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
               decoration: BoxDecoration(

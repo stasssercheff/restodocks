@@ -30,6 +30,9 @@ class _PosProcurementScreenState extends State<PosProcurementScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final mq = MediaQuery.of(context);
+    final compactVerticalTabs =
+        mq.size.shortestSide < 600 && mq.orientation == Orientation.portrait;
     final deptKey = posDepartmentLabelKeyForRoute(_dept);
     final deptLabel = deptKey != null ? loc.t(deptKey) : _dept;
     final title =
@@ -56,47 +59,72 @@ class _PosProcurementScreenState extends State<PosProcurementScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-            child: Row(
-              children: List.generate(tabs.length, (i) {
-                final selected = _tabIndex == i;
-                return Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(left: i > 0 ? 4 : 0),
-                    child: selected
-                        ? FilledButton(
-                            onPressed: () => setState(() => _tabIndex = i),
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 10,
-                              ),
-                            ),
-                            child: Text(
-                              tabs[i],
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          )
-                        : OutlinedButton(
-                            onPressed: () => setState(() => _tabIndex = i),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 10,
-                              ),
-                            ),
-                            child: Text(
-                              tabs[i],
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
+            child: compactVerticalTabs
+                ? DropdownButtonFormField<int>(
+                    value: _tabIndex,
+                    isDense: true,
+                    decoration: InputDecoration(
+                      labelText: loc.t('filter'),
+                    ),
+                    items: List.generate(
+                      tabs.length,
+                      (i) => DropdownMenuItem<int>(
+                        value: i,
+                        child: Text(
+                          tabs[i],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setState(() => _tabIndex = v);
+                    },
+                  )
+                : Row(
+                    children: List.generate(tabs.length, (i) {
+                      final selected = _tabIndex == i;
+                      return Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(left: i > 0 ? 4 : 0),
+                          child: selected
+                              ? FilledButton(
+                                  onPressed: () =>
+                                      setState(() => _tabIndex = i),
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 10,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    tabs[i],
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                )
+                              : OutlinedButton(
+                                  onPressed: () =>
+                                      setState(() => _tabIndex = i),
+                                  style: OutlinedButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 10,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    tabs[i],
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                        ),
+                      );
+                    }),
                   ),
-                );
-              }),
-            ),
           ),
           Expanded(
             child: IndexedStack(

@@ -122,9 +122,10 @@ class _AppShellState extends State<AppShell> {
 
     final tourController = context.watch<PageTourService>().homeTourController;
     final navBar = NavigationBarTheme(
-      data: const NavigationBarThemeData(
+      data: NavigationBarThemeData(
         height: _navBarHeight,
         labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+        backgroundColor: Theme.of(context).navigationBarTheme.backgroundColor,
       ),
       child: NavigationBar(
         selectedIndex: selectedIndex,
@@ -204,8 +205,7 @@ class _AppShellState extends State<AppShell> {
     final patchedMq = (landscapeNarrow || landscapeWeb)
         ? mq.copyWith(
             padding: mq.padding.copyWith(left: 0, right: 0, bottom: 0),
-            viewPadding:
-                mq.viewPadding.copyWith(left: 0, right: 0, bottom: 0),
+            viewPadding: mq.viewPadding.copyWith(left: 0, right: 0, bottom: 0),
           )
         : mq;
 
@@ -214,6 +214,7 @@ class _AppShellState extends State<AppShell> {
     return MediaQuery(
       data: patchedMq,
       child: Scaffold(
+        extendBody: true,
         backgroundColor: Theme.of(context).colorScheme.surface,
         body: NotificationListener<ScrollNotification>(
           onNotification: _onScroll,
@@ -225,6 +226,8 @@ class _AppShellState extends State<AppShell> {
                 duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutCubic,
                 height: _navBarHeight,
+                color: Theme.of(context).navigationBarTheme.backgroundColor ??
+                    Theme.of(context).colorScheme.surfaceContainerHighest,
                 child: ClipRect(
                   child: Align(
                     alignment: Alignment.topCenter,

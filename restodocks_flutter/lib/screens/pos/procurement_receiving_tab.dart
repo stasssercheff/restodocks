@@ -260,7 +260,8 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final df = DateFormat('dd.MM.yyyy');
-    final narrow = MediaQuery.sizeOf(context).shortestSide < 600;
+    final size = MediaQuery.sizeOf(context);
+    final compactFilters = size.shortestSide < 600 || size.width < 980;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -274,7 +275,7 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
                 ),
           ),
         ),
-        if (!narrow)
+        if (!compactFilters)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -394,11 +395,13 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
                     ),
                     DropdownMenuItem(
                       value: 'order',
-                      child: Text(loc.t('pos_procurement_filter_order_from')),
+                      child: Text(
+                          '${loc.t('pos_procurement_filter_order_from')} - ${loc.t('pos_procurement_filter_order_to')}'),
                     ),
                     DropdownMenuItem(
                       value: 'delivery',
-                      child: Text(loc.t('pos_procurement_filter_delivery_from')),
+                      child: Text(
+                          '${loc.t('pos_procurement_filter_delivery_from')} - ${loc.t('pos_procurement_filter_delivery_to')}'),
                     ),
                   ],
                   onChanged: (v) {
