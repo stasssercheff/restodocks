@@ -13,20 +13,10 @@ bool _targetMobileBrowser(html.Window w) {
       ua.contains('mobile');
 }
 
-bool _aggressiveChromeLandscape() {
-  try {
-    return html.window.localStorage['restodocks_landscape_chrome_aggressive'] ==
-        '1';
-  } catch (_) {
-    return false;
-  }
-}
-
 /// Лёгкий сдвиг scroll документа при прокрутке списков во Flutter: мобильные браузеры
 /// чаще убирают адресную строку/панель вкладок только при движении страницы, а не канваса.
 void mobileBrowserChromeNudgeFromFlutterScroll() {
   try {
-    if (!_aggressiveChromeLandscape()) return;
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - _lastChromeNudgeMs < 200) return;
     _lastChromeNudgeMs = now;
@@ -52,7 +42,6 @@ void mobileBrowserChromeNudgeFromFlutterScroll() {
 /// Браузер не даёт API «убрать строку мгновенно»; это максимум без поломки вёрстки.
 void mobileBrowserChromeNudgeOnLandscapeIfPhone() {
   try {
-    if (!_aggressiveChromeLandscape()) return;
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - _lastLandscapeNudgeMs < 900) return;
     _lastLandscapeNudgeMs = now;

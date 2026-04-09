@@ -29,7 +29,6 @@ import 'core/supabase_url_resolver_stub.dart'
 import 'core/mobile_browser_chrome_nudge_stub.dart'
     if (dart.library.html) 'core/mobile_browser_chrome_nudge_web.dart'
     as mobile_chrome;
-import 'core/mobile_web_chrome_aggressive_setting.dart';
 import 'core/web_mobile_chrome_landscape_watcher.dart';
 import 'services/fcm_push_service.dart';
 import 'services/services.dart';
@@ -50,13 +49,6 @@ Future<void> _applyLocaleFromEmployeeProfile(String profileLang) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  if (kIsWeb) {
-    try {
-      await loadMobileWebChromeAggressiveLandscape();
-    } catch (e) {
-      devLog('mobile web chrome aggressive pref: $e');
-    }
-  }
   // Критично: кэшировать путь+query до ВСЕГО остального — иначе теряются token_hash/type для auth/confirm-click
   if (kIsWeb) initial_loc.getInitialLocation();
   url_strategy

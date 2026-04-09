@@ -312,14 +312,6 @@
       if (!isMobile) return;
       if (window.navigator.standalone) return;
 
-      function aggressiveChromeOptIn() {
-        try {
-          return localStorage.getItem('restodocks_landscape_chrome_aggressive') === '1';
-        } catch (e) {
-          return false;
-        }
-      }
-
       // Сильнее дергаем document scroll сразу в альбоме на телефоне (API «свернуть строку» нет).
       function landscapeChromeKick() {
         try {
@@ -366,15 +358,9 @@
         });
       }
       function startWarmup() {
-        if (!aggressiveChromeOptIn()) return;
         var t = 0;
         if (warmup) clearInterval(warmup);
         warmup = setInterval(function () {
-          if (!aggressiveChromeOptIn()) {
-            if (warmup) clearInterval(warmup);
-            warmup = null;
-            return;
-          }
           t += 1;
           nudge();
           if (t > 80) {
@@ -383,65 +369,27 @@
           }
         }, 90);
       }
-      function onAggressiveFirstFrame() {
-        if (!aggressiveChromeOptIn()) return;
+      window.addEventListener('flutter-first-frame', function () {
         startWarmup();
         setTimeout(function () {
           if (window.innerWidth > window.innerHeight) landscapeChromeKick();
         }, 60);
-      }
-      window.addEventListener('flutter-first-frame', onAggressiveFirstFrame);
-      window.addEventListener('pageshow', function () {
-        if (aggressiveChromeOptIn()) startWarmup();
       });
-      window.addEventListener('focus', function () {
-        if (aggressiveChromeOptIn()) startWarmup();
-      });
+      window.addEventListener('pageshow', startWarmup);
+      window.addEventListener('focus', startWarmup);
       document.addEventListener('touchstart', function () {
-        if (aggressiveChromeOptIn()) nudge();
+        nudge();
       }, { passive: true });
       document.addEventListener('touchmove', function () {
-        if (aggressiveChromeOptIn()) nudge();
+        nudge();
       }, { passive: true });
       window.addEventListener('orientationchange', function () {
-        if (!aggressiveChromeOptIn()) return;
         setTimeout(nudge, 120);
         setTimeout(nudge, 360);
         setTimeout(landscapeChromeKick, 40);
         setTimeout(landscapeChromeKick, 200);
         setTimeout(landscapeChromeKick, 450);
         setTimeout(startWarmup, 450);
-      });
-
-      window.restodocksApplyChromeAggressive = function (enabled) {
-        try {
-          if (enabled) {
-            localStorage.setItem('restodocks_landscape_chrome_aggressive', '1');
-          } else {
-            localStorage.removeItem('restodocks_landscape_chrome_aggressive');
-          }
-        } catch (e) {}
-        if (!enabled) {
-          if (warmup) {
-            clearInterval(warmup);
-            warmup = null;
-          }
-          return;
-        }
-        startWarmup();
-        if (window.innerWidth > window.innerHeight) {
-          landscapeChromeKick();
-          setTimeout(landscapeChromeKick, 200);
-        }
-      };
-
-      window.addEventListener('restodocks-chrome-aggressive', function (e) {
-        try {
-          var enabled = e && e.detail === true;
-          if (typeof window.restodocksApplyChromeAggressive === 'function') {
-            window.restodocksApplyChromeAggressive(enabled);
-          }
-        } catch (err) {}
       });
     })();
   </script>
