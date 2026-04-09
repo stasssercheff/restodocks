@@ -121,11 +121,11 @@
       overflow-x: hidden;
       overflow-y: auto;
       -webkit-overflow-scrolling: touch;
-      touch-action: pan-y;
       background: #f7f4f4;
     }
-    @supports (min-height: 100svh) { html, body { min-height: 100svh; } }
-    @supports (min-height: 100lvh) { html, body { min-height: 100lvh; } }
+    @supports (min-height: 100svh) { html, body { min-height: calc(100svh + 2px); } }
+    /* +2px: запас прокрутки документа без отдельного блока в потоке (иначе белая полоса). */
+    @supports (min-height: 100lvh) { html, body { min-height: calc(100lvh + 2px); } }
     flutter-view, #flt-glass-pane, flt-glass-pane {
       width: 100vw !important;
       min-width: 100vw !important;
@@ -135,15 +135,9 @@
       border-radius: 0 !important;
       box-shadow: none !important;
       background: transparent !important;
-      touch-action: pan-y !important;
-    }
-    /* Keep a real document scroll range so mobile browser chrome can collapse. */
-    #safari-scroll-spacer {
-      height: 140px;
-      width: 100%;
-      pointer-events: none;
     }
     flt-glass-pane, flt-scene, flutter-view, #flt-glass-pane { background: transparent !important; }
+    @supports (height: 100dvh) { html, body { min-height: calc(100dvh + 2px); } }
     #loading-screen {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: #AD292C url('welcome_logo.png?v=20260403n') center center no-repeat;
@@ -157,7 +151,6 @@
 </head>
 <body>
   <div id="loading-screen"></div>
-  <div id="safari-scroll-spacer" aria-hidden="true"></div>
   <script>
     (function () {
       // Force-drop stale SW/caches so web always loads the latest splash/assets.
@@ -264,8 +257,6 @@
         nudge();
       }, { passive: true });
       window.addEventListener('orientationchange', function () {
-        var spacer = document.getElementById('safari-scroll-spacer');
-        if (spacer) spacer.style.height = (window.innerWidth > window.innerHeight) ? '220px' : '140px';
         setTimeout(nudge, 120);
         setTimeout(nudge, 360);
         setTimeout(startWarmup, 450);

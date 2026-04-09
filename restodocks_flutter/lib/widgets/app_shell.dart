@@ -215,6 +215,8 @@ class _AppShellState extends State<AppShell> {
           )
         : mq;
 
+    // When hidden, omit the slot entirely — a zero-height bar still reserves
+    // theme/shadow and reads as a second strip under the real nav.
     return MediaQuery(
       data: patchedMq,
       child: Scaffold(
@@ -222,18 +224,19 @@ class _AppShellState extends State<AppShell> {
           onNotification: _onScroll,
           child: bodyChild,
         ),
-        bottomNavigationBar: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          height: hideNav ? 0 : _navBarHeight,
-          child: ClipRect(
-            child: Align(
-              alignment: Alignment.topCenter,
-              heightFactor: hideNav ? 0 : 1,
-              child: bottomBar,
-            ),
-          ),
-        ),
+        bottomNavigationBar: hideNav
+            ? null
+            : AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                height: _navBarHeight,
+                child: ClipRect(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: bottomBar,
+                  ),
+                ),
+              ),
       ),
     );
   }

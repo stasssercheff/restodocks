@@ -1196,7 +1196,10 @@ class _MenuScreenState extends State<MenuScreen> {
           )
         : null;
     final shortViewport = MediaQuery.sizeOf(context).height < 560;
-    final hideTopFoodcostSwitch = shortViewport && showFoodcost && menuSeg == 1;
+    // Foodcost panel already has Меню/Фудкост — drop duplicate AppBar row in
+    // short portrait and in phone landscape to save vertical space.
+    final hideTopFoodcostSwitch =
+        showFoodcost && menuSeg == 1 && (shortViewport || isPhoneLandscape);
     final hallChips = _isHallMenu &&
         !_loading &&
         (_dishesBar.isNotEmpty || _dishesKitchen.isNotEmpty) &&
@@ -1224,6 +1227,7 @@ class _MenuScreenState extends State<MenuScreen> {
         ),
         child: Scaffold(
           appBar: AppBar(
+            toolbarHeight: isPhoneLandscape ? 44 : kToolbarHeight,
             title: ScrollToTopAppBarTitle(
               child: Text(loc.t('menu')),
             ),

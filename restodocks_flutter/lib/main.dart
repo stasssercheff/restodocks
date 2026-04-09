@@ -361,11 +361,14 @@ class RestodocksApp extends StatelessWidget {
               final raw = child ?? const SizedBox.shrink();
               final c = kIsWeb ? raw : MobileDeepLinkListener(child: raw);
               final media = MediaQuery.of(context);
-              // Узкое окно на macOS/Windows не должно включать «телефонный» масштаб текста.
-              final applyMobileUiScale = !kIsWeb &&
-                  (defaultTargetPlatform == TargetPlatform.iOS ||
-                      defaultTargetPlatform == TargetPlatform.android) &&
-                  media.size.shortestSide < 600;
+              // Телефонный масштаб: нативный iOS/Android и веб при узком экране (Safari и т.д.).
+              // Раньше веб не трогали — из‑за этого шрифты/плитки казались «раздутыми» относительно
+              // нативного приложения с тем же пресетом (0.9).
+              final narrowPhone = media.size.shortestSide < 600;
+              final applyMobileUiScale = narrowPhone &&
+                  (kIsWeb ||
+                      defaultTargetPlatform == TargetPlatform.iOS ||
+                      defaultTargetPlatform == TargetPlatform.android);
               Widget content = c;
               if (applyMobileUiScale) {
                 final factor = uiScale.scaleFactor;
