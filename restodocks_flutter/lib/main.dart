@@ -403,7 +403,8 @@ class RestodocksApp extends StatelessWidget {
                     );
                   }
                   if (stripLandscapeSideInsets) {
-                    final stripBottomInset = kIsWeb && landscape;
+                    final keyboardOpen = media.viewInsets.bottom > 0;
+                    final stripBottomInset = landscape && narrowPhone && !keyboardOpen;
                     m = m.copyWith(
                       padding: m.padding.copyWith(
                         left: 0,

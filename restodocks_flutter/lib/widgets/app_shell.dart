@@ -299,8 +299,9 @@ class _AppShellState extends State<AppShell> {
     final landscapeNarrow = _landscapeNarrowPhone(context);
     final landscapeWeb =
         kIsWeb && MediaQuery.of(context).orientation == Orientation.landscape;
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     final hideForKeyboard = landscapeNarrow &&
-        (MediaQuery.viewInsetsOf(context).bottom > 0 ||
+        (keyboardOpen ||
             FocusManager.instance.primaryFocus != null);
     final hideNav = landscapeNarrow && (_hideBottomBar || hideForKeyboard);
     final bottomBarTotalHeight = navBarHeight + navBottomInset;
@@ -311,13 +312,15 @@ class _AppShellState extends State<AppShell> {
     final mq = MediaQuery.of(context);
     // Совпадает с main.dart: веб в альбоме — сброс боков; нативно — только без выреза
     // (иначе сохраняем горизонтальный safe area под камеру / Dynamic Island).
-    final stripShellHorizontal = landscapeWeb ||
-        (landscapeNarrow &&
-            !isNativePhoneLandscapeWithSensorHousingInsets(context));
+    final stripShellHorizontal = landscapeWeb || landscapeNarrow;
     final patchedMq = stripShellHorizontal
         ? mq.copyWith(
             padding: mq.padding.copyWith(left: 0, right: 0, bottom: 0),
-            viewPadding: mq.viewPadding.copyWith(left: 0, right: 0, bottom: 0),
+            viewPadding: mq.viewPadding.copyWith(
+              left: 0,
+              right: 0,
+              bottom: keyboardOpen ? mq.viewPadding.bottom : 0,
+            ),
           )
         : mq;
 
@@ -326,7 +329,9 @@ class _AppShellState extends State<AppShell> {
     return MediaQuery(
       data: patchedMq,
       child: Scaffold(
-        extendBody: !hideNav,
+        // Reserve layout space for bottomNavigationBar to avoid overlapping
+        // trailing controls/lists on desktop and web pages.
+        extendBody: false,
         backgroundColor: Theme.of(context).colorScheme.surface,
         body: NotificationListener<ScrollNotification>(
           onNotification: _onScroll,
