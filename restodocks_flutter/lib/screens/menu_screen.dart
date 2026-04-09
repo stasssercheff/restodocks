@@ -1238,7 +1238,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     child: Material(
                       color: Theme.of(context).colorScheme.surface,
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                        padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
