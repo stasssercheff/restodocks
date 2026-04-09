@@ -99,6 +99,8 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
   bool _hideControlsOnScroll = false;
   int _lastControlsToggleMs = 0;
   Timer? _controlsToggleTimer;
+  double _tableZoom = 1.0;
+  double _tableZoomAtScaleStart = 1.0;
 
   final Map<String, _DishTargetState> _dishTargets = {};
   final Map<String, TextEditingController> _dishPctControllers = {};
@@ -708,12 +710,21 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         MediaQuery.of(context).orientation == Orientation.landscape;
     final landscapePhone = isPhoneLayout && isLandscape;
     final compactSegmentStyle = landscapePhone
-        ? const ButtonStyle(
-            minimumSize: WidgetStatePropertyAll(Size(0, 32)),
-            padding: WidgetStatePropertyAll(
+        ? ButtonStyle(
+            minimumSize: const WidgetStatePropertyAll(Size(0, 32)),
+            padding: const WidgetStatePropertyAll(
                 EdgeInsets.symmetric(horizontal: 10, vertical: 0)),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            visualDensity: VisualDensity(horizontal: -1, vertical: -2),
+            visualDensity: const VisualDensity(horizontal: -1, vertical: -2),
+            side: WidgetStateProperty.all(
+              BorderSide(
+                color: Theme.of(context)
+                    .colorScheme
+                    .outline
+                    .withValues(alpha: 0.26),
+                width: 0.5,
+              ),
+            ),
           )
         : null;
     if (_busy) {
@@ -851,30 +862,59 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       columns: tableColumns,
       rows: tableRows,
     );
+    final zoomedHeaderTable = Transform.scale(
+      alignment: Alignment.topLeft,
+      scale: _tableZoom,
+      child: foodcostHeaderTable,
+    );
+    final zoomedBodyTable = Transform.scale(
+      alignment: Alignment.topLeft,
+      scale: _tableZoom,
+      child: foodcostBodyTable,
+    );
+
+    Widget hScrollTable(ScrollController c, Widget table) {
+      if (narrow) {
+        return SingleChildScrollView(
+          controller: c,
+          scrollDirection: Axis.horizontal,
+          child: table,
+        );
+      }
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            controller: c,
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraints.maxWidth),
+              child: Center(child: table),
+            ),
+          );
+        },
+      );
+    }
 
     final tableArea = Scrollbar(
       child: Padding(
         padding: EdgeInsets.fromLTRB(narrow ? 6 : 14, 0, narrow ? 6 : 14, 18),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (groups.isNotEmpty)
-              SingleChildScrollView(
-                controller: _headerHScroll,
-                scrollDirection: Axis.horizontal,
-                child: foodcostHeaderTable,
-              ),
+              hScrollTable(_headerHScroll, zoomedHeaderTable),
             Expanded(
               child: SingleChildScrollView(
                 controller: _vScroll,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (groups.isNotEmpty)
-                      SingleChildScrollView(
+                      RawScrollbar(
                         controller: _bodyHScroll,
-                        scrollDirection: Axis.horizontal,
-                        child: foodcostBodyTable,
+                        scrollbarOrientation: ScrollbarOrientation.bottom,
+                        thumbVisibility: true,
+                        child: hScrollTable(_bodyHScroll, zoomedBodyTable),
                       ),
                     if (groups.isEmpty)
                       Padding(
@@ -893,6 +933,19 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
           ],
         ),
       ),
+    );
+    final interactiveTableArea = GestureDetector(
+      onScaleStart: (_) {
+        _tableZoomAtScaleStart = _tableZoom;
+      },
+      onScaleUpdate: (details) {
+        if (details.pointerCount < 2) return;
+        final nextZoom =
+            (_tableZoomAtScaleStart * details.scale).clamp(0.75, 2.2);
+        if (nextZoom == _tableZoom) return;
+        setState(() => _tableZoom = nextZoom);
+      },
+      child: tableArea,
     );
 
     final modeSegment = SegmentedButton<FoodcostPricingMode>(
@@ -930,9 +983,11 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       style: compactSegmentStyle,
     );
 
-    final menuSegment = (shortViewport &&
-            widget.onMenuSegmentChanged != null &&
-            widget.menuSegmentValue != null)
+    final showMenuSegmentInPanel = widget.onMenuSegmentChanged != null &&
+        widget.menuSegmentValue != null &&
+        (shortViewport || !isPhoneLayout);
+
+    final menuSegment = showMenuSegmentInPanel
         ? SegmentedButton<int>(
             segments: [
               ButtonSegment<int>(
@@ -942,7 +997,8 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                   maxLines: 1,
                   softWrap: false,
                   overflow: TextOverflow.fade,
-                  style: TextStyle(fontSize: landscapePhone ? 10.5 : 11),
+                  style: TextStyle(
+                      fontSize: landscapePhone ? 10.5 : (isPhoneLayout ? 11 : 13)),
                 ),
               ),
               ButtonSegment<int>(
@@ -952,7 +1008,8 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
                   maxLines: 1,
                   softWrap: false,
                   overflow: TextOverflow.fade,
-                  style: TextStyle(fontSize: landscapePhone ? 10.5 : 11),
+                  style: TextStyle(
+                      fontSize: landscapePhone ? 10.5 : (isPhoneLayout ? 11 : 13)),
                 ),
               ),
             ],
@@ -989,7 +1046,7 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     );
 
     final compactControls = isPhoneLayout;
-    final controls = Padding(
+    Widget controls = Padding(
       padding: EdgeInsets.fromLTRB(
           narrow ? 8 : 14, 0, narrow ? 8 : 14, isLandscape ? 4 : 6),
       child: Column(
@@ -1008,15 +1065,24 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
               ],
             )
           else
-            modeSegment,
-          if (!compactControls) ...[
-            const SizedBox(height: 6),
-            Align(
-              alignment: narrow ? Alignment.center : Alignment.centerLeft,
-              child: pctField,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (menuSegment != null) ...[
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: menuSegment,
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                Expanded(child: modeSegment),
+                const SizedBox(width: 12),
+                pctField,
+              ],
             ),
-          ],
-          SizedBox(height: shortViewport ? 2 : 6),
+          SizedBox(height: landscapePhone
+              ? 2
+              : (shortViewport ? 2 : 6)),
           TextField(
             decoration: InputDecoration(
               labelText: loc.t('foodcost_search_hint') ?? 'Поиск',
@@ -1035,12 +1101,19 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
       ),
     );
 
+    if (landscapePhone) {
+      controls = Transform.translate(
+        offset: const Offset(0, -6),
+        child: controls,
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (!_hideControlsOnScroll) controls,
         Expanded(
-          child: tableArea,
+          child: interactiveTableArea,
         ),
       ],
     );

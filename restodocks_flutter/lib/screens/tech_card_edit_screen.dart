@@ -5383,9 +5383,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                         // Таблица ТТК на странице: без «окна», при росте числа продуктов страница скроллится, технология остаётся ниже
                         SizedBox(
                           width: constraints.maxWidth,
-                          child: Scrollbar(
+                          child: RawScrollbar(
                             controller: _compositionTableHScrollController,
-                            thumbVisibility: kIsWeb,
+                            scrollbarOrientation: ScrollbarOrientation.bottom,
+                            thumbVisibility: true,
                             child: SingleChildScrollView(
                               controller: _compositionTableHScrollController,
                               scrollDirection: Axis.horizontal,
@@ -5397,7 +5398,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                     minWidth: 0,
                                     minHeight: 220,
                                   ),
-                                  child: effectiveCanEdit
+                                  child: InteractiveViewer(
+                                    panEnabled: false,
+                                    scaleEnabled: true,
+                                    minScale: 0.75,
+                                    maxScale: 2.2,
+                                    child: effectiveCanEdit
                                       ? RepaintBoundary(
                                           child: ExcelStyleTtkTable(
                                             loc: loc,
@@ -5539,6 +5545,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                             );
                                           },
                                         ),
+                                  ),
                                 ),
                               ),
                             ),
