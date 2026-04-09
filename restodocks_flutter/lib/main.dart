@@ -442,8 +442,7 @@ class RestodocksApp extends StatelessWidget {
                         (theme.brightness == Brightness.dark
                             ? AppTheme.navigationBarBackgroundDark
                             : AppTheme.navigationBarBackgroundLight);
-                    final bottomBackdropHeight =
-                        (kIsWeb && landscapePhoneCanvas) ? 0.0 : AppTheme.navigationBarHeight;
+                    const bottomBackdropHeight = 0.0;
                     content = Stack(
                       fit: StackFit.expand,
                       children: [

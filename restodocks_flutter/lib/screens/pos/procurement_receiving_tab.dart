@@ -219,6 +219,7 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
       initialDateRange: initial,
+      builder: _buildCompactRangePicker,
     );
     if (range == null || !mounted) return;
     setState(() {
@@ -240,6 +241,7 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
       initialDateRange: initial,
+      builder: _buildCompactRangePicker,
     );
     if (range == null || !mounted) return;
     setState(() {
@@ -266,18 +268,25 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
     await _pickDeliveryDateRange();
   }
 
-  String _orderRangeLabel(LocalizationService loc, DateFormat df) {
-    if (_orderDateFrom != null && _orderDateTo != null) {
-      return '${df.format(_orderDateFrom!)} — ${df.format(_orderDateTo!)}';
-    }
-    return loc.t('pos_procurement_filter_delivery_range_empty');
-  }
-
-  String _deliveryRangeLabel(LocalizationService loc, DateFormat df) {
-    if (_deliveryDateFrom != null && _deliveryDateTo != null) {
-      return '${df.format(_deliveryDateFrom!)} — ${df.format(_deliveryDateTo!)}';
-    }
-    return loc.t('pos_procurement_filter_delivery_range_empty');
+  Widget _buildCompactRangePicker(BuildContext context, Widget? child) {
+    final theme = Theme.of(context);
+    return Theme(
+      data: theme.copyWith(
+        datePickerTheme: theme.datePickerTheme.copyWith(
+          rangePickerHeaderHeadlineStyle:
+              theme.textTheme.headlineSmall?.copyWith(fontSize: 26),
+          rangePickerHeaderHelpStyle:
+              theme.textTheme.labelLarge?.copyWith(fontSize: 13),
+        ),
+        inputDecorationTheme: (theme.inputDecorationTheme).copyWith(
+          hintStyle: theme.textTheme.headlineSmall?.copyWith(
+            fontSize: 34,
+            fontWeight: FontWeight.w400,
+          ),
+        ),
+      ),
+      child: child ?? const SizedBox.shrink(),
+    );
   }
 
   @override
@@ -328,36 +337,32 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
                 ),
               ),
               const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: () => _selectDateMode('order_range'),
-                icon: Icon(
-                  Icons.date_range_outlined,
-                  size: 20,
-                  color: _dateFilterMode == 'order_range'
-                      ? theme.colorScheme.primary
-                      : null,
-                ),
-                label: Text(
-                  '${loc.t('pos_procurement_filter_mode_order')}\n${_orderRangeLabel(loc, df)}',
-                  maxLines: 3,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () => _selectDateMode('delivery_range'),
-                icon: Icon(
-                  Icons.date_range_outlined,
-                  size: 20,
-                  color: _dateFilterMode == 'delivery_range'
-                      ? theme.colorScheme.primary
-                      : null,
-                ),
-                label: Text(
-                  '${loc.t('pos_procurement_filter_mode_delivery')}\n${_deliveryRangeLabel(loc, df)}',
-                  maxLines: 3,
-                  textAlign: TextAlign.center,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _selectDateMode('order_range'),
+                      child: Text(
+                        loc.currentLanguageCode == 'ru'
+                            ? 'Заказ дата'
+                            : loc.t('pos_procurement_filter_mode_order'),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _selectDateMode('delivery_range'),
+                      child: Text(
+                        loc.currentLanguageCode == 'ru'
+                            ? 'Привоз дата'
+                            : loc.t('pos_procurement_filter_mode_delivery'),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 4),
               Align(

@@ -167,10 +167,14 @@ class _AppShellState extends State<AppShell> {
 
     final tourController = context.watch<PageTourService>().homeTourController;
     final theme = Theme.of(context);
-    final navBg = theme.navigationBarTheme.backgroundColor ??
+    final navBase = theme.navigationBarTheme.backgroundColor ??
         (theme.brightness == Brightness.dark
             ? AppTheme.navigationBarBackgroundDark
             : AppTheme.navigationBarBackgroundLight);
+    final navBg = Color.alphaBlend(
+      theme.colorScheme.primary.withValues(alpha: 0.06),
+      navBase,
+    );
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final navBarHeight = _effectiveNavBarHeight(context);
     final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
@@ -180,9 +184,15 @@ class _AppShellState extends State<AppShell> {
     /// иконки строго по центру по вертикали, без лишней «полки» под ними.
     final Widget navBar = Material(
       color: navBg,
+      elevation: 8,
+      shadowColor: Colors.black.withValues(alpha: 0.20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Container(
+            height: 1,
+            color: theme.colorScheme.outline.withValues(alpha: 0.35),
+          ),
           SizedBox(
             height: navBarHeight,
             child: Row(
