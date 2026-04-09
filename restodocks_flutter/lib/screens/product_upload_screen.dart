@@ -77,6 +77,9 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   String _loadingMessage = '';
   int _loadingProgress = 0;
   int _loadingTotal = 0;
+
+  /// Без процентов: сеть/ИИ без измеримого прогресса.
+  bool _loadingIndeterminate = false;
   Timer? _loadingTimeoutTimer; // Таймер для предотвращения зависания загрузки
 
   void _setLoadingMsg(String key, {Map<String, String>? args}) {
@@ -85,23 +88,19 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     setState(() => _loadingMessage = loc.t(key, args: args));
   }
 
-  void _setLoadingPercent(int percent) {
-    if (!mounted) return;
-    final clamped = percent.clamp(0, 100);
-    setState(() {
-      _loadingTotal = 100;
-      _loadingProgress = clamped;
-    });
-  }
-
   // Предотвращает зависание интерфейса в состоянии загрузки
   void _startLoadingTimeout() {
     _loadingTimeoutTimer?.cancel();
     _loadingTimeoutTimer = Timer(const Duration(seconds: 90), () {
       if (mounted && _isLoading) {
         _addDebugLog('Loading timeout reached, resetting loading state');
-        setState(() => _isLoading = false);
-        _loadingMessage = '';
+        setState(() {
+          _isLoading = false;
+          _loadingMessage = '';
+          _loadingIndeterminate = false;
+          _loadingProgress = 0;
+          _loadingTotal = 0;
+        });
       }
     });
   }
@@ -434,7 +433,22 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
                         ),
                       ],
                     ),
-                    if (_loadingTotal > 0) ...[
+                    if (_loadingIndeterminate) ...[
+                      const SizedBox(height: 12),
+                      LinearProgressIndicator(
+                        backgroundColor: Colors.blue.withOpacity(0.2),
+                        valueColor:
+                            const AlwaysStoppedAnimation<Color>(Colors.blue),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        loc.t('product_upload_loading_indeterminate_hint'),
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: Colors.blue.shade700),
+                      ),
+                    ] else if (_loadingTotal > 0) ...[
                       const SizedBox(height: 12),
                       LinearProgressIndicator(
                         value: _loadingProgress / _loadingTotal,
@@ -602,20 +616,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       return;
     }
 
-    var handedOffToModeration = false;
     try {
-      if (mounted) {
-        setState(() {
-          _isLoading = true;
-          _loadingMessage = 'Чтение бланка iiko...';
-        });
-      }
-      _setLoadingPercent(10);
+      // До выбора листа — без оверлея загрузки (иначе «зависшие» проценты).
       var bytes = result.files.single.bytes!;
       bytes = IikoXlsxSanitizer.ensureDecodable(bytes);
-      _setLoadingPercent(30);
       final excel = Excel.decodeBytes(bytes.toList());
-      _setLoadingPercent(45);
       final sheetNames = excel.tables.keys.toList();
       if (sheetNames.isEmpty) {
         if (!mounted) return;
@@ -632,7 +637,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         selectedSheet = picked;
       }
 
-      _setLoadingPercent(60);
       final rows = _extractIikoProductNamesFromSheet(excel, selectedSheet);
       if (rows.isEmpty) {
         if (!mounted) return;
@@ -642,7 +646,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
         return;
       }
 
-      handedOffToModeration = true;
       await _processWithDeferredModeration(
         rows: rows,
         source: 'бланк iiko ($selectedSheet)',
@@ -657,14 +660,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           ),
         ),
       );
-    } finally {
-      if (mounted && !handedOffToModeration) {
-        setState(() {
-          _isLoading = false;
-          _loadingProgress = 0;
-          _loadingTotal = 0;
-        });
-      }
     }
   }
 
@@ -1024,10 +1019,14 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     // Всегда используем _processExcel: он сначала пробует SheetJS Edge Function
     // (корректно читает BIFF8/.xls, Windows-1251, любые шрифты и кодировки),
     // и только при ошибке падает на локальный парсинг.
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadingIndeterminate = true;
+      _loadingProgress = 0;
+      _loadingTotal = 0;
+    });
     _startLoadingTimeout();
     _setLoadingMsg('product_upload_loading_read_file');
-    _setLoadingPercent(5);
     await _processExcel(bytes, loc);
   }
 
@@ -1493,60 +1492,84 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadingIndeterminate = true;
+      _loadingProgress = 0;
+      _loadingTotal = 0;
+    });
     _startLoadingTimeout();
     _setLoadingMsg('product_upload_loading_analyze');
-    if (_loadingTotal == 100) _setLoadingPercent(55);
 
     try {
+      final useRawIikoNames = mode == 'inventory' &&
+          (source ?? '').contains('бланк iiko') &&
+          rows != null &&
+          rows.isNotEmpty;
+
       List<ParsedProductItem> parsed = [];
       final ai = context.read<AiService>();
-
-      // ИИ обрабатывает входящие данные (текст или файл) — корректно определяет названия, цены, валюту, исправляет опечатки
       final userLocale =
           WidgetsBinding.instance.platformDispatcher.locale.toString();
-      if (rows != null && rows.isNotEmpty) {
-        parsed = await ai.parseProductList(
+
+      if (useRawIikoNames) {
+        _setLoadingMsg('product_upload_loading_match_db');
+        // Уже извлечённые наименования из бланка — без ИИ, без «фиктивных» процентов на сети.
+        parsed = rows
+            .map(
+              (n) => ParsedProductItem(
+                name: n,
+                price: null,
+                unit: null,
+                currency: null,
+              ),
+            )
+            .toList();
+      } else {
+        if (rows != null && rows.isNotEmpty) {
+          parsed = await ai.parseProductList(
             rows: rows,
             source: source ?? 'строки',
             userLocale: userLocale,
-            mode: mode);
-      } else if (text != null && text.trim().isNotEmpty) {
-        parsed = await ai.parseProductList(
+            mode: mode,
+          );
+        } else if (text != null && text.trim().isNotEmpty) {
+          parsed = await ai.parseProductList(
             text: text,
             source: source ?? 'вставленный текст',
             userLocale: userLocale,
-            mode: mode);
-      }
+            mode: mode,
+          );
+        }
 
-      // Fallback: локальный парсинг, если ИИ недоступен или вернул пустой результат
-      if (parsed.isEmpty) {
-        _setLoadingMsg('product_upload_loading_parse_local');
-        if (_loadingTotal == 100) _setLoadingPercent(70);
-        final rawLines = rows ??
-            text!
-                .split(RegExp(r'\r?\n'))
-                .map((s) => s.trim())
-                .where((s) => s.isNotEmpty)
-                .toList();
-        for (var i = 0; i < rawLines.length; i++) {
-          final line = rawLines[i];
-          final r = _parseLine(line);
-          if (r.name.isNotEmpty) {
-            parsed.add(ParsedProductItem(
-                name: r.name, price: r.price, unit: null, currency: null));
+        if (parsed.isEmpty) {
+          _setLoadingMsg('product_upload_loading_parse_local');
+          final rawLines = rows ??
+              text!
+                  .split(RegExp(r'\r?\n'))
+                  .map((s) => s.trim())
+                  .where((s) => s.isNotEmpty)
+                  .toList();
+          for (var i = 0; i < rawLines.length; i++) {
+            final line = rawLines[i];
+            final r = _parseLine(line);
+            if (r.name.isNotEmpty) {
+              parsed.add(ParsedProductItem(
+                  name: r.name, price: r.price, unit: null, currency: null));
+            }
           }
         }
-        // Уведомление о неудаче ИИ скрыто по запросу
       }
-
-      // Не вызываем normalizeProductNames для всех: ai-parse-product-list уже исправляет опечатки.
-      // Второй проход ИИ часто портил корректные данные (названия/цены «через раз» неверные).
 
       if (parsed.isEmpty) {
         _cancelLoadingTimeout();
         if (mounted) {
-          setState(() => _isLoading = false);
+          setState(() {
+            _isLoading = false;
+            _loadingIndeterminate = false;
+            _loadingProgress = 0;
+            _loadingTotal = 0;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(loc.t('product_upload_no_products_extracted')),
@@ -1558,7 +1581,6 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       }
 
       _setLoadingMsg('product_upload_loading_match_db');
-      if (_loadingTotal == 100) _setLoadingPercent(85);
       final store = context.read<ProductStoreSupabase>();
       await store.loadProducts(force: true);
       await store.loadNomenclature(est.dataEstablishmentId);
@@ -1566,12 +1588,23 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           store.getNomenclatureProducts(est.dataEstablishmentId);
       final allProducts = store.allProducts;
 
+      if (mounted) {
+        setState(() {
+          _loadingIndeterminate = false;
+          _loadingTotal = parsed.length;
+          _loadingProgress = 0;
+        });
+      }
+
       final moderationItems = <ModerationItem>[];
       final newNames = <String>[];
       final newIndices = <int>[];
 
       for (var i = 0; i < parsed.length; i++) {
         final p = parsed[i];
+        if (mounted && (i == 0 || i % 12 == 0 || i == parsed.length - 1)) {
+          setState(() => _loadingProgress = i + 1);
+        }
         final match = await _findMatch(p.name, p.price, existingProducts,
             allProducts, est.dataEstablishmentId, store);
         if (match.existingId != null) {
@@ -1626,6 +1659,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _loadingIndeterminate = false;
           _loadingProgress = 0;
           _loadingTotal = 0;
         });
@@ -2528,12 +2562,16 @@ ${text}
     try {
       // Для OLE (.xls) и как основной путь — сервер-сайд парсинг через SheetJS
       _setLoadingMsg('product_upload_loading_read_file');
-      _setLoadingPercent(15);
+      if (mounted) {
+        setState(() {
+          _loadingIndeterminate = true;
+          _loadingTotal = 0;
+        });
+      }
       final serverRows = await _parseXlsViaServer(bytes);
 
       if (serverRows != null && serverRows.isNotEmpty) {
         _addDebugLog('Server-side parse returned ${serverRows.length} rows');
-        _setLoadingPercent(40);
         await _processWithDeferredModeration(
           rows: serverRows,
           source: isOle ? 'xls' : 'xlsx',
@@ -2545,11 +2583,9 @@ ${text}
           'Server-side parse returned empty/null, falling back to local parsing');
 
       // Fallback: локальный парсинг — работает для xlsx и иногда для xls
-      _setLoadingPercent(25);
       final localRows = _extractRowsFromExcel(bytes);
       if (localRows.isNotEmpty) {
         _addDebugLog('Local Excel parse: ${localRows.length} rows');
-        _setLoadingPercent(40);
         await _processWithDeferredModeration(
             rows: localRows, source: isOle ? 'xls' : 'xlsx');
         return;
@@ -2559,6 +2595,7 @@ ${text}
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _loadingIndeterminate = false;
           _loadingProgress = 0;
           _loadingTotal = 0;
         });
@@ -2576,6 +2613,7 @@ ${text}
       if (mounted) {
         setState(() {
           _isLoading = false;
+          _loadingIndeterminate = false;
           _loadingProgress = 0;
           _loadingTotal = 0;
         });
