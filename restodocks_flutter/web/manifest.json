@@ -8,7 +8,7 @@
     "background_color": "#AD292C",
     "theme_color": "#AD292C",
     "description": "Professional restaurant tool. Smart recipe import, inventory merging, food cost tracking.",
-    "orientation": "portrait-primary",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

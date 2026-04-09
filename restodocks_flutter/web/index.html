@@ -47,7 +47,8 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <!-- interactive-widget=resizes-content: Chrome Android подстраивает layout при появлении/скрытии панелей (частично ближе к «обычным» сайтам). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content">
   <meta name="theme-color" content="#AD292C">
 
   <!-- SEO Meta Tags (default: English for international reach) -->
@@ -148,10 +149,48 @@
       transition: opacity 180ms ease-out;
     }
     #loading-screen.fade-out { opacity: 0; }
+    /* Подсказка: в обычной вкладке Safari/Chrome нет API «убрать строку»; PWA с главного экрана — да. */
+    #restodocks-pwa-chrome-hint {
+      display: none;
+      position: fixed;
+      left: 8px;
+      right: 8px;
+      top: max(8px, env(safe-area-inset-top, 0px));
+      z-index: 9998;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(30, 30, 30, 0.92);
+      color: #f5f5f5;
+      font: 13px/1.35 system-ui, -apple-system, sans-serif;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+      -webkit-tap-highlight-color: transparent;
+    }
+    #restodocks-pwa-chrome-hint.show { display: flex; flex-direction: column; gap: 8px; }
+    #restodocks-pwa-chrome-hint .hint-actions { display: flex; justify-content: flex-end; }
+    #restodocks-pwa-chrome-hint button {
+      padding: 6px 10px;
+      border: none;
+      border-radius: 8px;
+      background: #AD292C;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    #restodocks-pwa-chrome-hint .hint-title { font-weight: 600; margin-bottom: 4px; color: #fff; }
+    #restodocks-pwa-chrome-hint .hint-body { opacity: 0.92; }
   </style>
 </head>
 <body>
   <div id="loading-screen"></div>
+  <div id="restodocks-pwa-chrome-hint" role="status" aria-live="polite">
+    <div class="hint-title" id="restodocks-pwa-chrome-hint-title"></div>
+    <div class="hint-body" id="restodocks-pwa-chrome-hint-body"></div>
+    <div class="hint-actions">
+      <button type="button" id="restodocks-pwa-chrome-hint-close">OK</button>
+    </div>
+  </div>
   <script>
     (function () {
       // Force-drop stale SW/caches so web always loads the latest splash/assets.
@@ -201,6 +240,54 @@
     // Do not hide by canvas mutation: it may fire before first painted frame and causes white flash.
     // Last resort: remove after 20s
     setTimeout(hideLoadingScreen, 20000);
+  </script>
+  <script>
+    // Единственный надёжный способ убрать адресную строку/вкладки — открыть как PWA (с главного экрана).
+    (function () {
+      var hint = document.getElementById('restodocks-pwa-chrome-hint');
+      var titleEl = document.getElementById('restodocks-pwa-chrome-hint-title');
+      var bodyEl = document.getElementById('restodocks-pwa-chrome-hint-body');
+      var closeBtn = document.getElementById('restodocks-pwa-chrome-hint-close');
+      if (!hint || !titleEl || !bodyEl || !closeBtn) return;
+
+      function isStandalone() {
+        try {
+          if (window.navigator.standalone === true) return true;
+          if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
+          if (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches) return true;
+        } catch (e) {}
+        return false;
+      }
+      function isMobile() {
+        var ua = navigator.userAgent || '';
+        return /iPhone|iPad|iPod|Android/i.test(ua);
+      }
+      function showHint() {
+        try {
+          if (sessionStorage.getItem('restodocks_pwa_chrome_hint_dismissed') === '1') return;
+          if (!isMobile() || isStandalone()) return;
+          var ru = (navigator.language || '').toLowerCase().indexOf('ru') === 0;
+          if (ru) {
+            titleEl.textContent = 'Без адресной строки и вкладок';
+            bodyEl.textContent = 'Safari: Поделиться → «На экран „Домой“» — открывайте сайт с иконки. Chrome (Android): меню ⋮ → «Установить приложение» или «Добавить на главный экран». В обычной вкладке панель браузера полностью скрыть нельзя — это ограничение браузера, не приложения.';
+            closeBtn.textContent = 'Понятно';
+          } else {
+            titleEl.textContent = 'Full screen (no address bar)';
+            bodyEl.textContent = 'Safari: Share → Add to Home Screen, then open from the icon. Chrome (Android): ⋮ → Install app / Add to Home screen. In a normal tab the browser chrome cannot be fully removed — browser limitation.';
+            closeBtn.textContent = 'OK';
+          }
+          hint.classList.add('show');
+        } catch (e) {}
+      }
+      closeBtn.addEventListener('click', function () {
+        try { sessionStorage.setItem('restodocks_pwa_chrome_hint_dismissed', '1'); } catch (e) {}
+        hint.classList.remove('show');
+      });
+      // После первого кадра Flutter — не перекрываем HTML-сплэш.
+      window.addEventListener('flutter-first-frame', function () {
+        setTimeout(showHint, 800);
+      });
+    })();
   </script>
   <script>
     // iOS Safari: лёгкий сдвиг scroll иногда помогает свернуть адресную строку после первого кадра (без поломки вёрстки).
