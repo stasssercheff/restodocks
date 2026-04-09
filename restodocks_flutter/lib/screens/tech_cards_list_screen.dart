@@ -3738,7 +3738,35 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   }
 
   Widget _buildBody(LocalizationService loc, bool canEdit, bool showCost) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_loading) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LinearProgressIndicator(
+            minHeight: 3,
+            backgroundColor:
+                Theme.of(context).colorScheme.surfaceContainerHighest,
+          ),
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 16),
+                  Text(
+                    loc.t('loading'),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
     if (_error != null) {
       final errorText =
           _error == 'no_establishment' ? loc.t('no_establishment') : _error!;

@@ -250,6 +250,97 @@
       var closeBtn = document.getElementById('restodocks-pwa-chrome-hint-close');
       if (!hint || !titleEl || !bodyEl || !closeBtn) return;
 
+      /** Текущий путь приложения (hash #/… или path без хэша). */
+      function getFlutterPath() {
+        try {
+          var h = location.hash || '';
+          if (h.length > 1 && h.charAt(1) === '/') {
+            return h.substring(1).split('?')[0] || '/';
+          }
+        } catch (e) {}
+        try {
+          var p = (location.pathname || '/').split('?')[0];
+          return p || '/';
+        } catch (e2) {
+          return '/';
+        }
+      }
+
+      /** Не показывать подсказку на входе и соседних экранах (как в app_router). */
+      function isAuthOrEntryPath(path) {
+        var p = (path || '/').toLowerCase();
+        if (p === '/splash') return true;
+        if (p === '/login' || p.indexOf('/login/') === 0) return true;
+        if (p.indexOf('/register') === 0) return true;
+        if (p.indexOf('/forgot-password') === 0) return true;
+        if (p.indexOf('/reset-password') === 0) return true;
+        if (p.indexOf('/confirm-email') === 0) return true;
+        if (p.indexOf('/privacy-consent') === 0) return true;
+        if (p.indexOf('/auth/confirm') === 0) return true;
+        return false;
+      }
+
+      var PWA_HINT_I18N = {
+        en: {
+          title: 'Full screen (no address bar)',
+          body: 'Safari: Share → Add to Home Screen, then open from the icon. Chrome (Android): ⋮ → Install app / Add to Home screen. In a normal tab the browser chrome cannot be fully removed — this is a browser limitation, not the app.',
+          ok: 'OK'
+        },
+        ru: {
+          title: 'Без адресной строки и вкладок',
+          body: 'Safari: Поделиться → «На экран «Домой»» — затем открывайте сайт с иконки. Chrome (Android): меню ⋮ → «Установить приложение» или «Добавить на главный экран». В обычной вкладке панель браузера полностью скрыть нельзя — это ограничение браузера, не приложения.',
+          ok: 'Понятно'
+        },
+        uk: {
+          title: 'Без адресного рядка та вкладок',
+          body: 'Safari: Поділитися → «На екран Додому», далі відкривайте з іконки. Chrome (Android): меню ⋮ → «Встановити застосунок» або «Додати на головний екран». У звичайній вкладці панель браузера повністю сховати не можна — обмеження браузера.',
+          ok: 'Зрозуміло'
+        },
+        es: {
+          title: 'Pantalla completa (sin barra de direcciones)',
+          body: 'Safari: Compartir → Añadir a la pantalla de inicio y abrir desde el icono. Chrome (Android): ⋮ → Instalar app / Añadir a inicio. En una pestaña normal no se puede ocultar por completo la interfaz del navegador: es una limitación del navegador.',
+          ok: 'Entendido'
+        },
+        de: {
+          title: 'Vollbild (ohne Adressleiste)',
+          body: 'Safari: Teilen → Zum Home-Bildschirm, dann über das Symbol öffnen. Chrome (Android): ⋮ → App installieren / Zum Startbildschirm hinzufügen. In einem normalen Tab lässt sich die Browser-Leiste nicht vollständig ausblenden — Browser-Limitierung.',
+          ok: 'OK'
+        },
+        fr: {
+          title: 'Plein écran (sans barre d’adresse)',
+          body: 'Safari : Partager → Sur l’écran d’accueil, puis ouvrir via l’icône. Chrome (Android) : ⋮ → Installer l’app / Ajouter à l’écran d’accueil. Dans un onglet classique, l’interface du navigateur ne peut pas être entièrement masquée — limitation du navigateur.',
+          ok: 'Compris'
+        },
+        it: {
+          title: 'Schermo intero (senza barra indirizzi)',
+          body: 'Safari: Condividi → Aggiungi a Home, poi apri dall’icona. Chrome (Android): ⋮ → Installa app / Aggiungi a schermata Home. In una scheda normale non si può nascondere del tutto la barra del browser — limitazione del browser.',
+          ok: 'OK'
+        },
+        tr: {
+          title: 'Tam ekran (adres çubuğu yok)',
+          body: 'Safari: Paylaş → Ana Ekrana Ekle, ardından simgeden açın. Chrome (Android): ⋮ → Uygulamayı yükle / Ana ekrana ekle. Normal sekmede tarayıcı arayüzü tamamen gizlenemez — tarayıcı sınırıdır.',
+          ok: 'Tamam'
+        },
+        vi: {
+          title: 'Toàn màn hình (không thanh địa chỉ)',
+          body: 'Safari: Chia sẻ → Thêm vào Màn hình chính, rồi mở từ biểu tượng. Chrome (Android): ⋮ → Cài đặt ứng dụng / Thêm vào màn hình chính. Trong tab thường không thể ẩn hoàn toàn giao diện trình duyệt — đây là giới hạn của trình duyệt.',
+          ok: 'Đã hiểu'
+        }
+      };
+
+      function hintStringsForLocale() {
+        try {
+          var list = navigator.languages && navigator.languages.length
+            ? navigator.languages
+            : [navigator.language || 'en'];
+          for (var i = 0; i < list.length; i++) {
+            var base = String(list[i] || '').toLowerCase().split('-')[0];
+            if (PWA_HINT_I18N[base]) return PWA_HINT_I18N[base];
+          }
+        } catch (e) {}
+        return PWA_HINT_I18N.en;
+      }
+
       function isStandalone() {
         try {
           if (window.navigator.standalone === true) return true;
@@ -264,18 +355,15 @@
       }
       function showHint() {
         try {
+          // Hint is now shown from Flutter after successful login.
+          return;
           if (sessionStorage.getItem('restodocks_pwa_chrome_hint_dismissed') === '1') return;
           if (!isMobile() || isStandalone()) return;
-          var ru = (navigator.language || '').toLowerCase().indexOf('ru') === 0;
-          if (ru) {
-            titleEl.textContent = 'Без адресной строки и вкладок';
-            bodyEl.textContent = 'Safari: Поделиться → «На экран „Домой“» — открывайте сайт с иконки. Chrome (Android): меню ⋮ → «Установить приложение» или «Добавить на главный экран». В обычной вкладке панель браузера полностью скрыть нельзя — это ограничение браузера, не приложения.';
-            closeBtn.textContent = 'Понятно';
-          } else {
-            titleEl.textContent = 'Full screen (no address bar)';
-            bodyEl.textContent = 'Safari: Share → Add to Home Screen, then open from the icon. Chrome (Android): ⋮ → Install app / Add to Home screen. In a normal tab the browser chrome cannot be fully removed — browser limitation.';
-            closeBtn.textContent = 'OK';
-          }
+          if (isAuthOrEntryPath(getFlutterPath())) return;
+          var s = hintStringsForLocale();
+          titleEl.textContent = s.title;
+          bodyEl.textContent = s.body;
+          closeBtn.textContent = s.ok;
           hint.classList.add('show');
         } catch (e) {}
       }

@@ -898,6 +898,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   DateTime _lastReconcileAt = DateTime.fromMillisecondsSinceEpoch(0);
   Timer? _portionWeightUpdateDebounce;
 
+  /// Только для горизонтального скролла таблицы состава — иначе [Scrollbar] цепляется к вложенному вертикальному [SingleChildScrollView] и рисуется «по центру».
+  final ScrollController _compositionTableHScrollController =
+      ScrollController();
+
   /// Время последнего пользовательского взаимодействия (ввод/тап в таблице).
   /// Используется, чтобы не запускать тяжёлый reconcile в момент, когда пользователь
   /// прямо что-то меняет — иначе UI начинает "подвисать".
@@ -2433,6 +2437,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     _descriptionForHallController.dispose();
     _compositionForHallController.dispose();
     _sellingPriceController.dispose();
+    _compositionTableHScrollController.dispose();
     super.dispose();
   }
 
@@ -5379,8 +5384,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                         SizedBox(
                           width: constraints.maxWidth,
                           child: Scrollbar(
-                            thumbVisibility: true,
+                            controller: _compositionTableHScrollController,
+                            thumbVisibility: kIsWeb,
                             child: SingleChildScrollView(
+                              controller: _compositionTableHScrollController,
                               scrollDirection: Axis.horizontal,
                               clipBehavior: Clip.hardEdge,
                               child: SingleChildScrollView(

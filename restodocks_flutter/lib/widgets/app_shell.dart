@@ -9,6 +9,9 @@ import 'package:provider/provider.dart';
 import '../core/mobile_browser_chrome_nudge_stub.dart'
     if (dart.library.html) '../core/mobile_browser_chrome_nudge_web.dart'
     as browser_chrome_doc;
+import '../core/pwa_fullscreen_hint_gate_stub.dart'
+    if (dart.library.html) '../core/pwa_fullscreen_hint_gate_web.dart'
+    as pwa_hint_gate;
 import '../core/theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/localization_service.dart';
@@ -47,14 +50,19 @@ class _AppShellState extends State<AppShell> {
   bool _hideBottomBar = false;
   double _lastScrollPixels = 0;
   String? _lastPath;
-
-  /// Совпадает с NavigationBarTheme.height (M3 — 80): меньше даёт сжатый слот и «прилипание» иконок к верху.
-  static const _navBarHeight = 80.0;
+  bool _pwaHintQueued = false;
 
   bool _landscapeNarrowPhone(BuildContext context) {
     final mq = MediaQuery.of(context);
     return mq.orientation == Orientation.landscape &&
         mq.size.shortestSide < 600;
+  }
+
+  double _effectiveNavBarHeight(BuildContext context) {
+    final mq = MediaQuery.of(context);
+    final landscape = mq.orientation == Orientation.landscape;
+    final factor = landscape ? 0.70 : 0.80;
+    return AppTheme.navigationBarHeight * factor;
   }
 
   @override
@@ -68,6 +76,41 @@ class _AppShellState extends State<AppShell> {
         setState(() => _hideBottomBar = false);
       }
     }
+    _queuePwaHintIfNeeded();
+  }
+
+  void _queuePwaHintIfNeeded() {
+    if (_pwaHintQueued || !kIsWeb) return;
+    final employee = context.read<AccountManagerSupabase>().currentEmployee;
+    if (employee == null) return;
+    if (!pwa_hint_gate.shouldShowPwaFullscreenHintAfterLogin()) return;
+    _pwaHintQueued = true;
+    Future<void>.delayed(const Duration(milliseconds: 550), () {
+      if (!mounted) return;
+      _showPwaFullscreenHintDialog();
+    });
+  }
+
+  Future<void> _showPwaFullscreenHintDialog() async {
+    final loc = context.read<LocalizationService>();
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('pwa_fullscreen_hint_title')),
+        content: Text(loc.t('pwa_fullscreen_hint_body')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('ok')),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    pwa_hint_gate.markPwaFullscreenHintDismissed();
   }
 
   bool _onScroll(ScrollNotification n) {
@@ -133,13 +176,16 @@ class _AppShellState extends State<AppShell> {
             ? AppTheme.navigationBarBackgroundDark
             : AppTheme.navigationBarBackgroundLight);
     final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final navBarHeight = _effectiveNavBarHeight(context);
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final navBottomInset = kIsWeb ? 0.0 : (isLandscape ? 0.0 : bottomInset);
 
     /// M3 NavigationBar с скрытыми подписями на iOS часто визуально прижимает иконки к верху слота.
     /// На нативе — явный Row + Center по вертикали; на web оставляем NavigationBar.
     final Widget navBar = kIsWeb
         ? NavigationBarTheme(
             data: NavigationBarThemeData(
-              height: _navBarHeight,
+              height: navBarHeight,
               labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
               backgroundColor: navBg,
               surfaceTintColor: Colors.transparent,
@@ -185,7 +231,7 @@ class _AppShellState extends State<AppShell> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 SizedBox(
-                  height: _navBarHeight,
+                  height: navBarHeight,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -244,11 +290,11 @@ class _AppShellState extends State<AppShell> {
                     ],
                   ),
                 ),
-                if (bottomInset > 0)
+                if (navBottomInset > 0)
                   ColoredBox(
                     color: navBg,
                     child: SizedBox(
-                        height: bottomInset, width: double.infinity),
+                        height: navBottomInset, width: double.infinity),
                   ),
               ],
             ),
@@ -293,8 +339,7 @@ class _AppShellState extends State<AppShell> {
     final landscapeWeb =
         kIsWeb && MediaQuery.of(context).orientation == Orientation.landscape;
     final hideNav = landscapeNarrow && _hideBottomBar;
-    final bottomBarTotalHeight =
-        kIsWeb ? _navBarHeight : _navBarHeight + bottomInset;
+    final bottomBarTotalHeight = navBarHeight + navBottomInset;
 
     final bodyChild = showAccessPendingStub
         ? _AccessPendingPlaceholder(loc: loc)
@@ -380,7 +425,9 @@ class _AppShellState extends State<AppShell> {
     if (location.startsWith('/personal-cabinet') ||
         location.startsWith('/profile') ||
         location.startsWith('/settings') ||
-        location.startsWith('/establishments')) return 2;
+        location.startsWith('/establishments')) {
+      return 2;
+    }
 
     final middleRoute = noDataAccess ? '/schedule' : action.routeFor(employee);
     if (location.startsWith(middleRoute)) return 1;
