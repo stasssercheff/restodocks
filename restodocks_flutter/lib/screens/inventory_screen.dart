@@ -2319,7 +2319,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   static const double _sectionHeaderHeight = 36;
 
   /// Фиксированная высота строки данных — для выравнивания ячеек ввода с текстом.
-  static const double _dataRowHeight = 40;
+  static const double _dataRowHeight = 44;
 
   /// Ширина фиксированной части: #, Наименование, Мера, Итого (продукт зафиксирован слева).
   double _leftWidth(BuildContext context) {
@@ -2488,10 +2488,10 @@ class _InventoryScreenState extends State<InventoryScreen>
     final theme = Theme.of(context);
     final row = _rows[actualIndex];
 
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 52),
+    return SizedBox(
+      height: _dataRowHeight,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
           border: Border(
               bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
@@ -2513,7 +2513,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               child: Text(
                 row.productName(loc.currentLanguageCode),
                 style: theme.textTheme.bodyMedium,
-                maxLines: 4,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 softWrap: true,
               ),
@@ -3371,8 +3371,10 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
                 controller: _hScroll,
                 scrollDirection: Axis.horizontal,
                 physics: const ClampingScrollPhysics(),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                child: SizedBox(
+                  height: widget.dataRowHeight,
+                  child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.surface,
                     border: Border(
@@ -3437,6 +3439,7 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
                       ),
                     ],
                   ),
+                ),
                 ),
               ),
             ),
@@ -3601,7 +3604,7 @@ class _QtyCellState extends State<_QtyCell> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return SizedBox(
-      height: 54,
+      height: 40,
       child: TextField(
         controller: _controller,
         focusNode: _focus,
@@ -3614,9 +3617,9 @@ class _QtyCellState extends State<_QtyCell> {
         style: theme.textTheme.bodyMedium?.copyWith(
             fontSize: _kInventoryQtyFontSize, height: 1.2),
         decoration: InputDecoration(
-          isDense: false,
+          isDense: true,
           contentPadding:
-              const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+              const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
           filled: true,
           fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),

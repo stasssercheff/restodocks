@@ -1379,12 +1379,18 @@ class AppRouter {
               }
               final viewOnly = state.queryParameters['view'] == '1';
               final hallView = state.queryParameters['hall'] == '1';
+              TechCard? initialTechCard;
+              final extra = state.extra;
+              if (extra is Map && extra['initialTechCard'] is TechCard) {
+                initialTechCard = extra['initialTechCard'] as TechCard;
+              }
               return _slideTransitionPage(
                   state,
                   _DeferredTechCardEdit(
                       techCardId: segment,
                       forceViewMode: viewOnly,
-                      forceHallView: hallView));
+                      forceHallView: hallView,
+                      initialTechCard: initialTechCard));
             },
           ),
 
@@ -1497,10 +1503,12 @@ class _DeferredTechCardEdit extends StatefulWidget {
     required this.techCardId,
     this.forceViewMode = false,
     this.forceHallView = false,
+    this.initialTechCard,
   });
   final String techCardId;
   final bool forceViewMode;
   final bool forceHallView;
+  final TechCard? initialTechCard;
 
   @override
   State<_DeferredTechCardEdit> createState() => _DeferredTechCardEditState();
@@ -1514,6 +1522,11 @@ class _DeferredTechCardEditState extends State<_DeferredTechCardEdit> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialTechCard != null) {
+      _loadedCard = widget.initialTechCard;
+      _loading = false;
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadTechCard());
   }
 

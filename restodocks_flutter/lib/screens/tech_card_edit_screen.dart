@@ -4801,27 +4801,22 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         if (mounted) context.pushReplacement('/tech-cards');
       });
       return Scaffold(
-        appBar: AppBar(
-            leading: appBarBackButton(context),
-            title: Text(loc.t('tech_cards'))),
+        appBar:
+            AppBar(leading: appBarBackButton(context), title: const Text('ТТК')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(
-            leading: appBarBackButton(context),
-            title:
-                Text(_isNew ? loc.t('create_tech_card') : loc.t('tech_cards'))),
+        appBar:
+            AppBar(leading: appBarBackButton(context), title: const Text('ТТК')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(
-            leading: appBarBackButton(context),
-            title:
-                Text(_isNew ? loc.t('create_tech_card') : loc.t('tech_cards'))),
+        appBar:
+            AppBar(leading: appBarBackButton(context), title: const Text('ТТК')),
         body: Center(
             child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -4839,12 +4834,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
     // Фаза 0: лёгкий placeholder, полная форма — в след. кадре (без замирания)
     if (!_isNew && _contentPhase == 0) {
-      final name = _techCard?.getDisplayNameInLists(loc.currentLanguageCode) ??
-          loc.t('tech_cards');
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
-          title: Text(name),
+          title: const Text('ТТК'),
         ),
         body: Center(
           child: Column(
@@ -4887,8 +4880,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
-          title:
-              Text(_techCard!.getDisplayNameInLists(loc.currentLanguageCode)),
+          title: const Text('ТТК'),
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),

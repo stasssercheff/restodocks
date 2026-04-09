@@ -366,8 +366,9 @@ class _MenuScreenState extends State<MenuScreen> {
     final viewOnly = _isViewOnlyCardForEmployee(tc, emp);
     final viewPath = '/tech-cards/${tc.id}?view=1';
     final editPath = '/tech-cards/${tc.id}';
+    final navExtra = <String, dynamic>{'initialTechCard': tc};
     if (viewOnly) {
-      await context.push(viewPath);
+      await context.push(viewPath, extra: navExtra);
       return;
     }
     if (!mounted) return;
@@ -400,7 +401,7 @@ class _MenuScreenState extends State<MenuScreen> {
       ),
     );
     if (!mounted || mode == null) return;
-    await context.push(mode == 'edit' ? editPath : viewPath);
+    await context.push(mode == 'edit' ? editPath : viewPath, extra: navExtra);
   }
 
   String _buildSubtitleText(LocalizationService loc, TechCard tc, String lang) {
@@ -1196,10 +1197,12 @@ class _MenuScreenState extends State<MenuScreen> {
           )
         : null;
     final shortViewport = MediaQuery.sizeOf(context).height < 560;
+    final isWideLayout = MediaQuery.sizeOf(context).shortestSide >= 600;
     // Foodcost panel already has Меню/Фудкост — drop duplicate AppBar row in
-    // short portrait and in phone landscape to save vertical space.
-    final hideTopFoodcostSwitch =
-        showFoodcost && menuSeg == 1 && (shortViewport || isPhoneLandscape);
+    // short portrait, phone landscape и на ПК/планшете (одна строка контролов в панели).
+    final hideTopFoodcostSwitch = showFoodcost &&
+        menuSeg == 1 &&
+        (shortViewport || isPhoneLandscape || isWideLayout);
     final hallChips = _isHallMenu &&
         !_loading &&
         (_dishesBar.isNotEmpty || _dishesKitchen.isNotEmpty) &&
@@ -1208,11 +1211,18 @@ class _MenuScreenState extends State<MenuScreen> {
     final showAppBarBottom = showTopFoodcostSwitch || hallChips;
     double? bottomHeight;
     if (showAppBarBottom) {
-      var h = 8.0;
-      if (showTopFoodcostSwitch) h += 52;
-      if (hallChips) h += 48;
+      // В альбоме на телефоне — минимальные отступы под сегменты (без «полосы» под шапкой).
+      var h = isPhoneLandscape ? 2.0 : 8.0;
+      if (showTopFoodcostSwitch) h += isPhoneLandscape ? 42.0 : 52.0;
+      if (hallChips) h += isPhoneLandscape ? 38.0 : 48.0;
       bottomHeight = h;
     }
+    final appBarBottomOuterPad = isPhoneLandscape
+        ? const EdgeInsets.fromLTRB(12, 0, 12, 4)
+        : const EdgeInsets.fromLTRB(16, 6, 16, 8);
+    final appBarBottomSegPad = isPhoneLandscape
+        ? const EdgeInsets.only(top: 2, bottom: 2)
+        : const EdgeInsets.only(top: 8, bottom: 4);
 
     final mq = MediaQuery.of(context);
     final removeSideInsets = mq.orientation == Orientation.landscape;
@@ -1228,6 +1238,10 @@ class _MenuScreenState extends State<MenuScreen> {
         child: Scaffold(
           appBar: AppBar(
             toolbarHeight: isPhoneLandscape ? 44 : kToolbarHeight,
+            elevation: isPhoneLandscape ? 0 : null,
+            scrolledUnderElevation: isPhoneLandscape ? 0 : null,
+            shadowColor: isPhoneLandscape ? Colors.transparent : null,
+            surfaceTintColor: isPhoneLandscape ? Colors.transparent : null,
             title: ScrollToTopAppBarTitle(
               child: Text(loc.t('menu')),
             ),
@@ -1237,15 +1251,16 @@ class _MenuScreenState extends State<MenuScreen> {
                     preferredSize: Size.fromHeight(bottomHeight),
                     child: Material(
                       color: Theme.of(context).colorScheme.surface,
+                      elevation: 0,
+                      shadowColor: Colors.transparent,
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                        padding: appBarBottomOuterPad,
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             if (showTopFoodcostSwitch)
                               Padding(
-                                padding:
-                                    const EdgeInsets.only(top: 8, bottom: 4),
+                                padding: appBarBottomSegPad,
                                 child: Align(
                                   alignment: Alignment.centerLeft,
                                   child: SegmentedButton<int>(
