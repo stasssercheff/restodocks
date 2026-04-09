@@ -24,6 +24,9 @@ import 'core/initial_location_stub.dart'
     if (dart.library.html) 'core/initial_location_web.dart' as initial_loc;
 import 'core/supabase_url_resolver_stub.dart'
     if (dart.library.html) 'core/supabase_url_resolver_web.dart' as supabase_url;
+import 'core/mobile_browser_chrome_nudge_stub.dart'
+    if (dart.library.html) 'core/mobile_browser_chrome_nudge_web.dart'
+        as mobile_chrome;
 import 'services/fcm_push_service.dart';
 import 'services/services.dart';
 import 'services/translation_manager.dart';
@@ -390,8 +393,23 @@ class RestodocksApp extends StatelessWidget {
               }
               final needsMediaWrap =
                   applyMobileUiScale || stripLandscapeSideInsets;
-              final content =
+              var content =
                   needsMediaWrap ? MediaQuery(data: m, child: c) : c;
+              // Мобильный Chrome/Safari: сворачивание адресной строки привязано к scroll документа,
+              // а не к внутренним ListView канваса — слегка двигаем window при вертикальном скролле.
+              if (kIsWeb) {
+                content = NotificationListener<ScrollNotification>(
+                  onNotification: (ScrollNotification n) {
+                    if (n is! ScrollUpdateNotification) return false;
+                    if (n.metrics.axis != Axis.vertical) return false;
+                    final d = n.scrollDelta;
+                    if (d == null || d.abs() < 0.5) return false;
+                    mobile_chrome.mobileBrowserChromeNudgeFromFlutterScroll();
+                    return false;
+                  },
+                  child: content,
+                );
+              }
               return WebLocationCorrection(
                 child: AppPrimaryScrollController(child: content),
               );
