@@ -9,7 +9,7 @@ import {
 } from "../_shared/security.ts";
 
 const DEEPL_URL = "https://api-free.deepl.com/v2/translate";
-const SUPPORTED_LANGS = ["ru", "en", "es", "tr", "vi"];
+const SUPPORTED_LANGS = ["ru", "en", "es", "kk", "tr", "vi"];
 
 function corsHeaders(origin: string | null) {
   return {
@@ -65,18 +65,16 @@ async function translateWithDeepL(
 
   if (!res.ok) {
     console.error("[auto-translate-product] DeepL error:", res.status, await res.text());
-    // Fallback для vi: MyMemory API (бесплатно, без ключа)
-    if (tgt === "VI") {
-      const fallback = await translateWithMyMemory(text.trim(), src, "vi");
-      if (fallback) return fallback;
-    }
+    // Fallback для языков без DeepL/при сетевых сбоях: MyMemory API (бесплатно, без ключа)
+    const fallback = await translateWithMyMemory(text.trim(), src, targetLang.toLowerCase());
+    if (fallback) return fallback;
     return null;
   }
 
   const data = await res.json() as { translations?: Array<{ text?: string }> };
   let translated = data?.translations?.[0]?.text?.trim();
-  if (!translated && tgt === "VI") {
-    translated = await translateWithMyMemory(text.trim(), src, "vi");
+  if (!translated) {
+    translated = await translateWithMyMemory(text.trim(), src, targetLang.toLowerCase());
   }
   if (!translated) return null;
 
@@ -91,9 +89,17 @@ async function translateWithDeepL(
   return translated;
 }
 
-/** MyMemory fallback для vi когда DeepL недоступен. Лимит ~1000 слов/день. */
+/** MyMemory fallback когда DeepL недоступен/не поддерживает язык. Лимит ~1000 слов/день. */
 async function translateWithMyMemory(text: string, src: string, tgt: string): Promise<string | null> {
-  const srcCode = src === "RU" ? "ru" : src === "EN" ? "en" : src === "ES" ? "es" : src === "TR" ? "tr" : "en";
+  const source = src.toUpperCase();
+  const srcCode =
+    source === "RU" ? "ru" :
+    source === "EN" ? "en" :
+    source === "ES" ? "es" :
+    source === "TR" ? "tr" :
+    source === "KK" ? "kk" :
+    source === "VI" ? "vi" :
+    "en";
   try {
     const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${srcCode}|${tgt}`;
     const r = await fetch(url);

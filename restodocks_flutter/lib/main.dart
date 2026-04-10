@@ -336,6 +336,16 @@ class _BootstrapFailureApp extends StatelessWidget {
 class RestodocksApp extends StatelessWidget {
   const RestodocksApp({super.key});
 
+  /// Некоторые сторонние delegate (например flutter_quill) поддерживают не все языки.
+  /// Если текущая локаль не поддержана ими, даём fallback на en_US для Material/Cupertino delegate,
+  /// сохраняя при этом язык интерфейса в нашем LocalizationService (ключи `loc.t(...)`).
+  Locale _safeDelegateLocale(Locale locale) {
+    if (const FlutterQuillLocalizations.delegate.isSupported(locale)) {
+      return locale;
+    }
+    return const Locale('en', 'US');
+  }
+
   @override
   Widget build(BuildContext context) {
     // RestodocksApp.build() called
@@ -359,7 +369,7 @@ class RestodocksApp extends StatelessWidget {
                     ? AppTheme.darkTheme
                     : AppTheme.classicDarkTheme,
                 themeMode: themeService.themeMode,
-                locale: localization.currentLocale,
+                locale: _safeDelegateLocale(localization.currentLocale),
                 supportedLocales: LocalizationService.supportedLocales,
                 localizationsDelegates: const [
                   GlobalMaterialLocalizations.delegate,
