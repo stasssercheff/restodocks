@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _keyPrefix = 'restodocks_home_layout_';
+const _hiddenKeyPrefix = 'restodocks_home_hidden_';
 
 /// Идентификаторы плиток на домашнем экране (для сотрудника)
 enum HomeTileId {
@@ -42,6 +43,8 @@ class HomeLayoutConfigService extends ChangeNotifier {
 
   /// employeeId → порядок tile IDs
   final Map<String, List<String>> _cache = {};
+  /// employeeId → скрытые tile IDs
+  final Map<String, List<String>> _hiddenCache = {};
 
   List<HomeTileId> getOrder(String? employeeId) {
     if (employeeId == null || employeeId.isEmpty)
@@ -69,6 +72,24 @@ class HomeLayoutConfigService extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Set<String> getHiddenKeys(String? employeeId) {
+    if (employeeId == null || employeeId.isEmpty) return <String>{};
+    final hidden = _hiddenCache[employeeId];
+    if (hidden == null || hidden.isEmpty) return <String>{};
+    return hidden.toSet();
+  }
+
+  Future<void> setHiddenKeys(String? employeeId, Set<String> hiddenKeys) async {
+    if (employeeId == null || employeeId.isEmpty) return;
+    _hiddenCache[employeeId] = hiddenKeys.toList(growable: false);
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+          '$_hiddenKeyPrefix$employeeId', _hiddenCache[employeeId]!);
+    } catch (_) {}
+  }
+
   Future<void> loadForEmployee(String? employeeId) async {
     if (employeeId == null || employeeId.isEmpty) return;
     try {
@@ -76,8 +97,12 @@ class HomeLayoutConfigService extends ChangeNotifier {
       final saved = prefs.getStringList('$_keyPrefix$employeeId');
       if (saved != null) {
         _cache[employeeId] = saved;
-        notifyListeners();
       }
+      final hidden = prefs.getStringList('$_hiddenKeyPrefix$employeeId');
+      if (hidden != null) {
+        _hiddenCache[employeeId] = hidden;
+      }
+      notifyListeners();
     } catch (_) {}
   }
 }

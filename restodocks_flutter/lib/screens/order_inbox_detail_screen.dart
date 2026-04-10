@@ -289,6 +289,11 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
                   child: Text(
                       '🇹🇷  ${loc.t('order_export_language_tr') ?? 'Türkçe'}'),
                 ),
+                OutlinedButton(
+                  onPressed: () => Navigator.of(ctx).pop('kk'),
+                  child: Text(
+                      '🇰🇿  ${loc.t('order_export_language_kk') ?? 'Қазақша'}'),
+                ),
               ],
             ),
           ],

@@ -291,6 +291,10 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                     flag: '🇹🇷',
                     label: loc.t('order_export_language_tr') ?? 'Türkçe',
                     onTap: () => Navigator.of(ctx).pop('tr')),
+                _LangButton(
+                    flag: '🇰🇿',
+                    label: loc.t('order_export_language_kk') ?? 'Қазақша',
+                    onTap: () => Navigator.of(ctx).pop('kk')),
               ],
             ),
           ],

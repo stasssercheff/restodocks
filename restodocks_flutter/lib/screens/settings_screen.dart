@@ -594,6 +594,106 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final emp = account.currentEmployee;
     if (emp == null) return;
     final layoutSvc = context.read<HomeLayoutConfigService>();
+    final ownerPref = context.read<OwnerViewPreferenceService>();
+    final isOwnerHome =
+        emp.hasRole('owner') && (emp.positionRole == null || ownerPref.viewAsOwner);
+    if (isOwnerHome) {
+      final screenPref = context.read<ScreenLayoutPreferenceService>();
+      final posOn = FeatureFlags.posModuleEnabled;
+      final labels = <String, String>{
+        'owner_doc': loc.t('documentation') ?? 'Документация',
+        'owner_haccp': loc.t('haccp_journals') ?? 'Журналы и ХАССП',
+        'owner_messages': loc.t('inbox_tab_messages') ?? 'Сообщения',
+        'owner_inbox': loc.t('inbox'),
+        'owner_employees': loc.t('employees'),
+        'owner_schedule_all': '${loc.t('schedule')} (all)',
+        'owner_schedule_kitchen': '${loc.t('schedule')} (kitchen)',
+        'owner_menu_kitchen': '${loc.t('menu')} (kitchen)',
+        'owner_ttk_kitchen': loc.t('ttk_kitchen'),
+        'owner_nomenclature_kitchen': '${loc.t('nomenclature')} (kitchen)',
+        if (posOn) 'owner_pos_orders_kitchen': '${loc.t('order_tab_orders')} (kitchen)',
+        if (posOn) 'owner_pos_sales_kitchen': '${loc.t('sales_title') ?? 'Продажи'} (kitchen)',
+        if (posOn) 'owner_pos_warehouse_kitchen': '${loc.t('pos_nav_warehouse') ?? 'Склад'} (kitchen)',
+        if (posOn) 'owner_pos_procurement_kitchen': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (kitchen)',
+        if (!posOn) 'owner_procurement_kitchen': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (kitchen)',
+        'owner_writeoffs_kitchen': '${loc.t('writeoffs') ?? 'Списания'} (kitchen)',
+        'owner_checklists_kitchen': '${loc.t('checklists')} (kitchen)',
+        if (screenPref.showBarSection) ...{
+          'owner_schedule_bar': '${loc.t('schedule')} (bar)',
+          'owner_menu_bar': '${loc.t('menu')} (bar)',
+          'owner_ttk_bar': loc.t('ttk_bar') ?? 'ТТК бара',
+          'owner_nomenclature_bar': '${loc.t('nomenclature')} (bar)',
+          if (posOn) 'owner_pos_orders_bar': '${loc.t('order_tab_orders')} (bar)',
+          if (posOn) 'owner_pos_sales_bar': '${loc.t('sales_title') ?? 'Продажи'} (bar)',
+          if (posOn) 'owner_pos_warehouse_bar': '${loc.t('pos_nav_warehouse') ?? 'Склад'} (bar)',
+          if (posOn) 'owner_pos_procurement_bar': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (bar)',
+          if (!posOn) 'owner_procurement_bar': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (bar)',
+          'owner_writeoffs_bar': '${loc.t('writeoffs') ?? 'Списания'} (bar)',
+          'owner_checklists_bar': '${loc.t('checklists')} (bar)',
+        },
+        if (screenPref.showHallSection) ...{
+          'owner_schedule_hall': '${loc.t('schedule')} (hall)',
+          'owner_menu_hall': '${loc.t('menu')} (hall)',
+          'owner_checklists_hall': '${loc.t('checklists')} (hall)',
+          if (posOn) 'owner_pos_orders_hall': '${loc.t('order_tab_orders')} (hall)',
+          if (posOn) 'owner_pos_cash_hall': '${loc.t('pos_nav_cash_register') ?? 'Касса'} (hall)',
+          if (posOn) 'owner_pos_tables_hall': '${loc.t('pos_nav_tables') ?? 'Столы'} (hall)',
+          if (posOn) 'owner_pos_warehouse_hall': '${loc.t('pos_nav_warehouse') ?? 'Склад'} (hall)',
+          if (posOn) 'owner_pos_procurement_hall': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (hall)',
+          if (!posOn) 'owner_procurement_hall': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (hall)',
+          'owner_writeoffs_hall': '${loc.t('writeoffs') ?? 'Списания'} (hall)',
+        },
+        if (screenPref.showBanquetCatering) 'owner_banquet': loc.t('banquet_catering') ?? 'Банкет / Кейтринг',
+        if (posOn) 'owner_pos_warehouse_est': loc.t('pos_warehouse_establishment_title') ?? 'Сводно по заведению',
+        'owner_expenses': loc.t('expenses'),
+      };
+      final hidden = Set<String>.from(layoutSvc.getHiddenKeys(emp.id));
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx2, setState) => AlertDialog(
+            title: Text(loc.t('home_layout_config') ?? 'Настройка домашнего экрана'),
+            content: SizedBox(
+              width: 360,
+              height: 460,
+              child: ListView(
+                children: labels.entries.map((entry) {
+                  final enabled = !hidden.contains(entry.key);
+                  return CheckboxListTile(
+                    dense: true,
+                    value: enabled,
+                    title: Text(entry.value),
+                    onChanged: (v) {
+                      setState(() {
+                        if (v == true) {
+                          hidden.remove(entry.key);
+                        } else {
+                          hidden.add(entry.key);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  await layoutSvc.setHiddenKeys(emp.id, hidden);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                },
+                child: Text(loc.t('save')),
+              ),
+            ],
+          ),
+        ),
+      );
+      return;
+    }
     var order = List<HomeTileId>.from(layoutSvc.getOrder(emp.id));
     final showBanquet = emp.department == 'kitchen';
     if (!showBanquet) {

@@ -89,290 +89,377 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
-    final subOk = context.watch<AccountManagerSupabase>().hasProSubscription;
+    final account = context.watch<AccountManagerSupabase>();
+    final subOk = account.hasProSubscription;
+    final hiddenKeys = context
+        .watch<HomeLayoutConfigService>()
+        .getHiddenKeys(account.currentEmployee?.id);
     final screenPref = context.watch<ScreenLayoutPreferenceService>();
+    bool visible(String key) => !hiddenKeys.contains(key);
+    Widget ownerTile(String key, Widget child) =>
+        visible(key) ? child : const SizedBox.shrink();
 
     return ListView(
       controller: _scrollController,
       padding: const EdgeInsets.all(16),
       children: [
         _SectionTitle(title: loc.t('management')),
-        _wrap(
+        ownerTile(
+            'owner_doc',
+            _wrap(
             HomeFeatureTile(
                 icon: Icons.description_outlined,
                 title: loc.t('documentation') ?? 'Документация',
                 onTap: () => context.go('/documentation')),
-            'home-doc'),
-        _wrap(
+            'home-doc')),
+        ownerTile(
+            'owner_haccp',
+            _wrap(
             HomeFeatureTile(
                 icon: Icons.assignment,
                 title: loc.t('haccp_journals') ?? 'Журналы и ХАССП',
                 subscriptionLocked: !subOk,
                 onTap: () => context.go('/haccp-journals')),
-            'home-haccp'),
-        _wrap(
+            'home-haccp')),
+        ownerTile(
+            'owner_messages',
+            _wrap(
             HomeFeatureTile(
                 icon: Icons.chat_bubble_outline,
                 title: loc.t('inbox_tab_messages') ?? 'Сообщения',
                 onTap: () => context.go('/notifications?tab=messages')),
-            'home-messages'),
-        _wrap(
+            'home-messages')),
+        ownerTile(
+            'owner_inbox',
+            _wrap(
             HomeFeatureTile(
                 icon: Icons.inbox,
                 title: loc.t('inbox'),
                 onTap: () => context.go('/inbox')),
-            'home-inbox'),
-        _wrap(
+            'home-inbox')),
+        ownerTile(
+            'owner_employees',
+            _wrap(
             HomeFeatureTile(
                 icon: Icons.people,
                 title: loc.t('employees'),
                 onTap: () => context.go('/employees')),
-            'home-employees'),
-        _wrap(
+            'home-employees')),
+        ownerTile(
+            'owner_schedule_all',
+            _wrap(
             HomeFeatureTile(
                 icon: Icons.calendar_month,
                 title: loc.t('schedule'),
                 onTap: () => context.go('/schedule/all')),
-            'home-schedule-mgmt'),
+            'home-schedule-mgmt')),
         const SizedBox(height: 16),
         _SectionTitle(title: loc.t('kitchen')),
-        _wrap(
+        ownerTile(
+            'owner_schedule_kitchen',
+            _wrap(
             HomeFeatureTile(
                 icon: Icons.schedule,
                 title: loc.t('schedule'),
                 onTap: () => context.go('/schedule/kitchen')),
-            'home-schedule-kitchen'),
-        _wrap(
+            'home-schedule-kitchen')),
+        ownerTile(
+            'owner_menu_kitchen',
+            _wrap(
             HomeFeatureTile(
                 icon: Icons.restaurant_menu,
                 title: loc.t('menu'),
                 onTap: () => context.go('/menu/kitchen')),
-            'home-menu-kitchen'),
-        _wrap(
+            'home-menu-kitchen')),
+        ownerTile(
+            'owner_ttk_kitchen',
+            _wrap(
             HomeFeatureTile(
                 icon: Icons.description,
                 title: loc.t('ttk_kitchen'),
                 onTap: () => context.go('/tech-cards/kitchen')),
-            'home-ttk-kitchen'),
-        _wrap(
+            'home-ttk-kitchen')),
+        ownerTile(
+            'owner_nomenclature_kitchen',
+            _wrap(
             HomeFeatureTile(
                 icon: Icons.assignment,
                 title: loc.t('nomenclature'),
                 onTap: () => context.go('/nomenclature/kitchen')),
-            'home-nomenclature-kitchen'),
+            'home-nomenclature-kitchen')),
         if (!FeatureFlags.posModuleEnabled) ...[
-          _wrap(
+          ownerTile(
+              'owner_procurement_kitchen',
+              _wrap(
               HomeFeatureTile(
                   icon: Icons.local_shipping,
                   title: loc.t('pos_nav_procurement') ?? 'Закупка',
                   onTap: () => context.push('/procurement/kitchen')),
-              'home-procurement-kitchen'),
+              'home-procurement-kitchen')),
         ],
         if (FeatureFlags.posModuleEnabled) ...[
-          _wrap(
+          ownerTile(
+              'owner_pos_orders_kitchen',
+              _wrap(
               HomeFeatureTile(
                   icon: Icons.receipt_long,
                   title: loc.t('order_tab_orders') ?? 'Заказы',
                   onTap: () => context.push('/pos/orders/kitchen')),
-              'home-pos-orders-kitchen'),
-          _wrap(
+              'home-pos-orders-kitchen')),
+          ownerTile(
+              'owner_pos_sales_kitchen',
+              _wrap(
               HomeFeatureTile(
                   icon: Icons.point_of_sale_outlined,
                   title: loc.t('sales_title') ?? 'Продажи',
                   onTap: () => context.push('/sales/kitchen')),
-              'home-pos-sales-kitchen'),
-          _wrap(
+              'home-pos-sales-kitchen')),
+          ownerTile(
+              'owner_pos_warehouse_kitchen',
+              _wrap(
               HomeFeatureTile(
                   icon: Icons.warehouse,
                   title: loc.t('pos_nav_warehouse') ?? 'Склад',
                   onTap: () => context.push('/pos/warehouse/kitchen')),
-              'home-pos-wh-kitchen'),
-          _wrap(
+              'home-pos-wh-kitchen')),
+          ownerTile(
+              'owner_pos_procurement_kitchen',
+              _wrap(
               HomeFeatureTile(
                   icon: Icons.local_shipping,
                   title: loc.t('pos_nav_procurement') ?? 'Закупка',
                   onTap: () => context.push('/pos/procurement/kitchen')),
-              'home-pos-pr-kitchen'),
+              'home-pos-pr-kitchen')),
         ],
-        _wrap(
+        ownerTile(
+            'owner_writeoffs_kitchen',
+            _wrap(
             HomeFeatureTile(
                 icon: Icons.remove_circle_outline,
                 title: loc.t('writeoffs') ?? 'Списания',
                 subscriptionLocked: !subOk,
                 onTap: () => context.push('/writeoffs')),
-            'home-writeoffs-kitchen'),
-        _wrap(
+            'home-writeoffs-kitchen')),
+        ownerTile(
+            'owner_checklists_kitchen',
+            _wrap(
             HomeFeatureTile(
                 icon: Icons.checklist,
                 title: loc.t('checklists'),
                 onTap: () => context.go('/checklists?department=kitchen')),
-            'home-checklists-kitchen'),
+            'home-checklists-kitchen')),
         if (screenPref.showBarSection) ...[
           const SizedBox(height: 16),
           _SectionTitle(title: loc.t('bar')),
-          _wrap(
+          ownerTile(
+              'owner_schedule_bar',
+              _wrap(
               HomeFeatureTile(
                   icon: Icons.schedule,
                   title: loc.t('schedule'),
                   onTap: () => context.go('/schedule/bar')),
-              'home-schedule-bar'),
-          _wrap(
+              'home-schedule-bar')),
+          ownerTile(
+              'owner_menu_bar',
+              _wrap(
               HomeFeatureTile(
                   icon: Icons.restaurant_menu,
                   title: loc.t('menu'),
                   onTap: () => context.go('/menu/bar')),
-              'home-menu-bar'),
-          _wrap(
+              'home-menu-bar')),
+          ownerTile(
+              'owner_ttk_bar',
+              _wrap(
               HomeFeatureTile(
                   icon: Icons.description,
                   title: loc.t('ttk_bar') ?? 'ТТК бара',
                   onTap: () => context.go('/tech-cards/bar')),
-              'home-ttk-bar'),
-          _wrap(
+              'home-ttk-bar')),
+          ownerTile(
+              'owner_nomenclature_bar',
+              _wrap(
               HomeFeatureTile(
                   icon: Icons.assignment,
                   title: loc.t('nomenclature'),
                   onTap: () => context.go('/nomenclature/bar')),
-              'home-nomenclature-bar'),
+              'home-nomenclature-bar')),
           if (!FeatureFlags.posModuleEnabled) ...[
-            _wrap(
+            ownerTile(
+                'owner_procurement_bar',
+                _wrap(
                 HomeFeatureTile(
                     icon: Icons.local_shipping,
                     title: loc.t('pos_nav_procurement') ?? 'Закупка',
                     onTap: () => context.push('/procurement/bar')),
-                'home-procurement-bar'),
+                'home-procurement-bar')),
           ],
           if (FeatureFlags.posModuleEnabled) ...[
-            _wrap(
+            ownerTile(
+                'owner_pos_orders_bar',
+                _wrap(
                 HomeFeatureTile(
                     icon: Icons.receipt_long,
                     title: loc.t('order_tab_orders') ?? 'Заказы',
                     onTap: () => context.push('/pos/orders/bar')),
-                'home-pos-orders-bar'),
-            _wrap(
+                'home-pos-orders-bar')),
+            ownerTile(
+                'owner_pos_sales_bar',
+                _wrap(
                 HomeFeatureTile(
                     icon: Icons.point_of_sale_outlined,
                     title: loc.t('sales_title') ?? 'Продажи',
                     onTap: () => context.push('/sales/bar')),
-                'home-pos-sales-bar'),
-            _wrap(
+                'home-pos-sales-bar')),
+            ownerTile(
+                'owner_pos_warehouse_bar',
+                _wrap(
                 HomeFeatureTile(
                     icon: Icons.warehouse,
                     title: loc.t('pos_nav_warehouse') ?? 'Склад',
                     onTap: () => context.push('/pos/warehouse/bar')),
-                'home-pos-wh-bar'),
-            _wrap(
+                'home-pos-wh-bar')),
+            ownerTile(
+                'owner_pos_procurement_bar',
+                _wrap(
                 HomeFeatureTile(
                     icon: Icons.local_shipping,
                     title: loc.t('pos_nav_procurement') ?? 'Закупка',
                     onTap: () => context.push('/pos/procurement/bar')),
-                'home-pos-pr-bar'),
+                'home-pos-pr-bar')),
           ],
-          _wrap(
+          ownerTile(
+              'owner_writeoffs_bar',
+              _wrap(
               HomeFeatureTile(
                   icon: Icons.remove_circle_outline,
                   title: loc.t('writeoffs') ?? 'Списания',
                   subscriptionLocked: !subOk,
                   onTap: () => context.push('/writeoffs')),
-              'home-writeoffs-bar'),
-          _wrap(
+              'home-writeoffs-bar')),
+          ownerTile(
+              'owner_checklists_bar',
+              _wrap(
               HomeFeatureTile(
                   icon: Icons.checklist,
                   title: loc.t('checklists'),
                   onTap: () => context.go('/checklists?department=bar')),
-              'home-checklists-bar'),
+              'home-checklists-bar')),
         ],
         if (screenPref.showHallSection) ...[
           const SizedBox(height: 16),
           _SectionTitle(title: loc.t('dining_room')),
-          _wrap(
+          ownerTile(
+              'owner_schedule_hall',
+              _wrap(
               HomeFeatureTile(
                   icon: Icons.schedule,
                   title: loc.t('schedule'),
                   onTap: () => context.go('/schedule/hall')),
-              'home-schedule-hall'),
-          _wrap(
+              'home-schedule-hall')),
+          ownerTile(
+              'owner_menu_hall',
+              _wrap(
               HomeFeatureTile(
                   icon: Icons.restaurant_menu,
                   title: loc.t('menu'),
                   onTap: () => context.go('/menu/hall')),
-              'home-menu-hall'),
-          _wrap(
+              'home-menu-hall')),
+          ownerTile(
+              'owner_checklists_hall',
+              _wrap(
               HomeFeatureTile(
                   icon: Icons.checklist,
                   title: loc.t('checklists'),
                   onTap: () => context.go('/checklists?department=hall')),
-              'home-checklists-hall'),
+              'home-checklists-hall')),
           if (!FeatureFlags.posModuleEnabled) ...[
-            _wrap(
+            ownerTile(
+                'owner_procurement_hall',
+                _wrap(
                 HomeFeatureTile(
                     icon: Icons.local_shipping,
                     title: loc.t('pos_nav_procurement') ?? 'Закупка',
                     onTap: () => context.push('/procurement/hall')),
-                'home-procurement-hall'),
+                'home-procurement-hall')),
           ],
           if (FeatureFlags.posModuleEnabled) ...[
-            _wrap(
+            ownerTile(
+                'owner_pos_orders_hall',
+                _wrap(
                 HomeFeatureTile(
                     icon: Icons.receipt_long,
                     title: loc.t('order_tab_orders') ?? 'Заказы',
                     onTap: () => context.push('/pos/hall/orders')),
-                'home-pos-orders-hall'),
-            _wrap(
+                'home-pos-orders-hall')),
+            ownerTile(
+                'owner_pos_cash_hall',
+                _wrap(
                 HomeFeatureTile(
                     icon: Icons.point_of_sale,
                     title: loc.t('pos_nav_cash_register') ?? 'Касса',
                     onTap: () => context.push('/pos/hall/cash-register')),
-                'home-pos-cash-hall'),
-            _wrap(
+                'home-pos-cash-hall')),
+            ownerTile(
+                'owner_pos_tables_hall',
+                _wrap(
                 HomeFeatureTile(
                     icon: Icons.table_restaurant,
                     title: loc.t('pos_nav_tables') ?? 'Столы',
                     onTap: () => context.push('/pos/hall/tables')),
-                'home-pos-tables-hall'),
-            _wrap(
+                'home-pos-tables-hall')),
+            ownerTile(
+                'owner_pos_warehouse_hall',
+                _wrap(
                 HomeFeatureTile(
                     icon: Icons.warehouse,
                     title: loc.t('pos_nav_warehouse') ?? 'Склад',
                     onTap: () => context.push('/pos/warehouse/hall')),
-                'home-pos-wh-hall'),
-            _wrap(
+                'home-pos-wh-hall')),
+            ownerTile(
+                'owner_pos_procurement_hall',
+                _wrap(
                 HomeFeatureTile(
                     icon: Icons.local_shipping,
                     title: loc.t('pos_nav_procurement') ?? 'Закупка',
                     onTap: () => context.push('/pos/procurement/hall')),
-                'home-pos-pr-hall'),
+                'home-pos-pr-hall')),
           ],
-          _wrap(
+          ownerTile(
+              'owner_writeoffs_hall',
+              _wrap(
               HomeFeatureTile(
                   icon: Icons.remove_circle_outline,
                   title: loc.t('writeoffs') ?? 'Списания',
                   subscriptionLocked: !subOk,
                   onTap: () => context.push('/writeoffs')),
-              'home-writeoffs-hall'),
+              'home-writeoffs-hall')),
         ],
         if (screenPref.showBanquetCatering) ...[
           const SizedBox(height: 16),
-          _ExpandableBanquetSection(loc: loc),
+          if (visible('owner_banquet')) _ExpandableBanquetSection(loc: loc),
         ],
         const SizedBox(height: 16),
         _SectionTitle(title: loc.t('expenses')),
         if (FeatureFlags.posModuleEnabled) ...[
-          _wrap(
+          ownerTile(
+              'owner_pos_warehouse_est',
+              _wrap(
               HomeFeatureTile(
                   icon: Icons.warehouse,
                   title: loc.t('pos_warehouse_establishment_title') ??
                       'Сводно по заведению',
                   onTap: () => context.push('/pos/warehouse/establishment')),
-              'home-pos-wh-est'),
+              'home-pos-wh-est')),
         ],
-        _wrap(
+        ownerTile(
+            'owner_expenses',
+            _wrap(
             HomeFeatureTile(
                 icon: Icons.payments,
                 title: loc.t('expenses'),
                 subscriptionLocked: !subOk,
                 onTap: () => context.go('/expenses')),
-            'home-expenses'),
+            'home-expenses')),
       ],
     );
   }
