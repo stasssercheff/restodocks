@@ -2589,8 +2589,8 @@ class _InventoryScreenState extends State<InventoryScreen>
   /// Высота заголовка секции (Продукты/ПФ) — теперь вровень с высотой ячейки ввода.
   static const double _sectionHeaderHeight = _kInventoryQtyFieldHeight;
 
-  /// Фиксированная высота строки данных — для выравнивания ячеек ввода с текстом.
-  static const double _dataRowHeight = _kInventoryQtyFieldHeight;
+  /// Фиксированная высота строки данных (чуть выше поля ввода).
+  static const double _dataRowHeight = 38;
 
   /// Ширина фиксированной части: #, Наименование, Мера, Итого (продукт зафиксирован слева).
   /// В альбоме на телефоне — колонка «Наименование» ≈ **половина ширины экрана** (остаток под количества).
@@ -2807,7 +2807,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     return SizedBox(
       height: _dataRowHeight,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
         decoration: BoxDecoration(
           border: Border(
               bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
@@ -3755,6 +3755,7 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
                                                     'qty_${widget.actualIndex}_$colIndex'),
                                                 value: row
                                                     .quantities[colIndex],
+                                                fieldHeight: 34,
                                                 useGrams: row.isWeightInKg,
                                                 onChanged: (v) => widget
                                                     .onSetQuantity(
