@@ -5,6 +5,8 @@ class LocalSnapshotStore {
 
   Future<void> put(String scope, String payload) async {}
 
+  Future<String?> get(String scope) async => null;
+
   Future<void> clearEstablishment(String establishmentId) async {}
 
   Future<void> clearAll() async {}
