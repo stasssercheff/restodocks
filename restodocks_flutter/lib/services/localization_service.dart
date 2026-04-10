@@ -310,15 +310,36 @@ class LocalizationService extends ChangeNotifier {
     }
   }
 
+  /// Для [kk]: пока в JSON строка совпадает с английской (копия из `en`), показываем **ru** —
+  /// иначе весь UI выглядит как английский. Явно переведённые ключи (`kk` ≠ `en`) остаются казахскими.
+  String? _resolvedTranslationForLanguage(String languageCode, String key) {
+    final auto = _autoUiTranslations[languageCode]?[key];
+    if (auto != null && auto.isNotEmpty) return auto;
+
+    final lang = languageCode.trim().toLowerCase();
+    if (lang != 'kk') {
+      return _translations[languageCode]?[key] ?? _translations['en']?[key];
+    }
+
+    final kkStr = _translations['kk']?[key];
+    final enStr = _translations['en']?[key];
+    final ruStr = _translations['ru']?[key];
+
+    if (kkStr != null &&
+        kkStr.isNotEmpty &&
+        (enStr == null || kkStr.trim() != enStr.trim())) {
+      return kkStr;
+    }
+    if (ruStr != null && ruStr.isNotEmpty) return ruStr;
+    return kkStr ?? enStr;
+  }
+
   /// Получение перевода для текущей локали.
   ///
   /// Разрешение: текущий язык → **en** (если для текущего нет строки) → сырой [key].
-  /// В коде **нет** fallback на русский или другой язык — в [localizable.json] должны быть
-  /// строки интерфейса для **всех** [supportedLocales] (и новые ключи добавлять сразу во все языки).
+  /// Исключение: **kk** — см. [_resolvedTranslationForLanguage].
   String translate(String key, {Map<String, String>? args}) {
-    var translation = _autoUiTranslations[currentLanguageCode]?[key] ??
-        _translations[currentLanguageCode]?[key] ??
-        _translations['en']?[key];
+    var translation = _resolvedTranslationForLanguage(currentLanguageCode, key);
 
     var out = translation ?? key;
 
@@ -423,9 +444,7 @@ class LocalizationService extends ChangeNotifier {
   /// Получение перевода для указанного языка (для экспорта списка заказа на выбранном языке)
   String tForLanguage(String languageCode, String key,
       {Map<String, String>? args}) {
-    var translation = _autoUiTranslations[languageCode]?[key] ??
-        _translations[languageCode]?[key] ??
-        _translations['en']?[key];
+    var translation = _resolvedTranslationForLanguage(languageCode, key);
 
     var out = translation ?? key;
 
