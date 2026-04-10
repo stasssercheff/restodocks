@@ -30,6 +30,44 @@ class TechCardServiceSupabase {
   static const _cacheDataset = 'tech_cards_v2';
   static const _mobileTechCardsCacheTtl = Duration(minutes: 18);
 
+  /// Веб: снимок shallow-списка после [EstablishmentDataWarmupService], чтобы экран ТТК не качал то же снова.
+  List<TechCard>? _webShallowPrefetch;
+  String? _webShallowPrefetchScopesKey;
+
+  static String _scopesPrefetchKey(Iterable<String> ids) {
+    final s = ids.map((e) => e.trim()).where((e) => e.isNotEmpty).toList()
+      ..sort();
+    return s.join('\u001e');
+  }
+
+  void stashWebShallowPrefetchForScopes(
+    List<String> scopeEstablishmentIds,
+    List<TechCard> cards,
+  ) {
+    if (cards.isEmpty) return;
+    _webShallowPrefetchScopesKey = _scopesPrefetchKey(scopeEstablishmentIds);
+    _webShallowPrefetch = List<TechCard>.from(cards);
+  }
+
+  /// Одноразово отдаёт предзагруженный список при совпадении scope (главная → ТТК).
+  List<TechCard>? consumeWebShallowPrefetchIfScopesMatch(
+    List<String> scopeEstablishmentIds,
+  ) {
+    final k = _scopesPrefetchKey(scopeEstablishmentIds);
+    if (_webShallowPrefetch == null || _webShallowPrefetchScopesKey != k) {
+      return null;
+    }
+    final out = _webShallowPrefetch!;
+    _webShallowPrefetch = null;
+    _webShallowPrefetchScopesKey = null;
+    return out;
+  }
+
+  void clearWebShallowPrefetch() {
+    _webShallowPrefetch = null;
+    _webShallowPrefetchScopesKey = null;
+  }
+
   /// Кэш одной карточки; v2 — сброс после багов с «пустыми» снимками в offline/web.
   static const _detailDataset = 'tech_card_detail_v2';
 
@@ -205,6 +243,85 @@ class TechCardServiceSupabase {
       establishmentId,
       includeIngredients: includeIngredients,
     );
+  }
+
+  /// Снимок списка ТТК в SharedPreferences (v2). Очистка — перед принудительным обновлением на веб.
+  Future<void> clearTechCardsListCacheForEstablishment(
+      String establishmentId) async {
+    final id = establishmentId.trim();
+    if (id.isEmpty) return;
+    try {
+      final key = await _offlineCache.scopedKey(
+        dataset: _cacheDataset,
+        establishmentId: id,
+      );
+      await _offlineCache.removeKey(key);
+    } catch (_) {}
+  }
+
+  /// Одна страница ТТК без `tt_ingredients` (легкий JSON для веб).
+  Future<List<TechCard>> getTechCardsShallowPage(
+    String establishmentId, {
+    required int offset,
+    required int limit,
+  }) async {
+    final id = establishmentId.trim();
+    if (id.isEmpty || limit <= 0) return const [];
+    try {
+      final data = await _supabase.client
+          .from('tech_cards')
+          .select('*')
+          .eq('establishment_id', id)
+          .order('created_at', ascending: false)
+          .range(offset, offset + limit - 1);
+      return (data as List)
+          .map((row) =>
+              TechCard.fromJson(Map<String, dynamic>.from(row as Map)))
+          .toList();
+    } catch (e) {
+      devLog('TechCardServiceSupabase.getTechCardsShallowPage: $e');
+      return const [];
+    }
+  }
+
+  /// Веб: догрузить все ТТК без ингредиентов **страницами**, с колбэком прогресса (первый кадр списка быстрее).
+  Future<List<TechCard>> loadAllTechCardsShallowFromNetworkPaged(
+    List<String> scopeEstablishmentIds, {
+    int pageSize = 90,
+    void Function(List<TechCard> mergedSorted)? onProgress,
+  }) async {
+    final scopes = scopeEstablishmentIds.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet().toList();
+    if (scopes.isEmpty) return const [];
+
+    final byId = <String, TechCard>{};
+    const maxPagesSafety = 500;
+
+    for (final eid in scopes) {
+      var offset = 0;
+      for (var pageIdx = 0; pageIdx < maxPagesSafety; pageIdx++) {
+        final page = await getTechCardsShallowPage(
+          eid,
+          offset: offset,
+          limit: pageSize,
+        );
+        if (page.isEmpty) break;
+        for (final tc in page) {
+          byId[tc.id] = tc;
+        }
+        offset += page.length;
+        if (onProgress != null) {
+          final merged = byId.values.toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          onProgress(merged);
+        }
+        if (page.length < pageSize) break;
+      }
+    }
+
+    final out = byId.values.toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    onProgress?.call(out);
+    return out;
   }
 
   /// После полной загрузки списка с сервера — прогревает кэш открытия карточки (состав без лишнего round-trip).

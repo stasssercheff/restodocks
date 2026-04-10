@@ -28,6 +28,9 @@ import '../services/iiko_product_store.dart';
 import '../services/draft_storage_service.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../services/on_device_ocr/on_device_ocr_service.dart';
+import '../services/receipt_text_heuristic_parser.dart';
+import '../widgets/on_device_ocr_dialog.dart';
 
 /// Единица для ПФ в бланке: вес (г) или штуки/порции.
 const String _pfUnitGrams = 'g';
@@ -881,7 +884,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     _syncRowRepaintNotifiers();
   }
 
-  /// Добавить строки из распознанного чека (ИИ).
+  /// Добавить строки из распознанного чека (OCR на устройстве + эвристики).
   void _addReceiptLines(List<ReceiptLine> lines) {
     setState(() {
       for (final line in lines) {
@@ -905,27 +908,59 @@ class _InventoryScreenState extends State<InventoryScreen>
   Future<void> _scanReceipt(
       BuildContext context, LocalizationService loc) async {
     if (_completed) return;
+    if (kIsWeb || !OnDeviceOcrService.isSupported) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('on_device_ocr_not_supported'))),
+      );
+      return;
+    }
+    final agreed = await showOnDeviceOcrEducationDialog(
+      context,
+      loc,
+      kind: OnDeviceOcrHintKind.receipt,
+    );
+    if (!agreed || !mounted) return;
     final imageService = ImageService();
     final xFile = await imageService.pickImageFromGallery();
     if (xFile == null || !mounted) return;
     final bytes = await imageService.xFileToBytes(xFile);
     if (bytes == null || bytes.isEmpty || !mounted) return;
-    final ai = context.read<AiService>();
-    final result = await ai.recognizeReceipt(bytes);
+    final text = await OnDeviceOcrService().extractTextFromImageBytes(bytes);
     if (!mounted) return;
-    if (result == null || result.lines.isEmpty) {
+    if (text == null || text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('on_device_ocr_no_text'))),
+      );
+      return;
+    }
+    final lines = ReceiptTextHeuristicParser.parse(text);
+    if (lines.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(loc.t('inventory_receipt_scan_empty'))),
       );
       return;
     }
-    _addReceiptLines(result.lines);
+    _addReceiptLines(lines);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
           content: Text(loc
               .t('inventory_receipt_scan_added')
-              .replaceAll('%s', '${result.lines.length}'))),
+              .replaceAll('%s', '${lines.length}'))),
     );
+  }
+
+  List<Widget> _inventoryOcrActions(
+      BuildContext context, LocalizationService loc) {
+    if (_completed) return [];
+    if (kIsWeb || !OnDeviceOcrService.isSupported) return [];
+    return [
+      IconButton(
+        icon: const Icon(Icons.document_scanner_outlined),
+        tooltip: loc.t('inventory_scan_receipt'),
+        onPressed: () => _scanReceipt(context, loc),
+      ),
+    ];
   }
 
   @override
@@ -1775,6 +1810,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                 ),
                 toolbarHeight: 40,
                 elevation: 0,
+                actions: _inventoryOcrActions(context, loc),
               )
             : _isInputMode
                 ? AppBar(
@@ -1785,10 +1821,12 @@ class _InventoryScreenState extends State<InventoryScreen>
                     ),
                     toolbarHeight: 48,
                     elevation: 0,
+                    actions: _inventoryOcrActions(context, loc),
                   )
                 : AppBar(
                     leading: _inventoryAppBarLeading(context),
                     title: Text(_inventoryAppBarTitle(loc)),
+                    actions: _inventoryOcrActions(context, loc),
                   ),
         // Кнопка "Завершить" в bottomNavigationBar — Flutter поднимает её над клавиатурой автоматически.
         // Браузерный URL-бар (Safari/Chrome) остаётся ниже неё и не перекрывает таблицу.

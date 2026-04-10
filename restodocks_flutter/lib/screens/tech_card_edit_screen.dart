@@ -744,7 +744,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     with
         AutoSaveMixin<TechCardEditScreen>,
         InputChangeListenerMixin<TechCardEditScreen> {
-  static final Set<String> _openedTechCardsSession = <String>{};
   TechCard? _techCard;
   bool _loading = true;
   bool _technologyTranslating = false;
@@ -1570,33 +1569,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               try {
                 final tcSvc = context.read<TechCardServiceSupabase>();
 
-                // Параллельная загрузка ТТК и кастомных категорий
-                final futures = <Future>[];
-
-                // ТТК
-                late Future<List<TechCard>> allCardsFuture;
-                if (est.isBranch) {
-                  allCardsFuture = Future.wait([
-                    // В справочнике/пикере не нужно грузить ingredients и сразу
-                    // считать КБЖУ/стоимость для ВСЕХ ТТК — это блокирует UI.
-                    tcSvc.getTechCardsForEstablishment(
-                      est.dataEstablishmentId!,
-                      includeIngredients: false,
-                    ),
-                    tcSvc.getTechCardsForEstablishment(
-                      est.id,
-                      includeIngredients: false,
-                    ),
-                  ]).then((results) => [...results[0], ...results[1]]);
-                } else {
-                  allCardsFuture = tcSvc.getTechCardsForEstablishment(
-                    est.dataEstablishmentId,
-                    includeIngredients: false,
-                  );
-                }
-                futures.add(allCardsFuture);
-
-                // Кастомные категории
                 final customCategoriesFuture = Future.wait([
                   tcSvc.getCustomCategories(
                       est.isBranch ? est.id : est.dataEstablishmentId!,
@@ -1604,27 +1576,83 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   tcSvc.getCustomCategories(
                       est.isBranch ? est.id : est.dataEstablishmentId!, 'bar'),
                 ]);
-                futures.add(customCategoriesFuture);
-
-                final results = await Future.wait(futures);
-                var tcs = results[0] as List<TechCard>;
-                final customResults = results[1] as List;
+                final customResults = await customCategoriesFuture;
                 final customKitchen =
                     customResults[0] as List<({String id, String name})>;
                 final customBar =
                     customResults[1] as List<({String id, String name})>;
 
-                tcs = tcs.map(stripInvalidNestedPfSelfLinks).toList();
-                if (!mounted) return;
-                setState(() {
-                  _pickerTechCards = _isNew
-                      ? tcs
-                      : tcs.where((t) => t.id != widget.techCardId).toList();
-                  _semiFinishedProducts =
-                      tcs.where((t) => t.isSemiFinished).toList();
-                  _customCategoriesKitchen = customKitchen;
-                  _customCategoriesBar = customBar;
-                });
+                void applyPickerSlice(List<TechCard> merged) {
+                  if (!mounted) return;
+                  final slice =
+                      merged.map(stripInvalidNestedPfSelfLinks).toList();
+                  setState(() {
+                    _pickerTechCards = _isNew
+                        ? slice
+                        : slice
+                            .where((t) => t.id != widget.techCardId)
+                            .toList();
+                    _semiFinishedProducts =
+                        slice.where((t) => t.isSemiFinished).toList();
+                    _customCategoriesKitchen = customKitchen;
+                    _customCategoriesBar = customBar;
+                  });
+                }
+
+                late List<TechCard> tcs;
+                final scopeIds = est.isBranch
+                    ? <String>[est.dataEstablishmentId!, est.id]
+                    : <String>[est.dataEstablishmentId];
+                var settledFromLocal = false;
+
+                // Натив: сначала локальный снимок; иначе — те же страницы, что на веб (без одного гигантского ответа).
+                if (!kIsWeb) {
+                  try {
+                    if (est.isBranch) {
+                      final main = await tcSvc.getTechCardsForEstablishment(
+                        est.dataEstablishmentId!,
+                        includeIngredients: false,
+                      );
+                      final br = await tcSvc.getTechCardsForEstablishment(
+                        est.id,
+                        includeIngredients: false,
+                      );
+                      final byId = <String, TechCard>{};
+                      for (final t in main) {
+                        byId[t.id] = t;
+                      }
+                      for (final t in br) {
+                        byId[t.id] = t;
+                      }
+                      final merged = byId.values.toList()
+                        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+                      if (merged.isNotEmpty) {
+                        tcs = merged.map(stripInvalidNestedPfSelfLinks).toList();
+                        settledFromLocal = true;
+                        applyPickerSlice(merged);
+                      }
+                    } else {
+                      final c = await tcSvc.getTechCardsForEstablishment(
+                        est.dataEstablishmentId,
+                        includeIngredients: false,
+                      );
+                      if (c.isNotEmpty) {
+                        tcs = c.map(stripInvalidNestedPfSelfLinks).toList();
+                        settledFromLocal = true;
+                        applyPickerSlice(c);
+                      }
+                    }
+                  } catch (_) {}
+                }
+
+                if (!settledFromLocal) {
+                  tcs = await tcSvc.loadAllTechCardsShallowFromNetworkPaged(
+                    scopeIds,
+                    pageSize: 90,
+                    onProgress: applyPickerSlice,
+                  );
+                  tcs = tcs.map(stripInvalidNestedPfSelfLinks).toList();
+                }
 
                 // Для расчёта цены ПФ в ExcelStyleTtkTable нужны ingredients + cost внутри самих ПФ.
                 // В режиме deferTcLoad мы грузим карточки без ingredients, поэтому догружаем только ПФ.
@@ -1768,13 +1796,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       }
       final svc = context.read<TechCardServiceSupabase>();
       TechCard? tc;
-      final cardId = widget.techCardId;
-      final firstOpenInSession =
-          cardId.isNotEmpty && cardId != 'new' && _openedTechCardsSession.add(cardId);
-      if (widget.initialTechCard != null) {
+      // Список ТТК передаёт карточку без состава (includeIngredients: false) — не использовать как полный снимок.
+      if (widget.initialTechCard != null &&
+          widget.initialTechCard!.ingredients.isNotEmpty) {
         tc = widget.initialTechCard;
       } else {
-        tc = await svc.getTechCardById(widget.techCardId);
+        tc = await svc.getTechCardById(widget.techCardId, preferCache: true);
       }
       if (mounted) {
         // Показываем экран сразу, тяжёлую догрузку выполняем уже внутри страницы.
@@ -1784,21 +1811,22 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
           _contentPhase = 1;
         });
       }
-      if (firstOpenInSession && tc != null && tc.ingredients.isEmpty) {
+      // Кэш из списка часто без строк состава — один запрос, без «первого открытия в сессии».
+      if (tc != null && tc.ingredients.isEmpty) {
         try {
-          final server = await svc.getTechCardById(
+          var full = await svc.getTechCardById(
             widget.techCardId,
             preferCache: false,
           );
-          if (server != null) tc = server;
+          if (full != null && full.ingredients.isEmpty) {
+            final filled = await svc.fillIngredientsForCardsBulk([full]);
+            if (filled.isNotEmpty) full = filled.first;
+          }
+          if (full != null) tc = full;
         } catch (_) {}
       }
-      if (firstOpenInSession && tc != null && tc.ingredients.isEmpty) {
-        final filled = await svc.fillIngredientsForCardsBulk([tc]);
-        if (filled.isNotEmpty) tc = filled.first;
-      }
       List<TechCard> semiFinishedForCost = <TechCard>[];
-      if (tc != null && firstOpenInSession) {
+      if (tc != null) {
         var working = stripInvalidNestedPfSelfLinks(tc);
         // Нужные ПФ для расчёта цен/стоимости в таблице:
         // в режиме просмотра раньше могли не подгружаться "справочники" (loadedTechCards пустой),
@@ -5039,11 +5067,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             children: [
               Expanded(
                 child: ClipRect(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(12, 24, 12, 12),
+                  child: CustomScrollView(
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
-                    child: Column(
+                    slivers: [
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(12, 24, 12, 12),
+                        sliver: SliverToBoxAdapter(
+                          child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         // Шапка: название, категория, тип — на узком экране колонкой, на широком строкой
@@ -5393,190 +5424,183 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                   ?.copyWith(fontWeight: FontWeight.bold)),
                           const SizedBox(height: 8),
                         ],
-                        // Таблица ТТК в отдельном «окне»:
-                        // зум внутри, а горизонтальная шкала всегда в самом низу области таблицы.
-                        SizedBox(
-                          width: constraints.maxWidth,
-                          child: LayoutBuilder(
-                            builder: (context, tableConstraints) {
-                              final tableViewportHeight = (isMobile
-                                      ? MediaQuery.sizeOf(context).height * 0.42
-                                      : MediaQuery.sizeOf(context).height * 0.50)
-                                  .clamp(220.0, 520.0);
-                              return SizedBox(
-                                height: tableViewportHeight,
-                                child: RawScrollbar(
-                                  controller: _compositionTableHScrollController,
-                                  scrollbarOrientation:
-                                      ScrollbarOrientation.bottom,
-                                  thumbVisibility: true,
-                                  child: SingleChildScrollView(
-                                    controller: _compositionTableHScrollController,
-                                    scrollDirection: Axis.horizontal,
-                                    clipBehavior: Clip.hardEdge,
-                                    child: SingleChildScrollView(
-                                      scrollDirection: Axis.vertical,
-                                      child: ConstrainedBox(
-                                        constraints: BoxConstraints(
-                                          minWidth: tableConstraints.maxWidth,
-                                          minHeight: 220,
-                                        ),
-                                        child: InteractiveViewer(
-                                          panEnabled: false,
-                                          scaleEnabled: true,
-                                          minScale: 0.75,
-                                          maxScale: 2.2,
-                                          child: effectiveCanEdit
-                                      ? RepaintBoundary(
-                                          child: ExcelStyleTtkTable(
+                        ],
+                          ),
+                        ),
+                      ),
+                    if (effectiveCanEdit && !isCook)
+                      SliverPersistentHeader(
+                        pinned: true,
+                        delegate: _TtkCompositionPinnedHeaderDelegate(
+                          loc: loc,
+                          hScroll: _compositionTableHScrollController,
+                          surfaceColor:
+                              Theme.of(context).colorScheme.surface,
+                        ),
+                      ),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: RawScrollbar(
+                          controller: _compositionTableHScrollController,
+                          scrollbarOrientation: ScrollbarOrientation.bottom,
+                          thumbVisibility: true,
+                          child: SingleChildScrollView(
+                            controller: _compositionTableHScrollController,
+                            scrollDirection: Axis.horizontal,
+                            clipBehavior: Clip.hardEdge,
+                            child: InteractiveViewer(
+                              panEnabled: false,
+                              scaleEnabled: true,
+                              minScale: 0.75,
+                              maxScale: 2.2,
+                              child: effectiveCanEdit
+                                  ? RepaintBoundary(
+                                      child: ExcelStyleTtkTable(
+                                        loc: loc,
+                                        dishName: _nameController.text,
+                                        isSemiFinished: _isSemiFinished,
+                                        ingredients: _ingredients,
+                                        canEdit: effectiveCanEdit,
+                                        dishNameController: _nameController,
+                                        technologyController:
+                                            _technologyController,
+                                        productStore: context
+                                            .read<ProductStoreSupabase>(),
+                                        establishmentId: (() {
+                                          final est = context
+                                              .read<AccountManagerSupabase>()
+                                              .establishment;
+                                          return est != null && est.isBranch
+                                              ? est.id
+                                              : (est?.dataEstablishmentId ??
+                                                  '');
+                                        })(),
+                                        semiFinishedProducts:
+                                            _semiFinishedProducts,
+                                        isCook: isCook,
+                                        weightPerPortion: _portionWeight,
+                                        onWeightPerPortionChanged: (v) {
+                                          _portionWeightUpdateDebounce
+                                              ?.cancel();
+                                          _portionWeight = v;
+                                          _portionWeightUpdateDebounce =
+                                              Timer(
+                                            const Duration(milliseconds: 200),
+                                            () {
+                                              if (!mounted) return;
+                                              setState(() {});
+                                              _scheduleDraftSave();
+                                            },
+                                          );
+                                        },
+                                        onTotalOutputChanged: (newOutput) {
+                                          _scaleIngredientsToTotalOutput(
+                                              newOutput);
+                                        },
+                                        onAdd: _showAddIngredient,
+                                        onUpdate: (i, ing) {
+                                          _lastUserInteractionAt =
+                                              DateTime.now();
+                                          if (_ingredients.isEmpty &&
+                                              i == 0) {
+                                            _ingredients.add(ing);
+                                            if (ing.hasData) {
+                                              _ingredients[0] =
+                                                  ing.isPlaceholder
+                                                      ? ing.withRealId()
+                                                      : ing;
+                                            }
+                                            _ensurePlaceholderRowAtEnd();
+                                          } else if (i <
+                                              _ingredients.length) {
+                                            _ingredients[i] =
+                                                ing.isPlaceholder &&
+                                                        ing.hasData
+                                                    ? ing.withRealId()
+                                                    : ing;
+                                            _ensurePlaceholderRowAtEnd();
+                                          }
+                                          _ingredientUpdateDebounce?.cancel();
+                                          _ingredientUpdateDebounce = Timer(
+                                            const Duration(milliseconds: 250),
+                                            () {
+                                              if (!mounted) return;
+                                              setState(() {});
+                                              _scheduleDraftSave();
+                                            },
+                                          );
+                                        },
+                                        onRemove: _removeIngredient,
+                                        onSuggestWaste: _suggestWasteForRow,
+                                        hideTechnologyBlock: true,
+                                        omitTableHeader:
+                                            effectiveCanEdit && !isCook,
+                                        shrinkWrap: true,
+                                        onTapPfIngredient: (id) =>
+                                            context.push('/tech-cards/$id'),
+                                      ),
+                                    )
+                                  : ListenableBuilder(
+                                      listenable: context
+                                          .read<ProductStoreSupabase>()
+                                          .catalogRevision,
+                                      builder: (context, _) {
+                                        return ConstrainedBox(
+                                          constraints: BoxConstraints(
+                                              minWidth: constraints.maxWidth),
+                                          child: _TtkCookTable(
                                             loc: loc,
                                             dishName: _nameController.text,
-                                            isSemiFinished: _isSemiFinished,
-                                            ingredients: _ingredients,
-                                            canEdit: effectiveCanEdit,
-                                            dishNameController: _nameController,
-                                            technologyController:
-                                                _technologyController,
+                                            ingredients: _ingredients
+                                                .where((i) =>
+                                                    !i.isPlaceholder ||
+                                                    i.hasData)
+                                                .toList(),
+                                            technology:
+                                                _technologyController.text,
+                                            weightPerPortion: _portionWeight,
+                                            hideTechnologyInTable: true,
                                             productStore: context
                                                 .read<ProductStoreSupabase>(),
-                                            establishmentId: (() {
-                                              final est = context
-                                                  .read<
-                                                      AccountManagerSupabase>()
-                                                  .establishment;
-                                              return est != null && est.isBranch
-                                                  ? est.id
-                                                  : (est?.dataEstablishmentId ??
-                                                      '');
-                                            })(),
-                                            semiFinishedProducts:
-                                                _semiFinishedProducts,
-                                            isCook: isCook,
-                                            weightPerPortion: _portionWeight,
-                                            onWeightPerPortionChanged: (v) {
-                                              _portionWeightUpdateDebounce
-                                                  ?.cancel();
-                                              // Не дергаем тяжёлый setState на каждый символ:
-                                              // сам TextField показывает значение мгновенно через controller в ExcelStyleTtkTable.
-                                              _portionWeight = v;
-                                              _portionWeightUpdateDebounce =
-                                                  Timer(
-                                                      const Duration(
-                                                          milliseconds: 200),
-                                                      () {
-                                                if (!mounted) return;
-                                                setState(() {});
-                                                _scheduleDraftSave();
-                                              });
-                                            },
-                                            onTotalOutputChanged: (newOutput) {
-                                              _scaleIngredientsToTotalOutput(
-                                                  newOutput);
-                                            },
-                                            onAdd: _showAddIngredient,
-                                            onUpdate: (i, ing) {
-                                              _lastUserInteractionAt =
-                                                  DateTime.now();
-                                              if (_ingredients.isEmpty &&
-                                                  i == 0) {
-                                                _ingredients.add(ing);
-                                                if (ing.hasData) {
-                                                  _ingredients[0] =
-                                                      ing.isPlaceholder
-                                                          ? ing.withRealId()
-                                                          : ing;
-                                                }
-                                                _ensurePlaceholderRowAtEnd();
-                                              } else if (i <
-                                                  _ingredients.length) {
-                                                _ingredients[i] =
-                                                    ing.isPlaceholder &&
-                                                            ing.hasData
-                                                        ? ing.withRealId()
-                                                        : ing;
-                                                _ensurePlaceholderRowAtEnd();
-                                              }
-                                              _ingredientUpdateDebounce
-                                                  ?.cancel();
-                                              _ingredientUpdateDebounce = Timer(
+                                            onTapPfIngredient: (id) =>
+                                                context.push(
+                                                    '/tech-cards/$id?view=1'),
+                                            onIngredientsChanged: (list) {
+                                              _cookTableSyncDebounce?.cancel();
+                                              final snapshot =
+                                                  List<TTIngredient>.from(
+                                                      list);
+                                              _cookTableSyncDebounce = Timer(
                                                 const Duration(
-                                                    milliseconds: 250),
+                                                    milliseconds: 150),
                                                 () {
                                                   if (!mounted) return;
-                                                  setState(() {});
+                                                  setState(() {
+                                                    _ingredients
+                                                      ..clear()
+                                                      ..addAll(snapshot);
+                                                    _ensurePlaceholderRowAtEnd();
+                                                  });
                                                   _scheduleDraftSave();
                                                 },
                                               );
                                             },
-                                            onRemove: _removeIngredient,
-                                            onSuggestWaste: _suggestWasteForRow,
-                                            hideTechnologyBlock: true,
-                                            onTapPfIngredient: (id) =>
-                                                context.push('/tech-cards/$id'),
                                           ),
-                                        )
-                                      : ListenableBuilder(
-                                          listenable: context
-                                              .read<ProductStoreSupabase>()
-                                              .catalogRevision,
-                                          builder: (context, _) {
-                                            return ConstrainedBox(
-                                              constraints: BoxConstraints(
-                                                  minWidth:
-                                                      constraints.maxWidth),
-                                              child: _TtkCookTable(
-                                                loc: loc,
-                                                dishName: _nameController.text,
-                                                ingredients: _ingredients
-                                                    .where((i) =>
-                                                        !i.isPlaceholder ||
-                                                        i.hasData)
-                                                    .toList(),
-                                                technology:
-                                                    _technologyController.text,
-                                                weightPerPortion:
-                                                    _portionWeight,
-                                                hideTechnologyInTable: true,
-                                                productStore: context.read<
-                                                    ProductStoreSupabase>(),
-                                                onTapPfIngredient: (id) =>
-                                                    context.push(
-                                                        '/tech-cards/$id?view=1'),
-                                                onIngredientsChanged: (list) {
-                                                  _cookTableSyncDebounce
-                                                      ?.cancel();
-                                                  final snapshot =
-                                                      List<TTIngredient>.from(
-                                                          list);
-                                                  _cookTableSyncDebounce =
-                                                      Timer(
-                                                    const Duration(
-                                                        milliseconds: 150),
-                                                    () {
-                                                      if (!mounted) return;
-                                                      setState(() {
-                                                        _ingredients
-                                                          ..clear()
-                                                          ..addAll(snapshot);
-                                                        _ensurePlaceholderRowAtEnd();
-                                                      });
-                                                      _scheduleDraftSave();
-                                                    },
-                                                  );
-                                                },
-                                              ),
-                                            );
-                                          },
-                                          ),
-                                        ),
-                                      ),
+                                        );
+                                      },
                                     ),
-                                  ),
-                                ),
-                              );
-                            },
+                            ),
                           ),
                         ),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                      sliver: SliverToBoxAdapter(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
                         // Кнопка «Подстроить % отхода под целевой выход» — отдельно под таблицей, не на панели, компактная
                         if (!tableOnlyView)
                           Builder(
@@ -6068,12 +6092,58 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                     ),
                   ),
                 ),
-              ),
-            ],
-          );
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
         },
       ),
     );
+  }
+}
+
+/// Закреп шапки таблицы состава при вертикальном скролле страницы; горизонталь синхронизирован с телом таблицы.
+class _TtkCompositionPinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _TtkCompositionPinnedHeaderDelegate({
+    required this.loc,
+    required this.hScroll,
+    required this.surfaceColor,
+  });
+
+  final LocalizationService loc;
+  final ScrollController hScroll;
+  final Color surfaceColor;
+
+  static const double _extent = 45;
+
+  @override
+  double get minExtent => _extent;
+
+  @override
+  double get maxExtent => _extent;
+
+  @override
+  Widget build(
+    BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Material(
+      color: surfaceColor,
+      elevation: overlapsContent ? 2 : 0,
+      shadowColor: Colors.black26,
+      child: SingleChildScrollView(
+        controller: hScroll,
+        scrollDirection: Axis.horizontal,
+        child: ExcelStyleTtkTable.compositionPinnedHeader(loc),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _TtkCompositionPinnedHeaderDelegate oldDelegate) {
+    return oldDelegate.loc != loc ||
+        oldDelegate.surfaceColor != surfaceColor ||
+        oldDelegate.hScroll != hScroll;
   }
 }
 
