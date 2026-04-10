@@ -164,7 +164,7 @@ class TranslationManager {
 
     try {
       final prompt = '''
-Определи язык следующего текста. Верни только код языка (ru, en, de, fr, es, it, zh, ja, ko).
+Определи язык следующего текста. Верни только код языка (ru, en, es, kk, de, fr, it, tr, vi, zh, ja, ko).
 Если текст на нескольких языках, верни основной язык.
 
 Текст: "${text.substring(0, 500)}"
