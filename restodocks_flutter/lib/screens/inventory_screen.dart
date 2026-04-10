@@ -38,7 +38,7 @@ const String _pfUnitPcs = 'pcs';
 
 /// Размер цифр в ячейках количества (−2 pt к body, чтобы длинные значения влезали).
 const double _kInventoryQtyFontSize = 13;
-const double _kInventoryQtyFieldHeight = 36;
+const double _kInventoryQtyFieldHeight = 40;
 
 enum _InventoryTableEntryType { section, row, aggregated }
 
@@ -685,7 +685,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       final theme = Theme.of(ctx);
       return Container(
         margin: const EdgeInsets.only(left: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
           color: theme.colorScheme.primaryContainer,
           borderRadius: BorderRadius.circular(4),
