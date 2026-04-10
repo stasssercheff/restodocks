@@ -38,7 +38,6 @@ const String _pfUnitPcs = 'pcs';
 
 /// Размер цифр в ячейках количества (−2 pt к body, чтобы длинные значения влезали).
 const double _kInventoryQtyFontSize = 13;
-const double _kInventoryQtyFieldHeight = 40;
 
 enum _InventoryTableEntryType { section, row, aggregated }
 
@@ -2586,11 +2585,11 @@ class _InventoryScreenState extends State<InventoryScreen>
   static const double _colTotalWidth = 56;
   static const double _colQtyWidth = 48; // Сужен с 64
   static const double _colGap = 4; // Уменьшен с 10
-  /// Высота заголовка секции (Продукты/ПФ) — теперь вровень с высотой ячейки ввода.
-  static const double _sectionHeaderHeight = _kInventoryQtyFieldHeight;
+  /// Высота заголовка секции (Продукты/ПФ) — для выравнивания фиксированной и прокручиваемой колонок.
+  static const double _sectionHeaderHeight = 36;
 
   /// Фиксированная высота строки данных — для выравнивания ячеек ввода с текстом.
-  static const double _dataRowHeight = _kInventoryQtyFieldHeight;
+  static const double _dataRowHeight = 44;
 
   /// Ширина фиксированной части: #, Наименование, Мера, Итого (продукт зафиксирован слева).
   /// В альбоме на телефоне — колонка «Наименование» ≈ **половина ширины экрана** (остаток под количества).
@@ -2625,7 +2624,6 @@ class _InventoryScreenState extends State<InventoryScreen>
     double leftW, {
     required double sectionH,
   }) {
-    final theme = Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2633,21 +2631,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             width: leftW,
             child: _buildSectionHeader(loc, title,
                 isFixed: true, height: sectionH)),
-        Expanded(
-          child: SizedBox(
-            height: sectionH,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withOpacity(0.5),
-                border: Border(
-                  bottom: BorderSide(
-                    color: theme.colorScheme.outline.withOpacity(0.3),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
+        Expanded(child: SizedBox(height: sectionH)),
       ],
     );
   }
@@ -2804,10 +2788,10 @@ class _InventoryScreenState extends State<InventoryScreen>
     final row = _rows[actualIndex];
     final squish = _inventoryKbLandscapeSquish(context);
 
-    return SizedBox(
-      height: _dataRowHeight,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: _dataRowHeight),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
         decoration: BoxDecoration(
           border: Border(
               bottom: BorderSide(color: theme.dividerColor.withOpacity(0.5))),
@@ -2829,7 +2813,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               child: Text(
                 row.productName(loc.currentLanguageCode),
                 style: theme.textTheme.bodyMedium,
-                maxLines: 2,
+                maxLines: squish ? 4 : 2,
                 overflow: TextOverflow.ellipsis,
                 softWrap: true,
               ),
@@ -3714,7 +3698,7 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
                         height: h,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 0),
+                              horizontal: 4, vertical: 2),
                           decoration: BoxDecoration(
                             color: theme.colorScheme.surface,
                             border: Border(
@@ -3896,7 +3880,7 @@ class _QtyCell extends StatefulWidget {
     required this.value,
     this.useGrams = false,
     required this.onChanged,
-    this.fieldHeight = _kInventoryQtyFieldHeight,
+    this.fieldHeight = 40,
     this.fontSize = _kInventoryQtyFontSize,
     this.textInputAction = TextInputAction.next,
     this.onFocusGained,
