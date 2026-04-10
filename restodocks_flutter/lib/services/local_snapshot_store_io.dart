@@ -41,6 +41,20 @@ class LocalSnapshotStore {
     );
   }
 
+  /// Сырой JSON снимка или `null`, если ключа нет.
+  Future<String?> get(String scope) async {
+    final db = await _database();
+    final rows = await db.query(
+      'snapshots',
+      columns: ['payload'],
+      where: 'scope = ?',
+      whereArgs: [scope],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['payload'] as String?;
+  }
+
   Future<void> clearEstablishment(String establishmentId) async {
     final db = await _database();
     await db.delete(
