@@ -2441,7 +2441,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         final pre = svc.consumeWebShallowPrefetchIfScopesMatch(scopeIds);
         if (pre != null) {
           all = pre;
-          _applyPagedTtkListProgress(
+          _applyWebTtkListProgress(
             est: est,
             merged: all,
             customBarIds: customBarIds,
@@ -2453,7 +2453,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           all = await svc.loadAllTechCardsShallowFromNetworkPaged(
             scopeIds,
             pageSize: 90,
-            onProgress: (merged) => _applyPagedTtkListProgress(
+            onProgress: (merged) => _applyWebTtkListProgress(
                   est: est,
                   merged: merged,
                   customBarIds: customBarIds,
