@@ -303,7 +303,10 @@ class _AppShellState extends State<AppShell> {
     final hideForKeyboard = landscapeNarrow &&
         (keyboardOpen ||
             FocusManager.instance.primaryFocus != null);
-    final hideNav = landscapeNarrow && (_hideBottomBar || hideForKeyboard);
+    // Веб на телефоне в альбоме: нижнюю панель не показываем вообще — иначе остаётся
+    // заметная «полоска»/обводка без нормального футера (Safari/Chrome).
+    final hideNav = (kIsWeb && landscapeNarrow) ||
+        (landscapeNarrow && (_hideBottomBar || hideForKeyboard));
     final bottomBarTotalHeight = navBarHeight + navBottomInset;
 
     final bodyChild = showAccessPendingStub

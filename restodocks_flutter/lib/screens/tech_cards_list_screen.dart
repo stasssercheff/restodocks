@@ -34,6 +34,62 @@ enum _TtkImportMode { single, multi }
 
 enum _TtkNewDraftChoice { continueDraft, startNew, cancel }
 
+/// Снимок списка ТТК между заходами на экран (одно заведение + department).
+/// Убирает полноэкранный лоадер и повторную тяжёлую гидрацию при каждом открытии.
+class _TtkListMemoryCache {
+  _TtkListMemoryCache._();
+
+  static String _key(Establishment est, String department) =>
+      '${est.id}|${est.dataEstablishmentId}|${est.isBranch}|$department';
+
+  static String? _cachedKey;
+  static DateTime? _cachedAt;
+  static List<TechCard>? _cachedList;
+  static Map<String, TechCard>? _cachedById;
+
+  static const Duration _ttl = Duration(minutes: 5);
+
+  static bool restoreIfFresh(
+    Establishment est,
+    String department,
+    void Function(List<TechCard> list, Map<String, TechCard> byId) apply,
+  ) {
+    final k = _key(est, department);
+    if (_cachedKey != k ||
+        _cachedList == null ||
+        _cachedById == null ||
+        _cachedAt == null) {
+      return false;
+    }
+    if (DateTime.now().difference(_cachedAt!) > _ttl) return false;
+    apply(
+      List<TechCard>.from(_cachedList!),
+      Map<String, TechCard>.from(_cachedById!),
+    );
+    return true;
+  }
+
+  static void put(
+    Establishment est,
+    String department,
+    List<TechCard> list,
+    Map<String, TechCard> byId,
+  ) {
+    if (list.isEmpty) return;
+    _cachedKey = _key(est, department);
+    _cachedAt = DateTime.now();
+    _cachedList = List<TechCard>.from(list);
+    _cachedById = Map<String, TechCard>.from(byId);
+  }
+
+  static void invalidate() {
+    _cachedKey = null;
+    _cachedAt = null;
+    _cachedList = null;
+    _cachedById = null;
+  }
+}
+
 /// Список ТТК заведения. Создание и переход к редактированию.
 class TechCardsListScreen extends StatefulWidget {
   const TechCardsListScreen(
@@ -311,10 +367,36 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     LocalizationService().addListener(_localizationPrefetchListener);
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowTtkTour());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Не стартуем тяжёлую загрузку в середине свайп-перехода со стартового экрана.
-      await Future<void>.delayed(const Duration(milliseconds: 320));
+      // Короткая задержка, чтобы не спорить с анимацией перехода; кэш даёт мгновенный повторный вход.
+      await Future<void>.delayed(const Duration(milliseconds: 80));
       if (!mounted) return;
-      await _load();
+      final acc = context.read<AccountManagerSupabase>();
+      final est = acc.establishment;
+      var restoredFromMemory = false;
+      if (est != null) {
+        restoredFromMemory = _TtkListMemoryCache.restoreIfFresh(
+          est,
+          widget.department,
+          (snapshotList, snapshotById) {
+            if (!mounted) return;
+            setState(() {
+              _list = snapshotList;
+              _techCardsById = snapshotById;
+              _loading = false;
+              _error = null;
+              _listVersion++;
+              _cachedReviewList = null;
+              _cachedReviewCount = null;
+              _lastReviewCacheKey = null;
+              _listDetailsHydrating = false;
+            });
+            _rebuildPfCandidatesIndex(context.read<LocalizationService>());
+          },
+        );
+      }
+      if (!restoredFromMemory) {
+        await _load(showLoading: true);
+      }
       if (!mounted) return;
       _reconcileNotifier = context.read<TechCardsReconcileNotifier>();
       _lastReconcileNotifierVersion = _reconcileNotifier!.version;
@@ -735,22 +817,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     if (sectionKey == 'all') return loc.t('ttk_sections_all');
     if (sectionKey == 'hidden') return loc.t('ttk_sections_hidden');
     return _sectionCodeToLabel(sectionKey, loc);
-  }
-
-  /// Метка текущего подразделения (цех) для шапки
-  String _departmentHeaderLabel(LocalizationService loc) {
-    switch (widget.department) {
-      case 'kitchen':
-        return loc.t('department_kitchen');
-      case 'bar':
-        return loc.t('department_bar');
-      case 'banquet-catering':
-        return loc.t('banquet_catering');
-      case 'banquet-catering-bar':
-        return '${loc.t('banquet_catering')} + ${loc.t('department_bar')}';
-      default:
-        return loc.t('department_kitchen');
-    }
   }
 
   /// id -> name для пользовательских категорий (загружаются в _load).
@@ -1275,7 +1341,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
 
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _pullToRefresh,
       child: ListView.separated(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
         itemCount: list.length,
@@ -1701,8 +1767,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                       '/tech-cards/${tc.id}',
                                       extra: {'initialTechCard': tc},
                                     );
-                                    if (mounted && needRefresh == true)
-                                      _load(showLoading: false);
+                                    if (mounted && needRefresh == true) {
+                                      _TtkListMemoryCache.invalidate();
+                                      await _load(showLoading: false);
+                                    }
                                   },
                             child: Text(loc.t('ttk_open_tech_card')),
                           ),
@@ -1742,6 +1810,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                             ingredients: updatedIngredients);
                                         await svc.saveTechCard(updatedTc);
                                         if (mounted) {
+                                          _TtkListMemoryCache.invalidate();
                                           await _load();
                                         }
                                         if (ctx2.mounted)
@@ -1977,6 +2046,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     if (toHydrate.isEmpty) return;
 
     const chunkSize = 60;
+    final accumulated = <String, TechCard>{};
     for (var i = 0; i < toHydrate.length; i += chunkSize) {
       if (!mounted || requestToken != _loadRequestToken) return;
       final end = (i + chunkSize < toHydrate.length)
@@ -1986,28 +2056,33 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       try {
         final updated = await svc.fillIngredientsForCardsBulk(chunk);
         if (!mounted || requestToken != _loadRequestToken) return;
-        final updatedById = {for (final tc in updated) tc.id: tc};
-        setState(() {
-          for (final tc in updated) {
-            _techCardsById[tc.id] = tc;
-            _ingredientsHydratedIds.add(tc.id);
-          }
-          if (_list.isNotEmpty) {
-            _list = _list
-                .map((tc) => updatedById[tc.id] ?? tc)
-                .toList(growable: false);
-          }
-          _resolvedCostMemo.clear();
-          if (_tabController.index == 2) {
-            _cachedReviewList = null;
-            _cachedReviewCount = null;
-            _lastReviewCacheKey = null;
-          }
-        });
+        for (final tc in updated) {
+          accumulated[tc.id] = tc;
+        }
       } catch (_) {
         // как при ленивой догрузке — не ломаем список
       }
     }
+    if (accumulated.isEmpty || !mounted || requestToken != _loadRequestToken) {
+      return;
+    }
+    setState(() {
+      for (final tc in accumulated.values) {
+        _techCardsById[tc.id] = tc;
+        _ingredientsHydratedIds.add(tc.id);
+      }
+      if (_list.isNotEmpty) {
+        _list = _list
+            .map((tc) => accumulated[tc.id] ?? tc)
+            .toList(growable: false);
+      }
+      _resolvedCostMemo.clear();
+      if (_tabController.index == 2) {
+        _cachedReviewList = null;
+        _cachedReviewCount = null;
+        _lastReviewCacheKey = null;
+      }
+    });
   }
 
   /// Прогрев ингредиентов для вкладки «На проверку», чтобы подсчёт проблем
@@ -2145,10 +2220,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         .toList();
   }
 
+  Future<void> _pullToRefresh() async {
+    _TtkListMemoryCache.invalidate();
+    await _load(showLoading: true);
+  }
+
   Future<void> _load({bool showLoading = true}) async {
     final acc = context.read<AccountManagerSupabase>();
     final est = acc.establishment;
-    final emp = acc.currentEmployee;
     final requestToken = ++_loadRequestToken;
     if (est == null) {
       setState(() {
@@ -2215,57 +2294,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       }
       var processedAll = sanitizedAll;
 
-      final canSeeCosts = emp?.hasRole('owner') == true ||
-          emp?.hasRole('executive_chef') == true ||
-          emp?.hasRole('sous_chef') == true ||
-          emp?.hasRole('bar_manager') == true ||
-          emp?.hasRole('manager') == true ||
-          emp?.hasRole('general_manager') == true;
-
-      // Тяжёлое (products, nomenclature, fillIngredients, индекс цен) — в фоне.
-      // Чтобы не тормозить список, убираем лишние гидраторы (cost/nutrition)
-      // и полагаемся на рекурсивный расчёт себестоимости по ингредиентам + ценам номенклатуры.
-      final bool doHeavyHydration = (showLoading || canSeeCosts);
-      int? hydrateToken;
-      if (doHeavyHydration) {
-        hydrateToken = ++_loadHydrateToken;
-        Future.microtask(() async {
-          try {
-            await productStore.loadProducts().catchError((_) {});
-            if (est.isBranch) {
-              await productStore
-                  .loadNomenclatureForBranch(est.id, est.dataEstablishmentId!)
-                  .catchError((_) {});
-            } else {
-              await productStore
-                  .loadNomenclature(est.dataEstablishmentId)
-                  .catchError((_) {});
-            }
-            if (!mounted || requestToken != _loadRequestToken) return;
-            await _buildNomenclatureNamePriceIndex(
-              productStore,
-              est.isBranch ? est.id : est.dataEstablishmentId,
-            );
-            if (!mounted || requestToken != _loadRequestToken) return;
-            await _hydrateEmptyIngredientsForLoadedCards(
-              svc,
-              requestToken: requestToken,
-            );
-            if (!mounted || requestToken != _loadRequestToken) return;
-            // После догрузки ингредиентов и номенклатуры — сброс кэша себестоимости.
-            setState(() {
-              _resolvedCostMemo.clear();
-            });
-          } catch (_) {
-          } finally {
-            if (mounted &&
-                requestToken == _loadRequestToken &&
-                hydrateToken == _loadHydrateToken) {
-              setState(() => _listDetailsHydrating = false);
-            }
-          }
-        });
-      }
+      // primeCatalogAndPrices: полный прогон каталога/номенклатуры только при «тяжёлом» входе
+      // (первый показ, pull-to-refresh). Повторный фоновый _load после редактирования — без этого.
+      final bool primeCatalogAndPrices = showLoading;
 
       _customCategoryNames.clear();
       for (final c in customKitchen) _customCategoryNames[c.id] = c.name;
@@ -2302,10 +2333,58 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           _cachedReviewCount = null;
           _lastReviewCacheKey = null;
           _loading = false;
-          _listDetailsHydrating = doHeavyHydration && list.isNotEmpty;
+          _listDetailsHydrating = primeCatalogAndPrices && list.isNotEmpty;
         });
         _techCardsById = {for (final tc in processedAll) tc.id: tc};
         _resolvedCostMemo.clear();
+        if (list.isNotEmpty) {
+          _TtkListMemoryCache.put(est, widget.department, list, _techCardsById);
+        }
+        if (list.isNotEmpty || primeCatalogAndPrices) {
+          final hydrateToken = ++_loadHydrateToken;
+          Future.microtask(() async {
+            try {
+              if (primeCatalogAndPrices) {
+                await productStore.loadProducts().catchError((_) {});
+                if (est.isBranch) {
+                  await productStore
+                      .loadNomenclatureForBranch(
+                          est.id, est.dataEstablishmentId!)
+                      .catchError((_) {});
+                } else {
+                  await productStore
+                      .loadNomenclature(est.dataEstablishmentId)
+                      .catchError((_) {});
+                }
+                if (!mounted || requestToken != _loadRequestToken) return;
+                await _buildNomenclatureNamePriceIndex(
+                  productStore,
+                  est.isBranch ? est.id : est.dataEstablishmentId,
+                );
+              }
+              if (!mounted || requestToken != _loadRequestToken) return;
+              await _hydrateEmptyIngredientsForLoadedCards(
+                svc,
+                requestToken: requestToken,
+              );
+              if (!mounted || requestToken != _loadRequestToken) return;
+              setState(() {
+                _resolvedCostMemo.clear();
+              });
+              if (_list.isNotEmpty) {
+                _TtkListMemoryCache.put(
+                    est, widget.department, _list, _techCardsById);
+              }
+            } catch (_) {
+            } finally {
+              if (mounted &&
+                  requestToken == _loadRequestToken &&
+                  hydrateToken == _loadHydrateToken) {
+                setState(() => _listDetailsHydrating = false);
+              }
+            }
+          });
+        }
         _rebuildPfCandidatesIndex(context.read<LocalizationService>());
         unawaited(_prefetchDishNameTranslationOverlay(processedAll));
         _ensureTechCardTranslations(svc, list);
@@ -2340,6 +2419,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           _cachedReviewCount = null;
           _lastReviewCacheKey = null;
         });
+        if (relisted.isNotEmpty) {
+          _TtkListMemoryCache.put(est, widget.department, relisted, _techCardsById);
+        }
       }).catchError((_) {}));
 
       if (toPersistSelfLink.isNotEmpty && mounted) {
@@ -2607,6 +2689,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       }
 
       if (toSave.isNotEmpty && mounted) {
+        _TtkListMemoryCache.invalidate();
         await _load(showLoading: false);
       }
     } catch (_) {
@@ -3275,48 +3358,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     return v.toString();
   }
 
-  void _showTtkBranchFilterPicker(
-    BuildContext context,
-    LocalizationService loc,
-    AccountManagerSupabase accountManager,
-    List<Establishment> branches,
-  ) {
-    final branchFilter = context.read<TtkBranchFilterService>();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('ttk_branch_display')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.store),
-              title: Text(loc.t('main_establishment_short')),
-              trailing: branchFilter.selectedBranchId == null
-                  ? const Icon(Icons.check, color: Colors.green)
-                  : null,
-              onTap: () async {
-                await branchFilter.setBranchFilter(null);
-                if (ctx.mounted) Navigator.of(ctx).pop();
-              },
-            ),
-            ...branches.map((b) => ListTile(
-                  leading: const Icon(Icons.account_tree),
-                  title: Text(b.name),
-                  trailing: branchFilter.selectedBranchId == b.id
-                      ? const Icon(Icons.check, color: Colors.green)
-                      : null,
-                  onTap: () async {
-                    await branchFilter.setBranchFilter(b.id);
-                    if (ctx.mounted) Navigator.of(ctx).pop();
-                  },
-                )),
-          ],
-        ),
-      ),
-    );
-  }
-
   /// Себестоимость видят руководство и управляющие.
   bool _canSeeCost(AccountManagerSupabase acc) {
     final emp = acc.currentEmployee;
@@ -3472,7 +3513,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         ? '/tech-cards/new?department=bar'
         : '/tech-cards/new';
     final needRefresh = await context.push<bool>(path);
-    if (mounted && needRefresh == true) _load(showLoading: false);
+    if (mounted && needRefresh == true) {
+      _TtkListMemoryCache.invalidate();
+      await _load(showLoading: false);
+    }
   }
 
   List<Widget> _buildAppBarActions(
@@ -3619,7 +3663,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     );
     final refreshWidget = IconButton(
         icon: const Icon(Icons.refresh),
-        onPressed: _loading ? null : _load,
+        onPressed: _loading ? null : _pullToRefresh,
         tooltip: loc.t('refresh'));
 
     final result = <Widget>[];
@@ -3792,7 +3836,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             children: [
               Text(errorText, textAlign: TextAlign.center),
               const SizedBox(height: 16),
-              FilledButton(onPressed: _load, child: Text(loc.t('refresh'))),
+              FilledButton(
+                  onPressed: _pullToRefresh, child: Text(loc.t('refresh'))),
             ],
           ),
         ),
@@ -3880,12 +3925,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     _ensureReviewCache(loc, reviewFiltered);
     final reviewCount = _cachedReviewCount ?? 0;
 
-    final acc = context.read<AccountManagerSupabase>();
-    final emp = acc.currentEmployee;
-    final showBranchFilter = (emp?.hasRole('executive_chef') == true ||
-            emp?.hasRole('sous_chef') == true) &&
-        acc.establishment?.isMain == true;
-
     final initialTabIndex =
         semiFinishedFiltered.isEmpty && dishFiltered.isNotEmpty ? 1 : 0;
     // Автоматический выбор первой вкладки (как раньше), но только один раз
@@ -3933,86 +3972,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     );
 
     final chromeChildren = <Widget>[
-      if (showBranchFilter)
-        FutureBuilder<List<Establishment>>(
-          future: acc.getBranchesForEstablishment(acc.establishment!.id),
-          builder: (ctx, snap) {
-            if (!snap.hasData || snap.data!.isEmpty)
-              return const SizedBox.shrink();
-            final branches = snap.data!;
-            return Consumer<TtkBranchFilterService>(
-              builder: (_, branchFilter, __) {
-                final selId = branchFilter.selectedBranchId;
-                final label = selId == null
-                    ? loc.t('main_establishment_short')
-                    : branches
-                            .where((b) => b.id == selId)
-                            .map((b) => b.name)
-                            .firstOrNull ??
-                        selId;
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-                  child: Row(
-                    children: [
-                      FilterChip(
-                        avatar: const Icon(Icons.account_tree, size: 18),
-                        label: Text(label),
-                        selected: selId != null,
-                        onSelected: (_) => _showTtkBranchFilterPicker(
-                            context, loc, acc, branches),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            );
-          },
-        ),
-      // Шапка: цех (подразделение) над вкладками ТТК/ПФ
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-        child: _ttkTourController != null
-            ? SpotlightTarget(
-                id: 'ttk-subdivision',
-                controller: _ttkTourController!,
-                child: Row(
-                  children: [
-                    Icon(Icons.business,
-                        size: 20, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${loc.t('ttk_section')}: ${_departmentHeaderLabel(loc)}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            : Row(
-                children: [
-                  Icon(Icons.business,
-                      size: 20, color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${loc.t('ttk_section')}: ${_departmentHeaderLabel(loc)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          ),
-                    ),
-                  ),
-                ],
-              ),
-      ),
       ClipRRect(
         borderRadius: BorderRadius.circular(12),
         clipBehavior: Clip.antiAlias,
@@ -4185,7 +4144,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       {bool isDishesTab = false, bool hasActiveFilters = false}) {
     if (techCards.isEmpty) {
       return RefreshIndicator(
-        onRefresh: _load,
+        onRefresh: _pullToRefresh,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(24),
@@ -4272,7 +4231,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         : '$costSym/${loc.t('kg')}';
 
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _pullToRefresh,
       child: CustomScrollView(
         slivers: [
           SliverPersistentHeader(
@@ -4381,7 +4340,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               path,
               extra: {'initialTechCard': tc},
             );
-            if (mounted && needRefresh == true) _load(showLoading: false);
+            if (mounted && needRefresh == true) {
+              _TtkListMemoryCache.invalidate();
+              await _load(showLoading: false);
+            }
           }
         },
         onLongPress: effectiveCanEdit && !_selectionMode
@@ -4390,7 +4352,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                   '/tech-cards/${tc.id}?view=1',
                   extra: {'initialTechCard': tc},
                 );
-                if (mounted && needRefresh == true) _load(showLoading: false);
+                if (mounted && needRefresh == true) {
+                  _TtkListMemoryCache.invalidate();
+                  await _load(showLoading: false);
+                }
               }
             : null,
         child: Padding(
