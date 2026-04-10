@@ -1833,16 +1833,27 @@ class _InventoryScreenState extends State<InventoryScreen>
         bottomNavigationBar: ValueListenableBuilder<int>(
           valueListenable: _inventoryLayoutPulse,
           builder: (ctx, _, __) {
-            final kbOpen = MediaQuery.viewInsetsOf(ctx).bottom > 0 ||
-                FocusManager.instance.primaryFocus != null;
-            if (kbOpen) {
+            final narrow = isHandheldNarrowLayout(ctx);
+            final landscape =
+                MediaQuery.of(ctx).orientation == Orientation.landscape;
+            final viewBottom = MediaQuery.viewInsetsOf(ctx).bottom;
+            // Только в узком альбоме при открытой клавиатуре убираем весь слот — чуть больше высоты под строки.
+            // В книжке не скрываем: иначе пропадает панель над клавиатурой, а «полоска» от системы/скaffold остаётся.
+            // Не используем primaryFocus: на вебе он true почти всегда при вводе и ломает футер и в портрете.
+            if (narrow && landscape && viewBottom > 0) {
               return const SizedBox.shrink();
             }
             final collapse = _inventoryCollapseLayout(ctx);
-            final keepFooterInLandscape = isHandheldNarrowLayout(ctx) &&
-                MediaQuery.of(ctx).orientation == Orientation.landscape &&
-                MediaQuery.viewInsetsOf(ctx).bottom == 0;
-            return _buildFooter(loc, collapse && !keepFooterInLandscape) ??
+            final keepFooterInLandscape = narrow &&
+                landscape &&
+                viewBottom == 0;
+            // Книжка на телефоне: «Завершить / Новая» всегда (в т.ч. при фокусе в ячейке).
+            final keepFooterInPortrait =
+                narrow && MediaQuery.of(ctx).orientation == Orientation.portrait;
+            final hideFooterChrome = collapse &&
+                !keepFooterInLandscape &&
+                !keepFooterInPortrait;
+            return _buildFooter(loc, hideFooterChrome) ??
                 const SizedBox.shrink();
           },
         ),
