@@ -414,6 +414,10 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                     flag: '🇹🇷',
                     label: loc.t('order_export_language_tr') ?? 'Türkçe',
                     onTap: () => Navigator.of(ctx).pop('tr')),
+                _LangButton(
+                    flag: '🇰🇿',
+                    label: loc.t('order_export_language_kk') ?? 'Қазақша',
+                    onTap: () => Navigator.of(ctx).pop('kk')),
               ],
             ),
           ],
@@ -503,33 +507,37 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
                     ),
                   ],
                   const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text('${loc.t('order_export_order_for')}: ',
-                          style: Theme.of(context).textTheme.bodyMedium),
-                      TextButton(
-                        onPressed: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: list.orderForDate ??
-                                DateTime.now().add(const Duration(days: 1)),
-                            firstDate: DateTime.now(),
-                            lastDate:
-                                DateTime.now().add(const Duration(days: 365)),
-                          );
-                          if (picked != null) {
-                            setState(() =>
-                                _list = _list!.copyWith(orderForDate: picked));
-                          }
-                        },
-                        child: Text(
-                          list.orderForDate != null
-                              ? DateFormat('dd.MM.yyyy')
-                                  .format(list.orderForDate!)
-                              : '${loc.t('order_export_order_for')}...',
-                        ),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: list.orderForDate ??
+                              DateTime.now().add(const Duration(days: 1)),
+                          firstDate: DateTime.now(),
+                          lastDate:
+                              DateTime.now().add(const Duration(days: 365)),
+                        );
+                        if (picked != null) {
+                          setState(() =>
+                              _list = _list!.copyWith(orderForDate: picked));
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
                       ),
-                    ],
+                      child: Text(
+                        list.orderForDate != null
+                            ? DateFormat('dd.MM.yyyy')
+                                .format(list.orderForDate!)
+                            : loc.t('order_list_when'),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Table(

@@ -28,6 +28,7 @@ class LocalizationService extends ChangeNotifier {
     Locale('ru', 'RU'),
     Locale('en', 'US'),
     Locale('es', 'ES'),
+    Locale('kk', 'KZ'),
     Locale('de', 'DE'),
     Locale('fr', 'FR'),
     Locale('it', 'IT'),
@@ -40,6 +41,7 @@ class LocalizationService extends ChangeNotifier {
     'ru',
     'en',
     'es',
+    'kk',
     'de',
     'fr',
     'it',
@@ -56,6 +58,8 @@ class LocalizationService extends ChangeNotifier {
         return '🇺🇸';
       case 'es':
         return '🇪🇸';
+      case 'kk':
+        return '🇰🇿';
       case 'it':
         return '🇮🇹';
       case 'tr':
@@ -447,6 +451,7 @@ class LocalizationService extends ChangeNotifier {
     'ru': 'Русский',
     'en': 'English',
     'es': 'Español',
+    'kk': 'Қазақша',
     'it': 'Italiano',
     'tr': 'Türkçe',
     'vi': 'Tiếng Việt',

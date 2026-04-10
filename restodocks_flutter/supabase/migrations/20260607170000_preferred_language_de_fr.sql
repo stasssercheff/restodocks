@@ -22,7 +22,7 @@ DECLARE
   v_pos text;
 BEGIN
   v_lang := lower(trim(coalesce(nullif(p_preferred_language, ''), 'ru')));
-  IF v_lang NOT IN ('ru', 'en', 'es', 'de', 'fr', 'it', 'tr', 'vi') THEN
+  IF v_lang NOT IN ('ru', 'en', 'es', 'kk', 'de', 'fr', 'it', 'tr', 'vi') THEN
     v_lang := 'ru';
   END IF;
 
@@ -146,7 +146,7 @@ BEGIN
   IF NOT FOUND THEN RETURN NULL; END IF;
 
   v_lang := lower(trim(coalesce(nullif(v_row.preferred_language, ''), 'ru')));
-  IF v_lang NOT IN ('ru', 'en', 'es', 'de', 'fr', 'it', 'tr', 'vi') THEN
+  IF v_lang NOT IN ('ru', 'en', 'es', 'kk', 'de', 'fr', 'it', 'tr', 'vi') THEN
     v_lang := 'ru';
   END IF;
 
@@ -266,7 +266,7 @@ BEGIN
     v_name := trim(coalesce(v_pending.full_name, ''));
     v_surname := nullif(trim(coalesce(v_pending.surname, '')), '');
     v_lang := lower(trim(coalesce(nullif(v_pending.preferred_language, ''), 'ru')));
-    IF v_lang NOT IN ('ru', 'en', 'es', 'de', 'fr', 'it', 'tr', 'vi') THEN v_lang := 'ru'; END IF;
+    IF v_lang NOT IN ('ru', 'en', 'es', 'kk', 'de', 'fr', 'it', 'tr', 'vi') THEN v_lang := 'ru'; END IF;
 
     IF v_pending.roles IS NOT NULL AND array_length(v_pending.roles, 1) > 0 THEN
       SELECT array_agg(DISTINCT x) INTO v_roles
