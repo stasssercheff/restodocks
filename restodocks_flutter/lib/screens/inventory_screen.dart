@@ -1822,11 +1822,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                 _qtyCellFocused));
   }
 
-  /// Узкий телефон + альбом + ввод: минимум вертикального хрома.
-  /// На **вебе** (Safari и др.) при открытой клавиатуре часто `viewInsets.bottom == 0`,
-  /// поэтому учитываем фокус в ячейке / поиске — иначе футер не убирается и таблицы не видно.
+  /// Альбом + ввод: минимум вертикального хрома.
+  /// На вебе (Safari и др.) `viewInsets.bottom` нередко остаётся 0, поэтому учитываем фокус.
   bool _inventoryKbLandscapeSquish(BuildContext context) {
-    if (!isHandheldNarrowLayout(context)) return false;
     if (MediaQuery.of(context).orientation != Orientation.landscape) {
       return false;
     }
@@ -1986,13 +1984,20 @@ class _InventoryScreenState extends State<InventoryScreen>
                             hideInfoRow: hideInfo,
                           ),
                         if (collapseLayout && !_completed && _rows.isNotEmpty)
-                          _inventoryKbLandscapeSquish(ctx) &&
+                          (_inventoryKbLandscapeSquish(ctx) &&
                                   _qtyCellFocused &&
-                                  !_nameFilterFocusNode.hasFocus
-                              ? _buildMicroSearchBar(loc)
+                                  !_nameFilterFocusNode.hasFocus)
+                              // Во время ввода в альбоме прячем строку поиска целиком,
+                              // чтобы оставить максимум высоты под таблицу.
+                              ? const SizedBox.shrink()
                               : _buildCompactSearchBar(loc),
                         if (!collapseLayout) const Divider(height: 1),
-                        if (collapseLayout && !_completed && _rows.isNotEmpty)
+                        if (collapseLayout &&
+                            !_completed &&
+                            _rows.isNotEmpty &&
+                            !(_inventoryKbLandscapeSquish(ctx) &&
+                                _qtyCellFocused &&
+                                !_nameFilterFocusNode.hasFocus))
                           const Divider(height: 1),
                       ],
                     );
