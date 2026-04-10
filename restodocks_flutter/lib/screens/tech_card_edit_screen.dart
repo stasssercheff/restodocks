@@ -6104,7 +6104,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   }
 }
 
-/// Закреп шапки таблицы состава при вертикальном скролле страницы; горизонталь синхронизирован с телом таблицы.
+/// Закреп шапки таблицы состава при вертикальном скролле страницы.
+/// Горизонталь — не второй ScrollView (один [ScrollController] может быть только у одного скролла),
+/// а сдвиг содержимого по [hScroll.offset] тела таблицы — как закреплённая строка в Excel.
 class _TtkCompositionPinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
   _TtkCompositionPinnedHeaderDelegate({
     required this.loc,
@@ -6131,10 +6133,31 @@ class _TtkCompositionPinnedHeaderDelegate extends SliverPersistentHeaderDelegate
       color: surfaceColor,
       elevation: overlapsContent ? 2 : 0,
       shadowColor: Colors.black26,
-      child: SingleChildScrollView(
-        controller: hScroll,
-        scrollDirection: Axis.horizontal,
-        child: ExcelStyleTtkTable.compositionPinnedHeader(loc),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: ClipRect(
+          child: AnimatedBuilder(
+            animation: hScroll,
+            builder: (context, child) {
+              final dx = hScroll.hasClients ? hScroll.offset : 0.0;
+              return Transform.translate(
+                offset: Offset(-dx, 0),
+                child: child,
+              );
+            },
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onHorizontalDragUpdate: (details) {
+                if (!hScroll.hasClients) return;
+                final p = hScroll.position;
+                final next = (p.pixels - details.delta.dx)
+                    .clamp(p.minScrollExtent, p.maxScrollExtent);
+                hScroll.jumpTo(next);
+              },
+              child: ExcelStyleTtkTable.compositionPinnedHeader(loc),
+            ),
+          ),
+        ),
       ),
     );
   }
