@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import '../utils/dev_log.dart';
@@ -37,6 +38,10 @@ class ExcelStyleTtkTable extends StatefulWidget {
   final void Function(double)? onTotalOutputChanged;
   /// При клике на ПФ-ингредиент — переход к просмотру ТТК ПФ.
   final void Function(String techCardId)? onTapPfIngredient;
+  /// Родитель скроллит страницу по вертикали — без вложенного вертикального скролла таблицы.
+  final bool shrinkWrap;
+  /// Шапка таблицы вынесена в [compositionPinnedHeader] (закреп над скроллом страницы).
+  final bool omitTableHeader;
 
   ExcelStyleTtkTable({
     super.key,
@@ -61,7 +66,66 @@ class ExcelStyleTtkTable extends StatefulWidget {
     this.onWeightPerPortionChanged,
     this.onTotalOutputChanged,
     this.onTapPfIngredient,
+    this.shrinkWrap = false,
+    this.omitTableHeader = false,
   });
+
+  /// Одна строка шапки состава (для закрепа над страницей; ширина как у таблицы).
+  static Widget compositionPinnedHeader(LocalizationService loc) {
+    Widget h(String key) => Container(
+          height: 44,
+          alignment: Alignment.center,
+          child: Text(
+            loc.t(key),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+        );
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 1145, maxWidth: 1145),
+      child: Table(
+        border: TableBorder.all(color: Colors.black, width: 1),
+        defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+        columnWidths: const {
+          0: FixedColumnWidth(50),
+          1: FixedColumnWidth(120),
+          2: FixedColumnWidth(160),
+          3: FixedColumnWidth(70),
+          4: FixedColumnWidth(80),
+          5: FixedColumnWidth(70),
+          6: FixedColumnWidth(80),
+          7: FixedColumnWidth(80),
+          8: FixedColumnWidth(70),
+          9: FixedColumnWidth(70),
+          10: FixedColumnWidth(75),
+          11: FixedColumnWidth(70),
+          12: FixedColumnWidth(70),
+          13: FixedColumnWidth(40),
+        },
+        children: [
+          TableRow(
+            decoration: BoxDecoration(color: Colors.grey.shade200),
+            children: [
+              h('ttk_type'),
+              h('ttk_name'),
+              h('ttk_product'),
+              h('ttk_gross_gr'),
+              h('ttk_waste_pct'),
+              h('ttk_net_gr'),
+              h('ttk_cooking_method'),
+              h('ttk_cooking_loss_pct'),
+              h('ttk_output_gr'),
+              h('ttk_weight_prc'),
+              h('ttk_portions_pcs'),
+              h('ttk_price'),
+              h('ttk_cost'),
+              h(''),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   State<ExcelStyleTtkTable> createState() => _ExcelStyleTtkTableState();
@@ -325,7 +389,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     // Подгрузка остальных строк в следующих кадрах — убирает задержку до первой реакции
     final totalRows = indexedRows.length;
-    if (_rowsToShow < totalRows) {
+    final displayRows = widget.shrinkWrap
+        ? totalRows
+        : math.min(_rowsToShow, totalRows);
+    if (!widget.shrinkWrap && _rowsToShow < totalRows) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         setState(() {
@@ -334,11 +401,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       });
     }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.vertical,
-        child: ConstrainedBox(
+    final mergedOverlayTop = widget.omitTableHeader ? 0.0 : 44.0;
+
+    final Widget tableCore = ConstrainedBox(
             constraints: const BoxConstraints(
               minWidth: 1145,
               maxWidth: 1145,
@@ -370,7 +435,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               13: FixedColumnWidth(40), // Удаление
             },
             children: [
-              // Шапка
+              if (!widget.omitTableHeader)
               TableRow(
                 decoration: BoxDecoration(color: Colors.grey.shade200),
                 children: [
@@ -391,7 +456,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 ],
               ),
               // Строки с данными — сначала первые N, остальные подгружаются в следующих кадрах
-              ...indexedRows.take(_rowsToShow).map((entry) {
+              ...indexedRows.take(displayRows).map((entry) {
                 final rowIndex = entry.key;
                 final ingredient = entry.value;
                 return TableRow(
@@ -587,9 +652,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   // Объединённая ячейка «Тип ТТК» — позиция и размеры по границам столбца 0
                   Positioned(
                     left: 0,
-                    top: 44,
+                    top: mergedOverlayTop,
                     width: 50,
-                    height: (_rowsToShow.clamp(0, indexedRows.length) * 44 + 2).toDouble(),
+                    height: (displayRows.clamp(0, indexedRows.length) * 44 + 2)
+                        .toDouble(),
                     child: Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -605,9 +671,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   // Объединённая ячейка «Название» — позиция и размеры по границам столбца 1
                   Positioned(
                     left: 50,  // граница между колонками 0 и 1
-                    top: 44,   // сразу под шапкой
+                    top: mergedOverlayTop,
                     width: 120,
-                    height: (_rowsToShow.clamp(0, indexedRows.length) * 44 + 2).toDouble(),
+                    height: (displayRows.clamp(0, indexedRows.length) * 44 + 2)
+                        .toDouble(),
                     child: Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -693,7 +760,16 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                 ),
             ],
           ),
-        ),
+        );
+
+    if (widget.shrinkWrap) {
+      return tableCore;
+    }
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.vertical,
+        child: tableCore,
       ),
     );
     } catch (e, stackTrace) {

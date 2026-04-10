@@ -19,7 +19,6 @@ import '../services/account_manager_supabase.dart';
 import '../services/home_button_config_service.dart';
 import '../services/page_tour_service.dart';
 import 'subscription_required_dialog.dart';
-import '../utils/layout_breakpoints.dart';
 
 const _kDataAccessRequiredPaths = [
   '/tech-cards',
@@ -303,8 +302,7 @@ class _AppShellState extends State<AppShell> {
     final hideForKeyboard = landscapeNarrow &&
         (keyboardOpen ||
             FocusManager.instance.primaryFocus != null);
-    // Веб на телефоне в альбоме: нижнюю панель не показываем вообще — иначе остаётся
-    // заметная «полоска»/обводка без нормального футера (Safari/Chrome).
+    // Веб на телефоне в альбоме: нижнюю панель не показываем — иначе остаётся полоска без футера.
     final hideNav = (kIsWeb && landscapeNarrow) ||
         (landscapeNarrow && (_hideBottomBar || hideForKeyboard));
     final bottomBarTotalHeight = navBarHeight + navBottomInset;

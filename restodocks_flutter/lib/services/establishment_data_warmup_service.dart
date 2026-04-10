@@ -154,6 +154,20 @@ class EstablishmentDataWarmupService {
     required TechCardServiceSupabase techCards,
     required List<String> scopeEstablishmentIds,
   }) async {
+    // Веб: не тянем `*, tt_ingredients(*)` на всё заведение при входе — только лёгкие строки tech_cards,
+    // страницами (меньше фриза главной и быстрее первый заход в ТТК).
+    if (kIsWeb) {
+      try {
+        final out = await techCards.loadAllTechCardsShallowFromNetworkPaged(
+          scopeEstablishmentIds,
+          pageSize: 100,
+        );
+        techCards.stashWebShallowPrefetchForScopes(scopeEstablishmentIds, out);
+        return out;
+      } catch (_) {
+        return [];
+      }
+    }
     final byId = <String, TechCard>{};
     for (final estId in scopeEstablishmentIds) {
       try {
@@ -215,6 +229,7 @@ class EstablishmentDataWarmupService {
   void resetSession() {
     _chain = Future<void>.value();
     TechCard.clearTranslationOverlay();
+    TechCardServiceSupabase().clearWebShallowPrefetch();
     EstablishmentLocalHydrationService.instance.stopPeriodicSync();
   }
 }
