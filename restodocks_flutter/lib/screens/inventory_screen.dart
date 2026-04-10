@@ -1822,13 +1822,25 @@ class _InventoryScreenState extends State<InventoryScreen>
                 _qtyCellFocused));
   }
 
-  /// Узкий телефон + альбом + клавиатура: минимум вертикального хрома, чтобы остались строки таблицы.
+  /// Узкий телефон + альбом + ввод: минимум вертикального хрома.
+  /// На **вебе** (Safari и др.) при открытой клавиатуре часто `viewInsets.bottom == 0`,
+  /// поэтому учитываем фокус в ячейке / поиске — иначе футер не убирается и таблицы не видно.
   bool _inventoryKbLandscapeSquish(BuildContext context) {
     if (!isHandheldNarrowLayout(context)) return false;
     if (MediaQuery.of(context).orientation != Orientation.landscape) {
       return false;
     }
-    return MediaQuery.viewInsetsOf(context).bottom > 0;
+    final viewBottom = MediaQuery.viewInsetsOf(context).bottom;
+    return viewBottom > 0 ||
+        _qtyCellFocused ||
+        _nameFilterFocusNode.hasFocus;
+  }
+
+  /// Оценка высоты клавиатуры, когда Flutter на вебе не даёт viewInsets (iOS Safari).
+  double _inventoryWebKeyboardGuessBottom(BuildContext context) {
+    if (!kIsWeb || !_qtyCellFocused) return 0;
+    final h = MediaQuery.sizeOf(context).shortestSide;
+    return h.clamp(260.0, 340.0);
   }
 
   double _inventorySectionHeaderHeight(BuildContext context) =>
@@ -1923,16 +1935,23 @@ class _InventoryScreenState extends State<InventoryScreen>
             final landscape =
                 MediaQuery.of(ctx).orientation == Orientation.landscape;
             final viewBottom = MediaQuery.viewInsetsOf(ctx).bottom;
-            // Только в узком альбоме при открытой клавиатуре убираем весь слот — чуть больше высоты под строки.
-            // В книжке не скрываем: иначе пропадает панель над клавиатурой, а «полоска» от системы/скaffold остаётся.
-            // Не используем primaryFocus: на вебе он true почти всегда при вводе и ломает футер и в портрете.
-            if (narrow && landscape && viewBottom > 0) {
+            final typingInTable = _qtyCellFocused || _nameFilterFocusNode.hasFocus;
+            // Узкий альбом: убираем футер при реальных insets **или** при фокусе ввода (веб часто даёт insets=0).
+            // В книжке на нативе футер оставляем при insets=0; на вебе при вводе в ячейку — тоже убираем (см. ниже).
+            if (narrow && landscape && (viewBottom > 0 || typingInTable)) {
+              return const SizedBox.shrink();
+            }
+            if (narrow &&
+                !landscape &&
+                _qtyCellFocused &&
+                (viewBottom > 0 || kIsWeb)) {
               return const SizedBox.shrink();
             }
             final collapse = _inventoryCollapseLayout(ctx);
             final keepFooterInLandscape = narrow &&
                 landscape &&
-                viewBottom == 0;
+                viewBottom == 0 &&
+                !typingInTable;
             // Книжка на телефоне: «Завершить / Новая» всегда (в т.ч. при фокусе в ячейке).
             final keepFooterInPortrait =
                 narrow && MediaQuery.of(ctx).orientation == Orientation.portrait;
@@ -2012,11 +2031,14 @@ class _InventoryScreenState extends State<InventoryScreen>
                 }
                 final theme = Theme.of(ctx);
                 final row = _rows[idx];
-                final kb = MediaQuery.viewInsetsOf(ctx).bottom;
+                final viewBottom = MediaQuery.viewInsetsOf(ctx).bottom;
+                final bottomPad = viewBottom > 0
+                    ? viewBottom
+                    : _inventoryWebKeyboardGuessBottom(ctx);
                 return Positioned(
                   left: 0,
                   right: 0,
-                  bottom: kb,
+                  bottom: bottomPad,
                   child: Material(
                     elevation: 8,
                     color: theme.colorScheme.surfaceContainerHigh,
