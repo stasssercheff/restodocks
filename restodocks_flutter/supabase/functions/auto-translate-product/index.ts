@@ -11,18 +11,10 @@ import {
 const DEEPL_URL = "https://api-free.deepl.com/v2/translate";
 const SUPPORTED_LANGS = ["ru", "en", "es", "kk", "tr", "vi"];
 
-function corsHeaders(origin: string | null) {
-  return {
-    "Access-Control-Allow-Origin": origin || "*",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  };
-}
-
-function jsonResponse(data: unknown, status = 200, origin: string | null = null) {
+function jsonResponse(req: Request, data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
+    headers: { ...resolveCorsHeaders(req), "Content-Type": "application/json" },
   });
 }
 
@@ -30,7 +22,7 @@ async function translateWithDeepL(
   text: string,
   sourceLang: string,
   targetLang: string,
-  deeplKey: string,
+  deeplKey: string | undefined,
   supabase: ReturnType<typeof createClient>,
 ): Promise<string | null> {
   if (!text.trim() || sourceLang.toUpperCase() === targetLang.toUpperCase()) return null;
@@ -53,11 +45,23 @@ async function translateWithDeepL(
     console.log("[auto-translate-product] Cache read skip:", (e as Error)?.message);
   }
 
-  // Запрашиваем DeepL
+  const key = deeplKey?.trim();
+  if (!key) {
+    const only = await translateWithMyMemory(text.trim(), src, targetLang.toLowerCase());
+    if (!only) return null;
+    try {
+      await supabase.from("translation_cache").upsert(
+        { source_text: text.trim(), source_lang: src, target_lang: tgt, translated: only },
+        { onConflict: "source_text,source_lang,target_lang" },
+      );
+    } catch (_) {}
+    return only;
+  }
+
   const res = await fetch(DEEPL_URL, {
     method: "POST",
     headers: {
-      "Authorization": `DeepL-Auth-Key ${deeplKey}`,
+      "Authorization": `DeepL-Auth-Key ${key}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ text: [text.trim()], source_lang: src, target_lang: tgt }),
@@ -65,7 +69,6 @@ async function translateWithDeepL(
 
   if (!res.ok) {
     console.error("[auto-translate-product] DeepL error:", res.status, await res.text());
-    // Fallback для языков без DeepL/при сетевых сбоях: MyMemory API (бесплатно, без ключа)
     const fallback = await translateWithMyMemory(text.trim(), src, targetLang.toLowerCase());
     if (fallback) return fallback;
     return null;
@@ -78,7 +81,6 @@ async function translateWithDeepL(
   }
   if (!translated) return null;
 
-  // Сохраняем в кэш (если таблица есть)
   try {
     await supabase.from("translation_cache").upsert(
       { source_text: text.trim(), source_lang: src, target_lang: tgt, translated },
@@ -113,11 +115,10 @@ async function translateWithMyMemory(text: string, src: string, tgt: string): Pr
 }
 
 Deno.serve(async (req: Request) => {
-  const origin = req.headers.get("Origin");
   const cors = resolveCorsHeaders(req);
 
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
-  if (req.method !== "POST") return jsonResponse({ error: "Method not allowed" }, 405, origin);
+  if (req.method !== "POST") return jsonResponse(req, { error: "Method not allowed" }, 405);
   const uid = await getAuthenticatedUserId(req);
   const isService = isServiceRoleRequest(req) || isServiceRoleBearer(req);
   if (!isService && !uid) {
@@ -126,9 +127,6 @@ Deno.serve(async (req: Request) => {
   if (!enforceRateLimit(req, "auto-translate-product", { windowMs: 60_000, maxRequests: 40 })) {
     return new Response(JSON.stringify({ error: "Too many requests" }), { status: 429, headers: { ...cors, "Content-Type": "application/json" } });
   }
-
-  const deeplKey = Deno.env.get("DEEPL_API_KEY")?.trim();
-  if (!deeplKey) return jsonResponse({ error: "DEEPL_API_KEY not set" }, 500, origin);
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -139,7 +137,12 @@ Deno.serve(async (req: Request) => {
   try {
     body = await req.json();
   } catch {
-    return jsonResponse({ error: "Invalid JSON" }, 400, origin);
+    return jsonResponse(req, { error: "Invalid JSON" }, 400);
+  }
+
+  const deeplKey = Deno.env.get("DEEPL_API_KEY")?.trim();
+  if (!deeplKey) {
+    console.warn("[auto-translate-product] DEEPL_API_KEY not set — using MyMemory only");
   }
 
   // Режим batch: переводим продукты постранично (limit/offset для обхода таймаута)
@@ -160,7 +163,7 @@ Deno.serve(async (req: Request) => {
       .order("name")
       .range(offset, offset + limit - 1);
 
-    if (error) return jsonResponse({ error: error.message }, 500, origin);
+    if (error) return jsonResponse(req, { error: error.message }, 500);
 
     let translated = 0;
     let skipped = 0;
@@ -171,19 +174,16 @@ Deno.serve(async (req: Request) => {
       const name = (product.name as string)?.trim();
       if (!name) { skipped++; continue; }
 
-      // Определяем исходный язык — берём первый заполненный ключ, иначе 'ru'
       const sourceLang = Object.keys(names).find(k => names[k]?.trim()) ?? "ru";
       const sourceText = names[sourceLang]?.trim() || name;
 
       let needsUpdate = false;
       const updatedNames: Record<string, string> = { ...names };
 
-      // Убеждаемся что исходный язык заполнен
       if (!updatedNames[sourceLang]) updatedNames[sourceLang] = sourceText;
 
       for (const targetLang of SUPPORTED_LANGS) {
         if (targetLang === sourceLang) continue;
-        // Пропускаем если уже переведено (если не force_langs)
         const skipExisting = !forceLangs.has(targetLang) &&
           updatedNames[targetLang]?.trim() && updatedNames[targetLang] !== sourceText;
         if (skipExisting) continue;
@@ -211,19 +211,17 @@ Deno.serve(async (req: Request) => {
         skipped++;
       }
 
-      // Небольшая пауза чтобы не перегружать DeepL
       if (translated % 50 === 0 && translated > 0) {
         await new Promise(r => setTimeout(r, 500));
       }
     }
 
     const batchSize = (products ?? []).length;
-    return jsonResponse({ translated, skipped, failed, batch_size: batchSize, offset, has_more: batchSize === limit }, 200, origin);
+    return jsonResponse(req, { translated, skipped, failed, batch_size: batchSize, offset, has_more: batchSize === limit }, 200);
   }
 
-  // Режим одного продукта: product_id
   const { product_id } = body;
-  if (!product_id) return jsonResponse({ error: "product_id or batch required" }, 400, origin);
+  if (!product_id) return jsonResponse(req, { error: "product_id or batch required" }, 400);
 
   console.log("[auto-translate-product] Processing product_id:", product_id);
 
@@ -233,11 +231,11 @@ Deno.serve(async (req: Request) => {
     .eq("id", product_id)
     .maybeSingle();
 
-  if (fetchError || !product) return jsonResponse({ error: "Product not found" }, 404, origin);
+  if (fetchError || !product) return jsonResponse(req, { error: "Product not found" }, 404);
 
   const names = ((product.names ?? {}) as Record<string, string>);
   const name = (product.name as string)?.trim();
-  if (!name) return jsonResponse({ skipped: true }, 200, origin);
+  if (!name) return jsonResponse(req, { skipped: true }, 200);
 
   const sourceLang = Object.keys(names).find(k => names[k]?.trim()) ?? "ru";
   const sourceText = names[sourceLang]?.trim() || name;
@@ -269,5 +267,5 @@ Deno.serve(async (req: Request) => {
   }
 
   console.log("[auto-translate-product] Done. needsUpdate:", needsUpdate);
-  return jsonResponse({ product_id, names: updatedNames, updated: needsUpdate }, 200, origin);
+  return jsonResponse(req, { product_id, names: updatedNames, updated: needsUpdate }, 200);
 });

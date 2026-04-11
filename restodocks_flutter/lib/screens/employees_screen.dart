@@ -376,7 +376,7 @@ class _EmployeeCard extends StatelessWidget {
     final sectionStr = (employee.department == 'kitchen' && employee.section != null && employee.section!.isNotEmpty)
         ? (loc.t('section_${employee.section}') != 'section_${employee.section}'
             ? loc.t('section_${employee.section}')
-            : (employee.sectionDisplayName ?? employee.section!))
+            : (employee.kitchenSection?.getLocalizedName(loc.currentLanguageCode) ?? employee.section!))
         : null;
     final deptLabel = loc.departmentDisplayName(employee.department) != employee.department
         ? loc.departmentDisplayName(employee.department)
@@ -501,7 +501,7 @@ class _EmployeeCard extends StatelessWidget {
     final sectionStr = (employee.department == 'kitchen' && employee.section != null && employee.section!.isNotEmpty)
         ? (loc.t('section_${employee.section}') != 'section_${employee.section}'
             ? loc.t('section_${employee.section}')
-            : (employee.sectionDisplayName ?? employee.section!))
+            : (employee.kitchenSection?.getLocalizedName(loc.currentLanguageCode) ?? employee.section!))
         : null;
     final deptLabel = loc.departmentDisplayName(employee.department) != employee.department
         ? loc.departmentDisplayName(employee.department)

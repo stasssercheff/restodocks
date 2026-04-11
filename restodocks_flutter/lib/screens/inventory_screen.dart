@@ -3215,7 +3215,9 @@ class _InventoryScreenState extends State<InventoryScreen>
       'employeeName': employee.fullName,
       'employeeRole': loc.tForLanguage(lang, roleKey) != roleKey
           ? loc.tForLanguage(lang, roleKey)
-          : (employee.roleDisplayName),
+          : loc.roleDisplayName(
+              employee.roles.isNotEmpty ? employee.roles.first : '',
+            ),
       'department': employee.department,
       'date':
           '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',

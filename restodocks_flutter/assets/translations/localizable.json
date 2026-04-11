@@ -2952,7 +2952,8 @@
     "admin_security_fw_col_time": "Время",
     "admin_security_gql_hint": "Cloudflare: {hint}",
     "admin_security_retry": "Обновить",
-    "admin_security_error": "Не удалось загрузить сводку: {error}"
+    "admin_security_error": "Не удалось загрузить сводку: {error}",
+    "department_all": "Все подразделения"
   },
   "en": {
     "app_name": "Restodocks",
@@ -5907,7 +5908,8 @@
     "admin_security_fw_col_time": "Time",
     "admin_security_gql_hint": "Cloudflare: {hint}",
     "admin_security_retry": "Refresh",
-    "admin_security_error": "Could not load snapshot: {error}"
+    "admin_security_error": "Could not load snapshot: {error}",
+    "department_all": "All departments"
   },
   "es": {
     "app_name": "Restodocks",
@@ -8846,7 +8848,8 @@
     "admin_security_fw_col_time": "Time",
     "admin_security_gql_hint": "Cloudflare: {hint}",
     "admin_security_retry": "Refresh",
-    "admin_security_error": "Could not load snapshot: {error}"
+    "admin_security_error": "Could not load snapshot: {error}",
+    "department_all": "Todos los departamentos"
   },
   "kk": {
     "app_name": "Restodocks",
@@ -9189,10 +9192,10 @@
     "department": "Department",
     "subdivision": "Subdivision",
     "department_required": "Department is required",
-    "department_kitchen": "Kitchen",
-    "department_bar": "Bar",
-    "department_dining_room": "Dining room",
-    "department_management": "Management",
+    "department_kitchen": "Ас үй",
+    "department_bar": "Бар",
+    "department_dining_room": "Қонақ залы",
+    "department_management": "Басқару",
     "kitchen": "Ас үй",
     "bar": "Бар",
     "dining_room": "Зал",
@@ -9723,8 +9726,8 @@
     "nomenclature_empty": "Nomenclature: empty",
     "error_navigation": "Navigation error: %s",
     "schedule_pick_role": "Roles",
-    "schedule_date": "Date",
-    "schedule_day": "Day",
+    "schedule_date": "Күні",
+    "schedule_day": "Апта күні",
     "schedule_shift": "Shift",
     "schedule_day_off": "Day off",
     "schedule_tap_hint": "Tap: shift/day off and time (for hourly pay)",
@@ -11803,7 +11806,8 @@
     "admin_security_fw_col_time": "Time",
     "admin_security_gql_hint": "Cloudflare: {hint}",
     "admin_security_retry": "Refresh",
-    "admin_security_error": "Could not load snapshot: {error}"
+    "admin_security_error": "Could not load snapshot: {error}",
+    "department_all": "Барлық бөлімдер"
   },
   "de": {
     "app_name": "Restodocks",
@@ -14719,7 +14723,8 @@
     "admin_security_fw_col_time": "Time",
     "admin_security_gql_hint": "Cloudflare: {hint}",
     "admin_security_retry": "Refresh",
-    "admin_security_error": "Could not load snapshot: {error}"
+    "admin_security_error": "Could not load snapshot: {error}",
+    "department_all": "Alle Bereiche"
   },
   "fr": {
     "app_name": "Restodocks",
@@ -17633,7 +17638,8 @@
     "admin_security_fw_col_time": "Time",
     "admin_security_gql_hint": "Cloudflare: {hint}",
     "admin_security_retry": "Refresh",
-    "admin_security_error": "Could not load snapshot: {error}"
+    "admin_security_error": "Could not load snapshot: {error}",
+    "department_all": "Tous les services"
   },
   "it": {
     "app_name": "Restodocks",
@@ -20572,7 +20578,8 @@
     "admin_security_fw_col_time": "Time",
     "admin_security_gql_hint": "Cloudflare: {hint}",
     "admin_security_retry": "Refresh",
-    "admin_security_error": "Could not load snapshot: {error}"
+    "admin_security_error": "Could not load snapshot: {error}",
+    "department_all": "Tutti i reparti"
   },
   "tr": {
     "app_name": "Yeniden stoklamalar",
@@ -23511,7 +23518,8 @@
     "admin_security_fw_col_time": "Time",
     "admin_security_gql_hint": "Cloudflare: {hint}",
     "admin_security_retry": "Refresh",
-    "admin_security_error": "Could not load snapshot: {error}"
+    "admin_security_error": "Could not load snapshot: {error}",
+    "department_all": "Tüm bölümler"
   },
   "vi": {
     "app_name": "Khôi phục lại",
@@ -26450,6 +26458,7 @@
     "admin_security_fw_col_time": "Time",
     "admin_security_gql_hint": "Cloudflare: {hint}",
     "admin_security_retry": "Refresh",
-    "admin_security_error": "Could not load snapshot: {error}"
+    "admin_security_error": "Could not load snapshot: {error}",
+    "department_all": "Tất cả bộ phận"
   }
 }

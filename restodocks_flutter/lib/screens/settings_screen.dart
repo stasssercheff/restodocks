@@ -28,6 +28,22 @@ bool _isPlatformAdminEmail(String email) =>
     _adminEmails.contains(email.toLowerCase().trim());
 
 /// Экран только настроек: язык, тема, валюта и т.д. Без данных профиля (профиль — отдельная кнопка).
+/// Суффикс подразделения для подписей плиток домашнего экрана (без хардкода all/kitchen на английском).
+String _homeLayoutBranchLabel(LocalizationService loc, String branch) {
+  switch (branch) {
+    case 'all':
+      return loc.t('department_all');
+    case 'kitchen':
+      return loc.t('department_kitchen');
+    case 'bar':
+      return loc.t('department_bar');
+    case 'hall':
+      return loc.t('department_dining_room');
+    default:
+      return branch;
+  }
+}
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -611,42 +627,89 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'owner_messages': loc.t('inbox_tab_messages') ?? 'Сообщения',
         'owner_inbox': loc.t('inbox'),
         'owner_employees': loc.t('employees'),
-        'owner_schedule_all': '${loc.t('schedule')} (all)',
-        'owner_schedule_kitchen': '${loc.t('schedule')} (kitchen)',
-        'owner_menu_kitchen': '${loc.t('menu')} (kitchen)',
+        'owner_schedule_all':
+            '${loc.t('schedule')} (${_homeLayoutBranchLabel(loc, 'all')})',
+        'owner_schedule_kitchen':
+            '${loc.t('schedule')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        'owner_menu_kitchen':
+            '${loc.t('menu')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
         'owner_ttk_kitchen': loc.t('ttk_kitchen'),
-        'owner_nomenclature_kitchen': '${loc.t('nomenclature')} (kitchen)',
-        if (posOn) 'owner_pos_orders_kitchen': '${loc.t('order_tab_orders')} (kitchen)',
-        if (posOn) 'owner_pos_sales_kitchen': '${loc.t('sales_title') ?? 'Продажи'} (kitchen)',
-        if (posOn) 'owner_pos_warehouse_kitchen': '${loc.t('pos_nav_warehouse') ?? 'Склад'} (kitchen)',
-        if (posOn) 'owner_pos_procurement_kitchen': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (kitchen)',
-        if (!posOn) 'owner_procurement_kitchen': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (kitchen)',
-        'owner_writeoffs_kitchen': '${loc.t('writeoffs') ?? 'Списания'} (kitchen)',
-        'owner_checklists_kitchen': '${loc.t('checklists')} (kitchen)',
+        'owner_nomenclature_kitchen':
+            '${loc.t('nomenclature')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        if (posOn)
+          'owner_pos_orders_kitchen':
+              '${loc.t('order_tab_orders')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        if (posOn)
+          'owner_pos_sales_kitchen':
+              '${loc.t('sales_title') ?? 'Продажи'} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        if (posOn)
+          'owner_pos_warehouse_kitchen':
+              '${loc.t('pos_nav_warehouse') ?? 'Склад'} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        if (posOn)
+          'owner_pos_procurement_kitchen':
+              '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        if (!posOn)
+          'owner_procurement_kitchen':
+              '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        'owner_writeoffs_kitchen':
+            '${loc.t('writeoffs') ?? 'Списания'} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        'owner_checklists_kitchen':
+            '${loc.t('checklists')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
         if (screenPref.showBarSection) ...{
-          'owner_schedule_bar': '${loc.t('schedule')} (bar)',
-          'owner_menu_bar': '${loc.t('menu')} (bar)',
+          'owner_schedule_bar':
+              '${loc.t('schedule')} (${_homeLayoutBranchLabel(loc, 'bar')})',
+          'owner_menu_bar':
+              '${loc.t('menu')} (${_homeLayoutBranchLabel(loc, 'bar')})',
           'owner_ttk_bar': loc.t('ttk_bar') ?? 'ТТК бара',
-          'owner_nomenclature_bar': '${loc.t('nomenclature')} (bar)',
-          if (posOn) 'owner_pos_orders_bar': '${loc.t('order_tab_orders')} (bar)',
-          if (posOn) 'owner_pos_sales_bar': '${loc.t('sales_title') ?? 'Продажи'} (bar)',
-          if (posOn) 'owner_pos_warehouse_bar': '${loc.t('pos_nav_warehouse') ?? 'Склад'} (bar)',
-          if (posOn) 'owner_pos_procurement_bar': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (bar)',
-          if (!posOn) 'owner_procurement_bar': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (bar)',
-          'owner_writeoffs_bar': '${loc.t('writeoffs') ?? 'Списания'} (bar)',
-          'owner_checklists_bar': '${loc.t('checklists')} (bar)',
+          'owner_nomenclature_bar':
+              '${loc.t('nomenclature')} (${_homeLayoutBranchLabel(loc, 'bar')})',
+          if (posOn)
+            'owner_pos_orders_bar':
+                '${loc.t('order_tab_orders')} (${_homeLayoutBranchLabel(loc, 'bar')})',
+          if (posOn)
+            'owner_pos_sales_bar':
+                '${loc.t('sales_title') ?? 'Продажи'} (${_homeLayoutBranchLabel(loc, 'bar')})',
+          if (posOn)
+            'owner_pos_warehouse_bar':
+                '${loc.t('pos_nav_warehouse') ?? 'Склад'} (${_homeLayoutBranchLabel(loc, 'bar')})',
+          if (posOn)
+            'owner_pos_procurement_bar':
+                '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'bar')})',
+          if (!posOn)
+            'owner_procurement_bar':
+                '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'bar')})',
+          'owner_writeoffs_bar':
+              '${loc.t('writeoffs') ?? 'Списания'} (${_homeLayoutBranchLabel(loc, 'bar')})',
+          'owner_checklists_bar':
+              '${loc.t('checklists')} (${_homeLayoutBranchLabel(loc, 'bar')})',
         },
         if (screenPref.showHallSection) ...{
-          'owner_schedule_hall': '${loc.t('schedule')} (hall)',
-          'owner_menu_hall': '${loc.t('menu')} (hall)',
-          'owner_checklists_hall': '${loc.t('checklists')} (hall)',
-          if (posOn) 'owner_pos_orders_hall': '${loc.t('order_tab_orders')} (hall)',
-          if (posOn) 'owner_pos_cash_hall': '${loc.t('pos_nav_cash_register') ?? 'Касса'} (hall)',
-          if (posOn) 'owner_pos_tables_hall': '${loc.t('pos_nav_tables') ?? 'Столы'} (hall)',
-          if (posOn) 'owner_pos_warehouse_hall': '${loc.t('pos_nav_warehouse') ?? 'Склад'} (hall)',
-          if (posOn) 'owner_pos_procurement_hall': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (hall)',
-          if (!posOn) 'owner_procurement_hall': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (hall)',
-          'owner_writeoffs_hall': '${loc.t('writeoffs') ?? 'Списания'} (hall)',
+          'owner_schedule_hall':
+              '${loc.t('schedule')} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          'owner_menu_hall':
+              '${loc.t('menu')} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          'owner_checklists_hall':
+              '${loc.t('checklists')} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          if (posOn)
+            'owner_pos_orders_hall':
+                '${loc.t('order_tab_orders')} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          if (posOn)
+            'owner_pos_cash_hall':
+                '${loc.t('pos_nav_cash_register') ?? 'Касса'} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          if (posOn)
+            'owner_pos_tables_hall':
+                '${loc.t('pos_nav_tables') ?? 'Столы'} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          if (posOn)
+            'owner_pos_warehouse_hall':
+                '${loc.t('pos_nav_warehouse') ?? 'Склад'} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          if (posOn)
+            'owner_pos_procurement_hall':
+                '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          if (!posOn)
+            'owner_procurement_hall':
+                '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          'owner_writeoffs_hall':
+              '${loc.t('writeoffs') ?? 'Списания'} (${_homeLayoutBranchLabel(loc, 'hall')})',
         },
         if (screenPref.showBanquetCatering) 'owner_banquet': loc.t('banquet_catering') ?? 'Банкет / Кейтринг',
         if (posOn) 'owner_pos_warehouse_est': loc.t('pos_warehouse_establishment_title') ?? 'Сводно по заведению',

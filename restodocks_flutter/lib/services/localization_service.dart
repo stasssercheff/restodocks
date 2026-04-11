@@ -381,9 +381,8 @@ class LocalizationService extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// Для [kk]: если в JSON строка ещё совпадает с `en` (нет отдельного перевода), показываем **en**,
-  /// затем **ru** — как у остальных локалей с дырками. Раньше подставляли только ru: при выборе «Қазақша»
-  /// интерфейс неожиданно становился русским.
+  /// Для [kk]: реальная строка kk → показываем её; если в JSON плейсхолдер совпадает с `en`,
+  /// сначала **ru** (кириллица ближе к ожиданиям в KZ), затем **en** — пока kk-блок не заполнен полностью.
   String? _kkResolveBase(String key) {
     final kkStr = _translations['kk']?[key];
     final enStr = _translations['en']?[key];
@@ -394,15 +393,15 @@ class LocalizationService extends ChangeNotifier {
         (enStr == null || kkStr.trim() != enStr.trim())) {
       return kkStr;
     }
-    if (enStr != null && enStr.isNotEmpty) return enStr;
     if (ruStr != null && ruStr.isNotEmpty) return ruStr;
+    if (enStr != null && enStr.isNotEmpty) return enStr;
     return kkStr;
   }
 
   String? _resolvedTranslationForLanguage(String languageCode, String key) {
     final lang = languageCode.trim().toLowerCase();
 
-    // kk: сначала база (kk ≠ en → kk, иначе en → ru), затем runtime-auto;
+    // kk: сначала база (kk ≠ en → kk, иначе ru → en), затем runtime-auto;
     // если в кэше автоперевода строка совпадает с en — не затираем базу.
     if (lang == 'kk') {
       final base = _kkResolveBase(key);
