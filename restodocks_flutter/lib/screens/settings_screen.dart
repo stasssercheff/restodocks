@@ -712,7 +712,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               '${loc.t('writeoffs') ?? 'Списания'} (${_homeLayoutBranchLabel(loc, 'hall')})',
         },
         if (screenPref.showBanquetCatering) 'owner_banquet': loc.t('banquet_catering') ?? 'Банкет / Кейтринг',
-        if (posOn) 'owner_pos_warehouse_est': loc.t('pos_warehouse_establishment_title') ?? 'Сводно по заведению',
+        if (posOn) 'owner_pos_warehouse_est': loc.t('pos_warehouse_establishment_title') ?? 'Сводная по заведению',
         'owner_expenses': loc.t('expenses'),
       };
       final hidden = Set<String>.from(layoutSvc.getHiddenKeys(emp.id));

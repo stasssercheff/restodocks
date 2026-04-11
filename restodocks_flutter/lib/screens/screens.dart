@@ -65,6 +65,8 @@ export 'pos/procurement_receiving_tab.dart';
 export 'procurement_receipt_inbox_detail_screen.dart';
 export 'procurement_price_approval_inbox_detail_screen.dart';
 export 'pos/pos_warehouse_hub_screen.dart';
+export 'pos/pos_sales_export_screen.dart';
+export 'pos/pos_establishment_product_summary_screen.dart';
 export 'pos/pos_operations_hub_screen.dart';
 export 'pos/pos_shift_report_screen.dart';
 export 'pos/pos_kitchen_display_screen.dart';

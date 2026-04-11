@@ -77,6 +77,27 @@ class PosWarehouseHubScreen extends StatelessWidget {
               icon: const Icon(Icons.inventory_2_outlined),
               label: Text(loc.t('pos_warehouse_open_inventory')),
             ),
+            if (isEstablishment) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () {
+                  final am = context.read<AccountManagerSupabase>();
+                  if (!am.hasProSubscription) {
+                    showSubscriptionRequiredDialog(context);
+                    return;
+                  }
+                  context.push('/pos/sales-export');
+                },
+                icon: const Icon(Icons.download_outlined),
+                label: Text(loc.t('pos_warehouse_open_sales_excel')),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => context.push('/pos/establishment-summary'),
+                icon: const Icon(Icons.summarize_outlined),
+                label: Text(loc.t('pos_warehouse_open_est_summary')),
+              ),
+            ],
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: () => context.push('/pos/stock'),

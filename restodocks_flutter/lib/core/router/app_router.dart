@@ -823,6 +823,20 @@ class AppRouter {
             },
           ),
           GoRoute(
+            path: '/pos/sales-export',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const PosSalesExportScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/pos/establishment-summary',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const PosEstablishmentProductSummaryScreen(),
+            ),
+          ),
+          GoRoute(
             path: '/pos/stock',
             pageBuilder: (context, state) => _slideTransitionPage(
               state,

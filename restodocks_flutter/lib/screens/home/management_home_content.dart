@@ -228,7 +228,7 @@ class ManagementHomeContent extends StatelessWidget {
             HomeFeatureTile(
                 icon: Icons.warehouse,
                 title: loc.t('pos_warehouse_establishment_title') ??
-                    'Сводно по заведению',
+                    'Сводная по заведению',
                 onTap: () => context.push('/pos/warehouse/establishment')),
           HomeFeatureTile(
               icon: Icons.savings,
