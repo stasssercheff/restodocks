@@ -337,7 +337,7 @@ class RestodocksApp extends StatelessWidget {
   /// Если текущая локаль не поддержана ими, даём fallback на en_US для Material/Cupertino delegate,
   /// сохраняя при этом язык интерфейса в нашем LocalizationService (ключи `loc.t(...)`).
   Locale _safeDelegateLocale(Locale locale) {
-    if (const FlutterQuillLocalizations.delegate.isSupported(locale)) {
+    if (FlutterQuillLocalizations.delegate.isSupported(locale)) {
       return locale;
     }
     return const Locale('en', 'US');
