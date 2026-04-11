@@ -109,6 +109,11 @@ class RealtimeSyncService {
     if (establishmentId == null || dataEstablishmentId == null) return;
     if (_syncInProgress) return;
 
+    // Полная перезагрузка ТТК с сервера — при событии realtime или возврате сети; иначе [refreshTechCardsFromServer]
+    // сама уважает TTL (после [runFullHydration] кэш уже свежий — без лишнего SELECT на initial_bind).
+    final forceTechCards = reason.startsWith('realtime') ||
+        reason.startsWith('connectivity');
+
     _syncInProgress = true;
     try {
       try {
@@ -122,8 +127,13 @@ class RealtimeSyncService {
       } catch (e) {
         devLog('RealtimeSyncService.syncNow($reason) catalog/nom: $e');
       }
-      unawaited(_techCards.refreshTechCardsFromServer(dataEstablishmentId));
-      if (!kIsWeb) {
+      unawaited(_techCards.refreshTechCardsFromServer(
+        dataEstablishmentId,
+        force: forceTechCards,
+      ));
+      // Периодический тик — только лёгкий каталог выше; тяжёлые снимки (чеклисты, сотрудники…)
+      // оставляем для realtime/сеть/первого bind и для [runBackgroundDeltaSync].
+      if (!kIsWeb && reason != 'periodic') {
         unawaited(
           EstablishmentLocalHydrationService.instance.runSnapshotsOnlySync(
             establishmentId: establishmentId,

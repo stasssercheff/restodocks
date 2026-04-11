@@ -32,6 +32,7 @@ import 'secure_storage_service.dart';
 import 'supabase_service.dart';
 import 'fcm_push_service.dart';
 import 'localization_service.dart';
+import 'ttk_branch_filter_service.dart';
 
 const _keyEmployeeId = 'restodocks_employee_id';
 const _keyEstablishmentId = 'restodocks_establishment_id';
@@ -59,7 +60,9 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Список сотрудников заведения в памяти (мобильный клиент): меньше повторных SELECT по экранам.
   final Map<String, ({DateTime at, List<Employee> list})> _employeesListCache = {};
-  static const _employeesCacheTtl = Duration(minutes: 20);
+
+  static Duration _employeesMemoryTtl() =>
+      kIsWeb ? const Duration(minutes: 20) : const Duration(hours: 6);
   Establishment? _establishment;
   Employee? _currentEmployee;
   bool _initialized = false;
@@ -440,6 +443,11 @@ class AccountManagerSupabase extends ChangeNotifier {
   Future<void> switchEstablishment(Establishment establishment) async {
     _establishment = establishment;
     await _secureStorage.set(_keyEstablishmentId, establishment.id);
+    unawaited(
+      TtkBranchFilterService().setBranchFilter(null).catchError((Object e) {
+        devLog('AccountManager: TtkBranchFilter clear on switch: $e');
+      }),
+    );
     unawaited(
       _bindRealtimeSync().catchError((Object e, StackTrace st) {
         devLog('🔐 AccountManager: _bindRealtimeSync after switch: $e $st');
@@ -1602,7 +1610,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       String establishmentId) async {
     final hit = _employeesListCache[establishmentId];
     if (hit != null &&
-        DateTime.now().difference(hit.at) <= _employeesCacheTtl) {
+        DateTime.now().difference(hit.at) <= _employeesMemoryTtl()) {
       return List<Employee>.from(hit.list);
     }
     try {

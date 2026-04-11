@@ -558,33 +558,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (ctx) => AlertDialog(
         title:
             Text(loc.t('ttk_branch_display') ?? 'Отображение ТТК по филиалам'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.store),
-              title: Text(loc.t('main_establishment') ?? 'Основное'),
-              trailing: branchFilter.selectedBranchId == null
-                  ? const Icon(Icons.check, color: Colors.green)
-                  : null,
-              onTap: () async {
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ...branches.map((b) => ListTile(
+                    leading: const Icon(Icons.account_tree),
+                    title: Text(b.name),
+                    trailing: branchFilter.selectedBranchId == b.id
+                        ? const Icon(Icons.check, color: Colors.green)
+                        : null,
+                    onTap: () async {
+                      await branchFilter.setBranchFilter(b.id);
+                      if (ctx.mounted) Navigator.of(ctx).pop();
+                    },
+                  )),
+            ],
+          ),
+        ),
+        actions: [
+          if (branchFilter.selectedBranchId != null)
+            TextButton(
+              onPressed: () async {
                 await branchFilter.setBranchFilter(null);
                 if (ctx.mounted) Navigator.of(ctx).pop();
               },
+              child: Text(loc.t('ttk_branch_filter_reset')),
             ),
-            ...branches.map((b) => ListTile(
-                  leading: const Icon(Icons.account_tree),
-                  title: Text(b.name),
-                  trailing: branchFilter.selectedBranchId == b.id
-                      ? const Icon(Icons.check, color: Colors.green)
-                      : null,
-                  onTap: () async {
-                    await branchFilter.setBranchFilter(b.id);
-                    if (ctx.mounted) Navigator.of(ctx).pop();
-                  },
-                )),
-          ],
-        ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+        ],
       ),
     );
   }
@@ -2172,8 +2177,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       builder: (_, branchFilter, __) {
                         final selId = branchFilter.selectedBranchId;
                         final name = selId == null
-                            ? (localization.t('main_establishment') ??
-                                'Основное')
+                            ? localization.t('ttk_branch_filter_current')
                             : branches
                                     .where((b) => b.id == selId)
                                     .map((b) => b.name)

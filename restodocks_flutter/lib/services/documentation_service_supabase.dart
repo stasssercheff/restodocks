@@ -17,7 +17,8 @@ class DocumentationServiceSupabase {
 
   static const _docsListDataset = 'establishment_documents_full';
   static const _docBodyDataset = 'establishment_document_body';
-  static const _docsCacheTtl = Duration(minutes: 15);
+  static Duration get _docsCacheTtl =>
+      kIsWeb ? const Duration(minutes: 15) : const Duration(hours: 4);
 
   /// Документы, видимые текущему сотруднику (по visibility)
   Future<List<EstablishmentDocument>> getDocumentsForEmployee(

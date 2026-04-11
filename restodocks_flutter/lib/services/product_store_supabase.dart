@@ -68,8 +68,10 @@ class ProductStoreSupabase {
 
   /// На iOS/Android держим данные в памяти/SharedPreferences и не дёргаем сеть на каждый экран,
   /// пока кэш не устарел (на web — чаще обновляем, там localStorage и ожидание сети дешевле для консистентности).
-  static const _mobileProductsCacheTtl = Duration(minutes: 20);
-  static const _mobileNomenclatureCacheTtl = Duration(minutes: 12);
+  static const _webProductsCacheTtl = Duration(minutes: 20);
+  static const _mobileProductsCacheTtl = Duration(hours: 24);
+  static const _webNomenclatureCacheTtl = Duration(minutes: 12);
+  static const _mobileNomenclatureCacheTtl = Duration(hours: 6);
 
   // Геттеры
   List<Product> get allProducts => _allProducts;
@@ -99,8 +101,10 @@ class ProductStoreSupabase {
           ..sort();
         _hasFullProductCatalog = true;
         _bumpCatalogRevision();
+        final ttl =
+            kIsWeb ? _webProductsCacheTtl : _mobileProductsCacheTtl;
         final bgSync = kIsWeb ||
-            !await _offlineCache.isKeyFresh(cacheKey, _mobileProductsCacheTtl);
+            !await _offlineCache.isKeyFresh(cacheKey, ttl);
         if (bgSync) {
           unawaited(_loadProductsFromServer());
         }
@@ -782,9 +786,9 @@ class ProductStoreSupabase {
       }
       // Web: ждём сеть — иначе при быстром переходе виден рассинхрон.
       // Mobile: при свежем локальном кэше не блокируем UI; устаревший — фоновое обновление.
-      if (!kIsWeb &&
-          await _offlineCache.isKeyFresh(
-              cacheKey, _mobileNomenclatureCacheTtl)) {
+      final nomTtl =
+          kIsWeb ? _webNomenclatureCacheTtl : _mobileNomenclatureCacheTtl;
+      if (!kIsWeb && await _offlineCache.isKeyFresh(cacheKey, nomTtl)) {
         return;
       }
       if (!kIsWeb) {
@@ -928,9 +932,9 @@ class ProductStoreSupabase {
         await _reloadNomenclatureForBranchFromServer(branchId, mainId);
         return;
       }
-      if (!kIsWeb &&
-          await _offlineCache.isKeyFresh(
-              cacheKey, _mobileNomenclatureCacheTtl)) {
+      final nomTtl =
+          kIsWeb ? _webNomenclatureCacheTtl : _mobileNomenclatureCacheTtl;
+      if (!kIsWeb && await _offlineCache.isKeyFresh(cacheKey, nomTtl)) {
         return;
       }
       if (!kIsWeb) {

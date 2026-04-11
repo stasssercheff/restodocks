@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 const _keyTtkBranchFilter = 'restodocks_ttk_branch_filter';
 
 /// Фильтр отображения ТТК по филиалам (для шефа основного заведения).
-/// null = основное заведение, иначе = ID филиала.
+/// null = данные текущего выбранного заведения; иначе — подсветка ТТК выбранного филиала.
 class TtkBranchFilterService extends ChangeNotifier {
   static final TtkBranchFilterService _instance = TtkBranchFilterService._internal();
   factory TtkBranchFilterService() => _instance;

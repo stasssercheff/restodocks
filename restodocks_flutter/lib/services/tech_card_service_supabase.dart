@@ -30,7 +30,9 @@ class TechCardServiceSupabase {
   static const _cacheDataset = 'tech_cards_v2';
   /// Лёгкий снимок списка (ингредиенты пустые) — всегда пишется с сети; список ТТК читается с диска офлайн.
   static const _shallowListDataset = 'tech_cards_list_shallow_v1';
-  static const _mobileTechCardsCacheTtl = Duration(minutes: 18);
+  /// Мобильный клиент: не дёргать полный SELECT ТТК на каждом таймере sync — только по TTL,
+  /// realtime или явному refresh; веб оставляем короче (см. ветки kIsWeb в getTechCards*).
+  static const _mobileTechCardsCacheTtl = Duration(hours: 8);
 
   /// Счётчик записей в офлайн-кэш ТТК (экран списка может тихо перезагрузиться).
   final ValueNotifier<int> persistentTechCardsCacheGeneration =
@@ -474,10 +476,23 @@ class TechCardServiceSupabase {
     } catch (_) {}
   }
 
-  /// Принудительное обновление с сервера (используется фоновым realtime-sync).
+  /// Обновление ТТК с сервера. [force] — всегда полный запрос (гидрация, ручной refresh).
+  /// Без [force] на мобильных при свежем снимке на диске возвращаем локальные данные без сети.
   Future<List<TechCard>> refreshTechCardsFromServer(
-    String establishmentId,
-  ) async {
+    String establishmentId, {
+    bool force = false,
+  }) async {
+    final id = establishmentId.trim();
+    if (id.isEmpty) return const [];
+    if (!force && !kIsWeb) {
+      final cacheKey = await _offlineCache.scopedKey(
+        dataset: _cacheDataset,
+        establishmentId: id,
+      );
+      if (await _offlineCache.isKeyFresh(cacheKey, _mobileTechCardsCacheTtl)) {
+        return getTechCardsForEstablishment(id, includeIngredients: true);
+      }
+    }
     return _fetchTechCardsFromServer(
       establishmentId,
       includeIngredients: true,

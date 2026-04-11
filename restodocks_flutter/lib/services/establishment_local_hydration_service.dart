@@ -217,7 +217,7 @@ class EstablishmentLocalHydrationService {
   Future<void> _hydrateTechCards(String dataEstablishmentId) async {
     try {
       await TechCardServiceSupabase()
-          .refreshTechCardsFromServer(dataEstablishmentId);
+          .refreshTechCardsFromServer(dataEstablishmentId, force: true);
     } catch (e) {
       devLog('EstablishmentLocalHydration: tech cards $e');
     }
@@ -331,8 +331,9 @@ class EstablishmentLocalHydrationService {
         dataset: _productsCacheDataset,
         establishmentId: 'global',
       );
-      final productTtl =
-          kIsWeb ? const Duration(minutes: 25) : const Duration(minutes: 120);
+      final productTtl = kIsWeb
+          ? const Duration(minutes: 25)
+          : const Duration(hours: 24);
       if (!await _offlineCache.isKeyFresh(pk, productTtl)) {
         await ps.loadProducts(force: true);
       }
@@ -343,7 +344,7 @@ class EstablishmentLocalHydrationService {
         suffix: 'main',
       );
       final nomTtl =
-          kIsWeb ? const Duration(minutes: 15) : const Duration(minutes: 60);
+          kIsWeb ? const Duration(minutes: 15) : const Duration(hours: 6);
       if (!await _offlineCache.isKeyFresh(nk, nomTtl)) {
         await ps.loadNomenclatureForce(dataId);
       }
