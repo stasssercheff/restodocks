@@ -1,14 +1,17 @@
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Кабинет платформенного администратора бэты.
-/// Вкладки: Дашборд, Промокоды, Заведения, Пользователи.
+/// Вкладки: Дашборд, Промокоды, Заведения, Пользователи, Поддержка, Безопасность.
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
 
@@ -24,7 +27,7 @@ class _AdminScreenState extends State<AdminScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 6, vsync: this);
   }
 
   @override
@@ -49,6 +52,7 @@ class _AdminScreenState extends State<AdminScreen>
             Tab(icon: const Icon(Icons.store_outlined), text: loc.t('admin_tab_establishments')),
             Tab(icon: const Icon(Icons.people_outline), text: loc.t('admin_tab_users')),
             Tab(icon: const Icon(Icons.support_agent_outlined), text: loc.t('admin_tab_support')),
+            Tab(icon: const Icon(Icons.shield_outlined), text: loc.t('admin_tab_security')),
           ],
           labelStyle: theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
         ),
@@ -61,6 +65,7 @@ class _AdminScreenState extends State<AdminScreen>
           _EstablishmentsTab(supabase: _supabase),
           _UsersTab(supabase: _supabase),
           _SupportTab(supabase: _supabase),
+          _SecurityTab(supabase: _supabase),
         ],
       ),
     );
@@ -2066,6 +2071,322 @@ class _SupportTabState extends State<_SupportTab> {
             child: Text(k, style: const TextStyle(fontSize: 13, color: Colors.grey)),
           ),
           Expanded(child: Text(v, style: const TextStyle(fontSize: 13))),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// БЕЗОПАСНОСТЬ (Edge: admin-security-snapshot)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _SecurityTab extends StatefulWidget {
+  const _SecurityTab({required this.supabase});
+  final SupabaseClient supabase;
+
+  @override
+  State<_SecurityTab> createState() => _SecurityTabState();
+}
+
+class _SecurityTabState extends State<_SecurityTab> {
+  Map<String, dynamic>? _payload;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final res = await widget.supabase.functions.invoke('admin-security-snapshot');
+      if (res.status != 200) {
+        setState(() {
+          _error = 'HTTP ${res.status}';
+          _loading = false;
+        });
+        return;
+      }
+      final data = res.data;
+      if (data is! Map) {
+        setState(() {
+          _error = 'Invalid response';
+          _loading = false;
+        });
+        return;
+      }
+      setState(() {
+        _payload = Map<String, dynamic>.from(data);
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  String _insightLine(
+    BuildContext context,
+    LocalizationService loc,
+    Map<String, dynamic> row,
+  ) {
+    final fmt = NumberFormat.decimalPattern(
+      Localizations.localeOf(context).toLanguageTag(),
+    );
+    switch (row['kind'] as String?) {
+      case 'traffic_volume':
+        final n = (row['requests24h'] as num?)?.toInt() ?? 0;
+        return loc.t('admin_security_insight_traffic_volume',
+            args: {'count': fmt.format(n)});
+      case 'waf_activity':
+        final b = (row['blocks'] as num?)?.toInt() ?? 0;
+        final c = (row['challenges'] as num?)?.toInt() ?? 0;
+        return loc.t('admin_security_insight_waf_activity',
+            args: {'blocks': '$b', 'challenges': '$c'});
+      case 'ip_noisy':
+        return loc.t('admin_security_insight_ip_noisy', args: {
+          'ip': '${row['ip'] ?? ''}',
+          'events': '${(row['events'] as num?)?.toInt() ?? 0}',
+        });
+      case 'probe_path':
+        return loc.t('admin_security_insight_probe_path',
+            args: {'path': '${row['pathSample'] ?? ''}'});
+      case 'db_attack_note':
+        return loc.t('admin_security_insight_db_note');
+      default:
+        return '${row['kind'] ?? '?'}';
+    }
+  }
+
+  Color _severityColor(ThemeData theme, String? sev) =>
+      sev == 'warning' ? theme.colorScheme.tertiary : theme.colorScheme.primary;
+
+  IconData _severityIcon(String? sev) =>
+      sev == 'warning' ? Icons.warning_amber_rounded : Icons.info_outline;
+
+  Future<void> _open(String url) async {
+    final u = Uri.tryParse(url);
+    if (u == null) return;
+    if (await canLaunchUrl(u)) {
+      await launchUrl(u, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
+    final theme = Theme.of(context);
+
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                loc.t('admin_security_error', args: {'error': _error!}),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: _load,
+                child: Text(loc.t('admin_security_retry')),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final p = _payload!;
+    final gen = p['generatedAt'] as String?;
+    final genLabel = gen != null
+        ? loc.t('admin_security_generated_at', args: {'date': gen})
+        : '';
+
+    final cloudflare = p['cloudflare'];
+    final cfConfigured = cloudflare is Map && cloudflare['configured'] == true;
+    final requests24h = cloudflare is Map ? cloudflare['requests24hApprox'] : null;
+    final fwEvents = cloudflare is Map && cloudflare['firewallEvents'] is List
+        ? List<Map<String, dynamic>>.from(
+            (cloudflare['firewallEvents'] as List)
+                .map((e) => Map<String, dynamic>.from(e as Map)),
+          )
+        : <Map<String, dynamic>>[];
+
+    final gqlErrors = cloudflare is Map && cloudflare['graphqlErrors'] is List
+        ? (cloudflare['graphqlErrors'] as List).map((e) => '$e').join('; ')
+        : '';
+
+    final insights = p['insights'] is List
+        ? List<Map<String, dynamic>>.from(
+            (p['insights'] as List)
+                .map((e) => Map<String, dynamic>.from(e as Map)),
+          )
+        : <Map<String, dynamic>>[];
+
+    final links = p['links'] is Map
+        ? Map<String, dynamic>.from(p['links'] as Map)
+        : <String, dynamic>{};
+
+    final topHint = p['hint'] as String?;
+
+    final fmt = NumberFormat.decimalPattern(
+      Localizations.localeOf(context).toLanguageTag(),
+    );
+    final reqStr = requests24h is num ? fmt.format(requests24h.round()) : '—';
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(loc.t('admin_security_intro'), style: theme.textTheme.bodyMedium),
+          if (genLabel.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(genLabel,
+                style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+          ],
+          const SizedBox(height: 20),
+          Text(
+            loc.t('admin_security_section_cloudflare'),
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          if (!cfConfigured)
+            Text(loc.t('admin_security_cf_not_configured'),
+                style: theme.textTheme.bodySmall)
+          else ...[
+            Text(
+              loc.t('admin_security_requests_approx_24h', args: {'count': reqStr}),
+              style: theme.textTheme.bodyMedium,
+            ),
+            if (gqlErrors.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                loc.t('admin_security_gql_hint', args: {'hint': gqlErrors}),
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error),
+              ),
+            ],
+          ],
+          const SizedBox(height: 16),
+          Text(
+            loc.t('admin_security_insights_title'),
+            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          ...insights.map((row) {
+            final sev = row['severity'] as String?;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    _severityIcon(sev),
+                    size: 20,
+                    color: _severityColor(theme, sev),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      _insightLine(context, loc, row),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          if (topHint != null && topHint.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              topHint,
+              style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange),
+            ),
+          ],
+          const SizedBox(height: 16),
+          Text(
+            loc.t('admin_security_fw_title'),
+            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          if (cfConfigured && fwEvents.isEmpty)
+            Text(loc.t('admin_security_fw_empty'), style: theme.textTheme.bodySmall)
+          else if (cfConfigured)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: DataTable(
+                headingRowHeight: 36,
+                dataRowMinHeight: 32,
+                dataRowMaxHeight: 48,
+                columns: [
+                  DataColumn(label: Text(loc.t('admin_security_fw_col_action'), style: const TextStyle(fontSize: 12))),
+                  DataColumn(label: Text(loc.t('admin_security_fw_col_ip'), style: const TextStyle(fontSize: 12))),
+                  DataColumn(label: Text(loc.t('admin_security_fw_col_path'), style: const TextStyle(fontSize: 12))),
+                  DataColumn(label: Text(loc.t('admin_security_fw_col_time'), style: const TextStyle(fontSize: 12))),
+                ],
+                rows: fwEvents.take(25).map((e) {
+                  final path = (e['clientRequestPath'] ?? '').toString();
+                  final short = path.length > 48 ? '${path.substring(0, 48)}…' : path;
+                  return DataRow(cells: [
+                    DataCell(Text('${e['action'] ?? '—'}', style: const TextStyle(fontSize: 12))),
+                    DataCell(Text('${e['clientIP'] ?? '—'}', style: const TextStyle(fontSize: 12))),
+                    DataCell(Tooltip(message: path, child: Text(short, style: const TextStyle(fontSize: 11)))),
+                    DataCell(Text('${e['datetime'] ?? '—'}', style: const TextStyle(fontSize: 11))),
+                  ]);
+                }).toList(),
+              ),
+            )
+          else
+            Text(loc.t('admin_security_fw_empty'), style: theme.textTheme.bodySmall),
+          const SizedBox(height: 20),
+          Text(
+            loc.t('admin_security_section_links'),
+            style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.cloud_outlined, size: 22),
+            title: Text(loc.t('admin_security_link_cf_analytics')),
+            onTap: () => _open('${links['cloudflareSecurity'] ?? ''}'),
+          ),
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.filter_alt_outlined, size: 22),
+            title: Text(loc.t('admin_security_link_cf_waf')),
+            onTap: () => _open('${links['cloudflareWaf'] ?? ''}'),
+          ),
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.receipt_long_outlined, size: 22),
+            title: Text(loc.t('admin_security_link_supabase_logs')),
+            onTap: () => _open('${links['supabaseLogs'] ?? ''}'),
+          ),
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.key_outlined, size: 22),
+            title: Text(loc.t('admin_security_link_supabase_auth')),
+            onTap: () => _open('${links['supabaseAuth'] ?? ''}'),
+          ),
         ],
       ),
     );

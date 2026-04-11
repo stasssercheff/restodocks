@@ -290,3 +290,27 @@ export async function getAuthenticatedUserId(req: Request): Promise<string | nul
     return null;
   }
 }
+
+/** Email текущего пользователя по JWT (для проверки прав платформенного админа). */
+export async function getAuthenticatedUserEmail(req: Request): Promise<string | null> {
+  const token = parseBearerToken(
+    req.headers.get("authorization") ?? req.headers.get("Authorization"),
+  );
+  if (!token) return null;
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
+  if (!supabaseUrl || !anonKey) return null;
+
+  try {
+    const authClient = createClient(supabaseUrl, anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await authClient.auth.getUser(token);
+    if (error || !data.user) return null;
+    const e = data.user.email?.trim().toLowerCase();
+    return e || null;
+  } catch {
+    return null;
+  }
+}
