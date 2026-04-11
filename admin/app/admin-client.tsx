@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PromoCode } from '@/lib/supabase'
+import type { Insight, SecuritySnapshotPayload } from '@/lib/security-snapshot'
 
 type SubscriptionSummary = {
   statusLabel: string
@@ -60,7 +61,7 @@ function promoRowStatus(row: PromoCode): 'disabled' | 'used' | 'expired' | 'free
 
 export default function AdminClient() {
   const router = useRouter()
-  const [tab, setTab] = useState<'establishments' | 'promo' | 'settings'>('establishments')
+  const [tab, setTab] = useState<'establishments' | 'promo' | 'security' | 'settings'>('establishments')
 
   async function logout() {
     await fetch('/api/auth', { method: 'DELETE' })
@@ -84,6 +85,7 @@ export default function AdminClient() {
           {([
             { key: 'establishments', label: 'Заведения' },
             { key: 'promo', label: 'Промокоды' },
+            { key: 'security', label: 'Безопасность' },
             { key: 'settings', label: 'Настройки' },
           ] as const).map(t => (
             <button
@@ -104,6 +106,7 @@ export default function AdminClient() {
       <main className="max-w-6xl mx-auto px-3 py-4 sm:px-6 sm:py-8">
         {tab === 'establishments' && <EstablishmentsTab />}
         {tab === 'promo' && <PromoTab />}
+        {tab === 'security' && <SecurityTab />}
         {tab === 'settings' && <PlatformSettingsTab />}
       </main>
     </div>
@@ -873,6 +876,217 @@ function PromoTab() {
         </>
       )}
     </>
+  )
+}
+
+// ─── Security Tab ─────────────────────────────────────────────────────────────
+
+function insightTextRu(i: Insight): string {
+  const nf = (n: number) => n.toLocaleString('ru-RU')
+  switch (i.kind) {
+    case 'traffic_volume':
+      return `За ~24 ч около ${nf(i.requests24h)} HTTP-запросов к зоне. Сравните с обычным днём: резкий рост часто совпадает с ботами или парсингом.`
+    case 'waf_activity':
+      return `Срабатывания WAF: блокировок ${i.blocks}, challenge ${i.challenges}. Возможны сканирование, перебор или нетипичный клиент — смотрите Security в Cloudflare.`
+    case 'ip_noisy':
+      return `IP ${i.ip} даёт ${i.events} событий в выборке — проверьте rate limit / правило для IP (возможен парсинг или скрипт).`
+    case 'probe_path':
+      return `В выборке есть запрос к подозрительному пути (${i.pathSample}) — похоже на сканирование уязвимостей.`
+    case 'db_attack_note':
+      return 'Прямой доступ к БД из интернета здесь обычно не виден: Postgres за закрытым API. Риски — через ключи и эндпоинты; полные логи Auth/Edge — в Supabase.'
+    default:
+      return ''
+  }
+}
+
+function SecurityTab() {
+  const [data, setData] = useState<SecuritySnapshotPayload | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    const res = await fetch('/api/security-snapshot')
+    const json = (await res.json()) as SecuritySnapshotPayload & { error?: string }
+    if (!res.ok) {
+      setError(typeof json?.error === 'string' ? json.error : 'Ошибка загрузки')
+      setData(null)
+    } else {
+      setData(json as SecuritySnapshotPayload)
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  if (loading) {
+    return <div className="p-12 text-center text-gray-500">Загрузка...</div>
+  }
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <p className="text-red-300 text-sm">{error}</p>
+        <button
+          type="button"
+          onClick={() => load()}
+          className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm font-medium"
+        >
+          Обновить
+        </button>
+      </div>
+    )
+  }
+  if (!data) return null
+
+  const cf = data.cloudflare
+  const reqStr =
+    typeof cf.requests24hApprox === 'number'
+      ? cf.requests24hApprox.toLocaleString('ru-RU')
+      : '—'
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <p className="text-gray-400 text-sm leading-relaxed">
+        Сводка периметра: трафик и WAF (Cloudflare, если заданы CLOUDFLARE_API_TOKEN и CLOUDFLARE_ZONE_ID в
+        секретах Worker), эвристики и ссылки в консоли. Полные сырые логи — в Cloudflare и Supabase.
+      </p>
+      <p className="text-gray-500 text-xs">Снимок: {data.generatedAt}</p>
+
+      <section>
+        <h2 className="text-base font-semibold text-white mb-2">Cloudflare</h2>
+        {!cf.configured ? (
+          <p className="text-gray-400 text-sm">
+            API Cloudflare не настроен. В Secrets/переменных Worker задайте CLOUDFLARE_API_TOKEN и
+            CLOUDFLARE_ZONE_ID (Analytics + Firewall Read) — появятся счётчик и события WAF. Опционально
+            CLOUDFLARE_ACCOUNT_ID — для прямых ссылок в дашборд.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-gray-200 text-sm">
+              Запросы (~24 ч): <span className="font-mono text-indigo-300">{reqStr}</span>
+            </p>
+            {cf.graphqlErrors && cf.graphqlErrors.length > 0 && (
+              <p className="text-amber-300/90 text-xs">{cf.graphqlErrors.join('; ')}</p>
+            )}
+          </div>
+        )}
+      </section>
+
+      {data.hint ? (
+        <p className="text-amber-200/90 text-sm border border-amber-800/50 rounded-lg p-3 bg-amber-950/20">
+          {data.hint}
+        </p>
+      ) : null}
+
+      <section>
+        <h2 className="text-base font-semibold text-white mb-3">Интерпретация</h2>
+        <ul className="space-y-3">
+          {data.insights.map((row, idx) => (
+            <li key={idx} className="flex gap-2 text-sm text-gray-300">
+              <span className="shrink-0" title={row.severity}>
+                {row.severity === 'warning' ? '⚠️' : 'ℹ️'}
+              </span>
+              <span>{insightTextRu(row)}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section>
+        <h2 className="text-base font-semibold text-white mb-2">События WAF (последние)</h2>
+        {!cf.configured || cf.firewallEvents.length === 0 ? (
+          <p className="text-gray-500 text-sm">
+            {cf.configured ? 'Нет событий в выборке или недоступно на тарифе/API.' : '—'}
+          </p>
+        ) : (
+          <div className="overflow-x-auto bg-gray-900 rounded-xl border border-gray-800">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-800 text-gray-500 text-left">
+                  <th className="px-3 py-2">Действие</th>
+                  <th className="px-3 py-2">IP</th>
+                  <th className="px-3 py-2">Путь</th>
+                  <th className="px-3 py-2">Время</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cf.firewallEvents.slice(0, 25).map((e, i) => {
+                  const path = (e.clientRequestPath ?? '').toString()
+                  const short = path.length > 56 ? `${path.slice(0, 56)}…` : path
+                  return (
+                    <tr key={i} className="border-b border-gray-800/60">
+                      <td className="px-3 py-2 text-gray-300">{e.action ?? '—'}</td>
+                      <td className="px-3 py-2 font-mono text-gray-400">{e.clientIP ?? '—'}</td>
+                      <td className="px-3 py-2 text-gray-400 max-w-[14rem] truncate" title={path}>
+                        {short || '—'}
+                      </td>
+                      <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{e.datetime ?? '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 className="text-base font-semibold text-white mb-2">Полные логи</h2>
+        <ul className="space-y-2 text-sm">
+          <li>
+            <a
+              href={data.links.cloudflareSecurity}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Cloudflare — Security / Analytics
+            </a>
+          </li>
+          <li>
+            <a
+              href={data.links.cloudflareWaf}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Cloudflare — WAF
+            </a>
+          </li>
+          <li>
+            <a
+              href={data.links.supabaseLogs}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Supabase — Logs
+            </a>
+          </li>
+          <li>
+            <a
+              href={data.links.supabaseAuth}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Supabase — Auth
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <button
+        type="button"
+        onClick={() => load()}
+        className="bg-gray-800 hover:bg-gray-700 border border-gray-700 px-4 py-2 rounded-lg text-sm"
+      >
+        Обновить данные
+      </button>
+    </div>
   )
 }
 

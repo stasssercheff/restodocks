@@ -60,10 +60,6 @@ verify_jwt = false
 [functions.auth-password-proxy]
 verify_jwt = false
 
-# admin-security-snapshot: только JWT платформенного админа (проверка внутри функции)
-[functions.admin-security-snapshot]
-verify_jwt = false
-
 # push-inbox-dispatch: Database Webhook → FCM; авторизация через PUSH_WEBHOOK_SECRET в заголовке
 [functions.push-inbox-dispatch]
 verify_jwt = false
