@@ -266,8 +266,8 @@ class LocalizationService extends ChangeNotifier {
                           title: Text(getLanguageName(locale.languageCode)),
                           selected: selected,
                           onTap: () async {
-                            await setLocale(locale, userChoice: true);
                             if (ctx.mounted) Navigator.of(ctx).pop();
+                            await setLocale(locale, userChoice: true);
                             final cb = afterApplied;
                             if (cb != null) {
                               await cb(locale.languageCode);
@@ -306,11 +306,19 @@ class LocalizationService extends ChangeNotifier {
         await prefs.setBool(prefsKeyLocaleUserSet, true);
       }
     } catch (_) {}
-    try {
-      await onAfterLocaleChanged?.call();
-      notifyListeners();
-    } catch (e, st) {
-      devLog('onAfterLocaleChanged: $e $st');
+    // Прогрев ТТК/продуктов после смены языка не должен блокировать UI (в т.ч. закрытие диалога выбора языка).
+    final after = onAfterLocaleChanged;
+    if (after != null) {
+      unawaited(Future<void>(() async {
+        try {
+          await after();
+        } catch (e, st) {
+          devLog('onAfterLocaleChanged: $e $st');
+        }
+        try {
+          notifyListeners();
+        } catch (_) {}
+      }));
     }
   }
 
@@ -381,8 +389,8 @@ class LocalizationService extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// Для [kk]: реальная строка kk → показываем её; если в JSON плейсхолдер совпадает с `en`,
-  /// сначала **ru** (кириллица ближе к ожиданиям в KZ), затем **en** — пока kk-блок не заполнен полностью.
+  /// Для [kk]: отдельный перевод в JSON → kk; если строка kk совпадает с en (плейсхолдер), подставляем **en**, затем **ru**.
+  /// Полноценный казахский интерфейс — только когда в `localizable.json` для kk заполнены свои строки (не копии en).
   String? _kkResolveBase(String key) {
     final kkStr = _translations['kk']?[key];
     final enStr = _translations['en']?[key];
@@ -393,15 +401,15 @@ class LocalizationService extends ChangeNotifier {
         (enStr == null || kkStr.trim() != enStr.trim())) {
       return kkStr;
     }
-    if (ruStr != null && ruStr.isNotEmpty) return ruStr;
     if (enStr != null && enStr.isNotEmpty) return enStr;
+    if (ruStr != null && ruStr.isNotEmpty) return ruStr;
     return kkStr;
   }
 
   String? _resolvedTranslationForLanguage(String languageCode, String key) {
     final lang = languageCode.trim().toLowerCase();
 
-    // kk: сначала база (kk ≠ en → kk, иначе ru → en), затем runtime-auto;
+    // kk: сначала база (kk ≠ en → kk, иначе en → ru), затем runtime-auto;
     // если в кэше автоперевода строка совпадает с en — не затираем базу.
     if (lang == 'kk') {
       final base = _kkResolveBase(key);

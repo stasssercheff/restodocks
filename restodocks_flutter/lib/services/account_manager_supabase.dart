@@ -2035,13 +2035,7 @@ class AccountManagerSupabase extends ChangeNotifier {
         return;
       }
     }
-    try {
-      final res = await _supabase.client.rpc(
-        'patch_my_employee_profile',
-        params: {
-          'p_patch': {'preferred_language': code},
-        },
-      );
+    Future<void> applyRpcOrRows(dynamic res, List<dynamic>? rows) async {
       if (fromReconcile) {
         _lastReconcilePreferredLanguageAt = DateTime.now();
         _lastReconcilePreferredLanguageCode = code;
@@ -2050,11 +2044,25 @@ class AccountManagerSupabase extends ChangeNotifier {
         final m = Map<String, dynamic>.from(res);
         m['password'] = m['password_hash'] ?? '';
         _currentEmployee = Employee.fromJson(m);
+      } else if (rows != null && rows.isNotEmpty) {
+        final m = Map<String, dynamic>.from(rows.first as Map);
+        m['password'] = m['password_hash'] ?? '';
+        _currentEmployee = Employee.fromJson(m);
       } else {
         _currentEmployee = emp.copyWith(preferredLanguage: code);
       }
       await LocalizationService().markLocaleChoiceFromAuthFlow();
       notifyListeners();
+    }
+
+    try {
+      final res = await _supabase.client.rpc(
+        'patch_my_employee_profile',
+        params: {
+          'p_patch': {'preferred_language': code},
+        },
+      );
+      await applyRpcOrRows(res, null);
     } catch (e, st) {
       if (e is PostgrestException) {
         devLog(
@@ -2063,6 +2071,19 @@ class AccountManagerSupabase extends ChangeNotifier {
         );
       } else {
         devLog('AccountManager: savePreferredLanguage error: $e $st');
+      }
+      // Fallback: прямой UPDATE по строке сотрудника (RLS), если RPC 400/др.
+      try {
+        final authId = _supabase.currentUser?.id;
+        if (authId == null) return;
+        final rows = await _supabase.client
+            .from('employees')
+            .update({'preferred_language': code})
+            .or('id.eq.$authId,auth_user_id.eq.$authId')
+            .select();
+        await applyRpcOrRows(null, rows);
+      } catch (e2, st2) {
+        devLog('AccountManager: savePreferredLanguage fallback UPDATE: $e2 $st2');
       }
     }
   }
