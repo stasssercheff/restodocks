@@ -36,16 +36,9 @@ import 'services/services.dart';
 import 'services/translation_manager.dart';
 import 'widgets/widgets.dart';
 
-/// Язык интерфейса из профиля сотрудника: хранится в учётной записи и совпадает на всех устройствах.
+/// Язык интерфейса из профиля сотрудника: при refresh сессии не затираем явный выбор на устройстве.
 Future<void> _applyLocaleFromEmployeeProfile(String profileLang) async {
-  final loc = LocalizationService();
-  final p = profileLang.trim().toLowerCase();
-  if (!LocalizationService.supportedLocales.any((l) => l.languageCode == p)) {
-    return;
-  }
-  if (loc.currentLanguageCode != p) {
-    await loc.setLocale(Locale(p));
-  }
+  await LocalizationService().reconcileServerPreferredLanguage(profileLang);
 }
 
 Future<void> main() async {
@@ -150,6 +143,10 @@ Future<void> _bootstrapApp() async {
   // Сначала переводы + сохранённая локаль (SharedPreferences), затем аккаунт.
   // Иначе загрузка профиля вызывает onPreferredLanguageLoaded и затирает язык из prefs.
   await LocalizationService.initialize();
+  LocalizationService.onPinnedLocaleNeedsServerSync = (code) async {
+    await AccountManagerSupabase()
+        .savePreferredLanguage(code, fromReconcile: true);
+  };
   await AccountManagerSupabase().initialize();
 
   // Оверлей переводов ТТК не сбрасываем при смене языка — слои по языкам копятся локально; догрузка — в onAfterLocaleChanged.
@@ -173,7 +170,7 @@ Future<void> _bootstrapApp() async {
     );
   };
 
-  // При загрузке профиля: язык из БД + локальный выбор (prefs не затираем языком из БД).
+  // При загрузке профиля: язык из БД, но не поверх явного выбора в настройках (см. reconcile).
   AccountManagerSupabase().onPreferredLanguageLoaded = (langCode) {
     unawaited(_applyLocaleFromEmployeeProfile(langCode));
   };

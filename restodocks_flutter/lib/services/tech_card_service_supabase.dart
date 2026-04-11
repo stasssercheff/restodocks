@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show ValueNotifier, kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/dev_log.dart';
 
@@ -28,7 +28,17 @@ class TechCardServiceSupabase {
 
   /// v2: раньше shallow-лист перезаписывал этот кэш без ингредиентов — меняем префикс, чтобы сбросить битые снимки.
   static const _cacheDataset = 'tech_cards_v2';
+  /// Лёгкий снимок списка (ингредиенты пустые) — всегда пишется с сети; список ТТК читается с диска офлайн.
+  static const _shallowListDataset = 'tech_cards_list_shallow_v1';
   static const _mobileTechCardsCacheTtl = Duration(minutes: 18);
+
+  /// Счётчик записей в офлайн-кэш ТТК (экран списка может тихо перезагрузиться).
+  final ValueNotifier<int> persistentTechCardsCacheGeneration =
+      ValueNotifier<int>(0);
+
+  void _bumpPersistentTechCardsCache() {
+    persistentTechCardsCacheGeneration.value++;
+  }
 
   /// Веб: снимок shallow-списка после [EstablishmentDataWarmupService], чтобы экран ТТК не качал то же снова.
   List<TechCard>? _webShallowPrefetch;
@@ -195,54 +205,107 @@ class TechCardServiceSupabase {
   }
 
   /// Получение всех ТТК для заведения (один запрос с ингредиентами — без N+1).
-  /// При 0 карточек или ошибке — fallback без tt_ingredients (ингредиенты подгрузятся при открытии).
+  /// Кэш-first + офлайн: список без состава читается с диска; полный снимок — отдельный ключ.
   Future<List<TechCard>> getTechCardsForEstablishment(
     String establishmentId, {
     bool includeIngredients = true,
   }) async {
+    final id = establishmentId.trim();
+    if (id.isEmpty) return const [];
+
     final cacheKey = await _offlineCache.scopedKey(
       dataset: _cacheDataset,
-      establishmentId: establishmentId,
+      establishmentId: id,
     );
+    final shallowKey = await _offlineCache.scopedKey(
+      dataset: _shallowListDataset,
+      establishmentId: id,
+    );
+
+    List<TechCard> mapRows(List<dynamic> raw) => raw
+        .map((e) => TechCard.fromJson(Map<String, dynamic>.from(e as Map)))
+        .toList();
+
+    // Режим списка: сначала лёгкий кэш, затем полный снимок, затем сеть.
+    if (!includeIngredients) {
+      final shallowRaw = await _offlineCache.readJsonList(shallowKey);
+      if (shallowRaw != null && shallowRaw.isNotEmpty) {
+        final cards = mapRows(shallowRaw);
+        final skipBg = !kIsWeb &&
+            await _offlineCache.isKeyFresh(shallowKey, _mobileTechCardsCacheTtl);
+        if (!skipBg) {
+          unawaited(_refreshTechCardsCache(id, includeIngredients: false));
+        }
+        return cards;
+      }
+
+      final fullRaw = await _offlineCache.readJsonList(cacheKey);
+      if (fullRaw != null && fullRaw.isNotEmpty) {
+        final cards = mapRows(fullRaw);
+        unawaited(_saveShallowListCache(id, cards));
+        final skipBg = !kIsWeb &&
+            await _offlineCache.isKeyFresh(cacheKey, _mobileTechCardsCacheTtl);
+        if (!skipBg) {
+          unawaited(_refreshTechCardsCache(id, includeIngredients: true));
+        }
+        return cards;
+      }
+
+      try {
+        return await _fetchTechCardsFromServer(id, includeIngredients: false);
+      } catch (e) {
+        devLog('getTechCardsForEstablishment(shallow) offline/network: $e');
+        return const [];
+      }
+    }
+
     final cached = await _offlineCache.readJsonList(cacheKey);
     if (cached != null && cached.isNotEmpty) {
-      // Старый кэш сохранял toJson() без ingredients → fromJson давал пустой состав (фудкост/себестоимость).
-      if (includeIngredients) {
-        try {
-          final first = Map<String, dynamic>.from(cached.first as Map);
-          if (!first.containsKey('ingredients')) {
-            return _fetchTechCardsFromServer(
-              establishmentId,
-              includeIngredients: true,
-            );
+      try {
+        final first = Map<String, dynamic>.from(cached.first as Map);
+        if (!first.containsKey('ingredients')) {
+          try {
+            return await _fetchTechCardsFromServer(id, includeIngredients: true);
+          } catch (e) {
+            devLog('getTechCardsForEstablishment: full upgrade failed $e');
+            return mapRows(cached);
           }
-        } catch (_) {
-          return _fetchTechCardsFromServer(
-            establishmentId,
-            includeIngredients: includeIngredients,
-          );
+        }
+      } catch (_) {
+        try {
+          return await _fetchTechCardsFromServer(id, includeIngredients: true);
+        } catch (e) {
+          devLog('getTechCardsForEstablishment: cache parse, fetch failed $e');
+          final shallowRaw = await _offlineCache.readJsonList(shallowKey);
+          if (shallowRaw != null && shallowRaw.isNotEmpty) {
+            return mapRows(shallowRaw);
+          }
+          return const [];
         }
       }
-      var cachedCards = cached
-          .map((e) => TechCard.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList();
-      if (includeIngredients &&
-          cachedCards.any((c) => c.ingredients.isEmpty)) {
+      var cachedCards = mapRows(cached);
+      if (cachedCards.any((c) => c.ingredients.isEmpty)) {
         cachedCards = await _mergeBulkIngredientFill(cachedCards);
-        await _saveTechCardsCache(establishmentId, cachedCards);
+        await _saveTechCardsCache(id, cachedCards);
       }
       final skipBgRefresh = !kIsWeb &&
           await _offlineCache.isKeyFresh(cacheKey, _mobileTechCardsCacheTtl);
       if (!skipBgRefresh) {
-        unawaited(
-            _refreshTechCardsCache(establishmentId, includeIngredients: true));
+        unawaited(_refreshTechCardsCache(id, includeIngredients: true));
       }
       return cachedCards;
     }
-    return _fetchTechCardsFromServer(
-      establishmentId,
-      includeIngredients: includeIngredients,
-    );
+
+    try {
+      return await _fetchTechCardsFromServer(id, includeIngredients: true);
+    } catch (e) {
+      devLog('getTechCardsForEstablishment(full) offline/network: $e');
+      final shallowRaw = await _offlineCache.readJsonList(shallowKey);
+      if (shallowRaw != null && shallowRaw.isNotEmpty) {
+        return mapRows(shallowRaw);
+      }
+      return const [];
+    }
   }
 
   /// Снимок списка ТТК в SharedPreferences (v2). Очистка — перед принудительным обновлением на веб.
@@ -256,6 +319,11 @@ class TechCardServiceSupabase {
         establishmentId: id,
       );
       await _offlineCache.removeKey(key);
+      final shallowKey = await _offlineCache.scopedKey(
+        dataset: _shallowListDataset,
+        establishmentId: id,
+      );
+      await _offlineCache.removeKey(shallowKey);
     } catch (_) {}
   }
 
@@ -361,12 +429,16 @@ class TechCardServiceSupabase {
           .order('created_at', ascending: false);
 
       if (!includeIngredients) {
-        // В shallow-режиме ингредиенты не загружаем: догрузка в UI / bulk.
-        // Не пишем в общий офлайн-кэш — иначе перетираем полный снимок «пустыми» строками.
+        // Лёгкий запрос: пишем только shallow-кэш (полный tech_cards_v2 не трогаем).
         final list = (data as List)
             .map((row) =>
                 TechCard.fromJson(Map<String, dynamic>.from(row as Map)))
             .toList();
+        try {
+          await _saveShallowListCache(establishmentId, list);
+        } catch (e) {
+          devLog('TechCardServiceSupabase: shallow cache write failed: $e');
+        }
         return list;
       }
 
@@ -412,6 +484,19 @@ class TechCardServiceSupabase {
     );
   }
 
+  Future<void> _saveShallowListCache(
+      String establishmentId, List<TechCard> list) async {
+    final key = await _offlineCache.scopedKey(
+      dataset: _shallowListDataset,
+      establishmentId: establishmentId,
+    );
+    await _offlineCache.writeJsonList(
+      key,
+      list.map((e) => e.copyWith(ingredients: const []).toJson()).toList(),
+    );
+    _bumpPersistentTechCardsCache();
+  }
+
   Future<void> _saveTechCardsCache(
       String establishmentId, List<TechCard> list) async {
     final key = await _offlineCache.scopedKey(
@@ -422,6 +507,7 @@ class TechCardServiceSupabase {
       key,
       list.map((e) => e.toJson()).toList(),
     );
+    await _saveShallowListCache(establishmentId, list);
   }
 
   /// Парсинг списка ТТК из ответа с вложенными tt_ingredients.

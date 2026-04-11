@@ -336,6 +336,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   bool _ttkInitialBootstrapDone = false;
   Animation<double>? _ttkRouteAnimation;
 
+  void _onPersistentTechCardsOfflineCacheBump() {
+    if (!mounted) return;
+    unawaited(_load(showLoading: false));
+  }
+
   @override
   void initState() {
     super.initState();
@@ -371,6 +376,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     };
     LocalizationService().addListener(_localizationPrefetchListener);
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowTtkTour());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || kIsWeb) return;
+      TechCardServiceSupabase().persistentTechCardsCacheGeneration
+          .addListener(_onPersistentTechCardsOfflineCacheBump);
+    });
     _scheduleTtkBootstrapAfterRoute();
   }
 
@@ -717,6 +727,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   @override
   void dispose() {
+    if (!kIsWeb) {
+      TechCardServiceSupabase().persistentTechCardsCacheGeneration
+          .removeListener(_onPersistentTechCardsOfflineCacheBump);
+    }
     _detachTtkRouteListener();
     LocalizationService().removeListener(_localizationPrefetchListener);
     _searchDebounceTimer?.cancel();

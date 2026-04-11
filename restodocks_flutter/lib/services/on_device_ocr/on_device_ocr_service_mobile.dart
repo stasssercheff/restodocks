@@ -9,13 +9,11 @@ import 'ocr_reading_order.dart';
 
 /// Распознавание текста на устройстве без вызова облачных LLM.
 ///
-/// iOS: Apple Vision с приоритетом [ru-RU] (кириллица), затем упорядочивание блоков.
-/// Android: Google ML Kit (латиница + частично кириллица) и тот же порядок строк.
+/// Только **iOS**: Apple Vision с приоритетом [ru-RU] и упорядочивание блоков.
+/// Android и веб отключены до появления нормального распознавания (например через ИИ).
 class OnDeviceOcrService {
   static bool get isSupported =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.android ||
-          defaultTargetPlatform == TargetPlatform.iOS);
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
   /// Возвращает сырой текст или null при ошибке / пустом результате.
   Future<String?> extractTextFromImageBytes(Uint8List imageBytes) async {

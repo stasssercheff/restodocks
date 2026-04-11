@@ -104,6 +104,10 @@ class LocalizationService extends ChangeNotifier {
   /// После смены локали: перезагрузка оверлея названий ТТК для нового языка (не импортировать тяжёлые сервисы сюда).
   static Future<void> Function()? onAfterLocaleChanged;
 
+  /// Если локаль закреплена на устройстве, а в `employees.preferred_language` ещё старое значение —
+  /// догнать сервер (вызывается из [reconcileServerPreferredLanguage]).
+  static Future<void> Function(String languageCode)? onPinnedLocaleNeedsServerSync;
+
   void setTranslationManager(TranslationManager manager) {
     _translationManager = manager;
   }
@@ -310,17 +314,77 @@ class LocalizationService extends ChangeNotifier {
     }
   }
 
-  /// Для [kk]: пока в JSON строка совпадает с английской (копия из `en`), показываем **ru** —
-  /// иначе весь UI выглядит как английский. Явно переведённые ключи (`kk` ≠ `en`) остаются казахскими.
-  String? _resolvedTranslationForLanguage(String languageCode, String key) {
-    final auto = _autoUiTranslations[languageCode]?[key];
-    if (auto != null && auto.isNotEmpty) return auto;
+  /// Согласовать [serverLanguageCode] из профиля с локалью без «отката» при refresh сессии.
+  ///
+  /// После выбора языка в настройках выставляется [prefsKeyLocaleUserSet]. Пока он true,
+  /// строка из БД не перезаписывает устройство, если отличается (устаревший `preferred_language`);
+  /// вместо этого вызывается [onPinnedLocaleNeedsServerSync], чтобы снова записать выбор в БД.
+  Future<void> reconcileServerPreferredLanguage(String serverLanguageCode) async {
+    final p = serverLanguageCode.trim().toLowerCase();
+    if (!supportedLocales.any((l) => l.languageCode == p)) return;
 
-    final lang = languageCode.trim().toLowerCase();
-    if (lang != 'kk') {
-      return _translations[languageCode]?[key] ?? _translations['en']?[key];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final pinned = prefs.getBool(prefsKeyLocaleUserSet) == true;
+      var saved = prefs.getString(prefsKeyLocale)?.trim().toLowerCase();
+
+      // Явный выбор языка уже закреплён, но prefs ещё не успели записаться — не откатывать на серверный ru.
+      if (pinned && (saved == null || saved.isEmpty)) {
+        final cur = currentLanguageCode.trim().toLowerCase();
+        if (supportedLocales.any((l) => l.languageCode == cur)) {
+          saved = cur;
+          try {
+            await prefs.setString(prefsKeyLocale, saved);
+          } catch (_) {}
+        }
+      }
+
+      if (pinned && saved != null && saved.isNotEmpty) {
+        final savedSupported =
+            supportedLocales.any((l) => l.languageCode == saved);
+        if (!savedSupported) {
+          if (currentLanguageCode != p) {
+            await setLocale(Locale(p));
+          }
+          return;
+        }
+        if (saved == p) {
+          if (currentLanguageCode != saved) {
+            await setLocale(Locale(saved));
+          }
+          return;
+        }
+        if (currentLanguageCode != saved) {
+          await setLocale(Locale(saved));
+        }
+        try {
+          await onPinnedLocaleNeedsServerSync?.call(saved);
+        } catch (e, st) {
+          devLog('onPinnedLocaleNeedsServerSync: $e $st');
+        }
+        return;
+      }
+
+      if (currentLanguageCode != p) {
+        await setLocale(Locale(p));
+      }
+    } catch (e, st) {
+      devLog('reconcileServerPreferredLanguage: $e $st');
     }
+  }
 
+  /// Сброс закрепления языка при выходе — при следующем входе применится профиль с сервера.
+  static Future<void> clearPinnedLocaleOnLogout() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(prefsKeyLocaleUserSet);
+    } catch (_) {}
+  }
+
+  /// Для [kk]: если в JSON строка ещё совпадает с `en` (нет отдельного перевода), показываем **en**,
+  /// затем **ru** — как у остальных локалей с дырками. Раньше подставляли только ru: при выборе «Қазақша»
+  /// интерфейс неожиданно становился русским.
+  String? _kkResolveBase(String key) {
     final kkStr = _translations['kk']?[key];
     final enStr = _translations['en']?[key];
     final ruStr = _translations['ru']?[key];
@@ -330,8 +394,31 @@ class LocalizationService extends ChangeNotifier {
         (enStr == null || kkStr.trim() != enStr.trim())) {
       return kkStr;
     }
+    if (enStr != null && enStr.isNotEmpty) return enStr;
     if (ruStr != null && ruStr.isNotEmpty) return ruStr;
-    return kkStr ?? enStr;
+    return kkStr;
+  }
+
+  String? _resolvedTranslationForLanguage(String languageCode, String key) {
+    final lang = languageCode.trim().toLowerCase();
+
+    // kk: сначала база (kk ≠ en → kk, иначе en → ru), затем runtime-auto;
+    // если в кэше автоперевода строка совпадает с en — не затираем базу.
+    if (lang == 'kk') {
+      final base = _kkResolveBase(key);
+      final auto = _autoUiTranslations['kk']?[key];
+      if (auto != null && auto.isNotEmpty) {
+        final enStr = _translations['en']?[key];
+        final autoDupEn = enStr != null && auto.trim() == enStr.trim();
+        if (!autoDupEn) return auto;
+      }
+      return base;
+    }
+
+    final auto = _autoUiTranslations[languageCode]?[key];
+    if (auto != null && auto.isNotEmpty) return auto;
+
+    return _translations[languageCode]?[key] ?? _translations['en']?[key];
   }
 
   /// Получение перевода для текущей локали.

@@ -348,28 +348,53 @@ class EstablishmentLocalHydrationService {
         await ps.loadNomenclatureForce(dataId);
       }
 
-      await Future.wait([
-        _hydrateEmployees(estId),
-        DocumentationServiceSupabase().prefetchDocumentsCacheForMobile(estId),
-        loadSchedule(estId),
-        _prefetchOrderListsPrefs(estId),
-        _hydrateChecklistsSnapshot(estId),
-        _hydrateTechCards(dataId),
-        _hydrateHaccp(estId),
-        _hydratePosTables(estId),
-        _hydrateMenuStopGo(estId),
-        _hydrateSalesPlans(estId),
-        _hydrateInventoryDrafts(estId),
-      ].map((f) => f.catchError((Object e, _) {
-            devLog('EstablishmentLocalHydration: delta task $e');
-          })));
-
+      await _runSnapshotHydrationTasks(estId, dataId);
       if (!kIsWeb) {
-        await _mirrorEmployeesToSqlite(estId);
         await _hydrateIikoIfPossible(estId);
       }
     } catch (e, st) {
       devLog('EstablishmentLocalHydration: delta $e $st');
+    }
+  }
+
+  /// Без проверки TTL каталога: чеклисты, черновики инвентаризаций, зал, HACCP, график, сотрудники в SQLite.
+  /// Вызывается после восстановления сети / из [RealtimeSyncService].
+  Future<void> runSnapshotsOnlySync({
+    required String establishmentId,
+    required String dataEstablishmentId,
+  }) async {
+    if (kIsWeb) return;
+    final acc = AccountManagerSupabase();
+    if (!acc.isLoggedInSync) return;
+    try {
+      await _runSnapshotHydrationTasks(establishmentId, dataEstablishmentId);
+    } catch (e, st) {
+      devLog('EstablishmentLocalHydration: snapshots-only $e $st');
+    }
+  }
+
+  Future<void> _runSnapshotHydrationTasks(
+    String estId,
+    String dataId,
+  ) async {
+    await Future.wait([
+      _hydrateEmployees(estId),
+      DocumentationServiceSupabase().prefetchDocumentsCacheForMobile(estId),
+      loadSchedule(estId),
+      _prefetchOrderListsPrefs(estId),
+      _hydrateChecklistsSnapshot(estId),
+      _hydrateTechCards(dataId),
+      _hydrateHaccp(estId),
+      _hydratePosTables(estId),
+      _hydrateMenuStopGo(estId),
+      _hydrateSalesPlans(estId),
+      _hydrateInventoryDrafts(estId),
+    ].map((f) => f.catchError((Object e, _) {
+          devLog('EstablishmentLocalHydration: snapshot task $e');
+        })));
+
+    if (!kIsWeb) {
+      await _mirrorEmployeesToSqlite(estId);
     }
   }
 }

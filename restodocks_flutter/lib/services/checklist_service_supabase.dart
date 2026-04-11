@@ -1,9 +1,14 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import '../utils/dev_log.dart';
 
 import '../models/models.dart';
+import 'account_manager_supabase.dart';
 import 'checklist_submission_service.dart';
 import 'edge_function_http.dart';
+import 'local_snapshot_store.dart';
 import 'supabase_service.dart';
 
 /// Сервис чеклистов-шаблонов (Supabase).
@@ -14,6 +19,121 @@ class ChecklistServiceSupabase {
 
   final SupabaseService _supabase = SupabaseService();
 
+  static String _checklistsSnapshotKey(String establishmentId) =>
+      '${establishmentId.trim()}:checklists_raw';
+
+  Checklist _checklistFromJoinedRow(Map<String, dynamic> row) {
+    final map = Map<String, dynamic>.from(row);
+    final itemsRaw = map.remove('checklist_items');
+    final c = Checklist.fromJson(map);
+    final itemsList = itemsRaw is List ? itemsRaw : <dynamic>[];
+    final items = <ChecklistItem>[];
+    for (final e in itemsList) {
+      if (e is! Map) continue;
+      try {
+        items.add(ChecklistItem.fromJson(Map<String, dynamic>.from(e)));
+      } catch (_) {}
+    }
+    items.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    return c.copyWith(items: items);
+  }
+
+  List<Checklist> _filterChecklistsForUi(
+    List<Checklist> all, {
+    required String department,
+    String? currentEmployeeId,
+    required bool applyAssignmentFilter,
+  }) {
+    final list = <Checklist>[];
+    for (final c in all) {
+      if (c.assignedDepartment != department) continue;
+      if (department == 'hall' && c.type?.code == 'prep') continue;
+      if (applyAssignmentFilter && currentEmployeeId != null) {
+        final ids = c.assignedEmployeeIds;
+        final singleId = c.assignedEmployeeId;
+        final hasAssignment = (ids != null && ids.isNotEmpty) ||
+            (singleId != null && singleId.isNotEmpty);
+        if (hasAssignment) {
+          final assignedToCurrent = (ids != null &&
+                  ids.contains(currentEmployeeId)) ||
+              (singleId == currentEmployeeId);
+          if (!assignedToCurrent) continue;
+        }
+      }
+      list.add(c);
+    }
+    return list;
+  }
+
+  Future<void> _persistChecklistsRawSnapshot(
+    String establishmentId,
+    List<dynamic> rows,
+  ) async {
+    if (kIsWeb) return;
+    try {
+      await LocalSnapshotStore.instance.put(
+        _checklistsSnapshotKey(establishmentId),
+        jsonEncode(rows),
+      );
+    } catch (e) {
+      devLog('ChecklistService: persist snapshot $e');
+    }
+  }
+
+  Future<List<Checklist>?> _loadChecklistsFromSnapshot(
+    String establishmentId, {
+    required String department,
+    String? currentEmployeeId,
+    required bool applyAssignmentFilter,
+  }) async {
+    if (kIsWeb) return null;
+    try {
+      final raw = await LocalSnapshotStore.instance
+          .get(_checklistsSnapshotKey(establishmentId));
+      if (raw == null || raw.isEmpty) return null;
+      final data = jsonDecode(raw) as List<dynamic>;
+      final parsed = <Checklist>[];
+      for (final row in data) {
+        if (row is! Map) continue;
+        try {
+          parsed.add(
+              _checklistFromJoinedRow(Map<String, dynamic>.from(row)));
+        } catch (_) {}
+      }
+      final filtered = _filterChecklistsForUi(
+        parsed,
+        department: department,
+        currentEmployeeId: currentEmployeeId,
+        applyAssignmentFilter: applyAssignmentFilter,
+      );
+      return filtered.isEmpty ? null : filtered;
+    } catch (e) {
+      devLog('ChecklistService: read snapshot $e');
+      return null;
+    }
+  }
+
+  Future<void> _refreshChecklistsSnapshotInBackground(
+    String establishmentId, {
+    required String department,
+    String? currentEmployeeId,
+    required bool applyAssignmentFilter,
+  }) async {
+    try {
+      final data = await _supabase.client
+          .from('checklists')
+          .select(
+            '*, checklist_items(id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit)',
+          )
+          .eq('establishment_id', establishmentId)
+          .order('updated_at', ascending: false);
+      final listRaw = List<dynamic>.from(data as List);
+      await _persistChecklistsRawSnapshot(establishmentId, listRaw);
+    } catch (e) {
+      devLog('ChecklistService: background checklist refresh $e');
+    }
+  }
+
   Future<List<Checklist>> getChecklistsForEstablishment(
     String establishmentId, {
     String department = 'kitchen',
@@ -21,69 +141,122 @@ class ChecklistServiceSupabase {
     /// false = редакторы (шеф, владелец) видят все чеклисты подразделения
     bool applyAssignmentFilter = true,
   }) async {
+    if (!kIsWeb) {
+      final offline = await _loadChecklistsFromSnapshot(
+        establishmentId,
+        department: department,
+        currentEmployeeId: currentEmployeeId,
+        applyAssignmentFilter: applyAssignmentFilter,
+      );
+      if (offline != null && offline.isNotEmpty) {
+        unawaited(_refreshChecklistsSnapshotInBackground(
+          establishmentId,
+          department: department,
+          currentEmployeeId: currentEmployeeId,
+          applyAssignmentFilter: applyAssignmentFilter,
+        ));
+        if (kDebugMode) {
+          devLog(
+              'ChecklistService: ${offline.length} from snapshot, bg refresh');
+        }
+        return offline;
+      }
+    }
+
     try {
-      // Один запрос с вложенными checklist_items вместо N+1
       final data = await _supabase.client
           .from('checklists')
-          .select('*, checklist_items(id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit)')
+          .select(
+              '*, checklist_items(id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit)')
           .eq('establishment_id', establishmentId)
           .order('updated_at', ascending: false);
 
-      final list = <Checklist>[];
-      for (final row in data) {
-        final map = row is Map<String, dynamic> ? Map<String, dynamic>.from(row) : row as Map<String, dynamic>;
-        final itemsRaw = map.remove('checklist_items');
-        final c = Checklist.fromJson(map);
-        if (c.assignedDepartment != department) continue;
-        // Зал: без заготовок (нет приготовления и ТТК)
-        if (department == 'hall' && c.type?.code == 'prep') continue;
-        if (applyAssignmentFilter && currentEmployeeId != null) {
-          final ids = c.assignedEmployeeIds;
-          final singleId = c.assignedEmployeeId;
-          final hasAssignment = (ids != null && ids.isNotEmpty) || (singleId != null && singleId.isNotEmpty);
-          if (hasAssignment) {
-            final assignedToCurrent = (ids != null && ids.contains(currentEmployeeId)) ||
-                (singleId == currentEmployeeId);
-            if (!assignedToCurrent) continue;
-          }
-        }
-        final itemsList = itemsRaw is List ? itemsRaw : <dynamic>[];
-        final items = <ChecklistItem>[];
-        for (final e in itemsList) {
-          if (e is! Map) continue;
-          try {
-            items.add(ChecklistItem.fromJson(Map<String, dynamic>.from(e)));
-          } catch (_) {}
-        }
-        items.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-        list.add(c.copyWith(items: items));
+      final listRaw = List<dynamic>.from(data as List);
+      if (!kIsWeb) {
+        await _persistChecklistsRawSnapshot(establishmentId, listRaw);
       }
+      final parsed = <Checklist>[];
+      for (final row in listRaw) {
+        if (row is! Map) continue;
+        try {
+          parsed.add(
+              _checklistFromJoinedRow(Map<String, dynamic>.from(row)));
+        } catch (_) {}
+      }
+      final list = _filterChecklistsForUi(
+        parsed,
+        department: department,
+        currentEmployeeId: currentEmployeeId,
+        applyAssignmentFilter: applyAssignmentFilter,
+      );
       if (kDebugMode) {
-        devLog('ChecklistService: loaded ${list.length} checklists for $establishmentId dept=$department');
+        devLog(
+            'ChecklistService: loaded ${list.length} checklists for $establishmentId dept=$department');
       }
       return list;
     } catch (e) {
       devLog('ChecklistService: Ошибка загрузки чеклистов: $e');
+      if (!kIsWeb) {
+        final fallback = await _loadChecklistsFromSnapshot(
+          establishmentId,
+          department: department,
+          currentEmployeeId: currentEmployeeId,
+          applyAssignmentFilter: applyAssignmentFilter,
+        );
+        if (fallback != null && fallback.isNotEmpty) return fallback;
+      }
       rethrow;
     }
   }
 
   Future<Checklist?> getChecklistById(String id) async {
+    final trimmed = id.trim();
+    if (trimmed.isEmpty) return null;
+
+    final snapshotEstId =
+        !kIsWeb ? AccountManagerSupabase().establishment?.id : null;
+    if (snapshotEstId != null) {
+      try {
+        final raw = await LocalSnapshotStore.instance
+            .get(_checklistsSnapshotKey(snapshotEstId));
+        if (raw != null && raw.isNotEmpty) {
+          final data = jsonDecode(raw) as List<dynamic>;
+          for (final row in data) {
+            if (row is! Map) continue;
+            final m = Map<String, dynamic>.from(row);
+            if (m['id']?.toString() != trimmed) continue;
+            return _checklistFromJoinedRow(m);
+          }
+        }
+      } catch (_) {}
+    }
+
     try {
       final row = await _supabase.client
           .from('checklists')
           .select()
-          .eq('id', id)
+          .eq('id', trimmed)
           .limit(1)
           .single();
-      final c = Checklist.fromJson(row);
+      final c = Checklist.fromJson(Map<String, dynamic>.from(row as Map));
       final itemsData = await _supabase.client
           .from('checklist_items')
-          .select('id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit')
+          .select(
+              'id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit')
           .eq('checklist_id', c.id)
           .order('sort_order');
-      final items = (itemsData as List).map((e) => ChecklistItem.fromJson(e)).toList();
-      return c.copyWith(items: items);
+      final items =
+          (itemsData as List).map((e) => ChecklistItem.fromJson(e)).toList();
+      final result = c.copyWith(items: items);
+      if (snapshotEstId != null) {
+        unawaited(_refreshChecklistsSnapshotInBackground(
+          snapshotEstId,
+          department: c.assignedDepartment,
+          currentEmployeeId: null,
+          applyAssignmentFilter: false,
+        ));
+      }
+      return result;
     } catch (e) {
       devLog('Ошибка загрузки чеклиста: $e');
       return null;

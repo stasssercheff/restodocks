@@ -37,8 +37,7 @@ class AccountUiSyncService {
   Future<void> applyRemoteToLocal(Employee e) async {
     await ThemeService().applyFromServer(e.uiTheme);
     await OwnerViewPreferenceService().applyFromServer(e.uiViewAsOwner);
-    // Account is the source of truth for display settings across devices.
-    // Do not push local/browser language back to profile on login.
+    // Язык: сервер — источник для новых сессий; при закреплении на устройстве см. [LocalizationService.reconcileServerPreferredLanguage].
     await _applyPreferredLanguage(e.preferredLanguage);
   }
 
@@ -51,13 +50,7 @@ class AccountUiSyncService {
   Future<void> _applyPreferredLanguage(String raw) async {
     final p = raw.trim().toLowerCase();
     if (p.isEmpty) return;
-    if (!LocalizationService.supportedLocales.any((l) => l.languageCode == p)) {
-      return;
-    }
-    final loc = LocalizationService();
-    if (loc.currentLanguageCode != p) {
-      await loc.setLocale(Locale(p));
-    }
+    await LocalizationService().reconcileServerPreferredLanguage(p);
   }
 
   Future<void> seedServerIfNeeded(Employee e) async {

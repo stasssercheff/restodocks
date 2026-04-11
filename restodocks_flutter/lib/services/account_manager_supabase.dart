@@ -1,7 +1,9 @@
 import 'package:dio/dio.dart';
 import 'dart:async' show unawaited;
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show AuthException;
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show AuthException, PostgrestException;
 import 'package:restodocks/core/supabase_url_resolver_stub.dart'
     if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart'
     as supabase_url;
@@ -1558,6 +1560,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Выход из системы
   Future<void> logout() async {
+    await LocalizationService.clearPinnedLocaleOnLogout();
     await FcmPushService.unregisterBeforeLogout();
     final est = _establishment;
     if (est != null) {
@@ -1614,6 +1617,22 @@ class AccountManagerSupabase extends ChangeNotifier {
       return list;
     } catch (e) {
       devLog('Ошибка получения сотрудников: $e');
+      if (!kIsWeb) {
+        try {
+          final raw = await LocalSnapshotStore.instance
+              .get('$establishmentId:employees');
+          if (raw != null && raw.isNotEmpty) {
+            final data = jsonDecode(raw) as List<dynamic>;
+            final list = data
+                .map((j) =>
+                    Employee.fromJson(Map<String, dynamic>.from(j as Map)))
+                .toList();
+            _employeesListCache[establishmentId] =
+                (at: DateTime.now(), list: list);
+            return List<Employee>.from(list);
+          }
+        } catch (_) {}
+      }
       return [];
     }
   }
@@ -1985,12 +2004,29 @@ class AccountManagerSupabase extends ChangeNotifier {
     notifyListeners();
   }
 
+  DateTime? _lastReconcilePreferredLanguageAt;
+  String? _lastReconcilePreferredLanguageCode;
+
   /// Сохранить выбранный язык в профиле сотрудника (preferred_language в Supabase).
   /// Вызывается при смене языка из UI, чтобы язык сохранялся между сессиями и браузерами.
-  Future<void> savePreferredLanguage(String languageCode) async {
+  ///
+  /// [fromReconcile]: при рассинхроне устройство↔сервер — не дёргать RPC десятки раз подряд (лог 400).
+  Future<void> savePreferredLanguage(
+    String languageCode, {
+    bool fromReconcile = false,
+  }) async {
     final emp = _currentEmployee;
     if (emp == null) return;
     final code = languageCode.trim().toLowerCase();
+    if (fromReconcile) {
+      final now = DateTime.now();
+      if (_lastReconcilePreferredLanguageCode == code &&
+          _lastReconcilePreferredLanguageAt != null &&
+          now.difference(_lastReconcilePreferredLanguageAt!) <
+              const Duration(seconds: 25)) {
+        return;
+      }
+    }
     try {
       final res = await _supabase.client.rpc(
         'patch_my_employee_profile',
@@ -1998,6 +2034,10 @@ class AccountManagerSupabase extends ChangeNotifier {
           'p_patch': {'preferred_language': code},
         },
       );
+      if (fromReconcile) {
+        _lastReconcilePreferredLanguageAt = DateTime.now();
+        _lastReconcilePreferredLanguageCode = code;
+      }
       if (res is Map) {
         final m = Map<String, dynamic>.from(res);
         m['password'] = m['password_hash'] ?? '';
@@ -2007,8 +2047,15 @@ class AccountManagerSupabase extends ChangeNotifier {
       }
       await LocalizationService().markLocaleChoiceFromAuthFlow();
       notifyListeners();
-    } catch (e) {
-      devLog('AccountManager: savePreferredLanguage error: $e');
+    } catch (e, st) {
+      if (e is PostgrestException) {
+        devLog(
+          'AccountManager: savePreferredLanguage PostgREST ${e.code} '
+          'message=${e.message} details=${e.details} hint=${e.hint}',
+        );
+      } else {
+        devLog('AccountManager: savePreferredLanguage error: $e $st');
+      }
     }
   }
 

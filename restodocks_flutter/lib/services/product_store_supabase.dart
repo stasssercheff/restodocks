@@ -862,6 +862,25 @@ class ProductStoreSupabase {
         await _processNomenclatureResponse(list, establishmentId);
       }
     } catch (e) {
+      if (_isLikelyGatewayOrNetworkError(e)) {
+        devLog(
+            '⚠️ ProductStore: nomenclature network/gateway error, restore offline cache: $e');
+        try {
+          final cacheKey = await _offlineCache.scopedKey(
+            dataset: _nomenclatureCacheDataset,
+            establishmentId: establishmentId,
+            suffix: 'main',
+          );
+          final cached = await _offlineCache.readJsonMap(cacheKey);
+          if (cached != null) {
+            _applyNomenclatureCache(establishmentId, cached);
+            await _ensureNomenclatureProductsInStore();
+            _bumpCatalogRevision();
+            return;
+          }
+        } catch (_) {}
+        return;
+      }
       devLog(
           '⚠️ ProductStore: Primary loading failed, trying fallback method: $e');
       _branchOnlyProductIds.clear();
@@ -869,11 +888,6 @@ class ProductStoreSupabase {
       _nomenclatureDeptByProduct.clear();
       _priceCache
           .removeWhere((key, _) => key.startsWith('${establishmentId}_'));
-      if (_isLikelyGatewayOrNetworkError(e)) {
-        devLog(
-            '⚠️ ProductStore: skip RPC/alt fallbacks while upstream is gateway/network (avoids request storm)');
-        rethrow;
-      }
       try {
         await _loadNomenclatureFallback(establishmentId);
       } catch (fallbackError) {
