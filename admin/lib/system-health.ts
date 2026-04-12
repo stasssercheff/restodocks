@@ -42,12 +42,17 @@ function trimUrl(url: string): string {
   return url.replace(/\/+$/, '')
 }
 
-async function probeAuthHealth(supabaseUrl: string): Promise<ProbeResult> {
+async function probeAuthHealth(supabaseUrl: string, apiKey: string): Promise<ProbeResult> {
   const t0 = Date.now()
   try {
+    // Без apikey многие проекты отвечают 401 — тот же ключ, что для PostgREST (service_role).
     const res = await fetch(`${trimUrl(supabaseUrl)}/auth/v1/health`, {
       method: 'GET',
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        apikey: apiKey,
+        Authorization: `Bearer ${apiKey}`,
+      },
       cache: 'no-store',
     })
     const latencyMs = Date.now() - t0
@@ -177,7 +182,7 @@ export async function buildSystemHealthReport(params: {
   })()
 
   const [authHealth, restPack] = await Promise.all([
-    probeAuthHealth(supabaseUrl),
+    probeAuthHealth(supabaseUrl, serviceRoleKey),
     probeRestHead(supabaseUrl, serviceRoleKey),
   ])
 
