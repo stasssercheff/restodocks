@@ -47,11 +47,11 @@ const _keyRememberPassword = 'restodocks_remember_password';
 String _dateOnly(DateTime d) =>
     '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-/// RFC 4122 UUID (строго), иначе PostgREST может вернуть 400 на `rpc(..., p_establishment_id)`.
-bool _isValidEstablishmentUuid(String raw) {
+/// Строка похожа на UUID (8-4-4-4-12 hex). Нормализуйте в lower-case перед RPC, иначе дубли в in-flight.
+bool _looksLikeEstablishmentUuid(String raw) {
   final s = raw.trim();
   return RegExp(
-    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
   ).hasMatch(s);
 }
 
@@ -243,14 +243,15 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// вход и работа на free остаются. RPC может вернуть `expired` на старых БД — [logout] не вызываем.
   /// Вызывать после входа, при возврате приложения на передний план и после применения промокода.
   Future<void> syncEstablishmentAccessFromServer() async {
-    final estId = _establishment?.id.trim();
-    if (estId == null || estId.isEmpty) return;
-    if (!_isValidEstablishmentUuid(estId)) {
+    final rawId = _establishment?.id.trim();
+    if (rawId == null || rawId.isEmpty) return;
+    if (!_looksLikeEstablishmentUuid(rawId)) {
       devLog(
-        '🔐 AccountManager: syncEstablishmentAccessFromServer skip (invalid uuid): $estId',
+        '🔐 AccountManager: syncEstablishmentAccessFromServer skip (invalid uuid): $rawId',
       );
       return;
     }
+    final estId = rawId.toLowerCase();
 
     final inflight = _syncEstablishmentAccessInflight[estId];
     if (inflight != null) return inflight;
@@ -278,8 +279,17 @@ class AccountManagerSupabase extends ChangeNotifier {
             '🔐 AccountManager: check_establishment_access=expired (legacy) $estId — refresh establishment only, no logout');
       }
       await refreshCurrentEstablishmentFromServer();
-    } catch (e) {
-      devLog('🔐 AccountManager: syncEstablishmentAccessFromServer error (ignored): $e');
+    } catch (e, st) {
+      if (e is PostgrestException) {
+        devLog(
+          '🔐 AccountManager: syncEstablishmentAccessFromServer PostgREST '
+          'code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}',
+        );
+      } else {
+        devLog(
+          '🔐 AccountManager: syncEstablishmentAccessFromServer error (ignored): $e $st',
+        );
+      }
     }
   }
 
