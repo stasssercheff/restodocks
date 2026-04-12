@@ -839,11 +839,13 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
     final svc = context.read<ChecklistServiceSupabase>();
     final imageService = ImageService();
 
-    final action = await showModalBottomSheet<String>(
+    final action = await showDialog<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('checklist_item_photo')),
+        content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             ListTile(
               leading: const Icon(Icons.photo_camera_outlined),
@@ -864,6 +866,12 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               ),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('cancel')),
+          ),
+        ],
       ),
     );
     if (!mounted || action == null) return;
