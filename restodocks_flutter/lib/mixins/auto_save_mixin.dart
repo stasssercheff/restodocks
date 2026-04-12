@@ -266,14 +266,18 @@ class _LifecycleObserver extends WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Сохраняем при любом уходе с переднего плана: звонок (inactive), сворачивание,
+    // блокировка — не только paused, иначе черновик мог не успеть записаться на диск.
     switch (state) {
-      case AppLifecycleState.paused:
-        onPaused();
-        break;
       case AppLifecycleState.resumed:
         onResumed();
         break;
-      default:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+        onPaused();
+        break;
+      case AppLifecycleState.detached:
         break;
     }
   }

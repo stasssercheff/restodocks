@@ -351,8 +351,10 @@ class _InventoryScreenState extends State<InventoryScreen>
       'nameFilter': _inventoryFilterNotifier.value,
       'rows': _rows
           .map((row) => {
-                'productId': row.product?.id,
-                'techCardId': row.techCard?.id,
+                // После восстановления из черновика id лежат в productId/techCardId, пока не отработал
+                // _loadNomenclature. Сохранять только product?.id — затирало бы черновик при паузе/фоне.
+                'productId': row.product?.id ?? row.productId,
+                'techCardId': row.techCard?.id ?? row.techCardId,
                 'freeName': row.freeName,
                 'freeUnit': row.freeUnit,
                 'quantities': row.quantities,
@@ -875,74 +877,80 @@ class _InventoryScreenState extends State<InventoryScreen>
   Future<void> _loadNomenclature({bool fillAllProducts = true}) async {
     if (!mounted) return;
     setState(() => _isLoadingProducts = true);
-    final store = context.read<ProductStoreSupabase>();
-    final account = context.read<AccountManagerSupabase>();
-    final techCardSvc = context.read<TechCardServiceSupabase>();
-    final est = account.establishment;
-    final estId = est?.dataEstablishmentId;
-    if (estId == null) return;
-    // Порядок важен: полный каталог должен быть стабилен до номенклатуры, иначе гонка
-    // Future.wait(loadProducts ∥ loadNomenclature) могла оставить getNomenclatureProducts пустым.
-    await store.loadProducts();
-    await store.loadNomenclature(estId);
-    final techCards =
-        await techCardSvc.getTechCardsForEstablishment(estId);
-    if (!mounted) return;
-    final products = store.getNomenclatureProducts(estId);
-    final pfOnly = techCards.where((tc) => tc.isSemiFinished).toList();
-    if (!mounted) return;
-    setState(() => _isLoadingProducts = false);
-    final productMap = {for (final p in products) p.id: p};
-    final techCardMap = {for (final tc in pfOnly) tc.id: tc};
-    setState(() {
-      // Сначала разрешаем productId/techCardId в восстановленных строках
-      for (var i = 0; i < _rows.length; i++) {
-        final row = _rows[i];
-        if (row.productId != null && row.product == null) {
-          final p = productMap[row.productId];
-          if (p != null) {
-            _rows[i] = row.copyWith(product: p);
+    try {
+      final store = context.read<ProductStoreSupabase>();
+      final account = context.read<AccountManagerSupabase>();
+      final techCardSvc = context.read<TechCardServiceSupabase>();
+      final est = account.establishment;
+      final estId = est?.dataEstablishmentId;
+      if (estId == null) return;
+      // Порядок важен: полный каталог должен быть стабилен до номенклатуры, иначе гонка
+      // Future.wait(loadProducts ∥ loadNomenclature) могла оставить getNomenclatureProducts пустым.
+      await store.loadProducts();
+      await store.loadNomenclature(estId);
+      final techCards =
+          await techCardSvc.getTechCardsForEstablishment(estId);
+      if (!mounted) return;
+      final products = store.getNomenclatureProducts(estId);
+      final pfOnly = techCards.where((tc) => tc.isSemiFinished).toList();
+      if (!mounted) return;
+      setState(() => _isLoadingProducts = false);
+      final productMap = {for (final p in products) p.id: p};
+      final techCardMap = {for (final tc in pfOnly) tc.id: tc};
+      setState(() {
+        // Сначала разрешаем productId/techCardId в восстановленных строках
+        for (var i = 0; i < _rows.length; i++) {
+          final row = _rows[i];
+          if (row.productId != null && row.product == null) {
+            final p = productMap[row.productId];
+            if (p != null) {
+              _rows[i] = row.copyWith(product: p);
+            }
+          } else if (row.techCardId != null && row.techCard == null) {
+            final tc = techCardMap[row.techCardId];
+            if (tc != null) {
+              _rows[i] = row.copyWith(techCard: tc);
+            }
           }
-        } else if (row.techCardId != null && row.techCard == null) {
-          final tc = techCardMap[row.techCardId];
-          if (tc != null) {
-            _rows[i] = row.copyWith(techCard: tc);
+        }
+        // Все новые строки всегда начинаются с 2 колонок
+        final minQtyCount = 2;
+
+        if (fillAllProducts) {
+          // Добавляем недостающие продукты и ПФ
+          for (final p in products) {
+            if (_rows.any((r) => r.product?.id == p.id || r.productId == p.id))
+              continue;
+            _rows.add(_InventoryRow(
+                product: p,
+                techCard: null,
+                quantities: List<double>.generate(minQtyCount, (_) => 0.0)));
+          }
+          for (final tc in pfOnly) {
+            if (_rows
+                .any((r) => r.techCard?.id == tc.id || r.techCardId == tc.id))
+              continue;
+            _rows.add(_InventoryRow(
+                product: null,
+                techCard: tc,
+                quantities: List<double>.generate(minQtyCount, (_) => 0.0),
+                pfUnit: _pfUnitPcs));
           }
         }
-      }
-      // Все новые строки всегда начинаются с 2 колонок
-      final minQtyCount = 2;
 
-      if (fillAllProducts) {
-        // Добавляем недостающие продукты и ПФ
-        for (final p in products) {
-          if (_rows.any((r) => r.product?.id == p.id || r.productId == p.id))
-            continue;
-          _rows.add(_InventoryRow(
-              product: p,
-              techCard: null,
-              quantities: List<double>.generate(minQtyCount, (_) => 0.0)));
+        for (var i = 0; i < _rows.length; i++) {
+          final row = _rows[i];
+          while (row.quantities.length < 2) {
+            row.quantities.add(0.0);
+          }
         }
-        for (final tc in pfOnly) {
-          if (_rows
-              .any((r) => r.techCard?.id == tc.id || r.techCardId == tc.id))
-            continue;
-          _rows.add(_InventoryRow(
-              product: null,
-              techCard: tc,
-              quantities: List<double>.generate(minQtyCount, (_) => 0.0),
-              pfUnit: _pfUnitPcs));
-        }
+      });
+      _syncRowRepaintNotifiers();
+    } finally {
+      if (mounted && _isLoadingProducts) {
+        setState(() => _isLoadingProducts = false);
       }
-
-      for (var i = 0; i < _rows.length; i++) {
-        final row = _rows[i];
-        while (row.quantities.length < 2) {
-          row.quantities.add(0.0);
-        }
-      }
-    });
-    _syncRowRepaintNotifiers();
+    }
   }
 
   /// Добавить строки из распознанного чека (OCR на устройстве + эвристики).
@@ -1020,6 +1028,23 @@ class _InventoryScreenState extends State<InventoryScreen>
         icon: const Icon(Icons.document_scanner_outlined),
         tooltip: loc.t('inventory_scan_receipt'),
         onPressed: () => _scanReceipt(context, loc),
+      ),
+    ];
+  }
+
+  /// OCR слева, «Завершить» справа (только иконка).
+  List<Widget> _inventoryAppBarActions(
+    BuildContext context,
+    LocalizationService loc,
+  ) {
+    final ocr = _inventoryOcrActions(context, loc);
+    if (_completed || _inventoryModePickerOpen) return ocr;
+    return [
+      ...ocr,
+      IconButton(
+        icon: const Icon(Icons.task_alt),
+        tooltip: loc.t('inventory_finish_tooltip'),
+        onPressed: () => _showInventoryFinishMenu(context),
       ),
     ];
   }
@@ -1269,30 +1294,85 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
   }
 
-  Future<void> _complete(BuildContext context) async {
+  /// Меню «Завершить»: отправка шефу + Excel или новая инвентаризация (очистка черновика).
+  Future<void> _showInventoryFinishMenu(BuildContext context) async {
+    if (_completed || !mounted) return;
     final loc = context.read<LocalizationService>();
-    final account = context.read<AccountManagerSupabase>();
-    final establishment = account.establishment;
-    final employee = account.currentEmployee;
-
-    final ok = await showDialog<bool>(
+    final choice = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('inventory_complete_confirm')),
-        content: Text(loc.t('inventory_complete_confirm_detail')),
+        title: Text(loc.t('inventory_finish_menu_title')),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(
+                  Icons.cloud_upload_outlined,
+                  color: Theme.of(ctx).colorScheme.primary,
+                ),
+                title: Text(loc.t('inventory_finish_save_send')),
+                subtitle: Text(loc.t('inventory_finish_save_send_hint')),
+                onTap: () => Navigator.of(ctx).pop('export'),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Icon(
+                  Icons.refresh,
+                  color: Theme.of(ctx).colorScheme.secondary,
+                ),
+                title: Text(loc.t('inventory_new')),
+                subtitle: Text(loc.t('inventory_finish_new_hint')),
+                onTap: () => Navigator.of(ctx).pop('new'),
+              ),
+            ],
+          ),
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
+            onPressed: () => Navigator.of(ctx).pop(),
             child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(loc.t('inventory_complete')),
           ),
         ],
       ),
     );
-    if (ok != true || !mounted) return;
+    if (!mounted || choice == null) return;
+    if (choice == 'export') {
+      if (_rows.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('inventory_finish_empty_for_export'))),
+        );
+        return;
+      }
+      await _completeInventoryExportFlow(context);
+    } else if (choice == 'new') {
+      final sure = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(loc.t('inventory_new_confirm_title')),
+          content: Text(loc.t('inventory_new_confirm_detail')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(loc.t('inventory_new')),
+            ),
+          ],
+        ),
+      );
+      if (sure == true && mounted) _startNewInventory();
+    }
+  }
+
+  /// Сохранение во входящие шефа + выбор Excel (как раньше после «Завершить»).
+  Future<void> _completeInventoryExportFlow(BuildContext context) async {
+    final loc = context.read<LocalizationService>();
+    final account = context.read<AccountManagerSupabase>();
+    final establishment = account.establishment;
+    final employee = account.currentEmployee;
 
     if (establishment == null || employee == null) {
       if (mounted) {
@@ -1352,8 +1432,8 @@ class _InventoryScreenState extends State<InventoryScreen>
         inventoryData: {
           'rows': _rows
               .map((row) => {
-                    'productId': row.product?.id,
-                    'techCardId': row.techCard?.id,
+                    'productId': row.product?.id ?? row.productId,
+                    'techCardId': row.techCard?.id ?? row.techCardId,
                     'freeName': row.freeName,
                     'freeUnit': row.freeUnit,
                     'quantities': row.quantities,
@@ -1896,7 +1976,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                 ),
                 toolbarHeight: 34,
                 elevation: 0,
-                actions: _inventoryOcrActions(context, loc),
+                actions: _inventoryAppBarActions(context, loc),
               )
             : (isNarrow && isKeyboardOpen)
             ? AppBar(
@@ -1907,7 +1987,7 @@ class _InventoryScreenState extends State<InventoryScreen>
                 ),
                 toolbarHeight: 40,
                 elevation: 0,
-                actions: _inventoryOcrActions(context, loc),
+                actions: _inventoryAppBarActions(context, loc),
               )
             : _isInputMode
                 ? AppBar(
@@ -1918,49 +1998,13 @@ class _InventoryScreenState extends State<InventoryScreen>
                     ),
                     toolbarHeight: 48,
                     elevation: 0,
-                    actions: _inventoryOcrActions(context, loc),
+                    actions: _inventoryAppBarActions(context, loc),
                   )
                 : AppBar(
                     leading: _inventoryAppBarLeading(context),
                     title: Text(_inventoryAppBarTitle(loc)),
-                    actions: _inventoryOcrActions(context, loc),
+                    actions: _inventoryAppBarActions(context, loc),
                   ),
-        // Кнопка "Завершить" в bottomNavigationBar — Flutter поднимает её над клавиатурой автоматически.
-        // Браузерный URL-бар (Safari/Chrome) остаётся ниже неё и не перекрывает таблицу.
-        bottomNavigationBar: ValueListenableBuilder<int>(
-          valueListenable: _inventoryLayoutPulse,
-          builder: (ctx, _, __) {
-            final narrow = isHandheldNarrowLayout(ctx);
-            final landscape =
-                MediaQuery.of(ctx).orientation == Orientation.landscape;
-            final viewBottom = MediaQuery.viewInsetsOf(ctx).bottom;
-            final typingInTable = _qtyCellFocused || _nameFilterFocusNode.hasFocus;
-            // Узкий альбом: убираем футер при реальных insets **или** при фокусе ввода (веб часто даёт insets=0).
-            // В книжке на нативе футер оставляем при insets=0; на вебе при вводе в ячейку — тоже убираем (см. ниже).
-            if (narrow && landscape && (viewBottom > 0 || typingInTable)) {
-              return const SizedBox.shrink();
-            }
-            if (narrow &&
-                !landscape &&
-                _qtyCellFocused &&
-                (viewBottom > 0 || kIsWeb)) {
-              return const SizedBox.shrink();
-            }
-            final collapse = _inventoryCollapseLayout(ctx);
-            final keepFooterInLandscape = narrow &&
-                landscape &&
-                viewBottom == 0 &&
-                !typingInTable;
-            // Книжка на телефоне: «Завершить / Новая» всегда (в т.ч. при фокусе в ячейке).
-            final keepFooterInPortrait =
-                narrow && MediaQuery.of(ctx).orientation == Orientation.portrait;
-            final hideFooterChrome = collapse &&
-                !keepFooterInLandscape &&
-                !keepFooterInPortrait;
-            return _buildFooter(loc, hideFooterChrome) ??
-                const SizedBox.shrink();
-          },
-        ),
         body: Stack(
           children: [
             Column(
@@ -2437,48 +2481,6 @@ class _InventoryScreenState extends State<InventoryScreen>
         valueListenable: _inventoryFilterNotifier,
         builder: (context, _, __) =>
             _buildTableWithFixedColumn(loc),
-      ),
-    );
-  }
-
-  /// Компактный нижний блок: не перекрывает таблицу, минимум высоты.
-  /// [collapseLayout] — на десктопе при вводе скрываем футер. На мобильной при клавиатуре футер сдвигается вниз отступом (SizedBox выше), уходит под клавиатуру.
-  Widget? _buildFooter(LocalizationService loc, bool collapseLayout) {
-    if (collapseLayout) return null;
-
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        border: Border(top: BorderSide(color: theme.dividerColor)),
-      ),
-      child: SafeArea(
-        top: false,
-        bottom: false,
-        child: Row(
-          children: [
-            Expanded(
-              child: FilledButton(
-                onPressed: () => _complete(context),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                ),
-                child: Text(loc.t('inventory_complete')),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _startNewInventory,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                ),
-                child: Text(loc.t('inventory_new')),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -3142,7 +3144,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               TextButton(
                 onPressed: () =>
                     Navigator.of(ctx).pop((format: 'csv', lang: selectedLang)),
-                child: const Text('CSV'),
+                child: Text(loc.t('export_format_csv')),
               ),
             ],
           ),
