@@ -2845,103 +2845,118 @@ class _InventoryScreenState extends State<InventoryScreen>
               : theme.colorScheme.surfaceContainerLowest.withOpacity(0.5),
         ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-                width: _colNoWidth,
+              width: _colNoWidth,
+              child: Align(
+                alignment: Alignment.center,
                 child: Text('$rowNumber',
                     style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant))),
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              ),
+            ),
             SizedBox(width: _colGap),
             SizedBox(
               width: _colNameWidth(context),
-              child: Container(
+              child: Align(
                 alignment: Alignment.centerLeft,
-                padding: EdgeInsets.symmetric(
-                  horizontal: qtyRowFocused ? 2 : 0,
-                  vertical: qtyRowFocused ? 1 : 0,
-                ),
-                decoration: qtyRowFocused
-                    ? BoxDecoration(
-                        color: theme.colorScheme.primaryContainer
-                            .withOpacity(0.65),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border(
-                          left: BorderSide(
-                            color: theme.colorScheme.primary,
-                            width: 3,
-                          ),
-                        ),
-                      )
-                    : null,
-                child: Text(
-                  row.productName(loc.currentLanguageCode),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: qtyRowFocused
-                        ? theme.colorScheme.onPrimaryContainer
-                        : null,
-                    fontWeight:
-                        qtyRowFocused ? FontWeight.w600 : FontWeight.normal,
+                child: Container(
+                  alignment: Alignment.centerLeft,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: qtyRowFocused ? 2 : 0,
+                    vertical: qtyRowFocused ? 1 : 0,
                   ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  softWrap: true,
+                  decoration: qtyRowFocused
+                      ? BoxDecoration(
+                          color: theme.colorScheme.primaryContainer
+                              .withOpacity(0.65),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border(
+                            left: BorderSide(
+                              color: theme.colorScheme.primary,
+                              width: 3,
+                            ),
+                          ),
+                        )
+                      : null,
+                  child: Text(
+                    row.productName(loc.currentLanguageCode),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: qtyRowFocused
+                          ? theme.colorScheme.onPrimaryContainer
+                          : null,
+                      fontWeight:
+                          qtyRowFocused ? FontWeight.w600 : FontWeight.normal,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: true,
+                  ),
                 ),
               ),
             ),
             SizedBox(width: _colGap),
             SizedBox(
               width: _colUnitWidth,
-              child: !_completed
-                  ? (row.isPf
-                      ? DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: row.pfUnit ?? _pfUnitPcs,
-                            isDense: true,
-                            isExpanded: true,
-                            items: [
-                              DropdownMenuItem(
-                                  value: _pfUnitPcs,
-                                  child: Text(
-                                      loc.tForLanguage(loc.currentLanguageCode,
-                                          'unit_pf_pcs_abbr'),
-                                      style: theme.textTheme.bodySmall,
-                                      overflow: TextOverflow.ellipsis)),
-                              DropdownMenuItem(
-                                  value: _pfUnitGrams,
-                                  child: Text(
-                                      loc.tForLanguage(loc.currentLanguageCode,
-                                          'unit_pf_grams_abbr'),
-                                      style: theme.textTheme.bodySmall,
-                                      overflow: TextOverflow.ellipsis)),
-                            ],
-                            onChanged: (v) =>
-                                v != null ? _setPfUnit(actualIndex, v) : null,
-                          ),
-                        )
-                      : _ProductUnitDropdown(
-                          value: row.isCountedByPackage
-                              ? (row.unitOverride ?? 'pkg')
-                              : row.unit,
-                          lang: loc.currentLanguageCode,
-                          loc: loc,
-                          product: row.product,
-                          onChanged: (v) => _setProductUnit(actualIndex, v),
-                          theme: theme,
-                        ))
-                  : Text(row.unitDisplayForBlank(loc, loc.currentLanguageCode),
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                      overflow: TextOverflow.ellipsis),
+              child: Align(
+                alignment: Alignment.center,
+                child: !_completed
+                    ? (row.isPf
+                        ? DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              value: row.pfUnit ?? _pfUnitPcs,
+                              isDense: true,
+                              isExpanded: true,
+                              items: [
+                                DropdownMenuItem(
+                                    value: _pfUnitPcs,
+                                    child: Text(
+                                        loc.tForLanguage(
+                                            loc.currentLanguageCode,
+                                            'unit_pf_pcs_abbr'),
+                                        style: theme.textTheme.bodySmall,
+                                        overflow: TextOverflow.ellipsis)),
+                                DropdownMenuItem(
+                                    value: _pfUnitGrams,
+                                    child: Text(
+                                        loc.tForLanguage(
+                                            loc.currentLanguageCode,
+                                            'unit_pf_grams_abbr'),
+                                        style: theme.textTheme.bodySmall,
+                                        overflow: TextOverflow.ellipsis)),
+                              ],
+                              onChanged: (v) =>
+                                  v != null ? _setPfUnit(actualIndex, v) : null,
+                            ),
+                          )
+                        : _ProductUnitDropdown(
+                            value: row.isCountedByPackage
+                                ? (row.unitOverride ?? 'pkg')
+                                : row.unit,
+                            lang: loc.currentLanguageCode,
+                            loc: loc,
+                            product: row.product,
+                            onChanged: (v) => _setProductUnit(actualIndex, v),
+                            theme: theme,
+                          ))
+                    : Text(row.unitDisplayForBlank(loc, loc.currentLanguageCode),
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        overflow: TextOverflow.ellipsis),
+              ),
             ),
             SizedBox(width: _colGap),
-            Container(
+            SizedBox(
               width: _colTotalWidth,
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              alignment: Alignment.center,
-              child: Text(_formatQty(row.totalDisplay),
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(fontWeight: FontWeight.w600)),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(_formatQty(row.totalDisplay),
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(fontWeight: FontWeight.w600)),
+                ),
+              ),
             ),
           ],
         ),
@@ -3796,7 +3811,7 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
                           ),
                           alignment: Alignment.center,
                           child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               ...List.generate(
@@ -3811,7 +3826,8 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
                                             : 0),
                                     child: SizedBox(
                                       width: widget.colQtyWidth,
-                                      child: Center(
+                                      child: Align(
+                                        alignment: Alignment.center,
                                         child: widget.completed
                                             ? Text(
                                                 widget.formatQty(
