@@ -1980,6 +1980,16 @@ class _InventoryScreenState extends State<InventoryScreen>
     return viewBottom > 0 || _qtyCellFocused || _nameFilterFocusNode.hasFocus;
   }
 
+  /// Скрывать строку заголовков колонок (#, Наименование, 1, 2…) только при реальной клавиатуре
+  /// в альбоме — не при фокусе в ячейке количества (иначе шапка «пропадает» при вводе).
+  bool _hideInventoryTableColumnHeaderRow(BuildContext context) {
+    if (MediaQuery.of(context).orientation != Orientation.landscape) {
+      return false;
+    }
+    if (_nameFilterFocusNode.hasFocus) return false;
+    return MediaQuery.viewInsetsOf(context).bottom > 0;
+  }
+
   double _inventorySectionHeaderHeight(BuildContext context) =>
       _inventoryKbLandscapeSquish(context) ? 22.0 : _sectionHeaderHeight;
 
@@ -2552,7 +2562,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
 
     final squish = _inventoryKbLandscapeSquish(context);
-    final showTableColumnHeaders = !squish || _nameFilterFocusNode.hasFocus;
+    final showTableColumnHeaders = !_hideInventoryTableColumnHeaderRow(context);
 
     return Column(
       children: [
@@ -3752,94 +3762,112 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
         return SizedBox(
           height: _kInventoryDataRowHeight,
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(width: widget.leftWidth, child: widget.buildFixedPart()),
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: _hScroll,
-                  scrollDirection: Axis.horizontal,
-                  physics: const ClampingScrollPhysics(),
-                  child: SizedBox(
-                    height: _kInventoryDataRowHeight,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 4, vertical: 0),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surface,
-                        border: Border(
-                            bottom: BorderSide(
-                                color: theme.dividerColor.withOpacity(0.5))),
-                      ),
-                      alignment: Alignment.center,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          ...List.generate(
-                            qtyCols,
-                            (colIndex) {
-                              final isLastCell =
-                                  widget.isLastRow && colIndex == qtyCols - 1;
-                              return Padding(
-                                padding: EdgeInsets.only(
-                                    right: colIndex < qtyCols - 1
-                                        ? widget.colGap
-                                        : 0),
-                                child: SizedBox(
-                                  width: widget.colQtyWidth,
-                                  child: Center(
-                                    child: widget.completed
-                                        ? Text(
-                                            widget.formatQty(row
-                                                .quantityDisplayAt(colIndex)),
-                                            style: theme.textTheme.bodyMedium
-                                                ?.copyWith(
-                                                    fontSize:
-                                                        _kInventoryQtyFontSize))
-                                        : _QtyCell(
-                                            key: ValueKey(
-                                                'qty_${widget.actualIndex}_$colIndex'),
-                                            value: row.quantities[colIndex],
-                                            fieldHeight: 34,
-                                            useGrams: row.isWeightInKg,
-                                            onChanged: (v) =>
-                                                widget.onSetQuantity(
-                                                    widget.actualIndex,
-                                                    colIndex,
-                                                    v),
-                                            textInputAction: isLastCell
-                                                ? TextInputAction.done
-                                                : TextInputAction.next,
-                                            onFocusGained: () {
-                                              widget.onQtyCellEnteredForScroll
-                                                  ?.call();
-                                              widget.onFocusChange(true);
-                                              if (colIndex == qtyCols - 1) {
-                                                widget.onLastCellFocused(
-                                                    widget.actualIndex);
-                                              }
-                                            },
-                                            onFocusLost: () {
-                                              widget.onFocusChange(false);
-                                              widget.onCellFocusLost(
-                                                  widget.actualIndex, colIndex);
-                                              if (colIndex == qtyCols - 2 &&
-                                                  row.quantities[colIndex] >
-                                                      0) {
-                                                _scrollToEnd();
-                                              }
-                                            },
-                                          ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
+              SizedBox(
+                width: widget.leftWidth,
+                child: ClipRect(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: widget.buildFixedPart(),
                   ),
+                ),
+              ),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final h = constraints.maxHeight;
+                    return SingleChildScrollView(
+                      controller: _hScroll,
+                      scrollDirection: Axis.horizontal,
+                      physics: const ClampingScrollPhysics(),
+                      child: SizedBox(
+                        height: h,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 0),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surface,
+                            border: Border(
+                                bottom: BorderSide(
+                                    color:
+                                        theme.dividerColor.withOpacity(0.5))),
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ...List.generate(
+                                qtyCols,
+                                (colIndex) {
+                                  final isLastCell = widget.isLastRow &&
+                                      colIndex == qtyCols - 1;
+                                  return Padding(
+                                    padding: EdgeInsets.only(
+                                        right: colIndex < qtyCols - 1
+                                            ? widget.colGap
+                                            : 0),
+                                    child: SizedBox(
+                                      width: widget.colQtyWidth,
+                                      child: Center(
+                                        child: widget.completed
+                                            ? Text(
+                                                widget.formatQty(
+                                                    row.quantityDisplayAt(
+                                                        colIndex)),
+                                                style: theme
+                                                    .textTheme.bodyMedium
+                                                    ?.copyWith(
+                                                        fontSize:
+                                                            _kInventoryQtyFontSize))
+                                            : _QtyCell(
+                                                key: ValueKey(
+                                                    'qty_${widget.actualIndex}_$colIndex'),
+                                                value: row.quantities[colIndex],
+                                                fieldHeight: 34,
+                                                useGrams: row.isWeightInKg,
+                                                onChanged: (v) =>
+                                                    widget.onSetQuantity(
+                                                        widget.actualIndex,
+                                                        colIndex,
+                                                        v),
+                                                textInputAction: isLastCell
+                                                    ? TextInputAction.done
+                                                    : TextInputAction.next,
+                                                onFocusGained: () {
+                                                  widget
+                                                      .onQtyCellEnteredForScroll
+                                                      ?.call();
+                                                  widget.onFocusChange(true);
+                                                  if (colIndex == qtyCols - 1) {
+                                                    widget.onLastCellFocused(
+                                                        widget.actualIndex);
+                                                  }
+                                                },
+                                                onFocusLost: () {
+                                                  widget.onFocusChange(false);
+                                                  widget.onCellFocusLost(
+                                                      widget.actualIndex,
+                                                      colIndex);
+                                                  if (colIndex == qtyCols - 2 &&
+                                                      row.quantities[colIndex] >
+                                                          0) {
+                                                    _scrollToEnd();
+                                                  }
+                                                },
+                                              ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -4007,7 +4035,9 @@ class _QtyCellState extends State<_QtyCell> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final vPad = widget.fieldHeight <= 30 ? 4.0 : 8.0;
+    // При высоте 34 вертикальные отступы 8+8 визуально прижимают текст к верху рамки.
+    final vPad =
+        widget.fieldHeight <= 30 ? 4.0 : (widget.fieldHeight <= 34 ? 5.0 : 8.0);
     return SizedBox(
       height: widget.fieldHeight,
       child: TextField(
