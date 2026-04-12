@@ -3,7 +3,13 @@
  * Логика согласована с клиентом: effective Pro = оплаченный Pro ИЛИ активное окно trial.
  */
 
-export type PromoRedemptionRow = { code: string }
+/** Данные погашения из promo_code_redemptions + promo_codes (для админки). */
+export type PromoRedemptionRow = {
+  code: string
+  redeemed_at?: string | null
+  activation_duration_days?: number | null
+  expires_at?: string | null
+}
 
 export type EstablishmentSubFields = {
   subscription_type?: string | null
@@ -30,6 +36,54 @@ function parseDate(iso: string | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
+/** Конец Pro по промо: фиксированный expires_at в строке промо или N дней с redeemed_at. */
+export function promoProEndDate(
+  promo: PromoRedemptionRow | null | undefined,
+  nowMs: number = Date.now(),
+): Date | null {
+  if (!promo?.code) return null
+  const days = promo.activation_duration_days
+  if (days != null && days > 0) {
+    const start = parseDate(promo.redeemed_at ?? null)
+    if (!start) return null
+    return new Date(start.getTime() + days * 86400000)
+  }
+  return parseDate(promo.expires_at ?? null)
+}
+
+/**
+ * Pro «активен» для строки заведения: trial, IAP с датой, или промо (в т.ч. activation_duration_days).
+ * @param promo — данные погашения; без кода не учитывается окно промо (как раньше — только tier/IAP/trial).
+ */
+export function hasEffectivePro(
+  est: EstablishmentSubFields,
+  promo: PromoRedemptionRow | null | undefined,
+  nowMs: number = Date.now(),
+): boolean {
+  const now = new Date(nowMs)
+  const sub = (est.subscription_type ?? 'free').toLowerCase().trim()
+  const paidUntil = parseDate(est.pro_paid_until ?? null)
+  const trialUntil = parseDate(est.pro_trial_ends_at ?? null)
+  const trialActive = trialUntil !== null && trialUntil > now
+  if (trialActive) return true
+
+  const isProTier = sub === 'pro' || sub === 'premium'
+  if (!isProTier) return false
+
+  if (paidUntil !== null && paidUntil > now) return true
+  if (paidUntil !== null && paidUntil <= now) return false
+
+  if (!promo?.code) return true
+
+  const end = promoProEndDate(promo, nowMs)
+  if (promo.activation_duration_days != null && promo.activation_duration_days > 0) {
+    return end !== null && end > now
+  }
+  const exp = parseDate(promo.expires_at ?? null)
+  if (exp === null) return true
+  return exp > now
+}
+
 /**
  * @param promo — первая строка погашения промокода для заведения (код), если есть
  */
@@ -42,6 +96,7 @@ export function summarizeSubscriptionForAdmin(
   const sub = (est.subscription_type ?? 'free').toLowerCase().trim()
   const paidUntil = parseDate(est.pro_paid_until ?? null)
   const trialUntil = parseDate(est.pro_trial_ends_at ?? null)
+  const promoEnd = promoProEndDate(promo, nowMs)
 
   const trialActive = trialUntil !== null && trialUntil > now
   const isProTier = sub === 'pro' || sub === 'premium'
@@ -49,13 +104,29 @@ export function summarizeSubscriptionForAdmin(
     isProTier && (paidUntil === null || paidUntil > now)
   const paidProExpired = isProTier && paidUntil !== null && paidUntil <= now
 
-  const effectivePro = paidProActive || trialActive
-
-  if (!effectivePro) {
+  if (!hasEffectivePro(est, promo, nowMs)) {
+    if (promo?.code && isProTier && !trialActive) {
+      const pDetail =
+        promo.activation_duration_days != null &&
+        promo.activation_duration_days > 0 &&
+        promoEnd
+          ? `истёк ${promoEnd.toLocaleDateString('ru-RU')} (${promo.activation_duration_days} дн. с активации)`
+          : (() => {
+              const exp = parseDate(promo.expires_at ?? null)
+              return exp ? `истёк ${exp.toLocaleDateString('ru-RU')}` : null
+            })()
+      return {
+        statusLabel: 'Pro истёк',
+        paymentLabel: 'Промокод (истёк)',
+        promoCode: promo.code,
+        proUntilIso: est.pro_paid_until ?? null,
+        detail: pDetail,
+      }
+    }
     if (paidProExpired && !trialActive) {
       return {
         statusLabel: 'Pro истёк',
-        paymentLabel: promo ? 'Промокод (истёк)' : 'App Store / другое',
+        paymentLabel: 'App Store / другое',
         promoCode: promo?.code ?? null,
         proUntilIso: est.pro_paid_until ?? null,
         detail: paidUntil ? `до ${paidUntil.toLocaleDateString('ru-RU')}` : null,
@@ -90,12 +161,22 @@ export function summarizeSubscriptionForAdmin(
       : null
 
   if (promo?.code) {
+    let detail: string | null = null
+    if (promo.activation_duration_days != null && promo.activation_duration_days > 0 && promoEnd) {
+      detail = `до ${promoEnd.toLocaleDateString('ru-RU')} (${promo.activation_duration_days} дн. с активации)`
+    } else if (untilStr) {
+      detail = untilStr
+    } else {
+      const legExp = parseDate(promo.expires_at ?? null)
+      if (legExp) detail = `до ${legExp.toLocaleDateString('ru-RU')}`
+      else detail = 'без срока (промо)'
+    }
     return {
       statusLabel: 'Pro (промокод)',
       paymentLabel: 'Промокод',
       promoCode: promo.code,
       proUntilIso,
-      detail: paidUntil === null ? 'без срока (промо)' : untilStr,
+      detail,
     }
   }
 
@@ -118,25 +199,25 @@ export function summarizeSubscriptionForAdmin(
   }
 }
 
-/** Pro активен: trial или оплаченный/бессрочный Pro по tier и датам. */
-export function hasEffectivePro(
-  est: EstablishmentSubFields,
-  nowMs: number = Date.now(),
-): boolean {
-  const now = new Date(nowMs)
-  const sub = (est.subscription_type ?? 'free').toLowerCase().trim()
-  const paidUntil = parseDate(est.pro_paid_until ?? null)
-  const trialUntil = parseDate(est.pro_trial_ends_at ?? null)
-  const trialActive = trialUntil !== null && trialUntil > now
-  const isProTier = sub === 'pro' || sub === 'premium'
-  const paidProActive =
-    isProTier && (paidUntil === null || paidUntil > now)
-  return paidProActive || trialActive
-}
-
 export function countEffectiveProEstablishments(
   rows: EstablishmentSubFields[],
   nowMs: number = Date.now(),
 ): number {
-  return rows.filter((e) => hasEffectivePro(e, nowMs)).length
+  return rows.filter((e) => hasEffectivePro(e, null, nowMs)).length
+}
+
+/** Категория для фильтра колонки «Подписка» в админке (не email/имя). */
+export function subscriptionGroupKey(
+  est: EstablishmentSubFields,
+  promo: PromoRedemptionRow | null | undefined,
+  nowMs: number = Date.now(),
+): 'no_pro' | 'trial' | 'promo' | 'paid_iap' | 'expired' | 'pro_other' {
+  const s = summarizeSubscriptionForAdmin(est, promo, nowMs)
+  const label = s.statusLabel
+  if (label === 'Без Pro') return 'no_pro'
+  if (label === 'Пробный Pro') return 'trial'
+  if (label === 'Pro (промокод)') return 'promo'
+  if (label === 'Pro оплачен') return 'paid_iap'
+  if (label === 'Pro истёк') return 'expired'
+  return 'pro_other'
 }

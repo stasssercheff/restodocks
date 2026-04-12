@@ -13,14 +13,38 @@ function skipGeo(ip: string): boolean {
   return false
 }
 
+async function fetchGeoFromIpinfo(ip: string): Promise<{ country?: string; city?: string }> {
+  const res = await fetch(`https://ipinfo.io/${encodeURIComponent(ip)}`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) return {}
+  const data = (await res.json()) as { country?: string; city?: string; bogon?: boolean }
+  if (data.bogon) return {}
+  return { country: data.country, city: data.city }
+}
+
+async function fetchGeoFromIpApiCo(ip: string): Promise<{ country?: string; city?: string }> {
+  const res = await fetch(`https://ipapi.co/${encodeURIComponent(ip)}/json/`, {
+    headers: { Accept: 'application/json' },
+  })
+  if (!res.ok) return {}
+  const data = (await res.json()) as { country_name?: string; city?: string; error?: boolean }
+  if (data.error) return {}
+  return {
+    country: data.country_name,
+    city: data.city,
+  }
+}
+
 async function fetchGeo(ip: string): Promise<{ country?: string; city?: string }> {
   try {
-    const res = await fetch(`https://ipinfo.io/${encodeURIComponent(ip)}`, {
-      headers: { Accept: 'application/json' },
-    })
-    if (!res.ok) return {}
-    const data = (await res.json()) as { country?: string; city?: string }
-    return { country: data.country, city: data.city }
+    const a = await fetchGeoFromIpinfo(ip)
+    if (a.country || a.city) return a
+  } catch {
+    // try fallback
+  }
+  try {
+    return await fetchGeoFromIpApiCo(ip)
   } catch {
     return {}
   }

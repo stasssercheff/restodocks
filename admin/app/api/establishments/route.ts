@@ -5,6 +5,7 @@ import { getAdminPassword, getSupabaseConfig } from '@/lib/admin-env'
 import { verifySessionToken } from '@/lib/session'
 import {
   hasEffectivePro,
+  subscriptionGroupKey,
   summarizeSubscriptionForAdmin,
   type PromoRedemptionRow,
 } from '@/lib/subscription-admin'
@@ -99,18 +100,38 @@ export async function GET() {
   if (ids.length > 0) {
     const { data: redemptionRows } = await supabase
       .from('promo_code_redemptions')
-      .select('establishment_id, promo_codes(code)')
+      .select(
+        'establishment_id, redeemed_at, promo_codes(code, activation_duration_days, expires_at)',
+      )
       .in('establishment_id', ids)
 
     for (const raw of redemptionRows ?? []) {
       const r = raw as unknown as {
         establishment_id: string
-        promo_codes: { code: string } | { code: string }[] | null
+        redeemed_at?: string | null
+        promo_codes:
+          | {
+              code: string
+              activation_duration_days?: number | null
+              expires_at?: string | null
+            }
+          | {
+              code: string
+              activation_duration_days?: number | null
+              expires_at?: string | null
+            }[]
+          | null
       }
       const nested = r.promo_codes
-      const code = Array.isArray(nested) ? nested[0]?.code : nested?.code
+      const pc = Array.isArray(nested) ? nested[0] : nested
+      const code = pc?.code
       if (!code || promoByEstId.has(r.establishment_id)) continue
-      promoByEstId.set(r.establishment_id, { code })
+      promoByEstId.set(r.establishment_id, {
+        code,
+        redeemed_at: r.redeemed_at ?? null,
+        activation_duration_days: pc?.activation_duration_days ?? null,
+        expires_at: pc?.expires_at ?? null,
+      })
     }
   }
 
@@ -178,7 +199,8 @@ export async function GET() {
       pro_trial_ends_at: est.pro_trial_ends_at as string | null | undefined,
     }
     const subscription_summary = summarizeSubscriptionForAdmin(subFields, promo)
-    const effective_pro = hasEffectivePro(subFields)
+    const effective_pro = hasEffectivePro(subFields, promo)
+    const subscription_group = subscriptionGroupKey(subFields, promo)
 
     const isMain = !est.parent_establishment_id
     const scopeIds = isMain ? [estId, ...collectDescendants(estId)] : [estId]
@@ -201,6 +223,7 @@ export async function GET() {
         establishment_type,
         subscription_summary,
         effective_pro,
+        subscription_group,
       }
     }
 
@@ -224,6 +247,7 @@ export async function GET() {
       establishment_type,
       subscription_summary,
       effective_pro,
+      subscription_group,
     }
   })
 

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PromoCode } from '@/lib/supabase'
 import type { Insight, SecuritySnapshotPayload } from '@/lib/security-snapshot'
+import type { SystemHealthPayload } from '@/lib/system-health'
 
 type SubscriptionSummary = {
   statusLabel: string
@@ -12,6 +13,14 @@ type SubscriptionSummary = {
   proUntilIso: string | null
   detail: string | null
 }
+
+type SubscriptionGroup =
+  | 'no_pro'
+  | 'trial'
+  | 'promo'
+  | 'paid_iap'
+  | 'expired'
+  | 'pro_other'
 
 type Establishment = {
   id: string
@@ -30,6 +39,8 @@ type Establishment = {
   establishment_type?: 'main' | 'branch' | 'separate'
   subscription_summary?: SubscriptionSummary
   effective_pro?: boolean
+  /** Сводная категория подписки для фильтра колонки */
+  subscription_group?: SubscriptionGroup
 }
 
 function formatDate(iso: string | null) {
@@ -61,7 +72,7 @@ function promoRowStatus(row: PromoCode): 'disabled' | 'used' | 'expired' | 'free
 
 export default function AdminClient() {
   const router = useRouter()
-  const [tab, setTab] = useState<'establishments' | 'promo' | 'security' | 'settings'>('establishments')
+  const [tab, setTab] = useState<'establishments' | 'promo' | 'security' | 'health' | 'settings'>('establishments')
 
   async function logout() {
     await fetch('/api/auth', { method: 'DELETE' })
@@ -86,6 +97,7 @@ export default function AdminClient() {
             { key: 'establishments', label: 'Заведения' },
             { key: 'promo', label: 'Промокоды' },
             { key: 'security', label: 'Безопасность' },
+            { key: 'health', label: 'Нагрузка' },
             { key: 'settings', label: 'Настройки' },
           ] as const).map(t => (
             <button
@@ -107,6 +119,7 @@ export default function AdminClient() {
         {tab === 'establishments' && <EstablishmentsTab />}
         {tab === 'promo' && <PromoTab />}
         {tab === 'security' && <SecurityTab />}
+        {tab === 'health' && <SystemHealthTab />}
         {tab === 'settings' && <PlatformSettingsTab />}
       </main>
     </div>
@@ -182,6 +195,9 @@ function EstablishmentsTab() {
   const [data, setData] = useState<Establishment[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [filterType, setFilterType] = useState<'all' | 'main' | 'branch' | 'separate'>('all')
+  const [filterSubscription, setFilterSubscription] = useState<'all' | SubscriptionGroup>('all')
+  const [filterEmployees, setFilterEmployees] = useState<'all' | '0' | '1' | '2-5' | '6+'>('all')
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [refreshingGeo, setRefreshingGeo] = useState(false)
@@ -202,13 +218,21 @@ function EstablishmentsTab() {
 
   useEffect(() => { load() }, [load])
 
+  function matchesEmployeeFilter(n: number): boolean {
+    if (filterEmployees === 'all') return true
+    if (filterEmployees === '0') return n === 0
+    if (filterEmployees === '1') return n === 1
+    if (filterEmployees === '2-5') return n >= 2 && n <= 5
+    return n >= 6
+  }
+
   const filtered = data.filter(e => {
     const q = search.toLowerCase()
     const sub = e.subscription_summary
     const subText = sub
       ? [sub.statusLabel, sub.paymentLabel, sub.promoCode, sub.detail].filter(Boolean).join(' ').toLowerCase()
       : ''
-    return (
+    const textMatch =
       e.name.toLowerCase().includes(q) ||
       e.owner_email.toLowerCase().includes(q) ||
       e.owner_name.toLowerCase().includes(q) ||
@@ -216,7 +240,11 @@ function EstablishmentsTab() {
       (e.registration_country ?? '').toLowerCase().includes(q) ||
       (e.registration_city ?? '').toLowerCase().includes(q) ||
       subText.includes(q)
-    )
+    if (!textMatch) return false
+    if (filterType !== 'all' && e.establishment_type !== filterType) return false
+    if (filterSubscription !== 'all' && (e.subscription_group ?? 'no_pro') !== filterSubscription) return false
+    if (!matchesEmployeeFilter(e.employee_count)) return false
+    return true
   })
 
   function regInfo(row: Establishment) {
@@ -318,6 +346,43 @@ function EstablishmentsTab() {
         <StatCard label="Активных Pro" value={totalProActive} />
       </div>
 
+      <div className="flex flex-wrap gap-2 mb-3 md:hidden">
+        <select
+          value={filterType}
+          onChange={e => setFilterType(e.target.value as typeof filterType)}
+          className="bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs flex-1 min-w-[6rem]"
+        >
+          <option value="all">Тип: все</option>
+          <option value="main">Основное</option>
+          <option value="branch">Филиал</option>
+          <option value="separate">Отдельное</option>
+        </select>
+        <select
+          value={filterSubscription}
+          onChange={e => setFilterSubscription(e.target.value as typeof filterSubscription)}
+          className="bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs flex-1 min-w-[8rem]"
+        >
+          <option value="all">Подписка: все</option>
+          <option value="no_pro">Без Pro</option>
+          <option value="trial">Пробный</option>
+          <option value="promo">Pro (промокод)</option>
+          <option value="paid_iap">Pro (оплата)</option>
+          <option value="expired">Истёк</option>
+          <option value="pro_other">Прочее</option>
+        </select>
+        <select
+          value={filterEmployees}
+          onChange={e => setFilterEmployees(e.target.value as typeof filterEmployees)}
+          className="bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs flex-1 min-w-[6rem]"
+        >
+          <option value="all">Сотр.: все</option>
+          <option value="0">0</option>
+          <option value="1">1</option>
+          <option value="2-5">2–5</option>
+          <option value="6+">6+</option>
+        </select>
+      </div>
+
       <div className="flex gap-2 mb-4 flex-wrap">
         <input
           type="text"
@@ -351,16 +416,57 @@ function EstablishmentsTab() {
               <thead>
                 <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
                   <th className="px-4 py-3 text-left">Заведение</th>
-                  <th className="px-4 py-3 text-left">Тип</th>
+                  <th className="px-4 py-3 text-left align-top">
+                    <div className="mb-1.5">Тип</div>
+                    <select
+                      value={filterType}
+                      onChange={e => setFilterType(e.target.value as typeof filterType)}
+                      title="Фильтр по типу заведения"
+                      className="w-full max-w-[9rem] bg-gray-950 border border-gray-700 rounded-md px-1.5 py-1 text-[11px] text-gray-200 font-normal normal-case tracking-normal"
+                    >
+                      <option value="all">Все</option>
+                      <option value="main">Основное</option>
+                      <option value="branch">Филиал</option>
+                      <option value="separate">Отдельное</option>
+                    </select>
+                  </th>
                   <th
-                    className="px-4 py-3 text-left min-w-[11rem]"
+                    className="px-4 py-3 text-left min-w-[11rem] align-top"
                     title="Статус Pro, способ оплаты (сейчас App Store IAP или промокод), код промо при погашении"
                   >
-                    Подписка
+                    <div className="mb-1.5">Подписка</div>
+                    <select
+                      value={filterSubscription}
+                      onChange={e => setFilterSubscription(e.target.value as typeof filterSubscription)}
+                      title="Фильтр по подписке"
+                      className="w-full max-w-[12rem] bg-gray-950 border border-gray-700 rounded-md px-1.5 py-1 text-[11px] text-gray-200 font-normal normal-case tracking-normal"
+                    >
+                      <option value="all">Все</option>
+                      <option value="no_pro">Без Pro</option>
+                      <option value="trial">Пробный</option>
+                      <option value="promo">Pro (промокод)</option>
+                      <option value="paid_iap">Pro (оплата)</option>
+                      <option value="expired">Истёк</option>
+                      <option value="pro_other">Прочее</option>
+                    </select>
                   </th>
                   <th className="px-4 py-3 text-left">Владелец</th>
                   <th className="px-4 py-3 text-left">Email</th>
-                  <th className="px-4 py-3 text-center">Сотр.</th>
+                  <th className="px-4 py-3 text-center align-top">
+                    <div className="mb-1.5">Сотр.</div>
+                    <select
+                      value={filterEmployees}
+                      onChange={e => setFilterEmployees(e.target.value as typeof filterEmployees)}
+                      title="Фильтр по числу сотрудников"
+                      className="w-full max-w-[6rem] mx-auto bg-gray-950 border border-gray-700 rounded-md px-1.5 py-1 text-[11px] text-gray-200 font-normal normal-case tracking-normal"
+                    >
+                      <option value="all">Все</option>
+                      <option value="0">0</option>
+                      <option value="1">1</option>
+                      <option value="2-5">2–5</option>
+                      <option value="6+">6+</option>
+                    </select>
+                  </th>
                   <th className="px-4 py-3 text-center" title="Переопределение лимита доп. заведений для владельца; при нескольких — минимум">
                     Лимит доп.
                   </th>
@@ -488,6 +594,7 @@ function PromoTab() {
   const [newNote, setNewNote] = useState('')
   const [newStartDate, setNewStartDate] = useState('')
   const [newEndDate, setNewEndDate] = useState('')
+  const [newActivationDays, setNewActivationDays] = useState('')
   const [newMaxEmployees, setNewMaxEmployees] = useState('')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'free' | 'used' | 'expired' | 'disabled'>('all')
@@ -520,9 +627,17 @@ function PromoTab() {
         starts_at: newStartDate || null,
         expires_at: newEndDate || null,
         max_employees: newMaxEmployees ? parseInt(newMaxEmployees) : null,
+        activation_duration_days: newActivationDays.trim()
+          ? parseInt(newActivationDays.trim(), 10)
+          : null,
       }),
     })
-    setNewCode(''); setNewNote(''); setNewStartDate(''); setNewEndDate(''); setNewMaxEmployees('')
+    setNewCode('')
+    setNewNote('')
+    setNewStartDate('')
+    setNewEndDate('')
+    setNewActivationDays('')
+    setNewMaxEmployees('')
     await loadCodes()
     setSaving(false)
   }
@@ -552,12 +667,32 @@ function PromoTab() {
   }
 
   async function setEndDate(id: number) {
-    const val = prompt('Действует до (YYYY-MM-DD), пусто — без срока:')
+    const val = prompt('Последний день, когда код ещё можно ввести (YYYY-MM-DD). Пусто — без ограничения по дате ввода:')
     if (val === null) return
     await fetch('/api/promo', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, expires_at: val || null }),
+    })
+    await loadCodes()
+  }
+
+  async function setActivationDays(id: number, current: number | null) {
+    const val = prompt(
+      'Дней Pro с момента активации (целое 1–36500). Пусто — убрать режим «с активации» и использовать только дату в колонке «ввод до» / legacy:',
+      current != null ? String(current) : '',
+    )
+    if (val === null) return
+    const t = val.trim()
+    const parsed = t === '' ? null : parseInt(t, 10)
+    if (t !== '' && (Number.isNaN(parsed!) || parsed! < 1 || parsed! > 36500)) {
+      alert('Введи целое от 1 до 36500 или оставь пустым')
+      return
+    }
+    await fetch('/api/promo', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, activation_duration_days: parsed }),
     })
     await loadCodes()
   }
@@ -628,6 +763,10 @@ function PromoTab() {
       {/* Add form */}
       <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 mb-4">
         <h2 className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">Новый промокод</h2>
+        <p className="text-[11px] text-gray-600 mb-3 leading-snug">
+          Поле «дней Pro с активации» задаёт длительность подписки <span className="text-gray-500">с момента применения</span> кода.
+          Даты «ввод кода» ограничивают только срок, когда код ещё можно ввести. После применения число дней можно изменить — доступ пересчитается.
+        </p>
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 sm:items-end">
           <input
             type="text"
@@ -644,7 +783,7 @@ function PromoTab() {
             className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm"
           />
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Действует с</label>
+            <label className="text-xs text-gray-500">Ввод кода с</label>
             <input
               type="date"
               value={newStartDate}
@@ -653,12 +792,26 @@ function PromoTab() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Действует до</label>
+            <label className="text-xs text-gray-500">Ввод кода до</label>
             <input
               type="date"
               value={newEndDate}
               onChange={e => setNewEndDate(e.target.value)}
               className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500 text-sm"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500" title="Длина Pro в днях с момента применения кода">
+              Дней Pro с активации
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="36500"
+              value={newActivationDays}
+              onChange={e => setNewActivationDays(e.target.value)}
+              placeholder="напр. 30"
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28"
             />
           </div>
           <div className="flex flex-col gap-1">
@@ -718,7 +871,9 @@ function PromoTab() {
                   <th className="px-4 py-3 text-left">Код</th>
                   <th className="px-4 py-3 text-left">Статус</th>
                   <th className="px-4 py-3 text-left">Заметка / Заведение</th>
-                  <th className="px-4 py-3 text-left">До</th>
+                  <th className="px-4 py-3 text-left" title="Срок ввести код и/или длительность Pro с активации">
+                    Ввод до / дни
+                  </th>
                   <th className="px-4 py-3 text-center">Сотр.</th>
                   <th className="px-4 py-3 text-left">Создан</th>
                   <th className="px-4 py-3 text-right">Действия</th>
@@ -749,10 +904,37 @@ function PromoTab() {
                       <td className="px-4 py-3 text-gray-400">
                         {row.is_used && row.establishments?.name ? <span className="text-white">{row.establishments.name}</span> : row.note || '—'}
                       </td>
-                      <td className="px-4 py-3 text-gray-400">
-                        <button onClick={() => setEndDate(row.id)} className={`hover:text-white transition text-xs ${isExpired(row.expires_at) ? 'text-red-400' : ''}`}>
-                          {formatDate(row.expires_at)}
-                        </button>
+                      <td className="px-4 py-3 text-gray-400 align-top">
+                        {row.activation_duration_days != null && row.activation_duration_days > 0 ? (
+                          <div className="space-y-1">
+                            <button
+                              type="button"
+                              onClick={() => setActivationDays(row.id, row.activation_duration_days ?? null)}
+                              className="block text-left text-emerald-300/95 hover:text-emerald-200 text-xs"
+                            >
+                              {row.activation_duration_days} дн. с активации
+                            </button>
+                            {row.expires_at ? (
+                              <button
+                                type="button"
+                                onClick={() => setEndDate(row.id)}
+                                className={`block text-[10px] text-gray-500 hover:text-gray-300 ${isExpired(row.expires_at) ? 'text-red-400' : ''}`}
+                              >
+                                ввести до {formatDate(row.expires_at)}
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-gray-600">ввод кода без крайней даты</span>
+                            )}
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setEndDate(row.id)}
+                            className={`hover:text-white transition text-xs ${isExpired(row.expires_at) ? 'text-red-400' : ''}`}
+                          >
+                            {formatDate(row.expires_at)}
+                          </button>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button onClick={() => setMaxEmployees(row.id, row.max_employees)} className="text-xs font-mono hover:text-indigo-400 transition">
@@ -823,9 +1005,18 @@ function PromoTab() {
                   )}
 
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 mb-3">
+                    {row.activation_duration_days != null && row.activation_duration_days > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setActivationDays(row.id, row.activation_duration_days ?? null)}
+                        className="text-emerald-300"
+                      >
+                        {row.activation_duration_days} дн. с активации
+                      </button>
+                    )}
                     {row.expires_at && (
                       <span className={isExpired(row.expires_at) ? 'text-red-400' : ''}>
-                        до {formatDate(row.expires_at)}
+                        ввести до {formatDate(row.expires_at)}
                       </span>
                     )}
                     {row.max_employees != null && (
@@ -1085,6 +1276,201 @@ function SecurityTab() {
         className="bg-gray-800 hover:bg-gray-700 border border-gray-700 px-4 py-2 rounded-lg text-sm"
       >
         Обновить данные
+      </button>
+    </div>
+  )
+}
+
+// ─── System health / load Tab ─────────────────────────────────────────────────
+
+function SystemHealthTab() {
+  const [data, setData] = useState<SystemHealthPayload | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    const res = await fetch('/api/system-health')
+    const json = (await res.json()) as SystemHealthPayload & { error?: string }
+    if (!res.ok) {
+      setError(typeof json?.error === 'string' ? json.error : 'Ошибка загрузки')
+      setData(null)
+    } else {
+      setData(json as SystemHealthPayload)
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  if (loading) {
+    return <div className="p-12 text-center text-gray-500">Загрузка...</div>
+  }
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <p className="text-red-300 text-sm">{error}</p>
+        <button
+          type="button"
+          onClick={() => load()}
+          className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm font-medium"
+        >
+          Повторить
+        </button>
+      </div>
+    )
+  }
+  if (!data) return null
+
+  const reqStr =
+    typeof data.cloudflare.requests24hApprox === 'number'
+      ? data.cloudflare.requests24hApprox.toLocaleString('ru-RU')
+      : '—'
+
+  function latencyClass(ms: number, ok: boolean): string {
+    if (!ok) return 'text-red-400'
+    if (ms >= 1200) return 'text-amber-300'
+    return 'text-emerald-300'
+  }
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <p className="text-gray-400 text-sm leading-relaxed">
+        Быстрые проверки из админки: доступность Supabase (Auth и API к БД) и объём HTTP-запросов к зоне сайта в
+        Cloudflare за ~24 ч. Это не замена мониторингу в Supabase (CPU, квоты, логи Edge), но помогает заметить
+        отказ или аномальный трафик до того, как «ляжет» приложение у пользователей.
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <span
+          className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+            data.ok ? 'bg-emerald-950/60 text-emerald-200 border border-emerald-800/50' : 'bg-red-950/60 text-red-200 border border-red-800/50'
+          }`}
+        >
+          {data.ok ? 'Критичные проверки пройдены' : 'Есть проблемы доступности'}
+        </span>
+        <span className="text-gray-500 text-xs">Снимок: {data.generatedAt}</span>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <StatCard
+          label="Auth (GoTrue)"
+          value={data.authHealth ? `${data.authHealth.latencyMs} мс` : '—'}
+          dimmed={!data.authHealth?.ok}
+        />
+        <StatCard
+          label="API БД (PostgREST)"
+          value={data.restSmoke ? `${data.restSmoke.latencyMs} мс` : '—'}
+          dimmed={!data.restSmoke?.ok}
+        />
+        <StatCard
+          label="Заведений (оценка)"
+          value={data.restRowEstimate != null ? data.restRowEstimate : '—'}
+        />
+        <StatCard label="HTTP к зоне (~24 ч)" value={reqStr} />
+      </div>
+
+      {(data.authHealth || data.restSmoke) && (
+        <div className="text-xs text-gray-500 space-y-1 font-mono">
+          {data.authHealth ? (
+            <p className={latencyClass(data.authHealth.latencyMs, data.authHealth.ok)}>
+              Auth: {data.authHealth.ok ? 'OK' : 'FAIL'}
+              {data.authHealth.status != null ? ` ${data.authHealth.status}` : ''}
+              {data.authHealth.detail ? ` — ${data.authHealth.detail}` : ''}
+            </p>
+          ) : null}
+          {data.restSmoke ? (
+            <p className={latencyClass(data.restSmoke.latencyMs, data.restSmoke.ok)}>
+              REST HEAD establishments: {data.restSmoke.ok ? 'OK' : 'FAIL'}
+              {data.restSmoke.status != null ? ` ${data.restSmoke.status}` : ''}
+              {data.restSmoke.detail ? ` — ${data.restSmoke.detail}` : ''}
+            </p>
+          ) : null}
+          {data.supabaseUrlHost ? (
+            <p className="text-gray-600 truncate" title={data.supabaseUrlHost}>
+              Хост: {data.supabaseUrlHost}
+            </p>
+          ) : null}
+        </div>
+      )}
+
+      {!data.cloudflare.configured && (
+        <p className="text-amber-200/90 text-sm border border-amber-800/50 rounded-lg p-3 bg-amber-950/20">
+          Трафик Cloudflare не подключён: добавьте CLOUDFLARE_API_TOKEN и CLOUDFLARE_ZONE_ID в секреты Worker — как для
+          вкладки «Безопасность».
+        </p>
+      )}
+      {data.cloudflare.configured && data.cloudflare.graphqlError && (
+        <p className="text-amber-300/90 text-xs">{data.cloudflare.graphqlError}</p>
+      )}
+
+      {data.hints.length > 0 && (
+        <section>
+          <h2 className="text-base font-semibold text-white mb-2">Подсказки</h2>
+          <ul className="space-y-2">
+            {data.hints.map((h, i) => (
+              <li key={i} className="text-sm text-gray-400 border-l-2 border-gray-700 pl-3">
+                {h}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section>
+        <h2 className="text-base font-semibold text-white mb-2">Где смотреть полные метрики</h2>
+        <ul className="space-y-2 text-sm">
+          <li>
+            <a
+              href={data.links.supabaseProject}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Supabase — проект (отчёты, логи, биллинг)
+            </a>
+          </li>
+          <li>
+            <a
+              href={data.links.supabaseAdvisor}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Supabase — Advisors (медленные запросы, индексы)
+            </a>
+          </li>
+          <li>
+            <a
+              href={data.links.cloudflareAnalytics}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Cloudflare — аналитика трафика зоны
+            </a>
+          </li>
+          <li>
+            <a
+              href={data.links.cloudflareWorkersOverview}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Cloudflare — Workers &amp; Pages (в т.ч. эта админка)
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <button
+        type="button"
+        onClick={() => load()}
+        className="bg-gray-800 hover:bg-gray-700 border border-gray-700 px-4 py-2 rounded-lg text-sm"
+      >
+        Обновить проверки
       </button>
     </div>
   )

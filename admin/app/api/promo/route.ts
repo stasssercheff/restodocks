@@ -53,6 +53,15 @@ export async function POST(req: NextRequest) {
   if (body.expires_at && isNaN(Date.parse(body.expires_at))) {
     return NextResponse.json({ error: 'Invalid expires_at: must be a valid ISO date string' }, { status: 400 })
   }
+  if (body.activation_duration_days !== undefined && body.activation_duration_days !== null) {
+    const n = Number(body.activation_duration_days)
+    if (!Number.isInteger(n) || n < 1 || n > 36500) {
+      return NextResponse.json(
+        { error: 'Invalid activation_duration_days: must be an integer between 1 and 36500' },
+        { status: 400 },
+      )
+    }
+  }
 
   const config = await getSupabaseConfig()
   if (!config) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
@@ -65,6 +74,7 @@ export async function POST(req: NextRequest) {
       starts_at: body.starts_at || null,
       expires_at: body.expires_at || null,
       max_employees: body.max_employees ?? null,
+      activation_duration_days: body.activation_duration_days ?? null,
     })
     .select()
     .single()
@@ -78,7 +88,27 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json()
   const { id, ...updates } = body
-  const allowed = ['code', 'note', 'starts_at', 'expires_at', 'is_used', 'used_at', 'used_by_establishment_id', 'max_employees', 'is_disabled'] as const
+  const allowed = [
+    'code',
+    'note',
+    'starts_at',
+    'expires_at',
+    'is_used',
+    'used_at',
+    'used_by_establishment_id',
+    'max_employees',
+    'is_disabled',
+    'activation_duration_days',
+  ] as const
+  if (updates.activation_duration_days !== undefined && updates.activation_duration_days !== null) {
+    const n = Number(updates.activation_duration_days)
+    if (!Number.isInteger(n) || n < 1 || n > 36500) {
+      return NextResponse.json(
+        { error: 'Invalid activation_duration_days: must be an integer between 1 and 36500' },
+        { status: 400 },
+      )
+    }
+  }
   const patch = Object.fromEntries(
     Object.entries(updates).filter(([k]) => allowed.includes(k as typeof allowed[number]))
   )

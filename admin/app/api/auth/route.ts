@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getCloudflareContext } from '@opennextjs/cloudflare'
+import { getAdminPassword } from '@/lib/admin-env'
 import { createSessionToken } from '@/lib/session'
 
 export const dynamic = 'force-dynamic'
@@ -47,22 +47,6 @@ function recordFailedAttempt(ip: string): AttemptState {
 
 function clearAttemptState(ip: string): void {
   attemptBuckets.delete(ip)
-}
-
-async function getAdminPassword(): Promise<string> {
-  const p = (process.env.ADMIN_PASSWORD ?? '').trim()
-  if (p) return p
-  try {
-    const { env } = await getCloudflareContext()
-    const kv = (env as { ADMIN_CONFIG?: { get: (k: string) => Promise<string | null> } }).ADMIN_CONFIG
-    if (kv) {
-      const v = await kv.get('admin_password')
-      return (v ?? '').trim()
-    }
-  } catch {
-    // ignore
-  }
-  return ''
 }
 
 export async function POST(req: NextRequest) {

@@ -28,7 +28,10 @@ export type PromoCode = {
   created_at: string
   note: string | null
   starts_at: string | null
+  /** Срок ввести код (не длина Pro, если задано activation_duration_days). */
   expires_at: string | null
+  /** Дней Pro с момента активации; при изменении у использованного кода пересчитывается окончание. */
+  activation_duration_days?: number | null
   max_employees: number | null
   establishments?: { name: string } | null
 }

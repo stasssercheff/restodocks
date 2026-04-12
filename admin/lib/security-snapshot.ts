@@ -106,7 +106,7 @@ export function buildInsights(requests24h: number | null, events: FwEvent[]): In
   return out
 }
 
-function supabaseProjectRefFromUrl(supabaseUrl: string): string | null {
+export function supabaseProjectRefFromUrl(supabaseUrl: string): string | null {
   const m = /^https:\/\/([a-z0-9-]+)\.supabase\.co\/?$/i.exec(supabaseUrl.trim())
   return m ? m[1] : null
 }
