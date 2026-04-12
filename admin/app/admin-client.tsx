@@ -5,6 +5,11 @@ import { useRouter } from 'next/navigation'
 import type { PromoCode } from '@/lib/supabase'
 import type { Insight, SecuritySnapshotPayload } from '@/lib/security-snapshot'
 import type { SystemHealthPayload } from '@/lib/system-health'
+import {
+  PROMO_GRANT_SUBSCRIPTION_TYPES,
+  subscriptionTierLabelRu,
+  type PromoGrantSubscriptionType,
+} from '@/lib/promo-tiers'
 
 type SubscriptionSummary = {
   statusLabel: string
@@ -156,12 +161,12 @@ function EstablishmentsTab() {
   }
 
   function subscriptionStatusTextClass(status: string): string {
-    if (status === 'Без Pro') return 'text-gray-500'
+    if (status === 'Без подписки' || status === 'Без Pro') return 'text-gray-500'
     if (status.startsWith('Пробный')) return 'text-sky-300'
-    if (status === 'Pro истёк') return 'text-red-300/90'
-    if (status.includes('промокод')) return 'text-amber-200'
-    if (status.includes('оплачен')) return 'text-emerald-300'
-    if (status === 'Pro') return 'text-emerald-200'
+    if (status.includes('истёк')) return 'text-red-300/90'
+    if (status.includes('промокод') && !status.includes('истёк')) return 'text-amber-200'
+    if (status.includes('(оплата)') || status.includes('оплачен')) return 'text-emerald-300'
+    if (!status.includes('Без')) return 'text-emerald-200'
     return 'text-gray-200'
   }
 
@@ -343,7 +348,7 @@ function EstablishmentsTab() {
       <div className="grid grid-cols-3 gap-2 mb-4 sm:gap-3 sm:mb-8">
         <StatCard label="Заведений" value={total} />
         <StatCard label="Сотрудников" value={totalEmployees} />
-        <StatCard label="Активных Pro" value={totalProActive} />
+        <StatCard label="С платным тарифом" value={totalProActive} />
       </div>
 
       <div className="flex flex-wrap gap-2 mb-3 md:hidden">
@@ -363,7 +368,7 @@ function EstablishmentsTab() {
           className="bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs flex-1 min-w-[8rem]"
         >
           <option value="all">Подписка: все</option>
-          <option value="no_pro">Без Pro</option>
+          <option value="no_pro">Без подписки</option>
           <option value="trial">Пробный</option>
           <option value="promo">Pro (промокод)</option>
           <option value="paid_iap">Pro (оплата)</option>
@@ -442,7 +447,7 @@ function EstablishmentsTab() {
                       className="w-full max-w-[12rem] bg-gray-950 border border-gray-700 rounded-md px-1.5 py-1 text-[11px] text-gray-200 font-normal normal-case tracking-normal"
                     >
                       <option value="all">Все</option>
-                      <option value="no_pro">Без Pro</option>
+                      <option value="no_pro">Без подписки</option>
                       <option value="trial">Пробный</option>
                       <option value="promo">Pro (промокод)</option>
                       <option value="paid_iap">Pro (оплата)</option>
@@ -597,7 +602,13 @@ function PromoTab() {
   const [newActivationDays, setNewActivationDays] = useState('')
   /** «Классика» = как у уже существующих кодов (поле activation_duration_days пустое). «С активации» — второй, дополнительный тип. */
   const [newPromoLogic, setNewPromoLogic] = useState<'legacy' | 'activation'>('legacy')
+  const [newGrantTier, setNewGrantTier] = useState<PromoGrantSubscriptionType>('pro')
   const [newMaxEmployees, setNewMaxEmployees] = useState('')
+  /** Пакеты +5 сотрудников на одно заведение при погашении */
+  const [newEmpSlotPacks, setNewEmpSlotPacks] = useState('')
+  /** Пакеты +1 филиал на владельца */
+  const [newBranchSlotPacks, setNewBranchSlotPacks] = useState('')
+  const [newAdditiveOnly, setNewAdditiveOnly] = useState(false)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'free' | 'used' | 'expired' | 'disabled'>('all')
 
@@ -619,6 +630,12 @@ function PromoTab() {
 
   async function addCode() {
     if (!newCode.trim()) return
+    const empN = newEmpSlotPacks.trim() ? parseInt(newEmpSlotPacks.trim(), 10) : 0
+    const brN = newBranchSlotPacks.trim() ? parseInt(newBranchSlotPacks.trim(), 10) : 0
+    if (Number.isNaN(empN) || empN < 0 || empN > 500 || Number.isNaN(brN) || brN < 0 || brN > 500) {
+      alert('Пакеты: целые числа от 0 до 500.')
+      return
+    }
     if (newPromoLogic === 'activation') {
       const d = newActivationDays.trim()
       const n = d ? parseInt(d, 10) : NaN
@@ -641,6 +658,10 @@ function PromoTab() {
           newPromoLogic === 'activation' && newActivationDays.trim()
             ? parseInt(newActivationDays.trim(), 10)
             : null,
+        grants_subscription_type: newGrantTier,
+        grants_employee_slot_packs: empN,
+        grants_branch_slot_packs: brN,
+        grants_additive_only: newAdditiveOnly,
       }),
     })
     setNewCode('')
@@ -649,7 +670,11 @@ function PromoTab() {
     setNewEndDate('')
     setNewActivationDays('')
     setNewPromoLogic('legacy')
+    setNewGrantTier('pro')
     setNewMaxEmployees('')
+    setNewEmpSlotPacks('')
+    setNewBranchSlotPacks('')
+    setNewAdditiveOnly(false)
     await loadCodes()
     setSaving(false)
   }
@@ -694,6 +719,23 @@ function PromoTab() {
     await loadCodes()
   }
 
+  async function setGrantTier(row: PromoCode) {
+    const cur = (row.grants_subscription_type ?? 'pro').toLowerCase()
+    const val = prompt('Выдаваемый тариф: pro, ultra, premium, plus, starter, business', cur)
+    if (val === null) return
+    const g = val.trim().toLowerCase()
+    if (!(PROMO_GRANT_SUBSCRIPTION_TYPES as readonly string[]).includes(g)) {
+      alert('Недопустимое значение')
+      return
+    }
+    await fetch('/api/promo', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: row.id, grants_subscription_type: g }),
+    })
+    await loadCodes()
+  }
+
   async function setActivationDays(id: number, current: number | null) {
     const val = prompt(
       'Дней Pro с момента активации (1–36500). Пусто — вернуть промокод к классической логике (как раньше в базе), только дата «действует до»:',
@@ -723,6 +765,57 @@ function PromoTab() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, max_employees: parsed }),
+    })
+    await loadCodes()
+  }
+
+  async function setEmpSlotPacks(id: number, current: number | null | undefined) {
+    const val = prompt(
+      'Пакеты +5 сотрудников на одно заведение при погашении (0–500):',
+      String(current ?? 0),
+    )
+    if (val === null) return
+    const n = parseInt(val.trim(), 10)
+    if (val.trim() === '' || Number.isNaN(n) || n < 0 || n > 500) {
+      alert('Целое число от 0 до 500')
+      return
+    }
+    await fetch('/api/promo', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, grants_employee_slot_packs: n }),
+    })
+    await loadCodes()
+  }
+
+  async function setBranchSlotPacks(id: number, current: number | null | undefined) {
+    const val = prompt('Пакеты +1 филиал на владельца при погашении (0–500):', String(current ?? 0))
+    if (val === null) return
+    const n = parseInt(val.trim(), 10)
+    if (val.trim() === '' || Number.isNaN(n) || n < 0 || n > 500) {
+      alert('Целое число от 0 до 500')
+      return
+    }
+    await fetch('/api/promo', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, grants_branch_slot_packs: n }),
+    })
+    await loadCodes()
+  }
+
+  async function toggleAdditiveOnly(row: PromoCode) {
+    const next = !row.grants_additive_only
+    const ok = next
+      ? confirm(
+          'Включить «только аддон»? Код не будет менять тариф заведения — только начислит пакеты (после основного промо).',
+        )
+      : confirm('Выключить «только аддон»?')
+    if (!ok) return
+    await fetch('/api/promo', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: row.id, grants_additive_only: next }),
     })
     await loadCodes()
   }
@@ -783,6 +876,7 @@ function PromoTab() {
         <p className="text-[11px] text-gray-600 mb-3 leading-snug">
           Уже созданные промокоды <span className="text-gray-500">не меняются</span>: у них по-прежнему пустое поле «дней с активации» и работает прежняя логика.
           Ниже можно завести <span className="text-gray-500">дополнительно второй тип</span> — с длительностью Pro в днях от момента применения кода (число дней потом можно править).
+          Пакеты +5 сотрудников начисляются на <span className="text-gray-500">то заведение, где погасили код</span>; пакеты филиалов — на владельца.
         </p>
         <div className="flex flex-col gap-2 mb-3">
           <span className="text-[11px] text-gray-500 uppercase tracking-wide">Логика</span>
@@ -810,6 +904,24 @@ function PromoTab() {
               />
               Новый тип: дни Pro с активации
             </label>
+          </div>
+          <p className="text-[11px] text-gray-600 mb-2">
+            Тариф по промокоду — отдельно от «классика / с активации»: это значение попадёт в{' '}
+            <span className="text-gray-500">subscription_type</span> заведения (по умолчанию как раньше — pro).
+          </p>
+          <div className="flex flex-col gap-1 mb-3 max-w-xs">
+            <label className="text-xs text-gray-500">Выдаваемый тариф</label>
+            <select
+              value={newGrantTier}
+              onChange={e => setNewGrantTier(e.target.value as PromoGrantSubscriptionType)}
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+            >
+              {PROMO_GRANT_SUBSCRIPTION_TYPES.map(t => (
+                <option key={t} value={t}>
+                  {subscriptionTierLabelRu(t)} ({t})
+                </option>
+              ))}
+            </select>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 sm:items-end">
@@ -872,6 +984,43 @@ function PromoTab() {
               className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-24"
             />
           </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500" title="Начисляется на заведение, где погасили код">
+              +5 сотр. (пак.)
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={500}
+              value={newEmpSlotPacks}
+              onChange={e => setNewEmpSlotPacks(e.target.value)}
+              placeholder="0"
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-20"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-500" title="Слоты на доп. заведения для владельца">
+              +филиал (пак.)
+            </label>
+            <input
+              type="number"
+              min={0}
+              max={500}
+              value={newBranchSlotPacks}
+              onChange={e => setNewBranchSlotPacks(e.target.value)}
+              placeholder="0"
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-20"
+            />
+          </div>
+          <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer sm:mb-6">
+            <input
+              type="checkbox"
+              className="accent-indigo-500 rounded"
+              checked={newAdditiveOnly}
+              onChange={e => setNewAdditiveOnly(e.target.checked)}
+            />
+            Только аддон
+          </label>
           <button
             onClick={addCode}
             disabled={saving || !newCode.trim()}
@@ -925,6 +1074,15 @@ function PromoTab() {
                     Логика / срок
                   </th>
                   <th className="px-4 py-3 text-center">Сотр.</th>
+                  <th
+                    className="px-4 py-3 text-center text-[10px] uppercase"
+                    title="Пакеты при погашении: сотрудники на заведение / филиалы владельцу"
+                  >
+                    Пакеты
+                  </th>
+                  <th className="px-4 py-3 text-center text-[10px] uppercase" title="Только начисление пакетов без смены тарифа">
+                    Аддон
+                  </th>
                   <th className="px-4 py-3 text-left">Создан</th>
                   <th className="px-4 py-3 text-right">Действия</th>
                 </tr>
@@ -952,6 +1110,13 @@ function PromoTab() {
                           <span className="text-[10px] text-gray-600 font-normal tracking-normal">
                             {isNewType ? 'тип: с активации' : 'тип: классика'}
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => setGrantTier(row)}
+                            className="text-[10px] text-left text-gray-500 hover:text-indigo-400"
+                          >
+                            тариф: {subscriptionTierLabelRu(row.grants_subscription_type ?? 'pro')} — изм.
+                          </button>
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -997,6 +1162,39 @@ function PromoTab() {
                           {row.max_employees != null
                             ? <span className="bg-indigo-900/40 text-indigo-300 px-2 py-0.5 rounded">≤{row.max_employees}</span>
                             : <span className="text-gray-600">∞</span>}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-center align-top">
+                        <div className="flex flex-col gap-1 items-center">
+                          <button
+                            type="button"
+                            title="Пакеты +5 сотрудников на заведение"
+                            onClick={() => setEmpSlotPacks(row.id, row.grants_employee_slot_packs)}
+                            className="text-[10px] font-mono hover:text-indigo-400"
+                          >
+                            E:{row.grants_employee_slot_packs ?? 0}
+                          </button>
+                          <button
+                            type="button"
+                            title="Пакеты +1 филиал"
+                            onClick={() => setBranchSlotPacks(row.id, row.grants_branch_slot_packs)}
+                            className="text-[10px] font-mono hover:text-indigo-400"
+                          >
+                            B:{row.grants_branch_slot_packs ?? 0}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => toggleAdditiveOnly(row)}
+                          className={`text-[10px] px-2 py-0.5 rounded border transition ${
+                            row.grants_additive_only
+                              ? 'border-amber-600/60 text-amber-200 bg-amber-950/40'
+                              : 'border-gray-700 text-gray-600 hover:border-gray-500'
+                          }`}
+                        >
+                          {row.grants_additive_only ? 'да' : 'нет'}
                         </button>
                       </td>
                       <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(row.created_at)}</td>
@@ -1059,8 +1257,15 @@ function PromoTab() {
                       {row.is_used && row.establishments?.name ? row.establishments.name : row.note}
                     </div>
                   )}
-                  <div className="text-[10px] text-gray-600 mb-1">
-                    {(row.activation_duration_days ?? 0) > 0 ? 'тип: с активации' : 'тип: классика'}
+                  <div className="text-[10px] text-gray-600 mb-1 space-y-0.5">
+                    <div>{(row.activation_duration_days ?? 0) > 0 ? 'тип: с активации' : 'тип: классика'}</div>
+                    <button
+                      type="button"
+                      onClick={() => setGrantTier(row)}
+                      className="text-indigo-400/90 active:text-indigo-300"
+                    >
+                      тариф: {subscriptionTierLabelRu(row.grants_subscription_type ?? 'pro')} — изм.
+                    </button>
                   </div>
 
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 mb-3">
@@ -1082,6 +1287,10 @@ function PromoTab() {
                     {row.max_employees != null && (
                       <span className="text-indigo-300">≤{row.max_employees} сотр.</span>
                     )}
+                    <span className="text-gray-600">
+                      E:{row.grants_employee_slot_packs ?? 0} B:{row.grants_branch_slot_packs ?? 0}
+                      {row.grants_additive_only ? ' · аддон' : ''}
+                    </span>
                     <span>создан {formatDate(row.created_at)}</span>
                   </div>
 
@@ -1111,8 +1320,33 @@ function PromoTab() {
                     <button
                       onClick={() => setMaxEmployees(row.id, row.max_employees)}
                       className="px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white active:text-white text-sm"
+                      title="Макс. сотрудников (промо)"
                     >
                       👥
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEmpSlotPacks(row.id, row.grants_employee_slot_packs)}
+                      className="px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white text-sm font-mono text-[11px]"
+                      title="Пакеты +5 сотрудников на заведение"
+                    >
+                      E
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBranchSlotPacks(row.id, row.grants_branch_slot_packs)}
+                      className="px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white text-sm font-mono text-[11px]"
+                      title="Пакеты +1 филиал"
+                    >
+                      B
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleAdditiveOnly(row)}
+                      className="px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-amber-200 text-sm"
+                      title="Только аддон"
+                    >
+                      +
                     </button>
                     <button
                       onClick={() => deleteCode(row.id)}

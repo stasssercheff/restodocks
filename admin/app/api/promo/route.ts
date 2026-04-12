@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { getAdminPassword, getSupabaseConfig } from '@/lib/admin-env'
 import { verifySessionToken } from '@/lib/session'
+import { isAllowedPromoGrantType } from '@/lib/promo-tiers'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,6 +63,34 @@ export async function POST(req: NextRequest) {
       )
     }
   }
+  const grantTier = typeof body.grants_subscription_type === 'string'
+    ? body.grants_subscription_type.trim().toLowerCase()
+    : 'pro'
+  if (!isAllowedPromoGrantType(grantTier)) {
+    return NextResponse.json(
+      { error: 'Invalid grants_subscription_type: use pro, ultra, premium, plus, starter, or business' },
+      { status: 400 },
+    )
+  }
+
+  const empPacks =
+    body.grants_employee_slot_packs !== undefined && body.grants_employee_slot_packs !== null
+      ? Number(body.grants_employee_slot_packs)
+      : 0
+  const brPacks =
+    body.grants_branch_slot_packs !== undefined && body.grants_branch_slot_packs !== null
+      ? Number(body.grants_branch_slot_packs)
+      : 0
+  if (!Number.isInteger(empPacks) || empPacks < 0 || empPacks > 500) {
+    return NextResponse.json({ error: 'Invalid grants_employee_slot_packs: 0–500' }, { status: 400 })
+  }
+  if (!Number.isInteger(brPacks) || brPacks < 0 || brPacks > 500) {
+    return NextResponse.json({ error: 'Invalid grants_branch_slot_packs: 0–500' }, { status: 400 })
+  }
+  const additiveOnly =
+    body.grants_additive_only === true ||
+    body.grants_additive_only === 'true' ||
+    body.grants_additive_only === 1
 
   const config = await getSupabaseConfig()
   if (!config) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
@@ -75,6 +104,10 @@ export async function POST(req: NextRequest) {
       expires_at: body.expires_at || null,
       max_employees: body.max_employees ?? null,
       activation_duration_days: body.activation_duration_days ?? null,
+      grants_subscription_type: grantTier,
+      grants_employee_slot_packs: empPacks,
+      grants_branch_slot_packs: brPacks,
+      grants_additive_only: additiveOnly,
     })
     .select()
     .single()
@@ -99,7 +132,38 @@ export async function PATCH(req: NextRequest) {
     'max_employees',
     'is_disabled',
     'activation_duration_days',
+    'grants_subscription_type',
+    'grants_employee_slot_packs',
+    'grants_branch_slot_packs',
+    'grants_additive_only',
   ] as const
+  if (updates.grants_subscription_type !== undefined && updates.grants_subscription_type !== null) {
+    const g = String(updates.grants_subscription_type).trim().toLowerCase()
+    if (!isAllowedPromoGrantType(g)) {
+      return NextResponse.json(
+        { error: 'Invalid grants_subscription_type: use pro, ultra, premium, plus, starter, or business' },
+        { status: 400 },
+      )
+    }
+    updates.grants_subscription_type = g
+  }
+  if (updates.grants_employee_slot_packs !== undefined && updates.grants_employee_slot_packs !== null) {
+    const n = Number(updates.grants_employee_slot_packs)
+    if (!Number.isInteger(n) || n < 0 || n > 500) {
+      return NextResponse.json({ error: 'Invalid grants_employee_slot_packs: 0–500' }, { status: 400 })
+    }
+    updates.grants_employee_slot_packs = n
+  }
+  if (updates.grants_branch_slot_packs !== undefined && updates.grants_branch_slot_packs !== null) {
+    const n = Number(updates.grants_branch_slot_packs)
+    if (!Number.isInteger(n) || n < 0 || n > 500) {
+      return NextResponse.json({ error: 'Invalid grants_branch_slot_packs: 0–500' }, { status: 400 })
+    }
+    updates.grants_branch_slot_packs = n
+  }
+  if (updates.grants_additive_only !== undefined && updates.grants_additive_only !== null) {
+    updates.grants_additive_only = Boolean(updates.grants_additive_only)
+  }
   if (updates.activation_duration_days !== undefined && updates.activation_duration_days !== null) {
     const n = Number(updates.activation_duration_days)
     if (!Number.isInteger(n) || n < 1 || n > 36500) {

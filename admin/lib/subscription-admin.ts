@@ -1,7 +1,13 @@
 /**
- * Сводка Pro для админки: статус, способ (IAP / промокод), дата окончания.
- * Логика согласована с клиентом: effective Pro = оплаченный Pro ИЛИ активное окно trial.
+ * Сводка подписки для админки: тариф (не только pro), способ (IAP / промокод), даты.
  */
+import { isAllowedPromoGrantType, subscriptionTierLabelRu } from '@/lib/promo-tiers'
+
+function isPaidSubscriptionTier(sub: string | null | undefined): boolean {
+  const t = (sub ?? 'free').toLowerCase().trim()
+  if (t === 'free' || t === '') return false
+  return isAllowedPromoGrantType(t)
+}
 
 /** Данные погашения из promo_code_redemptions + promo_codes (для админки). */
 export type PromoRedemptionRow = {
@@ -64,8 +70,7 @@ export function hasEffectivePro(
   const trialActive = trialUntil !== null && trialUntil > now
   if (trialActive) return true
 
-  const isProTier = sub === 'pro' || sub === 'premium'
-  if (!isProTier) return false
+  if (!isPaidSubscriptionTier(sub)) return false
 
   if (paidUntil !== null && paidUntil > now) return true
   if (paidUntil !== null && paidUntil <= now) return false
@@ -96,13 +101,14 @@ export function summarizeSubscriptionForAdmin(
   const promoEnd = promoProEndDate(promo)
 
   const trialActive = trialUntil !== null && trialUntil > now
-  const isProTier = sub === 'pro' || sub === 'premium'
-  const paidProActive =
-    isProTier && (paidUntil === null || paidUntil > now)
-  const paidProExpired = isProTier && paidUntil !== null && paidUntil <= now
+  const tierName = subscriptionTierLabelRu(est.subscription_type)
+  const paidTierActive =
+    isPaidSubscriptionTier(sub) && (paidUntil === null || paidUntil > now)
+  const paidTierExpired =
+    isPaidSubscriptionTier(sub) && paidUntil !== null && paidUntil <= now
 
   if (!hasEffectivePro(est, promo, nowMs)) {
-    if (promo?.code && isProTier && !trialActive) {
+    if (promo?.code && isPaidSubscriptionTier(sub) && !trialActive) {
       const pDetail =
         promo.activation_duration_days != null &&
         promo.activation_duration_days > 0 &&
@@ -113,16 +119,16 @@ export function summarizeSubscriptionForAdmin(
               return exp ? `истёк ${exp.toLocaleDateString('ru-RU')}` : null
             })()
       return {
-        statusLabel: 'Pro истёк',
+        statusLabel: `${tierName} (истёк, промо)`,
         paymentLabel: 'Промокод (истёк)',
         promoCode: promo.code,
         proUntilIso: est.pro_paid_until ?? null,
         detail: pDetail,
       }
     }
-    if (paidProExpired && !trialActive) {
+    if (paidTierExpired && !trialActive) {
       return {
-        statusLabel: 'Pro истёк',
+        statusLabel: `${tierName} (истёк)`,
         paymentLabel: 'App Store / другое',
         promoCode: promo?.code ?? null,
         proUntilIso: est.pro_paid_until ?? null,
@@ -130,7 +136,7 @@ export function summarizeSubscriptionForAdmin(
       }
     }
     return {
-      statusLabel: 'Без Pro',
+      statusLabel: 'Без подписки',
       paymentLabel: '—',
       promoCode: null,
       proUntilIso: null,
@@ -138,10 +144,10 @@ export function summarizeSubscriptionForAdmin(
     }
   }
 
-  // Пробный 72ч имеет приоритет в отображении, если оплаченного Pro ещё нет
-  if (trialActive && !paidProActive) {
+  // Пробный 72ч имеет приоритет в отображении, если оплаченного тарифа ещё нет
+  if (trialActive && !paidTierActive) {
     return {
-      statusLabel: 'Пробный Pro',
+      statusLabel: 'Пробный период',
       paymentLabel: '—',
       promoCode: null,
       proUntilIso: null,
@@ -169,7 +175,7 @@ export function summarizeSubscriptionForAdmin(
       else detail = 'без срока (промо)'
     }
     return {
-      statusLabel: 'Pro (промокод)',
+      statusLabel: `${tierName} (промокод)`,
       paymentLabel: 'Промокод',
       promoCode: promo.code,
       proUntilIso,
@@ -179,7 +185,7 @@ export function summarizeSubscriptionForAdmin(
 
   if (paidUntil !== null) {
     return {
-      statusLabel: 'Pro оплачен',
+      statusLabel: `${tierName} (оплата)`,
       paymentLabel: 'App Store (In-App Purchase)',
       promoCode: null,
       proUntilIso,
@@ -188,7 +194,7 @@ export function summarizeSubscriptionForAdmin(
   }
 
   return {
-    statusLabel: 'Pro',
+    statusLabel: tierName,
     paymentLabel: 'Неизвестно / вручную',
     promoCode: null,
     proUntilIso: null,
@@ -211,10 +217,10 @@ export function subscriptionGroupKey(
 ): 'no_pro' | 'trial' | 'promo' | 'paid_iap' | 'expired' | 'pro_other' {
   const s = summarizeSubscriptionForAdmin(est, promo, nowMs)
   const label = s.statusLabel
-  if (label === 'Без Pro') return 'no_pro'
-  if (label === 'Пробный Pro') return 'trial'
-  if (label === 'Pro (промокод)') return 'promo'
-  if (label === 'Pro оплачен') return 'paid_iap'
-  if (label === 'Pro истёк') return 'expired'
+  if (label === 'Без подписки' || label === 'Без Pro') return 'no_pro'
+  if (label.includes('Пробный')) return 'trial'
+  if (label.includes('(промокод)') && !label.includes('истёк')) return 'promo'
+  if (label.includes('(оплата)') || label.includes('App Store')) return 'paid_iap'
+  if (label.includes('истёк')) return 'expired'
   return 'pro_other'
 }
