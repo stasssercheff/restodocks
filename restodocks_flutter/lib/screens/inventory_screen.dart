@@ -2636,6 +2636,12 @@ class _InventoryScreenState extends State<InventoryScreen>
       final nameW = (w * 0.5).clamp(168.0, 520.0);
       return nameW + _colNoWidth + _colUnitWidth + _colTotalWidth + 3 * _colGap;
     }
+    // ПК / планшет (shortestSide ≥ 600): шире колонка наименования — длинные названия в одну строку.
+    if (!narrow) {
+      final nameW = (w * 0.40).clamp(360.0, 920.0);
+      return nameW + _colNoWidth + _colUnitWidth + _colTotalWidth + 3 * _colGap;
+    }
+    // Узкий телефон, портрет
     final base = (w * 0.42).clamp(140.0, 200.0);
     return base + _colGap + _colTotalWidth;
   }
@@ -2829,6 +2835,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   Widget _buildFixedDataRow(
       LocalizationService loc, int actualIndex, int rowNumber) {
     final theme = Theme.of(context);
+    final wideLayout = !isHandheldNarrowLayout(context);
     final row = _rows[actualIndex];
     final qtyRowFocused =
         !_completed && _focusedQtyRowActualIndex == actualIndex;
@@ -2886,12 +2893,12 @@ class _InventoryScreenState extends State<InventoryScreen>
                       color: qtyRowFocused
                           ? theme.colorScheme.onPrimaryContainer
                           : null,
-                      fontWeight:
-                          qtyRowFocused ? FontWeight.w600 : FontWeight.normal,
+                    fontWeight:
+                        qtyRowFocused ? FontWeight.w600 : FontWeight.normal,
                     ),
-                    maxLines: 2,
+                    maxLines: wideLayout ? 1 : 2,
                     overflow: TextOverflow.ellipsis,
-                    softWrap: true,
+                    softWrap: !wideLayout,
                   ),
                 ),
               ),
@@ -3842,7 +3849,7 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
                                                 key: ValueKey(
                                                     'qty_${widget.actualIndex}_$colIndex'),
                                                 value: row.quantities[colIndex],
-                                                fieldHeight: 34,
+                                                fieldHeight: _kInventoryDataRowHeight,
                                                 useGrams: row.isWeightInKg,
                                                 onChanged: (v) =>
                                                     widget.onSetQuantity(
@@ -4052,12 +4059,15 @@ class _QtyCellState extends State<_QtyCell> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final vPad = widget.fieldHeight <= 30 ? 4.0 : 8.0;
+    // expands + фиксированная высота: текст и рамка по центру строки (без «прилипания» к верху).
     return SizedBox(
       height: widget.fieldHeight,
       child: TextField(
         controller: _controller,
         focusNode: _focus,
+        expands: true,
+        maxLines: null,
+        minLines: null,
         textInputAction: widget.textInputAction,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         inputFormatters: [
@@ -4066,10 +4076,10 @@ class _QtyCellState extends State<_QtyCell> {
         textAlign: TextAlign.center,
         textAlignVertical: TextAlignVertical.center,
         style: theme.textTheme.bodyMedium
-            ?.copyWith(fontSize: widget.fontSize, height: 1.15),
+            ?.copyWith(fontSize: widget.fontSize, height: 1.0),
         decoration: InputDecoration(
           isDense: true,
-          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: vPad),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
           filled: true,
           fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
