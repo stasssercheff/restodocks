@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/roles_config.dart';
 import '../services/services.dart';
+import '../utils/employee_limit_message.dart';
 import '../utils/person_name_format.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/apple_email_prefill_button.dart';
@@ -194,7 +195,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         devLog('DEBUG: Supabase Auth signUp failed: $e');
       }
 
-      // Проверяем лимит сотрудников по промокоду заведения
+      // Лимит сотрудников (тариф + пакеты; owner без должности не в счёте — см. RPC)
       try {
         final limitResult = await Supabase.instance.client.rpc(
           'check_employee_limit',
@@ -203,7 +204,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
         if (limitResult == 'limit_reached') {
           if (!mounted) return;
           final loc = context.read<LocalizationService>();
-          setState(() => _errorMessage = loc.t('employee_limit_reached'));
+          var msg = loc.t('employee_limit_reached');
+          try {
+            final capRaw = await Supabase.instance.client.rpc(
+              'establishment_active_employee_cap',
+              params: {'p_establishment_id': establishment.id},
+            );
+            final capStr = capRaw?.toString();
+            if (capStr != null && capStr.isNotEmpty) {
+              msg = loc.t('employee_limit_reached_cap', args: {'cap': capStr});
+            }
+          } catch (_) {}
+          setState(() => _errorMessage = msg);
           return;
         }
       } catch (_) {
@@ -265,6 +277,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } catch (e) {
       if (!mounted) return;
       final loc = context.read<LocalizationService>();
+      if (employeeLimitCapFromMessage(e.toString()) != null ||
+          e.toString().toLowerCase().contains('employee_limit_reached')) {
+        setState(() => _errorMessage = employeeLimitUserMessage(loc, e));
+        return;
+      }
       setState(() => _errorMessage = loc.t('register_error', args: {'error': e.toString()}));
     } finally {
       if (mounted) setState(() => _isLoading = false);

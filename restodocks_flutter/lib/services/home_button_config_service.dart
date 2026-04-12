@@ -111,7 +111,7 @@ extension HomeButtonActionExt on HomeButtonAction {
 }
 
 /// Доступные действия для роли. [hasProSubscription] — раздел «Расходы» только при Pro.
-/// [ownerLiteHome] — у владельца на Lite в средней кнопке только график и меню (по умолчанию — график).
+/// [ownerLiteHome] — у владельца на Lite средняя кнопка только график (без переключения на меню).
 List<HomeButtonAction> homeButtonActionsFor(Employee? emp,
     {bool hasProSubscription = false, bool ownerLiteHome = false}) {
   if (emp == null) return [HomeButtonAction.schedule];
@@ -119,11 +119,10 @@ List<HomeButtonAction> homeButtonActionsFor(Employee? emp,
   final isChef = emp.hasRole('executive_chef') || emp.hasRole('sous_chef');
   final isManagement = emp.department == 'management' || isChef ||
       emp.hasRole('bar_manager') || emp.hasRole('floor_manager') || emp.hasRole('general_manager');
-  final isLineStaff = !isOwner && !isManagement;
 
   if (isOwner) {
     if (ownerLiteHome) {
-      return [HomeButtonAction.schedule, HomeButtonAction.menu];
+      return [HomeButtonAction.schedule];
     }
     return [HomeButtonAction.inbox, HomeButtonAction.messages, HomeButtonAction.schedule, HomeButtonAction.menu];
   }

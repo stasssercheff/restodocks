@@ -9,6 +9,10 @@ enum AppSubscriptionTier {
 
 /// Доступ к функциям по тарифу и триалу 72 ч (триал = полный доступ к платным разделам,
 /// отдельные лимиты — trial_increment_usage и т.д.).
+///
+/// Базовые лимиты активных «слотов» сотрудников (без пакетов +5): Lite 3, Pro 8, Ultra 15
+/// — на стороне БД (`establishment_active_employee_cap`); собственник без должности
+/// (в `roles` только owner) в счёт не идёт (`employee_row_counts_toward_cap`).
 class SubscriptionEntitlements {
   SubscriptionEntitlements._(this.establishment);
 

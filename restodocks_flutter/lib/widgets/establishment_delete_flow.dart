@@ -139,9 +139,17 @@ Future<void> showDeleteEstablishmentFlow(
     }
     if (!context.mounted) return;
     final msg = e.toString();
+    final lower = msg.toLowerCase();
     var snack = loc.t('delete_establishment_wrong_pin');
-    if (msg.contains('Email') || msg.contains('email')) {
+    if (lower.contains('email does not match') ||
+        lower.contains('email не совпадает') ||
+        (lower.contains('email') && lower.contains('match'))) {
       snack = loc.t('delete_establishment_wrong_email');
+    } else if (!lower.contains('invalid pin') &&
+        !lower.contains('pin code') &&
+        !lower.contains('неверный') &&
+        !lower.contains('wrong pin')) {
+      snack = loc.t('delete_establishment_failed');
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(snack), backgroundColor: Colors.red),
