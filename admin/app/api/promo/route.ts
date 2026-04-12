@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   }
   const grantTier = typeof body.grants_subscription_type === 'string'
     ? body.grants_subscription_type.trim().toLowerCase()
-    : 'pro'
+    : 'ultra'
   if (!isAllowedPromoGrantType(grantTier)) {
     return NextResponse.json(
       { error: 'Invalid grants_subscription_type: use pro, ultra, premium, plus, starter, or business' },

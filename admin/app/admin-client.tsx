@@ -641,7 +641,7 @@ function PromoTab() {
   const [newActivationDays, setNewActivationDays] = useState('')
   /** «Классика» = как у уже существующих кодов (поле activation_duration_days пустое). «С активации» — второй, дополнительный тип. */
   const [newPromoLogic, setNewPromoLogic] = useState<'legacy' | 'activation'>('legacy')
-  const [newGrantTier, setNewGrantTier] = useState<PromoGrantSubscriptionType>('pro')
+  const [newGrantTier, setNewGrantTier] = useState<PromoGrantSubscriptionType>('ultra')
   const [newMaxEmployees, setNewMaxEmployees] = useState('')
   /** Пакеты +5 сотрудников на одно заведение при погашении */
   const [newEmpSlotPacks, setNewEmpSlotPacks] = useState('')
@@ -709,7 +709,7 @@ function PromoTab() {
     setNewEndDate('')
     setNewActivationDays('')
     setNewPromoLogic('legacy')
-    setNewGrantTier('pro')
+    setNewGrantTier('ultra')
     setNewMaxEmployees('')
     setNewEmpSlotPacks('')
     setNewBranchSlotPacks('')
@@ -759,8 +759,8 @@ function PromoTab() {
   }
 
   async function setGrantTier(row: PromoCode) {
-    const cur = (row.grants_subscription_type ?? 'pro').toLowerCase()
-    const val = prompt('Выдаваемый тариф: pro, ultra, premium, plus, starter, business', cur)
+    const cur = (row.grants_subscription_type ?? 'ultra').toLowerCase()
+    const val = prompt('Выдаваемый тариф: ultra, pro, premium, plus, starter, business', cur)
     if (val === null) return
     const g = val.trim().toLowerCase()
     if (!(PROMO_GRANT_SUBSCRIPTION_TYPES as readonly string[]).includes(g)) {
@@ -1161,7 +1161,7 @@ function PromoTab() {
                             onClick={() => setGrantTier(row)}
                             className="text-[10px] text-left text-gray-500 hover:text-indigo-400"
                           >
-                            тариф: {subscriptionTierLabelRu(row.grants_subscription_type ?? 'pro')} — изм.
+                            тариф: {subscriptionTierLabelRu(row.grants_subscription_type ?? 'ultra')} — изм.
                           </button>
                         </div>
                       </td>
@@ -1312,7 +1312,7 @@ function PromoTab() {
                       onClick={() => setGrantTier(row)}
                       className="text-indigo-400/90 active:text-indigo-300"
                     >
-                      тариф: {subscriptionTierLabelRu(row.grants_subscription_type ?? 'pro')} — изм.
+                      тариф: {subscriptionTierLabelRu(row.grants_subscription_type ?? 'ultra')} — изм.
                     </button>
                   </div>
 

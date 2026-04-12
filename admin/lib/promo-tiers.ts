@@ -11,7 +11,7 @@ export const PROMO_GRANT_SUBSCRIPTION_TYPES = [
 export type PromoGrantSubscriptionType = (typeof PROMO_GRANT_SUBSCRIPTION_TYPES)[number]
 
 export function isAllowedPromoGrantType(raw: string | null | undefined): raw is PromoGrantSubscriptionType {
-  const t = (raw ?? 'pro').toLowerCase().trim()
+  const t = (raw ?? 'ultra').toLowerCase().trim()
   return (PROMO_GRANT_SUBSCRIPTION_TYPES as readonly string[]).includes(t)
 }
 
