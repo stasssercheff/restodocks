@@ -13,6 +13,7 @@ import '../core/mobile_browser_chrome_nudge_stub.dart'
 import '../core/pwa_fullscreen_hint_gate_stub.dart'
     if (dart.library.html) '../core/pwa_fullscreen_hint_gate_web.dart'
     as pwa_hint_gate;
+import '../core/subscription_entitlements.dart';
 import '../core/theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/localization_service.dart';
@@ -153,8 +154,12 @@ class _AppShellState extends State<AppShell> {
 
     final isOwner = currentEmployee.hasRole('owner');
     final homeBtnConfig = context.watch<HomeButtonConfigService>();
+    final ownerLite = SubscriptionEntitlements.from(accountManager.establishment)
+            .isLiteTier &&
+        (currentEmployee.hasRole('owner'));
     final middleAction = homeBtnConfig.effectiveAction(currentEmployee,
-        hasProSubscription: accountManager.hasProSubscription);
+        hasProSubscription: accountManager.hasProSubscription,
+        ownerLiteHome: ownerLite);
     final noDataAccess = !isOwner && !currentEmployee.effectiveDataAccess;
     final isKitchenNoData =
         noDataAccess && currentEmployee.department == 'kitchen';
@@ -433,6 +438,16 @@ class _AppShellState extends State<AppShell> {
       bool isKitchenNoData,
       Employee? employee,
       int currentIndex) {
+    // Уже на домашнем экране: повторный тап «Дом» не должен вызывать go() — иначе
+    // лишняя анимация (как «вперёд») поверх того же маршрута.
+    if (index == 0) {
+      final loc = GoRouterState.of(context).matchedLocation;
+      final pathOnly = loc.split('?').first;
+      if (pathOnly == '/home' || pathOnly == '/') {
+        return;
+      }
+    }
+
     // Если переходим на вкладку с меньшим индексом — анимируем как «назад» (вправо)
     final isBackward = index < currentIndex;
     final extra = isBackward ? {'back': true} : null;
