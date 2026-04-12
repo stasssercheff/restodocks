@@ -198,9 +198,10 @@ export async function GET() {
       pro_paid_until: est.pro_paid_until as string | null | undefined,
       pro_trial_ends_at: est.pro_trial_ends_at as string | null | undefined,
     }
-    const subscription_summary = summarizeSubscriptionForAdmin(subFields, promo)
+    const createdAt = est.created_at as string | null | undefined
+    const subscription_summary = summarizeSubscriptionForAdmin(subFields, promo, Date.now(), createdAt)
     const effective_pro = hasEffectivePro(subFields, promo)
-    const subscription_group = subscriptionGroupKey(subFields, promo)
+    const subscription_group = subscriptionGroupKey(subFields, promo, Date.now(), createdAt)
 
     const isMain = !est.parent_establishment_id
     const scopeIds = isMain ? [estId, ...collectDescendants(estId)] : [estId]

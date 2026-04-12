@@ -53,6 +53,18 @@ function formatDate(iso: string | null) {
   return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+/** Дата и время создания записи заведения в БД (для админки). */
+function formatDateTime(iso: string | null) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 function isExpired(iso: string | null) {
   if (!iso) return false
   return new Date(iso) < new Date()
@@ -244,6 +256,8 @@ function EstablishmentsTab() {
       (e.registration_ip ?? '').toLowerCase().includes(q) ||
       (e.registration_country ?? '').toLowerCase().includes(q) ||
       (e.registration_city ?? '').toLowerCase().includes(q) ||
+      (e.created_at ?? '').toLowerCase().includes(q) ||
+      formatDateTime(e.created_at).toLowerCase().includes(q) ||
       subText.includes(q)
     if (!textMatch) return false
     if (filterType !== 'all' && e.establishment_type !== filterType) return false
@@ -349,6 +363,22 @@ function EstablishmentsTab() {
         <StatCard label="Заведений" value={total} />
         <StatCard label="Сотрудников" value={totalEmployees} />
         <StatCard label="С платным тарифом" value={totalProActive} />
+      </div>
+
+      <div className="mb-4 p-4 bg-gray-900/80 border border-gray-800 rounded-xl text-gray-400 text-sm leading-relaxed">
+        <p className="font-medium text-gray-300 mb-1">Регистрация и пробный Pro</p>
+        <p>
+          Колонка «Регистрация» — дата и время создания <span className="text-gray-500">записи заведения</span> в базе (
+          <code className="text-gray-500 text-xs">establishments.created_at</code>). Для входа{' '}
+          <span className="text-gray-300">без промокода</span> в продукте действует{' '}
+          <span className="text-gray-300">72 часа полного Pro</span> с этого момента (в БД — поле{' '}
+          <code className="text-gray-500 text-xs">pro_trial_ends_at</code>
+          ). С промокодом триал обычно не заполняется — тариф даёт промо.
+        </p>
+        <p className="mt-2 text-xs text-gray-600">
+          Если у старых аккаунтов без промо пропала дата окончания триала, выполни в Supabase миграцию{' '}
+          <code className="text-gray-500">20260621120000_backfill_pro_trial_ends_at_no_promo_main.sql</code>.
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2 mb-3 md:hidden">
@@ -475,7 +505,12 @@ function EstablishmentsTab() {
                   <th className="px-4 py-3 text-center" title="Переопределение лимита доп. заведений для владельца; при нескольких — минимум">
                     Лимит доп.
                   </th>
-                  <th className="px-4 py-3 text-left">Дата</th>
+                  <th
+                    className="px-4 py-3 text-left min-w-[9.5rem]"
+                    title="Дата и время создания записи заведения в БД. Без промокода: 72 ч Pro с этого момента (см. pro_trial_ends_at)."
+                  >
+                    Регистрация
+                  </th>
                   <th className="px-4 py-3 text-left">IP регистрации</th>
                   <th className="px-4 py-3 text-right w-20"></th>
                 </tr>
@@ -513,7 +548,9 @@ function EstablishmentsTab() {
                         )}
                       </button>
                     </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(row.created_at)}</td>
+                    <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap" title={row.created_at}>
+                      {formatDateTime(row.created_at)}
+                    </td>
                     <td className="px-4 py-3 text-gray-400 text-xs font-mono">{regInfo(row)}</td>
                     <td className="px-4 py-3 text-right">
                       <button
@@ -559,7 +596,9 @@ function EstablishmentsTab() {
                   <SubscriptionBlock row={row} />
                 </div>
                 <div className="text-gray-500 text-xs">{row.owner_email}</div>
-                <div className="text-gray-600 text-xs mt-1">{formatDate(row.created_at)}</div>
+                <div className="text-gray-600 text-xs mt-1" title={row.created_at}>
+                  Регистрация: {formatDateTime(row.created_at)}
+                </div>
                 {row.registration_ip && (
                   <div className="text-gray-500 text-xs mt-1 font-mono">{regInfo(row)}</div>
                 )}
@@ -869,6 +908,13 @@ function PromoTab() {
         <StatCard label="Истекло" value={expiredCount} />
         <StatCard label="Отключено" value={disabledCount} />
       </div>
+
+      <p className="text-gray-500 text-sm mb-4 leading-relaxed">
+        Регистрация <span className="text-gray-400">без промокода</span> в приложении даёт владельцу{' '}
+        <span className="text-gray-400">72 часа полного Pro</span> (см. вкладку «Заведения»: колонка «Регистрация» и
+        поле <code className="text-gray-600 text-xs">pro_trial_ends_at</code>). Промокоды ниже — отдельный способ выдать
+        тариф и срок.
+      </p>
 
       {/* Add form */}
       <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 mb-4">
@@ -1197,7 +1243,9 @@ function PromoTab() {
                           {row.grants_additive_only ? 'да' : 'нет'}
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(row.created_at)}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap" title={row.created_at}>
+                        {formatDateTime(row.created_at)}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2 justify-end flex-wrap">
                           <button

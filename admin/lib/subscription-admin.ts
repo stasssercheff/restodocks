@@ -42,6 +42,22 @@ function parseDate(iso: string | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
+const ruDateTime: Intl.DateTimeFormatOptions = {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+}
+
+/** Подсказка для админки: момент создания записи заведения и ориентир окончания 72 ч Pro без промокода. */
+export function registrationAndTrialHint(establishmentCreatedAt: string | null | undefined): string | null {
+  const reg = parseDate(establishmentCreatedAt ?? null)
+  if (!reg) return null
+  const trialEnd = new Date(reg.getTime() + 72 * 3600000)
+  return `Запись заведения: ${reg.toLocaleString('ru-RU', ruDateTime)}. Регистрация без промокода: полный Pro 72 ч с этого момента (ориентир окончания trial: ${trialEnd.toLocaleString('ru-RU', ruDateTime)}).`
+}
+
 /** Конец Pro по промо: фиксированный expires_at в строке промо или N дней с redeemed_at. */
 export function promoProEndDate(promo: PromoRedemptionRow | null | undefined): Date | null {
   if (!promo?.code) return null
@@ -93,6 +109,7 @@ export function summarizeSubscriptionForAdmin(
   est: EstablishmentSubFields,
   promo: PromoRedemptionRow | null | undefined,
   nowMs: number = Date.now(),
+  establishmentCreatedAt?: string | null,
 ): SubscriptionAdminSummary {
   const now = new Date(nowMs)
   const sub = (est.subscription_type ?? 'free').toLowerCase().trim()
@@ -140,7 +157,7 @@ export function summarizeSubscriptionForAdmin(
       paymentLabel: '—',
       promoCode: null,
       proUntilIso: null,
-      detail: null,
+      detail: registrationAndTrialHint(establishmentCreatedAt),
     }
   }
 
@@ -214,8 +231,9 @@ export function subscriptionGroupKey(
   est: EstablishmentSubFields,
   promo: PromoRedemptionRow | null | undefined,
   nowMs: number = Date.now(),
+  establishmentCreatedAt?: string | null,
 ): 'no_pro' | 'trial' | 'promo' | 'paid_iap' | 'expired' | 'pro_other' {
-  const s = summarizeSubscriptionForAdmin(est, promo, nowMs)
+  const s = summarizeSubscriptionForAdmin(est, promo, nowMs, establishmentCreatedAt)
   const label = s.statusLabel
   if (label === 'Без подписки' || label === 'Без Pro') return 'no_pro'
   if (label.includes('Пробный')) return 'trial'
