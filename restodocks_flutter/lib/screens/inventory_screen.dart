@@ -217,15 +217,20 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   @override
   void scheduleSave() {
+    _draftWriteGen++;
     _serverDraftDirty = true;
     super.scheduleSave();
     _scheduleDebouncedServerSave();
   }
 
-  /// Тот же debounce, что и локальное автосохранение — сервер не отстаёт на 45 с от ввода.
+  /// Debounce только для «лёгких» полей (фильтр, дата). Количества — через [saveNow] без задержки.
   Timer? _serverSaveDebounceTimer;
-  /// Пока false — не делаем лишних upsert на Supabase подряд.
+  /// Пока false — не отправляем пустой снимок на сервер.
   bool _serverDraftDirty = false;
+  /// Счётчик правок: пока upsert в полёте, новые saveNow увеличивают gen — цикл докидывает на сервер.
+  int _draftWriteGen = 0;
+  /// Очередь upsert на Supabase (строго по одному запросу, без гонок).
+  Future<void> _serverPushChain = Future.value();
 
   void _scheduleDebouncedServerSave() {
     _serverSaveDebounceTimer?.cancel();
@@ -233,9 +238,13 @@ class _InventoryScreenState extends State<InventoryScreen>
       Duration(milliseconds: scheduleSaveDebounceMs),
       () {
         if (!mounted) return;
-        unawaited(_pushDraftToServer());
+        _enqueueServerPush();
       },
     );
+  }
+
+  void _enqueueServerPush() {
+    _serverPushChain = _serverPushChain.then((_) => _runServerPushDrain());
   }
   final List<_InventoryRow> _rows = [];
 
@@ -319,12 +328,13 @@ class _InventoryScreenState extends State<InventoryScreen>
   String get draftKey =>
       _isSelectiveInventory ? 'selective_inventory' : 'inventory';
 
-  /// Сохранить данные немедленно локально и отправить черновик на сервер (без ожидания 45 с).
+  /// Сохранить немедленно локально и поставить в очередь отправку на сервер (каждое изменение количества).
   void saveNow() {
+    _draftWriteGen++;
     _serverDraftDirty = true;
     _serverSaveDebounceTimer?.cancel();
-    saveImmediately(); // Немедленно, без debounce — данные не потеряются при закрытии/падении
-    unawaited(_pushDraftToServer());
+    saveImmediately(); // Немедленно, без debounce — важно для веб/закрытия вкладки
+    _enqueueServerPush();
   }
 
   @override
@@ -1068,7 +1078,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       case AppLifecycleState.paused:
         if (!_completed && _rows.isNotEmpty) {
           _serverSaveDebounceTimer?.cancel();
-          unawaited(_pushDraftToServer());
+          _enqueueServerPush();
         }
         break;
       default:
@@ -1093,28 +1103,28 @@ class _InventoryScreenState extends State<InventoryScreen>
     super.dispose();
   }
 
-  /// Отправка черновика на Supabase сразу после локального снимка или после debounce ввода.
-  Future<void> _pushDraftToServer() async {
-    if (_completed || _rows.isEmpty)
-      return; // Не сохранять если завершено или пусто
-    if (!_serverDraftDirty) return;
+  /// Пока есть несохранённые на сервер правки — шлём upsert подряд (учитываем правки во время сети).
+  Future<void> _runServerPushDrain() async {
+    while (mounted && !_completed && _rows.isNotEmpty && _serverDraftDirty) {
+      final genAtStart = _draftWriteGen;
+      try {
+        final account = context.read<AccountManagerSupabase>();
+        final establishmentId = account.establishment?.id;
+        if (establishmentId == null) return;
 
-    try {
-      final account = context.read<AccountManagerSupabase>();
-      final establishmentId = account.establishment?.id;
-      if (establishmentId == null) return;
-
-      // Получить текущие данные
-      final currentState = getCurrentState();
-
-      // Отправить на сервер как черновик инвентаризации
-      await _saveDraftToServer(establishmentId, currentState);
-      if (mounted) _serverDraftDirty = false;
-
-      devLog('📡 Auto-saved inventory draft to server');
-    } catch (e) {
-      // Тихая ошибка - не показывать пользователю
-      devLog('⚠️ Failed to auto-save inventory draft: $e');
+        final currentState = getCurrentState();
+        await _saveDraftToServer(establishmentId, currentState);
+        devLog('📡 Inventory draft upserted to server');
+      } catch (e) {
+        devLog('⚠️ Failed to auto-save inventory draft: $e');
+        return;
+      }
+      if (!mounted) return;
+      if (genAtStart == _draftWriteGen) {
+        _serverDraftDirty = false;
+        return;
+      }
+      // За время запроса пользователь ввёл ещё данные — следующая итерация while
     }
   }
 
@@ -1294,9 +1304,9 @@ class _InventoryScreenState extends State<InventoryScreen>
       }
     }
 
-    // При печати в ячейке используем debounce-автосохранение, чтобы не блокировать UI.
-    // Немедленно сохраняем при потере фокуса/ключевых действиях.
-    scheduleSave();
+    // Каждое изменение количества — сразу кэш + очередь на сервер (иначе при закрытии вкладки
+    // до срабатывания debounce данные не попадают ни локально, ни в Supabase).
+    saveNow();
   }
 
   void _removeRow(int index) {
