@@ -1963,16 +1963,17 @@ class _InventoryScreenState extends State<InventoryScreen>
       return true;
     }
     final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
-    return (_isInputMode && !isNarrow) ||
-        (isNarrow &&
-            (isKeyboardOpen ||
-                _nameFilterFocusNode.hasFocus ||
-                _qtyCellFocused));
+    // Схлопывание полной шапки под компактный поиск — только на телефоне.
+    // На ПК не трогаем верх при фокусе в ячейке/клавиатуре (раньше срабатывало `_isInputMode && !isNarrow`).
+    return isNarrow &&
+        (isKeyboardOpen || _nameFilterFocusNode.hasFocus || _qtyCellFocused);
   }
 
   /// Альбом + ввод: минимум вертикального хрома.
   /// На вебе (Safari и др.) `viewInsets.bottom` нередко остаётся 0, поэтому учитываем фокус.
+  /// Только для узкого экрана — на ПК не сжимаем AppBar и секции при вводе в ячейку.
   bool _inventoryKbLandscapeSquish(BuildContext context) {
+    if (!isHandheldNarrowLayout(context)) return false;
     if (MediaQuery.of(context).orientation != Orientation.landscape) {
       return false;
     }
@@ -4035,9 +4036,7 @@ class _QtyCellState extends State<_QtyCell> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // При высоте 34 вертикальные отступы 8+8 визуально прижимают текст к верху рамки.
-    final vPad =
-        widget.fieldHeight <= 30 ? 4.0 : (widget.fieldHeight <= 34 ? 5.0 : 8.0);
+    final vPad = widget.fieldHeight <= 30 ? 4.0 : 8.0;
     return SizedBox(
       height: widget.fieldHeight,
       child: TextField(
