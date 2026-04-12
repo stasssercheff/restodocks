@@ -47,6 +47,14 @@ const _keyRememberPassword = 'restodocks_remember_password';
 String _dateOnly(DateTime d) =>
     '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
+/// RFC 4122 UUID (строго), иначе PostgREST может вернуть 400 на `rpc(..., p_establishment_id)`.
+bool _isValidEstablishmentUuid(String raw) {
+  final s = raw.trim();
+  return RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+  ).hasMatch(s);
+}
+
 /// Сервис управления аккаунтами с использованием Supabase
 class AccountManagerSupabase extends ChangeNotifier {
   static final AccountManagerSupabase _instance =
@@ -61,6 +69,9 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Список сотрудников заведения в памяти (мобильный клиент): меньше повторных SELECT по экранам.
   final Map<String, ({DateTime at, List<Employee> list})> _employeesListCache = {};
+
+  /// Один in-flight `check_establishment_access` на заведение (таймер + resume + гидратация не штормят RPC).
+  final Map<String, Future<void>> _syncEstablishmentAccessInflight = {};
 
   static Duration _employeesMemoryTtl() =>
       kIsWeb ? const Duration(minutes: 20) : const Duration(hours: 6);
@@ -232,8 +243,31 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// вход и работа на free остаются. RPC может вернуть `expired` на старых БД — [logout] не вызываем.
   /// Вызывать после входа, при возврате приложения на передний план и после применения промокода.
   Future<void> syncEstablishmentAccessFromServer() async {
-    final estId = _establishment?.id;
-    if (estId == null) return;
+    final estId = _establishment?.id.trim();
+    if (estId == null || estId.isEmpty) return;
+    if (!_isValidEstablishmentUuid(estId)) {
+      devLog(
+        '🔐 AccountManager: syncEstablishmentAccessFromServer skip (invalid uuid): $estId',
+      );
+      return;
+    }
+
+    final inflight = _syncEstablishmentAccessInflight[estId];
+    if (inflight != null) return inflight;
+
+    final run = _runSyncEstablishmentAccess(estId);
+    _syncEstablishmentAccessInflight[estId] = run;
+    try {
+      await run;
+    } finally {
+      final cur = _syncEstablishmentAccessInflight[estId];
+      if (identical(cur, run)) {
+        _syncEstablishmentAccessInflight.remove(estId);
+      }
+    }
+  }
+
+  Future<void> _runSyncEstablishmentAccess(String estId) async {
     try {
       final result = await _supabase.client.rpc(
         'check_establishment_access',
