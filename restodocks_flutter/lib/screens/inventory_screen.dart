@@ -36,12 +36,16 @@ import '../widgets/on_device_ocr_dialog.dart';
 const String _pfUnitGrams = 'g';
 const String _pfUnitPcs = 'pcs';
 
-/// Размер цифр в ячейках количества (−2 pt к body, чтобы длинные значения влезали).
-const double _kInventoryQtyFontSize = 13;
 const double _kInventoryQtyFieldHeight = 40;
 
 /// Одна высота для фикс. колонки и скролла количеств (без IntrinsicHeight — ровное выравнивание по вертикали).
 const double _kInventoryDataRowHeight = 38;
+
+/// Высота поля ввода количества ≈90% от строки; в строке [Align] центрирует поле по вертикали.
+const double _kInventoryQtyInputHeight = 34;
+
+/// Чуть меньше базового — чтобы 4 цифры умещались в колонку без переноса.
+const double _kInventoryQtyDigitFontSize = 11;
 
 enum _InventoryTableEntryType { section, row, aggregated }
 
@@ -3844,12 +3848,13 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
                                                     .textTheme.bodyMedium
                                                     ?.copyWith(
                                                         fontSize:
-                                                            _kInventoryQtyFontSize))
+                                                            _kInventoryQtyDigitFontSize))
                                             : _QtyCell(
                                                 key: ValueKey(
                                                     'qty_${widget.actualIndex}_$colIndex'),
                                                 value: row.quantities[colIndex],
-                                                fieldHeight: _kInventoryDataRowHeight,
+                                                fieldHeight:
+                                                    _kInventoryQtyInputHeight,
                                                 useGrams: row.isWeightInKg,
                                                 onChanged: (v) =>
                                                     widget.onSetQuantity(
@@ -3990,7 +3995,7 @@ class _QtyCell extends StatefulWidget {
     this.useGrams = false,
     required this.onChanged,
     this.fieldHeight = _kInventoryQtyFieldHeight,
-    this.fontSize = _kInventoryQtyFontSize,
+    this.fontSize = _kInventoryQtyDigitFontSize,
     this.textInputAction = TextInputAction.next,
     this.onFocusGained,
     this.onFocusLost,
@@ -4079,7 +4084,7 @@ class _QtyCellState extends State<_QtyCell> {
             ?.copyWith(fontSize: widget.fontSize, height: 1.0),
         decoration: InputDecoration(
           isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
           filled: true,
           fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
@@ -5861,10 +5866,11 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
               textInputAction: TextInputAction.next,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium
-                  ?.copyWith(fontSize: _kInventoryQtyFontSize, height: 1.2),
+                  ?.copyWith(
+                      fontSize: _kInventoryQtyDigitFontSize, height: 1.15),
               decoration: InputDecoration(
                 contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+                    const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
                 border:
                     OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
                 filled: true,
