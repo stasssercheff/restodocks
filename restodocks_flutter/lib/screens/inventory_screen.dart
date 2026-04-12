@@ -210,7 +210,7 @@ class InventoryScreen extends StatefulWidget {
 }
 
 class _InventoryScreenState extends State<InventoryScreen>
-    with AutoSaveMixin<InventoryScreen> {
+    with AutoSaveMixin<InventoryScreen>, WidgetsBindingObserver {
   /// Реже пишем большой черновик на диск — меньше подлагиваний при вводе в ячейках.
   @override
   int get scheduleSaveDebounceMs => 850;
@@ -219,11 +219,24 @@ class _InventoryScreenState extends State<InventoryScreen>
   void scheduleSave() {
     _serverDraftDirty = true;
     super.scheduleSave();
+    _scheduleDebouncedServerSave();
   }
 
-  Timer? _serverAutoSaveTimer;
-  /// Пока false — таймер не гоняет [getCurrentState] и upsert на Supabase (нет лишней работы в фоне).
+  /// Тот же debounce, что и локальное автосохранение — сервер не отстаёт на 45 с от ввода.
+  Timer? _serverSaveDebounceTimer;
+  /// Пока false — не делаем лишних upsert на Supabase подряд.
   bool _serverDraftDirty = false;
+
+  void _scheduleDebouncedServerSave() {
+    _serverSaveDebounceTimer?.cancel();
+    _serverSaveDebounceTimer = Timer(
+      Duration(milliseconds: scheduleSaveDebounceMs),
+      () {
+        if (!mounted) return;
+        unawaited(_pushDraftToServer());
+      },
+    );
+  }
   final List<_InventoryRow> _rows = [];
 
   /// Локальное обновление строки «Итого» без [setState] на всём экране (иначе при сотнях строк лаг при вводе).
@@ -306,15 +319,18 @@ class _InventoryScreenState extends State<InventoryScreen>
   String get draftKey =>
       _isSelectiveInventory ? 'selective_inventory' : 'inventory';
 
-  /// Сохранить данные немедленно в локальное хранилище (SharedPreferences/localStorage)
+  /// Сохранить данные немедленно локально и отправить черновик на сервер (без ожидания 45 с).
   void saveNow() {
     _serverDraftDirty = true;
+    _serverSaveDebounceTimer?.cancel();
     saveImmediately(); // Немедленно, без debounce — данные не потеряются при закрытии/падении
+    unawaited(_pushDraftToServer());
   }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _startTime = TimeOfDay.now();
     WidgetsBinding.instance.addPostFrameCallback((_) => _initScreen());
     _nameFilterCtrl.addListener(() {
@@ -330,12 +346,6 @@ class _InventoryScreenState extends State<InventoryScreen>
       _inventoryLayoutPulse.value++;
     });
 
-    // Тихая отправка на сервер: реже, чем раньше, и только если черновик менялся ([_serverDraftDirty]).
-    _serverAutoSaveTimer = Timer.periodic(const Duration(seconds: 45), (timer) {
-      if (mounted && !_completed) {
-        _autoSaveToServer();
-      }
-    });
   }
 
   @override
@@ -1050,7 +1060,25 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // После паузы миксин уже пишет локальный черновик; сервер — сразу, без ожидания debounce.
+    switch (state) {
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+        if (!_completed && _rows.isNotEmpty) {
+          _serverSaveDebounceTimer?.cancel();
+          unawaited(_pushDraftToServer());
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _inventoryLayoutPulse.dispose();
     for (final n in _rowRepaintTicks) {
       n.dispose();
@@ -1061,12 +1089,12 @@ class _InventoryScreenState extends State<InventoryScreen>
     _nameFilterCtrl.dispose();
     _nameFilterFocusNode.dispose();
     _inventoryTableScrollController.dispose();
-    _serverAutoSaveTimer?.cancel(); // Отменить таймер автосохранения на сервер
+    _serverSaveDebounceTimer?.cancel();
     super.dispose();
   }
 
-  /// Автоматическая отправка черновика на Supabase (без лишних вызовов при отсутствии изменений).
-  Future<void> _autoSaveToServer() async {
+  /// Отправка черновика на Supabase сразу после локального снимка или после debounce ввода.
+  Future<void> _pushDraftToServer() async {
     if (_completed || _rows.isEmpty)
       return; // Не сохранять если завершено или пусто
     if (!_serverDraftDirty) return;
