@@ -2,14 +2,18 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
 import '../utils/dev_log.dart';
 
 import '../models/models.dart';
 import 'account_manager_supabase.dart';
 import 'checklist_submission_service.dart';
 import 'edge_function_http.dart';
+import 'image_service.dart';
 import 'local_snapshot_store.dart';
 import 'supabase_service.dart';
+import 'tech_card_service_supabase.dart';
 
 /// Сервис чеклистов-шаблонов (Supabase).
 class ChecklistServiceSupabase {
@@ -18,6 +22,29 @@ class ChecklistServiceSupabase {
   ChecklistServiceSupabase._internal();
 
   final SupabaseService _supabase = SupabaseService();
+
+  /// Фото пункта чеклиста — тот же публичный bucket, что и для ТТК: `{est}/checklist_item_photos/{uuid}.jpg`.
+  Future<String?> uploadChecklistItemPhoto({
+    required String establishmentId,
+    required Uint8List bytes,
+  }) async {
+    try {
+      final compressed = await ImageService()
+              .compressToMaxBytes(bytes, maxBytes: 250 * 1024) ??
+          bytes;
+      final id = const Uuid().v4();
+      final path = '$establishmentId/checklist_item_photos/$id.jpg';
+      await _supabase.client.storage.from(kTechCardPhotosBucket).uploadBinary(
+            path,
+            compressed,
+            fileOptions: const FileOptions(upsert: true),
+          );
+      return _supabase.client.storage.from(kTechCardPhotosBucket).getPublicUrl(path);
+    } catch (e) {
+      devLog('ChecklistServiceSupabase.uploadChecklistItemPhoto: $e');
+      return null;
+    }
+  }
 
   static String _checklistsSnapshotKey(String establishmentId) =>
       '${establishmentId.trim()}:checklists_raw';
@@ -123,7 +150,7 @@ class ChecklistServiceSupabase {
       final data = await _supabase.client
           .from('checklists')
           .select(
-            '*, checklist_items(id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit)',
+            '*, checklist_items(id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit, image_url)',
           )
           .eq('establishment_id', establishmentId)
           .order('updated_at', ascending: false);
@@ -167,7 +194,7 @@ class ChecklistServiceSupabase {
       final data = await _supabase.client
           .from('checklists')
           .select(
-              '*, checklist_items(id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit)')
+              '*, checklist_items(id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit, image_url)')
           .eq('establishment_id', establishmentId)
           .order('updated_at', ascending: false);
 
@@ -242,7 +269,7 @@ class ChecklistServiceSupabase {
       final itemsData = await _supabase.client
           .from('checklist_items')
           .select(
-              'id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit')
+              'id, checklist_id, title, sort_order, tech_card_id, target_quantity, target_unit, image_url')
           .eq('checklist_id', c.id)
           .order('sort_order');
       final items =
@@ -335,6 +362,7 @@ class ChecklistServiceSupabase {
       if (item.techCardId != null) itemData['tech_card_id'] = item.techCardId;
       if (item.targetQuantity != null) itemData['target_quantity'] = item.targetQuantity;
       if (item.targetUnit != null) itemData['target_unit'] = item.targetUnit;
+      if (item.imageUrl != null) itemData['image_url'] = item.imageUrl;
       await _insertChecklistItem(itemData);
     }
     return (await getChecklistById(c.id)) ?? c;
@@ -442,6 +470,7 @@ class ChecklistServiceSupabase {
               'tech_card_id': e.techCardId,
               'target_quantity': e.targetQuantity,
               'target_unit': e.targetUnit,
+              'image_url': e.imageUrl,
             })
         .toList();
 
@@ -525,6 +554,7 @@ class ChecklistServiceSupabase {
       if (item.techCardId != null) itemData['tech_card_id'] = item.techCardId;
       if (item.targetQuantity != null) itemData['target_quantity'] = item.targetQuantity;
       if (item.targetUnit != null) itemData['target_unit'] = item.targetUnit;
+      if (item.imageUrl != null) itemData['image_url'] = item.imageUrl;
       await _insertChecklistItem(itemData);
     }
   }
@@ -557,6 +587,7 @@ class ChecklistServiceSupabase {
                 techCardId: e.techCardId,
                 targetQuantity: e.targetQuantity,
                 targetUnit: e.targetUnit,
+                imageUrl: e.imageUrl,
               ))
           .toList(),
     );

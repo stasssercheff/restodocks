@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -258,6 +259,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                 'techCardId': item.techCardId,
                 'targetQuantity': item.targetQuantity,
                 'targetUnit': item.targetUnit,
+                'imageUrl': item.imageUrl,
               })
           .toList(),
     };
@@ -298,6 +300,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
           techCardId: itemMap['techCardId'] as String?,
           targetQuantity: (itemMap['targetQuantity'] as num?)?.toDouble(),
           targetUnit: itemMap['targetUnit'] as String?,
+          imageUrl: itemMap['imageUrl'] as String?,
         ));
       }
     });
@@ -375,6 +378,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
               techCardId: e.techCardId,
               targetQuantity: e.targetQuantity,
               targetUnit: e.targetUnit,
+              imageUrl: e.imageUrl,
             ))
         .toList();
     try {
@@ -425,6 +429,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                     techCardId: e.techCardId,
                     targetQuantity: e.targetQuantity,
                     targetUnit: e.targetUnit,
+                    imageUrl: e.imageUrl,
                   ))
               .toList(),
         );
@@ -801,6 +806,100 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
         ),
       ),
     );
+  }
+
+  void _openItemPhotoPreview(String url) {
+    final u = url.trim();
+    if (u.isEmpty) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        clipBehavior: Clip.antiAlias,
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4,
+          child: Image.network(
+            u,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const Padding(
+              padding: EdgeInsets.all(24),
+              child: Icon(Icons.broken_image_outlined, size: 64),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickItemPhoto(int index) async {
+    final loc = context.read<LocalizationService>();
+    final est = context.read<AccountManagerSupabase>().establishment;
+    if (est == null || !mounted) return;
+    final item = _items[index];
+    final svc = context.read<ChecklistServiceSupabase>();
+    final imageService = ImageService();
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: Text(loc.t('photo_from_camera')),
+              onTap: () => Navigator.of(ctx).pop('camera'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: Text(loc.t('photo_from_gallery')),
+              onTap: () => Navigator.of(ctx).pop('gallery'),
+            ),
+            if (item.imageUrl != null && item.imageUrl!.trim().isNotEmpty)
+              ListTile(
+                leading: Icon(Icons.delete_outline,
+                    color: Theme.of(ctx).colorScheme.error),
+                title: Text(loc.t('delete')),
+                onTap: () => Navigator.of(ctx).pop('remove'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'remove') {
+      setState(() => _items[index] = item.copyWith(imageUrl: null));
+      scheduleSave();
+      return;
+    }
+    final source =
+        action == 'camera' ? ImageSource.camera : ImageSource.gallery;
+    final xFile = source == ImageSource.camera
+        ? await imageService.takePhotoWithCamera()
+        : await imageService.pickImageFromGallery();
+    if (xFile == null || !mounted) return;
+    final bytes = await imageService.xFileToBytes(xFile);
+    if (bytes == null || bytes.isEmpty || !mounted) return;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    final url = await svc.uploadChecklistItemPhoto(
+      establishmentId: est.dataEstablishmentId,
+      bytes: bytes,
+    );
+    if (!mounted) return;
+    Navigator.of(context, rootNavigator: true).pop();
+    if (url == null || url.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('photo_upload_error'))),
+      );
+      return;
+    }
+    setState(() => _items[index] = item.copyWith(imageUrl: url.trim()));
+    scheduleSave();
   }
 
   Widget _buildSectionSelector(
@@ -1915,14 +2014,41 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                             : '';
                         localizedQuantityLabel = '$qty$unit';
                       }
+                      final photoUrl = it.imageUrl?.trim();
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
-                          leading: it.techCardId != null
-                              ? Icon(Icons.link,
-                                  size: 20,
-                                  color: Theme.of(context).colorScheme.primary)
-                              : null,
+                          leading: photoUrl != null && photoUrl.isNotEmpty
+                              ? InkWell(
+                                  onTap: () => _openItemPhotoPreview(photoUrl),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      photoUrl,
+                                      width: 56,
+                                      height: 56,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => SizedBox(
+                                        width: 56,
+                                        height: 56,
+                                        child: Icon(
+                                          Icons.broken_image_outlined,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .outline,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : (it.techCardId != null
+                                  ? Icon(Icons.link,
+                                      size: 20,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary)
+                                  : null),
                           title: Text(displayTitle),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1993,12 +2119,35 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                             ],
                           ),
                           trailing: canEdit
-                              ? IconButton(
-                                  icon: const Icon(Icons.remove_circle_outline),
-                                  onPressed: () => _removeItem(i),
-                                  tooltip: loc.t('delete'),
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      icon: Icon(
+                                        photoUrl != null &&
+                                                photoUrl.isNotEmpty
+                                            ? Icons.edit_outlined
+                                            : Icons.add_a_photo_outlined,
+                                      ),
+                                      tooltip: loc.t('checklist_item_photo'),
+                                      onPressed: () => _pickItemPhoto(i),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(
+                                          Icons.remove_circle_outline),
+                                      onPressed: () => _removeItem(i),
+                                      tooltip: loc.t('delete'),
+                                    ),
+                                  ],
                                 )
-                              : null,
+                              : (photoUrl != null && photoUrl.isNotEmpty
+                                  ? IconButton(
+                                      icon: const Icon(Icons.photo_outlined),
+                                      tooltip: loc.t('checklist_item_photo'),
+                                      onPressed: () =>
+                                          _openItemPhotoPreview(photoUrl),
+                                    )
+                                  : null),
                         ),
                       );
                     }),

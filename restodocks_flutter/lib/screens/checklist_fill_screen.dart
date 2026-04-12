@@ -271,6 +271,8 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
         'dropdownValue': i < _dropdownValues.length ? _dropdownValues[i] : null,
         if (c.items[i].targetQuantity != null) 'targetQuantity': c.items[i].targetQuantity,
         if (c.items[i].targetUnit != null) 'targetUnit': c.items[i].targetUnit,
+        if (c.items[i].imageUrl != null && c.items[i].imageUrl!.trim().isNotEmpty)
+          'imageUrl': c.items[i].imageUrl,
       });
     }
 
@@ -504,6 +506,29 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     );
   }
 
+  void _openFillItemPhoto(String url) {
+    final u = url.trim();
+    if (u.isEmpty) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        clipBehavior: Clip.antiAlias,
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4,
+          child: Image.network(
+            u,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const Padding(
+              padding: EdgeInsets.all(24),
+              child: Icon(Icons.broken_image_outlined, size: 64),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTableHeader(LocalizationService loc, ChecklistActionConfig cfg) {
     final statusWidth =
         isHandheldNarrowLayout(context) ? 160.0 : 220.0;
@@ -580,6 +605,32 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                     )
                   else
                     Text(_getTitle(it), style: Theme.of(context).textTheme.bodyMedium),
+                  if (it.imageUrl != null && it.imageUrl!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _openFillItemPhoto(it.imageUrl!),
+                        borderRadius: BorderRadius.circular(8),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            it.imageUrl!.trim(),
+                            height: 120,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => SizedBox(
+                              height: 80,
+                              child: Icon(
+                                Icons.broken_image_outlined,
+                                color: Theme.of(context).colorScheme.outline,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   // Если есть колонка "Цифра", количество показываем в ней, а не "под" названием.
                   if (!cfg.hasNumeric && it.quantityLabel != null) ...[
                     const SizedBox(height: 4),

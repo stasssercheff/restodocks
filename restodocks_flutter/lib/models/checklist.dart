@@ -255,6 +255,8 @@ class ChecklistItem extends Equatable {
   final double? targetQuantity;
   /// Единица измерения количества (г, кг, порции, шт и т.д.).
   final String? targetUnit;
+  /// Фото к пункту (URL в Storage), не путать с фото блюда в ТТК.
+  final String? imageUrl;
 
   const ChecklistItem({
     required this.id,
@@ -264,12 +266,15 @@ class ChecklistItem extends Equatable {
     this.techCardId,
     this.targetQuantity,
     this.targetUnit,
+    this.imageUrl,
   });
 
   factory ChecklistItem.fromJson(Map<String, dynamic> json) {
     final raw = json['tech_card_id'];
     final techCardId = raw == null ? null : (raw is String ? raw : raw.toString()).trim();
     final tc = techCardId != null && techCardId.isNotEmpty && techCardId != 'null' ? techCardId : null;
+    final rawUrl = json['image_url'];
+    final urlStr = rawUrl == null ? null : rawUrl.toString().trim();
     return ChecklistItem(
       id: json['id'] as String,
       checklistId: json['checklist_id'] as String,
@@ -278,6 +283,7 @@ class ChecklistItem extends Equatable {
       techCardId: tc,
       targetQuantity: (json['target_quantity'] as num?)?.toDouble(),
       targetUnit: json['target_unit'] as String?,
+      imageUrl: urlStr != null && urlStr.isNotEmpty ? urlStr : null,
     );
   }
 
@@ -290,6 +296,7 @@ class ChecklistItem extends Equatable {
       if (techCardId != null) 'tech_card_id': techCardId,
       if (targetQuantity != null) 'target_quantity': targetQuantity,
       if (targetUnit != null) 'target_unit': targetUnit,
+      if (imageUrl != null) 'image_url': imageUrl,
     };
   }
 
@@ -300,6 +307,7 @@ class ChecklistItem extends Equatable {
     String? techCardId,
     double? targetQuantity,
     String? targetUnit,
+    String? imageUrl,
   }) {
     return ChecklistItem(
       id: '',
@@ -309,6 +317,7 @@ class ChecklistItem extends Equatable {
       techCardId: techCardId,
       targetQuantity: targetQuantity,
       targetUnit: targetUnit,
+      imageUrl: imageUrl,
     );
   }
 
@@ -320,6 +329,7 @@ class ChecklistItem extends Equatable {
     String? techCardId,
     Object? targetQuantity = _sentinel,
     Object? targetUnit = _sentinel,
+    Object? imageUrl = _sentinel,
   }) {
     return ChecklistItem(
       id: id ?? this.id,
@@ -329,6 +339,7 @@ class ChecklistItem extends Equatable {
       techCardId: techCardId ?? this.techCardId,
       targetQuantity: targetQuantity == _sentinel ? this.targetQuantity : targetQuantity as double?,
       targetUnit: targetUnit == _sentinel ? this.targetUnit : targetUnit as String?,
+      imageUrl: imageUrl == _sentinel ? this.imageUrl : imageUrl as String?,
     );
   }
 
@@ -343,5 +354,5 @@ class ChecklistItem extends Equatable {
   }
 
   @override
-  List<Object?> get props => [id, checklistId, title, sortOrder, techCardId, targetQuantity, targetUnit];
+  List<Object?> get props => [id, checklistId, title, sortOrder, techCardId, targetQuantity, targetUnit, imageUrl];
 }
