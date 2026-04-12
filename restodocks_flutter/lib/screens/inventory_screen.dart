@@ -523,14 +523,47 @@ class _InventoryScreenState extends State<InventoryScreen>
     final iikoDraft = futures[1] as Map<String, dynamic>?;
     final selectiveDraft = futures[2] as Map<String, dynamic>?;
 
+    Map<String, dynamic>? serverStdDraft;
+    Map<String, dynamic>? serverSelectiveDraft;
+    if (estId != null) {
+      final sp = await Future.wait([
+        _loadDraftFromServer(),
+        _loadSelectiveDraftFromServer(),
+      ]);
+      if (!mounted) return;
+      serverStdDraft = sp[0];
+      serverSelectiveDraft = sp[1];
+    }
+
+    final stdDraftResolved = stdDraft != null &&
+            stdDraft.isNotEmpty &&
+            _inventoryDraftSnapshotHasRows(stdDraft)
+        ? stdDraft
+        : null;
+    final serverStdResolved = serverStdDraft != null &&
+            serverStdDraft.isNotEmpty &&
+            _inventoryDraftSnapshotHasRows(serverStdDraft)
+        ? serverStdDraft
+        : null;
+    final stdDraftToRestore = stdDraftResolved ?? serverStdResolved;
+
+    final selectiveDraftResolved = selectiveDraft != null &&
+            selectiveDraft.isNotEmpty &&
+            _inventoryDraftSnapshotHasRows(selectiveDraft)
+        ? selectiveDraft
+        : null;
+    final serverSelResolved = serverSelectiveDraft != null &&
+            serverSelectiveDraft.isNotEmpty &&
+            _inventoryDraftSnapshotHasRows(serverSelectiveDraft)
+        ? serverSelectiveDraft
+        : null;
+    final selectiveDraftToRestore =
+        selectiveDraftResolved ?? serverSelResolved;
+
     final hasIikoProducts = iikoStore.hasProducts;
     final hasIikoDraft = iikoDraft != null && iikoDraft.isNotEmpty;
-    final hasStdDraft = stdDraft != null &&
-        stdDraft.isNotEmpty &&
-        _inventoryDraftSnapshotHasRows(stdDraft);
-    final hasSelectiveDraft = selectiveDraft != null &&
-        selectiveDraft.isNotEmpty &&
-        _inventoryDraftSnapshotHasRows(selectiveDraft);
+    final hasStdDraft = stdDraftToRestore != null;
+    final hasSelectiveDraft = selectiveDraftToRestore != null;
 
     // Если есть iiko-продукты или iiko-черновик — показываем диалог выбора ВСЕГДА
     // (пользователь должен сам выбрать куда вернуться)
@@ -567,30 +600,13 @@ class _InventoryScreenState extends State<InventoryScreen>
     // iiko нет — тихо восстанавливаем один из черновиков (если есть)
     if (hasStdDraft) {
       _stateRestored = false;
-      await restoreState(stdDraft!);
+      await restoreState(stdDraftToRestore!);
       return;
     }
 
     if (hasSelectiveDraft) {
       _stateRestored = false;
-      await restoreState(selectiveDraft!);
-      return;
-    }
-
-    // Стандартный черновик на сервере (инкогнито)
-    final serverStdDraft = await _loadDraftFromServer();
-    if (!mounted) return;
-    if (serverStdDraft != null && serverStdDraft.isNotEmpty) {
-      _stateRestored = false;
-      await restoreState(serverStdDraft);
-      return;
-    }
-
-    final serverSelectiveDraft = await _loadSelectiveDraftFromServer();
-    if (!mounted) return;
-    if (serverSelectiveDraft != null && serverSelectiveDraft.isNotEmpty) {
-      _stateRestored = false;
-      await restoreState(serverSelectiveDraft);
+      await restoreState(selectiveDraftToRestore!);
       return;
     }
 
@@ -854,9 +870,20 @@ class _InventoryScreenState extends State<InventoryScreen>
         final draftStorage = DraftStorageService();
         final savedDraft = await draftStorage.loadInventoryDraft();
         if (!mounted) return;
-        if (savedDraft != null && savedDraft.isNotEmpty) {
+        if (savedDraft != null &&
+            savedDraft.isNotEmpty &&
+            _inventoryDraftSnapshotHasRows(savedDraft)) {
           _stateRestored = false;
           await restoreState(savedDraft);
+          return;
+        }
+        final serverStd = await _loadDraftFromServer();
+        if (!mounted) return;
+        if (serverStd != null &&
+            serverStd.isNotEmpty &&
+            _inventoryDraftSnapshotHasRows(serverStd)) {
+          _stateRestored = false;
+          await restoreState(serverStd);
           return;
         }
       }
