@@ -595,6 +595,8 @@ function PromoTab() {
   const [newStartDate, setNewStartDate] = useState('')
   const [newEndDate, setNewEndDate] = useState('')
   const [newActivationDays, setNewActivationDays] = useState('')
+  /** «Классика» = как у уже существующих кодов (поле activation_duration_days пустое). «С активации» — второй, дополнительный тип. */
+  const [newPromoLogic, setNewPromoLogic] = useState<'legacy' | 'activation'>('legacy')
   const [newMaxEmployees, setNewMaxEmployees] = useState('')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'free' | 'used' | 'expired' | 'disabled'>('all')
@@ -617,6 +619,14 @@ function PromoTab() {
 
   async function addCode() {
     if (!newCode.trim()) return
+    if (newPromoLogic === 'activation') {
+      const d = newActivationDays.trim()
+      const n = d ? parseInt(d, 10) : NaN
+      if (!d || Number.isNaN(n) || n < 1) {
+        alert('Для нового типа укажи целое число дней Pro с активации (или переключись на «как раньше»).')
+        return
+      }
+    }
     setSaving(true)
     await fetch('/api/promo', {
       method: 'POST',
@@ -627,9 +637,10 @@ function PromoTab() {
         starts_at: newStartDate || null,
         expires_at: newEndDate || null,
         max_employees: newMaxEmployees ? parseInt(newMaxEmployees) : null,
-        activation_duration_days: newActivationDays.trim()
-          ? parseInt(newActivationDays.trim(), 10)
-          : null,
+        activation_duration_days:
+          newPromoLogic === 'activation' && newActivationDays.trim()
+            ? parseInt(newActivationDays.trim(), 10)
+            : null,
       }),
     })
     setNewCode('')
@@ -637,6 +648,7 @@ function PromoTab() {
     setNewStartDate('')
     setNewEndDate('')
     setNewActivationDays('')
+    setNewPromoLogic('legacy')
     setNewMaxEmployees('')
     await loadCodes()
     setSaving(false)
@@ -666,8 +678,13 @@ function PromoTab() {
     await loadCodes()
   }
 
-  async function setEndDate(id: number) {
-    const val = prompt('Последний день, когда код ещё можно ввести (YYYY-MM-DD). Пусто — без ограничения по дате ввода:')
+  async function setEndDate(id: number, row: PromoCode) {
+    const isActivation = (row.activation_duration_days ?? 0) > 0
+    const val = prompt(
+      isActivation
+        ? 'Последний день, когда код ещё можно ввести (YYYY-MM-DD). Пусто — без ограничения по дате ввода.'
+        : 'Действует до (YYYY-MM-DD), как у существующих промокодов без режима «дней с активации». Пусто — без даты.',
+    )
     if (val === null) return
     await fetch('/api/promo', {
       method: 'PATCH',
@@ -679,7 +696,7 @@ function PromoTab() {
 
   async function setActivationDays(id: number, current: number | null) {
     const val = prompt(
-      'Дней Pro с момента активации (целое 1–36500). Пусто — убрать режим «с активации» и использовать только дату в колонке «ввод до» / legacy:',
+      'Дней Pro с момента активации (1–36500). Пусто — вернуть промокод к классической логике (как раньше в базе), только дата «действует до»:',
       current != null ? String(current) : '',
     )
     if (val === null) return
@@ -764,9 +781,37 @@ function PromoTab() {
       <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 mb-4">
         <h2 className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">Новый промокод</h2>
         <p className="text-[11px] text-gray-600 mb-3 leading-snug">
-          Поле «дней Pro с активации» задаёт длительность подписки <span className="text-gray-500">с момента применения</span> кода.
-          Даты «ввод кода» ограничивают только срок, когда код ещё можно ввести. После применения число дней можно изменить — доступ пересчитается.
+          Уже созданные промокоды <span className="text-gray-500">не меняются</span>: у них по-прежнему пустое поле «дней с активации» и работает прежняя логика.
+          Ниже можно завести <span className="text-gray-500">дополнительно второй тип</span> — с длительностью Pro в днях от момента применения кода (число дней потом можно править).
         </p>
+        <div className="flex flex-col gap-2 mb-3">
+          <span className="text-[11px] text-gray-500 uppercase tracking-wide">Логика</span>
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-4">
+            <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+              <input
+                type="radio"
+                name="promoLogic"
+                className="accent-indigo-500"
+                checked={newPromoLogic === 'legacy'}
+                onChange={() => {
+                  setNewPromoLogic('legacy')
+                  setNewActivationDays('')
+                }}
+              />
+              Как раньше (классика)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+              <input
+                type="radio"
+                name="promoLogic"
+                className="accent-indigo-500"
+                checked={newPromoLogic === 'activation'}
+                onChange={() => setNewPromoLogic('activation')}
+              />
+              Новый тип: дни Pro с активации
+            </label>
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 sm:items-end">
           <input
             type="text"
@@ -783,7 +828,7 @@ function PromoTab() {
             className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm"
           />
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Ввод кода с</label>
+            <label className="text-xs text-gray-500">{newPromoLogic === 'legacy' ? 'Действует с' : 'Ввод кода с'}</label>
             <input
               type="date"
               value={newStartDate}
@@ -792,7 +837,7 @@ function PromoTab() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Ввод кода до</label>
+            <label className="text-xs text-gray-500">{newPromoLogic === 'legacy' ? 'Действует до' : 'Ввод кода до'}</label>
             <input
               type="date"
               value={newEndDate}
@@ -800,20 +845,22 @@ function PromoTab() {
               className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500 text-sm"
             />
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500" title="Длина Pro в днях с момента применения кода">
-              Дней Pro с активации
-            </label>
-            <input
-              type="number"
-              min="1"
-              max="36500"
-              value={newActivationDays}
-              onChange={e => setNewActivationDays(e.target.value)}
-              placeholder="напр. 30"
-              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28"
-            />
-          </div>
+          {newPromoLogic === 'activation' && (
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-500" title="Только для нового типа: длина Pro от момента применения кода">
+                Дней Pro с активации
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="36500"
+                value={newActivationDays}
+                onChange={e => setNewActivationDays(e.target.value)}
+                placeholder="напр. 30"
+                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28"
+              />
+            </div>
+          )}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-500">Макс. сотр.</label>
             <input
@@ -871,8 +918,11 @@ function PromoTab() {
                   <th className="px-4 py-3 text-left">Код</th>
                   <th className="px-4 py-3 text-left">Статус</th>
                   <th className="px-4 py-3 text-left">Заметка / Заведение</th>
-                  <th className="px-4 py-3 text-left" title="Срок ввести код и/или длительность Pro с активации">
-                    Ввод до / дни
+                  <th
+                    className="px-4 py-3 text-left"
+                    title="Классика: дата «действует до». Новый тип: дни с активации и при необходимости срок ввода кода."
+                  >
+                    Логика / срок
                   </th>
                   <th className="px-4 py-3 text-center">Сотр.</th>
                   <th className="px-4 py-3 text-left">Создан</th>
@@ -891,12 +941,18 @@ function PromoTab() {
                   const codeBtnClass = row.is_disabled
                     ? 'font-mono font-bold text-red-400 hover:text-red-300 transition'
                     : 'font-mono font-bold text-white hover:text-indigo-400 transition'
+                  const isNewType = (row.activation_duration_days ?? 0) > 0
                   return (
                     <tr key={row.id} className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition ${i === filtered.length - 1 ? 'border-0' : ''}`}>
                       <td className="px-4 py-3">
-                        <button type="button" onClick={() => navigator.clipboard.writeText(row.code)} className={codeBtnClass}>
-                          {row.code}
-                        </button>
+                        <div className="flex flex-col gap-0.5 items-start">
+                          <button type="button" onClick={() => navigator.clipboard.writeText(row.code)} className={codeBtnClass}>
+                            {row.code}
+                          </button>
+                          <span className="text-[10px] text-gray-600 font-normal tracking-normal">
+                            {isNewType ? 'тип: с активации' : 'тип: классика'}
+                          </span>
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusCfg.cls}`}>{statusCfg.label}</span>
@@ -917,7 +973,7 @@ function PromoTab() {
                             {row.expires_at ? (
                               <button
                                 type="button"
-                                onClick={() => setEndDate(row.id)}
+                                onClick={() => setEndDate(row.id, row)}
                                 className={`block text-[10px] text-gray-500 hover:text-gray-300 ${isExpired(row.expires_at) ? 'text-red-400' : ''}`}
                               >
                                 ввести до {formatDate(row.expires_at)}
@@ -929,7 +985,7 @@ function PromoTab() {
                         ) : (
                           <button
                             type="button"
-                            onClick={() => setEndDate(row.id)}
+                            onClick={() => setEndDate(row.id, row)}
                             className={`hover:text-white transition text-xs ${isExpired(row.expires_at) ? 'text-red-400' : ''}`}
                           >
                             {formatDate(row.expires_at)}
@@ -1003,6 +1059,9 @@ function PromoTab() {
                       {row.is_used && row.establishments?.name ? row.establishments.name : row.note}
                     </div>
                   )}
+                  <div className="text-[10px] text-gray-600 mb-1">
+                    {(row.activation_duration_days ?? 0) > 0 ? 'тип: с активации' : 'тип: классика'}
+                  </div>
 
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 mb-3">
                     {row.activation_duration_days != null && row.activation_duration_days > 0 && (
@@ -1016,7 +1075,8 @@ function PromoTab() {
                     )}
                     {row.expires_at && (
                       <span className={isExpired(row.expires_at) ? 'text-red-400' : ''}>
-                        ввести до {formatDate(row.expires_at)}
+                        {(row.activation_duration_days ?? 0) > 0 ? 'ввести до ' : 'до '}
+                        {formatDate(row.expires_at)}
                       </span>
                     )}
                     {row.max_employees != null && (
@@ -1042,8 +1102,9 @@ function PromoTab() {
                       {row.is_used ? '↩ Сбросить' : '✓ Отметить исп.'}
                     </button>
                     <button
-                      onClick={() => setEndDate(row.id)}
+                      onClick={() => setEndDate(row.id, row)}
                       className="px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white active:text-white text-sm"
+                      title="Дата окончания / ввода"
                     >
                       📅
                     </button>

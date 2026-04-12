@@ -28,9 +28,9 @@ export type PromoCode = {
   created_at: string
   note: string | null
   starts_at: string | null
-  /** Срок ввести код (не длина Pro, если задано activation_duration_days). */
+  /** Классика: срок действия по календарю. Новый тип: при activation_duration_days — окно «ввести код до». */
   expires_at: string | null
-  /** Дней Pro с момента активации; при изменении у использованного кода пересчитывается окончание. */
+  /** Если задано — второй тип промокода (дни Pro с применения). Если null — классическая логика как раньше. */
   activation_duration_days?: number | null
   max_employees: number | null
   establishments?: { name: string } | null
