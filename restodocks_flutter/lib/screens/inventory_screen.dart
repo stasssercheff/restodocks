@@ -219,37 +219,18 @@ class InventoryScreen extends StatefulWidget {
 
 class _InventoryScreenState extends State<InventoryScreen>
     with AutoSaveMixin<InventoryScreen>, WidgetsBindingObserver {
-  /// Реже пишем большой черновик на диск — меньше подлагиваний при вводе в ячейках.
-  @override
-  int get scheduleSaveDebounceMs => 850;
-
+  /// Весь ввод по бланку — без debounce: сразу кэш устройства/браузера и очередь на сервер.
   @override
   void scheduleSave() {
-    _draftWriteGen++;
-    _serverDraftDirty = true;
-    super.scheduleSave();
-    _scheduleDebouncedServerSave();
+    saveNow();
   }
 
-  /// Debounce только для «лёгких» полей (фильтр, дата). Количества — через [saveNow] без задержки.
-  Timer? _serverSaveDebounceTimer;
   /// Пока false — не отправляем пустой снимок на сервер.
   bool _serverDraftDirty = false;
   /// Счётчик правок: пока upsert в полёте, новые saveNow увеличивают gen — цикл докидывает на сервер.
   int _draftWriteGen = 0;
   /// Очередь upsert на Supabase (строго по одному запросу, без гонок).
   Future<void> _serverPushChain = Future.value();
-
-  void _scheduleDebouncedServerSave() {
-    _serverSaveDebounceTimer?.cancel();
-    _serverSaveDebounceTimer = Timer(
-      Duration(milliseconds: scheduleSaveDebounceMs),
-      () {
-        if (!mounted) return;
-        _enqueueServerPush();
-      },
-    );
-  }
 
   void _enqueueServerPush() {
     _serverPushChain = _serverPushChain.then((_) => _runServerPushDrain());
@@ -336,13 +317,16 @@ class _InventoryScreenState extends State<InventoryScreen>
   String get draftKey =>
       _isSelectiveInventory ? 'selective_inventory' : 'inventory';
 
-  /// Сохранить немедленно локально и поставить в очередь отправку на сервер (каждое изменение количества).
+  /// Сразу после правки: дождаться записи в кэш (SharedPreferences / localStorage), затем upsert на сервер.
   void saveNow() {
     _draftWriteGen++;
     _serverDraftDirty = true;
-    _serverSaveDebounceTimer?.cancel();
-    saveImmediately(); // Немедленно, без debounce — важно для веб/закрытия вкладки
-    _enqueueServerPush();
+    unawaited(
+      saveImmediately().whenComplete(() {
+        if (!mounted) return;
+        _enqueueServerPush();
+      }),
+    );
   }
 
   @override
@@ -1082,14 +1066,13 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // После паузы миксин уже пишет локальный черновик; сервер — сразу, без ожидания debounce.
+    // Миксин тоже пишет локально на паузе; здесь та же цепочка кэш → сервер, что и при вводе.
     switch (state) {
       case AppLifecycleState.inactive:
       case AppLifecycleState.hidden:
       case AppLifecycleState.paused:
         if (!_completed && _rows.isNotEmpty) {
-          _serverSaveDebounceTimer?.cancel();
-          _enqueueServerPush();
+          saveNow();
         }
         break;
       default:
@@ -1110,7 +1093,6 @@ class _InventoryScreenState extends State<InventoryScreen>
     _nameFilterCtrl.dispose();
     _nameFilterFocusNode.dispose();
     _inventoryTableScrollController.dispose();
-    _serverSaveDebounceTimer?.cancel();
     super.dispose();
   }
 
@@ -1275,8 +1257,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (row.quantities.length < 2 || colIndex != row.quantities.length - 2)
       return;
     if (row.quantities[colIndex] <= 0) return;
-    // Жесткая фиксация черновика при выходе из ячейки:
-    // ввод внутри ячейки сохраняем с debounce, чтобы не было микролагов.
+    // Дублирующий saveNow при уходе с ячейки (основной поток — на каждый onChanged).
     saveNow();
   }
 
