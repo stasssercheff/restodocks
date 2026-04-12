@@ -34,6 +34,12 @@ Future<String?> voiceStartRecordingToPath() async {
 
 Future<String?> voiceStopRecording() async => _recorder.stop();
 
+Future<void> voiceAbortRecording() async {
+  try {
+    await _recorder.cancel();
+  } catch (_) {}
+}
+
 Future<Uint8List?> voiceReadFileBytes(String path) async {
   try {
     final f = File(path);

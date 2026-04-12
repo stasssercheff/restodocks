@@ -46,6 +46,21 @@ class EmployeeMessageService {
   /// Макс. размер загрузки (согласовано с лимитом бакета `chat_voice`, см. миграцию).
   static const int maxChatVoiceUploadBytes = 3 * 1024 * 1024;
 
+  /// m4a/mp4 из приложения или webm из записи в браузере.
+  static (String extension, String contentType) _voiceFileExtensionAndContentType(Uint8List bytes) {
+    if (bytes.length >= 4 && bytes[0] == 0x1a && bytes[1] == 0x45 && bytes[2] == 0xdf && bytes[3] == 0xa3) {
+      return ('.webm', 'audio/webm');
+    }
+    if (bytes.length >= 8 &&
+        bytes[4] == 0x66 &&
+        bytes[5] == 0x74 &&
+        bytes[6] == 0x79 &&
+        bytes[7] == 0x70) {
+      return ('.m4a', 'audio/mp4');
+    }
+    return ('.m4a', 'audio/mp4');
+  }
+
   /// Отправить фото.
   Future<EmployeeDirectMessage?> sendPhoto(
     String senderEmployeeId,
@@ -85,13 +100,15 @@ class EmployeeMessageService {
       return null;
     }
     try {
-      final objectPath = '$senderEmployeeId/${DateTime.now().millisecondsSinceEpoch}.m4a';
+      final extCt = _voiceFileExtensionAndContentType(bytes);
+      final objectPath =
+          '$senderEmployeeId/${DateTime.now().millisecondsSinceEpoch}${extCt.$1}';
       await _supabase.client.storage.from(_chatVoiceBucket).uploadBinary(
             objectPath,
             bytes,
-            fileOptions: const FileOptions(
+            fileOptions: FileOptions(
               upsert: true,
-              contentType: 'audio/mp4',
+              contentType: extCt.$2,
             ),
           );
       final url = _supabase.client.storage.from(_chatVoiceBucket).getPublicUrl(objectPath);

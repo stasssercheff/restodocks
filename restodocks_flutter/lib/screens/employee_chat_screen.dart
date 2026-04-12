@@ -44,6 +44,8 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
   bool _recordingVoice = false;
   bool _voiceRecorderStopped = false;
   String? _voicePath;
+  /// Путь к файлу или blob: URL после [voiceStopRecording] (важно для веба).
+  String? _voiceResolvedPath;
   int _voiceElapsed = 0;
   Timer? _voiceTimer;
 
@@ -215,15 +217,12 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
   }
 
   Future<void> _startVoiceRecording() async {
-    final loc = context.read<LocalizationService>();
-    if (kIsWeb) {
-      AppToastService.show(loc.t('chat_voice_web_unsupported') ?? 'Голосовые сообщения недоступны в браузере');
-      return;
-    }
     if (_sending || _recordingVoice) return;
     if (!await voiceRecordingSupported()) return;
     if (!await voiceHasMicPermission()) {
-      AppToastService.show(loc.t('chat_voice_mic_denied') ?? 'Нужен доступ к микрофону');
+      if (!mounted) return;
+      final l = context.read<LocalizationService>();
+      AppToastService.show(l.t('chat_voice_mic_denied') ?? 'Нужен доступ к микрофону');
       return;
     }
     final path = await voiceStartRecordingToPath();
@@ -232,6 +231,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
       _recordingVoice = true;
       _voiceRecorderStopped = false;
       _voicePath = path;
+      _voiceResolvedPath = null;
       _voiceElapsed = 0;
     });
     _voiceTimer?.cancel();
@@ -249,22 +249,24 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
 
   Future<void> _stopVoiceRecorderHardware() async {
     if (_voiceRecorderStopped) return;
-    await voiceStopRecording();
+    final out = await voiceStopRecording();
     _voiceRecorderStopped = true;
+    _voiceResolvedPath = out ?? _voicePath;
     if (mounted) setState(() {});
   }
 
   Future<void> _cancelVoiceRecording() async {
     _voiceTimer?.cancel();
     if (!_voiceRecorderStopped) {
-      await voiceStopRecording();
+      await voiceAbortRecording();
       _voiceRecorderStopped = true;
     }
-    await voiceDeleteTempFile(_voicePath);
+    await voiceDeleteTempFile(_voiceResolvedPath ?? _voicePath);
     if (!mounted) return;
     setState(() {
       _recordingVoice = false;
       _voicePath = null;
+      _voiceResolvedPath = null;
       _voiceElapsed = 0;
       _voiceRecorderStopped = false;
     });
@@ -278,18 +280,33 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
     _voiceTimer?.cancel();
     setState(() => _sending = true);
     try {
+      String? pathForRead = _voiceResolvedPath;
       if (!_voiceRecorderStopped) {
-        await voiceStopRecording();
+        pathForRead = await voiceStopRecording();
         _voiceRecorderStopped = true;
       }
-      final path = _voicePath!;
+      pathForRead ??= _voicePath;
+      if (pathForRead == null) {
+        if (mounted) {
+          setState(() {
+            _sending = false;
+            _recordingVoice = false;
+            _voicePath = null;
+            _voiceResolvedPath = null;
+            _voiceElapsed = 0;
+            _voiceRecorderStopped = false;
+          });
+        }
+        return;
+      }
       final sec = _voiceElapsed.clamp(1, _maxVoiceSeconds);
-      final bytes = await voiceReadFileBytes(path);
-      await voiceDeleteTempFile(path);
+      final bytes = await voiceReadFileBytes(pathForRead);
+      await voiceDeleteTempFile(pathForRead);
       if (!mounted) return;
       setState(() {
         _recordingVoice = false;
         _voicePath = null;
+        _voiceResolvedPath = null;
         _voiceElapsed = 0;
         _voiceRecorderStopped = false;
       });
@@ -321,6 +338,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
           _sending = false;
           _recordingVoice = false;
           _voicePath = null;
+          _voiceResolvedPath = null;
           _voiceElapsed = 0;
           _voiceRecorderStopped = false;
         });
@@ -507,12 +525,11 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                           onPressed: _sending ? null : _pickSystemLink,
                           tooltip: loc.t('chat_attach_link_title') ?? 'Ссылка',
                         ),
-                        if (!kIsWeb)
-                          IconButton(
-                            icon: const Icon(Icons.mic_none_outlined),
-                            onPressed: _sending ? null : _startVoiceRecording,
-                            tooltip: loc.t('chat_voice_tooltip') ?? 'Голосовое',
-                          ),
+                        IconButton(
+                          icon: const Icon(Icons.mic_none_outlined),
+                          onPressed: _sending ? null : _startVoiceRecording,
+                          tooltip: loc.t('chat_voice_tooltip') ?? 'Голосовое',
+                        ),
                         Expanded(
                           child: TextField(
                             controller: _controller,
