@@ -252,6 +252,8 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
     if (thirdPageMode == null || !context.mounted) return;
     try {
       final bytes = await HaccpOrderPdfService.buildOrderPdfBytes(
+        tr: (String key, {Map<String, String>? args}) =>
+            loc.t(key, args: args),
         establishment: est,
         thirdPageMode: thirdPageMode.mode,
         selectedEmployees: thirdPageMode.selectedEmployees,

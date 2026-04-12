@@ -3546,14 +3546,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 DropdownButtonFormField<TechCardExportFormat>(
                   value: format,
                   isExpanded: true,
-                  items: const [
+                  items: [
                     DropdownMenuItem(
                       value: TechCardExportFormat.pdf,
-                      child: Text('PDF'),
+                      child: Text(loc.t('expenses_procurement_export_pdf')),
                     ),
                     DropdownMenuItem(
                       value: TechCardExportFormat.xlsx,
-                      child: Text('XLSX'),
+                      child: Text(loc.t('file_format_xlsx_short')),
                     ),
                   ],
                   onChanged: (v) {
@@ -4854,21 +4854,21 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       });
       return Scaffold(
         appBar:
-            AppBar(leading: appBarBackButton(context), title: const Text('ТТК')),
+            AppBar(leading: appBarBackButton(context), title: Text(loc.t('appbar_title_ttk_short'))),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_loading) {
       return Scaffold(
         appBar:
-            AppBar(leading: appBarBackButton(context), title: const Text('ТТК')),
+            AppBar(leading: appBarBackButton(context), title: Text(loc.t('appbar_title_ttk_short'))),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_error != null) {
       return Scaffold(
         appBar:
-            AppBar(leading: appBarBackButton(context), title: const Text('ТТК')),
+            AppBar(leading: appBarBackButton(context), title: Text(loc.t('appbar_title_ttk_short'))),
         body: Center(
             child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -4889,7 +4889,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
-          title: const Text('ТТК'),
+          title: Text(loc.t('appbar_title_ttk_short')),
         ),
         body: Center(
           child: Column(
@@ -4932,7 +4932,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
-          title: const Text('ТТК'),
+          title: Text(loc.t('appbar_title_ttk_short')),
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -5017,7 +5017,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 tooltip: loc.t('back'),
               )
             : appBarBackButton(context),
-        title: Text(_isNew ? loc.t('create_tech_card') : 'ТТК'),
+        title: Text(_isNew ? loc.t('create_tech_card') : loc.t('appbar_title_ttk_short')),
         actions: [
           if (effectiveCanEdit)
             IconButton(

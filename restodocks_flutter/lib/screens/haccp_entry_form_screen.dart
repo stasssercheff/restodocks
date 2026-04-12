@@ -499,14 +499,16 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     String? Function(String?)? validator,
     bool showHelperUnderField = false,
   }) {
+    final loc = context.read<LocalizationService>();
     _controllers[key] ??= TextEditingController();
     return TextFormField(
       controller: _controllers[key],
       decoration: InputDecoration(
         labelText: label,
         hintText: hintText,
-        helperText:
-            showHelperUnderField ? 'Плюс — в список, стрелка — выбрать' : null,
+        helperText: showHelperUnderField
+            ? loc.t('haccp_field_helper_plus_or_arrow')
+            : null,
         border: const OutlineInputBorder(),
         isDense: true,
         suffixIconConstraints:
@@ -515,7 +517,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              tooltip: 'Сохранить в список (этот журнал)',
+              tooltip: loc.t('haccp_tooltip_save_to_journal_list'),
               icon: const Icon(Icons.playlist_add),
               onPressed: () => _saveCurrentOption(
                 controllerKey: key,
@@ -524,7 +526,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               ),
             ),
             IconButton(
-              tooltip: 'Выбрать из сохранённых',
+              tooltip: loc.t('haccp_tooltip_pick_from_saved'),
               icon: const Icon(Icons.arrow_drop_down_circle_outlined),
               onPressed: () async {
                 final picked = await _showSavedOptionsPicker(

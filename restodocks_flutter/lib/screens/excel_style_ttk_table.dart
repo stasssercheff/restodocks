@@ -288,13 +288,22 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     try {
       // Проверяем обязательные поля widget
       if (widget.loc == null) {
-        return const Text('LocalizationService is null', style: TextStyle(color: Colors.red));
+        return Text(
+          LocalizationService().t('excel_ttk_err_loc_null'),
+          style: const TextStyle(color: Colors.red),
+        );
       }
       if (widget.productStore == null) {
-        return const Text('ProductStore is null', style: TextStyle(color: Colors.red));
+        return Text(
+          widget.loc.t('excel_ttk_err_product_store_null'),
+          style: const TextStyle(color: Colors.red),
+        );
       }
       if (widget.onUpdate == null) {
-        return const Text('onUpdate callback is null', style: TextStyle(color: Colors.red));
+        return Text(
+          widget.loc.t('excel_ttk_err_on_update_null'),
+          style: const TextStyle(color: Colors.red),
+        );
       }
 
       // Отложенный билд: избегаем замирания при большом числе ингредиентов.
@@ -335,8 +344,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Error in ExcelStyleTtkTable build', style: TextStyle(color: Colors.red)),
-            Text('Error: $e', style: const TextStyle(color: Colors.red, fontSize: 10)),
+            Text(
+              widget.loc.t('excel_ttk_err_build'),
+              style: const TextStyle(color: Colors.red),
+            ),
+            Text(
+              widget.loc.t('excel_ttk_err_generic', args: {'error': '$e'}),
+              style: const TextStyle(color: Colors.red, fontSize: 10),
+            ),
           ],
         ),
       );
@@ -347,7 +362,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     try {
       // Проверяем данные
       if (widget.ingredients == null) {
-        return const Text('Ingredients is null', style: TextStyle(color: Colors.red));
+        return Text(
+          widget.loc.t('excel_ttk_err_ingredients_null'),
+          style: const TextStyle(color: Colors.red),
+        );
       }
 
       // Строки с сохранением индексов для onUpdate (индекс в widget.ingredients)
@@ -355,7 +373,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       for (var i = 0; i < widget.ingredients.length; i++) {
         var ing = widget.ingredients[i];
         if (ing == null) {
-          return Text('Ingredient at index $i is null', style: const TextStyle(color: Colors.red));
+          return Text(
+            widget.loc.t('excel_ttk_err_ingredient_at_index',
+                args: {'index': '$i'}),
+            style: const TextStyle(color: Colors.red),
+          );
         }
         if (ing.productName.isNotEmpty && ing.outputWeight == 0) {
           ing = ing.copyWith(outputWeight: ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100));
@@ -780,8 +802,14 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Error in TTK table', style: TextStyle(color: Colors.red)),
-            Text('Error: $e', style: const TextStyle(color: Colors.red, fontSize: 10)),
+            Text(
+              widget.loc.t('excel_ttk_err_table'),
+              style: const TextStyle(color: Colors.red),
+            ),
+            Text(
+              widget.loc.t('excel_ttk_err_generic', args: {'error': '$e'}),
+              style: const TextStyle(color: Colors.red, fontSize: 10),
+            ),
           ],
         ),
       );
@@ -951,8 +979,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       return Container(
         height: 44,
         color: Colors.red.shade100,
-        child: const Center(
-          child: Text('Error in product cell', style: TextStyle(color: Colors.red, fontSize: 10)),
+        child: Center(
+          child: Text(
+            widget.loc.t('excel_ttk_err_product_cell'),
+            style: const TextStyle(color: Colors.red, fontSize: 10),
+          ),
         ),
       );
     }
@@ -1099,8 +1130,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       return Container(
         height: 44,
         color: Colors.red.shade100,
-        child: const Center(
-          child: Text('Error in dropdown', style: TextStyle(color: Colors.red, fontSize: 10)),
+        child: Center(
+          child: Text(
+            widget.loc.t('excel_ttk_err_dropdown'),
+            style: const TextStyle(color: Colors.red, fontSize: 10),
+          ),
         ),
       );
     }

@@ -1476,7 +1476,9 @@ class _DocumentTile extends StatelessWidget {
     final totalStr = grandTotal != null
         ? NumberFormatUtils.formatSum(grandTotal!, currency)
         : null;
-    final totalLabel = loc.t('order_list_grand_total') ?? 'Итого';
+    // order_list_grand_total часто уже с «:» в JSON — не дублировать
+    final totalRaw = loc.t('order_list_grand_total') ?? 'Итого';
+    final totalLabel = totalRaw.replaceFirst(RegExp(r':\s*$'), '');
     final theme = Theme.of(context);
 
     return Card(

@@ -3961,7 +3961,7 @@ class _CatalogTab extends StatelessWidget {
               ),
               PopupMenuButton<_CatalogSort>(
                 icon: const Icon(Icons.sort),
-                tooltip: 'Сортировка',
+                tooltip: loc.t('inventory_sort_label'),
                 onSelected: onSortChanged,
                 itemBuilder: (_) => [
                   PopupMenuItem(
@@ -5275,7 +5275,7 @@ class _IikoNomenclatureTabState extends State<_IikoNomenclatureTab>
               ),
               IconButton(
                 icon: const Icon(Icons.refresh),
-                tooltip: 'Обновить',
+                tooltip: loc.t('refresh'),
                 onPressed: () => widget.store
                     .loadProducts(widget.establishmentId, force: true),
               ),

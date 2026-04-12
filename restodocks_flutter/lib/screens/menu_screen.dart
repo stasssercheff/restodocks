@@ -524,20 +524,22 @@ class _MenuScreenState extends State<MenuScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(isFoodcostTab ? 'Фудкост меню' : 'Меню'),
+                Text(isFoodcostTab
+                    ? loc.t('menu_export_doc_title_foodcost')
+                    : loc.t('menu')),
                 const SizedBox(height: 10),
                 RadioListTile<String>(
                   dense: true,
                   value: 'all',
                   groupValue: exportScope,
-                  title: const Text('Все'),
+                  title: Text(loc.t('menu_export_scope_all')),
                   onChanged: (v) => setLocal(() => exportScope = v ?? 'all'),
                 ),
                 RadioListTile<String>(
                   dense: true,
                   value: 'selected',
                   groupValue: exportScope,
-                  title: const Text('Выборочно'),
+                  title: Text(loc.t('menu_export_scope_selected')),
                   onChanged: (v) =>
                       setLocal(() => exportScope = v ?? 'selected'),
                 ),
@@ -546,7 +548,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     dense: true,
                     value: 'above',
                     groupValue: exportScope,
-                    title: const Text('Выгодно (выше цели)'),
+                    title: Text(loc.t('menu_export_profitable_above_target')),
                     onChanged: (v) =>
                         setLocal(() => exportScope = v ?? 'above'),
                   ),
@@ -554,7 +556,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     dense: true,
                     value: 'below',
                     groupValue: exportScope,
-                    title: const Text('Невыгодно (ниже цели)'),
+                    title: Text(loc.t('menu_export_unprofitable_below_target')),
                     onChanged: (v) =>
                         setLocal(() => exportScope = v ?? 'below'),
                   ),
@@ -579,27 +581,36 @@ class _MenuScreenState extends State<MenuScreen> {
                     ),
                   ),
                 const SizedBox(height: 6),
-                const Text('Язык сохранения'),
+                Text(loc.t('salary_export_lang')),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
                   value: exportLang,
-                  items: const [
-                    DropdownMenuItem(value: 'ru', child: Text('🇷🇺 Русский')),
-                    DropdownMenuItem(value: 'en', child: Text('🇺🇸 English')),
-                    DropdownMenuItem(value: 'es', child: Text('🇪🇸 Español')),
-                    DropdownMenuItem(value: 'it', child: Text('🇮🇹 Italiano')),
-                    DropdownMenuItem(value: 'tr', child: Text('🇹🇷 Türkçe')),
-                  ],
+                  items: LocalizationService.supportedLocales
+                      .map(
+                        (l) => DropdownMenuItem<String>(
+                          value: l.languageCode,
+                          child: Text(
+                            '${LocalizationService.flagEmoji(l.languageCode)} ${loc.getLanguageName(l.languageCode)}',
+                          ),
+                        ),
+                      )
+                      .toList(),
                   onChanged: (v) =>
                       setLocal(() => exportLang = v ?? exportLang),
                 ),
                 const SizedBox(height: 10),
-                const Text('Формат файла'),
+                Text(loc.t('expenses_procurement_export_format_title')),
                 const SizedBox(height: 6),
                 SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'pdf', label: Text('PDF')),
-                    ButtonSegment(value: 'xlsx', label: Text('Excel')),
+                  segments: [
+                    ButtonSegment(
+                      value: 'pdf',
+                      label: Text(loc.t('expenses_procurement_export_pdf')),
+                    ),
+                    ButtonSegment(
+                      value: 'xlsx',
+                      label: Text(loc.t('file_format_short_excel')),
+                    ),
                   ],
                   selected: {exportFormat},
                   onSelectionChanged: (s) =>
@@ -742,6 +753,7 @@ class _MenuScreenState extends State<MenuScreen> {
     try {
       if (exportFormat == 'pdf') {
         final bytes = await _buildSimpleMenuPdfBytes(
+          loc: loc,
           dishes: dishes,
           isFoodcost: isFoodcost,
           exportLang: exportLang,
@@ -763,32 +775,31 @@ class _MenuScreenState extends State<MenuScreen> {
       final excel = Excel.createExcel();
       final sheet = excel['Export'];
       sheet.appendRow(_textRow([
-        'Дата',
+        loc.t('menu_excel_cell_date'),
         dateStr,
       ]));
       sheet.appendRow(_textRow([
-        'Заведение',
+        loc.t('menu_excel_cell_establishment'),
         estName,
       ]));
       sheet.appendRow(_textRow([
-        'Шеф',
+        loc.t('menu_excel_cell_chef'),
         chefName,
       ]));
       sheet.appendRow(_textRow(['']));
       sheet.appendRow(_textRow([
-        '№',
-        'Блюдо',
-        if (isFoodcost) 'Себестоимость',
-        isFoodcost
-            ? (foodcostConfig.mode == FoodcostPricingMode.markupOnCost
-                ? 'Наценка'
-                : '% себестоимости')
-            : '',
+        loc.t('foodcost_col_num'),
+        loc.t('foodcost_col_name'),
+        if (isFoodcost) loc.t('foodcost_col_cost'),
         if (isFoodcost)
-          (foodcostConfig.mode == FoodcostPricingMode.markupOnCost
-              ? 'Наценка'
-              : 'С наценкой'),
-        if (isFoodcost) 'В меню',
+          foodcostConfig.mode == FoodcostPricingMode.markupOnCost
+              ? loc.t('foodcost_col_markup_actual')
+              : loc.t('foodcost_col_cost_share_actual'),
+        if (isFoodcost)
+          foodcostConfig.mode == FoodcostPricingMode.markupOnCost
+              ? loc.t('foodcost_mode_markup')
+              : loc.t('foodcost_price_optimal'),
+        if (isFoodcost) loc.t('foodcost_price_actual'),
       ]));
       var idx = 1;
       for (final tc in dishes) {
@@ -884,6 +895,7 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<Uint8List> _buildSimpleMenuPdfBytes({
+    required LocalizationService loc,
     required List<TechCard> dishes,
     required bool isFoodcost,
     required String exportLang,
@@ -907,18 +919,18 @@ class _MenuScreenState extends State<MenuScreen> {
     );
 
     final headers = <String>[
-      '№',
-      'Блюдо',
-      if (isFoodcost) 'Себестоимость',
+      loc.t('foodcost_col_num'),
+      loc.t('foodcost_col_name'),
+      if (isFoodcost) loc.t('foodcost_col_cost'),
       if (isFoodcost)
-        (cfg.mode == FoodcostPricingMode.markupOnCost
-            ? 'Наценка'
-            : '% себестоимости'),
+        cfg.mode == FoodcostPricingMode.markupOnCost
+            ? loc.t('foodcost_col_markup_actual')
+            : loc.t('foodcost_col_cost_share_actual'),
       if (isFoodcost)
-        (cfg.mode == FoodcostPricingMode.markupOnCost
-            ? 'Наценка'
-            : 'С наценкой'),
-      if (isFoodcost) 'В меню',
+        cfg.mode == FoodcostPricingMode.markupOnCost
+            ? loc.t('foodcost_mode_markup')
+            : loc.t('foodcost_price_optimal'),
+      if (isFoodcost) loc.t('foodcost_price_actual'),
     ];
 
     final rows = <List<String>>[];
@@ -963,13 +975,17 @@ class _MenuScreenState extends State<MenuScreen> {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(24),
         build: (_) => [
-          pw.Text(isFoodcost ? 'Фудкост меню' : 'Меню',
+          pw.Text(
+              isFoodcost
+                  ? loc.t('menu_export_doc_title_foodcost')
+                  : loc.t('menu'),
               style:
                   pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 6),
-          pw.Text('Дата: $dateStr'),
-          pw.Text('Заведение: $establishmentName'),
-          pw.Text('Шеф: $chefName'),
+          pw.Text('${loc.t('menu_pdf_label_date')} $dateStr'),
+          pw.Text(
+              '${loc.t('menu_pdf_label_establishment')} $establishmentName'),
+          pw.Text('${loc.t('menu_pdf_label_chef')} $chefName'),
           pw.SizedBox(height: 12),
           pw.TableHelper.fromTextArray(
             headers: headers,
@@ -1330,7 +1346,7 @@ class _MenuScreenState extends State<MenuScreen> {
               if (_displayDishes.isNotEmpty && !_loading)
                 IconButton(
                   icon: const Icon(Icons.save_alt),
-                  tooltip: 'Скачать',
+                  tooltip: loc.t('download'),
                   onPressed: _openDeviceExportDialog,
                 ),
               if (menuSeg == 0 && _downloadableDishes.isNotEmpty && !_loading)

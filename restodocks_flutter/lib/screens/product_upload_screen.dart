@@ -585,11 +585,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     final approved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Важно перед загрузкой'),
-        content: const Text(
-          'ПФ будут добавлены как самостоятельные продукты и не будут отображаться как "ПФ" в системе Restodocks.\n\n'
-          'Рекомендуем загружать только чистые продукты.',
-        ),
+        title: Text(loc.t('product_upload_iiko_warning_title')),
+        content: Text(loc.t('product_upload_iiko_warning_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -597,7 +594,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Продолжить'),
+            child: Text(loc.t('continue_action')),
           ),
         ],
       ),
@@ -664,10 +661,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<String?> _pickIikoSheet(List<String> sheetNames) async {
+    final loc = context.read<LocalizationService>();
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Выберите лист iiko'),
+        title: Text(loc.t('product_upload_iiko_select_sheet_title')),
         content: SizedBox(
           width: 420,
           child: ListView.builder(

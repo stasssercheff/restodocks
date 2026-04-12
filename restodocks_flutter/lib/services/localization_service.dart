@@ -14,6 +14,11 @@ import 'translation_manager.dart';
 /// Не смешивать в виджетах захардкоженный русский/английский и ключи: пользовательский
 /// текст интерфейса всегда из JSON. Исключения — служебное (логи, парсинг CSV/ИИ) и
 /// данные с сервера/пользователя, не являющиеся строками оболочки приложения.
+///
+/// Инструменты: `scripts/i18n_dictionary_sync.py` (паритет ключей),
+/// `scripts/i18n_gap_report.py`, `scripts/i18n_scan_hardcoded.py`,
+/// `scripts/i18n_fill_from_ru_mt.py`, `scripts/i18n_fill_all_locales_from_ru.py`.
+/// До `initialize()` возможны единичные нейтральные строки (например ошибка сети при старте).
 class LocalizationService extends ChangeNotifier {
   static final LocalizationService _instance = LocalizationService._internal();
   factory LocalizationService() => _instance;
@@ -389,8 +394,9 @@ class LocalizationService extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// Для [kk]: отдельный перевод в JSON → kk; если строка kk совпадает с en (плейсхолдер), подставляем **en**, затем **ru**.
-  /// Полноценный казахский интерфейс — только когда в `localizable.json` для kk заполнены свои строки (не копии en).
+  /// Для [kk]: свой текст в JSON → kk; если ключа нет или значение kk совпадает с en (плейсхолдер из синка),
+  /// показываем **ru** (а не en), чтобы не было «шапка по-казахски, списки по-английски».
+  /// Если и ru совпадает с en (редкие интернационализмы) — тогда en.
   String? _kkResolveBase(String key) {
     final kkStr = _translations['kk']?[key];
     final enStr = _translations['en']?[key];
@@ -401,8 +407,12 @@ class LocalizationService extends ChangeNotifier {
         (enStr == null || kkStr.trim() != enStr.trim())) {
       return kkStr;
     }
+    if (ruStr != null &&
+        ruStr.isNotEmpty &&
+        (enStr == null || ruStr.trim() != enStr.trim())) {
+      return ruStr;
+    }
     if (enStr != null && enStr.isNotEmpty) return enStr;
-    if (ruStr != null && ruStr.isNotEmpty) return ruStr;
     return kkStr;
   }
 
