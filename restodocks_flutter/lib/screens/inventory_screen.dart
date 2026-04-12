@@ -195,6 +195,14 @@ class _InventoryRow {
       );
 }
 
+/// Локальный JSON пригоден для восстановления только если есть строки бланка.
+/// Иначе пустой/битый снимок (в т.ч. после инкогнито) не должен блокировать загрузку с Supabase.
+bool _inventoryDraftSnapshotHasRows(Map<String, dynamic>? d) {
+  if (d == null || d.isEmpty) return false;
+  final rows = d['rows'];
+  return rows is List && rows.isNotEmpty;
+}
+
 enum _InventorySort { alphabetAsc, alphabetDesc, lastAdded }
 
 /// Фильтр по типу строк: все, только продукты, только ПФ.
@@ -504,8 +512,8 @@ class _InventoryScreenState extends State<InventoryScreen>
   }
 
   /// При открытии: если есть черновик — восстанавливаем без диалога.
-  /// Порядок приоритетов: localStorage → Supabase → диалог.
-  /// В инкогнито localStorage пуст — восстанавливаем с сервера.
+  /// Порядок: валидный локальный снимок (есть строки `rows`) → иначе Supabase (инкогнито / новое устройство / IPA).
+  /// На сервер черновик уходит при каждом изменении количества; заведение одно — данные общие для веб/iOS.
   Future<void> _initScreen() async {
     final draftStorage = DraftStorageService();
 
@@ -529,9 +537,12 @@ class _InventoryScreenState extends State<InventoryScreen>
 
     final hasIikoProducts = iikoStore.hasProducts;
     final hasIikoDraft = iikoDraft != null && iikoDraft.isNotEmpty;
-    final hasStdDraft = stdDraft != null && stdDraft.isNotEmpty;
-    final hasSelectiveDraft =
-        selectiveDraft != null && selectiveDraft.isNotEmpty;
+    final hasStdDraft = stdDraft != null &&
+        stdDraft.isNotEmpty &&
+        _inventoryDraftSnapshotHasRows(stdDraft);
+    final hasSelectiveDraft = selectiveDraft != null &&
+        selectiveDraft.isNotEmpty &&
+        _inventoryDraftSnapshotHasRows(selectiveDraft);
 
     // Если есть iiko-продукты или iiko-черновик — показываем диалог выбора ВСЕГДА
     // (пользователь должен сам выбрать куда вернуться)
