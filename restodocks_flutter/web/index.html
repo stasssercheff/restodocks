@@ -400,12 +400,20 @@
       if (!isMobile) return;
       if (window.navigator.standalone) return;
 
+      // iPad в ландшафте тоже ≥600 по короткой стороне — без нуджа панель Safari часто не съезжает.
+      function isIPadLike() {
+        try {
+          if (/iPad/i.test(navigator.userAgent || '')) return true;
+          if (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1) return true;
+        } catch (e) {}
+        return false;
+      }
       // Сильнее дергаем document scroll сразу в альбоме на телефоне (API «свернуть строку» нет).
       function landscapeChromeKick() {
         try {
           if (!/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '')) return;
           if (window.innerWidth <= window.innerHeight) return;
-          if (Math.min(window.innerWidth, window.innerHeight) >= 600) return;
+          if (Math.min(window.innerWidth, window.innerHeight) >= 600 && !isIPadLike()) return;
           var doc = document.documentElement;
           var vh = window.innerHeight || 0;
           var sh = doc ? doc.scrollHeight : 0;
