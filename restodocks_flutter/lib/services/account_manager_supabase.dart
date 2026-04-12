@@ -558,14 +558,25 @@ class AccountManagerSupabase extends ChangeNotifier {
     required String kind,
     int delta = 1,
   }) async {
-    await _supabase.client.rpc(
-      'trial_increment_usage',
-      params: {
-        'p_establishment_id': establishmentId,
-        'p_kind': kind,
-        'p_delta': delta,
-      },
-    );
+    try {
+      await _supabase.client.rpc(
+        'trial_increment_usage',
+        params: {
+          'p_establishment_id': establishmentId,
+          'p_kind': kind,
+          'p_delta': delta,
+        },
+      );
+    } on PostgrestException catch (e) {
+      // PGRST202: RPC ещё не задеплоен в БД (миграция не применена) — не блокируем экспорт/импорт.
+      if (e.code == 'PGRST202') {
+        devLog(
+          'trial_increment_usage: RPC отсутствует в схеме (PGRST202), пропускаем учёт триала',
+        );
+        return;
+      }
+      rethrow;
+    }
   }
 
   /// Счётчик импортированных в триале карточек ТТК (для предпроверки лимита 10 за 72 ч).
