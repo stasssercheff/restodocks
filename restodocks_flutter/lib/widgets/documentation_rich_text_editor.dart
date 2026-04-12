@@ -119,17 +119,10 @@ class _DocumentationRichTextEditorState extends State<DocumentationRichTextEdito
         Widget withAppLocale(Widget child) {
           // Quill/Material pick up the nearest Localizations; keep toolbar and editor
           // aligned with LocalizationService (avoids mixed app language vs device/UI).
-          //
-          // flutter_quill ships l10n only for a fixed set — Kazakh (`kk`) is not included.
-          // With `locale: kk` the Quill toolbar delegate fails and the formatting bar can
-          // disappear entirely. Use a supported locale for this subtree only (RU is a
-          // common second UI language in KZ); form labels still come from `loc.t(...)`.
-          final quillUiLocale = appLocale.languageCode == 'kk'
-              ? const Locale('ru', 'RU')
-              : appLocale;
+          // Kazakh Quill strings: [FlutterQuillKkDelegate] in main.dart.
           return Localizations.override(
             context: context,
-            locale: quillUiLocale,
+            locale: appLocale,
             child: child,
           );
         }

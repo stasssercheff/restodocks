@@ -20,6 +20,7 @@ import 'core/mobile_deep_link_listener.dart';
 import 'core/supabase_env.dart';
 import 'core/public_app_origin.dart';
 import 'core/supabase_retry_http_client.dart';
+import 'l10n/flutter_quill_kk_delegate.dart';
 import 'utils/dev_log.dart';
 import 'utils/layout_breakpoints.dart';
 import 'core/initial_location_stub.dart'
@@ -368,6 +369,7 @@ class RestodocksApp extends StatelessWidget {
                 locale: _safeDelegateLocale(localization.currentLocale),
                 supportedLocales: LocalizationService.supportedLocales,
                 localizationsDelegates: const [
+                  FlutterQuillKkDelegate(),
                   GlobalMaterialLocalizations.delegate,
                   GlobalWidgetsLocalizations.delegate,
                   GlobalCupertinoLocalizations.delegate,
