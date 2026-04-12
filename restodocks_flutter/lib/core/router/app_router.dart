@@ -1393,6 +1393,8 @@ class AppRouter {
               }
               final viewOnly = state.queryParameters['view'] == '1';
               final hallView = state.queryParameters['hall'] == '1';
+              final targetOutputG =
+                  double.tryParse(state.queryParameters['targetOutputG'] ?? '');
               TechCard? initialTechCard;
               final extra = state.extra;
               if (extra is Map && extra['initialTechCard'] is TechCard) {
@@ -1405,6 +1407,11 @@ class AppRouter {
                     forceViewMode: viewOnly,
                     forceHallView: hallView,
                     initialTechCard: initialTechCard,
+                    initialViewTargetOutputGrams: viewOnly &&
+                            targetOutputG != null &&
+                            targetOutputG > 0
+                        ? targetOutputG
+                        : null,
                   ));
             },
           ),

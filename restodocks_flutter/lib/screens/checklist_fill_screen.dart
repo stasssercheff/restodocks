@@ -15,6 +15,24 @@ import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
 import '../widgets/app_bar_home_button.dart';
 
+/// Просмотр ТТК из пункта чеклиста: `view=1` и при необходимости `targetOutputG` (г) для пересчёта «итого выход».
+String checklistItemTechCardViewRoute(ChecklistItem item) {
+  final id = item.techCardId?.trim();
+  if (id == null || id.isEmpty) return '';
+  final q = <String, String>{'view': '1'};
+  final qty = item.targetQuantity;
+  if (qty != null && qty > 0) {
+    final unit = (item.targetUnit != null && item.targetUnit!.trim().isNotEmpty)
+        ? item.targetUnit!.trim()
+        : 'g';
+    final g = CulinaryUnits.toGrams(qty, unit);
+    if (g > 0) {
+      q['targetOutputG'] = g.toStringAsFixed(0);
+    }
+  }
+  return Uri(path: '/tech-cards/$id', queryParameters: q).toString();
+}
+
 /// Заполнение чеклиста: шапка, №, наименование (ссылками на ТТК ПФ), окно действия, комментарии.
 /// Сохранение: localStorage + сервер каждые 15 сек. Кнопка «Завершить» — во входящие шефу и су-шефу.
 class ChecklistFillScreen extends StatefulWidget {
@@ -594,7 +612,8 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                 children: [
                   if (it.techCardId != null)
                     InkWell(
-                      onTap: () => context.push('/tech-cards/${it.techCardId}?view=1'),
+                      onTap: () =>
+                          context.push(checklistItemTechCardViewRoute(it)),
                       child: Row(
                         children: [
                           Icon(Icons.link, size: 16, color: Theme.of(context).colorScheme.primary),
