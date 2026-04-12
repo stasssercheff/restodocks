@@ -185,7 +185,8 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                 ),
                 const SizedBox(height: 24),
                 FilledButton.icon(
-                  onPressed: () => context.go('/home'),
+                  onPressed: () =>
+                      context.go('/home', extra: {'back': true}),
                   icon: const Icon(Icons.home),
                   label: Text(loc.t('home')),
                 ),

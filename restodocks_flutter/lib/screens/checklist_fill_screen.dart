@@ -359,7 +359,8 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                 Text(loc.t('checklists_kitchen_only'), style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center),
                 const SizedBox(height: 24),
                 FilledButton.icon(
-                  onPressed: () => context.go('/home'),
+                  onPressed: () =>
+                      context.go('/home', extra: {'back': true}),
                   icon: const Icon(Icons.home),
                   label: Text(loc.t('home')),
                   style: FilledButton.styleFrom(

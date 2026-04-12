@@ -465,7 +465,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
             _isNew ? loc.t('checklist_created') : loc.t('saved');
         AppToastService.show(toastText, duration: const Duration(seconds: 4));
         clearDraft();
-        context.go('/checklists?department=$dept&refresh=1');
+        context.go('/checklists?department=$dept&refresh=1',
+            extra: {'back': true});
       }
     } catch (e) {
       if (mounted) {
@@ -1697,7 +1698,8 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                     textAlign: TextAlign.center),
                 const SizedBox(height: 24),
                 FilledButton.icon(
-                    onPressed: () => context.go('/home'),
+                    onPressed: () =>
+                        context.go('/home', extra: {'back': true}),
                     icon: const Icon(Icons.home),
                     label: Text(loc.t('home'))),
               ],

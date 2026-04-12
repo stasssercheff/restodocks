@@ -1037,7 +1037,8 @@ class _TechCardsImportReviewScreenState
               if (mounted) setState(() => _saving = false);
               await svc.deleteTechCard(existingTc.id);
               if (mounted) {
-                context.go('/tech-cards/${widget.department}?refresh=1');
+                context.go('/tech-cards/${widget.department}?refresh=1',
+                    extra: {'back': true});
               }
               abortAfterDuplicateAction = true;
               break;
@@ -1199,7 +1200,8 @@ class _TechCardsImportReviewScreenState
                       : const Duration(seconds: 4)),
             ),
           );
-          context.go('/tech-cards/${widget.department}?refresh=1');
+          context.go('/tech-cards/${widget.department}?refresh=1',
+              extra: {'back': true});
         } else {
           _items = failedItems;
           final firstErr = failed.isNotEmpty ? failed.first.error : '';

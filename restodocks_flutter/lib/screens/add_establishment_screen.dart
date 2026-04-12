@@ -92,7 +92,7 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
       if (!mounted) return;
       await accountManager.switchEstablishment(establishment);
       if (!mounted) return;
-      context.go('/home');
+      context.go('/home', extra: {'back': true});
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${loc.t('establishment_added') ?? 'Заведение добавлено'}: ${establishment.name}')),
       );

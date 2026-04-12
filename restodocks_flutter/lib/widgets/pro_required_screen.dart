@@ -26,7 +26,7 @@ class ProRequiredScreen extends StatelessWidget {
             if (context.canPop()) {
               context.pop();
             } else {
-              context.go('/home');
+              context.go('/home', extra: {'back': true});
             }
           },
         ),

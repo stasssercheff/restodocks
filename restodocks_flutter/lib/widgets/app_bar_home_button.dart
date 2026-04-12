@@ -16,7 +16,7 @@ Widget? shellReturnLeading(BuildContext context) {
       onPressed: () {
         final target = context.read<ShellReturnService>().takePending();
         if (target == null) return;
-        context.go(target);
+        context.go(target, extra: {'back': true});
       },
       tooltip: MaterialLocalizations.of(context).backButtonTooltip,
     ),

@@ -1165,7 +1165,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () {
                   Navigator.of(ctx).pop();
                   tourService.requestTourReplay(PageTourKeys.home);
-                  context.go('/home');
+                  context.go('/home', extra: {'back': true});
                 },
               ),
               ListTile(

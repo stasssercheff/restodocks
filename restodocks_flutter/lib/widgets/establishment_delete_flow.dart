@@ -168,6 +168,6 @@ Future<void> handleEstablishmentDeletedNavigation(
         backgroundColor: Colors.green,
       ),
     );
-    context.go('/home');
+    context.go('/home', extra: {'back': true});
   }
 }

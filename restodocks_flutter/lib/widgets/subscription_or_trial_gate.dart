@@ -34,7 +34,7 @@ class _SubscriptionOrTrialGateState extends State<SubscriptionOrTrialGate> {
       if (context.canPop()) {
         context.pop();
       } else {
-        context.go('/home');
+        context.go('/home', extra: {'back': true});
       }
     });
   }

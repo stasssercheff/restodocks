@@ -2603,7 +2603,7 @@ ${text}
             duration: const Duration(seconds: 6),
           ),
         );
-        context.go('/nomenclature');
+        context.go('/nomenclature', extra: {'back': true});
       }
     } catch (e) {
       _addDebugLog('Excel processing error: $e');
@@ -2621,7 +2621,7 @@ ${text}
                 .t('product_upload_error_file_process', args: {'error': '$e'})),
           ),
         );
-        context.go('/nomenclature');
+        context.go('/nomenclature', extra: {'back': true});
       }
     }
   }

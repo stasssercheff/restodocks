@@ -164,7 +164,10 @@ class _EstablishmentsManagementScreenState
                                       icon: const Icon(Icons.swap_horiz),
                                       onPressed: () async {
                                         await accountManager.switchEstablishment(est);
-                                        if (mounted) context.go('/home');
+                                        if (mounted) {
+                                          context.go('/home',
+                                              extra: {'back': true});
+                                        }
                                       },
                                     ),
                                   if (!viewOnly)
@@ -198,7 +201,9 @@ class _EstablishmentsManagementScreenState
                             ? null
                             : () async {
                                 await accountManager.switchEstablishment(est);
-                                if (mounted) context.go('/home');
+                                if (mounted) {
+                                  context.go('/home', extra: {'back': true});
+                                }
                               },
                       ),
                     );
