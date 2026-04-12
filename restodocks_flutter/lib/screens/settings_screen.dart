@@ -60,6 +60,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final acc = context.read<AccountManagerSupabase>();
       final est = acc.establishment;
       if (est != null) context.read<HaccpConfigService>().load(est.id);
+      // Отключение промо в админке / срок — сервер меняет тариф в check_establishment_access;
+      // при открытии настроек подтягиваем актуальное заведение без ожидания resume/таймера.
+      unawaited(acc.syncEstablishmentAccessFromServer());
       // Fast pull when settings are opened on another device/browser.
       unawaited(
           AccountUiSyncService.instance.refreshEmployeeProfileFromServer());
