@@ -1739,7 +1739,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: appBarBackButton(context),
+        leading: shellReturnLeading(context) ?? appBarBackButton(context),
         title: Text(localization.t('settings')),
       ),
       body: SingleChildScrollView(

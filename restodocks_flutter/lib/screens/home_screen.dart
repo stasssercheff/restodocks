@@ -510,7 +510,10 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
     if (employee == null) return const Scaffold(body: SizedBox());
 
     return Scaffold(
-      appBar: AppBar(title: Text(loc.t('personal_cabinet'))),
+      appBar: AppBar(
+        leading: shellReturnLeading(context),
+        title: Text(loc.t('personal_cabinet')),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

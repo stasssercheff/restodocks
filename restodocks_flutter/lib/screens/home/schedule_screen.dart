@@ -680,7 +680,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: Text(loc.t('schedule'))),
+        appBar: AppBar(
+          leading: widget.embedded
+              ? null
+              : (shellReturnLeading(context) ?? appBarBackButton(context)),
+          title: Text(loc.t('schedule')),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -972,7 +977,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: widget.embedded ? null : appBarBackButton(context),
+        leading: widget.embedded
+            ? null
+            : (shellReturnLeading(context) ?? appBarBackButton(context)),
         title: Text(widget.personalOnly
             ? loc.t('personal_schedule')
             : loc.t('schedule')),

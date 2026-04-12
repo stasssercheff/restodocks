@@ -66,7 +66,7 @@ class _EstablishmentsManagementScreenState
     if (accountManager.currentEmployee?.hasRole('owner') != true) {
       return Scaffold(
         appBar: AppBar(
-          leading: appBarBackButton(context),
+          leading: shellReturnLeading(context) ?? appBarBackButton(context),
           title: Text(loc.t('establishments')),
         ),
         body: Center(child: Text(loc.t('error_no_establishment_or_employee'))),
@@ -75,7 +75,8 @@ class _EstablishmentsManagementScreenState
 
     return Scaffold(
       appBar: AppBar(
-        leading: GoRouter.of(context).canPop() ? appBarBackButton(context) : null,
+        leading: shellReturnLeading(context) ??
+            (GoRouter.of(context).canPop() ? appBarBackButton(context) : null),
         title: Text(loc.t('establishments')),
       ),
       body: _loading

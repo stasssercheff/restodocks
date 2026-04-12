@@ -129,7 +129,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: GoRouter.of(context).canPop() ? appBarBackButton(context) : null,
+        leading: shellReturnLeading(context) ??
+            (GoRouter.of(context).canPop() ? appBarBackButton(context) : null),
         title: Text(localization.t('profile')),
         actions: [
           IconButton(

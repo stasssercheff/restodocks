@@ -145,7 +145,7 @@ class _FiscalTaxSettingsScreenState extends State<FiscalTaxSettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: appBarBackButton(context),
+        leading: shellReturnLeading(context) ?? appBarBackButton(context),
         title: Text(loc.t('fiscal_settings_title')),
       ),
       body: _loading

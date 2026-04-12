@@ -473,7 +473,9 @@ class _InboxScreenState extends State<InboxScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: widget.embedded ? null : appBarBackButton(context),
+        leading: widget.embedded
+            ? null
+            : (shellReturnLeading(context) ?? appBarBackButton(context)),
         title: ScrollToTopAppBarTitle(
           child: Text(widget.messagesOnly
               ? (loc.t('inbox_tab_messages') ?? 'Сообщения')

@@ -23,6 +23,9 @@ class AppProviders {
         ChangeNotifierProvider<HomeButtonConfigService>(
           create: (_) => HomeButtonConfigService(),
         ),
+        ChangeNotifierProvider<ShellReturnService>(
+          create: (_) => ShellReturnService(),
+        ),
         ChangeNotifierProvider<HomeLayoutConfigService>(
           create: (_) => HomeLayoutConfigService(),
         ),

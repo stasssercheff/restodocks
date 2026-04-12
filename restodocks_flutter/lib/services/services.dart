@@ -17,6 +17,7 @@ export 'supabase_service.dart';
 export 'secure_storage_service.dart';
 export 'theme_service.dart';
 export 'home_button_config_service.dart';
+export 'shell_return_service.dart';
 export 'home_layout_config_service.dart';
 export 'screen_layout_preference_service.dart';
 export 'mobile_ui_scale_service.dart';

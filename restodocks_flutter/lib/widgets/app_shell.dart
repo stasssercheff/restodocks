@@ -18,6 +18,7 @@ import '../models/models.dart';
 import '../services/localization_service.dart';
 import '../services/account_manager_supabase.dart';
 import '../services/home_button_config_service.dart';
+import '../services/shell_return_service.dart';
 import '../services/page_tour_service.dart';
 import 'subscription_required_dialog.dart';
 
@@ -445,8 +446,11 @@ class _AppShellState extends State<AppShell> {
       middleRoute = isKitchenNoData ? '/schedule' : '/schedule?personal=1';
     }
 
+    final shellReturn = context.read<ShellReturnService>();
     switch (index) {
       case 0:
+        shellReturn.onFooterWillNavigate(context,
+            tabIndex: 0, middleRoute: middleRoute);
         context.go('/home', extra: extra);
       case 1:
         if (!noDataAccess) {
@@ -458,10 +462,16 @@ class _AppShellState extends State<AppShell> {
             return;
           }
         }
+        shellReturn.onFooterWillNavigate(context,
+            tabIndex: 1, middleRoute: middleRoute);
         context.go(middleRoute, extra: extra);
       case 2:
+        shellReturn.onFooterWillNavigate(context,
+            tabIndex: 2, middleRoute: middleRoute);
         context.go('/personal-cabinet', extra: extra);
       default:
+        shellReturn.onFooterWillNavigate(context,
+            tabIndex: 0, middleRoute: middleRoute);
         context.go('/home', extra: extra);
     }
   }
