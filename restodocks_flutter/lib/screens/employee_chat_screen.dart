@@ -1,3 +1,4 @@
+import 'dart:async' show Timer;
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode, kIsWeb;
@@ -6,13 +7,18 @@ import '../utils/dev_log.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 import '../models/employee_direct_message.dart';
+import '../models/employee_message_system_link.dart';
 import '../services/services.dart';
+import '../utils/chat_system_link_paths.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/chat_system_link_picker_sheet.dart';
+import '../widgets/chat_voice_player.dart';
 
 /// Чат между двумя сотрудниками.
 class EmployeeChatScreen extends StatefulWidget {
@@ -25,6 +31,8 @@ class EmployeeChatScreen extends StatefulWidget {
 }
 
 class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
+  static const int _maxVoiceSeconds = 120;
+
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late final FocusNode _inputFocusNode;
@@ -32,6 +40,15 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
   Employee? _otherEmployee;
   bool _loading = true;
   bool _sending = false;
+
+  bool _recordingVoice = false;
+  bool _voiceRecorderStopped = false;
+  String? _voicePath;
+  int _voiceElapsed = 0;
+  Timer? _voiceTimer;
+
+  /// Ссылки на экраны приложения (до отправки).
+  List<EmployeeMessageSystemLink> _pendingLinks = [];
 
   RealtimeChannel? _realtimeChannel;
 
@@ -58,6 +75,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
 
   @override
   void dispose() {
+    _voiceTimer?.cancel();
     _realtimeChannel?.unsubscribe();
     _controller.dispose();
     _scrollController.dispose();
@@ -190,17 +208,103 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
     }
   }
 
-  Future<void> _send() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
+  String _formatVoiceElapsed(int sec) {
+    final m = sec ~/ 60;
+    final s = sec % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _startVoiceRecording() async {
+    final loc = context.read<LocalizationService>();
+    if (kIsWeb) {
+      AppToastService.show(loc.t('chat_voice_web_unsupported') ?? 'Голосовые сообщения недоступны в браузере');
+      return;
+    }
+    if (_sending || _recordingVoice) return;
+    if (!await voiceRecordingSupported()) return;
+    if (!await voiceHasMicPermission()) {
+      AppToastService.show(loc.t('chat_voice_mic_denied') ?? 'Нужен доступ к микрофону');
+      return;
+    }
+    final path = await voiceStartRecordingToPath();
+    if (path == null || !mounted) return;
+    setState(() {
+      _recordingVoice = true;
+      _voiceRecorderStopped = false;
+      _voicePath = path;
+      _voiceElapsed = 0;
+    });
+    _voiceTimer?.cancel();
+    _voiceTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      setState(() => _voiceElapsed++);
+      if (_voiceElapsed >= _maxVoiceSeconds) {
+        _voiceTimer?.cancel();
+        _stopVoiceRecorderHardware();
+        final l = context.read<LocalizationService>();
+        AppToastService.show(l.t('chat_voice_max_duration') ?? 'Максимум 2 мин.');
+      }
+    });
+  }
+
+  Future<void> _stopVoiceRecorderHardware() async {
+    if (_voiceRecorderStopped) return;
+    await voiceStopRecording();
+    _voiceRecorderStopped = true;
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _cancelVoiceRecording() async {
+    _voiceTimer?.cancel();
+    if (!_voiceRecorderStopped) {
+      await voiceStopRecording();
+      _voiceRecorderStopped = true;
+    }
+    await voiceDeleteTempFile(_voicePath);
+    if (!mounted) return;
+    setState(() {
+      _recordingVoice = false;
+      _voicePath = null;
+      _voiceElapsed = 0;
+      _voiceRecorderStopped = false;
+    });
+  }
+
+  Future<void> _commitVoiceRecording() async {
+    final loc = context.read<LocalizationService>();
     final acc = context.read<AccountManagerSupabase>();
     final emp = acc.currentEmployee;
-    if (emp == null) return;
-    _controller.clear();
+    if (emp == null || _voicePath == null) return;
+    _voiceTimer?.cancel();
     setState(() => _sending = true);
     try {
+      if (!_voiceRecorderStopped) {
+        await voiceStopRecording();
+        _voiceRecorderStopped = true;
+      }
+      final path = _voicePath!;
+      final sec = _voiceElapsed.clamp(1, _maxVoiceSeconds);
+      final bytes = await voiceReadFileBytes(path);
+      await voiceDeleteTempFile(path);
+      if (!mounted) return;
+      setState(() {
+        _recordingVoice = false;
+        _voicePath = null;
+        _voiceElapsed = 0;
+        _voiceRecorderStopped = false;
+      });
+      if (bytes == null || bytes.isEmpty) {
+        setState(() => _sending = false);
+        AppToastService.show(loc.t('chat_voice_error') ?? 'Ошибка записи');
+        return;
+      }
+      if (bytes.length > EmployeeMessageService.maxChatVoiceUploadBytes) {
+        setState(() => _sending = false);
+        AppToastService.show(loc.t('chat_voice_file_too_large') ?? 'Файл слишком большой');
+        return;
+      }
       final msgSvc = context.read<EmployeeMessageService>();
-      final sent = await msgSvc.send(emp.id, widget.otherEmployeeId, text);
+      final sent = await msgSvc.sendVoiceBytes(emp.id, widget.otherEmployeeId, bytes, sec);
       if (mounted && sent != null) {
         setState(() {
           _messages = [..._messages, sent];
@@ -209,10 +313,69 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
         _scrollToBottom();
       } else if (mounted) {
         setState(() => _sending = false);
+        AppToastService.show(loc.t('chat_voice_error') ?? 'Ошибка отправки');
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _sending = false);
+        setState(() {
+          _sending = false;
+          _recordingVoice = false;
+          _voicePath = null;
+          _voiceElapsed = 0;
+          _voiceRecorderStopped = false;
+        });
+        AppToastService.show('${loc.t('chat_voice_error') ?? 'Ошибка'}: $e', duration: const Duration(seconds: 4));
+      }
+    }
+  }
+
+  Future<void> _pickSystemLink() async {
+    if (_sending) return;
+    final link = await showChatSystemLinkPicker(context);
+    if (link == null || !mounted) return;
+    if (_pendingLinks.length >= kMaxSystemLinksPerMessage) return;
+    if (_pendingLinks.any((e) => e.path == link.path)) return;
+    setState(() => _pendingLinks = [..._pendingLinks, link]);
+  }
+
+  Future<void> _send() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty && _pendingLinks.isEmpty) return;
+    final acc = context.read<AccountManagerSupabase>();
+    final emp = acc.currentEmployee;
+    if (emp == null) return;
+    final linksCopy = List<EmployeeMessageSystemLink>.from(_pendingLinks);
+    _controller.clear();
+    setState(() {
+      _pendingLinks = [];
+      _sending = true;
+    });
+    try {
+      final msgSvc = context.read<EmployeeMessageService>();
+      final sent = await msgSvc.send(
+        emp.id,
+        widget.otherEmployeeId,
+        text,
+        systemLinks: linksCopy.isEmpty ? null : linksCopy,
+      );
+      if (mounted && sent != null) {
+        setState(() {
+          _messages = [..._messages, sent];
+          _sending = false;
+        });
+        _scrollToBottom();
+      } else if (mounted) {
+        setState(() {
+          _sending = false;
+          _pendingLinks = linksCopy;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _sending = false;
+          _pendingLinks = linksCopy;
+        });
         AppToastService.show('${context.read<LocalizationService>().t('error_short') ?? 'Ошибка'}: $e', duration: const Duration(seconds: 4));
       }
     }
@@ -286,39 +449,98 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                 color: theme.colorScheme.surface,
                 border: Border(top: BorderSide(color: theme.dividerColor)),
               ),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.add_photo_alternate_outlined),
-                    onPressed: _sending ? null : _sendPhoto,
-                    tooltip: loc.t('photo_from_gallery') ?? 'Фото',
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      focusNode: _inputFocusNode,
-                      decoration: InputDecoration(
-                        hintText: loc.t('chat_type_message') ?? 'Сообщение...',
-                        border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  if (!_recordingVoice && _pendingLinks.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 4,
+                        children: _pendingLinks
+                            .map(
+                              (l) => InputChip(
+                                label: ConstrainedBox(
+                                  constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.55),
+                                  child: Text(l.label, maxLines: 2, overflow: TextOverflow.ellipsis),
+                                ),
+                                onDeleted: _sending
+                                    ? null
+                                    : () => setState(() => _pendingLinks = _pendingLinks.where((x) => x.path != l.path).toList()),
+                              ),
+                            )
+                            .toList(),
                       ),
-                      textCapitalization: TextCapitalization.sentences,
-                      maxLines: null,
-                      onSubmitted: (_) {},
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: _sending ? null : _send,
-                    icon: _sending
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.send),
-                    tooltip: loc.t('send') ?? 'Отправить',
-                  ),
+                  if (_recordingVoice)
+                  Row(
+                      children: [
+                        Icon(Icons.fiber_manual_record, color: theme.colorScheme.error, size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          '${loc.t('chat_voice_recording') ?? 'Запись'} ${_formatVoiceElapsed(_voiceElapsed)}',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: _sending ? null : _cancelVoiceRecording,
+                          child: Text(loc.t('chat_voice_cancel') ?? 'Отмена'),
+                        ),
+                        FilledButton(
+                          onPressed: _sending ? null : _commitVoiceRecording,
+                          child: Text(loc.t('chat_voice_send') ?? 'Отправить'),
+                        ),
+                      ],
+                    )
+                  else
+                  Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.add_photo_alternate_outlined),
+                          onPressed: _sending ? null : _sendPhoto,
+                          tooltip: loc.t('photo_from_gallery') ?? 'Фото',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.add_circle_outline),
+                          onPressed: _sending ? null : _pickSystemLink,
+                          tooltip: loc.t('chat_attach_link_title') ?? 'Ссылка',
+                        ),
+                        if (!kIsWeb)
+                          IconButton(
+                            icon: const Icon(Icons.mic_none_outlined),
+                            onPressed: _sending ? null : _startVoiceRecording,
+                            tooltip: loc.t('chat_voice_tooltip') ?? 'Голосовое',
+                          ),
+                        Expanded(
+                          child: TextField(
+                            controller: _controller,
+                            focusNode: _inputFocusNode,
+                            decoration: InputDecoration(
+                              hintText: loc.t('chat_type_message') ?? 'Сообщение...',
+                              border: const OutlineInputBorder(),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            ),
+                            textCapitalization: TextCapitalization.sentences,
+                            maxLines: null,
+                            onSubmitted: (_) {},
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.filled(
+                          onPressed: _sending ? null : _send,
+                          icon: _sending
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.send),
+                          tooltip: loc.t('send') ?? 'Отправить',
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),
@@ -433,6 +655,7 @@ class _ChatMessageBubbleState extends State<_ChatMessageBubble> {
   }
 
   Future<void> _translateIfNeeded() async {
+    if (widget.message.content.trim().isEmpty) return;
     final loc = context.read<LocalizationService>();
     final targetLang = loc.currentLanguageCode;
     final sourceLang = _detectLanguage(widget.message.content);
@@ -505,6 +728,45 @@ class _ChatMessageBubbleState extends State<_ChatMessageBubble> {
                         progress == null ? child : const SizedBox(width: 200, height: 200, child: Center(child: CircularProgressIndicator())),
                     errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 48),
                   ),
+                ),
+              ),
+            ),
+          if (widget.message.hasAudio)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: ChatVoicePlayer(
+                  audioUrl: widget.message.audioUrl!,
+                  durationSeconds: widget.message.audioDurationSeconds ?? 0,
+                ),
+              ),
+            ),
+          if (widget.message.hasSystemLinks)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    for (final link in widget.message.systemLinks)
+                      ActionChip(
+                        avatar: const Icon(Icons.link, size: 18),
+                        label: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.sizeOf(context).width * 0.55,
+                          ),
+                          child: Text(link.label, maxLines: 2, overflow: TextOverflow.ellipsis),
+                        ),
+                        onPressed: () {
+                          try {
+                            context.push(link.path);
+                          } catch (_) {}
+                        },
+                      ),
+                  ],
                 ),
               ),
             ),

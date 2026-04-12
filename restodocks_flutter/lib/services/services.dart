@@ -55,6 +55,7 @@ export 'procurement_receipt_service.dart';
 export 'procurement_price_approval_service.dart';
 export 'procurement_receipt_export_service.dart';
 export 'employee_message_service.dart';
+export 'voice_recording.dart';
 export 'group_chat_service.dart';
 export 'inventory_history_service.dart';
 export 'offline_cache_service.dart';
