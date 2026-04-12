@@ -702,6 +702,7 @@ class TechCardEditScreen extends StatefulWidget {
     this.initialTypeRevision,
     this.initialHeaderSignature,
     this.initialSourceRows,
+    this.initialViewTargetOutputGrams,
   });
 
   /// Пусто для «новой», иначе id существующей ТТК.
@@ -727,6 +728,10 @@ class TechCardEditScreen extends StatefulWidget {
 
   /// Показать описание и состав для зала вместо полной ТТК (меню зала).
   final bool forceHallView;
+
+  /// Только с [forceViewMode]: целевой «итого выход» (г), подставляется из чеклиста (`targetOutputG` в URL).
+  /// Один раз после загрузки карточки масштабирует состав, как ручной ввод в таблице повара.
+  final double? initialViewTargetOutputGrams;
 
   /// Категория и цеха при открытии из импорта.
   final String? initialCategory;
@@ -756,6 +761,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// Синхронизацию обратно в родителя и автосохранение делаем с debounce и без `setState`,
   /// чтобы не блокировать UI при каждом пересчёте.
   Timer? _cookTableSyncDebounce;
+
+  /// Однократное применение [initialViewTargetOutputGrams] после загрузки с сервера.
+  bool _didApplyChecklistViewTargetOutput = false;
 
   late final VoidCallback _localizationListener;
 
@@ -1994,6 +2002,14 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               await restoreDraftNow();
             }
           }
+        }
+        if (mounted &&
+            tc != null &&
+            widget.forceViewMode &&
+            widget.initialViewTargetOutputGrams != null &&
+            widget.initialViewTargetOutputGrams! > 0) {
+          _applyChecklistViewTargetOutputOnce(
+              widget.initialViewTargetOutputGrams!);
         }
       });
     } catch (e) {
@@ -3833,6 +3849,19 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       if (!_isSemiFinished) _portionWeight = newOutput;
     });
     _scheduleDraftSave();
+  }
+
+  /// Режим просмотра + переход из чеклиста: подставить итог выхода (г) после загрузки карточки.
+  void _applyChecklistViewTargetOutputOnce(double targetG) {
+    if (_didApplyChecklistViewTargetOutput) return;
+    if (!widget.forceViewMode) return;
+    if (targetG <= 0) return;
+    final currentTotal = _ingredients
+        .where((i) => i.productName.trim().isNotEmpty && !i.isPlaceholder)
+        .fold<double>(0, (s, i) => s + i.outputWeight);
+    if (currentTotal <= 0) return;
+    _didApplyChecklistViewTargetOutput = true;
+    _scaleIngredientsToTotalOutput(targetG);
   }
 
   /// Подстроить % отхода у всех ингредиентов так, чтобы сумма выходов = [targetOutput] г.
