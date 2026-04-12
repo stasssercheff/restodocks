@@ -4,6 +4,9 @@ import 'dart:typed_data';
 
 import '../core/flutter_nav_bridge_stub.dart'
     if (dart.library.html) '../core/flutter_nav_bridge_web.dart' as flutter_nav;
+import '../core/inventory_chrome_autofill_web_stub.dart'
+    if (dart.library.html) '../core/inventory_chrome_autofill_web.dart'
+    as inv_ua;
 
 import 'package:archive/archive.dart';
 import '../utils/dev_log.dart';
@@ -4005,6 +4008,7 @@ class _QtyCellState extends State<_QtyCell> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final vPad = widget.fieldHeight <= 30 ? 4.0 : 8.0;
+    final chromeQtyNoAuto = inv_ua.inventoryWebChromeQuantityNoAutofill();
     return SizedBox(
       height: widget.fieldHeight,
       child: TextField(
@@ -4012,6 +4016,9 @@ class _QtyCellState extends State<_QtyCell> {
         focusNode: _focus,
         textInputAction: widget.textInputAction,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        autofillHints: chromeQtyNoAuto ? const <String>[] : null,
+        enableSuggestions: !chromeQtyNoAuto,
+        autocorrect: !chromeQtyNoAuto,
         inputFormatters: [
           FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),
         ],
@@ -5780,6 +5787,7 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
     final theme = Theme.of(context);
     final borderClr = theme.dividerColor;
     final cb = BorderSide(color: borderClr);
+    final chromeQtyNoAuto = inv_ua.inventoryWebChromeQuantityNoAutofill();
 
     // Ячейка ввода количества (достаточная высота тапа; строка тянется по названию)
     Widget numCell(int colIdx) {
@@ -5796,6 +5804,9 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
               focusNode: fn,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
+              autofillHints: chromeQtyNoAuto ? const <String>[] : null,
+              enableSuggestions: !chromeQtyNoAuto,
+              autocorrect: !chromeQtyNoAuto,
               textInputAction: TextInputAction.next,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium
