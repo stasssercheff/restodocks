@@ -37,10 +37,7 @@ function parseDate(iso: string | null | undefined): Date | null {
 }
 
 /** Конец Pro по промо: фиксированный expires_at в строке промо или N дней с redeemed_at. */
-export function promoProEndDate(
-  promo: PromoRedemptionRow | null | undefined,
-  nowMs: number = Date.now(),
-): Date | null {
+export function promoProEndDate(promo: PromoRedemptionRow | null | undefined): Date | null {
   if (!promo?.code) return null
   const days = promo.activation_duration_days
   if (days != null && days > 0) {
@@ -75,7 +72,7 @@ export function hasEffectivePro(
 
   if (!promo?.code) return true
 
-  const end = promoProEndDate(promo, nowMs)
+  const end = promoProEndDate(promo)
   if (promo.activation_duration_days != null && promo.activation_duration_days > 0) {
     return end !== null && end > now
   }
@@ -96,7 +93,7 @@ export function summarizeSubscriptionForAdmin(
   const sub = (est.subscription_type ?? 'free').toLowerCase().trim()
   const paidUntil = parseDate(est.pro_paid_until ?? null)
   const trialUntil = parseDate(est.pro_trial_ends_at ?? null)
-  const promoEnd = promoProEndDate(promo, nowMs)
+  const promoEnd = promoProEndDate(promo)
 
   const trialActive = trialUntil !== null && trialUntil > now
   const isProTier = sub === 'pro' || sub === 'premium'
