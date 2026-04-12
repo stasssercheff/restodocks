@@ -441,8 +441,11 @@ class Employee extends Equatable {
     return roles.first;
   }
 
-  /// Имеет ли сотрудник PRO подписку
-  bool get hasProSubscription => subscriptionPlan == 'pro' || subscriptionPlan == 'premium';
+  /// Платный тариф (не только Pro — см. [Establishment.kPaidSubscriptionTiers]).
+  bool get hasProSubscription {
+    final p = subscriptionPlan?.toLowerCase().trim();
+    return p != null && Establishment.kPaidSubscriptionTiers.contains(p);
+  }
 
   /// Тип подписки (free/pro)
   String get subscriptionType => subscriptionPlan ?? 'free';

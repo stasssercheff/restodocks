@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/haccp_log_type.dart';
 import '../models/models.dart';
 import '../core/feature_flags.dart';
+import '../core/subscription_entitlements.dart';
 import '../services/haccp_agreement_pdf_service.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
@@ -618,6 +619,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final ownerPref = context.read<OwnerViewPreferenceService>();
     final isOwnerHome =
         emp.hasRole('owner') && (emp.positionRole == null || ownerPref.viewAsOwner);
+    if (isOwnerHome &&
+        SubscriptionEntitlements.from(account.establishment).isLiteTier) {
+      return;
+    }
     if (isOwnerHome) {
       final screenPref = context.read<ScreenLayoutPreferenceService>();
       final posOn = FeatureFlags.posModuleEnabled;
@@ -873,10 +878,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       HomeButtonConfigService homeBtn) {
     final accountManager = context.read<AccountManagerSupabase>();
     final emp = accountManager.currentEmployee;
+    final ownerLite = SubscriptionEntitlements.from(accountManager.establishment)
+            .isLiteTier &&
+        (emp?.hasRole('owner') ?? false);
     final actions = homeButtonActionsFor(emp,
-        hasProSubscription: accountManager.hasProSubscription);
+        hasProSubscription: accountManager.hasProSubscription,
+        ownerLiteHome: ownerLite);
     final effective = homeBtn.effectiveAction(emp,
-        hasProSubscription: accountManager.hasProSubscription);
+        hasProSubscription: accountManager.hasProSubscription,
+        ownerLiteHome: ownerLite);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1828,13 +1838,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
-                ListTile(
-                  leading: const SizedBox(width: 24),
-                  title: Text(localization.t('home_layout_config_hint') ??
-                      'Изменить порядок кнопок на главной'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => _showHomeLayoutConfig(context, localization),
-                ),
+                if (!(accountManager.isLiteTier &&
+                    currentEmployee.hasRole('owner')))
+                  ListTile(
+                    leading: const SizedBox(width: 24),
+                    title: Text(localization.t('home_layout_config_hint') ??
+                        'Изменить порядок кнопок на главной'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showHomeLayoutConfig(context, localization),
+                  ),
                 Consumer<HomeButtonConfigService>(
                   builder: (_, homeBtn, __) => ListTile(
                     leading: const SizedBox(width: 24),
@@ -1847,19 +1859,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _showHomeButtonPicker(context, localization, homeBtn),
                   ),
                 ),
-                Consumer<ScreenLayoutPreferenceService>(
-                  builder: (_, screenPref, __) => SwitchListTile(
-                    secondary: const Icon(Icons.restaurant_menu),
-                    title: Text(localization.t('show_banquet_catering') ??
-                        'Показ «банкеты и кейтринг» на экране'),
-                    subtitle: Text(localization
-                            .t('show_banquet_catering_hint') ??
-                        'Показывать «Меню — Банкет/Кейтринг» и «ТТК — Банкет/Кейтринг»'),
-                    value: screenPref.showBanquetCatering,
-                    onChanged: (v) => screenPref.setShowBanquetCatering(v),
+                if (!accountManager.isLiteTier)
+                  Consumer<ScreenLayoutPreferenceService>(
+                    builder: (_, screenPref, __) => SwitchListTile(
+                      secondary: const Icon(Icons.restaurant_menu),
+                      title: Text(localization.t('show_banquet_catering') ??
+                          'Показ «банкеты и кейтринг» на экране'),
+                      subtitle: Text(localization
+                              .t('show_banquet_catering_hint') ??
+                          'Показывать «Меню — Банкет/Кейтринг» и «ТТК — Банкет/Кейтринг»'),
+                      value: screenPref.showBanquetCatering,
+                      onChanged: (v) => screenPref.setShowBanquetCatering(v),
+                    ),
                   ),
-                ),
-                if (currentEmployee.hasRole('owner')) ...[
+                if (currentEmployee.hasRole('owner') &&
+                    !accountManager.isLiteTier) ...[
                   Consumer<ScreenLayoutPreferenceService>(
                     builder: (_, screenPref, __) => SwitchListTile(
                       secondary: const Icon(Icons.local_bar),
@@ -1882,6 +1896,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onChanged: (v) => screenPref.setShowHallSection(v),
                     ),
                   ),
+                ],
+                if (currentEmployee.hasRole('owner'))
                   Consumer<AccountManagerSupabase>(
                     builder: (context, account, _) {
                       final est = account.establishment;
@@ -1915,11 +1931,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       );
                     },
                   ),
-                ],
               ],
             ),
             if (FeatureFlags.posModuleEnabled &&
-                posCanConfigureOrdersDisplay(currentEmployee))
+                posCanConfigureOrdersDisplay(currentEmployee) &&
+                !accountManager.isLiteTier)
               ListTile(
                 leading: const Icon(Icons.tune),
                 title: Text(
@@ -1933,10 +1949,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/settings/orders-display'),
               ),
-            if (FeatureFlags.posModuleEnabled)
+            if (FeatureFlags.posModuleEnabled && !accountManager.isLiteTier)
               SalesFinancialsManagementTile(employee: currentEmployee),
             if (FeatureFlags.posModuleEnabled &&
-                posCanManageFiscalTaxSettings(currentEmployee))
+                posCanManageFiscalTaxSettings(currentEmployee) &&
+                !accountManager.isLiteTier)
               ListTile(
                 leading: const Icon(Icons.account_balance_outlined),
                 title: Text(localization.t('fiscal_settings_title')),
@@ -2018,13 +2035,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             // Журналы и ХАССП (включая юридическую легитимность) — для руководителей.
-            if (currentEmployee.hasRole('owner') ||
-                currentEmployee.department == 'management' ||
-                currentEmployee.hasRole('executive_chef') ||
-                currentEmployee.hasRole('sous_chef') ||
-                currentEmployee.hasRole('bar_manager') ||
-                currentEmployee.hasRole('floor_manager') ||
-                currentEmployee.hasRole('general_manager')) ...[
+            if (!accountManager.isLiteTier &&
+                (currentEmployee.hasRole('owner') ||
+                    currentEmployee.department == 'management' ||
+                    currentEmployee.hasRole('executive_chef') ||
+                    currentEmployee.hasRole('sous_chef') ||
+                    currentEmployee.hasRole('bar_manager') ||
+                    currentEmployee.hasRole('floor_manager') ||
+                    currentEmployee.hasRole('general_manager'))) ...[
               ListTile(
                 leading: const Icon(Icons.menu_book),
                 title: Text(localization.t('documentation') ?? 'Документация'),
@@ -2228,7 +2246,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               if ((currentEmployee.hasRole('executive_chef') ||
                       currentEmployee.hasRole('sous_chef')) &&
-                  accountManager.establishment?.isMain == true)
+                  accountManager.establishment?.isMain == true &&
+                  !accountManager.isLiteTier)
                 FutureBuilder<List<Establishment>>(
                   future: accountManager.getBranchesForEstablishment(
                       accountManager.establishment!.id),

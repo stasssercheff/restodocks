@@ -87,10 +87,20 @@ class Establishment extends Equatable {
   // Alias for subscriptionType for backward compatibility
   String? get subscriptionPlan => subscriptionType;
 
-  /// Оплаченный Pro/Premium или выданный промокодом (не окно 72 ч после регистрации).
+  /// Тарифы с платным доступом (IAP, промокод; не только название «pro»).
+  static const Set<String> kPaidSubscriptionTiers = {
+    'pro',
+    'premium',
+    'ultra',
+    'plus',
+    'starter',
+    'business',
+  };
+
+  /// Оплаченный тариф или выданный промокодом (не окно 72 ч после регистрации).
   bool get hasPaidProAccess {
     final st = subscriptionType?.toLowerCase().trim();
-    if (st != 'pro' && st != 'premium') return false;
+    if (st == null || !kPaidSubscriptionTiers.contains(st)) return false;
     final paidUntil = proPaidUntil;
     return paidUntil == null || DateTime.now().isBefore(paidUntil);
   }

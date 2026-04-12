@@ -734,6 +734,7 @@ class AppRouter {
               return _slideTransitionPage(
                 state,
                 SubscriptionOrTrialGate(
+                  allowLiteTier: true,
                   child: SalaryExpenseScreen(departmentFilter: department),
                 ),
               );

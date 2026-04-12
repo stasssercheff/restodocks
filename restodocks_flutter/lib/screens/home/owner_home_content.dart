@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/feature_flags.dart';
+import '../../core/subscription_entitlements.dart';
 import '../../services/services.dart';
 import '../../widgets/home_feature_tile.dart';
 
@@ -98,6 +99,57 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
     bool visible(String key) => !hiddenKeys.contains(key);
     Widget ownerTile(String key, Widget child) =>
         visible(key) ? child : const SizedBox.shrink();
+
+    final ent = SubscriptionEntitlements.from(account.establishment);
+    if (ent.isLiteTier) {
+      return ListView(
+        controller: _scrollController,
+        padding: const EdgeInsets.all(16),
+        children: [
+          _SectionTitle(title: loc.t('kitchen')),
+          ownerTile(
+              'owner_schedule_all',
+              _wrap(
+                  HomeFeatureTile(
+                      icon: Icons.calendar_month,
+                      title: loc.t('schedule'),
+                      onTap: () => context.go('/schedule/all')),
+                  'home-schedule-mgmt')),
+          ownerTile(
+              'owner_menu_kitchen',
+              _wrap(
+                  HomeFeatureTile(
+                      icon: Icons.restaurant_menu,
+                      title: loc.t('menu'),
+                      onTap: () => context.go('/menu/kitchen')),
+                  'home-menu-kitchen')),
+          ownerTile(
+              'owner_ttk_kitchen',
+              _wrap(
+                  HomeFeatureTile(
+                      icon: Icons.description,
+                      title: loc.t('ttk_kitchen'),
+                      onTap: () => context.go('/tech-cards/kitchen')),
+                  'home-ttk-kitchen')),
+          ownerTile(
+              'owner_nomenclature_kitchen',
+              _wrap(
+                  HomeFeatureTile(
+                      icon: Icons.assignment,
+                      title: loc.t('nomenclature'),
+                      onTap: () => context.go('/nomenclature/kitchen')),
+                  'home-nomenclature-kitchen')),
+          ownerTile(
+              'owner_employees',
+              _wrap(
+                  HomeFeatureTile(
+                      icon: Icons.people,
+                      title: loc.t('employees'),
+                      onTap: () => context.go('/employees')),
+                  'home-employees')),
+        ],
+      );
+    }
 
     return ListView(
       controller: _scrollController,

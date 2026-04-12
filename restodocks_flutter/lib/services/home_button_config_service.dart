@@ -111,8 +111,9 @@ extension HomeButtonActionExt on HomeButtonAction {
 }
 
 /// Доступные действия для роли. [hasProSubscription] — раздел «Расходы» только при Pro.
+/// [ownerLiteHome] — у владельца на Lite в средней кнопке только график и меню (по умолчанию — график).
 List<HomeButtonAction> homeButtonActionsFor(Employee? emp,
-    {bool hasProSubscription = false}) {
+    {bool hasProSubscription = false, bool ownerLiteHome = false}) {
   if (emp == null) return [HomeButtonAction.schedule];
   final isOwner = emp.hasRole('owner');
   final isChef = emp.hasRole('executive_chef') || emp.hasRole('sous_chef');
@@ -121,6 +122,9 @@ List<HomeButtonAction> homeButtonActionsFor(Employee? emp,
   final isLineStaff = !isOwner && !isManagement;
 
   if (isOwner) {
+    if (ownerLiteHome) {
+      return [HomeButtonAction.schedule, HomeButtonAction.menu];
+    }
     return [HomeButtonAction.inbox, HomeButtonAction.messages, HomeButtonAction.schedule, HomeButtonAction.menu];
   }
   if (isChef || isManagement) {
@@ -160,9 +164,10 @@ class HomeButtonConfigService extends ChangeNotifier {
 
   /// Действие с учётом допустимых для роли (если сохранённое недоступно — первое из списка)
   HomeButtonAction effectiveAction(Employee? emp,
-      {bool hasProSubscription = false}) {
-    final allowed =
-        homeButtonActionsFor(emp, hasProSubscription: hasProSubscription);
+      {bool hasProSubscription = false, bool ownerLiteHome = false}) {
+    final allowed = homeButtonActionsFor(emp,
+        hasProSubscription: hasProSubscription,
+        ownerLiteHome: ownerLiteHome);
     return allowed.contains(_action)
         ? _action
         : (allowed.firstOrNull ?? HomeButtonAction.schedule);

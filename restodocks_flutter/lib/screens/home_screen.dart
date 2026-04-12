@@ -107,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!context.mounted) return;
 
     final st = est.subscriptionType?.toLowerCase().trim();
-    if (st == 'pro' || st == 'premium') return;
+    if (st != null && Establishment.kPaidSubscriptionTiers.contains(st)) return;
     final trialEnd = est.proTrialEndsAt ?? DateTime.now().add(const Duration(hours: 72));
     if (!DateTime.now().isBefore(trialEnd)) return;
 

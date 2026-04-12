@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../services/services.dart';
 import '../../models/models.dart';
 import '../../core/feature_flags.dart';
+import '../../core/subscription_entitlements.dart';
 import '../../utils/pos_hall_permissions.dart';
 import '../../widgets/home_feature_tile.dart';
 import 'expandable_banquet_section.dart';
@@ -26,14 +27,18 @@ class ManagementHomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
-    final subOk = context.watch<AccountManagerSupabase>().hasProSubscription;
+    final account = context.watch<AccountManagerSupabase>();
+    final subOk = account.hasProSubscription;
+    final ent = SubscriptionEntitlements.from(account.establishment);
     final screenPref = context.watch<ScreenLayoutPreferenceService>();
     final roles = employee.roles;
     final isChef = roles.contains('executive_chef');
     final isBarManager = roles.contains('bar_manager');
     final isGeneral = roles.contains('general_manager');
     final isFloorManager = roles.contains('floor_manager');
-    final dept = _deptForRoute(employee.department);
+    final dept = ent.kitchenOnlyDepartments
+        ? 'kitchen'
+        : _deptForRoute(employee.department);
     // ТТК: кухня, бар, зал — у каждого подразделения свои
     final showTtk = dept == 'kitchen' || dept == 'bar' || dept == 'hall';
     // Меню: только кухня и бар (у зала нет меню)
@@ -77,6 +82,45 @@ class ManagementHomeContent extends StatelessWidget {
                   color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
           ),
+        ],
+      );
+    }
+
+    if (ent.isLiteTier && employee.effectiveDataAccess) {
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          HomeFeatureTile(
+            icon: Icons.calendar_month,
+            title: loc.t('schedule'),
+            onTap: () => context.go('/schedule/kitchen'),
+          ),
+          HomeFeatureTile(
+            icon: Icons.restaurant_menu,
+            title: loc.t('menu'),
+            onTap: () => context.go('/menu/kitchen'),
+          ),
+          HomeFeatureTile(
+            icon: Icons.description,
+            title: loc.t('ttk_kitchen'),
+            onTap: () => context.go('/tech-cards/kitchen'),
+          ),
+          HomeFeatureTile(
+            icon: Icons.assignment,
+            title: loc.t('nomenclature'),
+            onTap: () => context.go('/nomenclature/kitchen'),
+          ),
+          HomeFeatureTile(
+            icon: Icons.people,
+            title: loc.t('employees'),
+            onTap: () => context.go('/employees'),
+          ),
+          if ((isChef || roles.contains('sous_chef')) && !isGeneral)
+            HomeFeatureTile(
+              icon: Icons.payments,
+              title: loc.t('salary_tab_fzp') ?? 'ФЗП',
+              onTap: () => context.go('/expenses/salary?department=kitchen'),
+            ),
         ],
       );
     }

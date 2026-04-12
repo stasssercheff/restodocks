@@ -10,6 +10,7 @@ import 'package:restodocks/core/supabase_url_resolver_stub.dart'
 
 import '../core/clear_hash_stub.dart'
     if (dart.library.html) '../core/clear_hash_web.dart' as clear_hash;
+import '../core/subscription_entitlements.dart';
 import '../core/pending_co_owner_registration.dart';
 import '../core/public_app_origin.dart';
 import '../models/models.dart';
@@ -95,6 +96,13 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Pro/Premium или активное окно 72 ч (см. establishments.pro_trial_ends_at).
   bool get hasProSubscription => _establishment?.hasEffectiveProAccess ?? false;
+
+  /// Бесплатный Lite после окончания триала (ограниченный функционал).
+  bool get isLiteTier =>
+      SubscriptionEntitlements.from(_establishment).isLiteTier;
+
+  SubscriptionEntitlements get subscriptionEntitlements =>
+      SubscriptionEntitlements.from(_establishment);
 
   /// Активное окно 72 ч без оплаченного Pro — лимиты триала (инвентаризация, импорт ТТК).
   bool get isTrialOnlyWithoutPaid {
