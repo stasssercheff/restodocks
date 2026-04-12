@@ -40,6 +40,9 @@ const String _pfUnitPcs = 'pcs';
 const double _kInventoryQtyFontSize = 13;
 const double _kInventoryQtyFieldHeight = 40;
 
+/// Одна высота для фикс. колонки и скролла количеств (без IntrinsicHeight — ровное выравнивание по вертикали).
+const double _kInventoryDataRowHeight = 38;
+
 enum _InventoryTableEntryType { section, row, aggregated }
 
 class _InventoryTableEntry {
@@ -48,8 +51,7 @@ class _InventoryTableEntry {
         rowIndex = null,
         rowNumber = null,
         isLastRow = false;
-  const _InventoryTableEntry.row(
-      this.rowIndex, this.rowNumber, this.isLastRow)
+  const _InventoryTableEntry.row(this.rowIndex, this.rowNumber, this.isLastRow)
       : type = _InventoryTableEntryType.row,
         title = null;
   const _InventoryTableEntry.aggregated()
@@ -227,14 +229,17 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   /// Пока false — не отправляем пустой снимок на сервер.
   bool _serverDraftDirty = false;
+
   /// Счётчик правок: пока upsert в полёте, новые saveNow увеличивают gen — цикл докидывает на сервер.
   int _draftWriteGen = 0;
+
   /// Очередь upsert на Supabase (строго по одному запросу, без гонок).
   Future<void> _serverPushChain = Future.value();
 
   void _enqueueServerPush() {
     _serverPushChain = _serverPushChain.then((_) => _runServerPushDrain());
   }
+
   final List<_InventoryRow> _rows = [];
 
   /// Локальное обновление строки «Итого» без [setState] на всём экране (иначе при сотнях строк лаг при вводе).
@@ -285,10 +290,12 @@ class _InventoryScreenState extends State<InventoryScreen>
   bool _isInputMode = false; // Режим ввода количества (клавиатура открыта)
   /// Фокус в числовой ячейке (обновляется без setState на весь экран).
   bool _qtyCellFocused = false;
+
   /// Строка, в ячейке которой сейчас фокус (для подписи над клавиатурой в альбоме).
   int? _focusedQtyRowActualIndex;
   final ScrollController _inventoryTableScrollController = ScrollController();
   final Map<int, GlobalKey> _inventoryRowKeys = {};
+
   /// Пересборка только шапки/футера при смене фокуса ячейки или поля фильтра.
   final ValueNotifier<int> _inventoryLayoutPulse = ValueNotifier<int>(0);
   _InventorySort _sortMode = _InventorySort.alphabetAsc;
@@ -296,6 +303,7 @@ class _InventoryScreenState extends State<InventoryScreen>
   final TextEditingController _nameFilterCtrl = TextEditingController();
   final FocusNode _nameFilterFocusNode = FocusNode();
   Timer? _nameFilterDebounce;
+
   /// Фильтр по имени: уведомляет только блок таблицы, без setState всего экрана.
   final ValueNotifier<String> _inventoryFilterNotifier =
       ValueNotifier<String>('');
@@ -348,7 +356,6 @@ class _InventoryScreenState extends State<InventoryScreen>
     _nameFilterFocusNode.addListener(() {
       _inventoryLayoutPulse.value++;
     });
-
   }
 
   @override
@@ -554,8 +561,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             _inventoryDraftSnapshotHasRows(serverSelectiveDraft)
         ? serverSelectiveDraft
         : null;
-    final selectiveDraftToRestore =
-        selectiveDraftResolved ?? serverSelResolved;
+    final selectiveDraftToRestore = selectiveDraftResolved ?? serverSelResolved;
 
     final hasIikoProducts = iikoStore.hasProducts;
     final hasIikoDraft = iikoDraft != null && iikoDraft.isNotEmpty;
@@ -639,8 +645,8 @@ class _InventoryScreenState extends State<InventoryScreen>
   ) async {
     if (kIsWeb) return null;
     try {
-      final raw = await LocalSnapshotStore.instance
-          .get('$estId:inventory_drafts');
+      final raw =
+          await LocalSnapshotStore.instance.get('$estId:inventory_drafts');
       if (raw == null || raw.isEmpty) return null;
       final rows = jsonDecode(raw) as List<dynamic>;
       for (final r in rows) {
@@ -754,8 +760,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                 children: [
                   ListTile(
                     dense: isLandscape,
-                    visualDensity:
-                        isLandscape ? VisualDensity.compact : VisualDensity.standard,
+                    visualDensity: isLandscape
+                        ? VisualDensity.compact
+                        : VisualDensity.standard,
                     minVerticalPadding: isLandscape ? 2 : null,
                     leading: const Icon(Icons.list_alt, color: Colors.blue),
                     title: Row(children: [
@@ -773,8 +780,9 @@ class _InventoryScreenState extends State<InventoryScreen>
                   SizedBox(height: tileGap),
                   ListTile(
                     dense: isLandscape,
-                    visualDensity:
-                        isLandscape ? VisualDensity.compact : VisualDensity.standard,
+                    visualDensity: isLandscape
+                        ? VisualDensity.compact
+                        : VisualDensity.standard,
                     minVerticalPadding: isLandscape ? 2 : null,
                     leading: Icon(Icons.filter_alt_outlined,
                         color: theme.colorScheme.secondary),
@@ -931,8 +939,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       // Future.wait(loadProducts ∥ loadNomenclature) могла оставить getNomenclatureProducts пустым.
       await store.loadProducts();
       await store.loadNomenclature(estId);
-      final techCards =
-          await techCardSvc.getTechCardsForEstablishment(estId);
+      final techCards = await techCardSvc.getTechCardsForEstablishment(estId);
       if (!mounted) return;
       final products = store.getNomenclatureProducts(estId);
       final pfOnly = techCards.where((tc) => tc.isSemiFinished).toList();
@@ -1970,16 +1977,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       return false;
     }
     final viewBottom = MediaQuery.viewInsetsOf(context).bottom;
-    return viewBottom > 0 ||
-        _qtyCellFocused ||
-        _nameFilterFocusNode.hasFocus;
-  }
-
-  /// Оценка высоты клавиатуры, когда Flutter на вебе не даёт viewInsets (iOS Safari).
-  double _inventoryWebKeyboardGuessBottom(BuildContext context) {
-    if (!kIsWeb || !_qtyCellFocused) return 0;
-    final h = MediaQuery.sizeOf(context).shortestSide;
-    return h.clamp(260.0, 340.0);
+    return viewBottom > 0 || _qtyCellFocused || _nameFilterFocusNode.hasFocus;
   }
 
   double _inventorySectionHeaderHeight(BuildContext context) =>
@@ -2039,32 +2037,32 @@ class _InventoryScreenState extends State<InventoryScreen>
                 actions: _inventoryAppBarActions(context, loc),
               )
             : (isNarrow && isKeyboardOpen)
-            ? AppBar(
-                leading: _inventoryAppBarLeading(context),
-                title: Text(
-                  _inventoryAppBarTitle(loc),
-                  style: const TextStyle(fontSize: 16),
-                ),
-                toolbarHeight: 40,
-                elevation: 0,
-                actions: _inventoryAppBarActions(context, loc),
-              )
-            : _isInputMode
                 ? AppBar(
                     leading: _inventoryAppBarLeading(context),
                     title: Text(
                       _inventoryAppBarTitle(loc),
                       style: const TextStyle(fontSize: 16),
                     ),
-                    toolbarHeight: 48,
+                    toolbarHeight: 40,
                     elevation: 0,
                     actions: _inventoryAppBarActions(context, loc),
                   )
-                : AppBar(
-                    leading: _inventoryAppBarLeading(context),
-                    title: Text(_inventoryAppBarTitle(loc)),
-                    actions: _inventoryAppBarActions(context, loc),
-                  ),
+                : _isInputMode
+                    ? AppBar(
+                        leading: _inventoryAppBarLeading(context),
+                        title: Text(
+                          _inventoryAppBarTitle(loc),
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                        toolbarHeight: 48,
+                        elevation: 0,
+                        actions: _inventoryAppBarActions(context, loc),
+                      )
+                    : AppBar(
+                        leading: _inventoryAppBarLeading(context),
+                        title: Text(_inventoryAppBarTitle(loc)),
+                        actions: _inventoryAppBarActions(context, loc),
+                      ),
         body: Stack(
           children: [
             Column(
@@ -2126,45 +2124,6 @@ class _InventoryScreenState extends State<InventoryScreen>
                   );
                 }
                 return const SizedBox.shrink();
-              },
-            ),
-            ValueListenableBuilder<int>(
-              valueListenable: _inventoryLayoutPulse,
-              builder: (ctx, _, __) {
-                if (!_inventoryKbLandscapeSquish(ctx) ||
-                    _nameFilterFocusNode.hasFocus) {
-                  return const SizedBox.shrink();
-                }
-                final idx = _focusedQtyRowActualIndex;
-                if (idx == null || idx < 0 || idx >= _rows.length) {
-                  return const SizedBox.shrink();
-                }
-                final theme = Theme.of(ctx);
-                final row = _rows[idx];
-                final viewBottom = MediaQuery.viewInsetsOf(ctx).bottom;
-                final bottomPad = viewBottom > 0
-                    ? viewBottom
-                    : _inventoryWebKeyboardGuessBottom(ctx);
-                return Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: bottomPad,
-                  child: Material(
-                    elevation: 8,
-                    color: theme.colorScheme.surfaceContainerHigh,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 8),
-                      child: Text(
-                        '${row.productName(loc.currentLanguageCode)} · ${row.unitDisplayForBlank(loc, loc.currentLanguageCode)}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium
-                            ?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-                );
               },
             ),
           ],
@@ -2539,8 +2498,10 @@ class _InventoryScreenState extends State<InventoryScreen>
       duration: const Duration(milliseconds: 300),
       child: ValueListenableBuilder<String>(
         valueListenable: _inventoryFilterNotifier,
-        builder: (context, _, __) =>
-            _buildTableWithFixedColumn(loc),
+        builder: (context, _, __) => ValueListenableBuilder<int>(
+          valueListenable: _inventoryLayoutPulse,
+          builder: (context, __, ___) => _buildTableWithFixedColumn(loc),
+        ),
       ),
     );
   }
@@ -2556,8 +2517,10 @@ class _InventoryScreenState extends State<InventoryScreen>
 
     if (_blockFilter != _InventoryBlockFilter.pfOnly &&
         productIndices.isNotEmpty) {
-      entries.add(_InventoryTableEntry.section(loc.t('inventory_block_products')));
-      final lastIdx = pfIndices.isNotEmpty ? pfIndices.last : productIndices.last;
+      entries
+          .add(_InventoryTableEntry.section(loc.t('inventory_block_products')));
+      final lastIdx =
+          pfIndices.isNotEmpty ? pfIndices.last : productIndices.last;
       for (var i = 0; i < productIndices.length; i++) {
         final rowIndex = productIndices[i];
         entries.add(_InventoryTableEntry.row(
@@ -2589,8 +2552,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     }
 
     final squish = _inventoryKbLandscapeSquish(context);
-    final showTableColumnHeaders =
-        !squish || _nameFilterFocusNode.hasFocus;
+    final showTableColumnHeaders = !squish || _nameFilterFocusNode.hasFocus;
 
     return Column(
       children: [
@@ -2652,8 +2614,6 @@ class _InventoryScreenState extends State<InventoryScreen>
   static const double _sectionHeaderHeight = _kInventoryQtyFieldHeight;
 
   /// Фиксированная высота строки данных (чуть выше поля ввода).
-  static const double _dataRowHeight = 38;
-
   /// Ширина фиксированной части: #, Наименование, Мера, Итого (продукт зафиксирован слева).
   /// В альбоме на телефоне — колонка «Наименование» ≈ **половина ширины экрана** (остаток под количества).
   double _leftWidth(BuildContext context) {
@@ -2663,11 +2623,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         MediaQuery.of(context).orientation == Orientation.landscape;
     if (narrow && landscape) {
       final nameW = (w * 0.5).clamp(168.0, 520.0);
-      return nameW +
-          _colNoWidth +
-          _colUnitWidth +
-          _colTotalWidth +
-          3 * _colGap;
+      return nameW + _colNoWidth + _colUnitWidth + _colTotalWidth + 3 * _colGap;
     }
     final base = (w * 0.42).clamp(140.0, 200.0);
     return base + _colGap + _colTotalWidth;
@@ -2759,8 +2715,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       height: h,
       width: leftW,
       child: Container(
-        padding: EdgeInsets.symmetric(
-            horizontal: 8, vertical: h < 28 ? 2 : 6),
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: h < 28 ? 2 : 6),
         decoration: BoxDecoration(
           color: theme.colorScheme.primaryContainer.withOpacity(0.5),
           border: Border(
@@ -2864,10 +2819,11 @@ class _InventoryScreenState extends State<InventoryScreen>
       LocalizationService loc, int actualIndex, int rowNumber) {
     final theme = Theme.of(context);
     final row = _rows[actualIndex];
-    final squish = _inventoryKbLandscapeSquish(context);
+    final qtyRowFocused =
+        !_completed && _focusedQtyRowActualIndex == actualIndex;
 
     return SizedBox(
-      height: _dataRowHeight,
+      height: _kInventoryDataRowHeight,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
         decoration: BoxDecoration(
@@ -2888,12 +2844,38 @@ class _InventoryScreenState extends State<InventoryScreen>
             SizedBox(width: _colGap),
             SizedBox(
               width: _colNameWidth(context),
-              child: Text(
-                row.productName(loc.currentLanguageCode),
-                style: theme.textTheme.bodyMedium,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                softWrap: true,
+              child: Container(
+                alignment: Alignment.centerLeft,
+                padding: EdgeInsets.symmetric(
+                  horizontal: qtyRowFocused ? 2 : 0,
+                  vertical: qtyRowFocused ? 1 : 0,
+                ),
+                decoration: qtyRowFocused
+                    ? BoxDecoration(
+                        color: theme.colorScheme.primaryContainer
+                            .withOpacity(0.65),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border(
+                          left: BorderSide(
+                            color: theme.colorScheme.primary,
+                            width: 3,
+                          ),
+                        ),
+                      )
+                    : null,
+                child: Text(
+                  row.productName(loc.currentLanguageCode),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: qtyRowFocused
+                        ? theme.colorScheme.onPrimaryContainer
+                        : null,
+                    fontWeight:
+                        qtyRowFocused ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  softWrap: true,
+                ),
               ),
             ),
             SizedBox(width: _colGap),
@@ -2988,11 +2970,15 @@ class _InventoryScreenState extends State<InventoryScreen>
                 if (!_qtyCellFocused && _focusedQtyRowActualIndex != null) {
                   _focusedQtyRowActualIndex = null;
                   _inventoryLayoutPulse.value++;
+                  setState(() {});
                 }
               });
             }
             if (prevFocused != hasFocus || hasFocus) {
               _inventoryLayoutPulse.value++;
+            }
+            if (prevFocused != hasFocus) {
+              setState(() {});
             }
           },
           leftWidth: _leftWidth(context),
@@ -3695,6 +3681,7 @@ class _StandardInventoryRowTile extends StatefulWidget {
   });
 
   final ValueNotifier<int> rowRepaintTick;
+
   /// Вызывается при каждом тике (обновление «Итого» без перерисовки всей таблицы).
   final Widget Function() buildFixedPart;
   final _InventoryRow row;
@@ -3706,6 +3693,7 @@ class _StandardInventoryRowTile extends StatefulWidget {
   final void Function(int) onLastCellFocused;
   final void Function(int, int) onCellFocusLost;
   final void Function(bool) onFocusChange;
+
   /// Прокрутка строки в видимую зону над клавиатурой (альбом).
   final VoidCallback? onQtyCellEnteredForScroll;
   final double leftWidth;
@@ -3761,109 +3749,97 @@ class _StandardInventoryRowTileState extends State<_StandardInventoryRowTile> {
         final row = widget.row;
         final qtyCols = row.quantities.length;
 
-        return IntrinsicHeight(
+        return SizedBox(
+          height: _kInventoryDataRowHeight,
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SizedBox(width: widget.leftWidth, child: widget.buildFixedPart()),
               Expanded(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final h = constraints.maxHeight;
-                    return SingleChildScrollView(
-                      controller: _hScroll,
-                      scrollDirection: Axis.horizontal,
-                      physics: const ClampingScrollPhysics(),
-                      child: SizedBox(
-                        height: h,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 4, vertical: 0),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surface,
-                            border: Border(
-                                bottom: BorderSide(
-                                    color: theme.dividerColor
-                                        .withOpacity(0.5))),
-                          ),
-                          alignment: Alignment.center,
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ...List.generate(
-                                qtyCols,
-                                (colIndex) {
-                                  final isLastCell = widget.isLastRow &&
-                                      colIndex == qtyCols - 1;
-                                  return Padding(
-                                    padding: EdgeInsets.only(
-                                        right: colIndex < qtyCols - 1
-                                            ? widget.colGap
-                                            : 0),
-                                    child: SizedBox(
-                                      width: widget.colQtyWidth,
-                                      child: Center(
-                                        child: widget.completed
-                                            ? Text(
-                                                widget.formatQty(
-                                                    row.quantityDisplayAt(
-                                                        colIndex)),
-                                                style: theme
-                                                    .textTheme.bodyMedium
-                                                    ?.copyWith(
-                                                        fontSize:
-                                                            _kInventoryQtyFontSize))
-                                            : _QtyCell(
-                                                key: ValueKey(
-                                                    'qty_${widget.actualIndex}_$colIndex'),
-                                                value: row
-                                                    .quantities[colIndex],
-                                                fieldHeight: 34,
-                                                useGrams: row.isWeightInKg,
-                                                onChanged: (v) => widget
-                                                    .onSetQuantity(
-                                                        widget.actualIndex,
-                                                        colIndex,
-                                                        v),
-                                                textInputAction: isLastCell
-                                                    ? TextInputAction.done
-                                                    : TextInputAction.next,
-                                                onFocusGained: () {
-                                                  widget.onQtyCellEnteredForScroll
-                                                      ?.call();
-                                                  widget.onFocusChange(true);
-                                                  if (colIndex ==
-                                                      qtyCols - 1) {
-                                                    widget.onLastCellFocused(
-                                                        widget.actualIndex);
-                                                  }
-                                                },
-                                                onFocusLost: () {
-                                                  widget.onFocusChange(false);
-                                                  widget.onCellFocusLost(
-                                                      widget.actualIndex,
-                                                      colIndex);
-                                                  if (colIndex ==
-                                                          qtyCols - 2 &&
-                                                      row.quantities[
-                                                              colIndex] >
-                                                          0) {
-                                                    _scrollToEnd();
-                                                  }
-                                                },
-                                              ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
+                child: SingleChildScrollView(
+                  controller: _hScroll,
+                  scrollDirection: Axis.horizontal,
+                  physics: const ClampingScrollPhysics(),
+                  child: SizedBox(
+                    height: _kInventoryDataRowHeight,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 4, vertical: 0),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface,
+                        border: Border(
+                            bottom: BorderSide(
+                                color: theme.dividerColor.withOpacity(0.5))),
                       ),
-                    );
-                  },
+                      alignment: Alignment.center,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ...List.generate(
+                            qtyCols,
+                            (colIndex) {
+                              final isLastCell =
+                                  widget.isLastRow && colIndex == qtyCols - 1;
+                              return Padding(
+                                padding: EdgeInsets.only(
+                                    right: colIndex < qtyCols - 1
+                                        ? widget.colGap
+                                        : 0),
+                                child: SizedBox(
+                                  width: widget.colQtyWidth,
+                                  child: Center(
+                                    child: widget.completed
+                                        ? Text(
+                                            widget.formatQty(row
+                                                .quantityDisplayAt(colIndex)),
+                                            style: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                                    fontSize:
+                                                        _kInventoryQtyFontSize))
+                                        : _QtyCell(
+                                            key: ValueKey(
+                                                'qty_${widget.actualIndex}_$colIndex'),
+                                            value: row.quantities[colIndex],
+                                            fieldHeight: 34,
+                                            useGrams: row.isWeightInKg,
+                                            onChanged: (v) =>
+                                                widget.onSetQuantity(
+                                                    widget.actualIndex,
+                                                    colIndex,
+                                                    v),
+                                            textInputAction: isLastCell
+                                                ? TextInputAction.done
+                                                : TextInputAction.next,
+                                            onFocusGained: () {
+                                              widget.onQtyCellEnteredForScroll
+                                                  ?.call();
+                                              widget.onFocusChange(true);
+                                              if (colIndex == qtyCols - 1) {
+                                                widget.onLastCellFocused(
+                                                    widget.actualIndex);
+                                              }
+                                            },
+                                            onFocusLost: () {
+                                              widget.onFocusChange(false);
+                                              widget.onCellFocusLost(
+                                                  widget.actualIndex, colIndex);
+                                              if (colIndex == qtyCols - 2 &&
+                                                  row.quantities[colIndex] >
+                                                      0) {
+                                                _scrollToEnd();
+                                              }
+                                            },
+                                          ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ],
@@ -4043,12 +4019,12 @@ class _QtyCellState extends State<_QtyCell> {
           FilteringTextInputFormatter.allow(RegExp(r'[\d,.]')),
         ],
         textAlign: TextAlign.center,
-        style: theme.textTheme.bodyMedium?.copyWith(
-            fontSize: widget.fontSize, height: 1.15),
+        textAlignVertical: TextAlignVertical.center,
+        style: theme.textTheme.bodyMedium
+            ?.copyWith(fontSize: widget.fontSize, height: 1.15),
         decoration: InputDecoration(
           isDense: true,
-          contentPadding:
-              EdgeInsets.symmetric(horizontal: 4, vertical: vPad),
+          contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: vPad),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
           filled: true,
           fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
@@ -4457,6 +4433,7 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
   }
 
   Timer? _serverSaveTimer;
+
   /// См. [_InventoryScreenState._serverDraftDirty] — не дергаем Supabase без изменений черновика.
   bool _serverDraftDirty = false;
 
@@ -5229,203 +5206,207 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
               behavior: HitTestBehavior.translucent,
               onTap: () => FocusScope.of(context).unfocus(),
               child: Stack(
-              children: [
-                Column(
-                  children: [
-                    // Вкладки листов (если > 1 листа в бланке)
-                    Consumer<IikoProductStore>(
-                      builder: (ctx, store, _) {
-                        final sheetNames = store.sheetNames;
-                        if (sheetNames.length <= 1)
-                          return const SizedBox.shrink();
-                        final activeSheet = sheetNames.contains(_selectedSheet)
-                            ? _selectedSheet!
-                            : sheetNames.first;
-                        return _SheetTabBar(
-                          sheetNames: sheetNames,
-                          selected: activeSheet,
-                          onSelect: (s) {
-                            setState(() {
-                              _selectedSheet = s;
-                              // Синхронизируем sheetName в _rows из актуального store
-                              // (store мог обновить sheetName после первоначальной загрузки _rows)
-                              final storeProducts = {
-                                for (final p in store.products) p.id: p
-                              };
-                              for (final row in _rows) {
-                                final fresh = storeProducts[row.product.id];
-                                if (fresh != null &&
-                                    fresh.sheetName != row.product.sheetName) {
-                                  row.product = fresh;
+                children: [
+                  Column(
+                    children: [
+                      // Вкладки листов (если > 1 листа в бланке)
+                      Consumer<IikoProductStore>(
+                        builder: (ctx, store, _) {
+                          final sheetNames = store.sheetNames;
+                          if (sheetNames.length <= 1)
+                            return const SizedBox.shrink();
+                          final activeSheet =
+                              sheetNames.contains(_selectedSheet)
+                                  ? _selectedSheet!
+                                  : sheetNames.first;
+                          return _SheetTabBar(
+                            sheetNames: sheetNames,
+                            selected: activeSheet,
+                            onSelect: (s) {
+                              setState(() {
+                                _selectedSheet = s;
+                                // Синхронизируем sheetName в _rows из актуального store
+                                // (store мог обновить sheetName после первоначальной загрузки _rows)
+                                final storeProducts = {
+                                  for (final p in store.products) p.id: p
+                                };
+                                for (final row in _rows) {
+                                  final fresh = storeProducts[row.product.id];
+                                  if (fresh != null &&
+                                      fresh.sheetName !=
+                                          row.product.sheetName) {
+                                    row.product = fresh;
+                                  }
                                 }
-                              }
-                            });
-                          },
-                        );
-                      },
-                    ),
-                    // Поиск — всегда видим
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                      child: TextField(
-                        controller: _filterCtrl,
-                        focusNode: _searchFocusNode,
-                        decoration: InputDecoration(
-                          hintText: loc.t('inventory_search_by_name_hint'),
-                          prefixIcon: const Icon(Icons.search),
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                      ),
-                    ),
-                    // Статус-строка — скрываем при фокусе (без setState всего экрана)
-                    ValueListenableBuilder<bool>(
-                      valueListenable: _keyboardChromeVisible,
-                      builder: (context, keyboardActive, _) {
-                        if (keyboardActive) return const SizedBox.shrink();
-                        return Container(
-                          color: theme.colorScheme.surfaceContainerHighest
-                              .withOpacity(0.5),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 6),
-                          child: Row(
-                            children: [
-                              Icon(Icons.table_chart_outlined,
-                                  size: 16, color: theme.colorScheme.primary),
-                              const SizedBox(width: 6),
-                              Text(
-                                loc.t('inventory_iiko_status', args: {
-                                  'count': '${_rows.length}',
-                                  'date': iikoStatusDateStr,
-                                }),
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: theme.colorScheme.onSurfaceVariant),
-                              ),
-                              const Spacer(),
-                              ValueListenableBuilder<DateTime?>(
-                                valueListenable: _lastSavedAtNotifier,
-                                builder: (context, savedAt, _) {
-                                  if (savedAt == null) {
-                                    return const SizedBox.shrink();
-                                  }
-                                  return Container(
-                                    margin: const EdgeInsets.only(right: 4),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 7, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                          color:
-                                              Colors.green.withOpacity(0.4)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.security,
-                                            size: 12, color: Colors.green),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          loc.t('inventory_data_protected'),
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.green[700],
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              ),
-                              TextButton(
-                                onPressed: () async {
-                                  final picked = await showDatePicker(
-                                    context: context,
-                                    initialDate: _date,
-                                    firstDate: DateTime(2020),
-                                    lastDate: DateTime(2030),
-                                  );
-                                  if (picked != null) {
-                                    setState(() => _date = picked);
-                                  }
-                                },
-                                child: Text(loc.t('inventory_date'),
-                                    style: const TextStyle(fontSize: 12)),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                    // Шапка таблицы
-                    _IikoInventoryHeader(
-                      qtyCols: _rows.isEmpty
-                          ? 2
-                          : _rows
-                              .map((r) => r.quantities.length)
-                              .reduce((a, b) => a > b ? a : b),
-                    ),
-                    // Список строк — тап/скролл внутри не закрывает клавиатуру (refocus).
-                    // Задержка 100ms: поиск refocus быстрее при скролле; ячейка успевает получить фокус.
-                    // Фильтр обновляет только таблицу, без пересборки шапки/футера.
-                    Expanded(
-                      child: ValueListenableBuilder<String>(
-                        valueListenable: _iikoFilterNotifier,
-                        builder: (context, _, __) {
-                          final visibleRows = _filteredRows;
-                          return visibleRows.isEmpty
-                              ? Center(
-                                  child: Text(loc.t('inventory_no_positions')))
-                              : _IikoInventoryTable(
-                                  rows: visibleRows,
-                                  completed: _completed,
-                                  onQuantityChanged: _setQuantity,
-                                  onFocusChange: _syncKeyboardChrome,
-                                );
+                              });
+                            },
+                          );
                         },
                       ),
-                    ),
-                    ValueListenableBuilder<bool>(
-                      valueListenable: _keyboardChromeVisible,
-                      builder: (context, keyboardActive, _) {
-                        if (keyboardActive) return const SizedBox.shrink();
-                        return Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: FilledButton.icon(
-                                  icon: const Icon(Icons.save_alt),
-                                  label: Text(
-                                      loc.t('inventory_save_download_xlsx')),
-                                  onPressed: _saveAndExport,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              OutlinedButton(
-                                onPressed: _confirmReset,
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: theme.colorScheme.error,
-                                  side: BorderSide(
-                                      color: theme.colorScheme.error
-                                          .withOpacity(0.5)),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 14, vertical: 12),
-                                ),
-                                child: Text(loc.t('inventory_reset_confirm'),
-                                    style: const TextStyle(fontSize: 13)),
-                              ),
-                            ],
+                      // Поиск — всегда видим
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                        child: TextField(
+                          controller: _filterCtrl,
+                          focusNode: _searchFocusNode,
+                          decoration: InputDecoration(
+                            hintText: loc.t('inventory_search_by_name_hint'),
+                            prefixIcon: const Icon(Icons.search),
+                            border: const OutlineInputBorder(),
+                            isDense: true,
                           ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                        ),
+                      ),
+                      // Статус-строка — скрываем при фокусе (без setState всего экрана)
+                      ValueListenableBuilder<bool>(
+                        valueListenable: _keyboardChromeVisible,
+                        builder: (context, keyboardActive, _) {
+                          if (keyboardActive) return const SizedBox.shrink();
+                          return Container(
+                            color: theme.colorScheme.surfaceContainerHighest
+                                .withOpacity(0.5),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 6),
+                            child: Row(
+                              children: [
+                                Icon(Icons.table_chart_outlined,
+                                    size: 16, color: theme.colorScheme.primary),
+                                const SizedBox(width: 6),
+                                Text(
+                                  loc.t('inventory_iiko_status', args: {
+                                    'count': '${_rows.length}',
+                                    'date': iikoStatusDateStr,
+                                  }),
+                                  style: TextStyle(
+                                      fontSize: 12,
+                                      color:
+                                          theme.colorScheme.onSurfaceVariant),
+                                ),
+                                const Spacer(),
+                                ValueListenableBuilder<DateTime?>(
+                                  valueListenable: _lastSavedAtNotifier,
+                                  builder: (context, savedAt, _) {
+                                    if (savedAt == null) {
+                                      return const SizedBox.shrink();
+                                    }
+                                    return Container(
+                                      margin: const EdgeInsets.only(right: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 7, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                            color:
+                                                Colors.green.withOpacity(0.4)),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.security,
+                                              size: 12, color: Colors.green),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            loc.t('inventory_data_protected'),
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.green[700],
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                                TextButton(
+                                  onPressed: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: _date,
+                                      firstDate: DateTime(2020),
+                                      lastDate: DateTime(2030),
+                                    );
+                                    if (picked != null) {
+                                      setState(() => _date = picked);
+                                    }
+                                  },
+                                  child: Text(loc.t('inventory_date'),
+                                      style: const TextStyle(fontSize: 12)),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                      // Шапка таблицы
+                      _IikoInventoryHeader(
+                        qtyCols: _rows.isEmpty
+                            ? 2
+                            : _rows
+                                .map((r) => r.quantities.length)
+                                .reduce((a, b) => a > b ? a : b),
+                      ),
+                      // Список строк — тап/скролл внутри не закрывает клавиатуру (refocus).
+                      // Задержка 100ms: поиск refocus быстрее при скролле; ячейка успевает получить фокус.
+                      // Фильтр обновляет только таблицу, без пересборки шапки/футера.
+                      Expanded(
+                        child: ValueListenableBuilder<String>(
+                          valueListenable: _iikoFilterNotifier,
+                          builder: (context, _, __) {
+                            final visibleRows = _filteredRows;
+                            return visibleRows.isEmpty
+                                ? Center(
+                                    child:
+                                        Text(loc.t('inventory_no_positions')))
+                                : _IikoInventoryTable(
+                                    rows: visibleRows,
+                                    completed: _completed,
+                                    onQuantityChanged: _setQuantity,
+                                    onFocusChange: _syncKeyboardChrome,
+                                  );
+                          },
+                        ),
+                      ),
+                      ValueListenableBuilder<bool>(
+                        valueListenable: _keyboardChromeVisible,
+                        builder: (context, keyboardActive, _) {
+                          if (keyboardActive) return const SizedBox.shrink();
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: FilledButton.icon(
+                                    icon: const Icon(Icons.save_alt),
+                                    label: Text(
+                                        loc.t('inventory_save_download_xlsx')),
+                                    onPressed: _saveAndExport,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                OutlinedButton(
+                                  onPressed: _confirmReset,
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: theme.colorScheme.error,
+                                    side: BorderSide(
+                                        color: theme.colorScheme.error
+                                            .withOpacity(0.5)),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 12),
+                                  ),
+                                  child: Text(loc.t('inventory_reset_confirm'),
+                                      style: const TextStyle(fontSize: 13)),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
     );
   }
@@ -5572,8 +5553,7 @@ class _IikoInventoryTable extends StatelessWidget {
             key: ValueKey(e.row!.product.id),
             row: e.row!,
             completed: completed,
-            onChanged: (colIdx, qty) =>
-                onQuantityChanged(e.row!, colIdx, qty),
+            onChanged: (colIdx, qty) => onQuantityChanged(e.row!, colIdx, qty),
             onFocusChange: onFocusChange,
           ),
         );
@@ -5842,7 +5822,8 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
               onChanged: (v) {
                 final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
                 widget.onChanged(colIdx, qty);
-                setState(() {}); // только «Итого» в строке, без перерисовки всего списка
+                setState(
+                    () {}); // только «Итого» в строке, без перерисовки всего списка
               },
               onSubmitted: (v) {
                 final qty = double.tryParse(v.replaceAll(',', '.')) ?? 0.0;
