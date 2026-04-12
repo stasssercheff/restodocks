@@ -317,7 +317,8 @@ class _InventoryScreenState extends State<InventoryScreen>
   String get draftKey =>
       _isSelectiveInventory ? 'selective_inventory' : 'inventory';
 
-  /// Сразу после правки: дождаться записи в кэш (SharedPreferences / localStorage), затем upsert на сервер.
+  /// Сразу после правки: дождаться записи в кэш, затем upsert на сервер.
+  /// Главный сценарий — введённые **количества** по строкам (`rows[].quantities` в JSON).
   void saveNow() {
     _draftWriteGen++;
     _serverDraftDirty = true;
@@ -1247,6 +1248,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (rowIndex < 0 || rowIndex >= _rows.length || _rows[rowIndex].isFree)
       return;
     setState(() => _rows[rowIndex].quantities.add(0.0));
+    _syncRowRepaintNotifiers();
+    saveNow(); // новый столбец количества — тот же приоритет, что и ввод в ячейку
   }
 
   /// При выходе из второй ячейки (после заполнения) — скролл выполняет tile через didUpdateWidget
@@ -1272,7 +1275,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     saveNow(); // Сохранить немедленно при добавлении продукта
   }
 
-  /// Обновление значения ячейки. При вводе в последнюю ячейку — добавляется новая колонка ко всем строкам (n+1).
+  /// Обновление **количества** в ячейке — каждый вызов сохраняет черновик (кэш + сервер).
   void _setQuantity(int rowIndex, int colIndex, double value) {
     if (rowIndex < 0 || rowIndex >= _rows.length) return;
     final row = _rows[rowIndex];
