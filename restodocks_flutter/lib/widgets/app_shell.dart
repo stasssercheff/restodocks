@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:feature_spotlight/feature_spotlight.dart';
 import 'package:flutter/foundation.dart';
@@ -325,6 +326,15 @@ class _AppShellState extends State<AppShell> {
           )
         : mq;
 
+    // Когда 71af6b31 скрывает bottomNavigationBar в веб+альбоме, пропадает Listener
+    // с жестом «вверх» → mobileBrowserChromeScrollDocumentBy (1c342b89). Зона у нижнего
+    // края (home indicator / узкая полоса) восстанавливает тот же жест без показа табов.
+    final webLandscapeChromeDrag =
+        kIsWeb && landscapeNarrow && hideNav;
+    final webChromeStripHeight = webLandscapeChromeDrag
+        ? math.max(36.0, mq.padding.bottom + 6.0)
+        : 0.0;
+
     // When hidden, omit the slot entirely — a zero-height bar still reserves
     // theme/shadow and reads as a second strip under the real nav.
     return MediaQuery(
@@ -334,9 +344,30 @@ class _AppShellState extends State<AppShell> {
         // trailing controls/lists on desktop and web pages.
         extendBody: false,
         backgroundColor: Theme.of(context).colorScheme.surface,
-        body: NotificationListener<ScrollNotification>(
-          onNotification: _onScroll,
-          child: bodyChild,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            NotificationListener<ScrollNotification>(
+              onNotification: _onScroll,
+              child: bodyChild,
+            ),
+            if (webLandscapeChromeDrag)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: webChromeStripHeight,
+                child: Listener(
+                  behavior: HitTestBehavior.translucent,
+                  onPointerMove: (e) {
+                    if (e.delta.dy >= -0.25) return;
+                    browser_chrome_doc
+                        .mobileBrowserChromeScrollDocumentBy(-e.delta.dy);
+                  },
+                  child: const SizedBox.expand(),
+                ),
+              ),
+          ],
         ),
         bottomNavigationBar: hideNav
             ? null
