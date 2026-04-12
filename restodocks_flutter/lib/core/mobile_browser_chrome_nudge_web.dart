@@ -44,7 +44,7 @@ bool mobileBrowserSkipChromeNudgeForWideTablet() {
 void mobileBrowserChromeNudgeFromFlutterScroll() {
   try {
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastChromeNudgeMs < 200) return;
+    if (now - _lastChromeNudgeMs < 130) return;
     _lastChromeNudgeMs = now;
 
     final w = html.window;

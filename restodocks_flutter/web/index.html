@@ -119,6 +119,8 @@
       width: 100%;
       min-height: 100%;
       min-height: -webkit-fill-available;
+      /* Без нижней строки часть Safari не даёт sh>vh — нуджи в Dart/JS сразу выходят (sh <= vh+4). */
+      min-height: calc(100vh + 96px);
       height: auto;
       overflow-x: hidden;
       overflow-y: auto;
@@ -240,6 +242,30 @@
     // Do not hide by canvas mutation: it may fire before first painted frame and causes white flash.
     // Last resort: remove after 20s
     setTimeout(hideLoadingScreen, 20000);
+  </script>
+  <script>
+    // После инициализации Flutter иногда схлопывается scrollHeight≈innerHeight — window.scroll не двигается.
+    (function () {
+      function ensureDocumentScrollSlack() {
+        try {
+          if (!/iPhone|iPad|iPod|Android/i.test(navigator.userAgent || '')) return;
+          if (window.navigator.standalone) return;
+          var root = document.documentElement;
+          var vh = window.innerHeight || 0;
+          var sh = root.scrollHeight || 0;
+          if (sh > vh + 16) return;
+          root.style.minHeight = (vh + 128) + 'px';
+        } catch (e) {}
+      }
+      function scheduleSlack() {
+        ensureDocumentScrollSlack();
+        setTimeout(ensureDocumentScrollSlack, 50);
+        setTimeout(ensureDocumentScrollSlack, 320);
+      }
+      window.addEventListener('flutter-first-frame', scheduleSlack);
+      window.addEventListener('resize', function () { setTimeout(ensureDocumentScrollSlack, 40); });
+      window.addEventListener('orientationchange', function () { setTimeout(ensureDocumentScrollSlack, 140); });
+    })();
   </script>
   <script>
     // Единственный надёжный способ убрать адресную строку/вкладки — открыть как PWA (с главного экрана).
