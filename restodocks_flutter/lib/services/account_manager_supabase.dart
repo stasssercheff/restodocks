@@ -94,23 +94,10 @@ class AccountManagerSupabase extends ChangeNotifier {
   bool _looksLikeMissingCheckAccessRpc(PostgrestException e) {
     final msg = '${e.message} ${e.details} ${e.hint}'.toLowerCase();
     return e.code == 'PGRST202' ||
-        e.code == '42883' ||
-        e.code == '42P01' ||
         (msg.contains('check_establishment_access') &&
             (msg.contains('does not exist') ||
                 msg.contains('schema cache') ||
                 msg.contains('no function matches')));
-  }
-
-  bool _isRecoverableSchemaIssue(PostgrestException e) {
-    final msg = '${e.message} ${e.details} ${e.hint}'.toLowerCase();
-    return e.code == 'PGRST202' ||
-        e.code == '42883' ||
-        e.code == '42P01' ||
-        msg.contains('schema cache') ||
-        (msg.contains('relation') && msg.contains('does not exist')) ||
-        msg.contains('check_establishment_access') ||
-        msg.contains('trial_increment_usage');
   }
 
   /// Callback вызывается после загрузки профиля — применяет preferred_language к LocalizationService.
@@ -670,14 +657,12 @@ class AccountManagerSupabase extends ChangeNotifier {
         },
       );
     } on PostgrestException catch (e) {
-      // PGRST202: RPC ещё не задеплоен в БД (миграция не применена) — не блокируем экспорт/импорт.
-      if (_isRecoverableSchemaIssue(e)) {
-        devLog(
-          'trial_increment_usage: RPC/check_establishment_access unavailable, skip trial usage increment',
-        );
-        return;
-      }
-      rethrow;
+      // На старой/частично мигрированной БД не блокируем экспорт/импорт из-за счётчиков триала.
+      devLog(
+        'trial_increment_usage: PostgREST error code=${e.code} '
+        'message=${e.message}; skip trial usage increment',
+      );
+      return;
     }
   }
 
@@ -2419,17 +2404,13 @@ class AccountManagerSupabase extends ChangeNotifier {
         notifyListeners();
       }
     } on PostgrestException catch (e) {
-      // Любая ошибка чтения support-таблиц => выключаем дальнейший polling, чтобы не спамить 404.
-      _supportAccessTablesUnavailable = true;
-      if (!_looksLikeMissingSupportAccessSchema(e)) {
-        devLog(
-          'support_access session state query failed; disable support polling: '
-          'code=${e.code} message=${e.message}',
-        );
+      if (_looksLikeMissingSupportAccessSchema(e)) {
+        _supportAccessTablesUnavailable = true;
       }
       // На старой БД таблицы может не быть — не ломаем UI.
       _supportSessionActive = false;
     } catch (_) {
+      _supportAccessTablesUnavailable = true;
       _supportSessionActive = false;
     }
   }
@@ -2455,15 +2436,12 @@ class AccountManagerSupabase extends ChangeNotifier {
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList(growable: false);
     } on PostgrestException catch (e) {
-      _supportAccessTablesUnavailable = true;
-      if (!_looksLikeMissingSupportAccessSchema(e)) {
-        devLog(
-          'support_access audit log query failed; disable support polling: '
-          'code=${e.code} message=${e.message}',
-        );
+      if (_looksLikeMissingSupportAccessSchema(e)) {
+        _supportAccessTablesUnavailable = true;
       }
       return const [];
     } catch (_) {
+      _supportAccessTablesUnavailable = true;
       return const [];
     }
   }
