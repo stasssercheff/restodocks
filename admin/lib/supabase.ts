@@ -32,7 +32,7 @@ export type PromoCode = {
   expires_at: string | null
   /** Если задано — второй тип промокода (дни Pro с применения). Если null — классическая логика как раньше. */
   activation_duration_days?: number | null
-  /** Какой тариф выдаёт код: pro (по умолчанию), premium, plus, … */
+  /** Тариф заведения при погашении: в админке создаём только pro | ultra; в БД могут быть legacy-значения. */
   grants_subscription_type?: string | null
   /** Пакеты +5 сотрудников на заведение при погашении */
   grants_employee_slot_packs?: number | null

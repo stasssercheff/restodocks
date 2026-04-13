@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { getAdminPassword, getSupabaseConfig } from '@/lib/admin-env'
 import { verifySessionToken } from '@/lib/session'
-import { isAllowedPromoGrantType } from '@/lib/promo-tiers'
+import { isAllowedPromoGrantType, isSelectablePromoGrantTier } from '@/lib/promo-tiers'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,9 +66,9 @@ export async function POST(req: NextRequest) {
   const grantTier = typeof body.grants_subscription_type === 'string'
     ? body.grants_subscription_type.trim().toLowerCase()
     : 'ultra'
-  if (!isAllowedPromoGrantType(grantTier)) {
+  if (!isSelectablePromoGrantTier(grantTier)) {
     return NextResponse.json(
-      { error: 'Invalid grants_subscription_type: use pro, ultra, premium, plus, starter, or business' },
+      { error: 'Invalid grants_subscription_type: use pro or ultra' },
       { status: 400 },
     )
   }
@@ -141,7 +141,7 @@ export async function PATCH(req: NextRequest) {
     const g = String(updates.grants_subscription_type).trim().toLowerCase()
     if (!isAllowedPromoGrantType(g)) {
       return NextResponse.json(
-        { error: 'Invalid grants_subscription_type: use pro, ultra, premium, plus, starter, or business' },
+        { error: 'Invalid grants_subscription_type: use pro, ultra, or a legacy tier already in the database' },
         { status: 400 },
       )
     }

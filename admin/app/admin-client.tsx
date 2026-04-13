@@ -760,7 +760,7 @@ function PromoTab() {
 
   async function setGrantTier(row: PromoCode) {
     const cur = (row.grants_subscription_type ?? 'ultra').toLowerCase()
-    const val = prompt('Выдаваемый тариф: ultra, pro, premium, plus, starter, business', cur)
+    const val = prompt('Выдаваемый тариф (subscription_type): pro или ultra', cur)
     if (val === null) return
     const g = val.trim().toLowerCase()
     if (!(PROMO_GRANT_SUBSCRIPTION_TYPES as readonly string[]).includes(g)) {
@@ -953,7 +953,8 @@ function PromoTab() {
           </div>
           <p className="text-[11px] text-gray-600 mb-2">
             Тариф по промокоду — отдельно от «классика / с активации»: это значение попадёт в{' '}
-            <span className="text-gray-500">subscription_type</span> заведения (по умолчанию как раньше — pro).
+            <span className="text-gray-500">subscription_type</span> заведения (в продукте — Pro или Ultra).
+            Доп. филиалы и слоты сотрудников — поля «+филиал» и «+5 сотр.», не отдельные «типы» тарифа.
           </p>
           <div className="flex flex-col gap-1 mb-3 max-w-xs">
             <label className="text-xs text-gray-500">Выдаваемый тариф</label>
