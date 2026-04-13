@@ -916,7 +916,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           return;
         }
       }
-      final ok = await _pickSelectivePositionsAndApply();
+      final ok = await _startSelectiveInventoryFlow();
       if (!ok && mounted) {
         await _showModeDialog(
           hasIikoDraft: hasIikoDraft,
@@ -1608,7 +1608,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     clearDraft();
     if (wasSelective) {
       Future.microtask(() async {
-        final ok = await _pickSelectivePositionsAndApply();
+        final ok = await _startSelectiveInventoryFlow();
         if (!ok && mounted) await _showModeDialog();
       });
     } else {
@@ -2489,7 +2489,7 @@ class _InventoryScreenState extends State<InventoryScreen>
               FilledButton.tonalIcon(
                 onPressed: () async {
                   if (_isSelectiveInventory) {
-                    final ok = await _pickSelectivePositionsAndApply();
+                    final ok = await _startSelectiveInventoryFlow();
                     if (!ok && mounted) await _showModeDialog();
                   } else {
                     await _showProductPicker(context, loc);
@@ -2897,8 +2897,8 @@ class _InventoryScreenState extends State<InventoryScreen>
                       color: qtyRowFocused
                           ? theme.colorScheme.onPrimaryContainer
                           : null,
-                    fontWeight:
-                        qtyRowFocused ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight:
+                          qtyRowFocused ? FontWeight.w600 : FontWeight.normal,
                     ),
                     maxLines: wideLayout ? 1 : 2,
                     overflow: TextOverflow.ellipsis,
@@ -2951,9 +2951,10 @@ class _InventoryScreenState extends State<InventoryScreen>
                             onChanged: (v) => _setProductUnit(actualIndex, v),
                             theme: theme,
                           ))
-                    : Text(row.unitDisplayForBlank(loc, loc.currentLanguageCode),
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    : Text(
+                        row.unitDisplayForBlank(loc, loc.currentLanguageCode),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant),
                         overflow: TextOverflow.ellipsis),
               ),
             ),
@@ -3382,8 +3383,94 @@ class _InventoryScreenState extends State<InventoryScreen>
     return loc.t('inventory_blank_title');
   }
 
+  bool get _canManageSelectiveTemplates {
+    final employee = context.read<AccountManagerSupabase>().currentEmployee;
+    if (employee == null) return false;
+    if (employee.hasRole('owner') && employee.isViewOnlyOwner) return false;
+    return employee.canEditChecklistsAndTechCards;
+  }
+
+  Future<bool> _startSelectiveInventoryFlow() async {
+    final loc = context.read<LocalizationService>();
+    final account = context.read<AccountManagerSupabase>();
+    final estId = account.establishment?.id;
+    if (estId == null) return false;
+    final templates = await _loadSelectiveTemplatesFromServer(estId);
+    if (!mounted) return false;
+    if (!_canManageSelectiveTemplates) {
+      if (templates.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('Шаблон выборочной инвентаризации пока не задан шефом'),
+          ),
+        );
+        return false;
+      }
+      final activeType = await _loadActiveSelectiveTemplateType(estId);
+      final active = activeType == null
+          ? templates.first
+          : templates.where((t) => t.draftType == activeType).firstOrNull;
+      final target = active ?? templates.first;
+      final ok = await _applySelectiveTemplate(target);
+      if (ok) return true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('inventory_selective_pick_empty'))),
+      );
+      return false;
+    }
+
+    final picked = await _showSelectiveTemplatePicker(templates);
+    if (!mounted || picked == null) return false;
+    if (picked == '__create__') {
+      return _pickSelectivePositionsAndApply(offerSaveAsTemplate: true);
+    }
+    final template = templates.where((t) => t.draftType == picked).firstOrNull;
+    if (template == null) return false;
+    final ok = await _applySelectiveTemplate(template);
+    if (!ok) return false;
+    await _setActiveSelectiveTemplateType(estId, template.draftType);
+    return true;
+  }
+
+  Future<String?> _showSelectiveTemplatePicker(
+      List<_SelectiveInventoryTemplate> templates) async {
+    final loc = context.read<LocalizationService>();
+    return showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.add_box_outlined),
+              title: const Text('Создать новый шаблон'),
+              subtitle: Text('Лимит: 10 шаблонов (${templates.length}/10)'),
+              onTap: () => Navigator.of(ctx).pop('__create__'),
+            ),
+            if (templates.isNotEmpty) const Divider(height: 1),
+            ...templates.map((t) => ListTile(
+                  leading: const Icon(Icons.bookmark_outline),
+                  title: Text(t.name),
+                  subtitle: Text(t.updatedAtLabel),
+                  onTap: () => Navigator.of(ctx).pop(t.draftType),
+                )),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(loc.t('back')),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Загрузить номенклатуру, показать выбор позиций, заполнить бланк только ими.
-  Future<bool> _pickSelectivePositionsAndApply() async {
+  Future<bool> _pickSelectivePositionsAndApply({
+    bool offerSaveAsTemplate = false,
+  }) async {
     final loc = context.read<LocalizationService>();
     final store = context.read<ProductStoreSupabase>();
     final account = context.read<AccountManagerSupabase>();
@@ -3438,11 +3525,51 @@ class _InventoryScreenState extends State<InventoryScreen>
       return false;
     }
 
+    final ok = _applySelectiveSelection(
+      selectedProductIds: result.p,
+      selectedTechCardIds: result.tc,
+      products: products,
+      pfOnly: pfOnly,
+    );
+    if (!ok) return false;
+    saveNow();
+    if (!offerSaveAsTemplate || !_canManageSelectiveTemplates) return true;
+
+    final account = context.read<AccountManagerSupabase>();
+    final estId = account.establishment?.id;
+    if (estId == null) return true;
+    final templates = await _loadSelectiveTemplatesFromServer(estId);
+    if (!mounted) return true;
+    if (templates.length >= 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Достигнут лимит: 10 шаблонов')),
+      );
+      return true;
+    }
+    final name = await _askSelectiveTemplateName(
+        defaultName: 'Выборочная ${templates.length + 1}');
+    if (!mounted || name == null || name.trim().isEmpty) return true;
+    await _saveSelectiveTemplate(
+      establishmentId: estId,
+      name: name.trim(),
+      selectedProductIds: result.p,
+      selectedTechCardIds: result.tc,
+      currentTemplates: templates,
+    );
+    return true;
+  }
+
+  bool _applySelectiveSelection({
+    required Set<String> selectedProductIds,
+    required Set<String> selectedTechCardIds,
+    required List<Product> products,
+    required List<TechCard> pfOnly,
+  }) {
     setState(() {
       _isSelectiveInventory = true;
       _rows.clear();
-      final minQty = 2;
-      for (final id in result.p) {
+      const minQty = 2;
+      for (final id in selectedProductIds) {
         for (final p in products) {
           if (p.id == id) {
             _rows.add(_InventoryRow(
@@ -3454,7 +3581,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           }
         }
       }
-      for (final id in result.tc) {
+      for (final id in selectedTechCardIds) {
         for (final tc in pfOnly) {
           if (tc.id == id) {
             _rows.add(_InventoryRow(
@@ -3469,8 +3596,214 @@ class _InventoryScreenState extends State<InventoryScreen>
       }
     });
     _syncRowRepaintNotifiers();
-    saveNow();
-    return true;
+    return _rows.isNotEmpty;
+  }
+
+  Future<List<_SelectiveInventoryTemplate>> _loadSelectiveTemplatesFromServer(
+    String establishmentId,
+  ) async {
+    try {
+      final rows = await Supabase.instance.client
+          .from('inventory_drafts')
+          .select('draft_type,draft_data,updated_at')
+          .eq('establishment_id', establishmentId)
+          .like('draft_type', 'selective_template_%')
+          .order('updated_at', ascending: false)
+          .limit(10);
+      final list = List<dynamic>.from(rows as List);
+      return list
+          .map((e) => _SelectiveInventoryTemplate.fromRow(
+                Map<String, dynamic>.from(e as Map),
+              ))
+          .whereType<_SelectiveInventoryTemplate>()
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<String?> _loadActiveSelectiveTemplateType(
+      String establishmentId) async {
+    try {
+      final row = await Supabase.instance.client
+          .from('inventory_drafts')
+          .select('draft_data')
+          .eq('establishment_id', establishmentId)
+          .eq('draft_type', 'selective_template_active')
+          .maybeSingle();
+      if (row == null) return null;
+      final map = row['draft_data'];
+      if (map is Map) {
+        return map['template_type']?.toString();
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> _setActiveSelectiveTemplateType(
+    String establishmentId,
+    String draftType,
+  ) async {
+    try {
+      final account = context.read<AccountManagerSupabase>();
+      await Supabase.instance.client.from('inventory_drafts').upsert(
+        {
+          'establishment_id': establishmentId,
+          'employee_id': account.currentEmployee?.id,
+          'draft_type': 'selective_template_active',
+          'draft_data': {'template_type': draftType},
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        onConflict: 'establishment_id,draft_type',
+      );
+    } catch (_) {}
+  }
+
+  Future<bool> _applySelectiveTemplate(
+      _SelectiveInventoryTemplate template) async {
+    final account = context.read<AccountManagerSupabase>();
+    final store = context.read<ProductStoreSupabase>();
+    final techCardSvc = context.read<TechCardServiceSupabase>();
+    final estId = account.establishment?.dataEstablishmentId;
+    if (estId == null) return false;
+    setState(() => _isLoadingProducts = true);
+    try {
+      final loaded = await Future.wait([
+        store.loadProducts(),
+        store.loadNomenclature(estId),
+        techCardSvc.getTechCardsForEstablishment(estId),
+      ]);
+      if (!mounted) return false;
+      final products = store.getNomenclatureProducts(estId);
+      final techCards = loaded[2] as List<TechCard>;
+      final pfOnly = techCards.where((tc) => tc.isSemiFinished).toList();
+      final ok = _applySelectiveSelection(
+        selectedProductIds: template.selectedProductIds,
+        selectedTechCardIds: template.selectedTechCardIds,
+        products: products,
+        pfOnly: pfOnly,
+      );
+      if (ok) saveNow();
+      return ok;
+    } finally {
+      if (mounted) setState(() => _isLoadingProducts = false);
+    }
+  }
+
+  Future<String?> _askSelectiveTemplateName(
+      {required String defaultName}) async {
+    final controller = TextEditingController(text: defaultName);
+    final res = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Название шаблона'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 50,
+          decoration: const InputDecoration(hintText: 'Например: Бар вечер'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Отмена'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text),
+            child: const Text('Сохранить'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return res;
+  }
+
+  Future<void> _saveSelectiveTemplate({
+    required String establishmentId,
+    required String name,
+    required Set<String> selectedProductIds,
+    required Set<String> selectedTechCardIds,
+    required List<_SelectiveInventoryTemplate> currentTemplates,
+  }) async {
+    var slot = 1;
+    final used = currentTemplates.map((t) => t.slot).whereType<int>().toSet();
+    while (used.contains(slot) && slot <= 10) {
+      slot++;
+    }
+    if (slot > 10) return;
+    final draftType = 'selective_template_$slot';
+    final account = context.read<AccountManagerSupabase>();
+    await Supabase.instance.client.from('inventory_drafts').upsert(
+      {
+        'establishment_id': establishmentId,
+        'employee_id': account.currentEmployee?.id,
+        'draft_type': draftType,
+        'draft_data': {
+          'name': name,
+          'selected_product_ids': selectedProductIds.toList(),
+          'selected_tech_card_ids': selectedTechCardIds.toList(),
+        },
+        'updated_at': DateTime.now().toIso8601String(),
+      },
+      onConflict: 'establishment_id,draft_type',
+    );
+    await _setActiveSelectiveTemplateType(establishmentId, draftType);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Шаблон "$name" сохранён и выбран активным')),
+    );
+  }
+}
+
+class _SelectiveInventoryTemplate {
+  const _SelectiveInventoryTemplate({
+    required this.draftType,
+    required this.name,
+    required this.selectedProductIds,
+    required this.selectedTechCardIds,
+    required this.updatedAtLabel,
+    required this.slot,
+  });
+
+  final String draftType;
+  final String name;
+  final Set<String> selectedProductIds;
+  final Set<String> selectedTechCardIds;
+  final String updatedAtLabel;
+  final int? slot;
+
+  static _SelectiveInventoryTemplate? fromRow(Map<String, dynamic> row) {
+    final draftType = row['draft_type']?.toString() ?? '';
+    if (!draftType.startsWith('selective_template_')) return null;
+    final data = row['draft_data'];
+    if (data is! Map) return null;
+    final map = Map<String, dynamic>.from(data);
+    final p = (map['selected_product_ids'] as List?)
+            ?.map((e) => e.toString())
+            .where((e) => e.isNotEmpty)
+            .toSet() ??
+        <String>{};
+    final tc = (map['selected_tech_card_ids'] as List?)
+            ?.map((e) => e.toString())
+            .where((e) => e.isNotEmpty)
+            .toSet() ??
+        <String>{};
+    final nameRaw = map['name']?.toString().trim();
+    final ts = row['updated_at']?.toString() ?? '';
+    final slot =
+        int.tryParse(draftType.replaceFirst('selective_template_', ''));
+    return _SelectiveInventoryTemplate(
+      draftType: draftType,
+      name: (nameRaw == null || nameRaw.isEmpty)
+          ? 'Шаблон ${slot ?? ''}'.trim()
+          : nameRaw,
+      selectedProductIds: p,
+      selectedTechCardIds: tc,
+      updatedAtLabel:
+          ts.isEmpty ? 'Без даты' : ts.replaceFirst('T', ' ').split('.').first,
+      slot: slot,
+    );
   }
 }
 
@@ -4100,7 +4433,8 @@ class _QtyCellState extends State<_QtyCell> {
             ?.copyWith(fontSize: widget.fontSize, height: 1.0),
         decoration: InputDecoration(
           isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 2, vertical: 0),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
           filled: true,
           fillColor: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
@@ -5889,9 +6223,8 @@ class _IikoInventoryRowTileState extends State<_IikoInventoryRowTile> {
                   const TextInputType.numberWithOptions(decimal: true),
               textInputAction: TextInputAction.next,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(
-                      fontSize: _kInventoryQtyDigitFontSize, height: 1.15),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                  fontSize: _kInventoryQtyDigitFontSize, height: 1.15),
               decoration: InputDecoration(
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
