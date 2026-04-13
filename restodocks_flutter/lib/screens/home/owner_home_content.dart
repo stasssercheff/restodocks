@@ -141,6 +141,15 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                       onTap: () => context.go('/nomenclature/kitchen')),
                   'home-nomenclature-kitchen')),
           ownerTile(
+              'owner_messages',
+              _wrap(
+                  HomeFeatureTile(
+                      icon: Icons.chat_bubble_outline,
+                      title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+                      onTap: () =>
+                          context.go('/notifications?tab=messages')),
+                  'home-messages')),
+          ownerTile(
               'owner_employees',
               _wrap(
                   HomeFeatureTile(
