@@ -3279,32 +3279,95 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       return;
     }
     final controller = TextEditingController();
+    var sttBusy = false;
+    var sttSupported = false;
+    try {
+      sttSupported = await speechToTextSupported();
+    } catch (_) {
+      sttSupported = false;
+    }
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('ttk_import_text') ?? 'Вставить из текста'),
-        content: SizedBox(
-          width: 400,
-          child: TextField(
-            controller: controller,
-            maxLines: 12,
-            decoration: InputDecoration(
-              hintText:
-                  'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
-              border: const OutlineInputBorder(),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocalState) => AlertDialog(
+          title: Text(loc.t('ttk_import_text') ?? 'Вставить из текста'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: controller,
+                  maxLines: 12,
+                  decoration: InputDecoration(
+                    hintText:
+                        'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                if (sttSupported) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: sttBusy
+                          ? null
+                          : () async {
+                              setLocalState(() => sttBusy = true);
+                              try {
+                                final spoken = await speechToTextListenOnce(
+                                  languageCode: loc.currentLanguageCode,
+                                );
+                                if (!ctx.mounted) return;
+                                if (spoken != null && spoken.trim().isNotEmpty) {
+                                  final current = controller.text.trim();
+                                  controller.text = current.isEmpty
+                                      ? spoken.trim()
+                                      : '$current\n${spoken.trim()}';
+                                } else {
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        loc.t('speech_not_recognized').trim().isEmpty
+                                            ? 'Речь не распознана'
+                                            : loc.t('speech_not_recognized'),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              } finally {
+                                if (ctx.mounted) {
+                                  setLocalState(() => sttBusy = false);
+                                }
+                              }
+                            },
+                      icon: Icon(sttBusy ? Icons.hearing : Icons.mic),
+                      label: Text(
+                        sttBusy
+                            ? (loc.t('speech_listening').trim().isEmpty
+                                ? 'Слушаю...'
+                                : loc.t('speech_listening'))
+                            : (loc.t('voice_input').trim().isEmpty
+                                ? 'Голосом'
+                                : loc.t('voice_input')),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+              child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
-          ),
-        ],
       ),
     );
     controller.dispose();
@@ -3699,7 +3762,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     );
   }
 
-  Future<void> _onTapCreateTechCard(LocalizationService loc) async {
+  Future<void> _openManualTechCardCreate(LocalizationService loc) async {
     if (_loading) return;
     const draftKey = 'tech_card_edit_new';
     final merged = await DraftStorageService()
@@ -3742,6 +3805,46 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     if (mounted && needRefresh == true) {
       _TtkListMemoryCache.invalidate();
       await _load(showLoading: false);
+    }
+  }
+
+  Future<void> _onTapCreateTechCard(LocalizationService loc) async {
+    if (_loading) return;
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_note),
+              title: Text(loc.t('create_tech_card')),
+              subtitle: Text(loc.t('ttk_create_manual_hint').trim().isEmpty
+                  ? 'Заполнить ТТК вручную'
+                  : loc.t('ttk_create_manual_hint')),
+              onTap: () => Navigator.of(ctx).pop('manual'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.auto_awesome),
+              title: Text(loc.t('create_with_ai').trim().isEmpty
+                  ? 'Создать с ИИ'
+                  : loc.t('create_with_ai')),
+              subtitle: Text(loc.t('ttk_create_ai_hint').trim().isEmpty
+                  ? 'Опишите блюдо текстом, ИИ заполнит ТТК'
+                  : loc.t('ttk_create_ai_hint')),
+              onTap: () => Navigator.of(ctx).pop('ai'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'manual') {
+      await _openManualTechCardCreate(loc);
+      return;
+    }
+    if (action == 'ai') {
+      await _createFromText(context, loc);
     }
   }
 

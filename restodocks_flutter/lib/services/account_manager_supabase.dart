@@ -377,29 +377,28 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Максимум дополнительных заведений на владельца (глобальная настройка ± переопределения по заведениям в БД).
   Future<int> getMaxEstablishmentsPerOwner() async {
+    int normalize(dynamic v) {
+      if (v == null) return 0;
+      if (v is int) return v >= 0 ? v : 0;
+      if (v is double) return v.toInt() >= 0 ? v.toInt() : 0;
+      final n = int.tryParse(v.toString());
+      return (n != null && n >= 0) ? n : 0;
+    }
+
     try {
       final v = await _supabase.client.rpc(
         'get_effective_max_additional_establishments_for_owner',
       );
-      if (v == null) return 999;
-      if (v is int) return v > 0 ? v : 999;
-      if (v is double) return v.toInt() > 0 ? v.toInt() : 999;
-      final n = int.tryParse(v.toString());
-      return (n != null && n > 0) ? n : 999;
+      return normalize(v);
     } catch (_) {
       try {
         final v = await _supabase.client.rpc(
           'get_platform_config',
           params: {'p_key': 'max_establishments_per_owner'},
         );
-        if (v == null) return 999;
-        if (v is int) return v > 0 ? v : 999;
-        if (v is double) return v.toInt() > 0 ? v.toInt() : 999;
-        final s = v.toString();
-        final n = int.tryParse(s);
-        return (n != null && n > 0) ? n : 999;
+        return normalize(v);
       } catch (_) {
-        return 999;
+        return 0;
       }
     }
   }

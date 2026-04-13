@@ -34,6 +34,8 @@
 	<string>Photo library access is used to attach images to products, documents, and employee profiles.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Microphone access is used to record voice messages between employees in work chats.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Speech recognition is used to convert your voice into text in AI input fields.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
