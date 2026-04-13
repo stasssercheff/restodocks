@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/subscription_entitlements.dart';
 import '../../models/models.dart';
 import '../../services/schedule_storage_service.dart';
 import '../../services/services.dart';
@@ -163,6 +164,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     'bakery'
   };
 
+  /// Lite: в графике только кухня (маршруты all/bar/hall → фильтр как у кухни).
+  String _effectiveScheduleDepartment(SubscriptionEntitlements ent) {
+    if (!ent.kitchenOnlyDepartments) return widget.department;
+    final d = widget.department;
+    if (d == 'all' || d == 'bar' || d == 'hall' || d == 'dining_room') {
+      return 'kitchen';
+    }
+    return d;
+  }
+
   /// Блоки отображения при department='all': Кухня (управление + цеха), Бар (управление + сотрудники), Зал (управление + сотрудники).
   List<
       ({
@@ -171,9 +182,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         String? sectionId,
         String sectionLabel,
         List<ScheduleSlot> slots
-      })> _displayBlocks(LocalizationService loc) {
-    if (widget.department != 'all') {
-      return _displaySections
+      })> _displayBlocks(
+    LocalizationService loc,
+    SubscriptionEntitlements ent,
+    String? personalScheduleEmployeeId,
+  ) {
+    if (_effectiveScheduleDepartment(ent) != 'all') {
+      return _displaySections(ent, personalScheduleEmployeeId)
           .map((s) => (
                 isDeptHeader: false,
                 deptLabel: '',
@@ -181,12 +196,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 sectionLabel: loc.translate(s.nameKey) != s.nameKey
                     ? loc.translate(s.nameKey)
                     : s.id,
-                slots: _displaySlotsBySection[s.id] ?? [],
+                slots: _displaySlotsBySection(ent, personalScheduleEmployeeId)[s.id] ??
+                    [],
               ))
           .where((b) => b.slots.isNotEmpty)
           .toList();
     }
-    final bySection = _displaySlotsBySection;
+    final bySection = _displaySlotsBySection(ent, personalScheduleEmployeeId);
     final blocks = <({
       bool isDeptHeader,
       String deptLabel,
@@ -272,9 +288,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   /// ID сотрудников выбранного подразделения (для фильтрации графика).
   /// Для кухни: department=kitchen + шеф/су-шеф (могут иметь department=management).
-  Set<String> get _employeeIdsForDepartment {
-    if (widget.department == 'all') return _employees.map((e) => e.id).toSet();
-    final dept = widget.department;
+  Set<String> _employeeIdsForDepartment(SubscriptionEntitlements ent) {
+    final dept = _effectiveScheduleDepartment(ent);
+    if (dept == 'all') return _employees.map((e) => e.id).toSet();
     return _employees
         .where((e) {
           if (dept == 'kitchen') {
@@ -295,17 +311,28 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   /// Слоты для отображения: при выборе подразделения — только сотрудники этого подразделения
-  List<ScheduleSlot> get _displaySlots {
-    if (widget.department == 'all') return _model.slots;
-    final ids = _employeeIdsForDepartment;
+  List<ScheduleSlot> _displaySlots(
+    SubscriptionEntitlements ent,
+    String? personalScheduleEmployeeId,
+  ) {
+    if (widget.personalOnly && ent.kitchenOnlyDepartments) {
+      final id = personalScheduleEmployeeId;
+      if (id == null) return [];
+      return _model.slots.where((s) => s.employeeId == id).toList();
+    }
+    if (_effectiveScheduleDepartment(ent) == 'all') return _model.slots;
+    final ids = _employeeIdsForDepartment(ent);
     return _model.slots
         .where((s) => s.employeeId != null && ids.contains(s.employeeId!))
         .toList();
   }
 
   /// Секции и слоты по секциям для отображения (с учётом фильтра по подразделению)
-  Map<String, List<ScheduleSlot>> get _displaySlotsBySection {
-    final filtered = _displaySlots;
+  Map<String, List<ScheduleSlot>> _displaySlotsBySection(
+    SubscriptionEntitlements ent,
+    String? personalScheduleEmployeeId,
+  ) {
+    final filtered = _displaySlots(ent, personalScheduleEmployeeId);
     final map = <String, List<ScheduleSlot>>{};
     for (final section in _model.sections) {
       final list = filtered.where((s) => s.sectionId == section.id).toList();
@@ -322,8 +349,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return map;
   }
 
-  List<ScheduleSection> get _displaySections {
-    final bySection = _displaySlotsBySection;
+  List<ScheduleSection> _displaySections(
+    SubscriptionEntitlements ent,
+    String? personalScheduleEmployeeId,
+  ) {
+    final bySection = _displaySlotsBySection(ent, personalScheduleEmployeeId);
     final ordered = ScheduleModel.sectionsInDisplayOrder(_model.sections);
     final fromModel =
         ordered.where((s) => bySection.containsKey(s.id)).toList();
@@ -778,7 +808,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           border: Border(right: BorderSide(color: borderColor))),
     ));
 
-    final blocks = _displayBlocks(loc);
+    final subEnt = SubscriptionEntitlements.from(acc.establishment);
+    final personalEmpId =
+        widget.personalOnly ? acc.currentEmployee?.id : null;
+    final blocks = _displayBlocks(loc, subEnt, personalEmpId);
     final sectionBg = theme.colorScheme.secondaryContainer.withOpacity(0.6);
     final sectionFg = theme.colorScheme.onSecondaryContainer;
     final deptHeaderBg = theme.colorScheme.primary.withOpacity(0.25);

@@ -25,7 +25,8 @@ enum HomeButtonAction {
 }
 
 extension HomeButtonActionExt on HomeButtonAction {
-  String routeFor(Employee? emp) {
+  /// [kitchenOnlySchedule]: Lite — график только кухня (`/schedule/kitchen`), не «все подразделения».
+  String routeFor(Employee? emp, {bool kitchenOnlySchedule = false}) {
     final dept = _deptForRoute(emp?.department);
     final isOwner = emp?.hasRole('owner') ?? false;
     switch (this) {
@@ -34,6 +35,7 @@ extension HomeButtonActionExt on HomeButtonAction {
       case HomeButtonAction.messages:
         return '/notifications?tab=messages';
       case HomeButtonAction.schedule:
+        if (kitchenOnlySchedule) return '/schedule/kitchen';
         return isOwner ? '/schedule/all' : '/schedule/$dept';
       case HomeButtonAction.productOrder:
         return '/product-order?department=$dept';

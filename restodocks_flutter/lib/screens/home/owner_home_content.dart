@@ -114,7 +114,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                   HomeFeatureTile(
                       icon: Icons.calendar_month,
                       title: loc.t('schedule'),
-                      onTap: () => context.go('/schedule/all')),
+                      onTap: () => context.go('/schedule/kitchen')),
                   'home-schedule-mgmt')),
           ownerTile(
               'owner_menu_kitchen',

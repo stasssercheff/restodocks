@@ -157,6 +157,9 @@ class _AppShellState extends State<AppShell> {
     final ownerLite = SubscriptionEntitlements.from(accountManager.establishment)
             .isLiteTier &&
         (currentEmployee.hasRole('owner'));
+    final kitchenOnlySchedule = SubscriptionEntitlements.from(
+            accountManager.establishment)
+        .kitchenOnlyDepartments;
     final middleAction = homeBtnConfig.effectiveAction(currentEmployee,
         hasProSubscription: accountManager.hasProSubscription,
         ownerLiteHome: ownerLite);
@@ -164,8 +167,8 @@ class _AppShellState extends State<AppShell> {
     final isKitchenNoData =
         noDataAccess && currentEmployee.department == 'kitchen';
     final location = GoRouterState.of(context).matchedLocation;
-    final selectedIndex = _indexForLocation(
-        location, middleAction, noDataAccess, isKitchenNoData, currentEmployee);
+    final selectedIndex = _indexForLocation(location, middleAction, noDataAccess,
+        isKitchenNoData, currentEmployee, kitchenOnlySchedule);
 
     final isDataRequiredRoute =
         _kDataAccessRequiredPaths.any((p) => location.startsWith(p));
@@ -217,7 +220,8 @@ class _AppShellState extends State<AppShell> {
                         noDataAccess,
                         isKitchenNoData,
                         currentEmployee,
-                        selectedIndex);
+                        selectedIndex,
+                        kitchenOnlySchedule);
                   },
                 ),
                 _NativeNavIconSlot(
@@ -236,7 +240,8 @@ class _AppShellState extends State<AppShell> {
                         noDataAccess,
                         isKitchenNoData,
                         currentEmployee,
-                        selectedIndex);
+                        selectedIndex,
+                        kitchenOnlySchedule);
                   },
                 ),
                 _NativeNavIconSlot(
@@ -252,7 +257,8 @@ class _AppShellState extends State<AppShell> {
                         noDataAccess,
                         isKitchenNoData,
                         currentEmployee,
-                        selectedIndex);
+                        selectedIndex,
+                        kitchenOnlySchedule);
                   },
                 ),
               ],
@@ -400,8 +406,13 @@ class _AppShellState extends State<AppShell> {
   }
 
   int _indexForLocation(
-      String location, HomeButtonAction action, bool noDataAccess,
-      [bool isKitchenNoData = false, Employee? employee]) {
+    String location,
+    HomeButtonAction action,
+    bool noDataAccess, [
+    bool isKitchenNoData = false,
+    Employee? employee,
+    bool kitchenOnlySchedule = false,
+  ]) {
     if (location == '/home' || location == '/') return 0;
     if (location.startsWith('/personal-cabinet') ||
         location.startsWith('/profile') ||
@@ -410,7 +421,10 @@ class _AppShellState extends State<AppShell> {
       return 2;
     }
 
-    final middleRoute = noDataAccess ? '/schedule' : action.routeFor(employee);
+    final middleRoute = noDataAccess
+        ? '/schedule'
+        : action.routeFor(employee,
+            kitchenOnlySchedule: kitchenOnlySchedule);
     if (location.startsWith(middleRoute)) return 1;
 
     // Дополнительные маршруты для средней вкладки
@@ -431,13 +445,15 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _onTap(
-      BuildContext context,
-      int index,
-      HomeButtonAction action,
-      bool noDataAccess,
-      bool isKitchenNoData,
-      Employee? employee,
-      int currentIndex) {
+    BuildContext context,
+    int index,
+    HomeButtonAction action,
+    bool noDataAccess,
+    bool isKitchenNoData,
+    Employee? employee,
+    int currentIndex,
+    bool kitchenOnlySchedule,
+  ) {
     // Уже на домашнем экране: повторный тап «Дом» не должен вызывать go() — иначе
     // лишняя анимация (как «вперёд») поверх того же маршрута.
     if (index == 0) {
@@ -452,7 +468,8 @@ class _AppShellState extends State<AppShell> {
     final isBackward = index < currentIndex;
     final extra = isBackward ? {'back': true} : null;
 
-    String middleRoute = action.routeFor(employee);
+    String middleRoute = action.routeFor(employee,
+        kitchenOnlySchedule: kitchenOnlySchedule);
     if (!noDataAccess &&
         action == HomeButtonAction.inbox &&
         (employee?.hasInboxDocuments ?? true) == false) {

@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../core/subscription_entitlements.dart';
 import '../models/models.dart';
 import '../models/employee_direct_message.dart';
 import '../models/employee_message_system_link.dart';
@@ -147,9 +148,18 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
     });
   }
 
+  void _toastLiteChatTextOnly() {
+    if (!mounted) return;
+    AppToastService.show(context.read<LocalizationService>().t('lite_chat_text_only_hint'));
+  }
+
   Future<void> _sendPhoto() async {
     final acc = context.read<AccountManagerSupabase>();
     final emp = acc.currentEmployee;
+    if (SubscriptionEntitlements.from(acc.establishment).isLiteTier) {
+      _toastLiteChatTextOnly();
+      return;
+    }
     if (emp == null || _sending) return;
     Uint8List? bytes;
     if (kIsWeb) {
@@ -217,6 +227,11 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
   }
 
   Future<void> _startVoiceRecording() async {
+    final acc = context.read<AccountManagerSupabase>();
+    if (SubscriptionEntitlements.from(acc.establishment).isLiteTier) {
+      _toastLiteChatTextOnly();
+      return;
+    }
     if (_sending || _recordingVoice) return;
     if (!await voiceRecordingSupported()) return;
     if (!await voiceHasMicPermission()) {
@@ -348,6 +363,11 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
   }
 
   Future<void> _pickSystemLink() async {
+    final acc = context.read<AccountManagerSupabase>();
+    if (SubscriptionEntitlements.from(acc.establishment).isLiteTier) {
+      _toastLiteChatTextOnly();
+      return;
+    }
     if (_sending) return;
     final link = await showChatSystemLinkPicker(context);
     if (link == null || !mounted) return;
@@ -362,7 +382,16 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
     final acc = context.read<AccountManagerSupabase>();
     final emp = acc.currentEmployee;
     if (emp == null) return;
+    final loc = context.read<LocalizationService>();
     final linksCopy = List<EmployeeMessageSystemLink>.from(_pendingLinks);
+    final lite = SubscriptionEntitlements.from(acc.establishment).isLiteTier;
+    var linksForSend = linksCopy;
+    if (lite && linksCopy.isNotEmpty) {
+      AppToastService.show(loc.t('lite_chat_text_only_hint'));
+      linksForSend = [];
+      if (text.isEmpty) return;
+    }
+    if (text.isEmpty && linksForSend.isEmpty) return;
     _controller.clear();
     setState(() {
       _pendingLinks = [];
@@ -374,7 +403,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
         emp.id,
         widget.otherEmployeeId,
         text,
-        systemLinks: linksCopy.isEmpty ? null : linksCopy,
+        systemLinks: linksForSend.isEmpty ? null : linksForSend,
       );
       if (mounted && sent != null) {
         setState(() {
@@ -403,6 +432,9 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
+    final acc = context.watch<AccountManagerSupabase>();
+    final liteChatTextOnly =
+        SubscriptionEntitlements.from(acc.establishment).isLiteTier;
     final otherName = _otherEmployee?.fullName ?? widget.otherEmployeeId;
 
     return Scaffold(
@@ -515,21 +547,23 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                   else
                   Row(
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.add_photo_alternate_outlined),
-                          onPressed: _sending ? null : _sendPhoto,
-                          tooltip: loc.t('photo_from_gallery') ?? 'Фото',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.add_circle_outline),
-                          onPressed: _sending ? null : _pickSystemLink,
-                          tooltip: loc.t('chat_attach_link_title') ?? 'Ссылка',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.mic_none_outlined),
-                          onPressed: _sending ? null : _startVoiceRecording,
-                          tooltip: loc.t('chat_voice_tooltip') ?? 'Голосовое',
-                        ),
+                        if (!liteChatTextOnly) ...[
+                          IconButton(
+                            icon: const Icon(Icons.add_photo_alternate_outlined),
+                            onPressed: _sending ? null : _sendPhoto,
+                            tooltip: loc.t('photo_from_gallery') ?? 'Фото',
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add_circle_outline),
+                            onPressed: _sending ? null : _pickSystemLink,
+                            tooltip: loc.t('chat_attach_link_title') ?? 'Ссылка',
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.mic_none_outlined),
+                            onPressed: _sending ? null : _startVoiceRecording,
+                            tooltip: loc.t('chat_voice_tooltip') ?? 'Голосовое',
+                          ),
+                        ],
                         Expanded(
                           child: TextField(
                             controller: _controller,
