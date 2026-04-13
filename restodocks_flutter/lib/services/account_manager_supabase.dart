@@ -2072,6 +2072,16 @@ class AccountManagerSupabase extends ChangeNotifier {
         })
         .eq('id', establishmentId)
         .select();
+    try {
+      final me = _currentEmployee;
+      await _supabase.client.from('support_access_event_log').insert({
+        'establishment_id': establishmentId,
+        'event_type': enabled
+            ? 'owner_enabled_access'
+            : 'owner_disabled_access',
+        'account_login': me?.email,
+      });
+    } catch (_) {}
     if (_establishment?.id == establishmentId) {
       _establishment = _establishment!.copyWith(
         supportAccessEnabled: enabled,
@@ -2361,11 +2371,11 @@ class AccountManagerSupabase extends ChangeNotifier {
     if (estId == null || emp == null || !emp.hasRole('owner')) return const [];
     try {
       final rows = await _supabase.client
-          .from('support_access_audit_log')
+          .from('support_access_event_log')
           .select(
-              'id, support_operator_login, account_login, started_at, ended_at')
+              'id, event_type, support_operator_login, account_login, created_at')
           .eq('establishment_id', estId)
-          .order('started_at', ascending: false)
+          .order('created_at', ascending: false)
           .limit(limit);
       if (rows is! List) return const [];
       return rows

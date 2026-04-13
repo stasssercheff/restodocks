@@ -149,9 +149,10 @@ function SupportAccessTab() {
   const [supportOperatorLogin, setSupportOperatorLogin] = useState('')
   const [accountLogin, setAccountLogin] = useState('')
   const [pinCode, setPinCode] = useState('')
+  const [appOrigin, setAppOrigin] = useState('https://restodocks-beta.pages.dev')
   const [activeEstablishmentId, setActiveEstablishmentId] = useState<string | null>(null)
   const [activeEstablishmentName, setActiveEstablishmentName] = useState<string | null>(null)
-  const [logs, setLogs] = useState<Array<{ id: number; support_operator_login: string; account_login: string; started_at: string; ended_at: string | null }>>([])
+  const [logs, setLogs] = useState<Array<{ id: number; event_type: string; support_operator_login: string | null; account_login: string | null; created_at: string }>>([])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -176,6 +177,7 @@ function SupportAccessTab() {
           support_operator_login: supportOperatorLogin.trim() || 'admin',
           account_login: accountLogin.trim().toLowerCase(),
           pin_code: pinCode.trim().toUpperCase(),
+          app_origin: appOrigin.trim(),
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -187,7 +189,10 @@ function SupportAccessTab() {
       setActiveEstablishmentId(est?.id ?? null)
       setActiveEstablishmentName(est?.name ?? null)
       if (est?.id) await loadLogs(est.id)
-      alert('Сеанс техподдержки открыт. Владелец увидит неснимаемое уведомление и запись в журнале.')
+      if (typeof data?.action_link === 'string' && data.action_link.length > 0) {
+        window.open(data.action_link, '_blank', 'noopener,noreferrer')
+      }
+      alert('Сеанс техподдержки открыт и ссылка входа в аккаунт запущена в новой вкладке.')
     } finally {
       setBusy(false)
     }
@@ -228,6 +233,7 @@ function SupportAccessTab() {
           <input value={accountLogin} onChange={e => setAccountLogin(e.target.value)} placeholder="Логин учётной записи (email)" className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
           <input value={pinCode} onChange={e => setPinCode(e.target.value.toUpperCase())} placeholder="PIN компании" className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono" />
         </div>
+        <input value={appOrigin} onChange={e => setAppOrigin(e.target.value)} placeholder="Origin веб-приложения, куда входить (например https://restodocks-beta.pages.dev)" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs" />
         <div className="flex gap-2">
           <button onClick={startSupportSession} disabled={busy || !accountLogin.trim() || !pinCode.trim()} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-4 py-2 rounded-lg text-sm">
             Открыть доступ
@@ -244,10 +250,10 @@ function SupportAccessTab() {
           <div className="space-y-1 text-xs text-gray-400">
             {logs.map(row => (
               <div key={row.id} className="flex flex-wrap gap-2 border-b border-gray-800 pb-1">
-                <span>Оператор: {row.support_operator_login}</span>
-                <span>Логин: {row.account_login}</span>
-                <span>Вход: {formatDateTime(row.started_at)}</span>
-                <span>Выход: {row.ended_at ? formatDateTime(row.ended_at) : 'активно'}</span>
+                <span>{row.event_type}</span>
+                <span>Оператор: {row.support_operator_login ?? '—'}</span>
+                <span>Логин: {row.account_login ?? '—'}</span>
+                <span>{formatDateTime(row.created_at)}</span>
               </div>
             ))}
             {logs.length === 0 && <div className="text-gray-600">Записей пока нет</div>}

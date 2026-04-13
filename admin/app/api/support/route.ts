@@ -23,6 +23,16 @@ async function requireAdmin(): Promise<
   return { ok: true, supabase: createClient(config.url, config.serviceRoleKey) }
 }
 
+async function hasTable(supabase: SupabaseClient, table: string): Promise<boolean> {
+  const { error } = await supabase.from(table).select('id').limit(1)
+  if (!error) return true
+  const msg = `${error.message ?? ''} ${error.details ?? ''}`.toLowerCase()
+  if (msg.includes('could not find the table') || msg.includes('relation') && msg.includes('does not exist')) {
+    return false
+  }
+  return true
+}
+
 export async function POST(req: NextRequest) {
   const auth = await requireAdmin()
   if (!auth.ok) return auth.response
@@ -32,6 +42,7 @@ export async function POST(req: NextRequest) {
   const pinCode = (body?.pin_code ?? '').toString().trim().toUpperCase()
   const accountLogin = (body?.account_login ?? '').toString().trim().toLowerCase()
   const supportOperatorLogin = (body?.support_operator_login ?? 'admin').toString().trim()
+  const appOrigin = (body?.app_origin ?? '').toString().trim().replace(/\/+$/, '')
   if (!pinCode || !accountLogin) {
     return NextResponse.json({ error: 'PIN and account login are required' }, { status: 400 })
   }
@@ -59,6 +70,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Логин не найден в этом заведении' }, { status: 404 })
   }
 
+  const hasAudit = await hasTable(supabase, 'support_access_audit_log')
+  const hasEvents = await hasTable(supabase, 'support_access_event_log')
+  if (!hasAudit || !hasEvents) {
+    return NextResponse.json(
+      { error: 'Не применены миграции журнала техподдержки в Supabase (support_access_audit_log / support_access_event_log).' },
+      { status: 500 },
+    )
+  }
+
   const { data: activeRows, error: activeErr } = await supabase
     .from('support_access_audit_log')
     .select('id')
@@ -78,10 +98,33 @@ export async function POST(req: NextRequest) {
   })
   if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 })
 
+  const { error: evErr } = await supabase.from('support_access_event_log').insert({
+    establishment_id: est.id,
+    event_type: 'support_login',
+    support_operator_login: supportOperatorLogin,
+    account_login: accountLogin,
+  })
+  if (evErr) return NextResponse.json({ error: evErr.message }, { status: 500 })
+
+  const redirectTo = appOrigin
+    ? `${appOrigin}/auth/confirm`
+    : 'https://restodocks-beta.pages.dev/auth/confirm'
+  const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
+    type: 'magiclink',
+    email: accountLogin,
+    options: { redirectTo },
+  })
+  if (linkErr) return NextResponse.json({ error: linkErr.message }, { status: 500 })
+  const actionLink = linkData?.properties?.action_link
+  if (!actionLink) {
+    return NextResponse.json({ error: 'Не удалось сгенерировать ссылку входа' }, { status: 500 })
+  }
+
   return NextResponse.json({
     ok: true,
     establishment: est,
     account: emp,
+    action_link: actionLink,
   })
 }
 
@@ -116,6 +159,12 @@ export async function PATCH(req: NextRequest) {
     .eq('id', active.id)
   if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
 
+  const { error: evErr } = await supabase.from('support_access_event_log').insert({
+    establishment_id: establishmentId,
+    event_type: 'support_logout',
+  })
+  if (evErr) return NextResponse.json({ error: evErr.message }, { status: 500 })
+
   return NextResponse.json({ ok: true })
 }
 
@@ -128,10 +177,10 @@ export async function GET(req: NextRequest) {
   if (!establishmentId) return NextResponse.json({ error: 'establishment_id is required' }, { status: 400 })
 
   const { data, error } = await supabase
-    .from('support_access_audit_log')
-    .select('id, support_operator_login, account_login, started_at, ended_at')
+    .from('support_access_event_log')
+    .select('id, event_type, support_operator_login, account_login, created_at')
     .eq('establishment_id', establishmentId)
-    .order('started_at', { ascending: false })
+    .order('created_at', { ascending: false })
     .limit(100)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json(data ?? [])

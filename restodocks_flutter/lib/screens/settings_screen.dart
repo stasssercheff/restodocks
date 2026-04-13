@@ -847,6 +847,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     var order = List<HomeTileId>.from(layoutSvc.getOrder(emp.id));
     final showBanquet = emp.department == 'kitchen';
+    final ent = SubscriptionEntitlements.from(account.establishment);
+    final isLiteTier = ent.isLiteTier;
     if (!showBanquet) {
       order = order
           .where((id) =>
@@ -881,6 +883,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               id != HomeTileId.departmentSales &&
               id != HomeTileId.inventory)
           .toList();
+    }
+    if (isLiteTier) {
+      // В Lite в настройке не показываем «премиальные»/недоступные плитки.
+      final allowedLite = <HomeTileId>{
+        HomeTileId.schedule,
+        HomeTileId.menu,
+        HomeTileId.ttk,
+        HomeTileId.nomenclature,
+        HomeTileId.messages,
+      };
+      order = order.where(allowedLite.contains).toList();
     }
     final tileLabels = <HomeTileId, String>{
       HomeTileId.messages: loc.t('inbox_tab_messages') ?? 'Сообщения',
@@ -2028,8 +2041,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 leading: const SizedBox(width: 24),
                                 title: const Text('Журнал входов техподдержки'),
                                 children: rows.map((row) {
-                                  final started = row['started_at']?.toString();
-                                  final ended = row['ended_at']?.toString();
                                   return ListTile(
                                     dense: true,
                                     title: Text(
@@ -2037,7 +2048,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       style: const TextStyle(fontSize: 12),
                                     ),
                                     subtitle: Text(
-                                      'Вход: ${started ?? '—'}\nВыход: ${ended ?? 'активно'}',
+                                      '${row['event_type'] ?? 'event'}: ${row['created_at'] ?? '—'}',
                                       style: const TextStyle(fontSize: 11),
                                     ),
                                   );
