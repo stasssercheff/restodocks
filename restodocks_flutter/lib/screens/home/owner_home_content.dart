@@ -140,15 +140,13 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                       title: loc.t('nomenclature'),
                       onTap: () => context.go('/nomenclature/kitchen')),
                   'home-nomenclature-kitchen')),
-          ownerTile(
-              'owner_messages',
-              _wrap(
-                  HomeFeatureTile(
-                      icon: Icons.chat_bubble_outline,
-                      title: loc.t('inbox_tab_messages') ?? 'Сообщения',
-                      onTap: () =>
-                          context.go('/notifications?tab=messages')),
-                  'home-messages')),
+          // Lite: всегда показываем (не через ownerTile — скрытие плиток в настройках не убирает пункт 6 спецификации).
+          _wrap(
+              HomeFeatureTile(
+                  icon: Icons.chat_bubble_outline,
+                  title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+                  onTap: () => context.go('/notifications?tab=messages')),
+              'home-messages'),
           ownerTile(
               'owner_employees',
               _wrap(
