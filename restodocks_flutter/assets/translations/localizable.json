@@ -3124,7 +3124,17 @@
     "haccp_order_pdf_jr11_name": "Журнал-график генеральных уборок",
     "haccp_order_pdf_jr11_resp": "Су-шеф",
     "haccp_order_pdf_jr12_name": "Журнал проверки сит/фильтров и магнитов",
-    "haccp_order_pdf_jr12_resp": "Повар заготовочного цеха"
+    "haccp_order_pdf_jr12_resp": "Повар заготовочного цеха",
+    "ttk_create_manual_hint": "Заполнить ТТК вручную",
+    "create_with_ai": "Создать с ИИ",
+    "ttk_create_ai_hint": "Опишите блюдо текстом, ИИ заполнит ТТК",
+    "inventory_selective_template_not_set": "Шаблон выборочной инвентаризации пока не задан шефом",
+    "inventory_selective_templates_create": "Создать новый шаблон",
+    "inventory_selective_templates_limit": "Лимит: 10 шаблонов (%s/10)",
+    "inventory_selective_templates_limit_reached": "Достигнут лимит: 10 шаблонов",
+    "inventory_selective_template_name_title": "Название шаблона",
+    "inventory_selective_template_name_hint": "Например: Бар вечер",
+    "inventory_selective_template_saved_active": "Шаблон \"%s\" сохранён и выбран активным"
   },
   "en": {
     "app_name": "Restodocks",
@@ -6251,7 +6261,17 @@
     "haccp_order_pdf_jr11_name": "General cleaning schedule log",
     "haccp_order_pdf_jr11_resp": "Sous chef",
     "haccp_order_pdf_jr12_name": "Sieve/filter and magnet inspection log",
-    "haccp_order_pdf_jr12_resp": "Prep kitchen cook"
+    "haccp_order_pdf_jr12_resp": "Prep kitchen cook",
+    "ttk_create_manual_hint": "Fill tech card manually",
+    "create_with_ai": "Create with AI",
+    "ttk_create_ai_hint": "Describe a dish and AI will fill the tech card",
+    "inventory_selective_template_not_set": "Selective inventory template has not been set by the chef yet",
+    "inventory_selective_templates_create": "Create new template",
+    "inventory_selective_templates_limit": "Limit: 10 templates (%s/10)",
+    "inventory_selective_templates_limit_reached": "Limit reached: 10 templates",
+    "inventory_selective_template_name_title": "Template name",
+    "inventory_selective_template_name_hint": "For example: Bar evening",
+    "inventory_selective_template_saved_active": "Template \"%s\" has been saved and set active"
   },
   "es": {
     "app_name": "Restodocks",
@@ -9378,7 +9398,17 @@
     "subscription_tier_pro_title": "Pro — about 25 USD/mo",
     "subscription_plans_list_tile_subtitle": "Lite, Pro, Ultra and add-ons",
     "subscription_plans_dialog_title": "Restodocks subscription options",
-    "subscription_plans_trial_72h_note": "For the first 3 days (72 hours) after signup you get full Ultra-level access for free, with the same trial limits as before (tech card import caps, inventory export caps, offline item limits, etc. — see in-app hints and Training)."
+    "subscription_plans_trial_72h_note": "For the first 3 days (72 hours) after signup you get full Ultra-level access for free, with the same trial limits as before (tech card import caps, inventory export caps, offline item limits, etc. — see in-app hints and Training).",
+    "ttk_create_manual_hint": "Completar ficha técnica manualmente",
+    "create_with_ai": "Crear con IA",
+    "ttk_create_ai_hint": "Describe el plato y la IA completará la ficha técnica",
+    "inventory_selective_template_not_set": "El chef aún no ha configurado una plantilla de inventario selectivo",
+    "inventory_selective_templates_create": "Crear nueva plantilla",
+    "inventory_selective_templates_limit": "Límite: 10 plantillas (%s/10)",
+    "inventory_selective_templates_limit_reached": "Límite alcanzado: 10 plantillas",
+    "inventory_selective_template_name_title": "Nombre de la plantilla",
+    "inventory_selective_template_name_hint": "Por ejemplo: Bar noche",
+    "inventory_selective_template_saved_active": "La plantilla \"%s\" se guardó y quedó activa"
   },
   "kk": {
     "app_name": "Restodocks",
@@ -12505,7 +12535,17 @@
     "subscription_tier_pro_title": "Pro — about 25 USD/mo",
     "subscription_plans_list_tile_subtitle": "Lite, Pro, Ultra and add-ons",
     "subscription_plans_dialog_title": "Restodocks subscription options",
-    "subscription_plans_trial_72h_note": "For the first 3 days (72 hours) after signup you get full Ultra-level access for free, with the same trial limits as before (tech card import caps, inventory export caps, offline item limits, etc. — see in-app hints and Training)."
+    "subscription_plans_trial_72h_note": "For the first 3 days (72 hours) after signup you get full Ultra-level access for free, with the same trial limits as before (tech card import caps, inventory export caps, offline item limits, etc. — see in-app hints and Training).",
+    "ttk_create_manual_hint": "TTK-ны қолмен толтырыңыз",
+    "create_with_ai": "AI көмегімен жасау",
+    "ttk_create_ai_hint": "Тағамды сипаттаңыз, AI TTK-ны толтырады",
+    "inventory_selective_template_not_set": "Таңдамалы түгендеу үлгісін әзірге шеф орнатпаған",
+    "inventory_selective_templates_create": "Жаңа үлгі жасау",
+    "inventory_selective_templates_limit": "Лимит: 10 үлгі (%s/10)",
+    "inventory_selective_templates_limit_reached": "Лимитке жетті: 10 үлгі",
+    "inventory_selective_template_name_title": "Үлгі атауы",
+    "inventory_selective_template_name_hint": "Мысалы: Кешкі бар",
+    "inventory_selective_template_saved_active": "\"%s\" үлгісі сақталып, белсенді болып таңдалды"
   },
   "de": {
     "app_name": "Restodocks",
@@ -15632,7 +15672,17 @@
     "subscription_tier_pro_title": "Pro — about 25 USD/mo",
     "subscription_plans_list_tile_subtitle": "Lite, Pro, Ultra and add-ons",
     "subscription_plans_dialog_title": "Restodocks subscription options",
-    "subscription_plans_trial_72h_note": "For the first 3 days (72 hours) after signup you get full Ultra-level access for free, with the same trial limits as before (tech card import caps, inventory export caps, offline item limits, etc. — see in-app hints and Training)."
+    "subscription_plans_trial_72h_note": "For the first 3 days (72 hours) after signup you get full Ultra-level access for free, with the same trial limits as before (tech card import caps, inventory export caps, offline item limits, etc. — see in-app hints and Training).",
+    "ttk_create_manual_hint": "Technische Karte manuell ausfüllen",
+    "create_with_ai": "Mit KI erstellen",
+    "ttk_create_ai_hint": "Beschreiben Sie das Gericht, die KI füllt die Karte aus",
+    "inventory_selective_template_not_set": "Die Vorlage für selektive Inventur wurde vom Küchenchef noch nicht festgelegt",
+    "inventory_selective_templates_create": "Neue Vorlage erstellen",
+    "inventory_selective_templates_limit": "Limit: 10 Vorlagen (%s/10)",
+    "inventory_selective_templates_limit_reached": "Limit erreicht: 10 Vorlagen",
+    "inventory_selective_template_name_title": "Vorlagenname",
+    "inventory_selective_template_name_hint": "Zum Beispiel: Bar Abend",
+    "inventory_selective_template_saved_active": "Vorlage \"%s\" wurde gespeichert und als aktiv gesetzt"
   },
   "fr": {
     "app_name": "Restodocks",
@@ -18759,7 +18809,17 @@
     "subscription_tier_pro_title": "Pro — about 25 USD/mo",
     "subscription_plans_list_tile_subtitle": "Lite, Pro, Ultra and add-ons",
     "subscription_plans_dialog_title": "Restodocks subscription options",
-    "subscription_plans_trial_72h_note": "For the first 3 days (72 hours) after signup you get full Ultra-level access for free, with the same trial limits as before (tech card import caps, inventory export caps, offline item limits, etc. — see in-app hints and Training)."
+    "subscription_plans_trial_72h_note": "For the first 3 days (72 hours) after signup you get full Ultra-level access for free, with the same trial limits as before (tech card import caps, inventory export caps, offline item limits, etc. — see in-app hints and Training).",
+    "ttk_create_manual_hint": "Remplir la fiche technique manuellement",
+    "create_with_ai": "Créer avec IA",
+    "ttk_create_ai_hint": "Décrivez le plat, l'IA remplira la fiche technique",
+    "inventory_selective_template_not_set": "Le modèle d'inventaire sélectif n'a pas encore été défini par le chef",
+    "inventory_selective_templates_create": "Créer un nouveau modèle",
+    "inventory_selective_templates_limit": "Limite : 10 modèles (%s/10)",
+    "inventory_selective_templates_limit_reached": "Limite atteinte : 10 modèles",
+    "inventory_selective_template_name_title": "Nom du modèle",
+    "inventory_selective_template_name_hint": "Par exemple : Bar du soir",
+    "inventory_selective_template_saved_active": "Le modèle \"%s\" a été enregistré et activé"
   },
   "it": {
     "app_name": "Restodocks",
@@ -21886,7 +21946,17 @@
     "subscription_tier_pro_title": "Pro — about 25 USD/mo",
     "subscription_plans_list_tile_subtitle": "Lite, Pro, Ultra and add-ons",
     "subscription_plans_dialog_title": "Restodocks subscription options",
-    "subscription_plans_trial_72h_note": "For the first 3 days (72 hours) after signup you get full Ultra-level access for free, with the same trial limits as before (tech card import caps, inventory export caps, offline item limits, etc. — see in-app hints and Training)."
+    "subscription_plans_trial_72h_note": "For the first 3 days (72 hours) after signup you get full Ultra-level access for free, with the same trial limits as before (tech card import caps, inventory export caps, offline item limits, etc. — see in-app hints and Training).",
+    "ttk_create_manual_hint": "Compilare la scheda tecnica manualmente",
+    "create_with_ai": "Crea con IA",
+    "ttk_create_ai_hint": "Descrivi il piatto e l'IA compilerà la scheda tecnica",
+    "inventory_selective_template_not_set": "Il modello di inventario selettivo non è ancora stato impostato dallo chef",
+    "inventory_selective_templates_create": "Crea nuovo modello",
+    "inventory_selective_templates_limit": "Limite: 10 modelli (%s/10)",
+    "inventory_selective_templates_limit_reached": "Limite raggiunto: 10 modelli",
+    "inventory_selective_template_name_title": "Nome del modello",
+    "inventory_selective_template_name_hint": "Ad esempio: Bar sera",
+    "inventory_selective_template_saved_active": "Il modello \"%s\" è stato salvato e impostato come attivo"
   },
   "tr": {
     "app_name": "Yeniden stoklamalar",
@@ -25013,7 +25083,17 @@
     "subscription_tier_pro_title": "Pro — about 25 USD/mo",
     "subscription_plans_list_tile_subtitle": "Lite, Pro, Ultra and add-ons",
     "subscription_plans_dialog_title": "Restodocks subscription options",
-    "subscription_plans_trial_72h_note": "For the first 3 days (72 hours) after signup you get full Ultra-level access for free, with the same trial limits as before (tech card import caps, inventory export caps, offline item limits, etc. — see in-app hints and Training)."
+    "subscription_plans_trial_72h_note": "For the first 3 days (72 hours) after signup you get full Ultra-level access for free, with the same trial limits as before (tech card import caps, inventory export caps, offline item limits, etc. — see in-app hints and Training).",
+    "ttk_create_manual_hint": "Teknoloji kartını manuel doldur",
+    "create_with_ai": "Yapay zekâ ile oluştur",
+    "ttk_create_ai_hint": "Yemeği metinle anlatın, yapay zekâ kartı doldursun",
+    "inventory_selective_template_not_set": "Seçici envanter şablonu şef tarafından henüz ayarlanmadı",
+    "inventory_selective_templates_create": "Yeni şablon oluştur",
+    "inventory_selective_templates_limit": "Limit: 10 şablon (%s/10)",
+    "inventory_selective_templates_limit_reached": "Limite ulaşıldı: 10 şablon",
+    "inventory_selective_template_name_title": "Şablon adı",
+    "inventory_selective_template_name_hint": "Örneğin: Akşam barı",
+    "inventory_selective_template_saved_active": "\"%s\" şablonu kaydedildi ve aktif seçildi"
   },
   "vi": {
     "app_name": "Khôi phục lại",
@@ -28140,6 +28220,16 @@
     "subscription_tier_pro_title": "Pro — about 25 USD/mo",
     "subscription_plans_list_tile_subtitle": "Lite, Pro, Ultra and add-ons",
     "subscription_plans_dialog_title": "Restodocks subscription options",
-    "subscription_plans_trial_72h_note": "For the first 3 days (72 hours) after signup you get full Ultra-level access for free, with the same trial limits as before (tech card import caps, inventory export caps, offline item limits, etc. — see in-app hints and Training)."
+    "subscription_plans_trial_72h_note": "For the first 3 days (72 hours) after signup you get full Ultra-level access for free, with the same trial limits as before (tech card import caps, inventory export caps, offline item limits, etc. — see in-app hints and Training).",
+    "ttk_create_manual_hint": "Điền thẻ công nghệ thủ công",
+    "create_with_ai": "Tạo bằng AI",
+    "ttk_create_ai_hint": "Mô tả món ăn, AI sẽ điền thẻ công nghệ",
+    "inventory_selective_template_not_set": "Mẫu kiểm kê chọn lọc chưa được bếp trưởng thiết lập",
+    "inventory_selective_templates_create": "Tạo mẫu mới",
+    "inventory_selective_templates_limit": "Giới hạn: 10 mẫu (%s/10)",
+    "inventory_selective_templates_limit_reached": "Đã đạt giới hạn: 10 mẫu",
+    "inventory_selective_template_name_title": "Tên mẫu",
+    "inventory_selective_template_name_hint": "Ví dụ: Quầy bar buổi tối",
+    "inventory_selective_template_saved_active": "Mẫu \"%s\" đã được lưu và đặt làm mẫu hoạt động"
   }
 }

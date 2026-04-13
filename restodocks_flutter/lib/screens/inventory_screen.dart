@@ -3400,9 +3400,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (!_canManageSelectiveTemplates) {
       if (templates.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('Шаблон выборочной инвентаризации пока не задан шефом'),
+          SnackBar(
+            content: Text(loc.t('inventory_selective_template_not_set')),
           ),
         );
         return false;
@@ -3445,8 +3444,10 @@ class _InventoryScreenState extends State<InventoryScreen>
           children: [
             ListTile(
               leading: const Icon(Icons.add_box_outlined),
-              title: const Text('Создать новый шаблон'),
-              subtitle: Text('Лимит: 10 шаблонов (${templates.length}/10)'),
+              title: Text(loc.t('inventory_selective_templates_create')),
+              subtitle: Text(loc
+                  .t('inventory_selective_templates_limit')
+                  .replaceAll('%s', '${templates.length}')),
               onTap: () => Navigator.of(ctx).pop('__create__'),
             ),
             if (templates.isNotEmpty) const Divider(height: 1),
@@ -3538,11 +3539,14 @@ class _InventoryScreenState extends State<InventoryScreen>
     final accountForTemplates = context.read<AccountManagerSupabase>();
     final estIdForTemplates = accountForTemplates.establishment?.id;
     if (estIdForTemplates == null) return true;
-    final templates = await _loadSelectiveTemplatesFromServer(estIdForTemplates);
+    final templates =
+        await _loadSelectiveTemplatesFromServer(estIdForTemplates);
     if (!mounted) return true;
     if (templates.length >= 10) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Достигнут лимит: 10 шаблонов')),
+        SnackBar(
+          content: Text(loc.t('inventory_selective_templates_limit_reached')),
+        ),
       );
       return true;
     }
@@ -3692,25 +3696,28 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   Future<String?> _askSelectiveTemplateName(
       {required String defaultName}) async {
+    final loc = context.read<LocalizationService>();
     final controller = TextEditingController(text: defaultName);
     final res = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Название шаблона'),
+        title: Text(loc.t('inventory_selective_template_name_title')),
         content: TextField(
           controller: controller,
           autofocus: true,
           maxLength: 50,
-          decoration: const InputDecoration(hintText: 'Например: Бар вечер'),
+          decoration: InputDecoration(
+            hintText: loc.t('inventory_selective_template_name_hint'),
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Отмена'),
+            child: Text(loc.t('cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(controller.text),
-            child: const Text('Сохранить'),
+            child: Text(loc.t('save')),
           ),
         ],
       ),
@@ -3726,6 +3733,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     required Set<String> selectedTechCardIds,
     required List<_SelectiveInventoryTemplate> currentTemplates,
   }) async {
+    final loc = context.read<LocalizationService>();
     var slot = 1;
     final used = currentTemplates.map((t) => t.slot).whereType<int>().toSet();
     while (used.contains(slot) && slot <= 10) {
@@ -3751,7 +3759,13 @@ class _InventoryScreenState extends State<InventoryScreen>
     await _setActiveSelectiveTemplateType(establishmentId, draftType);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Шаблон "$name" сохранён и выбран активным')),
+      SnackBar(
+        content: Text(
+          loc
+              .t('inventory_selective_template_saved_active')
+              .replaceAll('%s', name),
+        ),
+      ),
     );
   }
 }
