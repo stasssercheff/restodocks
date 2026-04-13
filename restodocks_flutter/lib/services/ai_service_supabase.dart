@@ -563,7 +563,7 @@ class AiServiceSupabase implements AiService {
     return list;
   }
 
-  Future<TechCardRecognitionResult?> createTechCardFromPrompt(
+  Future<List<TechCardRecognitionResult>> createTechCardsFromPrompt(
     String prompt, {
     String? establishmentId,
   }) async {
@@ -574,15 +574,30 @@ class AiServiceSupabase implements AiService {
     }
     final res = await _client.functions.invoke('ai-create-tech-card', body: body);
     final data = res.data;
-    if (data is! Map<String, dynamic>) return null;
+    if (data is! Map<String, dynamic>) return const [];
     final err = data['error'] as String? ?? data['reason'] as String?;
     if (err != null && err.trim().isNotEmpty) {
       lastCreateTechCardReason = err;
-      return null;
+      return const [];
+    }
+    final cardsRaw = data['cards'];
+    if (cardsRaw is List) {
+      final list = <TechCardRecognitionResult>[];
+      for (final c in cardsRaw) {
+        if (c is! Map) continue;
+        final parsed = _parseTechCardResult(Map<String, dynamic>.from(c));
+        if (parsed != null &&
+            (((parsed.dishName ?? '').trim().isNotEmpty) ||
+                parsed.ingredients.isNotEmpty)) {
+          list.add(parsed);
+        }
+      }
+      return list;
     }
     final cardRaw = data['card'];
-    if (cardRaw is! Map) return null;
-    return _parseTechCardResult(Map<String, dynamic>.from(cardRaw));
+    if (cardRaw is! Map) return const [];
+    final one = _parseTechCardResult(Map<String, dynamic>.from(cardRaw));
+    return one == null ? const [] : [one];
   }
 
   double? _toDouble(dynamic v) {

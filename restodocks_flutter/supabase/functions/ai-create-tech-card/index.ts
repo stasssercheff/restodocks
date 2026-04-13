@@ -47,11 +47,13 @@ Deno.serve(async (req: Request) => {
         {
           role: "system",
           content:
-            "Ты технолог общественного питания. По запросу пользователя сгенерируй ОДНУ ТТК в JSON. " +
-            "Верни только JSON вида: {\"dishName\":string,\"technologyText\":string,\"isSemiFinished\":boolean," +
-            "\"ingredients\":[{\"productName\":string,\"grossGrams\":number,\"unit\":\"г\"," +
-            "\"primaryWastePct\":number,\"netGrams\":number,\"cookingLossPct\":number,\"outputGrams\":number}],\"yieldGrams\":number}. " +
-            "Технология обязательна (подробно). Ингредиентов минимум 3. Без markdown.",
+            "Ты технолог общественного питания. По запросу пользователя сгенерируй ТТК в JSON. " +
+            "Верни только JSON вида: {\"cards\":[{...}]}, где каждый элемент массива — одна ТТК. " +
+            "Если пользователь явно просит компоненты собственного производства (например, домашний хлеб, вяленые томаты собственного производства, соус собственного производства), " +
+            "создай ОТДЕЛЬНЫЕ ТТК-ПФ для этих компонентов (isSemiFinished=true), а в основной ТТК добавь их как ingredientType='semi_finished'. " +
+            "Для каждой ТТК поля: dishName:string, technologyText:string, isSemiFinished:boolean, " +
+            "ingredients:[{productName:string,grossGrams:number,unit:string,primaryWastePct:number,netGrams:number,cookingLossPct:number,outputGrams:number,ingredientType:string}], yieldGrams:number. " +
+            "Технология обязательна и подробна. Ингредиентов минимум 3. Без markdown.",
         },
         { role: "user", content: prompt },
       ],
@@ -71,8 +73,12 @@ Deno.serve(async (req: Request) => {
     const codeBlock = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (codeBlock) jsonStr = codeBlock[1].trim();
     const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+    const cardsRaw = parsed["cards"];
+    const cards = Array.isArray(cardsRaw)
+      ? cardsRaw
+      : [parsed];
 
-    return new Response(JSON.stringify({ card: parsed }), {
+    return new Response(JSON.stringify({ cards }), {
       status: 200,
       headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
     });

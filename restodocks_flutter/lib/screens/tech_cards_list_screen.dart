@@ -293,6 +293,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   int _loadRequestToken = 0;
   bool _loadingExcel = false;
   bool _loadingTtkIsPdf = false;
+  bool _loadingTtkIsAiPrompt = false;
   String? _error;
   Set<String> _selectedTechCards = {}; // ID выбранных карточек
   bool _selectionMode = false;
@@ -3398,26 +3399,34 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     );
     controller.dispose();
     if (result == null || result.isEmpty || !mounted) return;
-    setState(() => _loadingExcel = true);
+    setState(() {
+      _loadingExcel = true;
+      _loadingTtkIsAiPrompt = allowPromptFallback;
+    });
     try {
       final est = context.read<AccountManagerSupabase>().establishment;
       final establishmentId = est?.dataEstablishmentId;
       final aiService = context.read<AiService>();
       if (allowPromptFallback && aiService is AiServiceSupabase) {
-        final created = await aiService.createTechCardFromPrompt(
+        final createdCards = await aiService.createTechCardsFromPrompt(
           result,
           establishmentId: establishmentId,
         );
         if (!mounted) return;
-        if (created != null &&
-            ((created.dishName ?? '').trim().isNotEmpty ||
-                created.ingredients.isNotEmpty)) {
-          context.push(
-            widget.department == 'bar'
-                ? '/tech-cards/new?department=bar'
-                : '/tech-cards/new',
-            extra: created,
-          );
+        if (createdCards.isNotEmpty) {
+          if (createdCards.length == 1) {
+            context.push(
+              widget.department == 'bar'
+                  ? '/tech-cards/new?department=bar'
+                  : '/tech-cards/new',
+              extra: createdCards.first,
+            );
+          } else {
+            context.push(
+              '/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}',
+              extra: {'cards': createdCards},
+            );
+          }
           return;
         }
         final reason = AiServiceSupabase.lastCreateTechCardReason ?? '';
@@ -3501,7 +3510,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             });
       }
     } finally {
-      if (mounted) setState(() => _loadingExcel = false);
+      if (mounted) {
+        setState(() {
+          _loadingExcel = false;
+          _loadingTtkIsAiPrompt = false;
+        });
+      }
     }
   }
 
@@ -3849,9 +3863,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                   child: CircularProgressIndicator(
                                       strokeWidth: 2)),
                               const SizedBox(height: 16),
-                              Text(_loadingTtkIsPdf
-                                  ? loc.t('loading_ttk_pdf')
-                                  : loc.t('loading_excel')),
+                              Text(_loadingTtkIsAiPrompt
+                                  ? 'Создание ТТК с ИИ...'
+                                  : (_loadingTtkIsPdf
+                                      ? loc.t('loading_ttk_pdf')
+                                      : loc.t('loading_excel'))),
                             ],
                           ),
                         ),
