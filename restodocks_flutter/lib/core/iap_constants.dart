@@ -26,6 +26,11 @@ const String kRestodocksUltraMonthlyProductId = 'restodocks_ultra_monthly';
 const String kRestodocksAddonEmployeePack5ProductId = 'restodocks_addon_employee_pack_5';
 const String kRestodocksAddonBranchPack1ProductId = 'restodocks_addon_branch_pack_1';
 
+const Set<String> kRestodocksAddonProductIds = {
+  kRestodocksAddonEmployeePack5ProductId,
+  kRestodocksAddonBranchPack1ProductId,
+};
+
 /// Подписки, которые переводят заведение в Pro / Ultra после billing-verify-apple.
 const Set<String> kRestodocksSubscriptionProductIds = {
   kRestodocksProMonthlyProductId,

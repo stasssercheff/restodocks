@@ -33,6 +33,8 @@ class AppleIapService extends ChangeNotifier {
 
   Future<bool> purchaseSubscription(String productId) async => false;
 
+  Future<bool> purchaseAddon(String productId) async => false;
+
   Future<void> restorePurchases() async {}
 
   Future<bool> trySyncProFromStoreReceipt({bool silentFailures = false}) async =>

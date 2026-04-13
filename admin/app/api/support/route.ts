@@ -39,35 +39,42 @@ export async function POST(req: NextRequest) {
   const supabase = auth.supabase
 
   const body = await req.json().catch(() => null)
-  const pinCode = (body?.pin_code ?? '').toString().trim().toUpperCase()
   const accountLogin = (body?.account_login ?? '').toString().trim().toLowerCase()
   const supportOperatorLogin = (body?.support_operator_login ?? 'admin').toString().trim()
   const appOrigin = (body?.app_origin ?? '').toString().trim().replace(/\/+$/, '')
-  if (!pinCode || !accountLogin) {
-    return NextResponse.json({ error: 'PIN and account login are required' }, { status: 400 })
-  }
-
-  const { data: est, error: estErr } = await supabase
-    .from('establishments')
-    .select('id, name, pin_code, support_access_enabled')
-    .eq('pin_code', pinCode)
-    .maybeSingle()
-  if (estErr) return NextResponse.json({ error: estErr.message }, { status: 500 })
-  if (!est) return NextResponse.json({ error: 'Заведение по PIN не найдено' }, { status: 404 })
-  if (est.support_access_enabled !== true) {
-    return NextResponse.json({ error: 'Владелец отключил доступ техподдержки' }, { status: 403 })
+  if (!accountLogin) {
+    return NextResponse.json({ error: 'Account login is required' }, { status: 400 })
   }
 
   const { data: emp, error: empErr } = await supabase
     .from('employees')
-    .select('id, email, full_name, roles, is_active')
-    .eq('establishment_id', est.id)
+    .select('id, email, full_name, roles, is_active, establishment_id')
     .eq('email', accountLogin)
     .eq('is_active', true)
     .maybeSingle()
   if (empErr) return NextResponse.json({ error: empErr.message }, { status: 500 })
   if (!emp) {
-    return NextResponse.json({ error: 'Логин не найден в этом заведении' }, { status: 404 })
+    return NextResponse.json({ error: 'Логин не найден' }, { status: 404 })
+  }
+
+  const establishmentId = (emp as { establishment_id?: string | null }).establishment_id?.toString().trim() ?? ''
+  if (!establishmentId) {
+    return NextResponse.json({ error: 'Для логина не найдено заведение' }, { status: 404 })
+  }
+  const { data: est, error: estErr } = await supabase
+    .from('establishments')
+    .select('id, name, pin_code, support_access_enabled')
+    .eq('id', establishmentId)
+    .maybeSingle()
+  if (estErr) return NextResponse.json({ error: estErr.message }, { status: 500 })
+  if (!est) return NextResponse.json({ error: 'Заведение не найдено' }, { status: 404 })
+  if (est.support_access_enabled !== true) {
+    return NextResponse.json({ error: 'Владелец отключил доступ техподдержки' }, { status: 403 })
+  }
+
+  const pinForAudit = (est.pin_code ?? '').toString().trim().toUpperCase()
+  if (!pinForAudit) {
+    return NextResponse.json({ error: 'PIN компании не задан у пользователя' }, { status: 403 })
   }
 
   const hasAudit = await hasTable(supabase, 'support_access_audit_log')
@@ -94,7 +101,7 @@ export async function POST(req: NextRequest) {
     establishment_id: est.id,
     support_operator_login: supportOperatorLogin,
     account_login: accountLogin,
-    pin_code: pinCode,
+    pin_code: pinForAudit,
   })
   if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 })
 

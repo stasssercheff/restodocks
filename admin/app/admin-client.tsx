@@ -148,7 +148,6 @@ export default function AdminClient() {
 function SupportAccessTab() {
   const [supportOperatorLogin, setSupportOperatorLogin] = useState('')
   const [accountLogin, setAccountLogin] = useState('')
-  const [pinCode, setPinCode] = useState('')
   const [appOrigin, setAppOrigin] = useState('https://restodocks-beta.pages.dev')
   const [activeEstablishmentId, setActiveEstablishmentId] = useState<string | null>(null)
   const [activeEstablishmentName, setActiveEstablishmentName] = useState<string | null>(null)
@@ -176,7 +175,6 @@ function SupportAccessTab() {
         body: JSON.stringify({
           support_operator_login: supportOperatorLogin.trim() || 'admin',
           account_login: accountLogin.trim().toLowerCase(),
-          pin_code: pinCode.trim().toUpperCase(),
           app_origin: appOrigin.trim(),
         }),
       })
@@ -226,16 +224,15 @@ function SupportAccessTab() {
       <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 space-y-3">
         <h2 className="text-sm font-semibold text-white">Доступ техподдержки</h2>
         <p className="text-xs text-gray-500">
-          Введите логин учётной записи и PIN компании. Доступ откроется только если у заведения включён тумблер в настройках.
+          Введите логин учётной записи (email). PIN вводит владелец на своей стороне вместе с тумблером доступа.
         </p>
-        <div className="grid sm:grid-cols-3 gap-2">
+        <div className="grid sm:grid-cols-2 gap-2">
           <input value={supportOperatorLogin} onChange={e => setSupportOperatorLogin(e.target.value)} placeholder="Логин оператора" className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
           <input value={accountLogin} onChange={e => setAccountLogin(e.target.value)} placeholder="Логин учётной записи (email)" className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
-          <input value={pinCode} onChange={e => setPinCode(e.target.value.toUpperCase())} placeholder="PIN компании" className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono" />
         </div>
         <input value={appOrigin} onChange={e => setAppOrigin(e.target.value)} placeholder="Origin веб-приложения, куда входить (например https://restodocks-beta.pages.dev)" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs" />
         <div className="flex gap-2">
-          <button onClick={startSupportSession} disabled={busy || !accountLogin.trim() || !pinCode.trim()} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-4 py-2 rounded-lg text-sm">
+          <button onClick={startSupportSession} disabled={busy || !accountLogin.trim()} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-4 py-2 rounded-lg text-sm">
             Открыть доступ
           </button>
           <button onClick={endSupportSession} disabled={busy || !activeEstablishmentId} className="bg-gray-800 border border-gray-700 hover:bg-gray-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm">

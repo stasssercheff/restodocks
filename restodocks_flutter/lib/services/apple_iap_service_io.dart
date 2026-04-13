@@ -288,6 +288,7 @@ class AppleIapService extends ChangeNotifier {
   Future<({int status, Map<String, dynamic>? data})> _postBillingVerifyApple({
     required String establishmentId,
     required String receiptData,
+    String? purchasedProductId,
   }) async {
     var ok = await _ensureSessionForPayment();
     if (!ok) {
@@ -304,6 +305,10 @@ class AppleIapService extends ChangeNotifier {
       'establishment_id': establishmentId,
       'receipt_data': receiptData,
     };
+    final productId = (purchasedProductId ?? '').trim();
+    if (productId.isNotEmpty) {
+      body['product_id'] = productId;
+    }
 
     Future<({int status, Map<String, dynamic>? data})> invokeOnce() async {
       try {
@@ -367,6 +372,7 @@ class AppleIapService extends ChangeNotifier {
   Future<({int status, Map<String, dynamic>? data})> _verifyReceiptWithRetries({
     required String establishmentId,
     required String receiptData,
+    String? purchasedProductId,
     bool aggressive = false,
   }) async {
     final delays = aggressive
@@ -384,6 +390,7 @@ class AppleIapService extends ChangeNotifier {
       final res = await _postBillingVerifyApple(
         establishmentId: establishmentId,
         receiptData: receiptData,
+        purchasedProductId: purchasedProductId,
       );
       last = res;
       if (res.status == 200) return res;
@@ -440,7 +447,7 @@ class AppleIapService extends ChangeNotifier {
 
   Future<void> _onPurchases(List<PurchaseDetails> purchases) async {
     for (final p in purchases) {
-      if (!kRestodocksSubscriptionProductIds.contains(p.productID)) continue;
+      if (!kRestodocksAllIapProductIds.contains(p.productID)) continue;
 
       if (p.status == PurchaseStatus.pending) {
         notifyListeners();
@@ -525,30 +532,35 @@ class AppleIapService extends ChangeNotifier {
       final res = await _verifyReceiptWithRetries(
         establishmentId: est.id,
         receiptData: receiptData,
+        purchasedProductId: purchase.productID,
         aggressive: true,
       );
 
       if (res.status != 200) {
         devLog('IAP billing-verify-apple failed: ${res.status} ${res.data}');
-        try {
-          await _account.refreshCurrentEstablishmentFromServer();
-        } catch (_) {}
-        if (_paidProActiveOnServer) {
-          devLog(
-            'IAP verify HTTP ${res.status} but Pro already active — ignoring spurious failure (duplicate StoreKit / race)',
-          );
-          await _finalizeVerifiedPurchase(purchase, countAsNewSuccess: false);
-          return;
-        }
-        // Дополнительный fallback: если чек уже на сервере, но текущая verify попытка дала
-        // временный binding/session ответ, пробуем синхронизацию из app receipt.
-        final synced = await trySyncProFromStoreReceipt(silentFailures: true);
-        if (synced || _paidProActiveOnServer) {
-          devLog(
-            'IAP verify HTTP ${res.status} recovered by trySyncProFromStoreReceipt',
-          );
-          await _finalizeVerifiedPurchase(purchase, countAsNewSuccess: false);
-          return;
+        final isSubscriptionPurchase =
+            kRestodocksSubscriptionProductIds.contains(purchase.productID);
+        if (isSubscriptionPurchase) {
+          try {
+            await _account.refreshCurrentEstablishmentFromServer();
+          } catch (_) {}
+          if (_paidProActiveOnServer) {
+            devLog(
+              'IAP verify HTTP ${res.status} but Pro already active — ignoring spurious failure (duplicate StoreKit / race)',
+            );
+            await _finalizeVerifiedPurchase(purchase, countAsNewSuccess: false);
+            return;
+          }
+          // Дополнительный fallback: если чек уже на сервере, но текущая verify попытка дала
+          // временный binding/session ответ, пробуем синхронизацию из app receipt.
+          final synced = await trySyncProFromStoreReceipt(silentFailures: true);
+          if (synced || _paidProActiveOnServer) {
+            devLog(
+              'IAP verify HTTP ${res.status} recovered by trySyncProFromStoreReceipt',
+            );
+            await _finalizeVerifiedPurchase(purchase, countAsNewSuccess: false);
+            return;
+          }
         }
         // Всегда сохраняем HTTP-статус первым сегментом — иначе UI показывает общий текст
         // и теряет различие между 401 / 403 / 400 / 5xx.
@@ -700,6 +712,50 @@ class AppleIapService extends ChangeNotifier {
         applicationUserName: est.ownerId,
       );
       await _iap.buyNonConsumable(purchaseParam: param);
+      return true;
+    } catch (e) {
+      _lastError = e.toString();
+      _setBusy(false);
+      return false;
+    }
+  }
+
+  Future<bool> purchaseAddon(String productId) async {
+    if (!isIOSPlatform) return false;
+    if (!kRestodocksAddonProductIds.contains(productId)) {
+      _lastError = 'product_not_supported';
+      notifyListeners();
+      return false;
+    }
+    await init();
+    final details = _products[productId];
+    if (!_ready || !_storeLoaded || details == null) {
+      _lastError = 'product_not_ready';
+      notifyListeners();
+      return false;
+    }
+    _setBusy(true, notify: false);
+    _lastError = null;
+    notifyListeners();
+    try {
+      if (!await _ensureSessionForPayment()) {
+        if (!await _ensureSessionForPayment(aggressive: true)) {
+          _lastError = 'iap_session_unavailable_pre_store';
+          _setBusy(false);
+          return false;
+        }
+      }
+      final est = _account.establishment;
+      if (est == null) {
+        _lastError = 'not_owner';
+        _setBusy(false);
+        return false;
+      }
+      final param = PurchaseParam(
+        productDetails: details,
+        applicationUserName: est.ownerId,
+      );
+      await _iap.buyConsumable(purchaseParam: param);
       return true;
     } catch (e) {
       _lastError = e.toString();

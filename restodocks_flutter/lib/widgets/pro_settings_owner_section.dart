@@ -876,10 +876,13 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
                               for (final a in addons) ...[
                                 Padding(
                                   padding: const EdgeInsets.only(bottom: 6),
-                                  child: Text(
-                                    '${a.title}: ${widget.formatIapPrice(a)}',
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      height: 1.35,
+                                  child: FilledButton.tonal(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      unawaited(widget.iap.purchaseAddon(a.id));
+                                    },
+                                    child: Text(
+                                      '${a.title} - ${widget.formatIapPrice(a)}',
                                     ),
                                   ),
                                 ),
