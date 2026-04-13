@@ -623,8 +623,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final ownerPref = context.read<OwnerViewPreferenceService>();
     final isOwnerHome =
         emp.hasRole('owner') && (emp.positionRole == null || ownerPref.viewAsOwner);
-    if (isOwnerHome &&
-        SubscriptionEntitlements.from(account.establishment).isLiteTier) {
+    final isLiteOwnerHome = isOwnerHome &&
+        SubscriptionEntitlements.from(account.establishment).isLiteTier;
+    if (isLiteOwnerHome) {
+      final labels = <String, String>{
+        'owner_schedule_all':
+            '${loc.t('schedule')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        'owner_menu_kitchen':
+            '${loc.t('menu')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        'owner_ttk_kitchen': loc.t('ttk_kitchen'),
+        'owner_nomenclature_kitchen':
+            '${loc.t('nomenclature')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        'owner_messages': loc.t('inbox_tab_messages') ?? 'Сообщения',
+        'owner_employees': loc.t('employees'),
+        'owner_expenses_lite': loc.t('expenses') ?? 'Расходы',
+      };
+      final hidden = Set<String>.from(layoutSvc.getHiddenKeys(emp.id));
+      var order = layoutSvc.getOwnerLiteOrder(emp.id, labels.keys.toList());
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx2, setState) => AlertDialog(
+            title: Text(loc.t('home_layout_config') ?? 'Настройка домашнего экрана'),
+            content: SizedBox(
+              width: 380,
+              height: 500,
+              child: ReorderableListView.builder(
+                itemCount: order.length,
+                onReorder: (oldIndex, newIndex) {
+                  setState(() {
+                    if (newIndex > oldIndex) newIndex -= 1;
+                    final item = order.removeAt(oldIndex);
+                    order.insert(newIndex, item);
+                  });
+                },
+                itemBuilder: (context, index) {
+                  final key = order[index];
+                  final enabled = !hidden.contains(key);
+                  return CheckboxListTile(
+                    key: ValueKey(key),
+                    dense: true,
+                    value: enabled,
+                    title: Text(labels[key] ?? key),
+                    subtitle: Text(
+                      'Перетащите для смены порядка',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    onChanged: (v) {
+                      setState(() {
+                        if (v == true) {
+                          hidden.remove(key);
+                        } else {
+                          hidden.add(key);
+                        }
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  await layoutSvc.setOwnerLiteOrder(emp.id, order);
+                  await layoutSvc.setHiddenKeys(emp.id, hidden);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                },
+                child: Text(loc.t('save')),
+              ),
+            ],
+          ),
+        ),
+      );
       return;
     }
     if (isOwnerHome) {
@@ -1845,15 +1919,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
-                if (!(accountManager.isLiteTier &&
-                    currentEmployee.hasRole('owner')))
-                  ListTile(
-                    leading: const SizedBox(width: 24),
-                    title: Text(localization.t('home_layout_config_hint') ??
-                        'Изменить порядок кнопок на главной'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _showHomeLayoutConfig(context, localization),
-                  ),
+                ListTile(
+                  leading: const SizedBox(width: 24),
+                  title: Text(localization.t('home_layout_config_hint') ??
+                      'Изменить порядок кнопок на главной'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _showHomeLayoutConfig(context, localization),
+                ),
                 Consumer<HomeButtonConfigService>(
                   builder: (_, homeBtn, __) => ListTile(
                     leading: const SizedBox(width: 24),
@@ -1909,32 +1981,71 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     builder: (context, account, _) {
                       final est = account.establishment;
                       if (est == null) return const SizedBox.shrink();
-                      return SwitchListTile(
-                        secondary: const Icon(Icons.support_agent_outlined),
-                        title:
-                            Text(localization.t('support_access_toggle_title')),
-                        subtitle:
-                            Text(localization.t('support_access_toggle_hint')),
-                        value: est.supportAccessEnabled,
-                        onChanged: (v) async {
-                          try {
-                            await account.updateEstablishmentSupportAccess(
-                              establishmentId: est.id,
-                              enabled: v,
-                            );
-                          } catch (e) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  localization
-                                      .t('error_with_message')
-                                      .replaceAll('%s', e.toString()),
-                                ),
-                              ),
-                            );
-                          }
-                        },
+                      return Column(
+                        children: [
+                          SwitchListTile(
+                            secondary: const Icon(Icons.support_agent_outlined),
+                            title: Text(
+                                localization.t('support_access_toggle_title')),
+                            subtitle:
+                                Text(localization.t('support_access_toggle_hint')),
+                            value: est.supportAccessEnabled,
+                            onChanged: (v) async {
+                              try {
+                                await account.updateEstablishmentSupportAccess(
+                                  establishmentId: est.id,
+                                  enabled: v,
+                                );
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      localization
+                                          .t('error_with_message')
+                                          .replaceAll('%s', e.toString()),
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                          FutureBuilder<List<Map<String, dynamic>>>(
+                            future: account.loadSupportAccessAuditLog(limit: 20),
+                            builder: (context, snapshot) {
+                              final rows = snapshot.data ?? const [];
+                              if (rows.isEmpty) {
+                                return const ListTile(
+                                  dense: true,
+                                  leading: SizedBox(width: 24),
+                                  title: Text(
+                                    'Журнал техподдержки пуст',
+                                    style: TextStyle(fontSize: 12),
+                                  ),
+                                );
+                              }
+                              return ExpansionTile(
+                                leading: const SizedBox(width: 24),
+                                title: const Text('Журнал входов техподдержки'),
+                                children: rows.map((row) {
+                                  final started = row['started_at']?.toString();
+                                  final ended = row['ended_at']?.toString();
+                                  return ListTile(
+                                    dense: true,
+                                    title: Text(
+                                      '${row['support_operator_login'] ?? 'support'} · ${row['account_login'] ?? '—'}',
+                                      style: const TextStyle(fontSize: 12),
+                                    ),
+                                    subtitle: Text(
+                                      'Вход: ${started ?? '—'}\nВыход: ${ended ?? 'активно'}',
+                                      style: const TextStyle(fontSize: 11),
+                                    ),
+                                  );
+                                }).toList(),
+                              );
+                            },
+                          ),
+                        ],
                       );
                     },
                   ),

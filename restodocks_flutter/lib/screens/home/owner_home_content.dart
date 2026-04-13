@@ -103,66 +103,87 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
 
     final ent = SubscriptionEntitlements.from(account.establishment);
     if (ent.isLiteTier) {
+      final layoutSvc = context.watch<HomeLayoutConfigService>();
+      const liteKeys = <String>[
+        'owner_schedule_all',
+        'owner_menu_kitchen',
+        'owner_ttk_kitchen',
+        'owner_nomenclature_kitchen',
+        'owner_messages',
+        'owner_employees',
+        'owner_expenses_lite',
+      ];
+      final liteOrder = layoutSvc.getOwnerLiteOrder(
+        account.currentEmployee?.id,
+        liteKeys,
+      );
+      final liteTiles = <String, Widget>{
+        'owner_schedule_all': _wrap(
+          HomeFeatureTile(
+            icon: Icons.calendar_month,
+            title: loc.t('schedule'),
+            onTap: () => context.go('/schedule/kitchen'),
+          ),
+          'home-schedule-mgmt',
+        ),
+        'owner_menu_kitchen': _wrap(
+          HomeFeatureTile(
+            icon: Icons.restaurant_menu,
+            title: loc.t('menu'),
+            onTap: () => context.go('/menu/kitchen'),
+          ),
+          'home-menu-kitchen',
+        ),
+        'owner_ttk_kitchen': _wrap(
+          HomeFeatureTile(
+            icon: Icons.description,
+            title: loc.t('ttk_kitchen'),
+            onTap: () => context.go('/tech-cards/kitchen'),
+          ),
+          'home-ttk-kitchen',
+        ),
+        'owner_nomenclature_kitchen': _wrap(
+          HomeFeatureTile(
+            icon: Icons.assignment,
+            title: loc.t('nomenclature'),
+            onTap: () => context.go('/nomenclature/kitchen'),
+          ),
+          'home-nomenclature-kitchen',
+        ),
+        'owner_messages': _wrap(
+          HomeFeatureTile(
+            icon: Icons.chat_bubble_outline,
+            title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+            onTap: () => context.go('/notifications?tab=messages'),
+          ),
+          'home-messages',
+        ),
+        'owner_employees': _wrap(
+          HomeFeatureTile(
+            icon: Icons.people,
+            title: loc.t('employees'),
+            onTap: () => context.go('/employees'),
+          ),
+          'home-employees',
+        ),
+        'owner_expenses_lite': _wrap(
+          HomeFeatureTile(
+            icon: Icons.payments,
+            title: loc.t('expenses') ?? 'Расходы',
+            onTap: () => context.go('/expenses'),
+          ),
+          'home-expenses-lite',
+        ),
+      };
       return ListView(
         controller: _scrollController,
         padding: const EdgeInsets.all(16),
         children: [
           _SectionTitle(title: loc.t('kitchen')),
-          ownerTile(
-              'owner_schedule_all',
-              _wrap(
-                  HomeFeatureTile(
-                      icon: Icons.calendar_month,
-                      title: loc.t('schedule'),
-                      onTap: () => context.go('/schedule/kitchen')),
-                  'home-schedule-mgmt')),
-          ownerTile(
-              'owner_menu_kitchen',
-              _wrap(
-                  HomeFeatureTile(
-                      icon: Icons.restaurant_menu,
-                      title: loc.t('menu'),
-                      onTap: () => context.go('/menu/kitchen')),
-                  'home-menu-kitchen')),
-          ownerTile(
-              'owner_ttk_kitchen',
-              _wrap(
-                  HomeFeatureTile(
-                      icon: Icons.description,
-                      title: loc.t('ttk_kitchen'),
-                      onTap: () => context.go('/tech-cards/kitchen')),
-                  'home-ttk-kitchen')),
-          ownerTile(
-              'owner_nomenclature_kitchen',
-              _wrap(
-                  HomeFeatureTile(
-                      icon: Icons.assignment,
-                      title: loc.t('nomenclature'),
-                      onTap: () => context.go('/nomenclature/kitchen')),
-                  'home-nomenclature-kitchen')),
-          // Lite: всегда показываем (не через ownerTile — скрытие плиток в настройках не убирает пункт 6 спецификации).
-          _wrap(
-              HomeFeatureTile(
-                  icon: Icons.chat_bubble_outline,
-                  title: loc.t('inbox_tab_messages') ?? 'Сообщения',
-                  onTap: () => context.go('/notifications?tab=messages')),
-              'home-messages'),
-          ownerTile(
-              'owner_employees',
-              _wrap(
-                  HomeFeatureTile(
-                      icon: Icons.people,
-                      title: loc.t('employees'),
-                      onTap: () => context.go('/employees')),
-                  'home-employees')),
-          ownerTile(
-              'owner_expenses_lite',
-              _wrap(
-                  HomeFeatureTile(
-                      icon: Icons.payments,
-                      title: loc.t('expenses') ?? 'Расходы',
-                      onTap: () => context.go('/expenses')),
-                  'home-expenses-lite')),
+          ...liteOrder.map((key) => ownerTile(
+                key,
+                liteTiles[key] ?? const SizedBox.shrink(),
+              )),
         ],
       );
     }

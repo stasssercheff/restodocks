@@ -89,7 +89,7 @@ function promoRowStatus(row: PromoCode): 'disabled' | 'used' | 'expired' | 'free
 
 export default function AdminClient() {
   const router = useRouter()
-  const [tab, setTab] = useState<'establishments' | 'promo' | 'security' | 'health' | 'settings'>('establishments')
+  const [tab, setTab] = useState<'establishments' | 'promo' | 'support' | 'security' | 'health' | 'settings'>('establishments')
 
   async function logout() {
     await fetch('/api/auth', { method: 'DELETE' })
@@ -113,6 +113,7 @@ export default function AdminClient() {
           {([
             { key: 'establishments', label: 'Заведения' },
             { key: 'promo', label: 'Промокоды' },
+            { key: 'support', label: 'Техподдержка' },
             { key: 'security', label: 'Безопасность' },
             { key: 'health', label: 'Нагрузка' },
             { key: 'settings', label: 'Настройки' },
@@ -135,10 +136,124 @@ export default function AdminClient() {
       <main className="max-w-6xl mx-auto px-3 py-4 sm:px-6 sm:py-8">
         {tab === 'establishments' && <EstablishmentsTab />}
         {tab === 'promo' && <PromoTab />}
+        {tab === 'support' && <SupportAccessTab />}
         {tab === 'security' && <SecurityTab />}
         {tab === 'health' && <SystemHealthTab />}
         {tab === 'settings' && <PlatformSettingsTab />}
       </main>
+    </div>
+  )
+}
+
+function SupportAccessTab() {
+  const [supportOperatorLogin, setSupportOperatorLogin] = useState('')
+  const [accountLogin, setAccountLogin] = useState('')
+  const [pinCode, setPinCode] = useState('')
+  const [activeEstablishmentId, setActiveEstablishmentId] = useState<string | null>(null)
+  const [activeEstablishmentName, setActiveEstablishmentName] = useState<string | null>(null)
+  const [logs, setLogs] = useState<Array<{ id: number; support_operator_login: string; account_login: string; started_at: string; ended_at: string | null }>>([])
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function loadLogs(establishmentId: string) {
+    const res = await fetch(`/api/support?establishment_id=${encodeURIComponent(establishmentId)}`)
+    const data = await res.json()
+    if (!res.ok) {
+      setError(typeof data?.error === 'string' ? data.error : 'Ошибка журнала')
+      return
+    }
+    setLogs(Array.isArray(data) ? data : [])
+  }
+
+  async function startSupportSession() {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/support', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          support_operator_login: supportOperatorLogin.trim() || 'admin',
+          account_login: accountLogin.trim().toLowerCase(),
+          pin_code: pinCode.trim().toUpperCase(),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(typeof data?.error === 'string' ? data.error : `Ошибка (${res.status})`)
+        return
+      }
+      const est = data?.establishment
+      setActiveEstablishmentId(est?.id ?? null)
+      setActiveEstablishmentName(est?.name ?? null)
+      if (est?.id) await loadLogs(est.id)
+      alert('Сеанс техподдержки открыт. Владелец увидит неснимаемое уведомление и запись в журнале.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function endSupportSession() {
+    if (!activeEstablishmentId) return
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/support', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ establishment_id: activeEstablishmentId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(typeof data?.error === 'string' ? data.error : `Ошибка (${res.status})`)
+        return
+      }
+      await loadLogs(activeEstablishmentId)
+      alert('Сеанс техподдержки завершён.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4 max-w-3xl">
+      {error && <div className="p-3 rounded-lg border border-red-800 bg-red-950/40 text-red-200 text-sm">{error}</div>}
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 space-y-3">
+        <h2 className="text-sm font-semibold text-white">Доступ техподдержки</h2>
+        <p className="text-xs text-gray-500">
+          Введите логин учётной записи и PIN компании. Доступ откроется только если у заведения включён тумблер в настройках.
+        </p>
+        <div className="grid sm:grid-cols-3 gap-2">
+          <input value={supportOperatorLogin} onChange={e => setSupportOperatorLogin(e.target.value)} placeholder="Логин оператора" className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
+          <input value={accountLogin} onChange={e => setAccountLogin(e.target.value)} placeholder="Логин учётной записи (email)" className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
+          <input value={pinCode} onChange={e => setPinCode(e.target.value.toUpperCase())} placeholder="PIN компании" className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono" />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={startSupportSession} disabled={busy || !accountLogin.trim() || !pinCode.trim()} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-4 py-2 rounded-lg text-sm">
+            Открыть доступ
+          </button>
+          <button onClick={endSupportSession} disabled={busy || !activeEstablishmentId} className="bg-gray-800 border border-gray-700 hover:bg-gray-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm">
+            Закрыть доступ
+          </button>
+        </div>
+      </div>
+
+      {activeEstablishmentId && (
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
+          <div className="text-sm text-gray-300 mb-2">Активное заведение: <span className="text-white">{activeEstablishmentName ?? activeEstablishmentId}</span></div>
+          <div className="space-y-1 text-xs text-gray-400">
+            {logs.map(row => (
+              <div key={row.id} className="flex flex-wrap gap-2 border-b border-gray-800 pb-1">
+                <span>Оператор: {row.support_operator_login}</span>
+                <span>Логин: {row.account_login}</span>
+                <span>Вход: {formatDateTime(row.started_at)}</span>
+                <span>Выход: {row.ended_at ? formatDateTime(row.ended_at) : 'активно'}</span>
+              </div>
+            ))}
+            {logs.length === 0 && <div className="text-gray-600">Записей пока нет</div>}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -78,6 +78,7 @@ class AccountManagerSupabase extends ChangeNotifier {
   Establishment? _establishment;
   Employee? _currentEmployee;
   bool _initialized = false;
+  bool _supportSessionActive = false;
 
   /// Callback вызывается после загрузки профиля — применяет preferred_language к LocalizationService.
   void Function(String languageCode)? onPreferredLanguageLoaded;
@@ -98,6 +99,7 @@ class AccountManagerSupabase extends ChangeNotifier {
   // Геттеры
   Establishment? get establishment => _establishment;
   Employee? get currentEmployee => _currentEmployee;
+  bool get supportSessionActive => _supportSessionActive;
 
   /// Предпочитаемый язык пользователя
   String get preferredLanguage => _currentEmployee?.preferredLanguage ?? 'ru';
@@ -155,6 +157,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
     await _tryRestoreSession();
     if (isLoggedInSync) {
+      await refreshSupportSessionState();
       unawaited(
         _bindRealtimeSync().catchError((Object e, StackTrace st) {
           devLog('🔐 AccountManager: _bindRealtimeSync at init: $e $st');
@@ -169,6 +172,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     await _tryRestoreSession();
     _initialized = true;
     if (isLoggedInSync) {
+      await refreshSupportSessionState();
       unawaited(
         _bindRealtimeSync().catchError((Object e, StackTrace st) {
           devLog('🔐 AccountManager: _bindRealtimeSync at init (retry): $e $st');
@@ -1588,6 +1592,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       await _secureStorage.remove(_keyRememberPassword);
     }
     await syncEstablishmentAccessFromServer();
+    await refreshSupportSessionState();
     if (!isLoggedInSync) {
       return;
     }
@@ -1648,6 +1653,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     _establishment = null;
     _initialized = false;
     _needsCompanyRegistration = false;
+    _supportSessionActive = false;
     if (kIsWeb) {
       clear_hash.clearHashFromUrl();
     }
@@ -2293,6 +2299,7 @@ class AccountManagerSupabase extends ChangeNotifier {
           .limit(1)
           .single();
       _establishment = Establishment.fromJson(estData);
+      await refreshSupportSessionState();
       notifyListeners();
     } catch (e, st) {
       devLog('refreshCurrentEstablishmentFromServer: $e $st');
@@ -2316,6 +2323,57 @@ class AccountManagerSupabase extends ChangeNotifier {
     );
     await refreshCurrentEstablishmentFromServer();
     await syncEstablishmentAccessFromServer();
+  }
+
+  /// Проверить, есть ли активный сеанс техподдержки по текущему заведению.
+  Future<void> refreshSupportSessionState() async {
+    final estId = _establishment?.id;
+    final emp = _currentEmployee;
+    if (estId == null || emp == null || !emp.hasRole('owner')) {
+      _supportSessionActive = false;
+      return;
+    }
+    try {
+      final rows = await _supabase.client
+          .from('support_access_audit_log')
+          .select('id')
+          .eq('establishment_id', estId)
+          .isFilter('ended_at', null)
+          .order('started_at', ascending: false)
+          .limit(1);
+      final next = rows is List && rows.isNotEmpty;
+      if (next != _supportSessionActive) {
+        _supportSessionActive = next;
+        notifyListeners();
+      }
+    } catch (_) {
+      // На старой БД таблицы может не быть — не ломаем UI.
+      _supportSessionActive = false;
+    }
+  }
+
+  /// Журнал входов/выходов системной поддержки для собственника.
+  Future<List<Map<String, dynamic>>> loadSupportAccessAuditLog({
+    int limit = 100,
+  }) async {
+    final estId = _establishment?.id;
+    final emp = _currentEmployee;
+    if (estId == null || emp == null || !emp.hasRole('owner')) return const [];
+    try {
+      final rows = await _supabase.client
+          .from('support_access_audit_log')
+          .select(
+              'id, support_operator_login, account_login, started_at, ended_at')
+          .eq('establishment_id', estId)
+          .order('started_at', ascending: false)
+          .limit(limit);
+      if (rows is! List) return const [];
+      return rows
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
   }
 }
 

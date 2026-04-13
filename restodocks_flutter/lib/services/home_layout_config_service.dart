@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _keyPrefix = 'restodocks_home_layout_';
 const _hiddenKeyPrefix = 'restodocks_home_hidden_';
+const _ownerLiteOrderPrefix = 'restodocks_owner_lite_home_order_';
 
 /// Идентификаторы плиток на домашнем экране (для сотрудника)
 enum HomeTileId {
@@ -45,6 +46,8 @@ class HomeLayoutConfigService extends ChangeNotifier {
   final Map<String, List<String>> _cache = {};
   /// employeeId → скрытые tile IDs
   final Map<String, List<String>> _hiddenCache = {};
+  /// employeeId → порядок кнопок домашнего экрана владельца в Lite (owner_* keys)
+  final Map<String, List<String>> _ownerLiteOrderCache = {};
 
   List<HomeTileId> getOrder(String? employeeId) {
     if (employeeId == null || employeeId.isEmpty)
@@ -102,7 +105,38 @@ class HomeLayoutConfigService extends ChangeNotifier {
       if (hidden != null) {
         _hiddenCache[employeeId] = hidden;
       }
+      final ownerLiteOrder =
+          prefs.getStringList('$_ownerLiteOrderPrefix$employeeId');
+      if (ownerLiteOrder != null) {
+        _ownerLiteOrderCache[employeeId] = ownerLiteOrder;
+      }
       notifyListeners();
+    } catch (_) {}
+  }
+
+  List<String> getOwnerLiteOrder(String? employeeId, List<String> defaults) {
+    if (employeeId == null || employeeId.isEmpty) {
+      return List<String>.from(defaults);
+    }
+    final saved = _ownerLiteOrderCache[employeeId];
+    if (saved == null || saved.isEmpty) return List<String>.from(defaults);
+    final ordered = saved.where(defaults.contains).toList(growable: true);
+    for (final key in defaults) {
+      if (!ordered.contains(key)) ordered.add(key);
+    }
+    return ordered;
+  }
+
+  Future<void> setOwnerLiteOrder(String? employeeId, List<String> order) async {
+    if (employeeId == null || employeeId.isEmpty) return;
+    _ownerLiteOrderCache[employeeId] = List<String>.from(order);
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(
+        '$_ownerLiteOrderPrefix$employeeId',
+        _ownerLiteOrderCache[employeeId]!,
+      );
     } catch (_) {}
   }
 }

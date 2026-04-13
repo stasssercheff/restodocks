@@ -53,6 +53,7 @@ class _AppShellState extends State<AppShell> {
   double _lastScrollPixels = 0;
   String? _lastPath;
   bool _pwaHintQueued = false;
+  Timer? _supportPollTimer;
 
   bool _landscapeNarrowPhone(BuildContext context) {
     final mq = MediaQuery.of(context);
@@ -79,6 +80,28 @@ class _AppShellState extends State<AppShell> {
       }
     }
     _queuePwaHintIfNeeded();
+    _ensureSupportPolling();
+  }
+
+  @override
+  void dispose() {
+    _supportPollTimer?.cancel();
+    super.dispose();
+  }
+
+  void _ensureSupportPolling() {
+    final account = context.read<AccountManagerSupabase>();
+    final isOwner = account.currentEmployee?.hasRole('owner') ?? false;
+    if (!isOwner) {
+      _supportPollTimer?.cancel();
+      _supportPollTimer = null;
+      return;
+    }
+    _supportPollTimer ??=
+        Timer.periodic(const Duration(seconds: 30), (_) async {
+      if (!mounted) return;
+      await account.refreshSupportSessionState();
+    });
   }
 
   void _queuePwaHintIfNeeded() {
@@ -323,6 +346,7 @@ class _AppShellState extends State<AppShell> {
     final bodyChild = showAccessPendingStub
         ? _AccessPendingPlaceholder(loc: loc)
         : widget.child;
+    final supportActive = accountManager.supportSessionActive;
     final mq = MediaQuery.of(context);
     // Совпадает с main.dart: веб в альбоме — сброс боков; нативно — только без выреза
     // (иначе сохраняем горизонтальный safe area под камеру / Dynamic Island).
@@ -363,6 +387,37 @@ class _AppShellState extends State<AppShell> {
               onNotification: _onScroll,
               child: bodyChild,
             ),
+            if (supportActive)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Material(
+                  color: Colors.amber.shade900.withValues(alpha: 0.95),
+                  elevation: 4,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.support_agent,
+                              color: Colors.white, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Сейчас у системной техподдержки есть активный доступ к вашему заведению.',
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             if (webLandscapeChromeDrag)
               Positioned(
                 left: 0,
