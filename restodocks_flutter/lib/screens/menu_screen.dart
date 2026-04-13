@@ -1229,13 +1229,16 @@ class _MenuScreenState extends State<MenuScreen> {
     if (showAppBarBottom) {
       // В альбоме на телефоне — минимальные отступы под сегменты (без «полосы» под шапкой).
       var h = isPhoneLandscape ? 2.0 : 8.0;
-      if (showTopFoodcostSwitch) h += isPhoneLandscape ? 42.0 : 52.0;
+      if (showTopFoodcostSwitch) {
+        h += isPhoneLandscape ? 42.0 : 52.0;
+        if (!isPhoneLandscape) h += 2; // запас под увеличенный отступ от красной шапки
+      }
       if (hallChips) h += isPhoneLandscape ? 38.0 : 48.0;
       bottomHeight = h;
     }
     final appBarBottomOuterPad = isPhoneLandscape
-        ? const EdgeInsets.fromLTRB(12, 0, 12, 4)
-        : const EdgeInsets.fromLTRB(16, 6, 16, 8);
+        ? const EdgeInsets.fromLTRB(12, 2, 12, 4)
+        : const EdgeInsets.fromLTRB(16, 8, 16, 8);
     final appBarBottomSegPad = isPhoneLandscape
         ? const EdgeInsets.only(top: 2, bottom: 2)
         : const EdgeInsets.only(top: 8, bottom: 4);
