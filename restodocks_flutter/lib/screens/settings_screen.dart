@@ -1836,6 +1836,145 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  Future<bool> _confirmSupportAccessEnableWithPin(
+    BuildContext context,
+    LocalizationService loc,
+    Establishment establishment,
+  ) async {
+    final pinController = TextEditingController();
+    final pinKey = GlobalKey<FormState>();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('company_pin') ?? 'PIN компании'),
+        content: Form(
+          key: pinKey,
+          child: TextFormField(
+            controller: pinController,
+            autofocus: true,
+            obscureText: true,
+            textInputAction: TextInputAction.done,
+            decoration: InputDecoration(
+              labelText: loc.t('company_pin') ?? 'PIN компании',
+              hintText: loc.t('enter_company_pin') ?? 'Введите PIN компании',
+            ),
+            validator: (v) {
+              final value = (v ?? '').trim();
+              if (value.isEmpty) {
+                return loc.t('company_pin_required') ?? 'PIN обязателен';
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (!(pinKey.currentState?.validate() ?? false)) return;
+              final pin = pinController.text.trim();
+              if (!establishment.verifyPinCode(pin)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(loc.t('clear_nomenclature_wrong_pin') ??
+                        'Неверный PIN'),
+                  ),
+                );
+                return;
+              }
+              Navigator.of(ctx).pop(true);
+            },
+            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+          ),
+        ],
+      ),
+    );
+    pinController.dispose();
+    return ok ?? false;
+  }
+
+  Widget _buildSupportAccessOwnerSection(LocalizationService localization) {
+    return Consumer<AccountManagerSupabase>(
+      builder: (context, account, _) {
+        final est = account.establishment;
+        if (est == null) return const SizedBox.shrink();
+        return Column(
+          children: [
+            SwitchListTile(
+              secondary: const Icon(Icons.support_agent_outlined),
+              title: Text(localization.t('support_access_toggle_title')),
+              subtitle: Text(localization.t('support_access_toggle_hint')),
+              value: est.supportAccessEnabled,
+              onChanged: (v) async {
+                try {
+                  if (v && !est.supportAccessEnabled) {
+                    final pinOk = await _confirmSupportAccessEnableWithPin(
+                      context,
+                      localization,
+                      est,
+                    );
+                    if (!pinOk) return;
+                  }
+                  await account.updateEstablishmentSupportAccess(
+                    establishmentId: est.id,
+                    enabled: v,
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        localization
+                            .t('error_with_message')
+                            .replaceAll('%s', e.toString()),
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: account.loadSupportAccessAuditLog(limit: 20),
+              builder: (context, snapshot) {
+                final rows = snapshot.data ?? const [];
+                if (rows.isEmpty) {
+                  return const ListTile(
+                    dense: true,
+                    leading: SizedBox(width: 24),
+                    title: Text(
+                      'Журнал техподдержки пуст',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  );
+                }
+                return ExpansionTile(
+                  leading: const SizedBox(width: 24),
+                  title: const Text('Журнал входов техподдержки'),
+                  children: rows.map((row) {
+                    return ListTile(
+                      dense: true,
+                      title: Text(
+                        '${row['support_operator_login'] ?? 'support'} · ${row['account_login'] ?? '—'}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      subtitle: Text(
+                        '${row['event_type'] ?? 'event'}: ${row['created_at'] ?? '—'}',
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final accountManager = context.watch<AccountManagerSupabase>();
@@ -1995,77 +2134,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                 ],
-                if (currentEmployee.hasRole('owner'))
-                  Consumer<AccountManagerSupabase>(
-                    builder: (context, account, _) {
-                      final est = account.establishment;
-                      if (est == null) return const SizedBox.shrink();
-                      return Column(
-                        children: [
-                          SwitchListTile(
-                            secondary: const Icon(Icons.support_agent_outlined),
-                            title: Text(
-                                localization.t('support_access_toggle_title')),
-                            subtitle:
-                                Text(localization.t('support_access_toggle_hint')),
-                            value: est.supportAccessEnabled,
-                            onChanged: (v) async {
-                              try {
-                                await account.updateEstablishmentSupportAccess(
-                                  establishmentId: est.id,
-                                  enabled: v,
-                                );
-                              } catch (e) {
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      localization
-                                          .t('error_with_message')
-                                          .replaceAll('%s', e.toString()),
-                                    ),
-                                  ),
-                                );
-                              }
-                            },
-                          ),
-                          FutureBuilder<List<Map<String, dynamic>>>(
-                            future: account.loadSupportAccessAuditLog(limit: 20),
-                            builder: (context, snapshot) {
-                              final rows = snapshot.data ?? const [];
-                              if (rows.isEmpty) {
-                                return const ListTile(
-                                  dense: true,
-                                  leading: SizedBox(width: 24),
-                                  title: Text(
-                                    'Журнал техподдержки пуст',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                );
-                              }
-                              return ExpansionTile(
-                                leading: const SizedBox(width: 24),
-                                title: const Text('Журнал входов техподдержки'),
-                                children: rows.map((row) {
-                                  return ListTile(
-                                    dense: true,
-                                    title: Text(
-                                      '${row['support_operator_login'] ?? 'support'} · ${row['account_login'] ?? '—'}',
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                    subtitle: Text(
-                                      '${row['event_type'] ?? 'event'}: ${row['created_at'] ?? '—'}',
-                                      style: const TextStyle(fontSize: 11),
-                                    ),
-                                  );
-                                }).toList(),
-                              );
-                            },
-                          ),
-                        ],
-                      );
-                    },
-                  ),
               ],
             ),
             if (FeatureFlags.posModuleEnabled &&
@@ -2454,6 +2522,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showSupportEmailForm(context, localization),
             ),
+            if (currentEmployee.hasRole('owner'))
+              _buildSupportAccessOwnerSection(localization),
             ListTile(
               leading: const Icon(Icons.gavel_outlined),
               title: Text(localization.t('public_offer')),

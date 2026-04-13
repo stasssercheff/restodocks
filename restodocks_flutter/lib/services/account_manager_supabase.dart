@@ -79,6 +79,26 @@ class AccountManagerSupabase extends ChangeNotifier {
   Employee? _currentEmployee;
   bool _initialized = false;
   bool _supportSessionActive = false;
+  bool _supportAccessTablesUnavailable = false;
+  bool _checkEstablishmentAccessRpcUnavailable = false;
+
+  bool _looksLikeMissingSupportAccessSchema(PostgrestException e) {
+    final msg = '${e.message} ${e.details} ${e.hint}'.toLowerCase();
+    return e.code == '42P01' ||
+        msg.contains('support_access_audit_log') ||
+        msg.contains('support_access_event_log') ||
+        msg.contains('could not find the table') ||
+        (msg.contains('relation') && msg.contains('does not exist'));
+  }
+
+  bool _looksLikeMissingCheckAccessRpc(PostgrestException e) {
+    final msg = '${e.message} ${e.details} ${e.hint}'.toLowerCase();
+    return e.code == 'PGRST202' ||
+        (msg.contains('check_establishment_access') &&
+            (msg.contains('does not exist') ||
+                msg.contains('schema cache') ||
+                msg.contains('no function matches')));
+  }
 
   /// Callback вызывается после загрузки профиля — применяет preferred_language к LocalizationService.
   void Function(String languageCode)? onPreferredLanguageLoaded;
@@ -273,6 +293,10 @@ class AccountManagerSupabase extends ChangeNotifier {
   }
 
   Future<void> _runSyncEstablishmentAccess(String estId) async {
+    if (_checkEstablishmentAccessRpcUnavailable) {
+      await refreshCurrentEstablishmentFromServer();
+      return;
+    }
     try {
       final result = await _supabase.client.rpc(
         'check_establishment_access',
@@ -285,6 +309,15 @@ class AccountManagerSupabase extends ChangeNotifier {
       await refreshCurrentEstablishmentFromServer();
     } catch (e, st) {
       if (e is PostgrestException) {
+        if (_looksLikeMissingCheckAccessRpc(e)) {
+          _checkEstablishmentAccessRpcUnavailable = true;
+          devLog(
+            '🔐 AccountManager: check_establishment_access unavailable; '
+            'fallback to refreshCurrentEstablishmentFromServer only',
+          );
+          await refreshCurrentEstablishmentFromServer();
+          return;
+        }
         devLog(
           '🔐 AccountManager: syncEstablishmentAccessFromServer PostgREST '
           'code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}',
@@ -625,9 +658,9 @@ class AccountManagerSupabase extends ChangeNotifier {
       );
     } on PostgrestException catch (e) {
       // PGRST202: RPC ещё не задеплоен в БД (миграция не применена) — не блокируем экспорт/импорт.
-      if (e.code == 'PGRST202') {
+      if (e.code == 'PGRST202' || _looksLikeMissingCheckAccessRpc(e)) {
         devLog(
-          'trial_increment_usage: RPC отсутствует в схеме (PGRST202), пропускаем учёт триала',
+          'trial_increment_usage: RPC/check_establishment_access unavailable, skip trial usage increment',
         );
         return;
       }
@@ -2355,6 +2388,10 @@ class AccountManagerSupabase extends ChangeNotifier {
       _supportSessionActive = false;
       return;
     }
+    if (_supportAccessTablesUnavailable) {
+      _supportSessionActive = false;
+      return;
+    }
     try {
       final rows = await _supabase.client
           .from('support_access_audit_log')
@@ -2368,8 +2405,13 @@ class AccountManagerSupabase extends ChangeNotifier {
         _supportSessionActive = next;
         notifyListeners();
       }
-    } catch (_) {
+    } on PostgrestException catch (e) {
+      if (_looksLikeMissingSupportAccessSchema(e)) {
+        _supportAccessTablesUnavailable = true;
+      }
       // На старой БД таблицы может не быть — не ломаем UI.
+      _supportSessionActive = false;
+    } catch (_) {
       _supportSessionActive = false;
     }
   }
@@ -2381,6 +2423,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     final estId = _establishment?.id;
     final emp = _currentEmployee;
     if (estId == null || emp == null || !emp.hasRole('owner')) return const [];
+    if (_supportAccessTablesUnavailable) return const [];
     try {
       final rows = await _supabase.client
           .from('support_access_event_log')
@@ -2393,6 +2436,11 @@ class AccountManagerSupabase extends ChangeNotifier {
       return rows
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList(growable: false);
+    } on PostgrestException catch (e) {
+      if (_looksLikeMissingSupportAccessSchema(e)) {
+        _supportAccessTablesUnavailable = true;
+      }
+      return const [];
     } catch (_) {
       return const [];
     }
