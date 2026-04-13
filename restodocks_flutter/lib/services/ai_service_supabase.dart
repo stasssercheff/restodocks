@@ -572,8 +572,9 @@ class AiServiceSupabase implements AiService {
     if (establishmentId != null && establishmentId.isNotEmpty) {
       body['establishmentId'] = establishmentId;
     }
-    final data = await invoke('ai-create-tech-card', body);
-    if (data == null) return null;
+    final res = await _client.functions.invoke('ai-create-tech-card', body: body);
+    final data = res.data;
+    if (data is! Map<String, dynamic>) return null;
     final err = data['error'] as String? ?? data['reason'] as String?;
     if (err != null && err.trim().isNotEmpty) {
       lastCreateTechCardReason = err;
@@ -582,6 +583,21 @@ class AiServiceSupabase implements AiService {
     final cardRaw = data['card'];
     if (cardRaw is! Map) return null;
     return _parseTechCardResult(Map<String, dynamic>.from(cardRaw));
+  }
+
+  double? _toDouble(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString().replaceAll(',', '.'));
+  }
+
+  bool? _toBool(dynamic v) {
+    if (v == null) return null;
+    if (v is bool) return v;
+    final s = v.toString().trim().toLowerCase();
+    if (s == 'true' || s == '1' || s == 'yes') return true;
+    if (s == 'false' || s == '0' || s == 'no') return false;
+    return null;
   }
 
   /// Строки для обучения при свободном формате (каждая строка — одна ячейка).
@@ -4213,15 +4229,15 @@ class AiServiceSupabase implements AiService {
         final it = (m['ingredientType'] as String?)?.toLowerCase();
         ingredients.add(TechCardIngredientLine(
           productName: (m['productName'] as String?) ?? '',
-          grossGrams: m['grossGrams'] != null ? (m['grossGrams'] as num).toDouble() : null,
-          netGrams: m['netGrams'] != null ? (m['netGrams'] as num).toDouble() : null,
-          outputGrams: m['outputGrams'] != null ? (m['outputGrams'] as num).toDouble() : null,
+          grossGrams: _toDouble(m['grossGrams']),
+          netGrams: _toDouble(m['netGrams']),
+          outputGrams: _toDouble(m['outputGrams']),
           unit: m['unit'] as String?,
           cookingMethod: m['cookingMethod'] as String?,
-          primaryWastePct: m['primaryWastePct'] != null ? (m['primaryWastePct'] as num).toDouble() : null,
-          cookingLossPct: m['cookingLossPct'] != null ? (m['cookingLossPct'] as num).toDouble() : null,
+          primaryWastePct: _toDouble(m['primaryWastePct']),
+          cookingLossPct: _toDouble(m['cookingLossPct']),
           ingredientType: (it == 'product' || it == 'semi_finished') ? it : null,
-          pricePerKg: m['pricePerKg'] != null ? (m['pricePerKg'] as num).toDouble() : null,
+          pricePerKg: _toDouble(m['pricePerKg']),
         ));
       }
     }
@@ -4229,8 +4245,8 @@ class AiServiceSupabase implements AiService {
       dishName: data['dishName'] as String?,
       technologyText: data['technologyText'] as String?,
       ingredients: ingredients,
-      isSemiFinished: data['isSemiFinished'] as bool?,
-      yieldGrams: data['yieldGrams'] != null ? (data['yieldGrams'] as num).toDouble() : null,
+      isSemiFinished: _toBool(data['isSemiFinished']),
+      yieldGrams: _toDouble(data['yieldGrams']),
     );
   }
 
