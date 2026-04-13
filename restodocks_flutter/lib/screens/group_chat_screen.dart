@@ -341,6 +341,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                                 isMe: isMe,
                                 senderName: isMe ? null : senderName,
                                 theme: theme,
+                                textOnlyViewer: liteChatTextOnly,
                               ),
                             );
                           },
@@ -474,12 +475,16 @@ class _GroupMessageBubble extends StatefulWidget {
     required this.isMe,
     required this.senderName,
     required this.theme,
+    this.textOnlyViewer = false,
   });
 
   final ChatRoomMessage message;
   final bool isMe;
   final String? senderName;
   final ThemeData theme;
+
+  /// Lite: не показывать фото (только текст).
+  final bool textOnlyViewer;
 
   @override
   State<_GroupMessageBubble> createState() => _GroupMessageBubbleState();
@@ -535,7 +540,9 @@ class _GroupMessageBubbleState extends State<_GroupMessageBubble> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     final content = _translatedContent ?? widget.message.content;
+    final lite = widget.textOnlyViewer;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -568,7 +575,7 @@ class _GroupMessageBubbleState extends State<_GroupMessageBubble> {
                 ),
               ),
             ),
-          if (widget.message.hasImage)
+          if (!lite && widget.message.hasImage)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: GestureDetector(
@@ -583,6 +590,20 @@ class _GroupMessageBubbleState extends State<_GroupMessageBubble> {
                     loadingBuilder: (_, child, progress) =>
                         progress == null ? child : const SizedBox(width: 200, height: 200, child: Center(child: CircularProgressIndicator())),
                     errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 48),
+                  ),
+                ),
+              ),
+            ),
+          if (lite && widget.message.hasImage && content.trim().isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  loc.t('lite_chat_rich_not_shown'),
+                  style: widget.theme.textTheme.bodySmall?.copyWith(
+                    color: widget.theme.colorScheme.onSurfaceVariant,
+                    fontStyle: FontStyle.italic,
                   ),
                 ),
               ),

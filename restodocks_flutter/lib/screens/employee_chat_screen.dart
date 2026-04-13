@@ -486,6 +486,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                               message: msg,
                               isMe: isMe,
                               theme: theme,
+                              textOnlyViewer: liteChatTextOnly,
                             ),
                           );
                         },
@@ -684,11 +685,15 @@ class _ChatMessageBubble extends StatefulWidget {
     required this.message,
     required this.isMe,
     required this.theme,
+    this.textOnlyViewer = false,
   });
 
   final EmployeeDirectMessage message;
   final bool isMe;
   final ThemeData theme;
+
+  /// Lite: не показывать фото, голос и системные ссылки (только текст).
+  final bool textOnlyViewer;
 
   @override
   State<_ChatMessageBubble> createState() => _ChatMessageBubbleState();
@@ -744,7 +749,12 @@ class _ChatMessageBubbleState extends State<_ChatMessageBubble> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     final content = _translatedContent ?? widget.message.content;
+    final lite = widget.textOnlyViewer;
+    final hasRich = widget.message.hasImage ||
+        widget.message.hasAudio ||
+        widget.message.hasSystemLinks;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -763,7 +773,7 @@ class _ChatMessageBubbleState extends State<_ChatMessageBubble> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (widget.message.hasImage)
+          if (!lite && widget.message.hasImage)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: GestureDetector(
@@ -782,7 +792,7 @@ class _ChatMessageBubbleState extends State<_ChatMessageBubble> {
                 ),
               ),
             ),
-          if (widget.message.hasAudio)
+          if (!lite && widget.message.hasAudio)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Align(
@@ -793,7 +803,7 @@ class _ChatMessageBubbleState extends State<_ChatMessageBubble> {
                 ),
               ),
             ),
-          if (widget.message.hasSystemLinks)
+          if (!lite && widget.message.hasSystemLinks)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: Align(
@@ -818,6 +828,20 @@ class _ChatMessageBubbleState extends State<_ChatMessageBubble> {
                         },
                       ),
                   ],
+                ),
+              ),
+            ),
+          if (lite && hasRich && content.trim().isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  loc.t('lite_chat_rich_not_shown'),
+                  style: widget.theme.textTheme.bodySmall?.copyWith(
+                    color: widget.theme.colorScheme.onSurfaceVariant,
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
               ),
             ),
