@@ -3535,10 +3535,10 @@ class _InventoryScreenState extends State<InventoryScreen>
     saveNow();
     if (!offerSaveAsTemplate || !_canManageSelectiveTemplates) return true;
 
-    final account = context.read<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
-    if (estId == null) return true;
-    final templates = await _loadSelectiveTemplatesFromServer(estId);
+    final accountForTemplates = context.read<AccountManagerSupabase>();
+    final estIdForTemplates = accountForTemplates.establishment?.id;
+    if (estIdForTemplates == null) return true;
+    final templates = await _loadSelectiveTemplatesFromServer(estIdForTemplates);
     if (!mounted) return true;
     if (templates.length >= 10) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -3550,7 +3550,7 @@ class _InventoryScreenState extends State<InventoryScreen>
         defaultName: 'Выборочная ${templates.length + 1}');
     if (!mounted || name == null || name.trim().isEmpty) return true;
     await _saveSelectiveTemplate(
-      establishmentId: estId,
+      establishmentId: estIdForTemplates,
       name: name.trim(),
       selectedProductIds: result.p,
       selectedTechCardIds: result.tc,
