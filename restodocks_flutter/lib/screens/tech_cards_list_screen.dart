@@ -378,7 +378,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowTtkTour());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || kIsWeb) return;
-      TechCardServiceSupabase().persistentTechCardsCacheGeneration
+      TechCardServiceSupabase()
+          .persistentTechCardsCacheGeneration
           .addListener(_onPersistentTechCardsOfflineCacheBump);
     });
     _scheduleTtkBootstrapAfterRoute();
@@ -467,7 +468,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final est = acc.establishment;
     if (est != null) {
       final svc = context.read<TechCardServiceSupabase>();
-      await svc.clearTechCardsListCacheForEstablishment(est.dataEstablishmentId);
+      await svc
+          .clearTechCardsListCacheForEstablishment(est.dataEstablishmentId);
       if (est.isBranch) {
         await svc.clearTechCardsListCacheForEstablishment(est.id);
       }
@@ -728,7 +730,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   @override
   void dispose() {
     if (!kIsWeb) {
-      TechCardServiceSupabase().persistentTechCardsCacheGeneration
+      TechCardServiceSupabase()
+          .persistentTechCardsCacheGeneration
           .removeListener(_onPersistentTechCardsOfflineCacheBump);
     }
     _detachTtkRouteListener();
@@ -2346,8 +2349,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     if (!mounted || requestToken != _loadRequestToken) return;
     final prep = _prepareTechCardListFromRaw(est, merged, customBarIds);
     _priceProductStore = productStore;
-    _priceEstablishmentId =
-        est.isBranch ? est.id : est.dataEstablishmentId;
+    _priceEstablishmentId = est.isBranch ? est.id : est.dataEstablishmentId;
     setState(() {
       _list = prep.list;
       _listVersion++;
@@ -2356,8 +2358,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       _lastReviewCacheKey = null;
       _loading = false;
       _error = null;
-      _listDetailsHydrating =
-          primeCatalogAndPrices && prep.list.isNotEmpty;
+      _listDetailsHydrating = primeCatalogAndPrices && prep.list.isNotEmpty;
     });
     _techCardsById = {for (final tc in prep.processedAll) tc.id: tc};
     _resolvedCostMemo.clear();
@@ -2433,8 +2434,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               await productStore.loadProducts().catchError((_) {});
               if (est.isBranch) {
                 await productStore
-                    .loadNomenclatureForBranch(
-                        est.id, est.dataEstablishmentId!)
+                    .loadNomenclatureForBranch(est.id, est.dataEstablishmentId!)
                     .catchError((_) {});
               } else {
                 await productStore
@@ -2468,13 +2468,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             scopeIds,
             pageSize: 90,
             onProgress: (merged) => _applyPagedTtkListProgress(
-                  est: est,
-                  merged: merged,
-                  customBarIds: customBarIds,
-                  productStore: productStore,
-                  primeCatalogAndPrices: primeCatalogAndPrices,
-                  requestToken: requestToken,
-                ),
+              est: est,
+              merged: merged,
+              customBarIds: customBarIds,
+              productStore: productStore,
+              primeCatalogAndPrices: primeCatalogAndPrices,
+              requestToken: requestToken,
+            ),
           );
         }
       } else {
@@ -3272,7 +3272,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   }
 
   Future<void> _createFromText(
-      BuildContext context, LocalizationService loc) async {
+    BuildContext context,
+    LocalizationService loc, {
+    bool allowPromptFallback = false,
+  }) async {
     final acc = context.read<AccountManagerSupabase>();
     if (!acc.hasProSubscription) {
       await showSubscriptionRequiredDialog(context);
@@ -3290,22 +3293,26 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocalState) => AlertDialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
           title: Text(loc.t('ttk_import_text') ?? 'Вставить из текста'),
-          content: SizedBox(
-            width: 420,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: controller,
-                  maxLines: 12,
-                  decoration: InputDecoration(
-                    hintText:
-                        'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
-                    border: const OutlineInputBorder(),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: 420,
+              maxHeight: MediaQuery.of(ctx).size.height * 0.55,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    maxLines: 10,
+                    decoration: InputDecoration(
+                      hintText:
+                          'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
+                      border: const OutlineInputBorder(),
+                    ),
                   ),
-                ),
-                if (sttSupported) ...[
                   const SizedBox(height: 8),
                   Align(
                     alignment: Alignment.centerLeft,
@@ -3313,13 +3320,24 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       onPressed: sttBusy
                           ? null
                           : () async {
+                              if (!sttSupported) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Голосовой ввод недоступен в этом браузере. Попробуйте IPA или другой браузер.',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
                               setLocalState(() => sttBusy = true);
                               try {
                                 final spoken = await speechToTextListenOnce(
                                   languageCode: loc.currentLanguageCode,
                                 );
                                 if (!ctx.mounted) return;
-                                if (spoken != null && spoken.trim().isNotEmpty) {
+                                if (spoken != null &&
+                                    spoken.trim().isNotEmpty) {
                                   final current = controller.text.trim();
                                   controller.text = current.isEmpty
                                       ? spoken.trim()
@@ -3328,7 +3346,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                   ScaffoldMessenger.of(ctx).showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        loc.t('speech_not_recognized').trim().isEmpty
+                                        loc
+                                                .t('speech_not_recognized')
+                                                .trim()
+                                                .isEmpty
                                             ? 'Речь не распознана'
                                             : loc.t('speech_not_recognized'),
                                       ),
@@ -3354,7 +3375,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     ),
                   ),
                 ],
-              ],
+              ),
             ),
           ),
           actions: [
@@ -3381,6 +3402,30 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           .parseTechCardsFromText(result, establishmentId: establishmentId);
       if (!mounted) return;
       if (list.isEmpty) {
+        if (allowPromptFallback) {
+          final prompt = result.trim();
+          final firstLine = prompt.split('\n').first.trim();
+          final fallback = TechCardRecognitionResult(
+            dishName: firstLine.isEmpty ? prompt : firstLine,
+            technologyText: prompt,
+            ingredients: const [],
+            isSemiFinished: false,
+          );
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'ИИ не смог извлечь структуру автоматически. Открыт черновик ТТК с вашим запросом.',
+              ),
+            ),
+          );
+          context.push(
+            widget.department == 'bar'
+                ? '/tech-cards/new?department=bar'
+                : '/tech-cards/new',
+            extra: fallback,
+          );
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(loc.t('ai_tech_card_excel_format_hint') ??
@@ -3502,16 +3547,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       final hasMeta = sig != null && sig.isNotEmpty;
       if (list.length == 1) {
         context.push(
-          widget.department == 'bar'
-              ? '/tech-cards/new?department=bar'
-              : '/tech-cards/new',
-          extra: hasMeta || sourceRows != null
-              ? {
-                  'result': list.single,
-                  'headerSignature': sig,
-                  'sourceRows': sourceRows,
-                }
-              : list.single);
+            widget.department == 'bar'
+                ? '/tech-cards/new?department=bar'
+                : '/tech-cards/new',
+            extra: hasMeta || sourceRows != null
+                ? {
+                    'result': list.single,
+                    'headerSignature': sig,
+                    'sourceRows': sourceRows,
+                  }
+                : list.single);
       } else {
         context.push(
           '/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}',
@@ -3810,31 +3855,48 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   Future<void> _onTapCreateTechCard(LocalizationService loc) async {
     if (_loading) return;
+    String tWithFallback(String key, String fallback) {
+      final v = loc.t(key);
+      if (v.trim().isEmpty || v == key) return fallback;
+      return v;
+    }
+
     final action = await showModalBottomSheet<String>(
       context: context,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.edit_note),
-              title: Text(loc.t('create_tech_card')),
-              subtitle: Text(loc.t('ttk_create_manual_hint').trim().isEmpty
-                  ? 'Заполнить ТТК вручную'
-                  : loc.t('ttk_create_manual_hint')),
-              onTap: () => Navigator.of(ctx).pop('manual'),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Card(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.edit_note),
+                    title: Text(loc.t('create_tech_card')),
+                    subtitle: Text(tWithFallback(
+                      'ttk_create_manual_hint',
+                      'Fill tech card manually',
+                    )),
+                    onTap: () => Navigator.of(ctx).pop('manual'),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.auto_awesome),
+                    title: Text(
+                      tWithFallback('create_with_ai', 'Create with AI'),
+                    ),
+                    subtitle: Text(tWithFallback(
+                      'ttk_create_ai_hint',
+                      'Describe a dish and AI will fill the card',
+                    )),
+                    onTap: () => Navigator.of(ctx).pop('ai'),
+                  ),
+                ],
+              ),
             ),
-            ListTile(
-              leading: const Icon(Icons.auto_awesome),
-              title: Text(loc.t('create_with_ai').trim().isEmpty
-                  ? 'Создать с ИИ'
-                  : loc.t('create_with_ai')),
-              subtitle: Text(loc.t('ttk_create_ai_hint').trim().isEmpty
-                  ? 'Опишите блюдо текстом, ИИ заполнит ТТК'
-                  : loc.t('ttk_create_ai_hint')),
-              onTap: () => Navigator.of(ctx).pop('ai'),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -3844,7 +3906,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       return;
     }
     if (action == 'ai') {
-      await _createFromText(context, loc);
+      await _createFromText(context, loc, allowPromptFallback: true);
     }
   }
 
