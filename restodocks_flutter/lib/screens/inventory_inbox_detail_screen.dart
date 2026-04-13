@@ -266,6 +266,29 @@ class _InventoryInboxDetailScreenState
     }
 
     try {
+      final account = context.read<AccountManagerSupabase>();
+      final estTrial = account.establishment;
+      if (estTrial != null && account.isTrialOnlyWithoutPaid) {
+        try {
+          await account.trialIncrementDeviceSaveOrThrow(
+            establishmentId: estTrial.id,
+            docKind: TrialDeviceSaveKinds.inventory,
+          );
+        } catch (e) {
+          if (e.toString().contains('TRIAL_DEVICE_SAVE_CAP')) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                      'В первые 72 часа можно сохранить не более 3 документов этого типа.'),
+                ),
+              );
+            }
+            return;
+          }
+          rethrow;
+        }
+      }
       var maxCols = 0;
       for (var i = 0; i < rows.length; i++) {
         final r = rows[i] as Map<String, dynamic>;

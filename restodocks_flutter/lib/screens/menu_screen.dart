@@ -434,6 +434,14 @@ class _MenuScreenState extends State<MenuScreen> {
     final list = _downloadableDishes;
     if (list.isEmpty) return;
     try {
+      final account = context.read<AccountManagerSupabase>();
+      final estObj = account.establishment;
+      if (estObj != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: estObj.id,
+          docKind: TrialDeviceSaveKinds.menu,
+        );
+      }
       final sym = context
               .read<AccountManagerSupabase>()
               .establishment
@@ -459,6 +467,14 @@ class _MenuScreenState extends State<MenuScreen> {
     final list = _downloadableDishes;
     if (list.isEmpty) return;
     try {
+      final account = context.read<AccountManagerSupabase>();
+      final estObj = account.establishment;
+      if (estObj != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: estObj.id,
+          docKind: TrialDeviceSaveKinds.menu,
+        );
+      }
       final sym = context
               .read<AccountManagerSupabase>()
               .establishment
@@ -491,6 +507,14 @@ class _MenuScreenState extends State<MenuScreen> {
   Future<void> _downloadDish(TechCard tc) async {
     final loc = context.read<LocalizationService>();
     try {
+      final account = context.read<AccountManagerSupabase>();
+      final estObj = account.establishment;
+      if (estObj != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: estObj.id,
+          docKind: TrialDeviceSaveKinds.menu,
+        );
+      }
       final fileName = await MenuExportService.saveHallDishPdf(
         dish: tc,
         t: loc.t,
@@ -759,6 +783,12 @@ class _MenuScreenState extends State<MenuScreen> {
     final estName = (est?.name.trim().isNotEmpty ?? false) ? est!.name : '—';
     final dateStr = DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now());
     try {
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: isFoodcost ? 'foodcost' : 'menu',
+        );
+      }
       if (exportFormat == 'pdf') {
         final bytes = await _buildSimpleMenuPdfBytes(
           loc: loc,

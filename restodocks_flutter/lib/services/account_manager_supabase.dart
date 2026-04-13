@@ -649,6 +649,18 @@ class AccountManagerSupabase extends ChangeNotifier {
     return 0;
   }
 
+  /// Лимит «сохранение на устройстве» в первые 72 ч: 3 на каждый вид документа.
+  Future<void> trialIncrementDeviceSaveOrThrow({
+    required String establishmentId,
+    required String docKind,
+  }) async {
+    await trialIncrementUsageOrThrow(
+      establishmentId: establishmentId,
+      kind: 'device_save:${docKind.trim().toLowerCase()}',
+      delta: 1,
+    );
+  }
+
   /// Первое заведение после шага «только владелец» (сессия auth, pending без establishment_id).
   /// Возвращает тот же jsonb, что complete_pending_owner_registration (employee + establishment).
   Future<Map<String, dynamic>> registerFirstEstablishmentWithoutPromo({

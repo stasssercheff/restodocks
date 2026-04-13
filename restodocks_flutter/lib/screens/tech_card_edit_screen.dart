@@ -3698,6 +3698,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               onPressed: () async {
                 Navigator.of(ctx).pop();
                 try {
+                  if (est != null && acc.isTrialOnlyWithoutPaid) {
+                    await acc.trialIncrementDeviceSaveOrThrow(
+                      establishmentId: est.id,
+                      docKind: TrialDeviceSaveKinds.ttk,
+                    );
+                  }
                   await ExcelExportService().exportSingleTechCardAdvanced(
                     tc,
                     TechCardExportOptions(

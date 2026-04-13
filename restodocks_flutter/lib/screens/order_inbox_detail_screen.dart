@@ -385,6 +385,27 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
     }
 
     try {
+      final account = context.read<AccountManagerSupabase>();
+      final est = account.establishment;
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        try {
+          await account.trialIncrementDeviceSaveOrThrow(
+            establishmentId: est.id,
+            docKind: TrialDeviceSaveKinds.order,
+          );
+        } catch (e) {
+          if (e.toString().contains('TRIAL_DEVICE_SAVE_CAP')) {
+            if (mounted) {
+              AppToastService.show(
+                'В первые 72 часа можно сохранить не более 3 документов этого типа.',
+                duration: const Duration(seconds: 4),
+              );
+            }
+            return;
+          }
+          rethrow;
+        }
+      }
       final currency = context
               .read<AccountManagerSupabase>()
               .establishment

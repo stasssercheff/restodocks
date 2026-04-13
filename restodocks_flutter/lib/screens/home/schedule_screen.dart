@@ -1,9 +1,12 @@
 import 'package:flutter/cupertino.dart'
     show CupertinoTimerPicker, CupertinoTimerPickerMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import '../../utils/dev_log.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
@@ -14,6 +17,7 @@ import '../../services/services.dart';
 import '../../utils/layout_breakpoints.dart';
 import '../../utils/translit_utils.dart';
 import '../../widgets/app_bar_home_button.dart';
+import '../../services/inventory_download.dart';
 
 /// График: слоты (должности/имена) задаются вручную, можно выбрать сотрудника из списка или вписать имя.
 /// Один график на заведение, прокрутка по неделям (неделя влезает на экран, ограничений нет).
@@ -690,6 +694,183 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return dates;
   }
 
+  Future<void> _showSchedulePdfExportDialog() async {
+    final loc = context.read<LocalizationService>();
+    final acc = context.read<AccountManagerSupabase>();
+    final subEnt = SubscriptionEntitlements.from(acc.establishment);
+    final personalEmpId = widget.personalOnly ? acc.currentEmployee?.id : null;
+    final blocks = _displayBlocks(loc, subEnt, personalEmpId);
+    final slots = <ScheduleSlot>[];
+    for (final b in blocks) {
+      if (b.isDeptHeader) continue;
+      slots.addAll(b.slots);
+    }
+    final uniqueSlots = <String, ScheduleSlot>{};
+    for (final s in slots) {
+      uniqueSlots[s.id] = s;
+    }
+    final result = await showDialog<({
+      DateTime from,
+      DateTime to,
+      List<String> slotIds,
+      String lang,
+    })>(
+      context: context,
+      builder: (ctx) => _SchedulePdfExportDialog(
+        dates: _visibleDates,
+        slots: uniqueSlots.values.toList(),
+        loc: loc,
+      ),
+    );
+    if (result == null || !mounted) return;
+    await _exportSchedulePdf(
+      from: result.from,
+      to: result.to,
+      slotIds: result.slotIds,
+      lang: result.lang,
+    );
+  }
+
+  Future<void> _exportSchedulePdf({
+    required DateTime from,
+    required DateTime to,
+    required List<String> slotIds,
+    required String lang,
+  }) async {
+    final loc = context.read<LocalizationService>();
+    final acc = context.read<AccountManagerSupabase>();
+    final days = _getDatesInRange(from, to);
+    if (days.isEmpty) return;
+    if (days.length > 31) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Диапазон экспорта: не более 1 месяца.')),
+      );
+      return;
+    }
+    final selectedSlots = _model.slots.where((s) => slotIds.contains(s.id)).toList();
+    if (selectedSlots.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Выберите хотя бы одного сотрудника.')),
+      );
+      return;
+    }
+
+    try {
+      final fontRegular = pw.Font.ttf(
+        await rootBundle.load('assets/fonts/Roboto-Regular.ttf'),
+      );
+      final fontBold = pw.Font.ttf(
+        await rootBundle.load('assets/fonts/Roboto-Bold.ttf'),
+      );
+      final doc = pw.Document();
+      final localeTag = switch (lang) {
+        'ru' => 'ru_RU',
+        'es' => 'es_ES',
+        'it' => 'it_IT',
+        'tr' => 'tr_TR',
+        'kk' => 'kk_KZ',
+        _ => 'en_US',
+      };
+      final showTranslit = lang != 'ru';
+      final title = loc.tForLanguage(lang, 'schedule');
+      final fromText = DateFormat('dd.MM.yyyy', localeTag).format(from);
+      final toText = DateFormat('dd.MM.yyyy', localeTag).format(to);
+      final headers = <String>[
+        loc.tForLanguage(lang, 'employees'),
+        ...days.map((d) => DateFormat('dd.MM\nEEE', localeTag).format(d)),
+      ];
+
+      pw.TableRow rowFor(ScheduleSlot slot) {
+        final employeeName = _slotDisplayName(slot, translit: showTranslit);
+        final cells = <pw.Widget>[
+          pw.Padding(
+            padding: const pw.EdgeInsets.all(3),
+            child: pw.Text(employeeName, style: const pw.TextStyle(fontSize: 8)),
+          ),
+        ];
+        for (final d in days) {
+          final v = _cellValue(slot.id, d);
+          final tr = _model.getTimeRange(slot.id, d);
+          String text = '';
+          if (v == '0') text = '0';
+          if (v == '1') {
+            if (tr != null && tr.contains('|')) {
+              final parts = tr.split('|');
+              text = '${parts[0]}-${parts[1]}';
+            } else {
+              text = '1';
+            }
+          }
+          cells.add(
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(2),
+              child: pw.Center(
+                child: pw.Text(text, style: const pw.TextStyle(fontSize: 7)),
+              ),
+            ),
+          );
+        }
+        return pw.TableRow(children: cells);
+      }
+
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4.landscape,
+          theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold),
+          build: (_) => [
+            pw.Text(
+              '$title: $fromText - $toText',
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 8),
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+              defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
+              children: [
+                pw.TableRow(
+                  children: headers
+                      .map(
+                        (h) => pw.Padding(
+                          padding: const pw.EdgeInsets.all(3),
+                          child: pw.Text(
+                            h,
+                            style: pw.TextStyle(
+                                fontSize: 7, fontWeight: pw.FontWeight.bold),
+                            textAlign: pw.TextAlign.center,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+                ...selectedSlots.map(rowFor),
+              ],
+            ),
+          ],
+        ),
+      );
+
+      final fileName =
+          'schedule_${DateFormat('yyyyMMdd').format(from)}_${DateFormat('yyyyMMdd').format(to)}.pdf';
+      final est = acc.establishment;
+      if (est != null && acc.isTrialOnlyWithoutPaid) {
+        await acc.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.schedule,
+        );
+      }
+      await saveFileBytes(fileName, await doc.save());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка экспорта PDF: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -1017,6 +1198,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             ? loc.t('personal_schedule')
             : loc.t('schedule')),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            onPressed: _showSchedulePdfExportDialog,
+            tooltip: 'PDF',
+          ),
           IconButton(
             icon: const Icon(Icons.today),
             onPressed: _scrollToCenterToday,
@@ -1649,6 +1835,142 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+        ),
+      ],
+    );
+  }
+}
+
+class _SchedulePdfExportDialog extends StatefulWidget {
+  const _SchedulePdfExportDialog({
+    required this.dates,
+    required this.slots,
+    required this.loc,
+  });
+
+  final List<DateTime> dates;
+  final List<ScheduleSlot> slots;
+  final LocalizationService loc;
+
+  @override
+  State<_SchedulePdfExportDialog> createState() => _SchedulePdfExportDialogState();
+}
+
+class _SchedulePdfExportDialogState extends State<_SchedulePdfExportDialog> {
+  late DateTime _from;
+  late DateTime _to;
+  late String _lang;
+  final Set<String> _selectedSlots = {};
+
+  @override
+  void initState() {
+    super.initState();
+    final today = DateTime.now();
+    _from = DateTime(today.year, today.month, today.day);
+    _to = _from;
+    _lang = widget.loc.currentLanguageCode;
+    for (final s in widget.slots) {
+      _selectedSlots.add(s.id);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Экспорт графика в PDF'),
+      content: SizedBox(
+        width: 500,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _DatePickerButton(
+                      label: 'С',
+                      selectedDate: _from,
+                      dates: widget.dates,
+                      initialDate: _from,
+                      onChanged: (d) => setState(() => _from = d),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _DatePickerButton(
+                      label: 'По',
+                      selectedDate: _to,
+                      dates: widget.dates,
+                      initialDate: _to,
+                      onChanged: (d) => setState(() => _to = d),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: _lang,
+                decoration: const InputDecoration(
+                  labelText: 'Язык',
+                  border: OutlineInputBorder(),
+                ),
+                items: LocalizationService.productLanguageCodes
+                    .map((code) => DropdownMenuItem(
+                          value: code,
+                          child: Text(widget.loc.getLanguageName(code)),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _lang = v);
+                },
+              ),
+              const SizedBox(height: 10),
+              const Text('Сотрудники'),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: widget.slots
+                    .map(
+                      (s) => FilterChip(
+                        label: Text(s.name),
+                        selected: _selectedSlots.contains(s.id),
+                        onSelected: (on) {
+                          setState(() {
+                            if (on) {
+                              _selectedSlots.add(s.id);
+                            } else {
+                              _selectedSlots.remove(s.id);
+                            }
+                          });
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (_selectedSlots.isEmpty) return;
+            if (_to.isBefore(_from)) return;
+            final days = _to.difference(_from).inDays + 1;
+            if (days > 31) return;
+            Navigator.of(context).pop((
+              from: _from,
+              to: _to,
+              slotIds: _selectedSlots.toList(),
+              lang: _lang,
+            ));
+          },
+          child: const Text('Сохранить PDF'),
         ),
       ],
     );

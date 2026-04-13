@@ -188,6 +188,27 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
     action(snap);
   }
 
+  Future<bool> _consumeTrialSaveForProductOrder() async {
+    final account = context.read<AccountManagerSupabase>();
+    final est = account.establishment;
+    if (est == null || !account.isTrialOnlyWithoutPaid) return true;
+    try {
+      await account.trialIncrementDeviceSaveOrThrow(
+        establishmentId: est.id,
+        docKind: TrialDeviceSaveKinds.productOrder,
+      );
+      return true;
+    } catch (e) {
+      if (e.toString().contains('TRIAL_DEVICE_SAVE_CAP')) {
+        widget.onSaved(
+          'В первые 72 часа можно сохранить не более 3 файлов этого типа.',
+        );
+        return false;
+      }
+      rethrow;
+    }
+  }
+
   // ─── Фоновые задачи (получают snapshot, не обращаются к State) ───────────
 
   static Future<void> _saveExcelBg(_ExportSnapshot s) async {
@@ -411,17 +432,32 @@ class _OrderExportSheetState extends State<OrderExportSheet> {
                       _ActionTile(
                         icon: Icons.table_chart,
                         label: _t('order_export_save_excel'),
-                        onTap: _translating ? null : () => _runAction(context, _saveExcelBg),
+                        onTap: _translating
+                            ? null
+                            : () async {
+                                if (!await _consumeTrialSaveForProductOrder()) return;
+                                _runAction(context, _saveExcelBg);
+                              },
                       ),
                       _ActionTile(
                         icon: Icons.picture_as_pdf,
                         label: _t('order_export_save_pdf'),
-                        onTap: _translating ? null : () => _runAction(context, _savePdfBg),
+                        onTap: _translating
+                            ? null
+                            : () async {
+                                if (!await _consumeTrialSaveForProductOrder()) return;
+                                _runAction(context, _savePdfBg);
+                              },
                       ),
                       _ActionTile(
                         icon: Icons.description,
                         label: _t('order_export_save_text'),
-                        onTap: _translating ? null : () => _runAction(context, _saveTextBg),
+                        onTap: _translating
+                            ? null
+                            : () async {
+                                if (!await _consumeTrialSaveForProductOrder()) return;
+                                _runAction(context, _saveTextBg);
+                              },
                       ),
                       _ActionTile(
                         icon: Icons.copy,

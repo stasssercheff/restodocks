@@ -3242,6 +3242,14 @@ class _InventoryScreenState extends State<InventoryScreen>
     final date = header['date'] as String? ??
         DateTime.now().toIso8601String().split('T').first;
     final fileName = 'inventory_$date.$extension';
+    final account = context.read<AccountManagerSupabase>();
+    final est = account.establishment;
+    if (est != null && account.isTrialOnlyWithoutPaid) {
+      await account.trialIncrementDeviceSaveOrThrow(
+        establishmentId: est.id,
+        docKind: TrialDeviceSaveKinds.productSummary,
+      );
+    }
     await saveFileBytes(fileName, bytes);
   }
 
@@ -3252,6 +3260,14 @@ class _InventoryScreenState extends State<InventoryScreen>
         DateTime.now().toIso8601String().split('T').first;
     final fileName = 'inventory_$date.csv';
     final bytes = utf8.encode(csvData);
+    final account = context.read<AccountManagerSupabase>();
+    final est = account.establishment;
+    if (est != null && account.isTrialOnlyWithoutPaid) {
+      await account.trialIncrementDeviceSaveOrThrow(
+        establishmentId: est.id,
+        docKind: TrialDeviceSaveKinds.productSummary,
+      );
+    }
     await saveFileBytes(fileName, bytes);
   }
 
@@ -5211,6 +5227,14 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
 
   Future<void> _downloadBytes(Uint8List bytes, String fileName) async {
     try {
+      final account = context.read<AccountManagerSupabase>();
+      final est = account.establishment;
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.productSummary,
+        );
+      }
       await saveFileBytes(fileName, bytes);
     } catch (e) {
       if (mounted) {

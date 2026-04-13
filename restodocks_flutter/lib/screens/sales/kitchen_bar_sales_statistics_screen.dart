@@ -11,6 +11,7 @@ import '../../services/account_manager_supabase.dart';
 import '../../services/inventory_download.dart';
 import '../../services/kitchen_bar_sales_service.dart';
 import '../../services/localization_service.dart';
+import '../../services/trial_device_save_kinds.dart';
 import '../../services/sales_financial_visibility_service.dart';
 import '../../utils/adaptive_time_picker.dart';
 import '../../utils/pos_order_department.dart';
@@ -354,6 +355,12 @@ class _KitchenBarSalesStatisticsScreenState
     if (out == null) return;
     final dateStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
     final fn = 'sales_${widget.department}_$dateStr.xlsx';
+    if (est.isNotEmpty && acc.isTrialOnlyWithoutPaid) {
+      await acc.trialIncrementDeviceSaveOrThrow(
+        establishmentId: est,
+        docKind: TrialDeviceSaveKinds.productSummary,
+      );
+    }
     await saveFileBytes(fn, out);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

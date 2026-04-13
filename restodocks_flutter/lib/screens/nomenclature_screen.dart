@@ -58,6 +58,8 @@ import '../services/order_list_storage_service.dart';
 import '../services/excel_export_service.dart';
 import '../services/domain_validation_service.dart';
 import '../services/translation_service.dart';
+import '../services/inventory_download.dart';
+import '../services/trial_device_save_kinds.dart';
 
 /// Экран номенклатуры: продукты и ПФ заведения с ценами
 class NomenclatureScreen extends StatefulWidget {
@@ -1638,6 +1640,16 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
           if (_selectedTab == _NomTab.nomenclature ||
               _selectedTab == _NomTab.newProducts) ...[
             IconButton(
+              icon: const Icon(Icons.file_download_outlined),
+              onPressed: () => _showNomenclatureExcelExportDialog(loc),
+              tooltip: 'Выгрузка номенклатуры в Excel',
+            ),
+            IconButton(
+              icon: const Icon(Icons.file_upload_outlined),
+              onPressed: () => _importNomenclatureExcel(loc),
+              tooltip: 'Импорт номенклатуры из Excel',
+            ),
+            IconButton(
               icon: const Icon(Icons.warning),
               onPressed: () => _showDuplicates(),
               tooltip: loc.t('tooltip_show_duplicates'),
@@ -2184,6 +2196,370 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         .trim();
     final price = double.tryParse(priceStr);
     return (name: name, price: price);
+  }
+
+  Future<void> _showNomenclatureExcelExportDialog(
+      LocalizationService loc) async {
+    final options = LocalizationService.productLanguageCodes;
+    var selected = options.contains(loc.currentLanguageCode)
+        ? loc.currentLanguageCode
+        : options.first;
+
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocalState) => AlertDialog(
+          title: const Text('Выгрузка номенклатуры в Excel'),
+          content: DropdownButtonFormField<String>(
+            value: selected,
+            items: options
+                .map((code) => DropdownMenuItem(
+                      value: code,
+                      child: Text(code.toUpperCase()),
+                    ))
+                .toList(),
+            onChanged: (value) {
+              if (value == null) return;
+              setLocalState(() => selected = value);
+            },
+            decoration: const InputDecoration(
+              labelText: 'Язык названий в файле',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: Text(loc.t('cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(selected),
+              child: const Text('Выгрузить'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (chosen == null) return;
+    await _exportNomenclatureExcel(loc, chosen);
+  }
+
+  Future<void> _exportNomenclatureExcel(
+      LocalizationService loc, String languageCode) async {
+    final account = context.read<AccountManagerSupabase>();
+    final store = context.read<ProductStoreSupabase>();
+    final estId = account.dataEstablishmentId;
+    if (estId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('no_establishment'))),
+      );
+      return;
+    }
+
+    await store.loadProducts(force: true);
+    await store.loadNomenclature(estId);
+    final products = store.getNomenclatureProducts(estId);
+    if (products.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Номенклатура пустая')),
+      );
+      return;
+    }
+
+    final excel = Excel.createExcel();
+    final sheetName = excel.getDefaultSheet() ?? 'Sheet1';
+    final sheet = excel[sheetName];
+    final headers = <String>[
+      'display_name',
+      'price',
+      'unit',
+      'id',
+      'category',
+      'name_default',
+      'names_json',
+      'currency',
+      'calories',
+      'protein',
+      'fat',
+      'carbs',
+      'contains_gluten',
+      'contains_lactose',
+      'kbju_manually_confirmed',
+      'package_price',
+      'package_weight_grams',
+      'grams_per_piece',
+      'primary_waste_pct',
+      'supplier_ids_json',
+    ];
+
+    for (var i = 0; i < headers.length; i++) {
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0))
+          .value = TextCellValue(headers[i]);
+    }
+
+    for (var i = 0; i < products.length; i++) {
+      final p = products[i];
+      final row = i + 1;
+      final values = <Object?>[
+        p.getLocalizedName(languageCode),
+        p.basePrice,
+        p.unit ?? '',
+        p.id,
+        p.category,
+        p.name,
+        jsonEncode(p.names ?? const <String, String>{}),
+        p.currency ?? '',
+        p.calories,
+        p.protein,
+        p.fat,
+        p.carbs,
+        p.containsGluten,
+        p.containsLactose,
+        p.kbjuManuallyConfirmed,
+        p.packagePrice,
+        p.packageWeightGrams,
+        p.gramsPerPiece,
+        p.primaryWastePct,
+        jsonEncode(p.supplierIds ?? const <String>[]),
+      ];
+      for (var c = 0; c < values.length; c++) {
+        final v = values[c];
+        final cell =
+            sheet.cell(CellIndex.indexByColumnRow(columnIndex: c, rowIndex: row));
+        if (v == null) {
+          cell.value = TextCellValue('');
+        } else if (v is num) {
+          cell.value = DoubleCellValue(v.toDouble());
+        } else if (v is bool) {
+          cell.value = TextCellValue(v ? 'true' : 'false');
+        } else {
+          cell.value = TextCellValue(v.toString());
+        }
+      }
+    }
+
+    final fileName =
+        'nomenclature_restodocks_${languageCode}_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+    final bytes = excel.encode();
+    if (bytes == null) return;
+    final est = account.establishment;
+    if (est != null && account.isTrialOnlyWithoutPaid) {
+      await account.trialIncrementDeviceSaveOrThrow(
+        establishmentId: est.id,
+        docKind: TrialDeviceSaveKinds.nomenclature,
+      );
+    }
+    await saveFileBytes(fileName, Uint8List.fromList(bytes));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Выгружено: ${products.length} позиций')),
+    );
+  }
+
+  Future<void> _importNomenclatureExcel(LocalizationService loc) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx', 'xls'],
+      withData: true,
+    );
+    if (result == null ||
+        result.files.isEmpty ||
+        result.files.single.bytes == null) return;
+
+    final bytes = result.files.single.bytes!;
+    try {
+      final excel = Excel.decodeBytes(bytes.toList());
+      if (excel.tables.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.t('excel_no_sheet_in_file'))));
+        return;
+      }
+      final sheet = excel.tables[excel.tables.keys.first];
+      if (sheet == null || sheet.rows.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(loc.t('file_empty'))));
+        return;
+      }
+
+      final header = sheet.rows.first
+          .map((c) => (c?.value?.toString() ?? '').trim().toLowerCase())
+          .toList();
+      final hasRestodocksFormat =
+          header.contains('display_name') && header.contains('names_json');
+      if (!hasRestodocksFormat) {
+        await _addProductsFromExcel(bytes, loc);
+        return;
+      }
+
+      final account = context.read<AccountManagerSupabase>();
+      final store = context.read<ProductStoreSupabase>();
+      final estId = account.dataEstablishmentId;
+      if (estId == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('no_establishment'))),
+        );
+        return;
+      }
+
+      await store.loadProducts(force: true);
+      await store.loadNomenclature(estId);
+      final existing = store.getNomenclatureProducts(estId);
+      final byId = {for (final p in existing) p.id: p};
+      final byName = {
+        for (final p in existing) _normalizeImportName(p.name): p,
+      };
+
+      int added = 0;
+      int updated = 0;
+      int failed = 0;
+
+      String cellAt(List<Data?> row, int index) =>
+          index < row.length ? (row[index]?.value?.toString() ?? '').trim() : '';
+      double? toDouble(String s) => s.isEmpty ? null : double.tryParse(s);
+      bool? toBoolNullable(String s) {
+        final v = s.trim().toLowerCase();
+        if (v.isEmpty) return null;
+        if (v == 'true' || v == '1' || v == 'yes') return true;
+        if (v == 'false' || v == '0' || v == 'no') return false;
+        return null;
+      }
+
+      Map<String, String> parseNames(String raw, String fallbackName) {
+        if (raw.trim().isEmpty) return {loc.currentLanguageCode: fallbackName};
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is Map) {
+            final map = <String, String>{};
+            decoded.forEach((k, v) {
+              final key = k.toString().trim();
+              final val = v?.toString().trim() ?? '';
+              if (key.isNotEmpty && val.isNotEmpty) map[key] = val;
+            });
+            if (map.isNotEmpty) return map;
+          }
+        } catch (_) {}
+        return {loc.currentLanguageCode: fallbackName};
+      }
+
+      List<String>? parseSuppliers(String raw) {
+        if (raw.trim().isEmpty) return null;
+        try {
+          final decoded = jsonDecode(raw);
+          if (decoded is List) {
+            final ids = decoded
+                .map((e) => e.toString().trim())
+                .where((e) => e.isNotEmpty)
+                .toList();
+            return ids.isEmpty ? null : ids;
+          }
+        } catch (_) {}
+        return null;
+      }
+
+      int col(String key) => header.indexOf(key);
+      final cDisplay = col('display_name');
+      final cPrice = col('price');
+      final cUnit = col('unit');
+      final cId = col('id');
+      final cCategory = col('category');
+      final cNameDefault = col('name_default');
+      final cNamesJson = col('names_json');
+      final cCurrency = col('currency');
+      final cCalories = col('calories');
+      final cProtein = col('protein');
+      final cFat = col('fat');
+      final cCarbs = col('carbs');
+      final cContainsGluten = col('contains_gluten');
+      final cContainsLactose = col('contains_lactose');
+      final cKbjuConfirmed = col('kbju_manually_confirmed');
+      final cPackagePrice = col('package_price');
+      final cPackageWeight = col('package_weight_grams');
+      final cGramsPerPiece = col('grams_per_piece');
+      final cPrimaryWaste = col('primary_waste_pct');
+      final cSupplierIds = col('supplier_ids_json');
+
+      for (var r = 1; r < sheet.rows.length; r++) {
+        final row = sheet.rows[r];
+        final displayName = cellAt(row, cDisplay);
+        final nameDefault = cellAt(row, cNameDefault);
+        final productName = nameDefault.isNotEmpty ? nameDefault : displayName;
+        if (productName.isEmpty) continue;
+        try {
+          final rawId = cellAt(row, cId);
+          final category = cellAt(row, cCategory);
+          final names = parseNames(cellAt(row, cNamesJson), productName);
+          final model = Product(
+            id: rawId.isNotEmpty ? rawId : const Uuid().v4(),
+            name: productName,
+            category: category.isNotEmpty ? category : 'manual',
+            names: names,
+            calories: toDouble(cellAt(row, cCalories)),
+            protein: toDouble(cellAt(row, cProtein)),
+            fat: toDouble(cellAt(row, cFat)),
+            carbs: toDouble(cellAt(row, cCarbs)),
+            kbjuManuallyConfirmed:
+                toBoolNullable(cellAt(row, cKbjuConfirmed)) ?? false,
+            containsGluten: toBoolNullable(cellAt(row, cContainsGluten)),
+            containsLactose: toBoolNullable(cellAt(row, cContainsLactose)),
+            basePrice: toDouble(cellAt(row, cPrice)),
+            currency: cellAt(row, cCurrency).isEmpty
+                ? null
+                : cellAt(row, cCurrency),
+            packagePrice: toDouble(cellAt(row, cPackagePrice)),
+            packageWeightGrams: toDouble(cellAt(row, cPackageWeight)),
+            gramsPerPiece: toDouble(cellAt(row, cGramsPerPiece)),
+            unit: cellAt(row, cUnit).isEmpty ? null : cellAt(row, cUnit),
+            primaryWastePct: toDouble(cellAt(row, cPrimaryWaste)),
+            supplierIds: parseSuppliers(cellAt(row, cSupplierIds)),
+          );
+
+          final matched = (rawId.isNotEmpty ? byId[rawId] : null) ??
+              byName[_normalizeImportName(productName)];
+          if (matched != null) {
+            await store.updateProduct(model.copyWith(id: matched.id));
+            await store.addToNomenclature(estId, matched.id);
+            updated++;
+          } else {
+            final saved = await store.addProduct(model);
+            await store.addToNomenclature(estId, saved.id);
+            added++;
+          }
+        } catch (_) {
+          failed++;
+        }
+      }
+
+      await store.loadProducts(force: true);
+      await store.loadNomenclature(estId);
+      if (mounted) setState(() {});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Импорт завершен: добавлено $added, обновлено $updated, ошибок $failed'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(loc.t(
+        'excel_file_process_error',
+        args: {'error': '$e'},
+      ))));
+    }
+  }
+
+  String _normalizeImportName(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .replaceAll(RegExp(r'[^\w\sа-яё]'), '')
+        .trim();
   }
 
   // Удалены дублированные функции загрузки продуктов:

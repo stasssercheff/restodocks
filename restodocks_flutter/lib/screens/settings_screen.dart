@@ -1621,6 +1621,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ? employerPosition
                 : null,
       );
+      if (account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.documentation,
+        );
+      }
       await saveFileBytes('haccp_agreement_employee.pdf', bytes);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

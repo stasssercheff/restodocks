@@ -300,6 +300,29 @@ class _ProductOrderReceivedScreenState extends State<ProductOrderReceivedScreen>
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
     final currency = context.read<AccountManagerSupabase>().establishment?.defaultCurrency ?? 'VND';
     try {
+      final account = context.read<AccountManagerSupabase>();
+      final est = account.establishment;
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        try {
+          await account.trialIncrementDeviceSaveOrThrow(
+            establishmentId: est.id,
+            docKind: TrialDeviceSaveKinds.order,
+          );
+        } catch (e) {
+          if (e.toString().contains('TRIAL_DEVICE_SAVE_CAP')) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                      'В первые 72 часа можно сохранить не более 3 документов этого типа.'),
+                ),
+              );
+            }
+            return;
+          }
+          rethrow;
+        }
+      }
       final bytes = await OrderListExportService.buildOrderExcelBytesFromPayload(
         payload: payload,
         t: (k) => loc.t(k) ?? k,

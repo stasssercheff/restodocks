@@ -153,6 +153,12 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
 
     final dateStr = DateFormat('yyyyMMdd').format(DateTime.now());
     final safeCode = logType.code.replaceAll(RegExp(r'[^a-z0-9]'), '_');
+    if (acc.isTrialOnlyWithoutPaid) {
+      await acc.trialIncrementDeviceSaveOrThrow(
+        establishmentId: est.id,
+        docKind: TrialDeviceSaveKinds.journal,
+      );
+    }
     await saveFileBytes('haccp_${safeCode}_$dateStr.pdf', bytes);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

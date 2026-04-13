@@ -850,6 +850,14 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
     );
 
     try {
+      final est = context.read<AccountManagerSupabase>().establishment;
+      if (est != null &&
+          context.read<AccountManagerSupabase>().isTrialOnlyWithoutPaid) {
+        await context.read<AccountManagerSupabase>().trialIncrementDeviceSaveOrThrow(
+              establishmentId: est.id,
+              docKind: TrialDeviceSaveKinds.expenses,
+            );
+      }
       final t = (String key) => loc.tForLanguage(selectedLang, key);
       final dateFormat = DateFormat('dd.MM.yyyy');
 

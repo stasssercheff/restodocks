@@ -302,6 +302,14 @@ class _InventoryPfScreenState extends State<InventoryPfScreen> {
   Future<void> _downloadExcel(List<int> bytes, Map<String, dynamic> payload, LocalizationService loc) async {
     final header = payload['header'] as Map<String, dynamic>? ?? {};
     final date = header['date'] as String? ?? DateTime.now().toIso8601String().split('T').first;
+    final account = context.read<AccountManagerSupabase>();
+    final est = account.establishment;
+    if (est != null && account.isTrialOnlyWithoutPaid) {
+      await account.trialIncrementDeviceSaveOrThrow(
+        establishmentId: est.id,
+        docKind: TrialDeviceSaveKinds.productSummary,
+      );
+    }
     await saveFileBytes('inventory_pf_$date.xlsx', bytes);
   }
 

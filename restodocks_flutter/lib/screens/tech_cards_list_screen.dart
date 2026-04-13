@@ -2668,6 +2668,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   Future<void> _exportSingleTechCard(TechCard techCard) async {
     final lang = context.read<LocalizationService>().currentLanguageCode;
     try {
+      final account = context.read<AccountManagerSupabase>();
+      final est = account.establishment;
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.ttk,
+        );
+      }
       await ExcelExportService()
           .exportSingleTechCard(techCard, languageCode: lang);
       if (mounted) {
@@ -2704,6 +2712,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
     try {
       final lang = context.read<LocalizationService>().currentLanguageCode;
+      final account = context.read<AccountManagerSupabase>();
+      final est = account.establishment;
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.ttk,
+        );
+      }
       await ExcelExportService()
           .exportSelectedTechCards(selectedCards, languageCode: lang);
       if (mounted) {
@@ -2742,6 +2758,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
 
     try {
+      final account = context.read<AccountManagerSupabase>();
+      final est = account.establishment;
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.ttk,
+        );
+      }
       await ExcelExportService()
           .exportAllTechCards(_list, languageCode: loc.currentLanguageCode);
       if (mounted) {

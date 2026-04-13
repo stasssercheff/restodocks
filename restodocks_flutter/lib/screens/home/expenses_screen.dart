@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -47,8 +46,19 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     final loc = context.watch<LocalizationService>();
     final account = context.watch<AccountManagerSupabase>();
     final ent = SubscriptionEntitlements.from(account.establishment);
-    // Веб: только ФЗП. Lite (после триала): только ФЗП — без заказов/списаний, требующих Pro на бэке.
-    final fzpOnly = kIsWeb || ent.isLiteTier;
+    final tabs = <_ExpensesTab>[
+      _ExpensesTab.fzp,
+      if (ent.effectiveTier == AppSubscriptionTier.pro ||
+          ent.effectiveTier == AppSubscriptionTier.ultra)
+        _ExpensesTab.productOrders,
+      if (ent.effectiveTier == AppSubscriptionTier.ultra) ...[
+        _ExpensesTab.writeoffs,
+        _ExpensesTab.procurementReceipts,
+      ],
+    ];
+    final selectedTab =
+        tabs.contains(_selectedTab) ? _selectedTab : _ExpensesTab.fzp;
+    final fzpOnly = tabs.length == 1;
 
     return Scaffold(
       appBar: AppBar(
@@ -76,34 +86,45 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         _buildTabChip(_ExpensesTab.fzp,
-                            loc.t('salary_tab_fzp') ?? 'ФЗП', loc),
-                        const SizedBox(width: 8),
-                        _buildTabChip(
+                            loc.t('salary_tab_fzp') ?? 'ФЗП', loc, selectedTab),
+                        if (tabs.contains(_ExpensesTab.productOrders)) ...[
+                          const SizedBox(width: 8),
+                          _buildTabChip(
                             _ExpensesTab.productOrders,
                             loc.t('expenses_tab_product_orders') ??
                                 'Заказы продуктов',
-                            loc),
-                        const SizedBox(width: 8),
-                        _buildTabChip(
+                            loc,
+                            selectedTab,
+                          ),
+                        ],
+                        if (tabs.contains(_ExpensesTab.writeoffs)) ...[
+                          const SizedBox(width: 8),
+                          _buildTabChip(
                             _ExpensesTab.writeoffs,
                             loc.t('expenses_tab_writeoffs') ?? 'Списания',
-                            loc),
-                        const SizedBox(width: 8),
-                        _buildTabChip(
-                          _ExpensesTab.procurementReceipts,
-                          loc.t('expenses_tab_procurement') ?? 'Поставки',
-                          loc,
-                        ),
+                            loc,
+                            selectedTab,
+                          ),
+                        ],
+                        if (tabs.contains(_ExpensesTab.procurementReceipts)) ...[
+                          const SizedBox(width: 8),
+                          _buildTabChip(
+                            _ExpensesTab.procurementReceipts,
+                            loc.t('expenses_tab_procurement') ?? 'Поставки',
+                            loc,
+                            selectedTab,
+                          ),
+                        ],
                       ],
                     ),
                   ),
                 ),
                 Expanded(
-                  child: _selectedTab == _ExpensesTab.fzp
+                  child: selectedTab == _ExpensesTab.fzp
                       ? const SalaryExpenseScreen(embedInScaffold: false)
-                      : _selectedTab == _ExpensesTab.productOrders
+                      : selectedTab == _ExpensesTab.productOrders
                           ? const _ProductOrdersTab()
-                          : _selectedTab == _ExpensesTab.writeoffs
+                          : selectedTab == _ExpensesTab.writeoffs
                               ? const _WriteoffsTab()
                               : const _ProcurementReceiptsTab(),
                 ),
@@ -112,8 +133,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
-  Widget _buildTabChip(_ExpensesTab tab, String label, LocalizationService loc) {
-    final isSelected = _selectedTab == tab;
+  Widget _buildTabChip(_ExpensesTab tab, String label, LocalizationService loc,
+      _ExpensesTab selectedTab) {
+    final isSelected = selectedTab == tab;
     return FilterChip(
       label: Text(label),
       selected: isSelected,
@@ -537,6 +559,13 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
         fileName =
             'product_orders_${dateFormat.format(exportStart)}_${dateFormat.format(exportEnd)}.xlsx';
       }
+      final est = account.establishment;
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.expenses,
+        );
+      }
       await saveFileBytes(fileName, bytes);
 
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
@@ -549,6 +578,14 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
       );
     } catch (e) {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (e.toString().contains('TRIAL_DEVICE_SAVE_CAP')) {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(
+            content: Text('В триале можно сохранить не более 3 файлов этого типа'),
+          ),
+        );
+        return;
+      }
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(
@@ -1188,6 +1225,13 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
       }
       final fileName =
           'procurement_receipts_${dateFormat.format(_dateStart)}_${dateFormat.format(_dateEnd)}.$ext';
+      final est = account.establishment;
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.expenses,
+        );
+      }
       await saveFileBytes(fileName, bytes);
 
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
@@ -1200,6 +1244,14 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
       );
     } catch (e) {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (e.toString().contains('TRIAL_DEVICE_SAVE_CAP')) {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(
+            content: Text('В триале можно сохранить не более 3 файлов этого типа'),
+          ),
+        );
+        return;
+      }
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(

@@ -85,3 +85,4 @@ export 'sales_financial_visibility_service.dart';
 export 'kitchen_bar_sales_service.dart';
 export 'sales_plan_storage_service.dart';
 export 'sales_plan_calendar_prefs_service.dart';
+export 'trial_device_save_kinds.dart';

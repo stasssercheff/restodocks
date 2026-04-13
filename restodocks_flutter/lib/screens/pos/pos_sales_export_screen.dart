@@ -115,6 +115,12 @@ class _PosSalesExportScreenState extends State<PosSalesExportScreen> {
       final df = DateFormat('yyyy-MM-dd');
       final fn =
           'pos_sales_${df.format(_rangeStartLocal)}_${df.format(_rangeEndLocal)}.xlsx';
+      if (account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.productSummary,
+        );
+      }
       await saveFileBytes(fn, bytes);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
