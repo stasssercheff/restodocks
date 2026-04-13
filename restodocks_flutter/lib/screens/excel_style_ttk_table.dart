@@ -70,19 +70,29 @@ class ExcelStyleTtkTable extends StatefulWidget {
     this.omitTableHeader = false,
   });
 
+  /// Сумма ширин колонок — как у [tableCore], иначе закреплённая шапка и тело расходятся.
+  static const double compositionTableWidth = 1105;
+
   /// Одна строка шапки состава (для закрепа над страницей; ширина как у таблицы).
   static Widget compositionPinnedHeader(LocalizationService loc) {
-    Widget h(String key) => Container(
-          height: 44,
-          alignment: Alignment.center,
-          child: Text(
-            loc.t(key),
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
+    Widget h(String key) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+          child: Center(
+            child: Text(
+              loc.t(key),
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+              softWrap: true,
+              maxLines: 4,
+              overflow: TextOverflow.clip,
+            ),
           ),
         );
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 1145, maxWidth: 1145),
+      constraints: const BoxConstraints(
+        minWidth: compositionTableWidth,
+        maxWidth: compositionTableWidth,
+      ),
       child: Table(
         border: TableBorder.all(color: Colors.black, width: 1),
         defaultVerticalAlignment: TableCellVerticalAlignment.middle,
@@ -427,9 +437,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     final Widget tableCore = ConstrainedBox(
             constraints: const BoxConstraints(
-              minWidth: 1145,
-              maxWidth: 1145,
-            ), // фиксируем ширину, чтобы контейнер не раздувался под доступную ширину
+              minWidth: ExcelStyleTtkTable.compositionTableWidth,
+              maxWidth: ExcelStyleTtkTable.compositionTableWidth,
+            ), // сумма FixedColumnWidth — без лишних px, шапка/тело совпадают
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -615,11 +625,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // порций(шт) — рассчитывается: outputWeight * (weightPerPortion / totalOutput)
                     _buildReadOnlyCell(_portionsPerOne(totalOutput, ingredient)),
 
-                    // Стоимость
-                    _buildCostCell(ingredient),
-
-                    // Цена за кг
+                    // Порядок как в шапке: Цена (за кг), затем Стоимость
                     _buildPricePerKgCell(ingredient),
+
+                    _buildCostCell(ingredient),
 
                     // Кнопка удаления
                     _buildDeleteButton(rowIndex),
@@ -639,6 +648,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // % отхода
                   const SizedBox.shrink(), // Нетто
                   const SizedBox.shrink(), // Способ
+                  const SizedBox.shrink(), // % ужарки (итого не суммируем)
                   // Выход г. итого: редактируемый — при изменении масштабируются все ингредиенты в реальном времени
                   widget.canEdit && widget.onTotalOutputChanged != null && totalOutput > 0
                       ? _buildNumericCell(
@@ -662,10 +672,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                         )
                       : _buildTotalCell(widget.weightPerPortion == 0 ? '' : widget.weightPerPortion.toStringAsFixed(0)),
                   _buildTotalCell('1'), // порций(шт) в итого всегда 1
-                  const SizedBox.shrink(), // Стоимость (пусто)
+                  // Как в шапке: колонка «Цена», затем «Стоимость»
                   widget.isCook
-                      ? const SizedBox.shrink() // Скрываем стоимость для поваров
-                      : _buildTotalCell('${NumberFormatUtils.formatInt(costPerKgFinishedProduct)} $_currencySymbol'), // Стоимость за кг готового продукта
+                      ? const SizedBox.shrink()
+                      : _buildTotalCell(
+                          '${NumberFormatUtils.formatInt(costPerKgFinishedProduct)} $_currencySymbol',
+                        ), // цена за кг готового продукта
+                  const SizedBox.shrink(), // суммовая стоимость в итого — не дублируем
                   const SizedBox.shrink(), // Удаление
                 ],
               ),
@@ -819,13 +832,16 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   // Вспомогательные методы для создания ячеек
 
   Widget _buildHeaderCell(String text) {
-    return Container(
-      height: 44,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
       child: Center(
         child: Text(
           text,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
+          softWrap: true,
+          maxLines: 4,
+          overflow: TextOverflow.clip,
         ),
       ),
     );

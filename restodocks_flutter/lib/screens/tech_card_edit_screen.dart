@@ -6147,7 +6147,8 @@ class _TtkCompositionPinnedHeaderDelegate extends SliverPersistentHeaderDelegate
   final ScrollController hScroll;
   final Color surfaceColor;
 
-  static const double _extent = 45;
+  /// Высота строки шапки с переносом текста (до 4 строк в ячейке).
+  static const double _extent = 72;
 
   @override
   double get minExtent => _extent;
