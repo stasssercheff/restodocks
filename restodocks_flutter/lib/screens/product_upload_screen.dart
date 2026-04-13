@@ -4317,6 +4317,40 @@ class _PasteTextDialog extends StatefulWidget {
 }
 
 class _PasteTextDialogState extends State<_PasteTextDialog> {
+  bool _speechBusy = false;
+
+  Future<void> _insertVoiceText(LocalizationService loc) async {
+    if (_speechBusy) return;
+    setState(() => _speechBusy = true);
+    try {
+      final supported = await speechToTextSupported();
+      if (!supported) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Голосовой ввод не поддерживается в этом браузере')),
+        );
+        return;
+      }
+      final text = await speechToTextListenOnce(
+        languageCode: loc.currentLanguageCode,
+      );
+      if (!mounted) return;
+      if (text == null || text.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Речь не распознана')),
+        );
+        return;
+      }
+      final prev = widget.controller.text.trimRight();
+      widget.controller.text = prev.isEmpty ? text : '$prev\n$text';
+      widget.controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: widget.controller.text.length),
+      );
+    } finally {
+      if (mounted) setState(() => _speechBusy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -4408,6 +4442,15 @@ class _PasteTextDialogState extends State<_PasteTextDialog> {
                   },
                 ),
                 const SizedBox(height: 12),
+                Row(
+                  children: [
+                    TextButton.icon(
+                      onPressed: _speechBusy ? null : () => _insertVoiceText(loc),
+                      icon: Icon(_speechBusy ? Icons.mic : Icons.mic_none),
+                      label: Text(_speechBusy ? 'Слушаю...' : 'Голосом'),
+                    ),
+                  ],
+                ),
                 TextField(
                   controller: widget.controller,
                   maxLines: 6,
@@ -4454,6 +4497,40 @@ class _InventoryPasteDialog extends StatefulWidget {
 }
 
 class _InventoryPasteDialogState extends State<_InventoryPasteDialog> {
+  bool _speechBusy = false;
+
+  Future<void> _insertVoiceText(LocalizationService loc) async {
+    if (_speechBusy) return;
+    setState(() => _speechBusy = true);
+    try {
+      final supported = await speechToTextSupported();
+      if (!supported) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Голосовой ввод не поддерживается в этом браузере')),
+        );
+        return;
+      }
+      final text = await speechToTextListenOnce(
+        languageCode: loc.currentLanguageCode,
+      );
+      if (!mounted) return;
+      if (text == null || text.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Речь не распознана')),
+        );
+        return;
+      }
+      final prev = widget.controller.text.trimRight();
+      widget.controller.text = prev.isEmpty ? text : '$prev\n$text';
+      widget.controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: widget.controller.text.length),
+      );
+    } finally {
+      if (mounted) setState(() => _speechBusy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -4512,6 +4589,15 @@ class _InventoryPasteDialogState extends State<_InventoryPasteDialog> {
                   ),
                 ),
                 const SizedBox(height: 10),
+                Row(
+                  children: [
+                    TextButton.icon(
+                      onPressed: _speechBusy ? null : () => _insertVoiceText(loc),
+                      icon: Icon(_speechBusy ? Icons.mic : Icons.mic_none),
+                      label: Text(_speechBusy ? 'Слушаю...' : 'Голосом'),
+                    ),
+                  ],
+                ),
                 TextField(
                   controller: widget.controller,
                   maxLines: 8,
