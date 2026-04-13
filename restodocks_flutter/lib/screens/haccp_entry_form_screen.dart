@@ -344,6 +344,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     String label,
     String? currentId,
     void Function(String?) onIdChanged,
+    LocalizationService loc,
+    bool showNameTranslit,
   ) {
     if (_formEmployees.isEmpty) {
       return const SizedBox.shrink();
@@ -359,9 +361,13 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       items: _formEmployees
           .map((e) => DropdownMenuItem<Employee?>(
                 value: e,
-                child: Text(e.surname != null
-                    ? '${e.surname} ${e.fullName}'
-                    : e.fullName),
+                child: Text(
+                  displayStoredPersonName(
+                    employeeFullNameRaw(e),
+                    loc,
+                    showNameTranslit: showNameTranslit,
+                  ),
+                ),
               ))
           .toList(),
       onChanged: (e) {
@@ -608,6 +614,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     required List<Employee> employees,
     required String label,
     required void Function(Employee?) onSelected,
+    required bool showNameTranslit,
   }) {
     if (employees.isEmpty) return const SizedBox.shrink();
     return DropdownButtonFormField<Employee?>(
@@ -623,7 +630,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         ...employees.map((e) => DropdownMenuItem<Employee?>(
               value: e,
               child: Text(
-                '${loc.displayPersonNameForLanguage(employeeFullNameRaw(e), loc.currentLanguageCode)} (${e.roles.isNotEmpty ? loc.roleDisplayName(e.roles.first) : ''})',
+                '${displayStoredPersonName(employeeFullNameRaw(e), loc, showNameTranslit: showNameTranslit)} (${e.roles.isNotEmpty ? loc.roleDisplayName(e.roles.first) : ''})',
               ),
             )),
       ],
@@ -633,12 +640,16 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
   /// Подпись — ФИО сотрудника из учётной записи (только отображение).
   Widget _signatureFromAccount() {
-    return Consumer2<AccountManagerSupabase, LocalizationService>(
-      builder: (_, acc, loc, __) {
+    return Consumer3<AccountManagerSupabase, LocalizationService,
+        ScreenLayoutPreferenceService>(
+      builder: (_, acc, loc, layout, __) {
         final emp = acc.currentEmployee;
         final name = emp != null
-            ? loc.displayPersonNameForLanguage(
-                employeeFullNameRaw(emp), loc.currentLanguageCode)
+            ? displayStoredPersonName(
+                employeeFullNameRaw(emp),
+                loc,
+                showNameTranslit: layout.showNameTranslit,
+              )
             : '—';
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
@@ -898,12 +909,16 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   }
 
   /// Форма по макету Приложения 1: Гигиенический журнал (сотрудники). Несколько строк — по одной на сотрудника; можно добавлять/удалять.
-  Widget _buildHealthHygieneForm(LocalizationService loc) {
+  Widget _buildHealthHygieneForm(
+      LocalizationService loc, bool showNameTranslit) {
     final dateStr = DateFormat('dd.MM.yyyy').format(DateTime.now());
     final currentEmp = context.watch<AccountManagerSupabase>().currentEmployee;
     final creatorName = currentEmp != null
-        ? loc.displayPersonNameForLanguage(
-            employeeFullNameRaw(currentEmp), loc.currentLanguageCode)
+        ? displayStoredPersonName(
+            employeeFullNameRaw(currentEmp),
+            loc,
+            showNameTranslit: showNameTranslit,
+          )
         : '—';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -945,8 +960,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               final row = _healthRows[i];
               final emp = _healthEmployeeById(row.employeeId);
               final name = emp != null
-                  ? loc.displayPersonNameForLanguage(
-                      employeeFullNameRaw(emp), loc.currentLanguageCode)
+                  ? displayStoredPersonName(
+                      employeeFullNameRaw(emp),
+                      loc,
+                      showNameTranslit: showNameTranslit,
+                    )
                   : '—';
               return TableRow(
                 children: [
@@ -1032,8 +1050,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: available.map((e) {
-                      final name = loc.displayPersonNameForLanguage(
-                          employeeFullNameRaw(e), loc.currentLanguageCode);
+                      final name = displayStoredPersonName(
+                          employeeFullNameRaw(e),
+                          loc,
+                          showNameTranslit: showNameTranslit);
                       return ListTile(
                         title: Text(name),
                         subtitle: Text(
@@ -1363,7 +1383,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   }
 
   /// Выбор сотрудника для журнала медкнижек (десктоп): одно поле «Ф. И. О.», без дубляжа с отдельным TextField.
-  Widget _medBookEmployeeDropdown(LocalizationService loc) {
+  Widget _medBookEmployeeDropdown(
+      LocalizationService loc, bool showNameTranslit) {
     if (_formEmployees.isEmpty) {
       return _textField(
           'med_book_employee_name', _th(loc, 'haccp_tbl_med_exam_fio', 'Ф. И. О.'));
@@ -1383,7 +1404,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             (e) => DropdownMenuItem<Employee?>(
               value: e,
               child: Text(
-                e.surname != null ? '${e.surname} ${e.fullName}' : e.fullName,
+                displayStoredPersonName(
+                  employeeFullNameRaw(e),
+                  loc,
+                  showNameTranslit: showNameTranslit,
+                ),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -1396,7 +1421,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           if (e != null) {
             _setText(
               'med_book_employee_name',
-              e.surname != null ? '${e.surname} ${e.fullName}' : e.fullName,
+              employeeFullNameRaw(e),
             );
             _setText(
               'med_book_position',
@@ -1412,7 +1437,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   }
 
   /// Форма по бланку: Журнал учёта личных медицинских книжек (1:1 с бумагой).
-  Widget _buildMedBookForm(LocalizationService loc) {
+  Widget _buildMedBookForm(LocalizationService loc, bool showNameTranslit) {
     return Table(
       columnWidths: const {
         0: FlexColumnWidth(0.4),
@@ -1444,7 +1469,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         TableRow(
           children: [
             _tableCell(const Text('1')),
-            _tableCell(_medBookEmployeeDropdown(loc)),
+            _tableCell(_medBookEmployeeDropdown(loc, showNameTranslit)),
             _tableCell(_textField(
                 'med_book_position', _th(loc, 'haccp_tbl_position', 'Должность'))),
             _tableCell(_textField('med_book_number',
@@ -1597,7 +1622,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     );
   }
 
-  Widget _buildMedExaminationsForm(LocalizationService loc) {
+  Widget _buildMedExaminationsForm(LocalizationService loc, bool showNameTranslit) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1610,13 +1635,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             loc: loc,
             employees: _formEmployees,
             label: _th(loc, 'haccp_form_pick_employee', 'Сотрудник'),
+            showNameTranslit: showNameTranslit,
             onSelected: (e) {
               if (e != null) {
-                _setText(
-                    'med_exam_employee_name',
-                    e.surname != null
-                        ? '${e.surname} ${e.fullName}'
-                        : e.fullName);
+                _setText('med_exam_employee_name', employeeFullNameRaw(e));
                 _setText(
                     'med_exam_dob',
                     e.birthday != null
@@ -2050,10 +2072,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     );
   }
 
-  Widget _buildFormByType(LocalizationService loc) {
+  Widget _buildFormByType(LocalizationService loc, bool showNameTranslit) {
     switch (_logType) {
       case HaccpLogType.healthHygiene:
-        return _buildHealthHygieneForm(loc);
+        return _buildHealthHygieneForm(loc, showNameTranslit);
       case HaccpLogType.fridgeTemperature:
         return _buildFridgeTemperatureForm(loc);
       case HaccpLogType.warehouseTempHumidity:
@@ -2065,9 +2087,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       case HaccpLogType.fryingOil:
         return _buildFryingOilForm(loc);
       case HaccpLogType.medBookRegistry:
-        return _buildMedBookForm(loc);
+        return _buildMedBookForm(loc, showNameTranslit);
       case HaccpLogType.medExaminations:
-        return _buildMedExaminationsForm(loc);
+        return _buildMedExaminationsForm(loc, showNameTranslit);
       case HaccpLogType.disinfectantAccounting:
         return _buildDisinfectantAccountingForm(loc);
       case HaccpLogType.equipmentWashing:
@@ -2137,15 +2159,18 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     );
   }
 
-  Widget _buildFormByTypeMobile(LocalizationService loc) {
+  Widget _buildFormByTypeMobile(LocalizationService loc, bool showNameTranslit) {
     switch (_logType) {
       case HaccpLogType.healthHygiene:
         final dateStr = DateFormat('dd.MM.yyyy').format(DateTime.now());
         final currentEmp =
             context.watch<AccountManagerSupabase>().currentEmployee;
         final creatorName = currentEmp != null
-            ? loc.displayPersonNameForLanguage(
-                employeeFullNameRaw(currentEmp), loc.currentLanguageCode)
+            ? displayStoredPersonName(
+                employeeFullNameRaw(currentEmp),
+                loc,
+                showNameTranslit: showNameTranslit,
+              )
             : '—';
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2154,8 +2179,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               final row = _healthRows[i];
               final emp = _healthEmployeeById(row.employeeId);
               final name = emp != null
-                  ? loc.displayPersonNameForLanguage(
-                      employeeFullNameRaw(emp), loc.currentLanguageCode)
+                  ? displayStoredPersonName(
+                      employeeFullNameRaw(emp),
+                      loc,
+                      showNameTranslit: showNameTranslit,
+                    )
                   : '—';
               return Card(
                 margin: const EdgeInsets.only(bottom: 10),
@@ -2231,8 +2259,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: available.map((e) {
-                          final name = loc.displayPersonNameForLanguage(
-                              employeeFullNameRaw(e), loc.currentLanguageCode);
+                          final name = displayStoredPersonName(
+                              employeeFullNameRaw(e),
+                              loc,
+                              showNameTranslit: showNameTranslit);
                           return ListTile(
                             title: Text(name),
                             subtitle: Text(
@@ -2513,9 +2543,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                       if (emp != null) {
                         _setText(
                           'med_book_employee_name',
-                          emp.surname != null
-                              ? '${emp.surname} ${emp.fullName}'
-                              : emp.fullName,
+                          employeeFullNameRaw(emp),
                         );
                         _setText(
                           'med_book_position',
@@ -2527,7 +2555,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                         _setText('med_book_employee_name', '');
                         _setText('med_book_position', '');
                       }
-                    })),
+                    }),
+                loc,
+                showNameTranslit),
             _textField('med_book_position',
                 _th(loc, 'haccp_tbl_position', 'Должность')),
             _textField('med_book_number',
@@ -2558,7 +2588,9 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 'med_exam_employee_id',
                 _th(loc, 'haccp_form_pick_employee', 'Сотрудник'),
                 _medExamEmployeeId,
-                (id) => setState(() => _medExamEmployeeId = id)),
+                (id) => setState(() => _medExamEmployeeId = id),
+                loc,
+                showNameTranslit),
             _textField('med_exam_position',
                 _th(loc, 'haccp_tbl_position', 'Должность')),
             _textField('med_exam_department',
@@ -2775,7 +2807,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         );
       default:
         // Для остальных журналов (пока) оставляем текущую форму; ключевая проблема — горизонтальный скролл контейнера.
-        return _buildFormByType(loc);
+        return _buildFormByType(loc, showNameTranslit);
     }
   }
 
@@ -3153,6 +3185,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final showNameTranslit =
+        context.watch<ScreenLayoutPreferenceService>().showNameTranslit;
     final emp = context.watch<AccountManagerSupabase>().currentEmployee;
     if (_logType == null) {
       return Scaffold(
@@ -3179,8 +3213,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 child: ListTile(
                   leading: const Icon(Icons.person),
                   title: Text(
-                    loc.displayPersonNameForLanguage(
-                        employeeFullNameRaw(emp), loc.currentLanguageCode),
+                    displayStoredPersonName(
+                      employeeFullNameRaw(emp),
+                      loc,
+                      showNameTranslit: showNameTranslit,
+                    ),
                   ),
                   subtitle: Text(
                     employeePositionLine(emp, loc,
@@ -3211,12 +3248,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 scrollDirection: Axis.horizontal,
                 child: SizedBox(
                   width: 1400,
-                  child: _buildFormByType(loc),
+                  child: _buildFormByType(loc, showNameTranslit),
                 ),
               ),
             ] else ...[
               const SizedBox(height: 8),
-              _buildFormByTypeMobile(loc),
+              _buildFormByTypeMobile(loc, showNameTranslit),
             ],
             const SizedBox(height: 24),
             FilledButton(

@@ -9,6 +9,7 @@ import '../models/haccp_log_type.dart';
 import '../models/tech_card.dart';
 import '../services/product_store_supabase.dart';
 import '../services/services.dart';
+import '../utils/employee_display_utils.dart';
 import '../utils/haccp_stored_field_localizer.dart';
 import '../services/haccp_pdf_export_service.dart';
 import '../services/inventory_download.dart';
@@ -710,6 +711,9 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                               logType == HaccpLogType.warehouseTempHumidity
                                   ? _selectedWarehousePremises
                                   : null,
+                          showNameTranslit: context
+                              .watch<ScreenLayoutPreferenceService>()
+                              .showNameTranslit,
                         ),
                 ),
               ],
@@ -792,6 +796,7 @@ class _JournalTableView extends StatelessWidget {
     required this.onLogTap,
     required this.techCardsById,
     this.warehousePremisesName,
+    required this.showNameTranslit,
   });
 
   final HaccpLogType logType;
@@ -799,6 +804,9 @@ class _JournalTableView extends StatelessWidget {
   final List<HaccpLog> logs;
   final List<Employee> employees;
   final void Function(HaccpLog log) onLogTap;
+
+  /// Как в списках сотрудников: транслит кириллицы при русском UI.
+  final bool showNameTranslit;
 
   /// ТТК по id для локализованных названий блюд в бракераже готовой продукции.
   final Map<String, TechCard?> techCardsById;
@@ -842,14 +850,20 @@ class _JournalTableView extends StatelessWidget {
         ),
       );
 
+  String _displayPerson(LocalizationService loc, String? raw) =>
+      displayStoredPersonName(raw, loc, showNameTranslit: showNameTranslit);
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final idToEmp = {for (final e in employees) e.id: e};
     final idToName = <String, String>{};
     for (final e in employees) {
-      final raw = '${e.fullName}${e.surname != null ? ' ${e.surname}' : ''}';
-      final name = loc.displayPersonNameForUi(raw);
+      final name = displayStoredPersonName(
+        employeeFullNameRaw(e),
+        loc,
+        showNameTranslit: showNameTranslit,
+      );
       final role = e.roles.isNotEmpty ? loc.roleDisplayName(e.roles.first) : '';
       idToName[e.id] = role.isEmpty ? name : '$name, $role';
     }
@@ -954,7 +968,7 @@ class _JournalTableView extends StatelessWidget {
         final log = e.value;
         return TableRow(children: [
           _wrapTap(_cell('${e.key + 1}'), log),
-          _wrapTap(_cell(log.medExamEmployeeName ?? '—'), log),
+          _wrapTap(_cell(_displayPerson(loc, log.medExamEmployeeName)), log),
           _wrapTap(_cell(log.medExamPosition ?? '—'), log),
           _wrapTap(
               _cell(log.medExamDate != null
@@ -1005,9 +1019,10 @@ class _JournalTableView extends StatelessWidget {
                     : '—'),
                 log),
             _wrapTap(
-                _cell(log.disinfResponsibleName ??
-                    idToName[log.createdByEmployeeId] ??
-                    '—'),
+                _cell(log.disinfResponsibleName != null &&
+                        log.disinfResponsibleName!.trim().isNotEmpty
+                    ? _displayPerson(loc, log.disinfResponsibleName)
+                    : (idToName[log.createdByEmployeeId] ?? '—')),
                 log),
           ])),
     ];
@@ -1038,9 +1053,10 @@ class _JournalTableView extends StatelessWidget {
             _wrapTap(_cell(log.washSolutionName ?? '—'), log),
             _wrapTap(_cell(log.washDisinfectantName ?? '—'), log),
             _wrapTap(
-                _cell(log.washControllerSignature ??
-                    idToName[log.createdByEmployeeId] ??
-                    '—'),
+                _cell(log.washControllerSignature != null &&
+                        log.washControllerSignature!.trim().isNotEmpty
+                    ? _displayPerson(loc, log.washControllerSignature)
+                    : (idToName[log.createdByEmployeeId] ?? '—')),
                 log),
           ])),
     ];
@@ -1074,9 +1090,10 @@ class _JournalTableView extends StatelessWidget {
                   : '—'),
               log),
           _wrapTap(
-              _cell(log.genCleanResponsible ??
-                  idToName[log.createdByEmployeeId] ??
-                  '—'),
+              _cell(log.genCleanResponsible != null &&
+                      log.genCleanResponsible!.trim().isNotEmpty
+                  ? _displayPerson(loc, log.genCleanResponsible)
+                  : (idToName[log.createdByEmployeeId] ?? '—')),
               log),
         ]);
       }),
@@ -1110,9 +1127,10 @@ class _JournalTableView extends StatelessWidget {
                     : '—'),
                 log),
             _wrapTap(
-                _cell(log.sieveSignature ??
-                    idToName[log.createdByEmployeeId] ??
-                    '—'),
+                _cell(log.sieveSignature != null &&
+                        log.sieveSignature!.trim().isNotEmpty
+                    ? _displayPerson(loc, log.sieveSignature)
+                    : (idToName[log.createdByEmployeeId] ?? '—')),
                 log),
             _wrapTap(_cell(log.sieveComments ?? '—'), log),
           ])),
@@ -1153,7 +1171,7 @@ class _JournalTableView extends StatelessWidget {
         return TableRow(
           children: [
             _wrapTap(_cell('${e.key + 1}'), log),
-            _wrapTap(_cell(log.medBookEmployeeName ?? '—'), log),
+            _wrapTap(_cell(_displayPerson(loc, log.medBookEmployeeName)), log),
             _wrapTap(_cell(log.medBookPosition ?? '—'), log),
             _wrapTap(_cell(log.medBookNumber ?? '—'), log),
             _wrapTap(
@@ -1221,9 +1239,10 @@ class _JournalTableView extends StatelessWidget {
                       : '—'),
                   log),
               _wrapTap(
-                  _cell(log.commissionSignatures ??
-                      idToName[log.createdByEmployeeId] ??
-                      '—'),
+                  _cell(log.commissionSignatures != null &&
+                          log.commissionSignatures!.trim().isNotEmpty
+                      ? _displayPerson(loc, log.commissionSignatures)
+                      : (idToName[log.createdByEmployeeId] ?? '—')),
                   log),
             ],
           )),
@@ -1269,20 +1288,17 @@ class _JournalTableView extends StatelessWidget {
         final subjectId = parsed.subjectEmployeeId ?? log.createdByEmployeeId;
         final emp = idToEmp[subjectId];
         final rawName = parsed.employeeNameSnapshot ??
-            (emp != null
-                ? '${emp.fullName}${emp.surname != null ? ' ${emp.surname}' : ''}'
-                : null) ??
+            (emp != null ? employeeFullNameRaw(emp) : null) ??
             '—';
-        final name = loc.displayPersonNameForUi(rawName);
+        final name = _displayPerson(loc, rawName == '—' ? null : rawName);
         final pos = loc.healthHygienePositionLabel(
           storedPosition: parsed.positionOverride,
           employee: emp,
         );
         final creator = idToEmp[log.createdByEmployeeId];
-        final creatorRaw = creator != null
-            ? '${creator.fullName}${creator.surname != null ? ' ${creator.surname}' : ''}'
-            : '—';
-        final creatorName = loc.displayPersonNameForUi(creatorRaw);
+        final creatorRaw =
+            creator != null ? employeeFullNameRaw(creator) : null;
+        final creatorName = _displayPerson(loc, creatorRaw);
         final r = log.statusOk == true
             ? loc.t('haccp_status_admitted')
             : (log.statusOk == false ? loc.t('haccp_status_suspended') : '—');
@@ -1469,7 +1485,7 @@ class _JournalTableView extends StatelessWidget {
             _wrapTap(_cell(dish), log),
             _wrapTap(_cell(result), log),
             _wrapTap(_cell(approval), log),
-            _wrapTap(_cell(log.commissionSignatures ?? '—'), log),
+            _wrapTap(_cell(_displayPerson(loc, log.commissionSignatures)), log),
             _wrapTap(_cell(weighing), log),
             _wrapTap(_cell(note), log),
           ],
