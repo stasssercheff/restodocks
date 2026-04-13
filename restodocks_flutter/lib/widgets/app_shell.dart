@@ -472,7 +472,7 @@ class _AppShellState extends State<AppShell> {
           final am = context.read<AccountManagerSupabase>();
           if (!am.hasProSubscription &&
               (action == HomeButtonAction.inventory ||
-                  action == HomeButtonAction.expenses)) {
+                  (action == HomeButtonAction.expenses && !kIsWeb))) {
             unawaited(showSubscriptionRequiredDialog(context));
             return;
           }

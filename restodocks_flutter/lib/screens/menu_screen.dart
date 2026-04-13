@@ -12,6 +12,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../core/subscription_entitlements.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 import '../services/inventory_download.dart';
@@ -298,6 +299,7 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   /// Вкладка «Фудкост»: шеф/су-шеф, барменеджер, менеджер зала, ген. директор, собственник, руководство (офис).
+  /// На тарифе Lite недоступна ([_foodcostTabEligible]).
   bool _showFoodcostTab(Employee? emp) {
     if (emp == null) return false;
     if (widget.department == 'banquet-catering' ||
@@ -323,6 +325,12 @@ class _MenuScreenState extends State<MenuScreen> {
             emp.hasRole('sous_chef') ||
             mgmtFoodcost;
     }
+  }
+
+  /// Фудкост в меню — не в Lite (п. 4 спецификации Lite).
+  bool _foodcostTabEligible(Employee? emp, Establishment? est) {
+    if (SubscriptionEntitlements.from(est).isLiteTier) return false;
+    return _showFoodcostTab(emp);
   }
 
   /// Скачать карточку блюда могут только руководители подразделения.
@@ -1198,7 +1206,7 @@ class _MenuScreenState extends State<MenuScreen> {
     final sym = estForCur?.currencySymbol ??
         empForCur?.currencySymbol ??
         Establishment.currencySymbolFor(currencyCode);
-    final showFoodcost = _showFoodcostTab(emp);
+    final showFoodcost = _foodcostTabEligible(emp, estForCur);
     final menuSeg = showFoodcost ? _menuSegment : 0;
     final isPhoneLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape &&
@@ -1408,7 +1416,7 @@ class _MenuScreenState extends State<MenuScreen> {
     final account = context.read<AccountManagerSupabase>();
     final emp = account.currentEmployee;
     final est = account.establishment;
-    final showFoodcost = _showFoodcostTab(emp);
+    final showFoodcost = _foodcostTabEligible(emp, est);
     final menuSeg = showFoodcost ? _menuSegment : 0;
     if (showFoodcost && menuSeg == 1 && est != null) {
       return MenuFoodcostPanel(

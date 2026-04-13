@@ -1,4 +1,5 @@
 import 'package:feature_spotlight/feature_spotlight.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -118,8 +119,9 @@ class ManagementHomeContent extends StatelessWidget {
           if ((isChef || roles.contains('sous_chef')) && !isGeneral)
             HomeFeatureTile(
               icon: Icons.payments,
-              title: loc.t('salary_tab_fzp') ?? 'ФЗП',
-              onTap: () => context.go('/expenses/salary?department=kitchen'),
+              title: kIsWeb ? (loc.t('expenses') ?? 'Расходы') : (loc.t('salary_tab_fzp') ?? 'ФЗП'),
+              onTap: () =>
+                  context.go('/expenses/salary?department=kitchen'),
             ),
         ],
       );
@@ -277,28 +279,50 @@ class ManagementHomeContent extends StatelessWidget {
           HomeFeatureTile(
               icon: Icons.savings,
               title: loc.t('expenses'),
-              subscriptionLocked: !subOk,
+              subscriptionLocked: !subOk && !kIsWeb,
               onTap: () => context.go('/expenses')),
         ],
-        // ФЗП подразделения для руководителей: шеф/су-шеф (кухня), менеджер зала (зал), барменеджер (бар)
-        if ((isChef || roles.contains('sous_chef')) && !isGeneral)
+        // Веб: одна кнопка «Расходы» → ФЗП по подразделению (без дубля «ФЗП» ×3).
+        if (kIsWeb &&
+            !isGeneral &&
+            (isChef ||
+                roles.contains('sous_chef') ||
+                isBarManager ||
+                isFloorManager))
           HomeFeatureTile(
-              icon: Icons.payments,
-              title: loc.t('salary_tab_fzp') ?? 'ФЗП',
-              subscriptionLocked: !subOk,
-              onTap: () => context.go('/expenses/salary?department=kitchen')),
-        if (roles.contains('floor_manager') && !isGeneral)
-          HomeFeatureTile(
-              icon: Icons.payments,
-              title: loc.t('salary_tab_fzp') ?? 'ФЗП',
-              subscriptionLocked: !subOk,
-              onTap: () => context.go('/expenses/salary?department=hall')),
-        if (isBarManager && !isGeneral)
-          HomeFeatureTile(
-              icon: Icons.payments,
-              title: loc.t('salary_tab_fzp') ?? 'ФЗП',
-              subscriptionLocked: !subOk,
-              onTap: () => context.go('/expenses/salary?department=bar')),
+            icon: Icons.payments,
+            title: loc.t('expenses') ?? 'Расходы',
+            onTap: () {
+              final d = isBarManager
+                  ? 'bar'
+                  : isFloorManager
+                      ? 'hall'
+                      : 'kitchen';
+              context.go('/expenses/salary?department=$d');
+            },
+          ),
+        // Натив: отдельные плитки ФЗП по отделам.
+        if (!kIsWeb) ...[
+          if ((isChef || roles.contains('sous_chef')) && !isGeneral)
+            HomeFeatureTile(
+                icon: Icons.payments,
+                title: loc.t('salary_tab_fzp') ?? 'ФЗП',
+                subscriptionLocked: !subOk,
+                onTap: () =>
+                    context.go('/expenses/salary?department=kitchen')),
+          if (roles.contains('floor_manager') && !isGeneral)
+            HomeFeatureTile(
+                icon: Icons.payments,
+                title: loc.t('salary_tab_fzp') ?? 'ФЗП',
+                subscriptionLocked: !subOk,
+                onTap: () => context.go('/expenses/salary?department=hall')),
+          if (isBarManager && !isGeneral)
+            HomeFeatureTile(
+                icon: Icons.payments,
+                title: loc.t('salary_tab_fzp') ?? 'ФЗП',
+                subscriptionLocked: !subOk,
+                onTap: () => context.go('/expenses/salary?department=bar')),
+        ],
       ],
     );
   }

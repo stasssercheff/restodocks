@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -137,7 +138,7 @@ List<HomeButtonAction> homeButtonActionsFor(Employee? emp,
       HomeButtonAction.checklists,
       HomeButtonAction.nomenclature,
       HomeButtonAction.inventory,
-      if (hasProSubscription) HomeButtonAction.expenses,
+      if (hasProSubscription || kIsWeb) HomeButtonAction.expenses,
     ];
   }
   // Линейный сотрудник

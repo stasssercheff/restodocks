@@ -722,6 +722,7 @@ class AppRouter {
             pageBuilder: (context, state) => _slideTransitionPage(
               state,
               const SubscriptionOrTrialGate(
+                allowLiteTier: true,
                 child: ExpensesScreen(),
               ),
             ),

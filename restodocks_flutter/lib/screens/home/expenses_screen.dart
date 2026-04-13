@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/subscription_entitlements.dart';
 import '../../models/models.dart';
 import '../../services/inventory_download.dart';
 import '../../services/services.dart';
@@ -43,6 +45,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final account = context.watch<AccountManagerSupabase>();
+    final ent = SubscriptionEntitlements.from(account.establishment);
+    // Веб: только ФЗП. Lite (после триала): только ФЗП — без заказов/списаний, требующих Pro на бэке.
+    final fzpOnly = kIsWeb || ent.isLiteTier;
 
     return Scaffold(
       appBar: AppBar(
@@ -51,46 +57,58 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           child: Text(loc.t('expenses') ?? 'Расходы'),
         ),
       ),
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              border: Border(
-                bottom: BorderSide(color: Theme.of(context).dividerColor, width: 1),
-              ),
-            ),
-            child: Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildTabChip(_ExpensesTab.fzp, loc.t('salary_tab_fzp') ?? 'ФЗП', loc),
-                  const SizedBox(width: 8),
-                  _buildTabChip(_ExpensesTab.productOrders, loc.t('expenses_tab_product_orders') ?? 'Заказы продуктов', loc),
-                  const SizedBox(width: 8),
-                  _buildTabChip(_ExpensesTab.writeoffs, loc.t('expenses_tab_writeoffs') ?? 'Списания', loc),
-                  const SizedBox(width: 8),
-                  _buildTabChip(
-                    _ExpensesTab.procurementReceipts,
-                    loc.t('expenses_tab_procurement') ?? 'Поставки',
-                    loc,
+      body: fzpOnly
+          ? const SalaryExpenseScreen(embedInScaffold: false)
+          : Column(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    border: Border(
+                      bottom: BorderSide(
+                          color: Theme.of(context).dividerColor, width: 1),
+                    ),
                   ),
-                ],
-              ),
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildTabChip(_ExpensesTab.fzp,
+                            loc.t('salary_tab_fzp') ?? 'ФЗП', loc),
+                        const SizedBox(width: 8),
+                        _buildTabChip(
+                            _ExpensesTab.productOrders,
+                            loc.t('expenses_tab_product_orders') ??
+                                'Заказы продуктов',
+                            loc),
+                        const SizedBox(width: 8),
+                        _buildTabChip(
+                            _ExpensesTab.writeoffs,
+                            loc.t('expenses_tab_writeoffs') ?? 'Списания',
+                            loc),
+                        const SizedBox(width: 8),
+                        _buildTabChip(
+                          _ExpensesTab.procurementReceipts,
+                          loc.t('expenses_tab_procurement') ?? 'Поставки',
+                          loc,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: _selectedTab == _ExpensesTab.fzp
+                      ? const SalaryExpenseScreen(embedInScaffold: false)
+                      : _selectedTab == _ExpensesTab.productOrders
+                          ? const _ProductOrdersTab()
+                          : _selectedTab == _ExpensesTab.writeoffs
+                              ? const _WriteoffsTab()
+                              : const _ProcurementReceiptsTab(),
+                ),
+              ],
             ),
-          ),
-          Expanded(
-            child: _selectedTab == _ExpensesTab.fzp
-                ? const SalaryExpenseScreen(embedInScaffold: false)
-                : _selectedTab == _ExpensesTab.productOrders
-                    ? const _ProductOrdersTab()
-                    : _selectedTab == _ExpensesTab.writeoffs
-                        ? const _WriteoffsTab()
-                        : const _ProcurementReceiptsTab(),
-          ),
-        ],
-      ),
     );
   }
 

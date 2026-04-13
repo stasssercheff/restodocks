@@ -1,4 +1,5 @@
 import 'package:feature_spotlight/feature_spotlight.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -147,6 +148,14 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                       title: loc.t('employees'),
                       onTap: () => context.go('/employees')),
                   'home-employees')),
+          ownerTile(
+              'owner_expenses_lite',
+              _wrap(
+                  HomeFeatureTile(
+                      icon: Icons.payments,
+                      title: loc.t('expenses') ?? 'Расходы',
+                      onTap: () => context.go('/expenses')),
+                  'home-expenses-lite')),
         ],
       );
     }
@@ -509,7 +518,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
             HomeFeatureTile(
                 icon: Icons.payments,
                 title: loc.t('expenses'),
-                subscriptionLocked: !subOk,
+                subscriptionLocked: !subOk && !kIsWeb,
                 onTap: () => context.go('/expenses')),
             'home-expenses')),
       ],
