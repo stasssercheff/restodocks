@@ -3174,8 +3174,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           if (context.read<AiService>() is AiServiceSupabase) {
             final reason = AiServiceSupabase.lastParseTechCardExcelReason ??
                 AiServiceSupabase.lastParseTechCardPdfReason;
-            if (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day') {
-              msg = loc.t('ai_ttk_limit_3_per_day') ?? '';
+            if (reason == 'ai_limit_exceeded' ||
+                reason == 'limit_3_per_day' ||
+                reason == 'ai_ttk_limit_trial_total' ||
+                reason == 'ai_ttk_limit_pro_month' ||
+                reason == 'ai_ttk_limit_ultra_month' ||
+                reason == 'ai_ttk_no_access_lite') {
+              msg = _aiTtkLimitMessage(reason ?? '', loc);
             } else if (reason == 'service_unavailable') {
               msg = loc.t('ai_ttk_pdf_service_unavailable') ??
                   'Сервис распознавания временно недоступен. Экспортируйте PDF в Word или Excel и загрузите снова.';
@@ -3622,8 +3627,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   }
 
   static String _pdfFailureMessage(String reason, LocalizationService loc) {
-    if (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day') {
-      return loc.t('ai_ttk_limit_3_per_day');
+    if (reason == 'ai_limit_exceeded' ||
+        reason == 'limit_3_per_day' ||
+        reason == 'ai_ttk_limit_trial_total' ||
+        reason == 'ai_ttk_limit_pro_month' ||
+        reason == 'ai_ttk_limit_ultra_month' ||
+        reason == 'ai_ttk_no_access_lite') {
+      return _aiTtkLimitMessage(reason, loc);
     }
     if (reason.startsWith('empty_text'))
       return 'PDF не содержит извлекаемого текста.';
@@ -3640,6 +3650,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     if (reason == 'invoke_null')
       return 'Сервер не ответил (503). Первый запрос после паузы может занять до минуты — подождите и попробуйте снова.';
     return loc.t('ai_tech_card_pdf_format_hint');
+  }
+
+  static String _aiTtkLimitMessage(String reason, LocalizationService loc) {
+    switch (reason) {
+      case 'ai_ttk_no_access_lite':
+        return 'Lite: создание ТТК с ИИ недоступно.';
+      case 'ai_ttk_limit_trial_total':
+      case 'limit_3_per_day':
+        return 'Триал: лимит создания ТТК с ИИ — 3 за первые 3 дня.';
+      case 'ai_ttk_limit_pro_month':
+        return 'Pro: лимит создания ТТК с ИИ — 15 в месяц.';
+      case 'ai_ttk_limit_ultra_month':
+        return 'Ultra: лимит создания ТТК с ИИ — 40 в месяц.';
+      default:
+        return loc.t('ai_ttk_limit_3_per_day');
+    }
   }
 
   /// Простой разбор Excel: столбец A или B — названия ПФ/блюд.

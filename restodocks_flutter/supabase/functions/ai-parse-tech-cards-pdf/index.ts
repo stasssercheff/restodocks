@@ -380,12 +380,16 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 3. Шаблон и каталог не сработали — AI. Проверяем лимит (3 ТТК/день на заведение)
+    // 3. Шаблон и каталог не сработали — AI. Проверяем лимит по тарифу.
     if (establishmentId) {
       const { checkAndIncrementAiTtkUsage } = await import("../_shared/ai_ttk_limit.ts");
-      const { allowed } = await checkAndIncrementAiTtkUsage(establishmentId);
+      const { allowed, reason } = await checkAndIncrementAiTtkUsage(establishmentId);
       if (!allowed) {
-        const payload: Record<string, unknown> = { cards: [], reason: "ai_limit_exceeded", error: "limit_3_per_day" };
+        const payload: Record<string, unknown> = {
+          cards: [],
+          reason: reason ?? "ai_limit_exceeded",
+          error: reason ?? "ai_limit_exceeded",
+        };
         if (rows.length >= 2) payload.rows = rows;
         return new Response(JSON.stringify(payload), {
           status: 200, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } },

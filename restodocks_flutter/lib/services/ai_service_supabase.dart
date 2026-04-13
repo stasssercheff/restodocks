@@ -424,7 +424,9 @@ class AiServiceSupabase implements AiService {
         final data = await invoke('ai-recognize-tech-cards-batch', body);
         if (data == null) return [];
         final err = data['error'] as String? ?? data['reason'] as String?;
-        if (err == 'limit_3_per_day' || err == 'ai_limit_exceeded') lastParseTechCardExcelReason = err;
+        if (err != null && err.trim().isNotEmpty) {
+          lastParseTechCardExcelReason = err;
+        }
         final raw = data['cards'];
         if (raw is! List) return [];
         list = <TechCardRecognitionResult>[];

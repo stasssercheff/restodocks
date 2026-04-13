@@ -30,10 +30,10 @@ Deno.serve(async (req: Request) => {
     // Лимит: 3 парсинга через AI в день на заведение
     if (establishmentId) {
       const { checkAndIncrementAiTtkUsage } = await import("../_shared/ai_ttk_limit.ts");
-      const { allowed } = await checkAndIncrementAiTtkUsage(establishmentId);
+      const { allowed, reason } = await checkAndIncrementAiTtkUsage(establishmentId);
       if (!allowed) {
         return new Response(
-          JSON.stringify({ cards: [], error: "limit_3_per_day", reason: "ai_limit_exceeded" }),
+          JSON.stringify({ cards: [], error: reason ?? "ai_limit_exceeded", reason: reason ?? "ai_limit_exceeded" }),
           { status: 200, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } },
         );
       }
