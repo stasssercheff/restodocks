@@ -875,34 +875,27 @@ class _JournalTableView extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-          child: logType == HaccpLogType.warehouseTempHumidity
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      loc.t('haccp_sanpin_line_warehouse_temp_humidity'),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.primary),
-                    ),
-                    if (warehousePremisesName != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '${loc.t('haccp_warehouse_premises')}: $warehousePremisesName',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleSmall
-                            ?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ],
-                )
-              : Text(
-                  loc.t('haccp_recommended_sample'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                loc.t('haccp_sanpin_line_${logType.code}'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.primary),
+              ),
+              if (logType == HaccpLogType.warehouseTempHumidity &&
+                  warehousePremisesName != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '${loc.t('haccp_warehouse_premises')}: $warehousePremisesName',
                   style: Theme.of(context)
                       .textTheme
                       .titleSmall
-                      ?.copyWith(color: Theme.of(context).colorScheme.primary),
+                      ?.copyWith(fontWeight: FontWeight.w600),
                 ),
+              ],
+            ],
+          ),
         ),
         Expanded(
           child: SingleChildScrollView(

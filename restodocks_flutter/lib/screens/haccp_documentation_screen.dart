@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/employee.dart';
 import '../models/models.dart';
+import '../legal/legal_compliance_provider.dart';
 import '../services/haccp_agreement_pdf_service.dart';
 import '../services/haccp_order_pdf_service.dart';
 import '../services/inventory_download.dart';
@@ -97,7 +98,10 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
         stampHint: loc.tForLanguage(pickedLang, 'haccp_agreement_stamp_hint'),
         workerSignLabel:
             loc.tForLanguage(pickedLang, 'haccp_agreement_worker_sign'),
-        agreementBody: loc.tForLanguage(pickedLang, 'haccp_agreement_body'),
+        agreementBody: LegalComplianceProvider.applyCompliancePlaceholders(
+          loc.tForLanguage(pickedLang, 'haccp_agreement_body'),
+          LegalComplianceProvider.complianceForLanguageCode(pickedLang),
+        ),
         employerPositionLabel:
             (employerPosition != null && employerPosition != 'role_$roleCode')
                 ? employerPosition

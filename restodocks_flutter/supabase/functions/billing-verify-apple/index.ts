@@ -94,7 +94,17 @@ function toExpiresMs(raw: unknown): number | null {
   return null;
 }
 
-const TARGET_PRODUCT_ID = "restodocks_pro_monthly";
+/** Подписки Restodocks в одном чеке: Pro и Ultra (разные product_id в App Store Connect). */
+const TARGET_SUBSCRIPTION_PRODUCT_IDS = new Set([
+  "restodocks_pro_monthly",
+  "restodocks_ultra_monthly",
+]);
+
+const ULTRA_PRODUCT_ID = "restodocks_ultra_monthly";
+
+function isTargetSubscriptionProductId(id: string): boolean {
+  return TARGET_SUBSCRIPTION_PRODUCT_IDS.has(String(id ?? "").trim());
+}
 
 function extractMaxExpiryMs(data: AppleVerifyReceiptResponse): number | null {
   let maxMs: number | null = null;
@@ -109,7 +119,7 @@ function extractMaxExpiryMs(data: AppleVerifyReceiptResponse): number | null {
     ...((data.receipt?.in_app as Array<Record<string, unknown>> | undefined) ?? []),
   ];
   const forOurProduct = fromReceipt.filter((row) =>
-    String(row["product_id"] ?? "") === TARGET_PRODUCT_ID
+    isTargetSubscriptionProductId(String(row["product_id"] ?? ""))
   );
   const rows = forOurProduct.length > 0 ? forOurProduct : fromReceipt;
 
@@ -120,7 +130,7 @@ function extractMaxExpiryMs(data: AppleVerifyReceiptResponse): number | null {
 
   // Billing grace / retry: конец доступа может быть позже `expires_date_ms` строки подписки.
   for (const row of data.pending_renewal_info ?? []) {
-    if (String(row["product_id"] ?? "") !== TARGET_PRODUCT_ID && forOurProduct.length > 0) {
+    if (!isTargetSubscriptionProductId(String(row["product_id"] ?? "")) && forOurProduct.length > 0) {
       continue;
     }
     consider(row["grace_period_expires_date_ms"]);
@@ -136,9 +146,33 @@ function pickReceiptRows(data: AppleVerifyReceiptResponse): Array<Record<string,
     ...((data.receipt?.in_app as Array<Record<string, unknown>> | undefined) ?? []),
   ];
   const forOurProduct = fromReceipt.filter((row) =>
-    String(row["product_id"] ?? "") === TARGET_PRODUCT_ID
+    isTargetSubscriptionProductId(String(row["product_id"] ?? ""))
   );
   return forOurProduct.length > 0 ? forOurProduct : fromReceipt;
+}
+
+/** Среди активных по времени строк чека выбираем Ultra, если есть активная подписка Ultra. */
+function subscriptionTypeFromReceipt(
+  data: AppleVerifyReceiptResponse,
+  expiryMs: number | null,
+  nowMs: number,
+): "pro" | "ultra" {
+  if (expiryMs == null || expiryMs <= nowMs) return "pro";
+  const rows = [
+    ...(data.latest_receipt_info ?? []),
+    ...((data.receipt?.in_app as Array<Record<string, unknown>> | undefined) ?? []),
+  ];
+  const ours = rows.filter((row) =>
+    isTargetSubscriptionProductId(String(row["product_id"] ?? ""))
+  );
+  for (const row of ours) {
+    const ms = rowExpiryMs(row);
+    if (ms == null || ms <= nowMs) continue;
+    if (String(row["product_id"] ?? "").trim() === ULTRA_PRODUCT_ID) {
+      return "ultra";
+    }
+  }
+  return "pro";
 }
 
 function rowExpiryMs(row: Record<string, unknown>): number | null {
@@ -160,7 +194,7 @@ function rawOtid(row: Record<string, unknown>): string {
 function extractOriginalTransactionId(data: AppleVerifyReceiptResponse): string | null {
   const rows = pickReceiptRows(data);
   const pending = (data.pending_renewal_info ?? []).filter((row) =>
-    String(row["product_id"] ?? "") === TARGET_PRODUCT_ID ||
+    isTargetSubscriptionProductId(String(row["product_id"] ?? "")) ||
     rows.length === 0
   );
   const combined = [...rows, ...pending];
@@ -700,8 +734,13 @@ Deno.serve(async (req: Request) => {
     }
 
     const nowIso = new Date().toISOString();
+    const paidTier = subscriptionTypeFromReceipt(appleResp, expiryMs, nowMs);
     const updatePayload = isActive
-      ? { subscription_type: "pro", pro_paid_until: paidUntilIso, updated_at: nowIso }
+      ? {
+        subscription_type: paidTier,
+        pro_paid_until: paidUntilIso,
+        updated_at: nowIso,
+      }
       : { subscription_type: "free", pro_paid_until: paidUntilIso, updated_at: nowIso };
 
     const { error: updateError } = await supabase

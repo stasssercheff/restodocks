@@ -6,12 +6,20 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/iap_constants.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 import '../utils/iap_product_price_format.dart';
-import 'post_registration_trial_dialog.dart';
+import 'subscription_plans_dialog.dart';
 
-/// Блок настроек PRO для собственника: промокод, оплата (iOS IAP), условия.
+String _iapSubscriptionPurchaseLabel(LocalizationService loc, String productId) {
+  if (productId == kRestodocksUltraMonthlyProductId) {
+    return loc.t('subscription_iap_purchase_ultra');
+  }
+  return loc.t('subscription_iap_purchase_pro');
+}
+
+/// Блок настроек подписки для собственника: промокод, тарифы, оплата (iOS IAP).
 class ProSettingsOwnerSection extends StatefulWidget {
   const ProSettingsOwnerSection({
     super.key,
@@ -511,8 +519,8 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     final loc = widget.localization;
     return ExpansionTile(
       leading: const Icon(Icons.workspace_premium_outlined),
-      title: Text(loc.t('pro_settings')),
-      subtitle: Text(loc.t('pro_settings_desc')),
+      title: Text(loc.t('subscription_settings')),
+      subtitle: Text(loc.t('subscription_settings_desc')),
       onExpansionChanged: (expanded) {
         if (expanded) unawaited(_syncProSectionFromServer());
       },
@@ -584,6 +592,13 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
             );
           },
         ),
+        ListTile(
+          leading: const Icon(Icons.list_alt_outlined),
+          title: Text(loc.t('subscription_plans_list_tile_title')),
+          subtitle: Text(loc.t('subscription_plans_list_tile_subtitle')),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => showSubscriptionPlansDialog(context),
+        ),
         FutureBuilder<EstablishmentPromoInfo>(
           future: _promoFuture,
           builder: (context, promoSnap) {
@@ -596,7 +611,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                   builder: (context, iap, _) {
                     final busy = iap.busy;
                     final subtitle = !paidPro
-                        ? loc.t('pro_payment_subtitle')
+                        ? loc.t('subscription_payment_list_tile_subtitle')
                         : _paidProPaymentSubtitle(
                             loc,
                             promo,
@@ -604,7 +619,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                           );
                     return ListTile(
                       leading: const Icon(Icons.payment_outlined),
-                      title: Text(loc.t('pro_payment_title')),
+                      title: Text(loc.t('subscription_payment_list_tile_title')),
                       subtitle: Text(subtitle),
                       trailing: busy
                           ? const SizedBox(
@@ -645,13 +660,6 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
               },
             );
           },
-        ),
-        ListTile(
-          leading: const Icon(Icons.description_outlined),
-          title: Text(loc.t('pro_conditions_title')),
-          subtitle: Text(loc.t('pro_conditions_subtitle')),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => showPostRegistrationTrialDialog(context),
         ),
       ],
     );
@@ -743,7 +751,8 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
           builder: (context, _) {
             final paid = widget.accountManager.hasPaidProSubscription;
             final est = widget.accountManager.establishment;
-            final product = widget.iap.product;
+            final subs = widget.iap.subscriptionProducts;
+            final addons = widget.iap.addonProducts;
             final ready = widget.iap.ready;
             final theme = Theme.of(context);
             final cs = theme.colorScheme;
@@ -806,56 +815,84 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
                               height: 1.45,
                             ),
                           ),
-                          if (ready && product != null) ...[
+                          if (ready && subs.isNotEmpty) ...[
                             const SizedBox(height: 16),
-                            DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: cs.surfaceContainerHighest
-                                    .withValues(alpha: 0.65),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                  horizontal: 12,
+                            for (final d in subs) ...[
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: cs.surfaceContainerHighest
+                                      .withValues(alpha: 0.65),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    Text(
-                                      widget.formatIapPrice(product),
-                                      textAlign: TextAlign.center,
-                                      style: theme.textTheme.headlineSmall
-                                          ?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        color: cs.primary,
-                                      ),
-                                    ),
-                                    if (product.currencyCode
-                                        .trim()
-                                        .isNotEmpty) ...[
-                                      const SizedBox(height: 6),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                    horizontal: 12,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
                                       Text(
-                                        loc.t('pro_payment_iap_currency_line',
-                                            args: {
-                                              'code': product.currencyCode
-                                                  .trim()
-                                                  .toUpperCase(),
-                                            }),
+                                        widget.formatIapPrice(d),
                                         textAlign: TextAlign.center,
-                                        style: theme.textTheme.bodySmall
+                                        style: theme.textTheme.headlineSmall
                                             ?.copyWith(
-                                          color: cs.onSurfaceVariant,
-                                          height: 1.3,
+                                          fontWeight: FontWeight.w700,
+                                          color: cs.primary,
                                         ),
                                       ),
+                                      if (d.currencyCode.trim().isNotEmpty) ...[
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          loc.t('pro_payment_iap_currency_line',
+                                              args: {
+                                                'code': d.currencyCode
+                                                    .trim()
+                                                    .toUpperCase(),
+                                              }),
+                                          textAlign: TextAlign.center,
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                            color: cs.onSurfaceVariant,
+                                            height: 1.3,
+                                          ),
+                                        ),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 10),
+                              const SizedBox(height: 10),
+                            ],
+                            if (addons.isNotEmpty) ...[
+                              Text(
+                                loc.t('subscription_iap_addons_heading'),
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              for (final a in addons) ...[
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: Text(
+                                    '${a.title}: ${widget.formatIapPrice(a)}',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              Text(
+                                loc.t('subscription_iap_addons_hint'),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                  height: 1.35,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
                             Text(
                               loc.t('pro_payment_price_note'),
                               textAlign: TextAlign.center,
@@ -898,15 +935,17 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
                           ),
                           const SizedBox(height: 12),
                         ],
-                        if (!paid && ready && product != null) ...[
-                          FilledButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              unawaited(widget.iap.purchasePro());
-                            },
-                            child: Text(loc.t('pro_purchase')),
-                          ),
-                          const SizedBox(height: 10),
+                        if (!paid && ready && subs.isNotEmpty) ...[
+                          for (final d in subs) ...[
+                            FilledButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                unawaited(widget.iap.purchaseSubscription(d.id));
+                              },
+                              child: Text(_iapSubscriptionPurchaseLabel(loc, d.id)),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
                         ],
                         if (paid) ...[
                           OutlinedButton(

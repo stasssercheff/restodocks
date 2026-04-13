@@ -12,6 +12,7 @@ import '../core/feature_flags.dart';
 import '../core/subscription_entitlements.dart';
 import '../services/haccp_agreement_pdf_service.dart';
 import '../services/inventory_download.dart';
+import '../legal/legal_compliance_provider.dart';
 import '../services/services.dart';
 import '../services/home_layout_config_service.dart';
 import '../services/screen_layout_preference_service.dart';
@@ -1524,7 +1525,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         employerLabel: loc.tForLanguage(lang, 'haccp_agreement_employer'),
         stampHint: loc.tForLanguage(lang, 'haccp_agreement_stamp_hint'),
         workerSignLabel: loc.tForLanguage(lang, 'haccp_agreement_worker_sign'),
-        agreementBody: loc.tForLanguage(lang, 'haccp_agreement_body'),
+        agreementBody: LegalComplianceProvider.applyCompliancePlaceholders(
+          loc.tForLanguage(lang, 'haccp_agreement_body'),
+          LegalComplianceProvider.complianceForLanguageCode(lang),
+        ),
         employerPositionLabel:
             (employerPosition != null && employerPosition != 'role_$roleCode')
                 ? employerPosition

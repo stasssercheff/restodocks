@@ -643,9 +643,9 @@ function PromoTab() {
   const [newPromoLogic, setNewPromoLogic] = useState<'legacy' | 'activation'>('legacy')
   const [newGrantTier, setNewGrantTier] = useState<PromoGrantSubscriptionType>('ultra')
   const [newMaxEmployees, setNewMaxEmployees] = useState('')
-  /** Пакеты +5 сотрудников на одно заведение при погашении */
+  /** Подписка расширения «+5 сотр.»: число активаций в коде */
   const [newEmpSlotPacks, setNewEmpSlotPacks] = useState('')
-  /** Пакеты +1 филиал на владельца */
+  /** Подписка расширения «+1 филиал»: число активаций в коде */
   const [newBranchSlotPacks, setNewBranchSlotPacks] = useState('')
   const [newAdditiveOnly, setNewAdditiveOnly] = useState(false)
   const [search, setSearch] = useState('')
@@ -672,7 +672,7 @@ function PromoTab() {
     const empN = newEmpSlotPacks.trim() ? parseInt(newEmpSlotPacks.trim(), 10) : 0
     const brN = newBranchSlotPacks.trim() ? parseInt(newBranchSlotPacks.trim(), 10) : 0
     if (Number.isNaN(empN) || empN < 0 || empN > 500 || Number.isNaN(brN) || brN < 0 || brN > 500) {
-      alert('Пакеты: целые числа от 0 до 500.')
+      alert('Подписки расширения: целые числа от 0 до 500 в каждом поле.')
       return
     }
     if (newPromoLogic === 'activation') {
@@ -684,38 +684,47 @@ function PromoTab() {
       }
     }
     setSaving(true)
-    await fetch('/api/promo', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        code: newCode.trim().toUpperCase(),
-        note: newNote.trim() || null,
-        starts_at: newStartDate || null,
-        expires_at: newEndDate || null,
-        max_employees: newMaxEmployees ? parseInt(newMaxEmployees) : null,
-        activation_duration_days:
-          newPromoLogic === 'activation' && newActivationDays.trim()
-            ? parseInt(newActivationDays.trim(), 10)
-            : null,
-        grants_subscription_type: newGrantTier,
-        grants_employee_slot_packs: empN,
-        grants_branch_slot_packs: brN,
-        grants_additive_only: newAdditiveOnly,
-      }),
-    })
-    setNewCode('')
-    setNewNote('')
-    setNewStartDate('')
-    setNewEndDate('')
-    setNewActivationDays('')
-    setNewPromoLogic('legacy')
-    setNewGrantTier('ultra')
-    setNewMaxEmployees('')
-    setNewEmpSlotPacks('')
-    setNewBranchSlotPacks('')
-    setNewAdditiveOnly(false)
-    await loadCodes()
-    setSaving(false)
+    setError(null)
+    try {
+      const res = await fetch('/api/promo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: newCode.trim().toUpperCase(),
+          note: newNote.trim() || null,
+          starts_at: newStartDate || null,
+          expires_at: newEndDate || null,
+          max_employees: newMaxEmployees ? parseInt(newMaxEmployees) : null,
+          activation_duration_days:
+            newPromoLogic === 'activation' && newActivationDays.trim()
+              ? parseInt(newActivationDays.trim(), 10)
+              : null,
+          grants_subscription_type: newGrantTier,
+          grants_employee_slot_packs: empN,
+          grants_branch_slot_packs: brN,
+          grants_additive_only: newAdditiveOnly,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(typeof data?.error === 'string' ? data.error : `Не удалось создать промокод (${res.status})`)
+        return
+      }
+      setNewCode('')
+      setNewNote('')
+      setNewStartDate('')
+      setNewEndDate('')
+      setNewActivationDays('')
+      setNewPromoLogic('legacy')
+      setNewGrantTier('ultra')
+      setNewMaxEmployees('')
+      setNewEmpSlotPacks('')
+      setNewBranchSlotPacks('')
+      setNewAdditiveOnly(false)
+      await loadCodes()
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function deleteCode(id: number) {
@@ -810,7 +819,7 @@ function PromoTab() {
 
   async function setEmpSlotPacks(id: number, current: number | null | undefined) {
     const val = prompt(
-      'Пакеты +5 сотрудников на одно заведение при погашении (0–500):',
+      'Подписка расширения «+5 сотр.»: сколько активаций заложено в коде (0–500). Каждая = +5 к лимиту на заведение погашения.',
       String(current ?? 0),
     )
     if (val === null) return
@@ -828,7 +837,10 @@ function PromoTab() {
   }
 
   async function setBranchSlotPacks(id: number, current: number | null | undefined) {
-    const val = prompt('Пакеты +1 филиал на владельца при погашении (0–500):', String(current ?? 0))
+    const val = prompt(
+      'Подписка расширения «+1 филиал»: сколько активаций в коде (0–500). Каждая = +1 слот филиала на владельца.',
+      String(current ?? 0),
+    )
     if (val === null) return
     const n = parseInt(val.trim(), 10)
     if (val.trim() === '' || Number.isNaN(n) || n < 0 || n > 500) {
@@ -847,9 +859,9 @@ function PromoTab() {
     const next = !row.grants_additive_only
     const ok = next
       ? confirm(
-          'Включить «только аддон»? Код не будет менять тариф заведения — только начислит пакеты (после основного промо).',
+          'Включить «только расширения»? Код не меняет тариф Pro/Ultra — только начисляет подписки расширения (+5 сотр. / +1 филиал), если они заданы.',
         )
-      : confirm('Выключить «только аддон»?')
+      : confirm('Выключить «только расширения»?')
     if (!ok) return
     await fetch('/api/promo', {
       method: 'PATCH',
@@ -920,9 +932,14 @@ function PromoTab() {
       <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 mb-4">
         <h2 className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">Новый промокод</h2>
         <p className="text-[11px] text-gray-600 mb-3 leading-snug">
-          Уже созданные промокоды <span className="text-gray-500">не меняются</span>: у них по-прежнему пустое поле «дней с активации» и работает прежняя логика.
-          Ниже можно завести <span className="text-gray-500">дополнительно второй тип</span> — с длительностью Pro в днях от момента применения кода (число дней потом можно править).
-          Пакеты +5 сотрудников начисляются на <span className="text-gray-500">то заведение, где погасили код</span>; пакеты филиалов — на владельца.
+          <span className="text-gray-500 font-medium">Промокод</span> — код выдачи тарифа (Pro/Ultra), сроков и при необходимости лимита сотрудников; это не то же самое, что платные подписки расширения в приложении.
+          Уже созданные коды <span className="text-gray-500">не меняются</span> автоматически: у старых пустое «дней с активации».
+          Ниже можно завести <span className="text-gray-500">второй тип срока</span> — дни Pro с момента активации кода.
+        </p>
+        <p className="text-[11px] text-gray-600 mb-3 leading-snug border-l-2 border-indigo-700/50 pl-3">
+          <span className="text-gray-500 font-medium">Подписки расширения Lite</span> (как отдельные продукты в App Store): в одном коде можно заложить{' '}
+          <span className="text-gray-400">подписку «+5 сотрудников»</span> (число активаций × +5 к лимиту на заведение, где погасили код) и{' '}
+          <span className="text-gray-400">подписку «+1 филиал»</span> (число активаций × +1 слот филиала на владельца). Поля независимы — не смешиваем в одну колонку «пакеты».
         </p>
         <div className="flex flex-col gap-2 mb-3">
           <span className="text-[11px] text-gray-500 uppercase tracking-wide">Логика</span>
@@ -952,9 +969,8 @@ function PromoTab() {
             </label>
           </div>
           <p className="text-[11px] text-gray-600 mb-2">
-            Тариф по промокоду — отдельно от «классика / с активации»: это значение попадёт в{' '}
-            <span className="text-gray-500">subscription_type</span> заведения (в продукте — Pro или Ultra).
-            Доп. филиалы и слоты сотрудников — поля «+филиал» и «+5 сотр.», не отдельные «типы» тарифа.
+            Тариф промокода — отдельно от «классика / с активации»: попадёт в{' '}
+            <span className="text-gray-500">subscription_type</span> (Pro или Ultra), если не включён только режим расширений.
           </p>
           <div className="flex flex-col gap-1 mb-3 max-w-xs">
             <label className="text-xs text-gray-500">Выдаваемый тариф</label>
@@ -971,6 +987,7 @@ function PromoTab() {
             </select>
           </div>
         </div>
+        <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Промокод — код, заметка, даты</div>
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 sm:items-end">
           <input
             type="text"
@@ -1031,9 +1048,17 @@ function PromoTab() {
               className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-24"
             />
           </div>
+        </div>
+        <div className="text-[10px] text-gray-500 uppercase tracking-wide mt-3 mb-1">
+          Подписки расширения (отдельно от промокода тарифа)
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 sm:items-end rounded-lg border border-gray-800 bg-gray-950/40 p-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500" title="Начисляется на заведение, где погасили код">
-              +5 сотр. (пак.)
+            <label
+              className="text-xs text-gray-400"
+              title="Отдельная подписка расширения: число активаций в коде; каждая = +5 к лимиту сотрудников на заведение погашения"
+            >
+              Подписка «+5 сотр.» (шт. в коде)
             </label>
             <input
               type="number"
@@ -1042,12 +1067,15 @@ function PromoTab() {
               value={newEmpSlotPacks}
               onChange={e => setNewEmpSlotPacks(e.target.value)}
               placeholder="0"
-              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-20"
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28"
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500" title="Слоты на доп. заведения для владельца">
-              +филиал (пак.)
+            <label
+              className="text-xs text-gray-400"
+              title="Отдельная подписка расширения: число активаций в коде; каждая = +1 слот филиала на владельца"
+            >
+              Подписка «+1 филиал» (шт. в коде)
             </label>
             <input
               type="number"
@@ -1056,17 +1084,17 @@ function PromoTab() {
               value={newBranchSlotPacks}
               onChange={e => setNewBranchSlotPacks(e.target.value)}
               placeholder="0"
-              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-20"
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28"
             />
           </div>
-          <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer sm:mb-6">
+          <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer sm:mb-0 col-span-2 sm:col-auto">
             <input
               type="checkbox"
               className="accent-indigo-500 rounded"
               checked={newAdditiveOnly}
               onChange={e => setNewAdditiveOnly(e.target.checked)}
             />
-            Только аддон
+            Только расширения (без смены тарифа промокодом)
           </label>
           <button
             onClick={addCode}
@@ -1075,6 +1103,54 @@ function PromoTab() {
           >
             {saving ? '...' : '+ Создать'}
           </button>
+        </div>
+        <div className="text-[11px] text-gray-600 mt-3 border-t border-gray-800 pt-3 leading-snug space-y-1.5">
+          <div>
+            <span className="text-gray-500">Промокод при погашении: </span>
+            <span className="text-gray-400">
+              {newAdditiveOnly
+                ? 'только расширения (тариф по коду не меняется)'
+                : `тариф ${subscriptionTierLabelRu(newGrantTier)}; даты и макс. сотр. — как в полях выше`}
+            </span>
+          </div>
+          {(() => {
+            const de = newEmpSlotPacks.trim() === '' ? 0 : parseInt(newEmpSlotPacks.trim(), 10)
+            const db = newBranchSlotPacks.trim() === '' ? 0 : parseInt(newBranchSlotPacks.trim(), 10)
+            if (
+              Number.isNaN(de) ||
+              Number.isNaN(db) ||
+              de < 0 ||
+              de > 500 ||
+              db < 0 ||
+              db > 500
+            ) {
+              return (
+                <div className="text-amber-600/90">
+                  В полях подписок расширения — целые 0–500 или пусто (= 0).
+                </div>
+              )
+            }
+            return (
+              <>
+                <div>
+                  <span className="text-gray-500">Подписка «+5 сотр.»: </span>
+                  <span className="text-gray-400">
+                    {de === 0
+                      ? 'не включена (0)'
+                      : `${de} активаций в коде → +${de * 5} к лимиту на заведение погашения`}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Подписка «+1 филиал»: </span>
+                  <span className="text-gray-400">
+                    {db === 0
+                      ? 'не включена (0)'
+                      : `${db} активаций в коде → +${db} слот(а/ов) филиала на владельца`}
+                  </span>
+                </div>
+              </>
+            )
+          })()}
         </div>
       </div>
 
@@ -1122,13 +1198,22 @@ function PromoTab() {
                   </th>
                   <th className="px-4 py-3 text-center">Сотр.</th>
                   <th
-                    className="px-4 py-3 text-center text-[10px] uppercase"
-                    title="Пакеты при погашении: сотрудники на заведение / филиалы владельцу"
+                    className="px-4 py-3 text-center text-[10px] uppercase max-w-[5.5rem]"
+                    title="Отдельная подписка расширения Lite: число активаций в коде, каждая даёт +5 к лимиту сотрудников на заведение погашения"
                   >
-                    Пакеты
+                    +5 сотр.
                   </th>
-                  <th className="px-4 py-3 text-center text-[10px] uppercase" title="Только начисление пакетов без смены тарифа">
-                    Аддон
+                  <th
+                    className="px-4 py-3 text-center text-[10px] uppercase max-w-[5.5rem]"
+                    title="Отдельная подписка расширения: число активаций в коде, каждая даёт +1 филиал на владельца"
+                  >
+                    +1 фил.
+                  </th>
+                  <th
+                    className="px-4 py-3 text-center text-[10px] uppercase"
+                    title="Только подписки расширения в коде, без выдачи тарифа Pro/Ultra"
+                  >
+                    Только расш.
                   </th>
                   <th className="px-4 py-3 text-left">Создан</th>
                   <th className="px-4 py-3 text-right">Действия</th>
@@ -1212,28 +1297,29 @@ function PromoTab() {
                         </button>
                       </td>
                       <td className="px-4 py-3 text-center align-top">
-                        <div className="flex flex-col gap-1 items-center">
-                          <button
-                            type="button"
-                            title="Пакеты +5 сотрудников на заведение"
-                            onClick={() => setEmpSlotPacks(row.id, row.grants_employee_slot_packs)}
-                            className="text-[10px] font-mono hover:text-indigo-400"
-                          >
-                            E:{row.grants_employee_slot_packs ?? 0}
-                          </button>
-                          <button
-                            type="button"
-                            title="Пакеты +1 филиал"
-                            onClick={() => setBranchSlotPacks(row.id, row.grants_branch_slot_packs)}
-                            className="text-[10px] font-mono hover:text-indigo-400"
-                          >
-                            B:{row.grants_branch_slot_packs ?? 0}
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          title="Подписка «+5 сотр.»: активаций в коде"
+                          onClick={() => setEmpSlotPacks(row.id, row.grants_employee_slot_packs)}
+                          className="text-xs font-mono tabular-nums hover:text-indigo-400"
+                        >
+                          {row.grants_employee_slot_packs ?? 0}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-center align-top">
+                        <button
+                          type="button"
+                          title="Подписка «+1 филиал»: активаций в коде"
+                          onClick={() => setBranchSlotPacks(row.id, row.grants_branch_slot_packs)}
+                          className="text-xs font-mono tabular-nums hover:text-indigo-400"
+                        >
+                          {row.grants_branch_slot_packs ?? 0}
+                        </button>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button
                           type="button"
+                          title="Только подписки расширения, без смены тарифа"
                           onClick={() => toggleAdditiveOnly(row)}
                           className={`text-[10px] px-2 py-0.5 rounded border transition ${
                             row.grants_additive_only
@@ -1336,9 +1422,12 @@ function PromoTab() {
                     {row.max_employees != null && (
                       <span className="text-indigo-300">≤{row.max_employees} сотр.</span>
                     )}
-                    <span className="text-gray-600">
-                      E:{row.grants_employee_slot_packs ?? 0} B:{row.grants_branch_slot_packs ?? 0}
-                      {row.grants_additive_only ? ' · аддон' : ''}
+                    <span className="text-gray-600 block">
+                      Подписка «+5 сотр.»: {row.grants_employee_slot_packs ?? 0}
+                    </span>
+                    <span className="text-gray-600 block">
+                      Подписка «+1 фил.»: {row.grants_branch_slot_packs ?? 0}
+                      {row.grants_additive_only ? ' · только расширения' : ''}
                     </span>
                     <span>создан {formatDate(row.created_at)}</span>
                   </div>
@@ -1376,24 +1465,24 @@ function PromoTab() {
                     <button
                       type="button"
                       onClick={() => setEmpSlotPacks(row.id, row.grants_employee_slot_packs)}
-                      className="px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white text-sm font-mono text-[11px]"
-                      title="Пакеты +5 сотрудников на заведение"
+                      className="px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white text-sm font-mono text-[10px]"
+                      title="Подписка «+5 сотр.»"
                     >
-                      E
+                      +5
                     </button>
                     <button
                       type="button"
                       onClick={() => setBranchSlotPacks(row.id, row.grants_branch_slot_packs)}
-                      className="px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white text-sm font-mono text-[11px]"
-                      title="Пакеты +1 филиал"
+                      className="px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white text-sm font-mono text-[10px]"
+                      title="Подписка «+1 филиал»"
                     >
-                      B
+                      +1ф
                     </button>
                     <button
                       type="button"
                       onClick={() => toggleAdditiveOnly(row)}
                       className="px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-amber-200 text-sm"
-                      title="Только аддон"
+                      title="Только подписки расширения"
                     >
                       +
                     </button>

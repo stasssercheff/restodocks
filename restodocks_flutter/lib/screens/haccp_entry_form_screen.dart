@@ -3238,7 +3238,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             if (MediaQuery.of(context).size.shortestSide >= 600) ...[
               Text(
                 loc.t('haccp_scroll_right_hint') ??
-                    'Таблица по форме СанПиН — при необходимости прокрутите вправо',
+                    'Широкая таблица журнала — при необходимости прокрутите вправо',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),

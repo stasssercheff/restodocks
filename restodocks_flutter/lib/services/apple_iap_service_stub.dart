@@ -18,12 +18,20 @@ class AppleIapService extends ChangeNotifier {
   bool get ready => false;
   bool get busy => false;
   ProductDetails? get product => null;
+
+  /// См. iOS-реализацию: подписки, найденные в App Store.
+  List<ProductDetails> get subscriptionProducts => const [];
+
+  List<ProductDetails> get addonProducts => const [];
+
   String? get lastError => null;
   int get successToken => 0;
 
   Future<void> init() async {}
 
   Future<bool> purchasePro() async => false;
+
+  Future<bool> purchaseSubscription(String productId) async => false;
 
   Future<void> restorePurchases() async {}
 

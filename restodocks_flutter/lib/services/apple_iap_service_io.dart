@@ -35,13 +35,36 @@ class AppleIapService extends ChangeNotifier {
   bool _ready = false;
   bool _busy = false;
   bool _storeLoaded = false;
-  ProductDetails? _product;
+  final Map<String, ProductDetails> _products = {};
   String? _lastError;
   int _successToken = 0;
 
   bool get ready => _ready;
   bool get busy => _busy;
-  ProductDetails? get product => _product;
+
+  /// Обратная совместимость: продукт подписки Pro (если есть в витрине).
+  ProductDetails? get product => _products[kRestodocksProMonthlyProductId];
+
+  /// Подписки Pro / Ultra, найденные в App Store (для цен и покупки).
+  List<ProductDetails> get subscriptionProducts {
+    final out = <ProductDetails>[];
+    final p = _products[kRestodocksProMonthlyProductId];
+    final u = _products[kRestodocksUltraMonthlyProductId];
+    if (p != null) out.add(p);
+    if (u != null) out.add(u);
+    return out;
+  }
+
+  /// Доп. пакеты (+5 сотрудников, +1 филиал), если настроены в App Store Connect.
+  List<ProductDetails> get addonProducts {
+    final out = <ProductDetails>[];
+    final e = _products[kRestodocksAddonEmployeePack5ProductId];
+    final b = _products[kRestodocksAddonBranchPack1ProductId];
+    if (e != null) out.add(e);
+    if (b != null) out.add(b);
+    return out;
+  }
+
   String? get lastError => _lastError;
 
   void _setBusy(bool value, {bool notify = true}) {
@@ -389,29 +412,35 @@ class AppleIapService extends ChangeNotifier {
       onError: (Object e) => devLog('IAP stream: $e'),
     );
 
-    await _loadProduct();
+    await _loadProducts();
     notifyListeners();
   }
 
-  Future<void> _loadProduct() async {
+  Future<void> _loadProducts() async {
     if (!isIOSPlatform || !_ready) return;
-    final ids = {kRestodocksProMonthlyProductId};
-    final response = await _iap.queryProductDetails(ids);
+    final response = await _iap.queryProductDetails(kRestodocksAllIapProductIds);
     if (response.error != null) {
       devLog('IAP queryProductDetails: ${response.error}');
       _lastError = response.error?.message;
     }
-    if (response.productDetails.isEmpty) {
+    _products.clear();
+    for (final d in response.productDetails) {
+      _products[d.id] = d;
+    }
+    final hasSubscriptionSku = kRestodocksSubscriptionProductIds.any(
+      _products.containsKey,
+    );
+    if (!hasSubscriptionSku) {
       _lastError = 'product_not_found';
+      _storeLoaded = false;
       return;
     }
-    _product = response.productDetails.first;
     _storeLoaded = true;
   }
 
   Future<void> _onPurchases(List<PurchaseDetails> purchases) async {
     for (final p in purchases) {
-      if (p.productID != kRestodocksProMonthlyProductId) continue;
+      if (!kRestodocksSubscriptionProductIds.contains(p.productID)) continue;
 
       if (p.status == PurchaseStatus.pending) {
         notifyListeners();
@@ -618,11 +647,21 @@ class AppleIapService extends ChangeNotifier {
     return _IapPurchasePreflight.proceed;
   }
 
-  /// Оформить подписку (автопродление).
-  Future<bool> purchasePro() async {
+  /// Оформить подписку Pro (автопродление).
+  Future<bool> purchasePro() async =>
+      purchaseSubscription(kRestodocksProMonthlyProductId);
+
+  /// Оформить подписку по идентификатору продукта App Store (`restodocks_pro_monthly` / `restodocks_ultra_monthly`).
+  Future<bool> purchaseSubscription(String productId) async {
     if (!isIOSPlatform) return false;
+    if (!kRestodocksSubscriptionProductIds.contains(productId)) {
+      _lastError = 'product_not_supported';
+      notifyListeners();
+      return false;
+    }
     await init();
-    if (!_ready || !_storeLoaded || _product == null) {
+    final details = _products[productId];
+    if (!_ready || !_storeLoaded || details == null) {
       _lastError = 'product_not_ready';
       notifyListeners();
       return false;
@@ -655,9 +694,9 @@ class AppleIapService extends ChangeNotifier {
         return false;
       }
 
-      // Один Apple ID → один owner_id: Pro на все заведения этого владельца (см. billing-verify-apple).
+      // Один Apple ID → один owner_id: подписка на все заведения этого владельца (см. billing-verify-apple).
       final param = PurchaseParam(
-        productDetails: _product!,
+        productDetails: details,
         applicationUserName: est.ownerId,
       );
       await _iap.buyNonConsumable(purchaseParam: param);
