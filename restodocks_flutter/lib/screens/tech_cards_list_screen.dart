@@ -3402,9 +3402,43 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     try {
       final est = context.read<AccountManagerSupabase>().establishment;
       final establishmentId = est?.dataEstablishmentId;
-      final list = await context
-          .read<AiService>()
-          .parseTechCardsFromText(result, establishmentId: establishmentId);
+      final aiService = context.read<AiService>();
+      if (allowPromptFallback && aiService is AiServiceSupabase) {
+        final created = await aiService.createTechCardFromPrompt(
+          result,
+          establishmentId: establishmentId,
+        );
+        if (!mounted) return;
+        if (created != null &&
+            ((created.dishName ?? '').trim().isNotEmpty ||
+                created.ingredients.isNotEmpty)) {
+          context.push(
+            widget.department == 'bar'
+                ? '/tech-cards/new?department=bar'
+                : '/tech-cards/new',
+            extra: created,
+          );
+          return;
+        }
+        final reason = AiServiceSupabase.lastCreateTechCardReason ?? '';
+        if (reason.isNotEmpty &&
+            (reason == 'ai_ttk_limit_trial_total' ||
+                reason == 'ai_ttk_limit_pro_month' ||
+                reason == 'ai_ttk_limit_ultra_month' ||
+                reason == 'ai_ttk_no_access_lite' ||
+                reason == 'ai_limit_exceeded' ||
+                reason == 'limit_3_per_day')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_aiTtkLimitMessage(reason, loc))),
+          );
+          return;
+        }
+      }
+
+      final list = await aiService.parseTechCardsFromText(
+        result,
+        establishmentId: establishmentId,
+      );
       if (!mounted) return;
       if (list.isEmpty) {
         if (allowPromptFallback) {

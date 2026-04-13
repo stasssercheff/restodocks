@@ -46,6 +46,7 @@ class AiServiceSupabase implements AiService {
 
   /// Последняя ошибка invoke (для различения 503/preflight и таймаута).
   static String? lastInvokeError;
+  static String? lastCreateTechCardReason;
 
   /// Преобразует сырую ошибку API (JSON, 429 и т.д.) в понятное пользователю сообщение.
   static String _sanitizeAiError(String raw) {
@@ -560,6 +561,27 @@ class AiServiceSupabase implements AiService {
       return _fillTechnologyFromStoredPf(corrected, establishmentId);
     }
     return list;
+  }
+
+  Future<TechCardRecognitionResult?> createTechCardFromPrompt(
+    String prompt, {
+    String? establishmentId,
+  }) async {
+    lastCreateTechCardReason = null;
+    final body = <String, dynamic>{'prompt': prompt};
+    if (establishmentId != null && establishmentId.isNotEmpty) {
+      body['establishmentId'] = establishmentId;
+    }
+    final data = await invoke('ai-create-tech-card', body);
+    if (data == null) return null;
+    final err = data['error'] as String? ?? data['reason'] as String?;
+    if (err != null && err.trim().isNotEmpty) {
+      lastCreateTechCardReason = err;
+      return null;
+    }
+    final cardRaw = data['card'];
+    if (cardRaw is! Map) return null;
+    return _parseTechCardResult(Map<String, dynamic>.from(cardRaw));
   }
 
   /// Строки для обучения при свободном формате (каждая строка — одна ячейка).
