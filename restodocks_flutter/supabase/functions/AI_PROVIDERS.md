@@ -6,7 +6,9 @@
 
 | Переменная | Задача | Edge Functions |
 |------------|--------|----------------|
-| `AI_PROVIDER_TTK` | Парсинг ТТК | ai-parse-tech-cards-pdf, ai-recognize-tech-card, ai-recognize-tech-cards-batch |
+| `AI_PROVIDER_TTK` | Legacy общий для ТТК | fallback для ttk_parse/ttk_create |
+| `AI_PROVIDER_TTK_PARSE` | Парсинг ТТК | ai-parse-tech-cards-pdf, ai-recognize-tech-card, ai-recognize-tech-cards-batch |
+| `AI_PROVIDER_TTK_CREATE` | Создание ТТК с ИИ | поток генерации рецептов/ТТК |
 | `AI_PROVIDER_NUTRITION` | КБЖУ | ai-refine-nutrition |
 | `AI_PROVIDER_PRODUCT` | Продукты | ai-normalize-product-names, ai-find-duplicates, ai-verify-product, ai-recognize-product, ai-parse-product-list |
 | `AI_PROVIDER_CHECKLIST` | Чеклисты | ai-generate-checklist |
@@ -36,7 +38,8 @@
 
 Распределить нагрузку:
 
-- `AI_PROVIDER_TTK` = `groq` — ТТК только через Groq
+- `AI_PROVIDER_TTK_PARSE` = `groq` — парсинг ТТК через Groq
+- `AI_PROVIDER_TTK_CREATE` = `deepseek` — генерация новых ТТК через DeepSeek
 - `AI_PROVIDER_NUTRITION` = `openrouter` — КБЖУ через OpenRouter
 - `AI_PROVIDER_PRODUCT` = `gigachat` — продукты через GigaChat
 - `AI_PROVIDER_CHECKLIST` не задавать — каскад для чеклистов

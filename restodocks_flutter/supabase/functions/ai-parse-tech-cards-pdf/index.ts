@@ -144,12 +144,13 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const hasProvider = Deno.env.get("GROQ_API_KEY")?.trim() ||
+    const hasProvider = Deno.env.get("DEEPSEEK_API_KEY")?.trim() ||
+      Deno.env.get("GROQ_API_KEY")?.trim() ||
       Deno.env.get("GEMINI_API_KEY")?.trim() ||
       Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() ||
       Deno.env.get("OPENAI_API_KEY");
     if (!hasProvider) {
-      return new Response(JSON.stringify({ error: "AI provider key required" }), {
+      return new Response(JSON.stringify({ error: "AI provider key required (DEEPSEEK_API_KEY/GROQ_API_KEY/GEMINI_API_KEY/GIGACHAT_AUTH_KEY/OPENAI_API_KEY)" }), {
         status: 500,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
@@ -404,7 +405,7 @@ Deno.serve(async (req: Request) => {
           { role: "user", content: `PDF extracted text:\n\n${textForAi}` },
         ],
         maxTokens: 16384,
-        context: "ttk",
+        context: "ttk_parse",
       }) ?? "";
     } catch (aiErr) {
       return new Response(JSON.stringify({ cards: [], reason: `ai_error: ${aiErr}` }), {
@@ -447,7 +448,7 @@ Deno.serve(async (req: Request) => {
             { role: "user", content: text },
           ],
           maxTokens: 8192,
-          context: "ttk",
+          context: "ttk_parse",
         });
         if (simpleContent?.trim()) {
           const simpleCleaned = simpleContent.replace(/^```\w*\n?|\n?```$/g, "").trim();

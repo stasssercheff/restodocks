@@ -39,9 +39,9 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const hasTextProvider = Deno.env.get("GROQ_API_KEY")?.trim() || Deno.env.get("GEMINI_API_KEY")?.trim() || Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() || Deno.env.get("OPENAI_API_KEY");
+    const hasTextProvider = Deno.env.get("DEEPSEEK_API_KEY")?.trim() || Deno.env.get("GROQ_API_KEY")?.trim() || Deno.env.get("GEMINI_API_KEY")?.trim() || Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() || Deno.env.get("OPENAI_API_KEY");
     if (!hasTextProvider) {
-      return new Response(JSON.stringify({ error: "GROQ_API_KEY, GEMINI_API_KEY, GIGACHAT_AUTH_KEY or OPENAI_API_KEY required" }), {
+      return new Response(JSON.stringify({ error: "DEEPSEEK_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, GIGACHAT_AUTH_KEY or OPENAI_API_KEY required" }), {
         status: 500,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
@@ -115,7 +115,7 @@ Return ALL cards found (up to hundreds). If no cards, return { "cards": [] }.`;
         { role: "user", content: `Document table rows:\n${JSON.stringify(rows)}` },
       ],
       maxTokens: 16384,
-      context: "ttk",
+      context: "ttk_parse",
     });
 
     if (!content?.trim()) {

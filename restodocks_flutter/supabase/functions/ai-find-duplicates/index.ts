@@ -37,13 +37,14 @@ Deno.serve(async (req: Request) => {
   }
 
   const hasProvider =
+    Deno.env.get("DEEPSEEK_API_KEY")?.trim() ||
     Deno.env.get("GROQ_API_KEY")?.trim() ||
     Deno.env.get("GEMINI_API_KEY")?.trim() ||
     Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() ||
     Deno.env.get("OPENAI_API_KEY");
   if (!hasProvider) {
     return new Response(
-      JSON.stringify({ error: "GROQ_API_KEY, GEMINI_API_KEY, GIGACHAT_AUTH_KEY or OPENAI_API_KEY required" }),
+      JSON.stringify({ error: "DEEPSEEK_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, GIGACHAT_AUTH_KEY or OPENAI_API_KEY required" }),
       {
         status: 500,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },

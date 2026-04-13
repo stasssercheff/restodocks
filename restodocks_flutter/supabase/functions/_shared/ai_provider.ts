@@ -1,11 +1,14 @@
 /**
- * Общий слой вызова ИИ. Поддерживаются: Groq, Gemini, GigaChat, OpenRouter, Mistral, Cerebras, OpenAI, Claude.
+ * Общий слой вызова ИИ. Поддерживаются: DeepSeek, Groq, Gemini, GigaChat, OpenRouter, Mistral, Cerebras, OpenAI, Claude.
  * Переменные:
  * - AI_PROVIDER = глобально для всех (если задан)
- * - AI_PROVIDER_TTK = парсинг ТТК (ai-parse-tech-cards-pdf, ai-recognize-tech-card, ai-recognize-tech-cards-batch)
+ * - AI_PROVIDER_TTK = общий провайдер ТТК (legacy fallback)
+ * - AI_PROVIDER_TTK_PARSE = парсинг ТТК (ai-parse-tech-cards-pdf, ai-recognize-tech-card, ai-recognize-tech-cards-batch)
+ * - AI_PROVIDER_TTK_CREATE = создание ТТК с ИИ (новый поток генерации рецептов)
  * - AI_PROVIDER_NUTRITION = КБЖУ (ai-refine-nutrition)
  * - AI_PROVIDER_PRODUCT = продукты (ai-normalize, ai-find-duplicates, ai-verify, ai-recognize-product, ai-parse-product-list)
  * - AI_PROVIDER_CHECKLIST = чеклисты (ai-generate-checklist)
+ * - DEEPSEEK_API_KEY — DeepSeek
  * - GROQ_API_KEY — Groq (free tier)
  * - GEMINI_API_KEY — Google AI Studio
  * - GIGACHAT_AUTH_KEY / GIGACHAT_API_KEY — GigaChat (Base64 client_id:client_secret)
@@ -17,6 +20,7 @@
  */
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions";
 const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
@@ -55,25 +59,42 @@ async function getGigaChatToken(authKey: string): Promise<string> {
   return gigachatToken;
 }
 
-export type TextProvider = "groq" | "gigachat" | "openai" | "gemini" | "claude" | "openrouter" | "mistral" | "cerebras";
+export type TextProvider = "deepseek" | "groq" | "gigachat" | "openai" | "gemini" | "claude" | "openrouter" | "mistral" | "cerebras";
 
-const PROVIDER_NAMES: TextProvider[] = ["groq", "openai", "gigachat", "gemini", "claude", "openrouter", "mistral", "cerebras"];
+const PROVIDER_NAMES: TextProvider[] = ["deepseek", "groq", "openai", "gigachat", "gemini", "claude", "openrouter", "mistral", "cerebras"];
 
-export type AIContext = "ttk" | "nutrition" | "product" | "checklist";
+export type AIContext = "ttk" | "ttk_parse" | "ttk_create" | "nutrition" | "product" | "checklist";
 
 /** Список провайдеров с ключами, в порядке приоритета (каскад при fallback) */
 function getAvailableProviders(context?: AIContext): TextProvider[] {
   const ctx = context ?? null;
-  const ttkRaw = ctx === "ttk" ? Deno.env.get("AI_PROVIDER_TTK") : undefined;
+  const ttkRaw =
+    ctx === "ttk" ? Deno.env.get("AI_PROVIDER_TTK") : undefined;
+  const ttkParseRaw =
+    (ctx === "ttk_parse" || ctx === "ttk")
+      ? (Deno.env.get("AI_PROVIDER_TTK_PARSE") || Deno.env.get("AI_PROVIDER_TTK"))
+      : undefined;
+  const ttkCreateRaw =
+    (ctx === "ttk_create" || ctx === "ttk")
+      ? (Deno.env.get("AI_PROVIDER_TTK_CREATE") || Deno.env.get("AI_PROVIDER_TTK"))
+      : undefined;
   const nutritionRaw = ctx === "nutrition" ? Deno.env.get("AI_PROVIDER_NUTRITION") : undefined;
   const productRaw = ctx === "product" ? Deno.env.get("AI_PROVIDER_PRODUCT") : undefined;
   const checklistRaw = ctx === "checklist" ? Deno.env.get("AI_PROVIDER_CHECKLIST") : undefined;
-  const raw = ttkRaw || nutritionRaw || productRaw || checklistRaw || Deno.env.get("AI_PROVIDER");
+  const raw =
+    ttkCreateRaw ||
+    ttkParseRaw ||
+    ttkRaw ||
+    nutritionRaw ||
+    productRaw ||
+    checklistRaw ||
+    Deno.env.get("AI_PROVIDER");
   const forced = raw ? String(raw).toLowerCase().trim() : undefined;
   if (forced && PROVIDER_NAMES.includes(forced as TextProvider)) {
     return [forced as TextProvider];
   }
   const list: TextProvider[] = [];
+  if (Deno.env.get("DEEPSEEK_API_KEY")?.trim()) list.push("deepseek");
   if (Deno.env.get("GROQ_API_KEY")?.trim()) list.push("groq");
   if (Deno.env.get("GEMINI_API_KEY")?.trim()) list.push("gemini");
   if (Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() || Deno.env.get("GIGACHAT_API_KEY")?.trim()) list.push("gigachat");
@@ -98,6 +119,27 @@ async function chatTextWithProvider(provider: TextProvider, options: {
   maxTokens?: number;
 }): Promise<string> {
   const { messages, temperature = 0.3, maxTokens = 2048 } = options;
+
+  if (provider === "deepseek") {
+    const apiKey = Deno.env.get("DEEPSEEK_API_KEY")?.trim();
+    if (!apiKey) throw new Error("DEEPSEEK_API_KEY not set");
+    const model = options.model ?? "deepseek-chat";
+    const body: Record<string, unknown> = { model, messages, temperature };
+    if (maxTokens != null) body.max_tokens = maxTokens;
+    const res = await fetch(DEEPSEEK_URL, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`DeepSeek: ${res.status} ${err}`);
+    }
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = data.choices?.[0]?.message?.content?.trim();
+    if (content == null) throw new Error("DeepSeek: empty response");
+    return content;
+  }
 
   if (provider === "groq") {
     const apiKey = Deno.env.get("GROQ_API_KEY")?.trim();
@@ -300,7 +342,7 @@ async function chatTextWithProvider(provider: TextProvider, options: {
 
 /**
  * Вызов чата (только текст). Каскад: при ошибке/пустом ответе пробует следующий провайдер.
- * context: "ttk" | "nutrition" | "product" | "checklist" — для выбора AI_PROVIDER_*.
+ * context: "ttk_parse" | "ttk_create" | "nutrition" | "product" | "checklist" — для выбора AI_PROVIDER_*.
  */
 export async function chatText(options: {
   messages: Message[];
