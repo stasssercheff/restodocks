@@ -112,6 +112,11 @@ class ManagementHomeContent extends StatelessWidget {
             onTap: () => context.go('/nomenclature/kitchen'),
           ),
           HomeFeatureTile(
+            icon: Icons.chat_bubble_outline,
+            title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+            onTap: () => context.go('/notifications?tab=messages'),
+          ),
+          HomeFeatureTile(
             icon: Icons.people,
             title: loc.t('employees'),
             onTap: () => context.go('/employees'),
