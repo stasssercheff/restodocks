@@ -909,6 +909,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// Только для горизонтального скролла таблицы состава — иначе [Scrollbar] цепляется к вложенному вертикальному [SingleChildScrollView] и рисуется «по центру».
   final ScrollController _compositionTableHScrollController =
       ScrollController();
+  final Map<int, Offset> _compositionTablePointerStart = {};
+  final Map<int, Offset> _compositionTablePointerLast = {};
+  final Set<int> _compositionTableDragActivePointers = <int>{};
 
   /// Время последнего пользовательского взаимодействия (ввод/тап в таблице).
   /// Используется, чтобы не запускать тяжёлый reconcile в момент, когда пользователь
@@ -921,6 +924,33 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// Для web автосохранение черновика (localStorage + jsonEncode) может быть тяжёлым,
   /// поэтому откладываем сохранение до "паузы" после ввода, чтобы не фризить UI.
   Timer? _draftSaveIdleDebounceTimer;
+
+  void _scrollCompositionTableByDelta(Offset delta, BuildContext context) {
+    if (delta == Offset.zero) return;
+
+    if (_compositionTableHScrollController.hasClients) {
+      final p = _compositionTableHScrollController.position;
+      final next = (p.pixels - delta.dx).clamp(p.minScrollExtent, p.maxScrollExtent);
+      if (next != p.pixels) {
+        _compositionTableHScrollController.jumpTo(next);
+      }
+    }
+
+    final v = PrimaryScrollController.maybeOf(context);
+    if (v != null && v.hasClients) {
+      final p = v.position;
+      final next = (p.pixels - delta.dy).clamp(p.minScrollExtent, p.maxScrollExtent);
+      if (next != p.pixels) {
+        v.jumpTo(next);
+      }
+    }
+  }
+
+  void _clearCompositionPointerState(int pointer) {
+    _compositionTablePointerStart.remove(pointer);
+    _compositionTablePointerLast.remove(pointer);
+    _compositionTableDragActivePointers.remove(pointer);
+  }
 
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
 
@@ -5105,7 +5135,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   child: CustomScrollView(
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
-                    dragStartBehavior: DragStartBehavior.down,
                     slivers: [
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(12, 24, 12, 12),
@@ -5249,7 +5278,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                 children: [
                                   SizedBox(
                                     width: 320,
-                                    height: 64,
+                                    height: 56,
                                     child: TextField(
                                       controller: _nameController,
                                       readOnly: !effectiveCanEdit,
@@ -5484,14 +5513,51 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                           child: SingleChildScrollView(
                             controller: _compositionTableHScrollController,
                             scrollDirection: Axis.horizontal,
-                            dragStartBehavior: DragStartBehavior.down,
                             clipBehavior: Clip.hardEdge,
                             // Без InteractiveViewer: pinch/scale-жест перехватывал касания и
                             // ломал горизонтальный скролл таблицы и вертикальный скролл страницы (iOS Safari / web).
                             physics: const BouncingScrollPhysics(
                               parent: AlwaysScrollableScrollPhysics(),
                             ),
-                            child: effectiveCanEdit
+                            child: Listener(
+                              behavior: HitTestBehavior.translucent,
+                              onPointerDown: (event) {
+                                if (!kIsWeb || MediaQuery.of(context).size.width > 900) {
+                                  return;
+                                }
+                                _compositionTablePointerStart[event.pointer] = event.position;
+                                _compositionTablePointerLast[event.pointer] = event.position;
+                              },
+                              onPointerMove: (event) {
+                                // Mobile web: запускаем ручной скролл только после явного свайпа.
+                                // Обычный tap (для ввода/редактирования) не перехватываем.
+                                if (!kIsWeb || MediaQuery.of(context).size.width > 900) {
+                                  return;
+                                }
+                                final start = _compositionTablePointerStart[event.pointer];
+                                final last = _compositionTablePointerLast[event.pointer];
+                                if (start == null || last == null) return;
+
+                                final total = event.position - start;
+                                final isActive = _compositionTableDragActivePointers
+                                    .contains(event.pointer);
+                                if (!isActive && total.distance < 10) {
+                                  _compositionTablePointerLast[event.pointer] = event.position;
+                                  return;
+                                }
+
+                                _compositionTableDragActivePointers.add(event.pointer);
+                                final delta = event.position - last;
+                                _compositionTablePointerLast[event.pointer] = event.position;
+                                _scrollCompositionTableByDelta(delta, context);
+                              },
+                              onPointerUp: (event) {
+                                _clearCompositionPointerState(event.pointer);
+                              },
+                              onPointerCancel: (event) {
+                                _clearCompositionPointerState(event.pointer);
+                              },
+                              child: effectiveCanEdit
                                   ? RepaintBoundary(
                                       child: ExcelStyleTtkTable(
                                         loc: loc,
