@@ -2312,6 +2312,9 @@ class AccountManagerSupabase extends ChangeNotifier {
         final n = _parseRpcInt(rawMaxEmp, -1);
         if (n >= 0) promoMaxEmployees = n;
       }
+      final noteRaw = m['promo_template_note']?.toString().trim();
+      final promoTemplateNote =
+          noteRaw != null && noteRaw.isNotEmpty ? noteRaw : null;
       return EstablishmentPromoInfo(
         code: code,
         expiresAt: exp,
@@ -2322,6 +2325,7 @@ class AccountManagerSupabase extends ChangeNotifier {
         grantsBranchSlotPacks: branchPacks,
         grantsAdditiveOnly: additiveOnly,
         promoMaxEmployees: promoMaxEmployees,
+        promoTemplateNote: promoTemplateNote,
       );
     } catch (e, st) {
       devLog('getEstablishmentPromoForOwner: $e $st');
@@ -2448,6 +2452,7 @@ class EstablishmentPromoInfo {
     this.grantsBranchSlotPacks = 0,
     this.grantsAdditiveOnly = false,
     this.promoMaxEmployees,
+    this.promoTemplateNote,
   });
 
   final String? code;
@@ -2471,6 +2476,9 @@ class EstablishmentPromoInfo {
 
   /// Опциональный лимит сотрудников из шаблона промокода (`max_employees`).
   final int? promoMaxEmployees;
+
+  /// Примечание из `promo_codes.note` (админка).
+  final String? promoTemplateNote;
 
   bool get hasPromo => !loadFailed && code != null && code!.isNotEmpty;
 
