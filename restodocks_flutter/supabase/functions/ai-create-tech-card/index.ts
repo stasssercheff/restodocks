@@ -53,12 +53,12 @@ Deno.serve(async (req: Request) => {
             "создай ОТДЕЛЬНЫЕ ТТК-ПФ для этих компонентов (isSemiFinished=true), а в основной ТТК добавь их как ingredientType='semi_finished'. " +
             "Для каждой ТТК поля: dishName:string, technologyText:string, isSemiFinished:boolean, " +
             "ingredients:[{productName:string,grossGrams:number,unit:string,primaryWastePct:number,netGrams:number,cookingLossPct:number,outputGrams:number,ingredientType:string}], yieldGrams:number. " +
-            "Технология обязательна и подробна. Ингредиентов минимум 3. Без markdown.",
+            "Технология: 3–6 коротких предложений по шагам (без воды). Ингредиентов минимум 3. Без markdown.",
         },
         { role: "user", content: prompt },
       ],
       temperature: 0.35,
-      maxTokens: 4096,
+      maxTokens: 3072,
       context: "ttk_create",
     });
 

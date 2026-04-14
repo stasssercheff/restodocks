@@ -51,12 +51,19 @@ class FeatureFlags {
   static bool get _posModuleEnabledFromDefine =>
       const String.fromEnvironment('ENABLE_POS', defaultValue: 'false') == 'true';
 
+  /// Временно выключить весь POS UI (зал, столы, касса, KDS, склад/закупка POS, заказы подразделений, продажи POS).
+  /// Для бэты можно передать `--dart-define=HIDE_POS_MODULE=true` (см. `cloudflare-build.sh` / deploy-cloudflare-beta).
+  /// Обычная инвентаризация `/inventory` не относится к POS и не скрывается.
+  static bool get _hidePosModule =>
+      const String.fromEnvironment('HIDE_POS_MODULE', defaultValue: 'false') == 'true';
+
   /// Включается если: `IS_BETA=true`, или `ENABLE_POS=true`, или открыт известный не-прод веб-хост (Cloudflare Pages и т.д.).
   ///
   /// На **restodocks.com** / **www.restodocks.com** пункты POS в меню **никогда** не показываем — даже если в сборке
   /// ошибочно переданы `IS_BETA` / `ENABLE_POS` (витрина и основной прод без POS в навигации).
   /// Beta / превью / localhost — по правилам ниже.
   static bool get posModuleEnabled {
+    if (_hidePosModule) return false;
     if (_isProdMarketingHost) return false;
     return isBeta || _posModuleEnabledFromDefine || _posModuleEnabledWebNonProdHost;
   }

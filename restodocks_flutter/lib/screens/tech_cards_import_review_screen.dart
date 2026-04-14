@@ -135,6 +135,10 @@ class _TechCardsImportReviewScreenState
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
+  /// Баннер с подсказкой по импорту: можно свернуть или скрыть (восстановление — иконка в AppBar).
+  bool _importReviewHelpDismissed = false;
+  bool _importReviewHelpExpanded = false;
+
   /// Ошибки парсинга (битые карточки) — берём из сервиса и очищаем
   List<TtkParseError>? _parseErrors;
 
@@ -1232,6 +1236,56 @@ class _TechCardsImportReviewScreenState
     }
   }
 
+  Future<void> _showEditDishNameDialog(int realIndex) async {
+    final loc = context.read<LocalizationService>();
+    final item = _items[realIndex];
+    final controller = TextEditingController(text: item.result.dishName ?? '');
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(loc.t('dish_name') ?? 'Название'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              hintText: loc.t('tech_cards_import_unnamed'),
+              border: const OutlineInputBorder(),
+            ),
+            textInputAction: TextInputAction.done,
+            onSubmitted: (v) =>
+                Navigator.of(ctx).pop<String>(v.trim().isEmpty ? null : v.trim()),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop<String>(),
+              child: Text(loc.t('cancel') ?? 'Отмена'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final v = controller.text.trim();
+                Navigator.of(ctx).pop<String>(v.isEmpty ? null : v);
+              },
+              child: Text(loc.t('save') ?? 'Сохранить'),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    if (!mounted || newName == null) return;
+    setState(() {
+      _items[realIndex] = _ReviewItem(
+        result: item.result.copyWith(dishName: newName),
+        originalDishName: item.originalDishName,
+        category: item.category,
+        sections: item.sections,
+        isSemiFinished: item.isSemiFinished,
+        alreadySaved: item.alreadySaved,
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -1243,6 +1297,18 @@ class _TechCardsImportReviewScreenState
         leading: appBarBackButton(context),
         title: Text(
             '${loc.t('tech_cards_import_review_title')} (${_items.length})'),
+        actions: [
+          if (_importReviewHelpDismissed)
+            IconButton(
+              icon: const Icon(Icons.help_outline),
+              tooltip: loc.t('tech_cards_import_hint_restore') ??
+                  'Подсказка по импорту',
+              onPressed: () => setState(() {
+                _importReviewHelpDismissed = false;
+                _importReviewHelpExpanded = true;
+              }),
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -1280,15 +1346,72 @@ class _TechCardsImportReviewScreenState
                 ),
               ),
           ],
-          // Одно сообщение сверху: полная подсказка (вместо дублирующего короткого баннера)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Text(
-              loc.t('tech_cards_import_review_hint'),
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          if (!_importReviewHelpDismissed)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Material(
+                color: theme.colorScheme.surfaceContainerHighest
+                    .withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(10),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Icon(
+                          Icons.info_outline,
+                          size: 20,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _importReviewHelpExpanded
+                              ? (loc.t('tech_cards_import_review_hint') ?? '')
+                              : (loc.t('tech_cards_import_review_check_banner') ??
+                                  ''),
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                            minWidth: 36, minHeight: 36),
+                        tooltip: _importReviewHelpExpanded
+                            ? loc.t('ui_collapse')
+                            : loc.t('ui_expand'),
+                        icon: Icon(
+                          _importReviewHelpExpanded
+                              ? Icons.expand_less
+                              : Icons.expand_more,
+                          size: 22,
+                        ),
+                        onPressed: () => setState(() =>
+                            _importReviewHelpExpanded =
+                                !_importReviewHelpExpanded),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                            minWidth: 36, minHeight: 36),
+                        tooltip: loc.t('close') ?? 'Закрыть',
+                        icon: const Icon(Icons.close, size: 22),
+                        onPressed: () => setState(
+                            () => _importReviewHelpDismissed = true),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
           if (_items.any((i) => i.isSemiFinished))
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -1481,6 +1604,10 @@ class _TechCardsImportReviewScreenState
           ],
           Expanded(
             child: ListView.builder(
+              primary: false,
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: ClampingScrollPhysics(),
+              ),
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
               itemCount: _filteredIndices.length,
               itemBuilder: (context, index) {
@@ -1498,31 +1625,36 @@ class _TechCardsImportReviewScreenState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Expanded(
-                              child: TextFormField(
-                                initialValue: item.result.dishName ?? '',
-                                decoration: InputDecoration(
-                                  hintText: loc.t('tech_cards_import_unnamed'),
-                                  isDense: true,
-                                  border: const OutlineInputBorder(),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 8),
+                              child: InkWell(
+                                onTap: _saving
+                                    ? null
+                                    : () => _showEditDishNameDialog(realIndex),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 10),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          name,
+                                          style: theme.textTheme.titleMedium,
+                                          maxLines: 3,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Icon(
+                                        Icons.edit_outlined,
+                                        size: 18,
+                                        color: theme.colorScheme.primary
+                                            .withValues(alpha: 0.85),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                style: theme.textTheme.titleMedium,
-                                enabled: !_saving,
-                                onChanged: (v) => setState(() =>
-                                    _items[realIndex] = _ReviewItem(
-                                      result: item.result.copyWith(
-                                          dishName: v.trim().isEmpty
-                                              ? null
-                                              : v.trim()),
-                                      originalDishName: item.originalDishName,
-                                      category: item.category,
-                                      sections: item.sections,
-                                      isSemiFinished: item.isSemiFinished,
-                                      alreadySaved: item.alreadySaved,
-                                    )),
                               ),
                             ),
                             TextButton.icon(
@@ -1818,7 +1950,7 @@ class _TechCardsImportReviewScreenState
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1848,30 +1980,32 @@ class _TechCardsImportReviewScreenState
                       ),
                     ),
                   ],
-                  if (!_saving && _items.any(_canBenefitFromAdjustWaste)) ...[
-                    SizedBox(
-                      width: double.infinity,
-                      child: TextButton.icon(
-                        onPressed: _adjustWasteForAllCards,
-                        icon: const Icon(Icons.tune, size: 20),
-                        label: Text(
-                            loc.t('tech_cards_import_adjust_waste_all') ??
-                                'Подстроить % отхода для всех карточек'),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      if (!_saving && _items.any(_canBenefitFromAdjustWaste))
+                        IconButton(
+                          style: IconButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          tooltip: loc.t('tech_cards_import_adjust_waste_all'),
+                          onPressed: _adjustWasteForAllCards,
+                          icon: const Icon(Icons.tune),
+                        ),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed:
+                              _saving || _items.isEmpty ? null : _createAll,
+                          child: _saving
+                              ? const SizedBox(
+                                  height: 24,
+                                  width: 24,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2))
+                              : Text(loc.t('tech_cards_import_create_all')),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: _saving || _items.isEmpty ? null : _createAll,
-                      child: _saving
-                          ? const SizedBox(
-                              height: 24,
-                              width: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2))
-                          : Text(loc.t('tech_cards_import_create_all')),
-                    ),
+                    ],
                   ),
                 ],
               ),

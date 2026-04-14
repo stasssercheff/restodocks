@@ -126,7 +126,7 @@ class _MenuScreenState extends State<MenuScreen> {
         await productStore.loadNomenclatureForBranch(
             est.id, est.dataEstablishmentId);
       } else {
-        await productStore.loadNomenclature(est.dataEstablishmentId);
+      await productStore.loadNomenclature(est.dataEstablishmentId);
       }
       final emp = acc.currentEmployee;
       final allTcs = await techCardService
@@ -138,14 +138,14 @@ class _MenuScreenState extends State<MenuScreen> {
       if (widget.department == 'banquet-catering') {
         tcs = allTcs
             .where((tc) =>
-                !tc.isSemiFinished &&
+            !tc.isSemiFinished &&
                 (tc.category == 'banquet' || tc.category == 'catering'))
             .toList();
       } else if (widget.department == 'banquet-catering-bar') {
         tcs = allTcs
             .where((tc) =>
-                !tc.isSemiFinished &&
-                (tc.category == 'banquet' || tc.category == 'catering') &&
+            !tc.isSemiFinished &&
+            (tc.category == 'banquet' || tc.category == 'catering') &&
                 (tc.sections.contains('bar') || tc.sections.contains('all')))
             .toList();
       } else if (widget.department == 'hall' ||
@@ -154,16 +154,16 @@ class _MenuScreenState extends State<MenuScreen> {
       } else if (widget.department == 'bar') {
         tcs = allTcs
             .where((tc) =>
-                !tc.isSemiFinished &&
-                (_barCategories.contains(tc.category) ||
-                    tc.sections.contains('bar') ||
+            !tc.isSemiFinished &&
+            (_barCategories.contains(tc.category) ||
+                tc.sections.contains('bar') ||
                     tc.sections.contains('all')))
             .toList();
       } else {
         // Кухня/бар: показываем ВСЕ блюда отдела в меню для сотрудников подразделения (без фильтра по цехам).
         final byDept = allTcs
             .where((tc) =>
-                !tc.isSemiFinished &&
+            !tc.isSemiFinished &&
                 (!_barCategories.contains(tc.category) ||
                     tc.sections.contains('all')))
             .toList();
@@ -1293,18 +1293,18 @@ class _MenuScreenState extends State<MenuScreen> {
               : mq.viewPadding,
         ),
         child: Scaffold(
-          appBar: AppBar(
+      appBar: AppBar(
             toolbarHeight: isPhoneLandscape ? 44 : kToolbarHeight,
             elevation: isPhoneLandscape ? 0 : null,
             scrolledUnderElevation: isPhoneLandscape ? 0 : null,
             shadowColor: isPhoneLandscape ? Colors.transparent : null,
             surfaceTintColor: isPhoneLandscape ? Colors.transparent : null,
-            title: ScrollToTopAppBarTitle(
-              child: Text(loc.t('menu')),
-            ),
-            leading: appBarBackButton(context),
+        title: ScrollToTopAppBarTitle(
+          child: Text(loc.t('menu')),
+        ),
+        leading: appBarBackButton(context),
             bottom: bottomHeight != null
-                ? PreferredSize(
+            ? PreferredSize(
                     preferredSize: Size.fromHeight(bottomHeight),
                     child: Material(
                       color: Theme.of(context).colorScheme.surface,
@@ -1357,33 +1357,33 @@ class _MenuScreenState extends State<MenuScreen> {
                               ),
                             if (hallChips)
                               Row(
-                                children: [
-                                  Expanded(
-                                    child: _HallTabChip(
-                                      label: loc.t('dept_bar'),
-                                      selected: _hallTab == 'bar',
+                    children: [
+                      Expanded(
+                        child: _HallTabChip(
+                          label: loc.t('dept_bar'),
+                          selected: _hallTab == 'bar',
                                       onTap: () =>
                                           setState(() => _hallTab = 'bar'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: _HallTabChip(
-                                      label: loc.t('dept_kitchen'),
-                                      selected: _hallTab == 'kitchen',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _HallTabChip(
+                          label: loc.t('dept_kitchen'),
+                          selected: _hallTab == 'kitchen',
                                       onTap: () =>
                                           setState(() => _hallTab = 'kitchen'),
-                                    ),
-                                  ),
-                                ],
+                        ),
+                      ),
+                    ],
                               ),
                           ],
                         ),
-                      ),
-                    ),
-                  )
-                : null,
-            actions: [
+                  ),
+                ),
+              )
+            : null,
+        actions: [
               if (_displayDishes.isNotEmpty && !_loading)
                 IconButton(
                   icon: const Icon(Icons.save_alt),
@@ -1391,14 +1391,14 @@ class _MenuScreenState extends State<MenuScreen> {
                   onPressed: _openDeviceExportDialog,
                 ),
               if (menuSeg == 0 && _downloadableDishes.isNotEmpty && !_loading)
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.download),
-                  tooltip: loc.t('download'),
-                  onSelected: (v) async {
-                    if (v == 'menu') await _downloadMenu();
-                    if (v == 'all') await _downloadAllDishes();
-                  },
-                  itemBuilder: (_) => [
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.download),
+              tooltip: loc.t('download'),
+              onSelected: (v) async {
+                if (v == 'menu') await _downloadMenu();
+                if (v == 'all') await _downloadAllDishes();
+              },
+              itemBuilder: (_) => [
                     PopupMenuItem(
                         value: 'menu', child: Text(loc.t('download_menu'))),
                     PopupMenuItem(
@@ -1937,13 +1937,13 @@ class _MenuDishTable extends StatelessWidget {
     final effectiveColCount = showCost ? colCount : colCount - 1;
 
     List<Widget> headerCells() => [
-          _cell(context, loc.t('ttk_product'), bold: true),
-          _cell(context, loc.t('ttk_gross'), bold: true),
-          _cell(context, loc.t('ttk_net'), bold: true),
-          _cell(context, loc.t('ttk_cooking_method'), bold: true),
-          _cell(context, loc.t('ttk_output'), bold: true),
-          if (showCost) _cell(context, loc.t('ttk_cost'), bold: true),
-        ];
+      _cell(context, loc.t('ttk_product'), bold: true),
+      _cell(context, loc.t('ttk_gross'), bold: true),
+      _cell(context, loc.t('ttk_net'), bold: true),
+      _cell(context, loc.t('ttk_cooking_method'), bold: true),
+      _cell(context, loc.t('ttk_output'), bold: true),
+      if (showCost) _cell(context, loc.t('ttk_cost'), bold: true),
+    ];
 
     List<Widget> ingCells(TTIngredient ing) => [
           _cell(context, ing.sourceTechCardName ?? ing.productName,
@@ -1952,7 +1952,7 @@ class _MenuDishTable extends StatelessWidget {
               ing.grossWeight > 0 ? ing.grossWeight.toStringAsFixed(0) : ''),
           _cell(context,
               ing.netWeight > 0 ? ing.netWeight.toStringAsFixed(0) : ''),
-          _cell(context, ing.cookingProcessName ?? loc.t('dash')),
+      _cell(context, ing.cookingProcessName ?? loc.t('dash')),
           _cell(context,
               ing.outputWeight > 0 ? ing.outputWeight.toStringAsFixed(0) : ''),
           if (showCost)
@@ -1963,13 +1963,13 @@ class _MenuDishTable extends StatelessWidget {
                       ing.cost, currencyCode, currencySym)
                   : '',
             ),
-        ];
+    ];
 
     List<Widget> totalCells() => [
-          _cell(context, loc.t('ttk_total'), bold: true),
-          _cell(context, ''),
-          _cell(context, ''),
-          _cell(context, ''),
+      _cell(context, loc.t('ttk_total'), bold: true),
+      _cell(context, ''),
+      _cell(context, ''),
+      _cell(context, ''),
           _cell(context, '${totalOutput.toStringAsFixed(0)} ${loc.t('gram')}',
               bold: true),
           if (showCost)
@@ -1979,7 +1979,7 @@ class _MenuDishTable extends StatelessWidget {
                   totalCost, currencyCode, currencySym),
               bold: true,
             ),
-        ];
+    ];
 
     final tableScroll = SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -2231,16 +2231,16 @@ class _MenuPhotoViewerState extends State<_MenuPhotoViewer> {
                   ...List.generate(
                       total,
                       (i) => AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            width: _current == i ? 12 : 8,
-                            height: _current == i ? 12 : 8,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: _current == i ? 12 : 8,
+                    height: _current == i ? 12 : 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
                               color:
                                   _current == i ? Colors.white : Colors.white38,
-                            ),
-                          )),
+                    ),
+                  )),
                   if (_current < total - 1)
                     IconButton(
                       icon: const Icon(Icons.chevron_right,
