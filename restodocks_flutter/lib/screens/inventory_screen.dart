@@ -18,6 +18,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/subscription_entitlements.dart';
 import '../models/models.dart';
 import '../models/iiko_product.dart';
 import '../services/ai_service.dart';
@@ -517,6 +518,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     final iikoStore = context.read<IikoProductStore>();
     final account = context.read<AccountManagerSupabase>();
     final estId = account.establishment?.id;
+    final allowSelectiveInventory =
+        SubscriptionEntitlements.from(account.establishment).hasUltraLevelFeatures;
 
     final futures = await Future.wait([
       draftStorage.loadInventoryDraft(),
@@ -571,6 +574,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     final hasIikoDraft = iikoDraft != null && iikoDraft.isNotEmpty;
     final hasStdDraft = stdDraftToRestore != null;
     final hasSelectiveDraft = selectiveDraftToRestore != null;
+    final hasSelectiveDraftForModeDialog =
+        hasSelectiveDraft && allowSelectiveInventory;
 
     // Если есть iiko-продукты или iiko-черновик — показываем диалог выбора ВСЕГДА
     // (пользователь должен сам выбрать куда вернуться)
@@ -578,7 +583,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       await _showModeDialog(
         hasIikoDraft: hasIikoDraft,
         hasStdDraft: hasStdDraft,
-        hasSelectiveDraft: hasSelectiveDraft,
+        hasSelectiveDraft: hasSelectiveDraftForModeDialog,
       );
       return;
     }
@@ -590,7 +595,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       await _showModeDialog(
         hasIikoDraft: true,
         hasStdDraft: hasStdDraft,
-        hasSelectiveDraft: hasSelectiveDraft,
+        hasSelectiveDraft: hasSelectiveDraftForModeDialog,
       );
       return;
     }
@@ -599,7 +604,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     if (hasStdDraft && hasSelectiveDraft) {
       await _showModeDialog(
         hasStdDraft: true,
-        hasSelectiveDraft: true,
+        hasSelectiveDraft: hasSelectiveDraftForModeDialog,
       );
       return;
     }
@@ -611,7 +616,17 @@ class _InventoryScreenState extends State<InventoryScreen>
       return;
     }
 
-    if (hasSelectiveDraft) {
+    // Pro: черновик выборочной не открываем — только диалог «стандарт / iiko».
+    if (hasSelectiveDraft && !allowSelectiveInventory) {
+      await _showModeDialog(
+        hasIikoDraft: hasIikoDraft,
+        hasStdDraft: hasStdDraft,
+        hasSelectiveDraft: false,
+      );
+      return;
+    }
+
+    if (hasSelectiveDraft && allowSelectiveInventory) {
       _stateRestored = false;
       await restoreState(selectiveDraftToRestore!);
       return;
@@ -724,6 +739,9 @@ class _InventoryScreenState extends State<InventoryScreen>
     final isHall =
         employee?.department == 'hall' || employee?.department == 'dining_room';
     final loc = context.read<LocalizationService>();
+    final allowSelectiveInventory = SubscriptionEntitlements.from(
+            context.read<AccountManagerSupabase>().establishment)
+        .hasUltraLevelFeatures;
 
     Widget _continueBadge(BuildContext ctx) {
       final theme = Theme.of(ctx);
@@ -781,30 +799,32 @@ class _InventoryScreenState extends State<InventoryScreen>
                     tileColor: Colors.blue.withOpacity(0.05),
                     onTap: () => Navigator.of(ctx).pop('standard'),
                   ),
-                  SizedBox(height: tileGap),
-                  ListTile(
-                    dense: isLandscape,
-                    visualDensity: isLandscape
-                        ? VisualDensity.compact
-                        : VisualDensity.standard,
-                    minVerticalPadding: isLandscape ? 2 : null,
-                    leading: Icon(Icons.filter_alt_outlined,
-                        color: theme.colorScheme.secondary),
-                    title: Row(children: [
-                      Text(loc.t('inventory_selective_mode_title')),
-                      if (hasSelectiveDraft) _continueBadge(ctx),
-                    ]),
-                    subtitle: Text(
-                      hasSelectiveDraft
-                          ? loc.t('inventory_mode_saved_draft')
-                          : loc.t('inventory_selective_mode_subtitle'),
+                  if (allowSelectiveInventory) ...[
+                    SizedBox(height: tileGap),
+                    ListTile(
+                      dense: isLandscape,
+                      visualDensity: isLandscape
+                          ? VisualDensity.compact
+                          : VisualDensity.standard,
+                      minVerticalPadding: isLandscape ? 2 : null,
+                      leading: Icon(Icons.filter_alt_outlined,
+                          color: theme.colorScheme.secondary),
+                      title: Row(children: [
+                        Text(loc.t('inventory_selective_mode_title')),
+                        if (hasSelectiveDraft) _continueBadge(ctx),
+                      ]),
+                      subtitle: Text(
+                        hasSelectiveDraft
+                            ? loc.t('inventory_mode_saved_draft')
+                            : loc.t('inventory_selective_mode_subtitle'),
+                      ),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      tileColor: theme.colorScheme.secondaryContainer
+                          .withOpacity(0.25),
+                      onTap: () => Navigator.of(ctx).pop('selective'),
                     ),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    tileColor:
-                        theme.colorScheme.secondaryContainer.withOpacity(0.25),
-                    onTap: () => Navigator.of(ctx).pop('selective'),
-                  ),
+                  ],
                   if (!isHall) ...[
                     SizedBox(height: tileGap),
                     ListTile(
