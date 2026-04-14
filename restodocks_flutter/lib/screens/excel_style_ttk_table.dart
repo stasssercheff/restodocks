@@ -82,7 +82,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
           ),
         );
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 1225, maxWidth: 1225),
+      constraints: const BoxConstraints(minWidth: 1245, maxWidth: 1245),
       child: Table(
         border: TableBorder.all(color: Colors.black, width: 1),
         defaultVerticalAlignment: TableCellVerticalAlignment.middle,
@@ -90,16 +90,16 @@ class ExcelStyleTtkTable extends StatefulWidget {
           0: FixedColumnWidth(50),
           1: FixedColumnWidth(120),
           2: FixedColumnWidth(175),
-          3: FixedColumnWidth(75),
+          3: FixedColumnWidth(80),
           4: FixedColumnWidth(90),
           5: FixedColumnWidth(75),
-          6: FixedColumnWidth(95),
-          7: FixedColumnWidth(95),
+          6: FixedColumnWidth(100),
+          7: FixedColumnWidth(100),
           8: FixedColumnWidth(75),
           9: FixedColumnWidth(75),
           10: FixedColumnWidth(90),
           11: FixedColumnWidth(80),
-          12: FixedColumnWidth(90),
+          12: FixedColumnWidth(95),
           13: FixedColumnWidth(40),
         },
         children: [
@@ -300,7 +300,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       // Отложенный билд: избегаем замирания при большом числе ингредиентов.
       if (!_tableBuilt) {
         return ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 1225, minHeight: 200),
+          constraints: const BoxConstraints(minWidth: 1245, minHeight: 200),
           child: Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
@@ -405,8 +405,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     final Widget tableCore = ConstrainedBox(
             constraints: const BoxConstraints(
-              minWidth: 1225,
-              maxWidth: 1225,
+              minWidth: 1245,
+              maxWidth: 1245,
             ), // фиксируем ширину, чтобы контейнер не раздувался под доступную ширину
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -422,16 +422,16 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               0: FixedColumnWidth(50),   // Тип ТТК
               1: FixedColumnWidth(120),  // Название
               2: FixedColumnWidth(175),  // Продукт
-              3: FixedColumnWidth(75),   // Брутто г./шт
+              3: FixedColumnWidth(80),   // Брутто г./шт
               4: FixedColumnWidth(90),   // % отхода
               5: FixedColumnWidth(75),   // Нетто г.
-              6: FixedColumnWidth(95),   // Способ приготовления
-              7: FixedColumnWidth(95),   // % ужарки
+              6: FixedColumnWidth(100),  // Способ приготовления
+              7: FixedColumnWidth(100),  // % ужарки
               8: FixedColumnWidth(75),   // Выход г.
               9: FixedColumnWidth(75),   // вес прц
               10: FixedColumnWidth(90),  // порций(шт)
               11: FixedColumnWidth(80),  // Стоимость
-              12: FixedColumnWidth(90),  // Цена за кг
+              12: FixedColumnWidth(95),  // Цена за кг
               13: FixedColumnWidth(40), // Удаление
             },
             children: [
