@@ -682,13 +682,34 @@ function EstablishmentsTab() {
                     Регистрация
                   </th>
                   <th className="px-4 py-3 text-left">IP регистрации</th>
-                  <th className="px-4 py-3 text-right w-20"></th>
+                  <th
+                    className="px-3 py-3 text-right w-[5.5rem] sticky right-0 z-20 bg-gray-900 border-l border-gray-800 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.45)]"
+                    title="Действия — при узком окне колонка закреплена справа"
+                  >
+                    <span className="sr-only">Действия</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((row, i) => (
-                  <tr key={row.id} className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition ${i === filtered.length - 1 ? 'border-0' : ''}`}>
-                    <td className="px-4 py-3 font-medium text-white">{row.name}</td>
+                  <tr
+                    key={row.id}
+                    className={`group border-b border-gray-800/50 hover:bg-gray-800/30 transition ${i === filtered.length - 1 ? 'border-0' : ''}`}
+                  >
+                    <td className="px-4 py-3 font-medium text-white">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <span className="min-w-0">{row.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(row)}
+                          disabled={deleting === row.id}
+                          className="hidden max-xl:inline-flex shrink-0 text-red-400/90 hover:text-red-300 text-[11px] font-medium underline underline-offset-2 disabled:opacity-50"
+                          title="Удалить без прокрутки таблицы вправо"
+                        >
+                          {deleting === row.id ? '…' : 'Удалить'}
+                        </button>
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-xs">
                       <span className={establishmentTypeBadgeClass(row)}>
                         {establishmentTypeLabel(row)}
@@ -706,11 +727,12 @@ function EstablishmentsTab() {
                       {formatDateTime(row.created_at)}
                     </td>
                     <td className="px-4 py-3 text-gray-400 text-xs font-mono">{regInfo(row)}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-3 py-3 text-right sticky right-0 z-10 bg-gray-900 group-hover:bg-gray-800/30 border-l border-gray-800 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.45)]">
                       <button
+                        type="button"
                         onClick={() => handleDelete(row)}
                         disabled={deleting === row.id}
-                        className="text-red-400 hover:text-red-300 text-xs disabled:opacity-50"
+                        className="text-red-400 hover:text-red-300 text-xs disabled:opacity-50 min-w-[2rem]"
                         title="Удалить заведение"
                       >
                         {deleting === row.id ? '...' : '🗑'}
