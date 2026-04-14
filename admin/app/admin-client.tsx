@@ -504,8 +504,11 @@ function EstablishmentsTab() {
         throw new Error(parts.join(' ') || 'Ошибка удаления')
       }
       await load()
+      alert(`Заведение «${row.name}» удалено из базы (строка establishments).`)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка удаления')
+      const msg = e instanceof Error ? e.message : 'Ошибка удаления'
+      setError(msg)
+      alert(`Не удалось удалить заведение «${row.name}».\n\n${msg}\n\nЕсли здесь про миграцию или функцию admin_delete_establishment — выполните её в Supabase (см. репозиторий, папка supabase/migrations).`)
       await load()
     } finally {
       setDeleting(null)
@@ -544,6 +547,10 @@ function EstablishmentsTab() {
         <p className="mt-2 text-xs text-gray-600">
           Если у старых аккаунтов без промо пропала дата окончания триала, выполни в Supabase миграцию{' '}
           <code className="text-gray-500">20260621120000_backfill_pro_trial_ends_at_no_promo_main.sql</code>.
+        </p>
+        <p className="mt-3 text-xs text-gray-500 leading-relaxed border-t border-gray-800 pt-3">
+          <span className="text-gray-400">Заведения и филиалы</span> создаются только в приложении (регистрация, экран «Мои заведения» / добавление филиала). В этой админке нет кнопки «создать заведение» — здесь только список из БД, удаление и гео. Если
+          строка «видна в админке, но не в приложении», это всё равно записи в Supabase; после успешного удаления появится подтверждение; при ошибке — текст в алерте и в красном блоке выше.
         </p>
       </div>
 
