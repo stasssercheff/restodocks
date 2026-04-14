@@ -5433,7 +5433,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                           ),
                         ),
                       ),
-                    if (false && effectiveCanEdit && !isCook && isMobile)
+                    if (effectiveCanEdit && !isCook)
                       SliverPersistentHeader(
                         pinned: true,
                         delegate: _TtkCompositionPinnedHeaderDelegate(
@@ -5454,12 +5454,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                             controller: _compositionTableHScrollController,
                             scrollDirection: Axis.horizontal,
                             clipBehavior: Clip.hardEdge,
-                            child: InteractiveViewer(
-                              panEnabled: false,
-                              scaleEnabled: true,
-                              minScale: 0.75,
-                              maxScale: 2.2,
-                              child: effectiveCanEdit
+                            child: effectiveCanEdit
                                   ? RepaintBoundary(
                                       child: ExcelStyleTtkTable(
                                         loc: loc,
@@ -5539,12 +5534,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                         onRemove: _removeIngredient,
                                         onSuggestWaste: _suggestWasteForRow,
                                         hideTechnologyBlock: true,
-                                        omitTableHeader: false,
+                                        omitTableHeader:
+                                            effectiveCanEdit && !isCook,
                                         shrinkWrap: true,
                                         onTapPfIngredient: (id) =>
                                             context.push('/tech-cards/$id'),
                                       ),
-                                    )
                                   : ListenableBuilder(
                                       listenable: context
                                           .read<ProductStoreSupabase>()
