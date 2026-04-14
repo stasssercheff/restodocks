@@ -5433,7 +5433,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                           ),
                         ),
                       ),
-                    if (effectiveCanEdit && !isCook)
+                    if (false && effectiveCanEdit && !isCook && isMobile)
                       SliverPersistentHeader(
                         pinned: true,
                         delegate: _TtkCompositionPinnedHeaderDelegate(
@@ -5539,8 +5539,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                         onRemove: _removeIngredient,
                                         onSuggestWaste: _suggestWasteForRow,
                                         hideTechnologyBlock: true,
-                                        omitTableHeader:
-                                            effectiveCanEdit && !isCook,
+                                        omitTableHeader: false,
                                         shrinkWrap: true,
                                         onTapPfIngredient: (id) =>
                                             context.push('/tech-cards/$id'),
