@@ -82,7 +82,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
           ),
         );
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 1105, maxWidth: 1105),
+      constraints: const BoxConstraints(minWidth: 1145, maxWidth: 1145),
       child: Table(
         border: TableBorder.all(color: Colors.black, width: 1),
         defaultVerticalAlignment: TableCellVerticalAlignment.middle,
@@ -300,7 +300,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       // Отложенный билд: избегаем замирания при большом числе ингредиентов.
       if (!_tableBuilt) {
         return ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 1105, minHeight: 200),
+          constraints: const BoxConstraints(minWidth: 1145, minHeight: 200),
           child: Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
@@ -405,8 +405,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     final Widget tableCore = ConstrainedBox(
             constraints: const BoxConstraints(
-              minWidth: 1105,
-              maxWidth: 1105,
+              minWidth: 1145,
+              maxWidth: 1145,
             ), // фиксируем ширину, чтобы контейнер не раздувался под доступную ширину
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
