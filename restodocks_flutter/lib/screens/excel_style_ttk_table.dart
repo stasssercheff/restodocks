@@ -77,12 +77,19 @@ class ExcelStyleTtkTable extends StatefulWidget {
           alignment: Alignment.center,
           child: Text(
             loc.t(key),
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              height: 1.1,
+            ),
             textAlign: TextAlign.center,
+            softWrap: true,
+            maxLines: 2,
+            overflow: TextOverflow.clip,
           ),
         );
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 1245, maxWidth: 1245),
+      constraints: const BoxConstraints(minWidth: 1295, maxWidth: 1295),
       child: Table(
         border: TableBorder.all(color: Colors.black, width: 1),
         defaultVerticalAlignment: TableCellVerticalAlignment.middle,
@@ -90,16 +97,16 @@ class ExcelStyleTtkTable extends StatefulWidget {
           0: FixedColumnWidth(50),
           1: FixedColumnWidth(120),
           2: FixedColumnWidth(175),
-          3: FixedColumnWidth(80),
-          4: FixedColumnWidth(90),
+          3: FixedColumnWidth(85),
+          4: FixedColumnWidth(95),
           5: FixedColumnWidth(75),
-          6: FixedColumnWidth(100),
+          6: FixedColumnWidth(115),
           7: FixedColumnWidth(100),
           8: FixedColumnWidth(75),
           9: FixedColumnWidth(75),
           10: FixedColumnWidth(90),
-          11: FixedColumnWidth(80),
-          12: FixedColumnWidth(95),
+          11: FixedColumnWidth(95),
+          12: FixedColumnWidth(105),
           13: FixedColumnWidth(40),
         },
         children: [
@@ -300,7 +307,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       // Отложенный билд: избегаем замирания при большом числе ингредиентов.
       if (!_tableBuilt) {
         return ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 1245, minHeight: 200),
+          constraints: const BoxConstraints(minWidth: 1295, minHeight: 200),
           child: Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
@@ -405,8 +412,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     final Widget tableCore = ConstrainedBox(
             constraints: const BoxConstraints(
-              minWidth: 1245,
-              maxWidth: 1245,
+              minWidth: 1295,
+              maxWidth: 1295,
             ), // фиксируем ширину, чтобы контейнер не раздувался под доступную ширину
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -422,16 +429,16 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
               0: FixedColumnWidth(50),   // Тип ТТК
               1: FixedColumnWidth(120),  // Название
               2: FixedColumnWidth(175),  // Продукт
-              3: FixedColumnWidth(80),   // Брутто г./шт
-              4: FixedColumnWidth(90),   // % отхода
+              3: FixedColumnWidth(85),   // Брутто г./шт
+              4: FixedColumnWidth(95),   // % отхода
               5: FixedColumnWidth(75),   // Нетто г.
-              6: FixedColumnWidth(100),  // Способ приготовления
+              6: FixedColumnWidth(115),  // Способ приготовления
               7: FixedColumnWidth(100),  // % ужарки
               8: FixedColumnWidth(75),   // Выход г.
               9: FixedColumnWidth(75),   // вес прц
               10: FixedColumnWidth(90),  // порций(шт)
-              11: FixedColumnWidth(80),  // Стоимость
-              12: FixedColumnWidth(95),  // Цена за кг
+              11: FixedColumnWidth(95),  // Стоимость
+              12: FixedColumnWidth(105), // Цена за кг
               13: FixedColumnWidth(40), // Удаление
             },
             children: [
@@ -796,8 +803,15 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       child: Center(
         child: Text(
           text,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            height: 1.1,
+          ),
           textAlign: TextAlign.center,
+          softWrap: true,
+          maxLines: 2,
+          overflow: TextOverflow.clip,
         ),
       ),
     );
