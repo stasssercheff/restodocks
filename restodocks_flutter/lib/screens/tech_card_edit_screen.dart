@@ -5495,7 +5495,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                           ),
                         ),
                       ),
-                    if (effectiveCanEdit && !isCook)
+                    if (false && effectiveCanEdit && !isCook)
                       SliverPersistentHeader(
                         pinned: true,
                         delegate: _TtkCompositionPinnedHeaderDelegate(
@@ -5523,45 +5523,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                               parent: AlwaysScrollableScrollPhysics(),
                             ),
                             child: Listener(
-                              behavior: HitTestBehavior.translucent,
-                              onPointerDown: (event) {
-                                if (!kIsWeb || MediaQuery.of(context).size.width > 900) {
-                                  return;
-                                }
-                                _compositionTablePointerStart[event.pointer] = event.position;
-                                _compositionTablePointerLast[event.pointer] = event.position;
-                              },
-                              onPointerMove: (event) {
-                                // Disabled: pointer-driven manual scroll caused edit lock and header drift.
-                                return;
-                                // Mobile web: запускаем ручной скролл только после явного свайпа.
-                                // Обычный tap (для ввода/редактирования) не перехватываем.
-                                if (!kIsWeb || MediaQuery.of(context).size.width > 900) {
-                                  return;
-                                }
-                                final start = _compositionTablePointerStart[event.pointer];
-                                final last = _compositionTablePointerLast[event.pointer];
-                                if (start == null || last == null) return;
-
-                                final total = event.position - start;
-                                final isActive = _compositionTableDragActivePointers
-                                    .contains(event.pointer);
-                                if (!isActive && total.distance < 10) {
-                                  _compositionTablePointerLast[event.pointer] = event.position;
-                                  return;
-                                }
-
-                                _compositionTableDragActivePointers.add(event.pointer);
-                                final delta = event.position - last;
-                                _compositionTablePointerLast[event.pointer] = event.position;
-                                _scrollCompositionTableByDelta(delta, context);
-                              },
-                              onPointerUp: (event) {
-                                _clearCompositionPointerState(event.pointer);
-                              },
-                              onPointerCancel: (event) {
-                                _clearCompositionPointerState(event.pointer);
-                              },
+                              behavior: HitTestBehavior.deferToChild,
                               child: effectiveCanEdit
                                   ? RepaintBoundary(
                                       child: ExcelStyleTtkTable(
@@ -5642,8 +5604,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                         onRemove: _removeIngredient,
                                         onSuggestWaste: _suggestWasteForRow,
                                         hideTechnologyBlock: true,
-                                        omitTableHeader:
-                                            effectiveCanEdit && !isCook,
+                                        omitTableHeader: false,
                                         shrinkWrap: true,
                                         onTapPfIngredient: (id) =>
                                             context.push('/tech-cards/$id'),
