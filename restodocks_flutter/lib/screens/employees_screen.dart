@@ -95,6 +95,12 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     return !(hasOnlyOwnerRole && (e.positionRole == null || e.positionRole!.trim().isEmpty));
   }
 
+  String _resolvedRateHeader(LocalizationService loc) {
+    final translated = loc.t('rate').trim();
+    if (translated.isEmpty || translated == 'rate') return 'Ставка';
+    return translated;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -115,23 +121,10 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         leading: appBarBackButton(context),
         title: Text(loc.t('employees')),
         actions: [
-          if (_employeeCap > 0)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Center(
-                child: Text(
-                  '$_employeeUsedCount из $_employeeCap',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ),
-            ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
         ],
       ),
-      body: _buildBody(loc, theme, canEdit, showTranslit),
+      body: _buildBody(loc, theme, canEdit, showTranslit, _resolvedRateHeader(loc)),
     );
   }
 
@@ -140,6 +133,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     ThemeData theme,
     bool canEdit,
     bool showTranslit,
+    String rateHeader,
   ) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
@@ -191,13 +185,28 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _EmployeeTableHeader(loc: loc, canEdit: canEdit),
+        if (_employeeCap > 0)
+          Padding(
+            padding: const EdgeInsets.only(right: 6, bottom: 4),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                '$_employeeUsedCount из $_employeeCap',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
+          ),
+        _EmployeeTableHeader(loc: loc, canEdit: canEdit, rateHeader: rateHeader),
         const SizedBox(height: 4),
         ...List.generate(_list.length, (i) => _EmployeeCard(
         employee: _list[i],
         loc: loc,
         showTranslit: showTranslit,
         canEdit: canEdit,
+        rateHeader: rateHeader,
         onEdit: () => _openEditEmployee(context, _list[i]),
         onDelete: () => _deleteEmployee(context, _list[i]),
       )),
@@ -338,10 +347,12 @@ class _EmployeeTableHeader extends StatelessWidget {
   const _EmployeeTableHeader({
     required this.loc,
     required this.canEdit,
+    required this.rateHeader,
   });
 
   final LocalizationService loc;
   final bool canEdit;
+  final String rateHeader;
 
   @override
   Widget build(BuildContext context) {
@@ -366,7 +377,7 @@ class _EmployeeTableHeader extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(flex: 3, child: Text(loc.t('position') ?? 'Должность', style: style)),
           const SizedBox(width: 8),
-          Expanded(flex: 2, child: Text(loc.t('rate') ?? 'Ставка', style: style)),
+          Expanded(flex: 3, child: Text(rateHeader, style: style, textAlign: TextAlign.right)),
           if (canEdit) const SizedBox(width: 64),
         ],
       ),
@@ -380,6 +391,7 @@ class _EmployeeCard extends StatelessWidget {
     required this.loc,
     required this.showTranslit,
     required this.canEdit,
+    required this.rateHeader,
     required this.onEdit,
     required this.onDelete,
   });
@@ -388,6 +400,7 @@ class _EmployeeCard extends StatelessWidget {
   final LocalizationService loc;
   final bool showTranslit;
   final bool canEdit;
+  final String rateHeader;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -395,6 +408,15 @@ class _EmployeeCard extends StatelessWidget {
     final pos = e.positionRole;
     if (pos == null || pos.isEmpty) return '—';
     return loc.roleDisplayName(pos);
+  }
+
+  String _rateUnitLabel() {
+    final isRu = loc.currentLanguageCode == 'ru';
+    final isPerShift = employee.paymentType == 'per_shift';
+    if (isRu) return isPerShift ? 'за смену' : 'за час';
+    return isPerShift
+        ? (loc.t('payment_per_shift') ?? 'per shift').toLowerCase()
+        : (loc.t('payment_hourly') ?? 'hourly').toLowerCase();
   }
 
   @override
@@ -410,8 +432,9 @@ class _EmployeeCard extends StatelessWidget {
     final currencySymbol = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
     final isPerShift = employee.paymentType == 'per_shift';
     final rate = isPerShift ? employee.ratePerShift : employee.hourlyRate;
+    final rateUnit = _rateUnitLabel();
     final rateStr = rate != null && rate > 0
-        ? '${NumberFormatUtils.formatInt(rate)} $currencySymbol'
+        ? '${NumberFormatUtils.formatInt(rate)} $currencySymbol · ${rateUnit.toLowerCase()}'
         : '—';
     final sectionStr = (employee.department == 'kitchen' && employee.section != null && employee.section!.isNotEmpty)
         ? (loc.t('section_${employee.section}') != 'section_${employee.section}'
@@ -485,7 +508,7 @@ class _EmployeeCard extends StatelessWidget {
               const SizedBox(width: 6),
               // Ставка (без иконки на ПК — экономит ширину и убирает overflow)
               Expanded(
-                flex: 2,
+                flex: 3,
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: Text(
@@ -530,8 +553,9 @@ class _EmployeeCard extends StatelessWidget {
     final currencySymbol = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
     final isPerShift = employee.paymentType == 'per_shift';
     final rate = isPerShift ? employee.ratePerShift : employee.hourlyRate;
+    final rateUnit = _rateUnitLabel();
     final rateStr = rate != null && rate > 0
-        ? '${NumberFormatUtils.formatInt(rate)} $currencySymbol'
+        ? '${NumberFormatUtils.formatInt(rate)} $currencySymbol · ${rateUnit.toLowerCase()}'
         : '—';
     final sectionStr = (employee.department == 'kitchen' && employee.section != null && employee.section!.isNotEmpty)
         ? (loc.t('section_${employee.section}') != 'section_${employee.section}'
@@ -595,7 +619,12 @@ class _EmployeeCard extends StatelessWidget {
                       children: [
                         Icon(Icons.payments_outlined, size: 12, color: theme.colorScheme.primary),
                         const SizedBox(width: 4),
-                        Text(rateStr, style: subStyle?.copyWith(fontWeight: FontWeight.w500)),
+                        Text(
+                          '${rateHeader.toLowerCase()}: $rateStr',
+                          style: subStyle?.copyWith(fontWeight: FontWeight.w500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ],
