@@ -798,6 +798,8 @@ function EstablishmentsTab() {
 // ─── Promo Tab ────────────────────────────────────────────────────────────────
 
 function PromoTab() {
+  const EMPLOYEE_PACK_OPTIONS = [0, 5, 8, 12, 15] as const
+  const BRANCH_PACK_OPTIONS = [0, 1, 3, 5, 10] as const
   const [codes, setCodes] = useState<PromoCode[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -811,10 +813,10 @@ function PromoTab() {
   const [newPromoLogic, setNewPromoLogic] = useState<'legacy' | 'activation'>('legacy')
   const [newGrantTier, setNewGrantTier] = useState<PromoGrantSubscriptionType>('ultra')
   const [newMaxEmployees, setNewMaxEmployees] = useState('')
-  /** Подписка расширения «+5 сотр.»: число активаций в коде */
-  const [newEmpSlotPacks, setNewEmpSlotPacks] = useState('')
-  /** Подписка расширения «+1 филиал»: число активаций в коде */
-  const [newBranchSlotPacks, setNewBranchSlotPacks] = useState('')
+  /** Подписка расширения сотрудников: значение из фиксированного набора пакетов. */
+  const [newEmpSlotPacks, setNewEmpSlotPacks] = useState('0')
+  /** Подписка расширения заведений: значение из фиксированного набора пакетов. */
+  const [newBranchSlotPacks, setNewBranchSlotPacks] = useState('0')
   const [newAdditiveOnly, setNewAdditiveOnly] = useState(false)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'free' | 'used' | 'expired' | 'disabled'>('all')
@@ -839,8 +841,13 @@ function PromoTab() {
     if (!newCode.trim()) return
     const empN = newEmpSlotPacks.trim() ? parseInt(newEmpSlotPacks.trim(), 10) : 0
     const brN = newBranchSlotPacks.trim() ? parseInt(newBranchSlotPacks.trim(), 10) : 0
-    if (Number.isNaN(empN) || empN < 0 || empN > 500 || Number.isNaN(brN) || brN < 0 || brN > 500) {
-      alert('Подписки расширения: целые числа от 0 до 500 в каждом поле.')
+    if (
+      Number.isNaN(empN) ||
+      Number.isNaN(brN) ||
+      !EMPLOYEE_PACK_OPTIONS.includes(empN as typeof EMPLOYEE_PACK_OPTIONS[number]) ||
+      !BRANCH_PACK_OPTIONS.includes(brN as typeof BRANCH_PACK_OPTIONS[number])
+    ) {
+      alert('Выберите пакет из списка для сотрудников и заведений.')
       return
     }
     if (newPromoLogic === 'activation') {
@@ -886,8 +893,8 @@ function PromoTab() {
       setNewPromoLogic('legacy')
       setNewGrantTier('ultra')
       setNewMaxEmployees('')
-      setNewEmpSlotPacks('')
-      setNewBranchSlotPacks('')
+      setNewEmpSlotPacks('0')
+      setNewBranchSlotPacks('0')
       setNewAdditiveOnly(false)
       await loadCodes()
     } finally {
@@ -985,40 +992,22 @@ function PromoTab() {
     await loadCodes()
   }
 
-  async function setEmpSlotPacks(id: number, current: number | null | undefined) {
-    const val = prompt(
-      'Подписка расширения «+5 сотр.»: сколько активаций заложено в коде (0–500). Каждая = +5 к лимиту на заведение погашения.',
-      String(current ?? 0),
-    )
-    if (val === null) return
-    const n = parseInt(val.trim(), 10)
-    if (val.trim() === '' || Number.isNaN(n) || n < 0 || n > 500) {
-      alert('Целое число от 0 до 500')
-      return
-    }
+  async function setEmpSlotPacks(id: number, nextValue: number) {
+    if (!EMPLOYEE_PACK_OPTIONS.includes(nextValue as typeof EMPLOYEE_PACK_OPTIONS[number])) return
     await fetch('/api/promo', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, grants_employee_slot_packs: n }),
+      body: JSON.stringify({ id, grants_employee_slot_packs: nextValue }),
     })
     await loadCodes()
   }
 
-  async function setBranchSlotPacks(id: number, current: number | null | undefined) {
-    const val = prompt(
-      'Подписка расширения «+1 филиал»: сколько активаций в коде (0–500). Каждая = +1 слот филиала на владельца.',
-      String(current ?? 0),
-    )
-    if (val === null) return
-    const n = parseInt(val.trim(), 10)
-    if (val.trim() === '' || Number.isNaN(n) || n < 0 || n > 500) {
-      alert('Целое число от 0 до 500')
-      return
-    }
+  async function setBranchSlotPacks(id: number, nextValue: number) {
+    if (!BRANCH_PACK_OPTIONS.includes(nextValue as typeof BRANCH_PACK_OPTIONS[number])) return
     await fetch('/api/promo', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, grants_branch_slot_packs: n }),
+      body: JSON.stringify({ id, grants_branch_slot_packs: nextValue }),
     })
     await loadCodes()
   }
@@ -1105,9 +1094,9 @@ function PromoTab() {
           Ниже можно завести <span className="text-gray-500">второй тип срока</span> — дни Pro с момента активации кода.
         </p>
         <p className="text-[11px] text-gray-600 mb-3 leading-snug border-l-2 border-indigo-700/50 pl-3">
-          <span className="text-gray-500 font-medium">Подписки расширения Lite</span> (как отдельные продукты в App Store): в одном коде можно заложить{' '}
-          <span className="text-gray-400">подписку «+5 сотрудников»</span> (число активаций × +5 к лимиту на заведение, где погасили код) и{' '}
-          <span className="text-gray-400">подписку «+1 филиал»</span> (число активаций × +1 слот филиала на владельца). Поля независимы — не смешиваем в одну колонку «пакеты».
+          <span className="text-gray-500 font-medium">Подписки расширения Lite</span>: выбор только из фиксированных пакетов.
+          Для сотрудников: <span className="text-gray-400">+5 / +8 / +12 / +15</span>.
+          Для заведений: <span className="text-gray-400">+1 / +3 / +5 / +10</span>.
         </p>
         <div className="flex flex-col gap-2 mb-3">
           <span className="text-[11px] text-gray-500 uppercase tracking-wide">Логика</span>
@@ -1222,38 +1211,32 @@ function PromoTab() {
         </div>
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 sm:items-end rounded-lg border border-gray-800 bg-gray-950/40 p-3">
           <div className="flex flex-col gap-1">
-            <label
-              className="text-xs text-gray-400"
-              title="Отдельная подписка расширения: число активаций в коде; каждая = +5 к лимиту сотрудников на заведение погашения"
-            >
-              Подписка «+5 сотр.» (шт. в коде)
-            </label>
-            <input
-              type="number"
-              min={0}
-              max={500}
+            <label className="text-xs text-gray-400">Увеличение сотрудников (пакет)</label>
+            <select
               value={newEmpSlotPacks}
               onChange={e => setNewEmpSlotPacks(e.target.value)}
-              placeholder="0"
-              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28"
-            />
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28"
+            >
+              {EMPLOYEE_PACK_OPTIONS.map(v => (
+                <option key={v} value={v}>
+                  {v === 0 ? 'нет' : `+${v}`}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex flex-col gap-1">
-            <label
-              className="text-xs text-gray-400"
-              title="Отдельная подписка расширения: число активаций в коде; каждая = +1 слот филиала на владельца"
-            >
-              Подписка «+1 филиал» (шт. в коде)
-            </label>
-            <input
-              type="number"
-              min={0}
-              max={500}
+            <label className="text-xs text-gray-400">Доп. заведения/филиалы (пакет)</label>
+            <select
               value={newBranchSlotPacks}
               onChange={e => setNewBranchSlotPacks(e.target.value)}
-              placeholder="0"
-              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28"
-            />
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28"
+            >
+              {BRANCH_PACK_OPTIONS.map(v => (
+                <option key={v} value={v}>
+                  {v === 0 ? 'нет' : `+${v}`}
+                </option>
+              ))}
+            </select>
           </div>
           <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer sm:mb-0 col-span-2 sm:col-auto">
             <input
@@ -1287,33 +1270,27 @@ function PromoTab() {
             if (
               Number.isNaN(de) ||
               Number.isNaN(db) ||
-              de < 0 ||
-              de > 500 ||
-              db < 0 ||
-              db > 500
+              !EMPLOYEE_PACK_OPTIONS.includes(de as typeof EMPLOYEE_PACK_OPTIONS[number]) ||
+              !BRANCH_PACK_OPTIONS.includes(db as typeof BRANCH_PACK_OPTIONS[number])
             ) {
               return (
                 <div className="text-amber-600/90">
-                  В полях подписок расширения — целые 0–500 или пусто (= 0).
+                  Выберите пакеты только из фиксированного списка.
                 </div>
               )
             }
             return (
               <>
                 <div>
-                  <span className="text-gray-500">Подписка «+5 сотр.»: </span>
+                  <span className="text-gray-500">Пакет сотрудников: </span>
                   <span className="text-gray-400">
-                    {de === 0
-                      ? 'не включена (0)'
-                      : `${de} активаций в коде → +${de * 5} к лимиту на заведение погашения`}
+                    {de === 0 ? 'не включен' : `+${de}`}
                   </span>
                 </div>
                 <div>
-                  <span className="text-gray-500">Подписка «+1 филиал»: </span>
+                  <span className="text-gray-500">Пакет заведений: </span>
                   <span className="text-gray-400">
-                    {db === 0
-                      ? 'не включена (0)'
-                      : `${db} активаций в коде → +${db} слот(а/ов) филиала на владельца`}
+                    {db === 0 ? 'не включен' : `+${db}`}
                   </span>
                 </div>
               </>
@@ -1465,24 +1442,32 @@ function PromoTab() {
                         </button>
                       </td>
                       <td className="px-4 py-3 text-center align-top">
-                        <button
-                          type="button"
-                          title="Подписка «+5 сотр.»: активаций в коде"
-                          onClick={() => setEmpSlotPacks(row.id, row.grants_employee_slot_packs)}
-                          className="text-xs font-mono tabular-nums hover:text-indigo-400"
+                        <select
+                          title="Пакет сотрудников"
+                          value={String(row.grants_employee_slot_packs ?? 0)}
+                          onChange={e => setEmpSlotPacks(row.id, parseInt(e.target.value, 10))}
+                          className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200"
                         >
-                          {row.grants_employee_slot_packs ?? 0}
-                        </button>
+                          {EMPLOYEE_PACK_OPTIONS.map(v => (
+                            <option key={v} value={v}>
+                              {v === 0 ? 'нет' : `+${v}`}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                       <td className="px-4 py-3 text-center align-top">
-                        <button
-                          type="button"
-                          title="Подписка «+1 филиал»: активаций в коде"
-                          onClick={() => setBranchSlotPacks(row.id, row.grants_branch_slot_packs)}
-                          className="text-xs font-mono tabular-nums hover:text-indigo-400"
+                        <select
+                          title="Пакет заведений"
+                          value={String(row.grants_branch_slot_packs ?? 0)}
+                          onChange={e => setBranchSlotPacks(row.id, parseInt(e.target.value, 10))}
+                          className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200"
                         >
-                          {row.grants_branch_slot_packs ?? 0}
-                        </button>
+                          {BRANCH_PACK_OPTIONS.map(v => (
+                            <option key={v} value={v}>
+                              {v === 0 ? 'нет' : `+${v}`}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button
@@ -1591,10 +1576,10 @@ function PromoTab() {
                       <span className="text-indigo-300">≤{row.max_employees} сотр.</span>
                     )}
                     <span className="text-gray-600 block">
-                      Подписка «+5 сотр.»: {row.grants_employee_slot_packs ?? 0}
+                      Пакет сотрудников: {((row.grants_employee_slot_packs ?? 0) > 0) ? `+${row.grants_employee_slot_packs}` : 'нет'}
                     </span>
                     <span className="text-gray-600 block">
-                      Подписка «+1 фил.»: {row.grants_branch_slot_packs ?? 0}
+                      Пакет заведений: {((row.grants_branch_slot_packs ?? 0) > 0) ? `+${row.grants_branch_slot_packs}` : 'нет'}
                       {row.grants_additive_only ? ' · только расширения' : ''}
                     </span>
                     <span>создан {formatDate(row.created_at)}</span>
@@ -1630,22 +1615,30 @@ function PromoTab() {
                     >
                       👥
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setEmpSlotPacks(row.id, row.grants_employee_slot_packs)}
-                      className="px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white text-sm font-mono text-[10px]"
-                      title="Подписка «+5 сотр.»"
+                    <select
+                      value={String(row.grants_employee_slot_packs ?? 0)}
+                      onChange={e => setEmpSlotPacks(row.id, parseInt(e.target.value, 10))}
+                      className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-900 text-gray-200 text-sm"
+                      title="Пакет сотрудников"
                     >
-                      +5
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setBranchSlotPacks(row.id, row.grants_branch_slot_packs)}
-                      className="px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white text-sm font-mono text-[10px]"
-                      title="Подписка «+1 филиал»"
+                      {EMPLOYEE_PACK_OPTIONS.map(v => (
+                        <option key={v} value={v}>
+                          {v === 0 ? 'Сотр.: нет' : `Сотр.: +${v}`}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={String(row.grants_branch_slot_packs ?? 0)}
+                      onChange={e => setBranchSlotPacks(row.id, parseInt(e.target.value, 10))}
+                      className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-900 text-gray-200 text-sm"
+                      title="Пакет заведений"
                     >
-                      +1ф
-                    </button>
+                      {BRANCH_PACK_OPTIONS.map(v => (
+                        <option key={v} value={v}>
+                          {v === 0 ? 'Филиалы: нет' : `Филиалы: +${v}`}
+                        </option>
+                      ))}
+                    </select>
                     <button
                       type="button"
                       onClick={() => toggleAdditiveOnly(row)}

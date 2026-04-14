@@ -5,6 +5,9 @@ import { getAdminPassword, getSupabaseConfig } from '@/lib/admin-env'
 import { verifySessionToken } from '@/lib/session'
 import { isAllowedPromoGrantType, isSelectablePromoGrantTier } from '@/lib/promo-tiers'
 
+const EMPLOYEE_PACK_OPTIONS = new Set([0, 5, 8, 12, 15])
+const BRANCH_PACK_OPTIONS = new Set([0, 1, 3, 5, 10])
+
 export const dynamic = 'force-dynamic'
 
 async function checkAuth(): Promise<boolean> {
@@ -81,11 +84,11 @@ export async function POST(req: NextRequest) {
     body.grants_branch_slot_packs !== undefined && body.grants_branch_slot_packs !== null
       ? Number(body.grants_branch_slot_packs)
       : 0
-  if (!Number.isInteger(empPacks) || empPacks < 0 || empPacks > 500) {
-    return NextResponse.json({ error: 'Invalid grants_employee_slot_packs: 0–500' }, { status: 400 })
+  if (!Number.isInteger(empPacks) || !EMPLOYEE_PACK_OPTIONS.has(empPacks)) {
+    return NextResponse.json({ error: 'Invalid grants_employee_slot_packs: allowed 0, 5, 8, 12, 15' }, { status: 400 })
   }
-  if (!Number.isInteger(brPacks) || brPacks < 0 || brPacks > 500) {
-    return NextResponse.json({ error: 'Invalid grants_branch_slot_packs: 0–500' }, { status: 400 })
+  if (!Number.isInteger(brPacks) || !BRANCH_PACK_OPTIONS.has(brPacks)) {
+    return NextResponse.json({ error: 'Invalid grants_branch_slot_packs: allowed 0, 1, 3, 5, 10' }, { status: 400 })
   }
   const additiveOnly =
     body.grants_additive_only === true ||
@@ -149,15 +152,15 @@ export async function PATCH(req: NextRequest) {
   }
   if (updates.grants_employee_slot_packs !== undefined && updates.grants_employee_slot_packs !== null) {
     const n = Number(updates.grants_employee_slot_packs)
-    if (!Number.isInteger(n) || n < 0 || n > 500) {
-      return NextResponse.json({ error: 'Invalid grants_employee_slot_packs: 0–500' }, { status: 400 })
+    if (!Number.isInteger(n) || !EMPLOYEE_PACK_OPTIONS.has(n)) {
+      return NextResponse.json({ error: 'Invalid grants_employee_slot_packs: allowed 0, 5, 8, 12, 15' }, { status: 400 })
     }
     updates.grants_employee_slot_packs = n
   }
   if (updates.grants_branch_slot_packs !== undefined && updates.grants_branch_slot_packs !== null) {
     const n = Number(updates.grants_branch_slot_packs)
-    if (!Number.isInteger(n) || n < 0 || n > 500) {
-      return NextResponse.json({ error: 'Invalid grants_branch_slot_packs: 0–500' }, { status: 400 })
+    if (!Number.isInteger(n) || !BRANCH_PACK_OPTIONS.has(n)) {
+      return NextResponse.json({ error: 'Invalid grants_branch_slot_packs: allowed 0, 1, 3, 5, 10' }, { status: 400 })
     }
     updates.grants_branch_slot_packs = n
   }
