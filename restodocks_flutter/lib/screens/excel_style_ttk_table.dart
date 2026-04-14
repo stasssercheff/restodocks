@@ -70,6 +70,9 @@ class ExcelStyleTtkTable extends StatefulWidget {
     this.omitTableHeader = false,
   });
 
+  /// Сумма ширин всех колонок таблицы состава.
+  static const double compositionTableWidth = 1105;
+
   /// Одна строка шапки состава (для закрепа над страницей; ширина как у таблицы).
   static Widget compositionPinnedHeader(LocalizationService loc) {
     Widget h(String key) => Container(
@@ -82,7 +85,10 @@ class ExcelStyleTtkTable extends StatefulWidget {
           ),
         );
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 1145, maxWidth: 1145),
+      constraints: const BoxConstraints(
+        minWidth: compositionTableWidth,
+        maxWidth: compositionTableWidth,
+      ),
       child: Table(
         border: TableBorder.all(color: Colors.black, width: 1),
         defaultVerticalAlignment: TableCellVerticalAlignment.middle,
@@ -300,7 +306,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       // Отложенный билд: избегаем замирания при большом числе ингредиентов.
       if (!_tableBuilt) {
         return ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 1145, minHeight: 200),
+          constraints: const BoxConstraints(
+            minWidth: ExcelStyleTtkTable.compositionTableWidth,
+            minHeight: 200,
+          ),
           child: Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
@@ -405,8 +414,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     final Widget tableCore = ConstrainedBox(
             constraints: const BoxConstraints(
-              minWidth: 1145,
-              maxWidth: 1145,
+              minWidth: ExcelStyleTtkTable.compositionTableWidth,
+              maxWidth: ExcelStyleTtkTable.compositionTableWidth,
             ), // фиксируем ширину, чтобы контейнер не раздувался под доступную ширину
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
