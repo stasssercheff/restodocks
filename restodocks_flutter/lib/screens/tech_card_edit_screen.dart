@@ -5540,6 +5540,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                         onTapPfIngredient: (id) =>
                                             context.push('/tech-cards/$id'),
                                       ),
+                                    )
                                   : ListenableBuilder(
                                       listenable: context
                                           .read<ProductStoreSupabase>()
