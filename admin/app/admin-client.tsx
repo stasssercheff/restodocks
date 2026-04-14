@@ -39,8 +39,6 @@ type Establishment = {
   registration_ip?: string | null
   registration_country?: string | null
   registration_city?: string | null
-  /** Админ: лимит доп. заведений для владельца; null = общая настройка «Настройки» */
-  max_additional_establishments_override?: number | null
   establishment_type?: 'main' | 'branch' | 'separate'
   subscription_summary?: SubscriptionSummary
   effective_pro?: boolean
@@ -91,7 +89,7 @@ const RD_ADMIN_SUPPORT_KEY = 'rd_admin_support_active'
 
 export default function AdminClient() {
   const router = useRouter()
-  const [tab, setTab] = useState<'establishments' | 'promo' | 'support' | 'security' | 'health' | 'settings'>('establishments')
+  const [tab, setTab] = useState<'establishments' | 'promo' | 'support' | 'security' | 'health'>('establishments')
   const [supportShellHighlight, setSupportShellHighlight] = useState(false)
 
   useEffect(() => {
@@ -140,7 +138,6 @@ export default function AdminClient() {
             { key: 'support', label: 'Техподдержка' },
             { key: 'security', label: 'Безопасность' },
             { key: 'health', label: 'Нагрузка' },
-            { key: 'settings', label: 'Настройки' },
           ] as const).map(t => (
             <button
               key={t.key}
@@ -176,7 +173,6 @@ export default function AdminClient() {
         )}
         {tab === 'security' && <SecurityTab />}
         {tab === 'health' && <SystemHealthTab />}
-        {tab === 'settings' && <PlatformSettingsTab />}
       </main>
     </div>
   )
@@ -221,7 +217,6 @@ function SupportAccessTab({
     } catch {
       /* ignore */
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only restore
   }, [])
 
   async function startSupportSession() {
@@ -493,32 +488,6 @@ function EstablishmentsTab() {
     }
   }
 
-  async function setMaxAdditionalOverride(row: Establishment) {
-    const current = row.max_additional_establishments_override
-    const val = prompt(
-      'Макс. дополнительных заведений для аккаунта этого владельца (как общая настройка). Пусто — брать лимит из вкладки «Настройки»:',
-      current != null ? String(current) : '',
-    )
-    if (val === null) return
-    const trimmed = val.trim()
-    const parsed = trimmed === '' ? null : parseInt(trimmed, 10)
-    if (trimmed !== '' && (Number.isNaN(parsed!) || parsed! < 0 || parsed! > 999)) {
-      alert('Введи целое от 0 до 999 или оставь пустым')
-      return
-    }
-    const res = await fetch(`/api/establishments/${row.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ max_additional_establishments_override: parsed }),
-    })
-    const json = await res.json()
-    if (!res.ok) {
-      setError(typeof json?.error === 'string' ? json.error : 'Ошибка сохранения')
-      return
-    }
-    await load()
-  }
-
   async function handleDelete(row: Establishment) {
     if (!confirm(`Удалить заведение «${row.name}»?\n\nБудут удалены все данные: номенклатура, ТТК, чеклисты, сотрудники и т.д. Действие необратимо.`)) return
     const typed = prompt(`Для подтверждения введите "${CONFIRM_DELETE_TEXT}":`)
@@ -551,9 +520,7 @@ function EstablishmentsTab() {
           <span className="block mt-2 text-gray-500 text-xs">
             Нет колонки или схема старая — открой Supabase → SQL Editor и выполни миграции:{' '}
             <code className="text-gray-400">supabase/migrations/20260502120000_pro_paid_until_and_status_rpc.sql</code>
-            {' '}(колонка <code className="text-gray-500">pro_paid_until</code>), при необходимости{' '}
-            <code className="text-gray-400">supabase/migrations/20260430230000_establishments_max_additional_override.sql</code>
-            . Ошибка входа/401 — проверь Secrets в Cloudflare (<code className="text-gray-500">SUPABASE_URL</code>,{' '}
+            {' '}(колонка <code className="text-gray-500">pro_paid_until</code>). Ошибка входа/401 — проверь Secrets в Cloudflare (<code className="text-gray-500">SUPABASE_URL</code>,{' '}
             <code className="text-gray-500">SERVICE_ROLE_KEY</code>) и перелогинься в админке.
           </span>
         </div>
@@ -646,7 +613,7 @@ function EstablishmentsTab() {
         <>
           {/* Desktop table */}
           <div className="hidden md:block bg-gray-900 rounded-xl border border-gray-800 overflow-x-auto">
-            <table className="w-full text-sm min-w-[960px]">
+            <table className="w-full text-sm min-w-[880px]">
               <thead>
                 <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
                   <th className="px-4 py-3 text-left">Заведение</th>
@@ -701,9 +668,6 @@ function EstablishmentsTab() {
                       <option value="6+">6+</option>
                     </select>
                   </th>
-                  <th className="px-4 py-3 text-center" title="Переопределение лимита доп. заведений для владельца; при нескольких — минимум">
-                    Лимит доп.
-                  </th>
                   <th
                     className="px-4 py-3 text-left min-w-[9.5rem]"
                     title="Дата и время создания записи заведения в БД. Без промокода: 72 ч Pro с этого момента (см. pro_trial_ends_at)."
@@ -730,22 +694,6 @@ function EstablishmentsTab() {
                     <td className="px-4 py-3 text-gray-400 text-xs">{row.owner_email}</td>
                     <td className="px-4 py-3 text-center">
                       <span className="bg-gray-800 px-2 py-0.5 rounded text-xs font-mono">{row.employee_count}</span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        type="button"
-                        onClick={() => setMaxAdditionalOverride(row)}
-                        className="text-xs font-mono hover:text-indigo-400 transition"
-                        title="Переопределить лимит доп. заведений для этого владельца"
-                      >
-                        {row.max_additional_establishments_override != null ? (
-                          <span className="bg-indigo-900/40 text-indigo-300 px-2 py-0.5 rounded">
-                            {row.max_additional_establishments_override}
-                          </span>
-                        ) : (
-                          <span className="text-gray-600">платформа</span>
-                        )}
-                      </button>
                     </td>
                     <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap" title={row.created_at}>
                       {formatDateTime(row.created_at)}
@@ -801,22 +749,6 @@ function EstablishmentsTab() {
                 {row.registration_ip && (
                   <div className="text-gray-500 text-xs mt-1 font-mono">{regInfo(row)}</div>
                 )}
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-gray-600 text-xs">Лимит доп.:</span>
-                  <button
-                    type="button"
-                    onClick={() => setMaxAdditionalOverride(row)}
-                    className="text-xs font-mono hover:text-indigo-400"
-                  >
-                    {row.max_additional_establishments_override != null ? (
-                      <span className="bg-indigo-900/40 text-indigo-300 px-2 py-0.5 rounded">
-                        {row.max_additional_establishments_override}
-                      </span>
-                    ) : (
-                      <span className="text-gray-600">платформа</span>
-                    )}
-                  </button>
-                </div>
               </div>
             ))}
           </div>
@@ -2105,82 +2037,6 @@ function SystemHealthTab() {
         Обновить проверки
       </button>
     </div>
-  )
-}
-
-// ─── Platform Settings Tab ────────────────────────────────────────────────────
-
-function PlatformSettingsTab() {
-  const [maxEstablishments, setMaxEstablishments] = useState<number>(5)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    const res = await fetch('/api/platform-config')
-    const data = await res.json()
-    if (!res.ok) {
-      setError(data?.error || 'Ошибка загрузки')
-    } else {
-      setMaxEstablishments(data.max_establishments_per_owner ?? 5)
-    }
-    setLoading(false)
-  }, [])
-
-  useEffect(() => { load() }, [load])
-
-  async function save() {
-    setSaving(true)
-    setError(null)
-    const res = await fetch('/api/platform-config', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ max_establishments_per_owner: maxEstablishments }),
-    })
-    const data = await res.json()
-    if (!res.ok) {
-      setError(data?.error || 'Ошибка сохранения')
-    }
-    setSaving(false)
-  }
-
-  if (loading) return <div className="p-12 text-center text-gray-500">Загрузка...</div>
-
-  return (
-    <>
-      {error && (
-        <div className="mb-4 p-4 bg-red-900/30 border border-red-700 rounded-lg text-red-200 text-sm">
-          {error}
-        </div>
-      )}
-      <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 max-w-md">
-        <h2 className="text-base font-medium text-white mb-4">Лимит заведений на одного владельца</h2>
-        <p className="text-gray-400 text-sm mb-4">
-          Максимум дополнительных заведений (первое не в счёт). Владелец может добавить до этого числа дополнительных заведений.
-          Для отдельных аккаунтов лимит можно переопределить на вкладке «Заведения» (колонка «Лимит доп.»); если задано на нескольких заведениях одного владельца, действует минимальное значение.
-        </p>
-        <div className="flex items-center gap-3">
-          <input
-            type="number"
-            min={0}
-            max={999}
-            value={maxEstablishments}
-            onChange={e => setMaxEstablishments(Math.max(0, Math.min(999, parseInt(e.target.value, 10) || 0)))}
-            className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white w-24 focus:outline-none focus:border-indigo-500"
-          />
-          <span className="text-gray-400 text-sm">дополнительных заведений</span>
-        </div>
-        <button
-          onClick={save}
-          disabled={saving}
-          className="mt-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-4 py-2 rounded-lg font-medium text-sm"
-        >
-          {saving ? 'Сохранение...' : 'Сохранить'}
-        </button>
-      </div>
-    </>
   )
 }
 

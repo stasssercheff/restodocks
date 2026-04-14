@@ -29,9 +29,8 @@ export async function GET() {
 
   /** Пока на БД не все миграции — перебираем селекты от полного к минимальному. */
   const selectVariants: string[] = [
-    `${selectCore}, subscription_type, pro_paid_until, pro_trial_ends_at, max_additional_establishments_override`,
     `${selectCore}, subscription_type, pro_paid_until, pro_trial_ends_at`,
-    `${selectCore}, subscription_type, max_additional_establishments_override`,
+    `${selectCore}, subscription_type, pro_trial_ends_at`,
     `${selectCore}, subscription_type`,
     selectCore,
   ]
@@ -43,8 +42,6 @@ export async function GET() {
   function normalizeEstablishmentRow(row: Record<string, unknown>) {
     return {
       ...row,
-      max_additional_establishments_override:
-        (row.max_additional_establishments_override as number | null | undefined) ?? null,
       subscription_type: (row.subscription_type as string | null | undefined) ?? null,
       pro_paid_until: (row.pro_paid_until as string | null | undefined) ?? null,
       pro_trial_ends_at: (row.pro_trial_ends_at as string | null | undefined) ?? null,
