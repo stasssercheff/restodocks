@@ -17,8 +17,11 @@ const double _desktopEmployeeColumnGap = 8;
 const double _desktopEmployeeRowHorizontalPadding = 12;
 const int _desktopEmployeeNameFlex = 4;
 const int _desktopEmployeeDepartmentFlex = 3;
-const int _desktopEmployeePositionFlex = 1;
-const int _desktopEmployeeRateFlex = 3;
+const int _desktopEmployeeHeaderPositionFlex = 2;
+const int _desktopEmployeeHeaderRateFlex = 2;
+const int _desktopEmployeeRowPositionFlex = 1;
+const int _desktopEmployeeRowRateFlex = 3;
+const double _desktopEmployeeRateRowLeftInset = 24;
 
 /// Список сотрудников. Владелец видит всех; остальные — по своему отделу. Редактирование для шефа/владельца. Добавление — только личная регистрация по PIN.
 class EmployeesScreen extends StatefulWidget {
@@ -390,12 +393,12 @@ class _EmployeeTableHeader extends StatelessWidget {
           ),
           const SizedBox(width: _desktopEmployeeColumnGap),
           Expanded(
-            flex: _desktopEmployeePositionFlex,
+            flex: _desktopEmployeeHeaderPositionFlex,
             child: Text(loc.t('position') ?? 'Должность', style: style),
           ),
           const SizedBox(width: _desktopEmployeeColumnGap),
           Expanded(
-            flex: _desktopEmployeeRateFlex,
+            flex: _desktopEmployeeHeaderRateFlex,
             child: Text(rateHeader, style: style, textAlign: TextAlign.left),
           ),
           if (canEdit) const SizedBox(width: 64),
@@ -520,7 +523,7 @@ class _EmployeeCard extends StatelessWidget {
               const SizedBox(width: _desktopEmployeeColumnGap),
               // Должность
               Expanded(
-                flex: _desktopEmployeePositionFlex,
+                flex: _desktopEmployeeRowPositionFlex,
                 child: Text(
                   positionDisplay(employee, loc),
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -531,13 +534,16 @@ class _EmployeeCard extends StatelessWidget {
               const SizedBox(width: _desktopEmployeeColumnGap),
               // Ставка (без иконки на ПК — экономит ширину и убирает overflow)
               Expanded(
-                flex: _desktopEmployeeRateFlex,
-                child: Text(
-                  rateStr,
-                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.left,
+                flex: _desktopEmployeeRowRateFlex,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: _desktopEmployeeRateRowLeftInset),
+                  child: Text(
+                    rateStr,
+                    style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.left,
+                  ),
                 ),
               ),
               // Кнопки редактирования
