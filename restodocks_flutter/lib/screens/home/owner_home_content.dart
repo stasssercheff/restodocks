@@ -523,7 +523,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                   onTap: () => context.push('/writeoffs')),
               'home-writeoffs-hall')),
         ],
-        if (screenPref.showBanquetCatering) ...[
+        if (screenPref.showBanquetCatering && ent.canAccessBanquetCatering) ...[
           const SizedBox(height: 16),
           if (visible('owner_banquet')) _ExpandableBanquetSection(loc: loc),
         ],

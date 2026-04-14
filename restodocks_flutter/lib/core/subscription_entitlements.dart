@@ -84,6 +84,9 @@ class SubscriptionEntitlements {
   /// Системные ссылки в личном чате (на экраны приложения) — только Ultra; Pro: текст, фото и голос.
   bool get canUseChatSystemLinks => hasUltraLevelFeatures;
 
+  /// Банкет / кейтринг (главная, меню/ТТК банкета) — только Ultra; на Pro раздел скрыт.
+  bool get canAccessBanquetCatering => hasUltraLevelFeatures;
+
   /// Pro или выше по возможностям (включая триал как «всё открыто»).
   bool get hasProLevelOrTrial =>
       _hasEst && establishment!.hasEffectiveProAccess;

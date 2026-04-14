@@ -794,7 +794,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'owner_writeoffs_hall':
               '${loc.t('writeoffs') ?? 'Списания'} (${_homeLayoutBranchLabel(loc, 'hall')})',
         },
-        if (screenPref.showBanquetCatering) 'owner_banquet': loc.t('banquet_catering') ?? 'Банкет / Кейтринг',
+        if (screenPref.showBanquetCatering &&
+            SubscriptionEntitlements.from(account.establishment)
+                .canAccessBanquetCatering)
+          'owner_banquet': loc.t('banquet_catering') ?? 'Банкет / Кейтринг',
         if (posOn) 'owner_pos_warehouse_est': loc.t('pos_warehouse_establishment_title') ?? 'Сводная по заведению',
         'owner_expenses': loc.t('expenses'),
       };
@@ -2096,7 +2099,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _showHomeButtonPicker(context, localization, homeBtn),
                   ),
                 ),
-                if (!accountManager.isLiteTier)
+                if (!accountManager.isLiteTier &&
+                    SubscriptionEntitlements.from(accountManager.establishment)
+                        .canAccessBanquetCatering)
                   Consumer<ScreenLayoutPreferenceService>(
                     builder: (_, screenPref, __) => SwitchListTile(
                       secondary: const Icon(Icons.restaurant_menu),

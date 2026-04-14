@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/feature_flags.dart';
+import '../../core/subscription_entitlements.dart';
 import '../../services/services.dart';
 import '../../widgets/home_feature_tile.dart';
 import '../../services/home_layout_config_service.dart';
@@ -25,7 +26,9 @@ class StaffHomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
-    final subOk = context.watch<AccountManagerSupabase>().hasProSubscription;
+    final account = context.watch<AccountManagerSupabase>();
+    final subOk = account.hasProSubscription;
+    final ent = SubscriptionEntitlements.from(account.establishment);
 
     // Без доступа к данным (в т.ч. временный с истёкшим периодом)
     if (!employee.hasRole('owner') && !employee.effectiveDataAccess) {
@@ -179,7 +182,8 @@ class StaffHomeContent extends StatelessWidget {
         employee.department == 'dining_room';
     final showBanquet =
         (employee.department == 'kitchen' || employee.department == 'bar') &&
-            screenPref.showBanquetCatering;
+            screenPref.showBanquetCatering &&
+            ent.canAccessBanquetCatering;
     // ТТК: кухня, бар, зал — у каждого подразделения свои
     final showTtk = employee.department == 'kitchen' ||
         employee.department == 'bar' ||

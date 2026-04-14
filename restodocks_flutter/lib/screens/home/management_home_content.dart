@@ -266,11 +266,14 @@ class ManagementHomeContent extends StatelessWidget {
             subscriptionLocked: !subOk,
             onTap: () => context.push('/writeoffs')),
         if ((isChef || roles.contains('sous_chef')) &&
-            screenPref.showBanquetCatering) ...[
+            screenPref.showBanquetCatering &&
+            ent.canAccessBanquetCatering) ...[
           const SizedBox(height: 8),
           ExpandableBanquetSection(loc: loc, department: 'kitchen'),
         ],
-        if (isBarManager && screenPref.showBanquetCatering) ...[
+        if (isBarManager &&
+            screenPref.showBanquetCatering &&
+            ent.canAccessBanquetCatering) ...[
           const SizedBox(height: 8),
           ExpandableBanquetSection(loc: loc, department: 'bar'),
         ],

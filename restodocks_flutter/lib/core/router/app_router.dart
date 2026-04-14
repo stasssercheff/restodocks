@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../subscription_entitlements.dart';
 import '../initial_location_stub.dart'
     if (dart.library.html) '../initial_location_web.dart' as initial_loc;
 import '../../models/models.dart';
@@ -950,6 +951,15 @@ class AppRouter {
           ),
           GoRoute(
             path: '/menu/:department',
+            redirect: (context, state) {
+              final d = state.pathParameters['department'] ?? '';
+              if (d == 'banquet-catering' || d == 'banquet-catering-bar') {
+                final ent = SubscriptionEntitlements.from(
+                    context.read<AccountManagerSupabase>().establishment);
+                if (!ent.canAccessBanquetCatering) return '/home';
+              }
+              return null;
+            },
             pageBuilder: (context, state) {
               final department =
                   state.pathParameters['department'] ?? 'kitchen';
@@ -973,6 +983,15 @@ class AppRouter {
           ),
           GoRoute(
             path: '/nomenclature/:department',
+            redirect: (context, state) {
+              final d = state.pathParameters['department'] ?? '';
+              if (d == 'banquet-catering' || d == 'banquet-catering-bar') {
+                final ent = SubscriptionEntitlements.from(
+                    context.read<AccountManagerSupabase>().establishment);
+                if (!ent.canAccessBanquetCatering) return '/home';
+              }
+              return null;
+            },
             pageBuilder: (context, state) {
               final department =
                   state.pathParameters['department'] ?? 'general';
@@ -1371,6 +1390,16 @@ class AppRouter {
           ),
           GoRoute(
             path: '/tech-cards/:segment',
+            redirect: (context, state) {
+              final segment = state.pathParameters['segment'] ?? '';
+              if (segment == 'banquet-catering' ||
+                  segment == 'banquet-catering-bar') {
+                final ent = SubscriptionEntitlements.from(
+                    context.read<AccountManagerSupabase>().establishment);
+                if (!ent.canAccessBanquetCatering) return '/home';
+              }
+              return null;
+            },
             pageBuilder: (context, state) {
               final segment = state.pathParameters['segment'] ?? '';
               const knownDepartments = [
