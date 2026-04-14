@@ -189,7 +189,10 @@ export async function GET() {
 
   const result = list.map(est => {
     const estId = est.id
-    const promo = promoByEstId.get(estId)
+    const rootId = getRootParentId(estId)
+    // Для филиалов показываем источник подписки по корневому заведению владельца,
+    // если у самого филиала нет своей строки promo_code_redemptions.
+    const promo = promoByEstId.get(estId) ?? promoByEstId.get(rootId)
     const subFields = {
       subscription_type: est.subscription_type as string | null | undefined,
       pro_paid_until: est.pro_paid_until as string | null | undefined,
@@ -226,7 +229,6 @@ export async function GET() {
     }
 
     // Если владелец не найден по самому филиалу, пробуем найти его у root parent.
-    const rootId = getRootParentId(estId)
     const rootEmployees = employeesByEstId.get(rootId) ?? []
     const rootOwner = rootEmployees.find(e => e.roles?.includes('owner'))
 
