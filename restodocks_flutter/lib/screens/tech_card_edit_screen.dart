@@ -5532,6 +5532,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                 _compositionTablePointerLast[event.pointer] = event.position;
                               },
                               onPointerMove: (event) {
+                                // Disabled: pointer-driven manual scroll caused edit lock and header drift.
+                                return;
                                 // Mobile web: запускаем ручной скролл только после явного свайпа.
                                 // Обычный tap (для ввода/редактирования) не перехватываем.
                                 if (!kIsWeb || MediaQuery.of(context).size.width > 900) {
