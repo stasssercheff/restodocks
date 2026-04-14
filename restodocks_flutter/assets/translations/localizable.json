@@ -1495,6 +1495,7 @@
     "writeoff_category_spoilage": "Порча",
     "writeoff_category_breakage": "Брекераж",
     "writeoff_category_guest_refusal": "Отказ гостя",
+    "writeoff_category_simple": "Списание",
     "writeoff_add": "Добавить",
     "writeoff_add_items_hint": "Добавьте продукт или ТТК",
     "writeoff_empty_hint": "Добавьте позиции с количеством",
@@ -1844,6 +1845,10 @@
     "ttk_import_empty_parse_hint": "Не удалось распознать автоматически. Заполните карточку вручную — при следующем импорте похожего файла применится обучение.",
     "ttk_import_paste_text": "Вставить текст",
     "ttk_import_text": "Вставить из текста",
+    "voice_input": "Голосом",
+    "speech_listening": "Идёт запись. Нажмите ещё раз, чтобы остановить.",
+    "speech_not_recognized": "Речь не распознана",
+    "voice_input_unavailable": "Голосовой ввод недоступен.",
     "ttk_import_select_sheet": "Выберите лист",
     "ttk_import_select_sheet_hint": "В файле «%s» несколько листов. Импортировать за раз можно только один лист.",
     "ttk_import_strip_pf_prefix": "Убирать «ПФ» из названия при сохранении",
@@ -4543,6 +4548,7 @@
     "writeoff_category_spoilage": "Spoilage",
     "writeoff_category_breakage": "Tasting / breakage",
     "writeoff_category_guest_refusal": "Guest refusal",
+    "writeoff_category_simple": "Write-off",
     "writeoff_add": "Add",
     "writeoff_add_items_hint": "Add a product or tech card",
     "writeoff_empty_hint": "Add lines with quantities",
@@ -4860,6 +4866,10 @@
     "schedule_show_time": "Show time in schedule",
     "schedule_edit_shift": "Edit shift",
     "checklist_type": "Checklist type",
+    "voice_input": "Voice input",
+    "speech_listening": "Recording... Tap again to stop.",
+    "speech_not_recognized": "Speech was not recognized",
+    "voice_input_unavailable": "Voice input is unavailable.",
     "checklist_additional_name": "Additional name",
     "checklist_additional_name_hint": "Checklist subtitle",
     "checklist_action_numeric": "Number",
@@ -7407,6 +7417,7 @@
     "writeoff_category_spoilage": "Daño",
     "writeoff_category_breakage": "corretaje",
     "writeoff_category_guest_refusal": "Rechazo del huésped",
+    "writeoff_category_simple": "Baja",
     "writeoff_add": "Agregar",
     "writeoff_add_items_hint": "Añadir un producto o TTK",
     "writeoff_empty_hint": "Agregar artículos con cantidad",
@@ -9480,7 +9491,11 @@
     "schedule_pdf_validation_date_order": "The end date cannot be before the start date.",
     "documentation_pdf_ready": "PDF ready to share",
     "support_admin_session_snackbar": "A subtle strip at the top indicates platform support is signed in to your account. It disappears when the session ends.",
-    "schedule_pdf_validation_employees": "Select at least one employee to export."
+    "schedule_pdf_validation_employees": "Select at least one employee to export.",
+    "voice_input": "Voice input",
+    "speech_not_recognized": "Speech was not recognized",
+    "voice_input_unavailable": "Voice input is unavailable.",
+    "speech_listening": "Recording... Tap again to stop."
   },
   "kk": {
     "app_name": "Restodocks",
@@ -10830,6 +10845,7 @@
     "writeoff_category_spoilage": "Зақым",
     "writeoff_category_breakage": "Делдалдық",
     "writeoff_category_guest_refusal": "Қонақтардың бас тартуы",
+    "writeoff_category_simple": "Есептен шығару",
     "writeoff_add": "қосу",
     "writeoff_add_items_hint": "Өнімді немесе TTK қосыңыз",
     "writeoff_empty_hint": "Саны бар элементтерді қосыңыз",
@@ -12641,7 +12657,11 @@
     "schedule_pdf_validation_date_order": "The end date cannot be before the start date.",
     "documentation_pdf_ready": "PDF ready to share",
     "support_admin_session_snackbar": "A subtle strip at the top indicates platform support is signed in to your account. It disappears when the session ends.",
-    "schedule_pdf_validation_employees": "Select at least one employee to export."
+    "schedule_pdf_validation_employees": "Select at least one employee to export.",
+    "voice_input": "Voice input",
+    "speech_not_recognized": "Speech was not recognized",
+    "voice_input_unavailable": "Voice input is unavailable.",
+    "speech_listening": "Recording... Tap again to stop."
   },
   "de": {
     "app_name": "Restodocks",
@@ -12751,6 +12771,7 @@
     "writeoff_category_spoilage": "Schaden",
     "writeoff_category_breakage": "Brekerage",
     "writeoff_category_guest_refusal": "Ablehnung des Gastes",
+    "writeoff_category_simple": "Ausbuchung",
     "writeoff_add": "Hinzufügen",
     "writeoff_add_items_hint": "Fügen Sie ein Produkt oder TTK hinzu",
     "writeoff_empty_hint": "Fügen Sie Artikel mit Menge hinzu",
@@ -15802,7 +15823,11 @@
     "schedule_pdf_validation_date_order": "The end date cannot be before the start date.",
     "documentation_pdf_ready": "PDF ready to share",
     "support_admin_session_snackbar": "A subtle strip at the top indicates platform support is signed in to your account. It disappears when the session ends.",
-    "schedule_pdf_validation_employees": "Select at least one employee to export."
+    "schedule_pdf_validation_employees": "Select at least one employee to export.",
+    "voice_input": "Voice input",
+    "speech_not_recognized": "Speech was not recognized",
+    "voice_input_unavailable": "Voice input is unavailable.",
+    "speech_listening": "Recording... Tap again to stop."
   },
   "fr": {
     "app_name": "Restodocks",
@@ -15910,6 +15935,7 @@
     "writeoff_category_spoilage": "Dommage",
     "writeoff_category_breakage": "Courtage",
     "writeoff_category_guest_refusal": "Refus du client",
+    "writeoff_category_simple": "Sortie de stock",
     "writeoff_add": "Ajouter",
     "writeoff_add_items_hint": "Ajouter un produit ou TTK",
     "writeoff_empty_hint": "Ajouter des articles avec quantité",
@@ -18963,7 +18989,11 @@
     "schedule_pdf_validation_date_order": "The end date cannot be before the start date.",
     "documentation_pdf_ready": "PDF ready to share",
     "support_admin_session_snackbar": "A subtle strip at the top indicates platform support is signed in to your account. It disappears when the session ends.",
-    "schedule_pdf_validation_employees": "Select at least one employee to export."
+    "schedule_pdf_validation_employees": "Select at least one employee to export.",
+    "voice_input": "Voice input",
+    "speech_not_recognized": "Speech was not recognized",
+    "voice_input_unavailable": "Voice input is unavailable.",
+    "speech_listening": "Recording... Tap again to stop."
   },
   "it": {
     "app_name": "Restodocks",
@@ -20031,6 +20061,7 @@
     "writeoff_category_spoilage": "Danno",
     "writeoff_category_breakage": "Brekerage",
     "writeoff_category_guest_refusal": "Rifiuto dell'ospite",
+    "writeoff_category_simple": "Rettifica",
     "writeoff_add": "Aggiungere",
     "writeoff_add_items_hint": "Aggiungi un prodotto o TTK",
     "writeoff_empty_hint": "Aggiungi articoli con quantità",
@@ -22124,7 +22155,11 @@
     "schedule_pdf_validation_date_order": "The end date cannot be before the start date.",
     "documentation_pdf_ready": "PDF ready to share",
     "support_admin_session_snackbar": "A subtle strip at the top indicates platform support is signed in to your account. It disappears when the session ends.",
-    "schedule_pdf_validation_employees": "Select at least one employee to export."
+    "schedule_pdf_validation_employees": "Select at least one employee to export.",
+    "voice_input": "Voice input",
+    "speech_not_recognized": "Speech was not recognized",
+    "voice_input_unavailable": "Voice input is unavailable.",
+    "speech_listening": "Recording... Tap again to stop."
   },
   "tr": {
     "app_name": "Yeniden stoklamalar",
@@ -23159,6 +23194,7 @@
     "writeoff_category_spoilage": "Zarar",
     "writeoff_category_breakage": "Komisyonculuk",
     "writeoff_category_guest_refusal": "Misafir reddi",
+    "writeoff_category_simple": "Çıkış",
     "writeoff_add": "Eklemek",
     "writeoff_add_items_hint": "Bir ürün veya TTK ekleyin",
     "writeoff_empty_hint": "Miktarı olan öğeleri ekleyin",
@@ -25285,7 +25321,11 @@
     "schedule_pdf_validation_date_order": "The end date cannot be before the start date.",
     "documentation_pdf_ready": "PDF ready to share",
     "support_admin_session_snackbar": "A subtle strip at the top indicates platform support is signed in to your account. It disappears when the session ends.",
-    "schedule_pdf_validation_employees": "Select at least one employee to export."
+    "schedule_pdf_validation_employees": "Select at least one employee to export.",
+    "voice_input": "Voice input",
+    "speech_not_recognized": "Speech was not recognized",
+    "voice_input_unavailable": "Voice input is unavailable.",
+    "speech_listening": "Recording... Tap again to stop."
   },
   "vi": {
     "app_name": "Khôi phục lại",
@@ -26337,6 +26377,7 @@
     "writeoff_category_spoilage": "Hư hại",
     "writeoff_category_breakage": "sự cố",
     "writeoff_category_guest_refusal": "khách từ chối",
+    "writeoff_category_simple": "Ghi nhận",
     "writeoff_add": "Thêm vào",
     "writeoff_add_items_hint": "Thêm sản phẩm hoặc TTK",
     "writeoff_empty_hint": "Thêm mặt hàng có số lượng",
@@ -28446,6 +28487,10 @@
     "schedule_pdf_validation_date_order": "The end date cannot be before the start date.",
     "documentation_pdf_ready": "PDF ready to share",
     "support_admin_session_snackbar": "A subtle strip at the top indicates platform support is signed in to your account. It disappears when the session ends.",
-    "schedule_pdf_validation_employees": "Select at least one employee to export."
+    "schedule_pdf_validation_employees": "Select at least one employee to export.",
+    "voice_input": "Voice input",
+    "speech_not_recognized": "Speech was not recognized",
+    "voice_input_unavailable": "Voice input is unavailable.",
+    "speech_listening": "Recording... Tap again to stop."
   }
 }

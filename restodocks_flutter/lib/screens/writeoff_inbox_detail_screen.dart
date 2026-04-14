@@ -313,6 +313,8 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
         return loc.t('writeoff_category_breakage') ?? 'Брекераж';
       case 'guestRefusal':
         return loc.t('writeoff_category_guest_refusal') ?? 'Отказ гостя';
+      case 'generic':
+        return loc.t('writeoff_category_simple') ?? 'Списание';
       default:
         return code ?? '—';
     }

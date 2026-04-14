@@ -119,8 +119,13 @@ class _InboxScreenState extends State<InboxScreen> {
         employee.hasRole('floor_manager') ||
         employee.department == 'management';
     if (isOwner || isManagement) {
+      final ultra = SubscriptionEntitlements.from(
+              context.read<AccountManagerSupabase>().establishment)
+          .hasUltraLevelFeatures;
       final dept =
-          (employee.department == 'bar' || employee.hasRole('bar_manager'))
+          (ultra &&
+                  (employee.department == 'bar' ||
+                      employee.hasRole('bar_manager')))
               ? _InboxDeptTab.bar
               : (employee.department == 'dining_room' ||
                       employee.hasRole('floor_manager'))
@@ -157,21 +162,23 @@ class _InboxScreenState extends State<InboxScreen> {
         employee.hasRole('floor_manager') ||
         employee.department == 'management';
     final hasDocs = employee.hasInboxDocuments;
-    final ultra = tier == AppSubscriptionTier.ultra;
+    final ultraTier = tier == AppSubscriptionTier.ultra;
+    final proPaid = tier == AppSubscriptionTier.pro;
 
     final tabs = <_InboxTab>[];
     if (hasDocs) {
       tabs.add(_InboxTab.order);
       if (isOwner || isManagement) {
-        if (ultra) tabs.add(_InboxTab.goodsReceipt);
+        if (ultraTier) tabs.add(_InboxTab.goodsReceipt);
         tabs.add(_InboxTab.inventory);
-        if (ultra) {
+        if (ultraTier) {
           tabs.add(_InboxTab.writeoff);
-          if (employee.hasRole('executive_chef') ||
-              employee.hasRole('owner') ||
-              employee.hasRole('bar_manager')) {
-            tabs.add(_InboxTab.iikoInventory);
-          }
+        }
+        if ((ultraTier || proPaid) &&
+            (employee.hasRole('executive_chef') ||
+                employee.hasRole('owner') ||
+                employee.hasRole('bar_manager'))) {
+          tabs.add(_InboxTab.iikoInventory);
         }
       }
     }
@@ -186,19 +193,70 @@ class _InboxScreenState extends State<InboxScreen> {
     return tabs;
   }
 
-  /// Вкладки типов для собственника: Ultra — полный набор (как «Расходы»); Pro — без приёмки, списаний и iiko.
+  /// Вкладки типов для собственника: Ultra — полный набор; Pro — без приёмки и списаний; iiko — Pro и Ultra (не зал).
   List<_InboxTypeTab> _ownerVisibleTypeTabs(
       AppSubscriptionTier tier, bool isHall) {
-    final ultra = tier == AppSubscriptionTier.ultra;
+    final ultraTier = tier == AppSubscriptionTier.ultra;
+    final proOrUltra = tier == AppSubscriptionTier.pro ||
+        tier == AppSubscriptionTier.ultra;
     return [
       _InboxTypeTab.order,
-      if (ultra) _InboxTypeTab.goodsReceipt,
+      if (ultraTier) _InboxTypeTab.goodsReceipt,
       _InboxTypeTab.inventory,
-      if (ultra) _InboxTypeTab.writeoff,
-      if (ultra && !isHall) _InboxTypeTab.iikoInventory,
+      if (ultraTier) _InboxTypeTab.writeoff,
+      if (!isHall && proOrUltra) _InboxTypeTab.iikoInventory,
       _InboxTypeTab.notifications,
       _InboxTypeTab.checklist,
     ];
+  }
+
+  /// Доступные вкладки подразделений (без «Бар» на Pro — документы бара показываются в «Кухня»).
+  List<_InboxDeptTab> _allowedInboxDeptTabs() {
+    final account = context.read<AccountManagerSupabase>();
+    final emp = account.currentEmployee;
+    final isOwner = emp?.hasRole('owner') == true;
+    final ultra = SubscriptionEntitlements.from(account.establishment)
+        .hasUltraLevelFeatures;
+    if (!isOwner) {
+      final dept = emp?.department ?? 'kitchen';
+      if (ultra && (dept == 'bar' || emp?.hasRole('bar_manager') == true)) {
+        return [_InboxDeptTab.bar];
+      }
+      if (!ultra && (dept == 'bar' || emp?.hasRole('bar_manager') == true)) {
+        return [_InboxDeptTab.kitchen];
+      }
+      if (dept == 'dining_room' ||
+          dept == 'hall' ||
+          emp?.hasRole('floor_manager') == true) {
+        return [_InboxDeptTab.hall];
+      }
+      return [_InboxDeptTab.kitchen];
+    }
+    if (ultra) {
+      return [
+        _InboxDeptTab.kitchen,
+        _InboxDeptTab.bar,
+        _InboxDeptTab.hall,
+      ];
+    }
+    return [_InboxDeptTab.kitchen, _InboxDeptTab.hall];
+  }
+
+  bool _documentMatchesDeptTab(InboxDocument d, _InboxDeptTab tab) {
+    final ultra = SubscriptionEntitlements.from(
+            context.read<AccountManagerSupabase>().establishment)
+        .hasUltraLevelFeatures;
+    switch (tab) {
+      case _InboxDeptTab.kitchen:
+        if (!ultra) {
+          return d.department == 'kitchen' || d.department == 'bar';
+        }
+        return d.department == 'kitchen';
+      case _InboxDeptTab.bar:
+        return d.department == 'bar';
+      case _InboxDeptTab.hall:
+        return d.department == 'hall';
+    }
   }
 
   Future<void> _loadDocuments() async {
@@ -408,12 +466,9 @@ class _InboxScreenState extends State<InboxScreen> {
             .where((d) => d.type == DocumentType.checklistMissedDeadline)
             .toList();
       }
-      final dept = switch (_selectedDeptTab!) {
-        _InboxDeptTab.kitchen => 'kitchen',
-        _InboxDeptTab.bar => 'bar',
-        _InboxDeptTab.hall => 'hall',
-      };
-      final docsByDept = _documents.where((d) => d.department == dept).toList();
+      final docsByDept = _documents
+          .where((d) => _documentMatchesDeptTab(d, _selectedDeptTab!))
+          .toList();
       if (_selectedTypeTab == _InboxTypeTab.checklist) {
         return docsByDept
             .where((d) =>
@@ -509,6 +564,17 @@ class _InboxScreenState extends State<InboxScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (isOwner || isManagement) {
+        final allowedDepts = _allowedInboxDeptTabs();
+        if (_selectedDeptTab != null &&
+            !allowedDepts.contains(_selectedDeptTab)) {
+          setState(() {
+            _selectedDeptTab = allowedDepts.first;
+            if (_selectedTypeTab == _InboxTypeTab.iikoInventory &&
+                _selectedDeptTab == _InboxDeptTab.hall) {
+              _selectedTypeTab = _InboxTypeTab.inventory;
+            }
+          });
+        }
         final isHall = _selectedDeptTab == _InboxDeptTab.hall;
         final allowed = _ownerVisibleTypeTabs(tier, isHall);
         if (_selectedTypeTab != null && !allowed.contains(_selectedTypeTab!)) {
@@ -624,24 +690,7 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   Widget _buildDeptFilter(LocalizationService loc) {
-    final emp = context.read<AccountManagerSupabase>().currentEmployee;
-    final isOwner = emp?.hasRole('owner') == true;
-    final allowed = <_InboxDeptTab>[];
-    if (!isOwner) {
-      final dept = emp?.department ?? 'kitchen';
-      if (dept == 'bar' || emp?.hasRole('bar_manager') == true) {
-        allowed.add(_InboxDeptTab.bar);
-      } else if (dept == 'dining_room' ||
-          dept == 'hall' ||
-          emp?.hasRole('floor_manager') == true) {
-        allowed.add(_InboxDeptTab.hall);
-      } else {
-        allowed.add(_InboxDeptTab.kitchen);
-      }
-    } else {
-      allowed.addAll(
-          [_InboxDeptTab.kitchen, _InboxDeptTab.bar, _InboxDeptTab.hall]);
-    }
+    final allowed = _allowedInboxDeptTabs();
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -683,26 +732,18 @@ class _InboxScreenState extends State<InboxScreen> {
 
   int _getCountForDeptTab(_InboxDeptTab dept) {
     final viewed = _viewedIds;
-    final deptStr = switch (dept) {
-      _InboxDeptTab.kitchen => 'kitchen',
-      _InboxDeptTab.bar => 'bar',
-      _InboxDeptTab.hall => 'hall',
-    };
     return _documents
-        .where((d) => d.department == deptStr && !viewed.contains(d.id))
+        .where(
+            (d) => _documentMatchesDeptTab(d, dept) && !viewed.contains(d.id))
         .length;
   }
 
   int _getCountForOwnerTypeTab(_InboxTypeTab tab) {
     if (_selectedDeptTab == null) return 0;
     final viewed = _viewedIds;
-    final deptStr = switch (_selectedDeptTab!) {
-      _InboxDeptTab.kitchen => 'kitchen',
-      _InboxDeptTab.bar => 'bar',
-      _InboxDeptTab.hall => 'hall',
-    };
-    final docsByDept = _documents
-        .where((d) => d.department == deptStr && !viewed.contains(d.id));
+    final docsByDept = _documents.where((d) =>
+        _documentMatchesDeptTab(d, _selectedDeptTab!) &&
+        !viewed.contains(d.id));
     switch (tab) {
       case _InboxTypeTab.messages:
         return _unreadMessagesCount;
@@ -1072,15 +1113,11 @@ class _InboxScreenState extends State<InboxScreen> {
                 ?.hasRole('owner') ==
             true &&
         _selectedDeptTab != null) {
-      final deptStr = switch (_selectedDeptTab!) {
-        _InboxDeptTab.kitchen => 'kitchen',
-        _InboxDeptTab.bar => 'bar',
-        _InboxDeptTab.hall => 'hall',
-      };
+      final tab = _selectedDeptTab!;
       return _documents
           .where((d) =>
               d.type == DocumentType.checklistMissedDeadline &&
-              d.department == deptStr)
+              _documentMatchesDeptTab(d, tab))
           .toList();
     }
     return _documents

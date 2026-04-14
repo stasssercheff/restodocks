@@ -1810,6 +1810,8 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
         return loc.t('writeoff_category_breakage') ?? 'Брекераж';
       case 'guestRefusal':
         return loc.t('writeoff_category_guest_refusal') ?? 'Отказ гостя';
+      case 'generic':
+        return loc.t('writeoff_category_simple') ?? 'Списание';
       default:
         return code ?? '—';
     }

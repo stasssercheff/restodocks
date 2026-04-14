@@ -3304,28 +3304,56 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           content: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: 420,
-              maxHeight: MediaQuery.of(ctx).size.height * 0.55,
+              maxHeight: MediaQuery.of(ctx).size.height * 0.62,
             ),
             child: SingleChildScrollView(
+              padding:
+                  EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextField(
-                    controller: controller,
-                    maxLines: 10,
-                    decoration: InputDecoration(
-                      hintText:
-                          'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
-                      border: const OutlineInputBorder(),
+                  SizedBox(
+                    height: 215,
+                    child: TextField(
+                      controller: controller,
+                      maxLines: null,
+                      expands: true,
+                      scrollPadding: const EdgeInsets.only(bottom: 180),
+                      textInputAction: TextInputAction.newline,
+                      decoration: InputDecoration(
+                        hintText:
+                            'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
+                        border: const OutlineInputBorder(),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
-                      onPressed: sttBusy
-                          ? null
-                          : () async {
+                      onPressed: () async {
+                              if (sttBusy) {
+                                final spoken = await speechToTextStop();
+                                if (!ctx.mounted) return;
+                                setLocalState(() => sttBusy = false);
+                                if (spoken != null && spoken.trim().isNotEmpty) {
+                                  final current = controller.text.trim();
+                                  controller.text = current.isEmpty
+                                      ? spoken.trim()
+                                      : '$current\n${spoken.trim()}';
+                                } else {
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        (loc.t('speech_not_recognized').trim().isEmpty)
+                                            ? 'Речь не распознана'
+                                            : loc.t('speech_not_recognized'),
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return;
+                              }
                               if (!sttSupported) {
                                 ScaffoldMessenger.of(ctx).showSnackBar(
                                   const SnackBar(
@@ -3336,43 +3364,30 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                 );
                                 return;
                               }
-                              setLocalState(() => sttBusy = true);
-                              try {
-                                final spoken = await speechToTextListenOnce(
-                                  languageCode: loc.currentLanguageCode,
-                                );
-                                if (!ctx.mounted) return;
-                                if (spoken != null &&
-                                    spoken.trim().isNotEmpty) {
-                                  final current = controller.text.trim();
-                                  controller.text = current.isEmpty
-                                      ? spoken.trim()
-                                      : '$current\n${spoken.trim()}';
-                                } else {
-                                  ScaffoldMessenger.of(ctx).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        loc
-                                                .t('speech_not_recognized')
-                                                .trim()
-                                                .isEmpty
-                                            ? 'Речь не распознана'
-                                            : loc.t('speech_not_recognized'),
-                                      ),
+                              final started = await speechToTextStart(
+                                languageCode: loc.currentLanguageCode,
+                                timeout: const Duration(seconds: 18),
+                              );
+                              if (!ctx.mounted) return;
+                              if (!started) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      (loc.t('voice_input_unavailable').trim().isEmpty)
+                                          ? 'Голосовой ввод недоступен.'
+                                          : loc.t('voice_input_unavailable'),
                                     ),
-                                  );
-                                }
-                              } finally {
-                                if (ctx.mounted) {
-                                  setLocalState(() => sttBusy = false);
-                                }
+                                  ),
+                                );
+                                return;
                               }
+                              setLocalState(() => sttBusy = true);
                             },
                       icon: Icon(sttBusy ? Icons.hearing : Icons.mic),
                       label: Text(
                         sttBusy
                             ? (loc.t('speech_listening').trim().isEmpty
-                                ? 'Слушаю...'
+                                ? 'Идёт запись. Нажмите ещё раз, чтобы остановить.'
                                 : loc.t('speech_listening'))
                             : (loc.t('voice_input').trim().isEmpty
                                 ? 'Голосом'
@@ -3386,11 +3401,25 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(ctx).pop(null),
+              onPressed: () async {
+                if (sttBusy) {
+                  await speechToTextStop();
+                  sttBusy = false;
+                }
+                if (ctx.mounted) Navigator.of(ctx).pop(null);
+              },
               child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+              onPressed: () async {
+                if (sttBusy) {
+                  await speechToTextStop();
+                  sttBusy = false;
+                }
+                if (ctx.mounted) {
+                  Navigator.of(ctx).pop(controller.text.trim());
+                }
+              },
               child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
             ),
           ],

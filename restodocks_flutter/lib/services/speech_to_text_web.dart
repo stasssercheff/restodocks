@@ -1,7 +1,10 @@
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 import 'dart:async';
-import 'dart:js_util' as js_util;
+Object? _activeRec;
+Completer<String?>? _activeCompleter;
+String _latestText = '';
+bool _listening = false;
 
 String _localeForStt(String languageCode) {
   switch (languageCode.trim().toLowerCase()) {
@@ -21,80 +24,109 @@ String _localeForStt(String languageCode) {
 }
 
 Future<bool> speechToTextSupported() async {
+  final w = html.window as dynamic;
+  return (w.webkitSpeechRecognition != null) || (w.SpeechRecognition != null);
+}
+
+bool speechToTextIsListening() => _listening;
+
+Future<bool> speechToTextStart({
+  String languageCode = 'ru',
+  Duration timeout = const Duration(seconds: 12),
+}) async {
+  if (_listening) return true;
   final w = html.window;
-  return js_util.hasProperty(w, 'webkitSpeechRecognition') ||
-      js_util.hasProperty(w, 'SpeechRecognition');
+  final dynamic wd = w as dynamic;
+  final ctor = wd.webkitSpeechRecognition ?? wd.SpeechRecognition;
+  if (ctor == null) return false;
+
+  final dynamic rec = ctor();
+  final completer = Completer<String?>();
+  _activeRec = rec;
+  _activeCompleter = completer;
+  _latestText = '';
+  _listening = true;
+
+  rec.lang = _localeForStt(languageCode);
+  rec.continuous = false;
+  rec.interimResults = true;
+  rec.maxAlternatives = 1;
+
+  rec.onresult = (dynamic event) {
+      try {
+        final results = event.results;
+        final first = results[0];
+        final alt = first[0];
+        final text = (alt.transcript as String?)?.trim();
+        if (text != null) _latestText = text;
+      } catch (_) {}
+    };
+
+  rec.onerror = (_) {
+      if (_activeCompleter != null && !_activeCompleter!.isCompleted) {
+        _activeCompleter!.complete(null);
+      }
+      _listening = false;
+    };
+
+  rec.onnomatch = (_) {
+      if (_activeCompleter != null && !_activeCompleter!.isCompleted) {
+        _activeCompleter!.complete(null);
+      }
+      _listening = false;
+    };
+
+  rec.onend = (_) {
+      if (_activeCompleter != null && !_activeCompleter!.isCompleted) {
+        final t = _latestText.trim();
+        _activeCompleter!.complete(t.isEmpty ? null : t);
+      }
+      _listening = false;
+    };
+
+  try {
+    rec.start();
+  } catch (_) {
+    _activeRec = null;
+    _activeCompleter = null;
+    _listening = false;
+    return false;
+  }
+
+  unawaited(Future<void>.delayed(timeout).then((_) async {
+    if (_listening) {
+      await speechToTextStop();
+    }
+  }));
+  return true;
+}
+
+Future<String?> speechToTextStop() async {
+  if (!_listening || _activeRec == null || _activeCompleter == null) {
+    return null;
+  }
+  try {
+    (_activeRec as dynamic).stop();
+  } catch (_) {}
+  if (!_activeCompleter!.isCompleted) {
+    final t = _latestText.trim();
+    _activeCompleter!.complete(t.isEmpty ? null : t);
+  }
+  _listening = false;
+  return _activeCompleter!.future;
 }
 
 Future<String?> speechToTextListenOnce({
   String languageCode = 'ru',
   Duration timeout = const Duration(seconds: 12),
 }) async {
-  final w = html.window;
-  final ctor = js_util.getProperty<Object?>(
-        w,
-        'webkitSpeechRecognition',
-      ) ??
-      js_util.getProperty<Object?>(w, 'SpeechRecognition');
-  if (ctor == null) return null;
-
-  final rec = js_util.callConstructor(ctor as Object, const []);
-  final completer = Completer<String?>();
-
-  js_util.setProperty(rec, 'lang', _localeForStt(languageCode));
-  js_util.setProperty(rec, 'continuous', false);
-  js_util.setProperty(rec, 'interimResults', false);
-  js_util.setProperty(rec, 'maxAlternatives', 1);
-
-  js_util.setProperty(
-    rec,
-    'onresult',
-    (dynamic event) {
-      try {
-        final results = js_util.getProperty(event, 'results');
-        final first = js_util.getProperty(results, 0);
-        final alt = js_util.getProperty(first, 0);
-        final text = js_util.getProperty<String?>(alt, 'transcript')?.trim();
-        if (!completer.isCompleted) completer.complete(text);
-      } catch (_) {
-        if (!completer.isCompleted) completer.complete(null);
-      }
-    },
+  final ok = await speechToTextStart(
+    languageCode: languageCode,
+    timeout: timeout,
   );
-
-  js_util.setProperty(
-    rec,
-    'onerror',
-    (_) {
-      if (!completer.isCompleted) completer.complete(null);
-    },
-  );
-
-  js_util.setProperty(
-    rec,
-    'onnomatch',
-    (_) {
-      if (!completer.isCompleted) completer.complete(null);
-    },
-  );
-
-  js_util.setProperty(
-    rec,
-    'onend',
-    (_) {
-      if (!completer.isCompleted) completer.complete(null);
-    },
-  );
-
-  try {
-    js_util.callMethod<void>(rec, 'start', const []);
-  } catch (_) {
-    return null;
-  }
-
-  final text = await completer.future.timeout(timeout, onTimeout: () => null);
-  try {
-    js_util.callMethod<void>(rec, 'stop', const []);
-  } catch (_) {}
+  if (!ok || _activeCompleter == null) return null;
+  final text =
+      await _activeCompleter!.future.timeout(timeout, onTimeout: () => null);
+  await speechToTextStop();
   return text;
 }

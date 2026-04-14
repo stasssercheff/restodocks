@@ -130,6 +130,7 @@ class InboxDocument extends Equatable {
           'spoilage' => loc.t('writeoff_category_spoilage') ?? 'Порча',
           'breakage' => loc.t('writeoff_category_breakage') ?? 'Брекераж',
           'guestRefusal' => loc.t('writeoff_category_guest_refusal') ?? 'Отказ гостя',
+          'generic' => loc.t('writeoff_category_simple') ?? 'Списание',
           _ => cat,
         };
         return '${loc.t('writeoffs') ?? 'Списания'} ($catName) $date';

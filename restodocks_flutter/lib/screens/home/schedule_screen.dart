@@ -3,8 +3,8 @@ import 'package:flutter/cupertino.dart'
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import '../../utils/dev_log.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:excel/excel.dart' as xls;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:provider/provider.dart';
@@ -694,7 +694,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return dates;
   }
 
-  Future<void> _showSchedulePdfExportDialog() async {
+  Future<void> _showScheduleExportDialog() async {
     final loc = context.read<LocalizationService>();
     final acc = context.read<AccountManagerSupabase>();
     final subEnt = SubscriptionEntitlements.from(acc.establishment);
@@ -710,25 +710,35 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       uniqueSlots[s.id] = s;
     }
     final result = await showDialog<({
+      String format,
       DateTime from,
       DateTime to,
       List<String> slotIds,
       String lang,
     })>(
       context: context,
-      builder: (ctx) => _SchedulePdfExportDialog(
+      builder: (ctx) => _ScheduleExportDialog(
         dates: _visibleDates,
         slots: uniqueSlots.values.toList(),
         loc: loc,
       ),
     );
     if (result == null || !mounted) return;
-    await _exportSchedulePdf(
-      from: result.from,
-      to: result.to,
-      slotIds: result.slotIds,
-      lang: result.lang,
-    );
+    if (result.format == 'excel') {
+      await _exportScheduleExcel(
+        from: result.from,
+        to: result.to,
+        slotIds: result.slotIds,
+        lang: result.lang,
+      );
+    } else {
+      await _exportSchedulePdf(
+        from: result.from,
+        to: result.to,
+        slotIds: result.slotIds,
+        lang: result.lang,
+      );
+    }
   }
 
   Future<void> _exportSchedulePdf({
@@ -867,6 +877,101 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка экспорта PDF: $e')),
+      );
+    }
+  }
+
+  Future<void> _exportScheduleExcel({
+    required DateTime from,
+    required DateTime to,
+    required List<String> slotIds,
+    required String lang,
+  }) async {
+    final loc = context.read<LocalizationService>();
+    final acc = context.read<AccountManagerSupabase>();
+    final days = _getDatesInRange(from, to);
+    if (days.isEmpty) return;
+    if (days.length > 31) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Диапазон экспорта: не более 1 месяца.')),
+      );
+      return;
+    }
+    final selectedSlots = _model.slots.where((s) => slotIds.contains(s.id)).toList();
+    if (selectedSlots.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Выберите хотя бы одного сотрудника.')),
+      );
+      return;
+    }
+
+    try {
+      final localeTag = switch (lang) {
+        'ru' => 'ru_RU',
+        'es' => 'es_ES',
+        'it' => 'it_IT',
+        'tr' => 'tr_TR',
+        'kk' => 'kk_KZ',
+        _ => 'en_US',
+      };
+      final showTranslit = lang != 'ru';
+      final excel = xls.Excel.createExcel();
+      final sheet = excel['Schedule'];
+      final fromText = DateFormat('dd.MM.yyyy', localeTag).format(from);
+      final toText = DateFormat('dd.MM.yyyy', localeTag).format(to);
+      final headers = <String>[
+        loc.tForLanguage(lang, 'employees'),
+        ...days.map((d) => DateFormat('dd.MM EEE', localeTag).format(d)),
+      ];
+
+      sheet.appendRow([xls.TextCellValue('${loc.tForLanguage(lang, 'schedule')}: $fromText - $toText')]);
+      sheet.appendRow([]);
+      sheet.appendRow(headers.map((h) => xls.TextCellValue(h)).toList());
+
+      for (final slot in selectedSlots) {
+        final row = <xls.CellValue>[
+          xls.TextCellValue(_slotDisplayName(slot, translit: showTranslit)),
+        ];
+        for (final d in days) {
+          final v = _cellValue(slot.id, d);
+          final tr = _model.getTimeRange(slot.id, d);
+          String text = '';
+          if (v == '0') text = '0';
+          if (v == '1') {
+            if (tr != null && tr.contains('|')) {
+              final parts = tr.split('|');
+              text = '${parts[0]}-${parts[1]}';
+            } else {
+              text = '1';
+            }
+          }
+          row.add(xls.TextCellValue(text));
+        }
+        sheet.appendRow(row);
+      }
+
+      final fileBytes = excel.encode();
+      if (fileBytes == null || fileBytes.isEmpty) {
+        throw Exception('Excel encode failed');
+      }
+      final fileName =
+          'schedule_${DateFormat('yyyyMMdd').format(from)}_${DateFormat('yyyyMMdd').format(to)}.xlsx';
+      final est = acc.establishment;
+      if (est != null && acc.isTrialOnlyWithoutPaid) {
+        await acc.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.schedule,
+        );
+      }
+      await saveFileBytes(fileName, fileBytes);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка экспорта Excel: $e')),
       );
     }
   }
@@ -1199,9 +1304,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             : loc.t('schedule')),
         actions: [
           IconButton(
-            icon: const Icon(Icons.picture_as_pdf_outlined),
-            onPressed: _showSchedulePdfExportDialog,
-            tooltip: 'PDF',
+            icon: const Icon(Icons.file_download_outlined),
+            onPressed: _showScheduleExportDialog,
+            tooltip: loc.t('export'),
           ),
           IconButton(
             icon: const Icon(Icons.today),
@@ -1841,8 +1946,8 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
   }
 }
 
-class _SchedulePdfExportDialog extends StatefulWidget {
-  const _SchedulePdfExportDialog({
+class _ScheduleExportDialog extends StatefulWidget {
+  const _ScheduleExportDialog({
     required this.dates,
     required this.slots,
     required this.loc,
@@ -1853,13 +1958,14 @@ class _SchedulePdfExportDialog extends StatefulWidget {
   final LocalizationService loc;
 
   @override
-  State<_SchedulePdfExportDialog> createState() => _SchedulePdfExportDialogState();
+  State<_ScheduleExportDialog> createState() => _ScheduleExportDialogState();
 }
 
-class _SchedulePdfExportDialogState extends State<_SchedulePdfExportDialog> {
+class _ScheduleExportDialogState extends State<_ScheduleExportDialog> {
   late DateTime _from;
   late DateTime _to;
   late String _lang;
+  String _format = 'pdf';
   final Set<String> _selectedSlots = {};
 
   @override
@@ -1877,7 +1983,7 @@ class _SchedulePdfExportDialogState extends State<_SchedulePdfExportDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Экспорт графика в PDF'),
+      title: const Text('Экспорт графика'),
       content: SizedBox(
         width: 500,
         child: SingleChildScrollView(
@@ -1909,6 +2015,21 @@ class _SchedulePdfExportDialogState extends State<_SchedulePdfExportDialog> {
               ),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
+                value: _format,
+                decoration: const InputDecoration(
+                  labelText: 'Формат',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'pdf', child: Text('PDF')),
+                  DropdownMenuItem(value: 'excel', child: Text('Excel (.xlsx)')),
+                ],
+                onChanged: (v) {
+                  if (v != null) setState(() => _format = v);
+                },
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
                 value: _lang,
                 decoration: const InputDecoration(
                   labelText: 'Язык',
@@ -1926,6 +2047,23 @@ class _SchedulePdfExportDialogState extends State<_SchedulePdfExportDialog> {
               ),
               const SizedBox(height: 10),
               const Text('Сотрудники'),
+              const SizedBox(height: 6),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2),
+                    child: Icon(Icons.info_outline, size: 16),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Изначально выбраны все сотрудники. Нажмите на имя, чтобы исключить сотрудника из файла.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -1983,13 +2121,14 @@ class _SchedulePdfExportDialogState extends State<_SchedulePdfExportDialog> {
               return;
             }
             Navigator.of(context).pop((
+              format: _format,
               from: fromDay,
               to: toDay,
               slotIds: _selectedSlots.toList(),
               lang: _lang,
             ));
           },
-          child: const Text('Сохранить PDF'),
+          child: Text(_format == 'excel' ? 'Сохранить Excel' : 'Сохранить PDF'),
         ),
       ],
     );

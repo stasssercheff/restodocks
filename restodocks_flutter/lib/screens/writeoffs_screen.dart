@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
+import '../core/subscription_entitlements.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../models/models.dart';
 import '../services/inventory_download.dart';
@@ -34,6 +35,7 @@ enum WriteoffCategory {
   spoilage, // Порча
   breakage, // Брекераж
   guestRefusal, // Отказ гостя
+  generic, // Просто «списание» (Pro без выбора типа)
 }
 
 extension WriteoffCategoryExt on WriteoffCategory {
@@ -104,6 +106,33 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
       _rowsByCategory[cat] ??= [];
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final ultra = SubscriptionEntitlements.from(
+      context.read<AccountManagerSupabase>().establishment,
+    ).hasUltraLevelFeatures;
+    if (!ultra) {
+      var changed = false;
+      for (final c in WriteoffCategory.values) {
+        if (c == WriteoffCategory.generic) continue;
+        final list = _rowsByCategory[c];
+        if (list != null && list.isNotEmpty) {
+          _rowsFor(WriteoffCategory.generic).addAll(list);
+          list.clear();
+          changed = true;
+        }
+      }
+      if (_selectedCategory != WriteoffCategory.generic) {
+        _selectedCategory = WriteoffCategory.generic;
+        changed = true;
+      }
+      if (changed) _rowsVersion.value++;
+    } else if (_selectedCategory == WriteoffCategory.generic) {
+      _selectedCategory = WriteoffCategory.staff;
+    }
+  }
+
+  @override
   void dispose() {
     _rowsVersion.dispose();
     _savedListVersion.dispose();
@@ -127,6 +156,24 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
 
   @override
   Map<String, dynamic> getCurrentState() {
+    final ultra = SubscriptionEntitlements.from(
+      context.read<AccountManagerSupabase>().establishment,
+    ).hasUltraLevelFeatures;
+    if (!ultra) {
+      return {
+        'selectedCategory': WriteoffCategory.generic.name,
+        'rowsByCategory': {
+          WriteoffCategory.generic.name: _rowsFor(WriteoffCategory.generic)
+              .map((r) => {
+                    'productId': r.product?.id,
+                    'techCardId': r.techCard?.id,
+                    'quantities': r.quantities,
+                    'unitOverride': r.unitOverride,
+                  })
+              .toList(),
+        },
+      };
+    }
     return {
       'selectedCategory': _selectedCategory.name,
       'rowsByCategory': _rowsByCategory.map((cat, rows) => MapEntry(
@@ -146,10 +193,14 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     final dataEstId = context.read<AccountManagerSupabase>().establishment?.dataEstablishmentId;
     if (dataEstId == null) return;
 
-    final catName = data['selectedCategory'] as String? ?? 'staff';
+    final ultra = SubscriptionEntitlements.from(
+      context.read<AccountManagerSupabase>().establishment,
+    ).hasUltraLevelFeatures;
+    final catName = data['selectedCategory'] as String? ??
+        (ultra ? 'staff' : 'generic');
     _selectedCategory = WriteoffCategory.values.firstWhere(
       (c) => c.name == catName,
-      orElse: () => WriteoffCategory.staff,
+      orElse: () => ultra ? WriteoffCategory.staff : WriteoffCategory.generic,
     );
 
     final raw = data['rowsByCategory'] as Map<String, dynamic>?;
@@ -530,6 +581,8 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
         return loc.t('writeoff_category_breakage') ?? 'Брекераж';
       case WriteoffCategory.guestRefusal:
         return loc.t('writeoff_category_guest_refusal') ?? 'Отказ гостя';
+      case WriteoffCategory.generic:
+        return loc.t('writeoff_category_simple') ?? 'Списание';
     }
   }
 
@@ -572,7 +625,14 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
         padding: const EdgeInsets.all(16),
         children: dateKeys.expand((dateKey) {
           final cats = grouped[dateKey]!;
-          final catOrder = ['staff', 'workingThrough', 'spoilage', 'breakage', 'guestRefusal'];
+          final catOrder = [
+            'generic',
+            'staff',
+            'workingThrough',
+            'spoilage',
+            'breakage',
+            'guestRefusal',
+          ];
           return [
             Padding(
               padding: const EdgeInsets.only(top: 16, bottom: 8),
@@ -612,6 +672,10 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final ultra = SubscriptionEntitlements.from(
+      context.watch<AccountManagerSupabase>().establishment,
+    ).hasUltraLevelFeatures;
+    final cat = ultra ? _selectedCategory : WriteoffCategory.generic;
 
     return Scaffold(
       appBar: AppBar(
@@ -639,45 +703,51 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
                   ),
                 ),
                 if (!_showSavedList) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 220),
-                        child: DropdownButtonFormField<WriteoffCategory>(
-                          value: _selectedCategory,
-                          decoration: InputDecoration(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  if (ultra)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 220),
+                          child: DropdownButtonFormField<WriteoffCategory>(
+                            value: _selectedCategory,
+                            decoration: InputDecoration(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            isExpanded: true,
+                            alignment: Alignment.center,
+                            selectedItemBuilder: (context) =>
+                                WriteoffCategory.values
+                                    .where((c) => c != WriteoffCategory.generic)
+                                    .map((c) => Center(child: Text(_tabLabel(c, loc))))
+                                    .toList(),
+                            items: WriteoffCategory.values
+                                .where((c) => c != WriteoffCategory.generic)
+                                .map((c) => DropdownMenuItem(
+                                      value: c,
+                                      child: Text(_tabLabel(c, loc)),
+                                    ))
+                                .toList(),
+                            onChanged: (v) {
+                              if (v != null) setState(() => _selectedCategory = v);
+                            },
                           ),
-                          isExpanded: true,
-                          alignment: Alignment.center,
-                          selectedItemBuilder: (context) => WriteoffCategory.values
-                              .map((c) => Center(child: Text(_tabLabel(c, loc))))
-                              .toList(),
-                          items: WriteoffCategory.values.map((c) => DropdownMenuItem(
-                            value: c,
-                            child: Text(_tabLabel(c, loc)),
-                          )).toList(),
-                          onChanged: (v) {
-                            if (v != null) setState(() => _selectedCategory = v);
-                          },
                         ),
                       ),
                     ),
-                  ),
                   Expanded(
                       child: ValueListenableBuilder<int>(
                       valueListenable: _rowsVersion,
                       builder: (_, __, ___) => _WriteoffTabContent(
-                        category: _selectedCategory,
-                        rows: _rowsFor(_selectedCategory),
-                        onAdd: () => _showItemPicker(_selectedCategory),
-                        onSetQuantity: (ri, ci, v) => _setQuantity(_selectedCategory, ri, ci, v),
-                        onSetUnit: (ri, u) => _setUnit(_selectedCategory, ri, u),
-                        onLastCellFocused: (ri) => _onLastCellFocused(_selectedCategory, ri),
-                        onRemove: (i) => _removeRow(_selectedCategory, i),
-                        onSave: () => _save(_selectedCategory),
+                        category: cat,
+                        rows: _rowsFor(cat),
+                        onAdd: () => _showItemPicker(cat),
+                        onSetQuantity: (ri, ci, v) => _setQuantity(cat, ri, ci, v),
+                        onSetUnit: (ri, u) => _setUnit(cat, ri, u),
+                        onLastCellFocused: (ri) => _onLastCellFocused(cat, ri),
+                        onRemove: (i) => _removeRow(cat, i),
+                        onSave: () => _save(cat),
                         loc: loc,
                       ),
                     ),

@@ -226,6 +226,13 @@ class InventoryScreen extends StatefulWidget {
 
 class _InventoryScreenState extends State<InventoryScreen>
     with AutoSaveMixin<InventoryScreen>, WidgetsBindingObserver {
+  /// Пока не завершена первичная инициализация/восстановление черновика,
+  /// не даём lifecycle-автосохранению перезаписать локальный черновик пустым снимком.
+  bool _draftHydrationFinished = false;
+
+  @override
+  bool get canPersistDraft => _draftHydrationFinished;
+
   /// Весь ввод по бланку — без debounce: сразу кэш устройства/браузера и очередь на сервер.
   @override
   void scheduleSave() {
@@ -512,128 +519,137 @@ class _InventoryScreenState extends State<InventoryScreen>
   /// Порядок: валидный локальный снимок (есть строки `rows`) → иначе Supabase (инкогнито / новое устройство / IPA).
   /// На сервер черновик уходит при каждом изменении количества; заведение одно — данные общие для веб/iOS.
   Future<void> _initScreen() async {
-    final draftStorage = DraftStorageService();
+    try {
+      final draftStorage = DraftStorageService();
 
-    // Загружаем iiko-продукты и оба типа черновиков одновременно
-    final iikoStore = context.read<IikoProductStore>();
-    final account = context.read<AccountManagerSupabase>();
-    final estId = account.establishment?.id;
-    final allowSelectiveInventory =
-        SubscriptionEntitlements.from(account.establishment).hasUltraLevelFeatures;
+      // Загружаем iiko-продукты и оба типа черновиков одновременно
+      final iikoStore = context.read<IikoProductStore>();
+      final account = context.read<AccountManagerSupabase>();
+      final estId = account.establishment?.id;
+      final allowSelectiveInventory =
+          SubscriptionEntitlements.from(account.establishment)
+              .hasUltraLevelFeatures;
 
-    final futures = await Future.wait([
-      draftStorage.loadInventoryDraft(),
-      draftStorage.loadIikoInventoryDraft(),
-      draftStorage.loadSelectiveInventoryDraft(),
-      if (estId != null) iikoStore.loadProducts(estId) else Future.value(null),
-    ]);
-    if (!mounted) return;
-    if (_isLoadingProducts) setState(() => _isLoadingProducts = false);
-
-    final stdDraft = futures[0] as Map<String, dynamic>?;
-    final iikoDraft = futures[1] as Map<String, dynamic>?;
-    final selectiveDraft = futures[2] as Map<String, dynamic>?;
-
-    Map<String, dynamic>? serverStdDraft;
-    Map<String, dynamic>? serverSelectiveDraft;
-    if (estId != null) {
-      final sp = await Future.wait([
-        _loadDraftFromServer(),
-        _loadSelectiveDraftFromServer(),
+      final futures = await Future.wait([
+        draftStorage.loadInventoryDraft(),
+        draftStorage.loadIikoInventoryDraft(),
+        draftStorage.loadSelectiveInventoryDraft(),
+        if (estId != null)
+          iikoStore.loadProducts(estId)
+        else
+          Future.value(null),
       ]);
       if (!mounted) return;
-      serverStdDraft = sp[0];
-      serverSelectiveDraft = sp[1];
+      if (_isLoadingProducts) setState(() => _isLoadingProducts = false);
+
+      final stdDraft = futures[0] as Map<String, dynamic>?;
+      final iikoDraft = futures[1] as Map<String, dynamic>?;
+      final selectiveDraft = futures[2] as Map<String, dynamic>?;
+
+      Map<String, dynamic>? serverStdDraft;
+      Map<String, dynamic>? serverSelectiveDraft;
+      if (estId != null) {
+        final sp = await Future.wait([
+          _loadDraftFromServer(),
+          _loadSelectiveDraftFromServer(),
+        ]);
+        if (!mounted) return;
+        serverStdDraft = sp[0];
+        serverSelectiveDraft = sp[1];
+      }
+
+      final stdDraftResolved = stdDraft != null &&
+              stdDraft.isNotEmpty &&
+              _inventoryDraftSnapshotHasRows(stdDraft)
+          ? stdDraft
+          : null;
+      final serverStdResolved = serverStdDraft != null &&
+              serverStdDraft.isNotEmpty &&
+              _inventoryDraftSnapshotHasRows(serverStdDraft)
+          ? serverStdDraft
+          : null;
+      final stdDraftToRestore = stdDraftResolved ?? serverStdResolved;
+
+      final selectiveDraftResolved = selectiveDraft != null &&
+              selectiveDraft.isNotEmpty &&
+              _inventoryDraftSnapshotHasRows(selectiveDraft)
+          ? selectiveDraft
+          : null;
+      final serverSelResolved = serverSelectiveDraft != null &&
+              serverSelectiveDraft.isNotEmpty &&
+              _inventoryDraftSnapshotHasRows(serverSelectiveDraft)
+          ? serverSelectiveDraft
+          : null;
+      final selectiveDraftToRestore =
+          selectiveDraftResolved ?? serverSelResolved;
+
+      final hasIikoProducts = iikoStore.hasProducts;
+      final hasIikoDraft = iikoDraft != null && iikoDraft.isNotEmpty;
+      final hasStdDraft = stdDraftToRestore != null;
+      final hasSelectiveDraft = selectiveDraftToRestore != null;
+      final hasSelectiveDraftForModeDialog =
+          hasSelectiveDraft && allowSelectiveInventory;
+
+      // Если есть iiko-продукты или iiko-черновик — показываем диалог выбора ВСЕГДА
+      // (пользователь должен сам выбрать куда вернуться)
+      if (hasIikoProducts || hasIikoDraft) {
+        await _showModeDialog(
+          hasIikoDraft: hasIikoDraft,
+          hasStdDraft: hasStdDraft,
+          hasSelectiveDraft: hasSelectiveDraftForModeDialog,
+        );
+        return;
+      }
+
+      // iiko-продуктов нет — проверяем сервер (инкогнито / очищенный localStorage)
+      final serverIikoDraft = await _loadIikoDraftFromServer();
+      if (!mounted) return;
+      if (serverIikoDraft != null) {
+        await _showModeDialog(
+          hasIikoDraft: true,
+          hasStdDraft: hasStdDraft,
+          hasSelectiveDraft: hasSelectiveDraftForModeDialog,
+        );
+        return;
+      }
+
+      // Оба локальных черновика (стандарт + выборочная) — пусть пользователь выберет
+      if (hasStdDraft && hasSelectiveDraft) {
+        await _showModeDialog(
+          hasStdDraft: true,
+          hasSelectiveDraft: hasSelectiveDraftForModeDialog,
+        );
+        return;
+      }
+
+      // iiko нет — тихо восстанавливаем один из черновиков (если есть)
+      if (hasStdDraft) {
+        _stateRestored = false;
+        await restoreState(stdDraftToRestore!);
+        return;
+      }
+
+      // Pro: черновик выборочной не открываем — только диалог «стандарт / iiko».
+      if (hasSelectiveDraft && !allowSelectiveInventory) {
+        await _showModeDialog(
+          hasIikoDraft: hasIikoDraft,
+          hasStdDraft: hasStdDraft,
+          hasSelectiveDraft: false,
+        );
+        return;
+      }
+
+      if (hasSelectiveDraft && allowSelectiveInventory) {
+        _stateRestored = false;
+        await restoreState(selectiveDraftToRestore!);
+        return;
+      }
+
+      // Черновиков нет — диалог (iiko-продуктов тоже нет, но показываем для консистентности)
+      await _showModeDialog();
+    } finally {
+      _draftHydrationFinished = true;
     }
-
-    final stdDraftResolved = stdDraft != null &&
-            stdDraft.isNotEmpty &&
-            _inventoryDraftSnapshotHasRows(stdDraft)
-        ? stdDraft
-        : null;
-    final serverStdResolved = serverStdDraft != null &&
-            serverStdDraft.isNotEmpty &&
-            _inventoryDraftSnapshotHasRows(serverStdDraft)
-        ? serverStdDraft
-        : null;
-    final stdDraftToRestore = stdDraftResolved ?? serverStdResolved;
-
-    final selectiveDraftResolved = selectiveDraft != null &&
-            selectiveDraft.isNotEmpty &&
-            _inventoryDraftSnapshotHasRows(selectiveDraft)
-        ? selectiveDraft
-        : null;
-    final serverSelResolved = serverSelectiveDraft != null &&
-            serverSelectiveDraft.isNotEmpty &&
-            _inventoryDraftSnapshotHasRows(serverSelectiveDraft)
-        ? serverSelectiveDraft
-        : null;
-    final selectiveDraftToRestore = selectiveDraftResolved ?? serverSelResolved;
-
-    final hasIikoProducts = iikoStore.hasProducts;
-    final hasIikoDraft = iikoDraft != null && iikoDraft.isNotEmpty;
-    final hasStdDraft = stdDraftToRestore != null;
-    final hasSelectiveDraft = selectiveDraftToRestore != null;
-    final hasSelectiveDraftForModeDialog =
-        hasSelectiveDraft && allowSelectiveInventory;
-
-    // Если есть iiko-продукты или iiko-черновик — показываем диалог выбора ВСЕГДА
-    // (пользователь должен сам выбрать куда вернуться)
-    if (hasIikoProducts || hasIikoDraft) {
-      await _showModeDialog(
-        hasIikoDraft: hasIikoDraft,
-        hasStdDraft: hasStdDraft,
-        hasSelectiveDraft: hasSelectiveDraftForModeDialog,
-      );
-      return;
-    }
-
-    // iiko-продуктов нет — проверяем сервер (инкогнито / очищенный localStorage)
-    final serverIikoDraft = await _loadIikoDraftFromServer();
-    if (!mounted) return;
-    if (serverIikoDraft != null) {
-      await _showModeDialog(
-        hasIikoDraft: true,
-        hasStdDraft: hasStdDraft,
-        hasSelectiveDraft: hasSelectiveDraftForModeDialog,
-      );
-      return;
-    }
-
-    // Оба локальных черновика (стандарт + выборочная) — пусть пользователь выберет
-    if (hasStdDraft && hasSelectiveDraft) {
-      await _showModeDialog(
-        hasStdDraft: true,
-        hasSelectiveDraft: hasSelectiveDraftForModeDialog,
-      );
-      return;
-    }
-
-    // iiko нет — тихо восстанавливаем один из черновиков (если есть)
-    if (hasStdDraft) {
-      _stateRestored = false;
-      await restoreState(stdDraftToRestore!);
-      return;
-    }
-
-    // Pro: черновик выборочной не открываем — только диалог «стандарт / iiko».
-    if (hasSelectiveDraft && !allowSelectiveInventory) {
-      await _showModeDialog(
-        hasIikoDraft: hasIikoDraft,
-        hasStdDraft: hasStdDraft,
-        hasSelectiveDraft: false,
-      );
-      return;
-    }
-
-    if (hasSelectiveDraft && allowSelectiveInventory) {
-      _stateRestored = false;
-      await restoreState(selectiveDraftToRestore!);
-      return;
-    }
-
-    // Черновиков нет — диалог (iiko-продуктов тоже нет, но показываем для консистентности)
-    await _showModeDialog();
   }
 
   /// Проверяет наличие iiko-черновика на сервере (для инкогнито / очищенного localStorage).

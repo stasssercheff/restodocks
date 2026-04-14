@@ -8,7 +8,8 @@ import 'package:flutter/scheduler.dart';
 import '../services/cloud_draft_service.dart';
 import '../services/draft_storage_service.dart';
 import '../services/web_lifecycle_saver_stub.dart'
-    if (dart.library.html) '../services/web_lifecycle_saver_web.dart' as web_lifecycle;
+    if (dart.library.html) '../services/web_lifecycle_saver_web.dart'
+    as web_lifecycle;
 
 /// Mixin для автосохранения состояния экрана
 mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
@@ -26,6 +27,11 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
 
   /// Метод для восстановления состояния (должен быть переопределен)
   Future<void> restoreState(Map<String, dynamic> data);
+
+  /// Можно ли сейчас писать черновик в локальное хранилище.
+  /// Экраны с кастомной инициализацией могут временно блокировать запись,
+  /// чтобы не перезаписать существующий черновик пустым состоянием.
+  bool get canPersistDraft => true;
 
   Timer? _saveTimer;
   bool _isInitialized = false;
@@ -123,6 +129,7 @@ mixin AutoSaveMixin<T extends StatefulWidget> on State<T> {
   // Приватные методы для работы с хранилищем
 
   Future<void> _saveDraft() async {
+    if (!canPersistDraft) return;
     try {
       final data = getCurrentState();
       await _saveToStorage(data);

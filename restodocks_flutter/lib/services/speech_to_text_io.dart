@@ -3,6 +3,11 @@ import 'dart:async';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+SpeechToText? _activeStt;
+Completer<String?>? _activeCompleter;
+String _latestText = '';
+bool _listening = false;
+
 String _localeForStt(String languageCode) {
   switch (languageCode.trim().toLowerCase()) {
     case 'en':
@@ -29,44 +34,85 @@ Future<bool> speechToTextSupported() async {
   );
 }
 
-Future<String?> speechToTextListenOnce({
+bool speechToTextIsListening() => _listening;
+
+Future<bool> speechToTextStart({
   String languageCode = 'ru',
   Duration timeout = const Duration(seconds: 12),
 }) async {
+  if (_listening) return true;
   final stt = SpeechToText();
   final ready = await stt.initialize(
-    onStatus: (_) {},
-    onError: (_) {},
+    onStatus: (status) {
+      if ((status == 'done' || status == 'notListening') && _listening) {
+        if (!_activeCompleter!.isCompleted) {
+          final text = _latestText.trim();
+          _activeCompleter!.complete(text.isEmpty ? null : text);
+        }
+        _listening = false;
+      }
+    },
+    onError: (_) {
+      if (_activeCompleter != null && !_activeCompleter!.isCompleted) {
+        _activeCompleter!.complete(null);
+      }
+      _listening = false;
+    },
     debugLogging: false,
   );
-  if (!ready) return null;
+  if (!ready) return false;
 
-  final completer = Completer<String?>();
-  String latest = '';
-
-  void finish() {
-    if (!completer.isCompleted) {
-      final text = latest.trim();
-      completer.complete(text.isEmpty ? null : text);
-    }
-  }
+  _activeStt = stt;
+  _activeCompleter = Completer<String?>();
+  _latestText = '';
+  _listening = true;
 
   await stt.listen(
     localeId: _localeForStt(languageCode),
     listenMode: ListenMode.confirmation,
-    partialResults: false,
+    partialResults: true,
     onResult: (SpeechRecognitionResult result) {
-      latest = result.recognizedWords;
-      if (result.finalResult) finish();
+      _latestText = result.recognizedWords;
+      if (result.finalResult && _activeCompleter != null && !_activeCompleter!.isCompleted) {
+        final text = _latestText.trim();
+        _activeCompleter!.complete(text.isEmpty ? null : text);
+      }
     },
     listenFor: timeout,
     pauseFor: const Duration(seconds: 2),
     cancelOnError: true,
   );
+  return true;
+}
 
-  final text = await completer.future.timeout(timeout, onTimeout: () => null);
-  if (stt.isListening) {
-    await stt.stop();
+Future<String?> speechToTextStop() async {
+  if (!_listening || _activeCompleter == null || _activeStt == null) {
+    return null;
   }
+  try {
+    if (_activeStt!.isListening) {
+      await _activeStt!.stop();
+    }
+  } catch (_) {}
+  if (!_activeCompleter!.isCompleted) {
+    final text = _latestText.trim();
+    _activeCompleter!.complete(text.isEmpty ? null : text);
+  }
+  _listening = false;
+  return _activeCompleter!.future;
+}
+
+Future<String?> speechToTextListenOnce({
+  String languageCode = 'ru',
+  Duration timeout = const Duration(seconds: 12),
+}) async {
+  final ok = await speechToTextStart(
+    languageCode: languageCode,
+    timeout: timeout,
+  );
+  if (!ok || _activeCompleter == null) return null;
+  final text =
+      await _activeCompleter!.future.timeout(timeout, onTimeout: () => null);
+  await speechToTextStop();
   return text;
 }

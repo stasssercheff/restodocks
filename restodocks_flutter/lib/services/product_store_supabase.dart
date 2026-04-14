@@ -191,14 +191,15 @@ class ProductStoreSupabase {
 
   Future<void> _scheduleNutritionBackfillAfterCatalogLoad() async {
     await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (kIsWeb) return;
     if (!AccountManagerSupabase().isLoggedInSync) return;
     try {
       final client = Supabase.instance.client;
       if (client.auth.currentSession == null) return;
       await client.auth.refreshSession();
     } catch (_) {}
-    NutritionBackfillService().startBackgroundBackfill(this);
+    final backfill = NutritionBackfillService();
+    backfill.startBackgroundBackfill(this);
+    backfill.startCatchUpBackfill(this);
   }
 
   /// Получить продукты с фильтрами
