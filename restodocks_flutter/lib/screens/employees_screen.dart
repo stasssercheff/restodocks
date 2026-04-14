@@ -377,7 +377,7 @@ class _EmployeeTableHeader extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(flex: 3, child: Text(loc.t('position') ?? 'Должность', style: style)),
           const SizedBox(width: 8),
-          Expanded(flex: 3, child: Text(rateHeader, style: style, textAlign: TextAlign.right)),
+          Expanded(flex: 2, child: Text(rateHeader, style: style, textAlign: TextAlign.left)),
           if (canEdit) const SizedBox(width: 64),
         ],
       ),
@@ -508,16 +508,13 @@ class _EmployeeCard extends StatelessWidget {
               const SizedBox(width: 6),
               // Ставка (без иконки на ПК — экономит ширину и убирает overflow)
               Expanded(
-                flex: 3,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    rateStr,
-                    style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.right,
-                  ),
+                flex: 2,
+                child: Text(
+                  rateStr,
+                  style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.left,
                 ),
               ),
               // Кнопки редактирования
