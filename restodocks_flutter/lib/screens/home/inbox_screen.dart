@@ -103,46 +103,15 @@ class _InboxScreenState extends State<InboxScreen> {
     super.dispose();
   }
 
-  List<_InboxTypeTab> _ownerAllowedTypeTabs(
-      bool isHall, SubscriptionEntitlements ent) {
-    final ultra = ent.hasUltraLevelFeatures;
-    return [
-      _InboxTypeTab.order,
-      if (ultra) _InboxTypeTab.goodsReceipt,
-      _InboxTypeTab.inventory,
-      if (ultra) _InboxTypeTab.writeoff,
-      if (ultra && !isHall) _InboxTypeTab.iikoInventory,
-      _InboxTypeTab.notifications,
-      _InboxTypeTab.checklist,
-    ];
-  }
-
-  void _ensureInboxTabsMatchTier(SubscriptionEntitlements ent) {
-    final employee = context.read<AccountManagerSupabase>().currentEmployee;
-    if (employee == null) return;
-    final isOwner = employee.hasRole('owner');
-    final isHall = _selectedDeptTab == _InboxDeptTab.hall;
-    if (isOwner && _selectedTypeTab != null) {
-      final allowed = _ownerAllowedTypeTabs(isHall, ent);
-      if (!allowed.contains(_selectedTypeTab)) {
-        setState(() => _selectedTypeTab = allowed.first);
-      }
-    } else if (!isOwner && _selectedTab != null) {
-      final allowed = _visibleTabs(employee, ent);
-      if (!allowed.contains(_selectedTab)) {
-        setState(() => _selectedTab = allowed.first);
-      }
-    }
-  }
-
   /// Выбираем первую доступную вкладку для текущего сотрудника
   void _initDefaultTab() {
-    final account = context.read<AccountManagerSupabase>();
-    final employee = account.currentEmployee;
+    final employee = context.read<AccountManagerSupabase>().currentEmployee;
     if (employee == null) return;
     if (widget.messagesOnly) return;
-    final ent = SubscriptionEntitlements.from(account.establishment);
-    final tabs = _visibleTabs(employee, ent);
+    final tier = SubscriptionEntitlements.from(
+            context.read<AccountManagerSupabase>().establishment)
+        .effectiveTier;
+    final tabs = _visibleTabs(employee, tier);
     final isOwner = employee.hasRole('owner');
     final isManagement = employee.hasRole('executive_chef') ||
         employee.hasRole('sous_chef') ||
@@ -157,10 +126,9 @@ class _InboxScreenState extends State<InboxScreen> {
                       employee.hasRole('floor_manager'))
                   ? _InboxDeptTab.hall
                   : _InboxDeptTab.kitchen;
-      final isHall = dept == _InboxDeptTab.hall;
       setState(() {
         _selectedDeptTab = dept;
-        _selectedTypeTab = _ownerAllowedTypeTabs(isHall, ent).first;
+        _selectedTypeTab = _InboxTypeTab.order; // Заказы по умолчанию
       });
     } else {
       if (tabs.isNotEmpty) {
@@ -181,8 +149,7 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   /// Входящие по ролям: Заказы, Инвентаризация, iiko, Уведомления, Чеклисты. Сообщения — отдельная кнопка на главной.
-  /// Вкладки Ultra (приёмка, списания, iiko) — только при [SubscriptionEntitlements.hasUltraLevelFeatures], как на «Расходах».
-  List<_InboxTab> _visibleTabs(Employee employee, SubscriptionEntitlements ent) {
+  List<_InboxTab> _visibleTabs(Employee employee, AppSubscriptionTier tier) {
     final isOwner = employee.hasRole('owner');
     final isManagement = employee.hasRole('executive_chef') ||
         employee.hasRole('sous_chef') ||
@@ -190,7 +157,7 @@ class _InboxScreenState extends State<InboxScreen> {
         employee.hasRole('floor_manager') ||
         employee.department == 'management';
     final hasDocs = employee.hasInboxDocuments;
-    final ultra = ent.hasUltraLevelFeatures;
+    final ultra = tier == AppSubscriptionTier.ultra;
 
     final tabs = <_InboxTab>[];
     if (hasDocs) {
@@ -219,6 +186,21 @@ class _InboxScreenState extends State<InboxScreen> {
     return tabs;
   }
 
+  /// Вкладки типов для собственника: Ultra — полный набор (как «Расходы»); Pro — без приёмки, списаний и iiko.
+  List<_InboxTypeTab> _ownerVisibleTypeTabs(
+      AppSubscriptionTier tier, bool isHall) {
+    final ultra = tier == AppSubscriptionTier.ultra;
+    return [
+      _InboxTypeTab.order,
+      if (ultra) _InboxTypeTab.goodsReceipt,
+      _InboxTypeTab.inventory,
+      if (ultra) _InboxTypeTab.writeoff,
+      if (ultra && !isHall) _InboxTypeTab.iikoInventory,
+      _InboxTypeTab.notifications,
+      _InboxTypeTab.checklist,
+    ];
+  }
+
   Future<void> _loadDocuments() async {
     final accountManager = context.read<AccountManagerSupabase>();
     final establishment = accountManager.establishment;
@@ -243,44 +225,33 @@ class _InboxScreenState extends State<InboxScreen> {
         final byId = {for (final e in emps) e.id: e};
         enrichedDocs = documents.map((d) {
           final e = byId[d.employeeId];
+          final rawName = d.employeeName;
+          final String newName;
           if (e != null) {
-            final nameLine = employeeNameWithPositionLine(
+            newName = employeeNameWithPositionLine(
               e,
               loc,
               establishment: accountManager.establishment,
               translit: useTranslit,
             );
-            if (d.type == DocumentType.writeoff) {
-              return d.copyWith(employeeName: nameLine, description: nameLine);
-            }
-            final empRaw = d.employeeName.trim();
-            final descRaw = d.description.trim();
-            final desc = descRaw.isEmpty
-                ? descRaw
-                : (descRaw == empRaw
-                    ? nameLine
-                    : displayStoredPersonName(descRaw, loc,
-                        showNameTranslit: layoutPrefs.showNameTranslit));
-            return d.copyWith(employeeName: nameLine, description: desc);
+          } else if (rawName.isEmpty || rawName == '—') {
+            newName = rawName;
+          } else {
+            newName = useTranslit
+                ? loc.displayPersonNameForLanguage(
+                    rawName, loc.currentLanguageCode)
+                : rawName;
           }
+          var newDesc = d.description;
           if (d.type == DocumentType.writeoff) {
-            final raw = d.employeeName;
-            if (raw.isEmpty || raw == '—') return d;
-            final shown = displayStoredPersonName(raw, loc,
-                showNameTranslit: layoutPrefs.showNameTranslit);
-            return d.copyWith(employeeName: shown, description: shown);
+            newDesc = newName;
+          } else if (rawName.isNotEmpty &&
+              d.description.trim() == rawName.trim() &&
+              newName != rawName) {
+            newDesc = newName;
           }
-          final empShown = displayStoredPersonName(d.employeeName, loc,
-              showNameTranslit: layoutPrefs.showNameTranslit);
-          final empRaw = d.employeeName.trim();
-          final descRaw = d.description.trim();
-          final desc = descRaw.isEmpty
-              ? ''
-              : (descRaw == empRaw
-                  ? empShown
-                  : displayStoredPersonName(descRaw, loc,
-                      showNameTranslit: layoutPrefs.showNameTranslit));
-          return d.copyWith(employeeName: empShown, description: desc);
+          if (newName == d.employeeName && newDesc == d.description) return d;
+          return d.copyWith(employeeName: newName, description: newDesc);
         }).toList();
       }
       List<EmployeeDeletionNotification> notifications = [];
@@ -328,7 +299,6 @@ class _InboxScreenState extends State<InboxScreen> {
       }
       await context.read<InboxViewedService>().getViewedIds(establishment.id);
       if (mounted) {
-        final ent = SubscriptionEntitlements.from(accountManager.establishment);
         setState(() {
           _documents = enrichedDocs;
           _deletionNotifications = notifications;
@@ -337,7 +307,6 @@ class _InboxScreenState extends State<InboxScreen> {
           _unreadMessagesCount = unreadMessages;
           _loading = false;
         });
-        _ensureInboxTabsMatchTier(ent);
       }
     } catch (e) {
       devLog('Error loading inbox documents: $e');
@@ -532,9 +501,29 @@ class _InboxScreenState extends State<InboxScreen> {
             employee.hasRole('bar_manager') ||
             employee.hasRole('floor_manager') ||
             employee.department == 'management');
-    final ent = SubscriptionEntitlements.from(accountManager.establishment);
+    final tier = SubscriptionEntitlements.from(accountManager.establishment)
+        .effectiveTier;
     final visibleTabs =
-        employee != null ? _visibleTabs(employee, ent) : <_InboxTab>[];
+        employee != null ? _visibleTabs(employee, tier) : <_InboxTab>[];
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (isOwner || isManagement) {
+        final isHall = _selectedDeptTab == _InboxDeptTab.hall;
+        final allowed = _ownerVisibleTypeTabs(tier, isHall);
+        if (_selectedTypeTab != null && !allowed.contains(_selectedTypeTab!)) {
+          setState(() {
+            _selectedTypeTab = allowed.contains(_InboxTypeTab.order)
+                ? _InboxTypeTab.order
+                : allowed.first;
+          });
+        }
+      } else if (employee != null && visibleTabs.isNotEmpty) {
+        if (_selectedTab != null && !visibleTabs.contains(_selectedTab!)) {
+          setState(() => _selectedTab = visibleTabs.first);
+        }
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -601,7 +590,7 @@ class _InboxScreenState extends State<InboxScreen> {
           if (!widget.messagesOnly) ...[
             if (isOwner || isManagement) ...[
               _buildDeptFilter(loc),
-              _buildTypeFilterForOwner(loc, ent),
+              _buildTypeFilterForOwner(loc, tier),
             ],
             if (!isOwner && !isManagement && visibleTabs.isNotEmpty)
               _buildTypeFilter(loc, visibleTabs),
@@ -879,11 +868,11 @@ class _InboxScreenState extends State<InboxScreen> {
     );
   }
 
-  /// Типы вкладок для собственника: Ultra — приёмка, списания, iiko; Pro — заказы, инвентаризация, уведомления, чеклисты.
+  /// Типы вкладок для собственника: по тарифу (Pro — без Ultra-разделов).
   Widget _buildTypeFilterForOwner(
-      LocalizationService loc, SubscriptionEntitlements ent) {
+      LocalizationService loc, AppSubscriptionTier tier) {
     final isHall = _selectedDeptTab == _InboxDeptTab.hall;
-    final tabs = _ownerAllowedTypeTabs(isHall, ent);
+    final tabs = _ownerVisibleTypeTabs(tier, isHall);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
@@ -901,32 +890,32 @@ class _InboxScreenState extends State<InboxScreen> {
           children: [
             for (var i = 0; i < tabs.length; i++) ...[
               if (i > 0) const SizedBox(width: 8),
-              _buildTypeChipForTab(tabs[i], loc),
+              _buildTypeChip(
+                tabs[i],
+                switch (tabs[i]) {
+                  _InboxTypeTab.order =>
+                    loc.t('inbox_tab_order') ?? 'Заказы',
+                  _InboxTypeTab.goodsReceipt =>
+                    loc.t('inbox_tab_goods_receipt') ?? 'Приёмка товара',
+                  _InboxTypeTab.inventory =>
+                    loc.t('inbox_tab_inventory') ?? 'Инвентаризация',
+                  _InboxTypeTab.writeoff => loc.t('writeoffs') ?? 'Списания',
+                  _InboxTypeTab.iikoInventory =>
+                    loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko',
+                  _InboxTypeTab.notifications =>
+                    loc.t('inbox_tab_notifications') ?? 'Уведомления',
+                  _InboxTypeTab.checklist =>
+                    loc.t('inbox_tab_checklist') ?? 'Чеклисты',
+                  _InboxTypeTab.messages =>
+                    loc.t('inbox_tab_messages') ?? 'Сообщения',
+                },
+                loc,
+              ),
             ],
           ],
         ),
       ),
     );
-  }
-
-  Widget _buildTypeChipForTab(_InboxTypeTab tab, LocalizationService loc) {
-    final label = switch (tab) {
-      _InboxTypeTab.order => loc.t('inbox_tab_order') ?? 'Заказы',
-      _InboxTypeTab.goodsReceipt =>
-        loc.t('inbox_tab_goods_receipt') ?? 'Приёмка товара',
-      _InboxTypeTab.inventory =>
-        loc.t('inbox_tab_inventory') ?? 'Инвентаризация',
-      _InboxTypeTab.writeoff => loc.t('writeoffs') ?? 'Списания',
-      _InboxTypeTab.iikoInventory =>
-        loc.t('iiko_inventory_title') ?? 'Инвентаризация iiko',
-      _InboxTypeTab.notifications =>
-        loc.t('inbox_tab_notifications') ?? 'Уведомления',
-      _InboxTypeTab.checklist =>
-        loc.t('inbox_tab_checklist') ?? 'Чеклисты',
-      _InboxTypeTab.messages =>
-        loc.t('inbox_tab_messages') ?? 'Сообщения',
-    };
-    return _buildTypeChip(tab, label, loc);
   }
 
   Widget _buildTypeChip(
@@ -1100,14 +1089,19 @@ class _InboxScreenState extends State<InboxScreen> {
   }
 
   Widget _buildDeletionNotificationsList(LocalizationService loc) {
-    final layoutPrefs = context.watch<ScreenLayoutPreferenceService>();
-    final useTranslit =
-        loc.currentLanguageCode != 'ru' || layoutPrefs.showNameTranslit;
+    final layoutPrefs = context.read<ScreenLayoutPreferenceService>();
     final overdueChecklists = _overdueChecklistsForNotifications;
     final hasDeletions = _deletionNotifications.isNotEmpty;
     final hasBirthdayChanges = _birthdayChangeNotifications.isNotEmpty;
     final hasUpcoming = _upcomingBirthdays.isNotEmpty;
     final hasOverdue = overdueChecklists.isNotEmpty;
+    String personLabel(String? raw) {
+      return displayStoredPersonName(
+        raw,
+        loc,
+        showNameTranslit: layoutPrefs.showNameTranslit,
+      );
+    }
 
     if (!hasDeletions && !hasOverdue && !hasBirthdayChanges && !hasUpcoming) {
       return Center(
@@ -1164,6 +1158,11 @@ class _InboxScreenState extends State<InboxScreen> {
                 ? (loc.t('birthday_today') ?? 'Сегодня')
                 : (loc.t('birthday_in_days') ?? 'Через %s дн.')
                     .replaceAll('%s', '${e.daysUntil}');
+            final nameLine = employeeDisplayName(
+              e.emp,
+              translit: loc.currentLanguageCode != 'ru' ||
+                  layoutPrefs.showNameTranslit,
+            );
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
@@ -1174,7 +1173,7 @@ class _InboxScreenState extends State<InboxScreen> {
                       color: Theme.of(context).colorScheme.onPrimaryContainer),
                 ),
                 title: Text(
-                  '${employeeDisplayName(e.emp, translit: useTranslit)} — $dateStr',
+                  '$nameLine — $dateStr',
                   style: Theme.of(context)
                       .textTheme
                       .bodyMedium
@@ -1223,7 +1222,7 @@ class _InboxScreenState extends State<InboxScreen> {
                           Theme.of(context).colorScheme.onSecondaryContainer),
                 ),
                 title: Text(
-                  '${displayStoredPersonName(n.employeeName, loc, showNameTranslit: layoutPrefs.showNameTranslit)}: $dateStr',
+                  '${personLabel(n.employeeName)}: $dateStr',
                   style: Theme.of(context)
                       .textTheme
                       .bodyMedium
@@ -1257,10 +1256,8 @@ class _InboxScreenState extends State<InboxScreen> {
                 title: Text(
                   n.isSelfDeletion
                       ? loc.t('employee_deleted_self_inbox').replaceAll(
-                          '%s',
-                          displayStoredPersonName(n.deletedEmployeeName, loc,
-                              showNameTranslit: layoutPrefs.showNameTranslit))
-                      : '${displayStoredPersonName(n.deletedEmployeeName, loc, showNameTranslit: layoutPrefs.showNameTranslit)} ${loc.t('employee_deleted_by')} ${displayStoredPersonName(n.deletedByName, loc, showNameTranslit: layoutPrefs.showNameTranslit)}',
+                            '%s', personLabel(n.deletedEmployeeName))
+                      : '${personLabel(n.deletedEmployeeName)} ${loc.t('employee_deleted_by')} ${personLabel(n.deletedByName)})',
                   style: Theme.of(context)
                       .textTheme
                       .bodyMedium

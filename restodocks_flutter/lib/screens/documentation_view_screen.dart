@@ -1,20 +1,16 @@
-import 'dart:math' show min;
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
 
 import '../core/subscription_entitlements.dart';
 import '../models/models.dart';
-import '../services/inventory_download.dart';
 import '../services/services.dart';
+import '../utils/documentation_pdf_export.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/documentation_rich_text_editor.dart';
+import '../widgets/subscription_required_dialog.dart';
 
 /// Просмотр документа. Тема, текст. Владелец/менеджмент: кнопка редактирования.
 class DocumentationViewScreen extends StatefulWidget {
@@ -32,37 +28,46 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
   String? _error;
   String? _translatedName;
   String? _translatedTopic;
-  String? _translatedBodyPlain;
-  bool _bodyTranslationPending = false;
   QuillController? _quillController;
+
+  void _onLocaleChanged() {
+    if (!mounted || _doc == null || _loading) return;
+    _loadTranslations();
+  }
+
+  void _rebuildQuillFromDocBody() {
+    if (_doc == null) return;
+    _quillController?.dispose();
+    _quillController = QuillController(
+      document: documentFromBody(_doc!.body),
+      selection: const TextSelection.collapsed(offset: 0),
+      readOnly: true,
+    );
+  }
 
   Future<void> _loadTranslations() async {
     if (!mounted || _doc == null) return;
     final loc = context.read<LocalizationService>();
     final targetLang = loc.currentLanguageCode;
     const sourceLang = 'ru';
+
     if (targetLang == sourceLang) {
       if (mounted) {
         setState(() {
           _translatedName = null;
           _translatedTopic = null;
-          _translatedBodyPlain = null;
-          _bodyTranslationPending = false;
         });
+        _rebuildQuillFromDocBody();
       }
       return;
     }
+
     try {
       final translationSvc = context.read<TranslationService>();
-      final plainBody = documentFromBody(_doc!.body).toPlainText().trim();
-      if (mounted) {
-        setState(() {
-          _bodyTranslationPending = plainBody.isNotEmpty;
-          _translatedBodyPlain = null;
-        });
-      }
+      String? nameT;
+      String? topicT;
       if (_doc!.name.trim().isNotEmpty) {
-        final t = await translationSvc.translate(
+        nameT = await translationSvc.translate(
           entityType: TranslationEntityType.document,
           entityId: _doc!.id,
           fieldName: 'name',
@@ -70,10 +75,9 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
           from: sourceLang,
           to: targetLang,
         );
-        if (t != null && t != _doc!.name && mounted) setState(() => _translatedName = t);
       }
       if (_doc!.topic?.trim().isNotEmpty == true) {
-        final t = await translationSvc.translate(
+        topicT = await translationSvc.translate(
           entityType: TranslationEntityType.document,
           entityId: _doc!.id,
           fieldName: 'topic',
@@ -81,37 +85,60 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
           from: sourceLang,
           to: targetLang,
         );
-        if (t != null && t != _doc!.topic && mounted) setState(() => _translatedTopic = t);
       }
-      if (plainBody.isNotEmpty) {
-        final tb = await translationSvc.translate(
+
+      final plain = documentFromBody(_doc!.body).toPlainText().trim();
+      String? bodyT;
+      if (plain.isNotEmpty) {
+        bodyT = await translationSvc.translate(
           entityType: TranslationEntityType.document,
           entityId: _doc!.id,
           fieldName: 'body',
-          text: plainBody,
+          text: plain,
           from: sourceLang,
           to: targetLang,
         );
-        if (mounted) {
-          setState(() {
-            _bodyTranslationPending = false;
-            if (tb != null && tb.trim().isNotEmpty) _translatedBodyPlain = tb;
-          });
-        }
-      } else if (mounted) {
-        setState(() => _bodyTranslationPending = false);
       }
-    } catch (_) {
-      if (mounted) setState(() => _bodyTranslationPending = false);
-    }
+
+      if (!mounted) return;
+      if (context.read<LocalizationService>().currentLanguageCode != targetLang) {
+        return;
+      }
+
+      setState(() {
+        _translatedName =
+            (nameT != null && nameT.isNotEmpty && nameT != _doc!.name) ? nameT : null;
+        _translatedTopic = (topicT != null &&
+                topicT.isNotEmpty &&
+                topicT != _doc!.topic)
+            ? topicT
+            : null;
+      });
+
+      final useTranslatedBody =
+          bodyT != null && bodyT.isNotEmpty && bodyT != plain;
+      if (useTranslatedBody) {
+        _quillController?.dispose();
+        _quillController = QuillController(
+          document: Document()..insert(0, bodyT),
+          selection: const TextSelection.collapsed(offset: 0),
+          readOnly: true,
+        );
+      } else {
+        _rebuildQuillFromDocBody();
+      }
+      if (mounted) setState(() {});
+    } catch (_) {}
   }
 
   Future<void> _load() async {
     final acc = context.read<AccountManagerSupabase>();
+    final loc = context.read<LocalizationService>();
+    final docSvc = context.read<DocumentationServiceSupabase>();
     if (acc.establishment == null || acc.currentEmployee == null) {
       setState(() {
         _loading = false;
-        _error = context.read<LocalizationService>().t('error_no_establishment_or_employee');
+        _error = loc.t('error_no_establishment_or_employee');
       });
       return;
     }
@@ -120,20 +147,23 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
       _error = null;
     });
     try {
-      final doc = await context.read<DocumentationServiceSupabase>().getDocumentById(widget.documentId);
+      final doc = await docSvc.getDocumentById(widget.documentId);
+      if (!mounted) return;
       if (doc == null) {
         setState(() {
           _loading = false;
-          _error = context.read<LocalizationService>().t('document_not_found');
+          _error = loc.t('document_not_found');
         });
         return;
       }
       final emp = acc.currentEmployee!;
-      final docs = await context.read<DocumentationServiceSupabase>().getDocumentsForEmployee(acc.establishment!.id, emp);
+      final docs =
+          await docSvc.getDocumentsForEmployee(acc.establishment!.id, emp);
+      if (!mounted) return;
       if (!docs.any((d) => d.id == doc.id)) {
         setState(() {
           _loading = false;
-          _error = context.read<LocalizationService>().t('access_denied') ?? 'Доступ запрещён';
+          _error = loc.t('access_denied');
         });
         return;
       }
@@ -151,33 +181,125 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
         _loadTranslations();
       }
     } catch (e) {
-      if (mounted) setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _exportPdf(BuildContext context) async {
+    final loc = context.read<LocalizationService>();
+    final account = context.read<AccountManagerSupabase>();
+    final translationSvc = context.read<TranslationService>();
+    final exportOk =
+        SubscriptionEntitlements.from(account.establishment).canExportSalaryPayrollToDevice;
+    if (!exportOk) {
+      await showSubscriptionRequiredDialog(context);
+      return;
+    }
+    if (_doc == null) return;
+
+    final selectedLang = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _DocumentationPdfLanguageDialog(loc: loc),
+    );
+    if (selectedLang == null) return;
+    if (!context.mounted) return;
+
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Center(
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 16),
+                Text(loc.t('loading')),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final est = account.establishment;
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.documentation,
+        );
+      }
+      if (!context.mounted) return;
+
+      const sourceLang = 'ru';
+      final d = _doc!;
+
+      Future<String> trField(String fieldName, String text) async {
+        if (text.trim().isEmpty) return text;
+        if (selectedLang == sourceLang) return text;
+        final t = await translationSvc.translate(
+          entityType: TranslationEntityType.document,
+          entityId: d.id,
+          fieldName: fieldName,
+          text: text,
+          from: sourceLang,
+          to: selectedLang,
+        );
+        return (t != null && t.isNotEmpty) ? t : text;
+      }
+
+      final nameOut = await trField('name', d.name);
+      final topicOut = d.topic == null ? '' : await trField('topic', d.topic!);
+      final plain = documentFromBody(d.body).toPlainText().trim();
+      final bodyOut = plain.isEmpty ? '' : await trField('body', plain);
+
+      final bytes = await buildDocumentationPdfBytes(
+        title: nameOut,
+        topic: topicOut,
+        bodyPlain: bodyOut,
+      );
+
+      final safe = d.name.replaceAll(RegExp(r'[^\w\-.\s]'), '_').trim();
+      final fname = 'documentation_${safe.isEmpty ? d.id : safe}.pdf';
+
+      if (context.mounted) Navigator.of(context).pop();
+
+      await Printing.sharePdf(bytes: bytes, filename: fname);
+
+      if (context.mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(content: Text(loc.t('documentation_pdf_ready') ?? 'PDF')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) Navigator.of(context).pop();
+      if (context.mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(content: Text('${loc.t('error_short') ?? 'Error'}: $e')),
+        );
+      }
     }
   }
 
   @override
   void initState() {
     super.initState();
+    LocalizationService().addListener(_onLocaleChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
-  }
-
-  String? _prevUiLang;
-
-  void _syncTranslationLanguageIfNeeded(LocalizationService loc) {
-    final lang = loc.currentLanguageCode;
-    if (_prevUiLang != null && lang != _prevUiLang) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _doc != null) _loadTranslations();
-      });
-    }
-    _prevUiLang = lang;
   }
 
   @override
   void dispose() {
+    LocalizationService().removeListener(_onLocaleChanged);
     _quillController?.dispose();
     super.dispose();
   }
@@ -214,14 +336,9 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
       );
     }
 
-    _syncTranslationLanguageIfNeeded(loc);
-
     final name = _translatedName ?? _doc!.name;
     final topic = _translatedTopic ?? _doc!.topic ?? '';
     final hasBody = _doc!.body?.trim().isNotEmpty == true;
-    final uiLang = loc.currentLanguageCode;
-    final showTranslatedBody =
-        uiLang != 'ru' && (_translatedBodyPlain?.trim().isNotEmpty ?? false);
 
     return Scaffold(
       appBar: AppBar(
@@ -231,7 +348,7 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
           IconButton(
             icon: const Icon(Icons.picture_as_pdf_outlined),
             tooltip: loc.t('documentation_save_pdf') ?? 'Сохранить PDF',
-            onPressed: () => _onSavePdfTapped(),
+            onPressed: () => _exportPdf(context),
           ),
           if (canEdit)
             IconButton(
@@ -258,17 +375,7 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
               ),
               const SizedBox(height: 16),
             ],
-            if (hasBody && _bodyTranslationPending)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (hasBody && showTranslatedBody)
-              SelectableText(
-                _translatedBodyPlain!,
-                style: Theme.of(context).textTheme.bodyLarge,
-              )
-            else if (hasBody && _quillController != null)
+            if (hasBody && _quillController != null)
               DocumentationRichTextEditor(
                 controller: _quillController!,
                 readOnly: true,
@@ -289,204 +396,63 @@ class _DocumentationViewScreenState extends State<DocumentationViewScreen> {
       ),
     );
   }
-
-  Future<void> _onSavePdfTapped() async {
-    final loc = context.read<LocalizationService>();
-    final acc = context.read<AccountManagerSupabase>();
-    final ent = SubscriptionEntitlements.from(acc.establishment);
-    if (ent.isLiteTier) {
-      ScaffoldMessenger.of(this.context).showSnackBar(
-        SnackBar(content: Text(loc.t('subscription_required_lite_body'))),
-      );
-      return;
-    }
-    final exportLang = await showDialog<String>(
-      context: this.context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('order_export_language_title')),
-        contentPadding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(loc.t('order_export_language_subtitle')),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _DocPdfLangButton(
-                    flag: '🇷🇺',
-                    label: loc.t('order_export_language_ru'),
-                    onTap: () => Navigator.of(ctx).pop('ru')),
-                _DocPdfLangButton(
-                    flag: '🇺🇸',
-                    label: loc.t('order_export_language_en'),
-                    onTap: () => Navigator.of(ctx).pop('en')),
-                _DocPdfLangButton(
-                    flag: '🇪🇸',
-                    label: loc.t('order_export_language_es'),
-                    onTap: () => Navigator.of(ctx).pop('es')),
-                _DocPdfLangButton(
-                    flag: '🇮🇹',
-                    label: loc.t('order_export_language_it') ?? 'Italiano',
-                    onTap: () => Navigator.of(ctx).pop('it')),
-                _DocPdfLangButton(
-                    flag: '🇹🇷',
-                    label: loc.t('order_export_language_tr') ?? 'Türkçe',
-                    onTap: () => Navigator.of(ctx).pop('tr')),
-                _DocPdfLangButton(
-                    flag: '🇰🇿',
-                    label: loc.t('order_export_language_kk') ?? 'Қазақша',
-                    onTap: () => Navigator.of(ctx).pop('kk')),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-    if (exportLang == null || !mounted || _doc == null) return;
-
-    try {
-      if (!mounted) return;
-      final translationSvc = context.read<TranslationService>();
-      const sourceLang = 'ru';
-      String title = _doc!.name;
-      String topicLine = _doc!.topic?.trim() ?? '';
-      final plainBody = documentFromBody(_doc!.body).toPlainText().trim();
-
-      Future<String?> tr(String field, String text) async {
-        if (text.isEmpty) return text;
-        if (exportLang == sourceLang) return text;
-        final out = await translationSvc.translate(
-          entityType: TranslationEntityType.document,
-          entityId: _doc!.id,
-          fieldName: field,
-          text: text,
-          from: sourceLang,
-          to: exportLang,
-        );
-        return out ?? text;
-      }
-
-      title = (await tr('name', title)) ?? title;
-      if (topicLine.isNotEmpty) {
-        topicLine = (await tr('topic', topicLine)) ?? topicLine;
-      }
-      var bodyOut = plainBody;
-      if (plainBody.isNotEmpty && exportLang != sourceLang) {
-        bodyOut = (await tr('body', plainBody)) ?? plainBody;
-      }
-
-      final fontRegular = pw.Font.ttf(
-        await rootBundle.load('assets/fonts/Roboto-Regular.ttf'),
-      );
-      final fontBold = pw.Font.ttf(
-        await rootBundle.load('assets/fonts/Roboto-Bold.ttf'),
-      );
-
-      final pdf = pw.Document();
-      final dateStr =
-          DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now().toLocal());
-      pdf.addPage(
-        pw.MultiPage(
-          pageFormat: PdfPageFormat.a4,
-          theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold),
-          build: (_) => [
-            pw.Text(
-              title,
-              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold),
-            ),
-            pw.SizedBox(height: 8),
-            pw.Text(
-              dateStr,
-              style: pw.TextStyle(
-                fontSize: 9,
-                color: PdfColors.grey700,
-              ),
-            ),
-            if (topicLine.isNotEmpty) ...[
-              pw.SizedBox(height: 12),
-              pw.Text(
-                topicLine,
-                style: pw.TextStyle(
-                  fontSize: 12,
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColors.blue800,
-                ),
-              ),
-            ],
-            pw.SizedBox(height: 16),
-            if (bodyOut.isEmpty)
-              pw.Text(
-                loc.t('documentation_empty_body') ?? '',
-                style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey600),
-              )
-            else
-              pw.Text(
-                bodyOut,
-                style: const pw.TextStyle(fontSize: 11),
-              ),
-          ],
-        ),
-      );
-
-      final est = acc.establishment;
-      if (est != null && acc.isTrialOnlyWithoutPaid) {
-        await acc.trialIncrementDeviceSaveOrThrow(
-          establishmentId: est.id,
-          docKind: TrialDeviceSaveKinds.documentation,
-        );
-      }
-
-      final safe = _doc!.name
-          .replaceAll(RegExp(r'[^\w\-]+'), '_')
-          .replaceAll(RegExp(r'_+'), '_')
-          .trim();
-      final base = safe.isEmpty
-          ? 'document'
-          : safe.substring(0, min(safe.length, 60));
-      final fileName = '${base}_$exportLang.pdf';
-      await saveFileBytes(fileName, await pdf.save());
-      if (!mounted) return;
-      final msg = (loc.t('documentation_pdf_saved') ?? 'Saved: %s')
-          .replaceFirst('%s', fileName);
-      ScaffoldMessenger.of(this.context).showSnackBar(SnackBar(content: Text(msg)));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(this.context).showSnackBar(
-        SnackBar(content: Text('${loc.t('error')}: $e')),
-      );
-    }
-  }
 }
 
-class _DocPdfLangButton extends StatelessWidget {
-  const _DocPdfLangButton({
-    required this.flag,
-    required this.label,
-    required this.onTap,
-  });
+class _DocumentationPdfLanguageDialog extends StatefulWidget {
+  const _DocumentationPdfLanguageDialog({required this.loc});
 
-  final String flag;
-  final String label;
-  final VoidCallback onTap;
+  final LocalizationService loc;
+
+  @override
+  State<_DocumentationPdfLanguageDialog> createState() =>
+      _DocumentationPdfLanguageDialogState();
+}
+
+class _DocumentationPdfLanguageDialogState extends State<_DocumentationPdfLanguageDialog> {
+  late String _selectedLang;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedLang = widget.loc.currentLanguageCode;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return FilledButton.tonal(
-      onPressed: onTap,
-      style: FilledButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-      ),
-      child: Column(
+    final loc = widget.loc;
+    return AlertDialog(
+      title: Text(loc.t('documentation_pdf_dialog_title') ?? 'PDF'),
+      content: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(flag, style: const TextStyle(fontSize: 28)),
-          const SizedBox(height: 4),
-          Text(label, style: Theme.of(context).textTheme.labelLarge),
+          Text(
+            loc.t('documentation_pdf_language') ?? 'Язык:',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: LocalizationService.productLanguageCodes.map((code) {
+              return ChoiceChip(
+                label: Text(loc.getLanguageName(code)),
+                selected: _selectedLang == code,
+                onSelected: (_) => setState(() => _selectedLang = code),
+              );
+            }).toList(),
+          ),
         ],
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_selectedLang),
+          child: Text(loc.t('documentation_pdf_export_btn') ?? 'Сохранить'),
+        ),
+      ],
     );
   }
 }
