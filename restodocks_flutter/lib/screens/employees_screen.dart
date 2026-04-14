@@ -390,7 +390,7 @@ class _EmployeeCard extends StatelessWidget {
         onTap: canEdit ? onEdit : null,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -420,7 +420,7 @@ class _EmployeeCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               // Подразделение (+ цех)
               Expanded(
                 flex: 3,
@@ -431,7 +431,7 @@ class _EmployeeCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               // Должность
               Expanded(
                 flex: 3,
@@ -442,24 +442,19 @@ class _EmployeeCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 8),
-              // Ставка
+              const SizedBox(width: 6),
+              // Ставка (без иконки на ПК — экономит ширину и убирает overflow)
               Expanded(
                 flex: 2,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.payments_outlined, size: 14, color: theme.colorScheme.primary),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        rateStr,
-                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    rateStr,
+                    style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                  ),
                 ),
               ),
               // Кнопки редактирования
@@ -773,7 +768,9 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
               const SizedBox(height: 16),
               Flexible(
                 child: SingleChildScrollView(
-                  child: Column(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       TextField(
@@ -782,6 +779,9 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                           labelText: loc.t('full_name') ?? 'ФИО',
                           border: const OutlineInputBorder(),
                           filled: true,
+                          isDense: false,
+                          contentPadding: const EdgeInsets.fromLTRB(12, 18, 12, 14),
+                          floatingLabelAlignment: FloatingLabelAlignment.start,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -1004,6 +1004,7 @@ ALTER TABLE employees ADD COLUMN IF NOT EXISTS hourly_rate REAL;''';
                   ),
                 ),
               ),
+            ),
             ],
           ),
         ),

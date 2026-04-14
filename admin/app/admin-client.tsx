@@ -154,7 +154,7 @@ export default function AdminClient() {
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto px-3 py-4 sm:px-6 sm:py-8">
+      <main className="max-w-[min(1600px,calc(100vw-1.5rem))] mx-auto px-3 py-4 sm:px-6 sm:py-8">
         {tab === 'establishments' && <EstablishmentsTab />}
         {tab === 'promo' && <PromoTab />}
         {tab === 'support' && (
@@ -386,7 +386,7 @@ function EstablishmentsTab() {
         ? 'Подписка через App Store (In-App Purchase). Дата окончания в БД обычно уже учитывает отсрочку оплаты (grace period), если она пришла в чеке из App Store Connect.'
         : undefined
     return (
-      <div className="space-y-0.5 max-w-[15rem]">
+      <div className="space-y-0.5 max-w-[11rem] min-w-0">
         <div className={`text-xs font-medium ${subscriptionStatusTextClass(s.statusLabel)}`}>
           {s.statusLabel}
         </div>
@@ -620,11 +620,11 @@ function EstablishmentsTab() {
         <>
           {/* Desktop table */}
           <div className="hidden md:block bg-gray-900 rounded-xl border border-gray-800 overflow-x-auto">
-            <table className="w-full text-sm min-w-[880px]">
+            <table className="w-full text-xs sm:text-sm min-w-full">
               <thead>
                 <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
-                  <th className="px-4 py-3 text-left">Заведение</th>
-                  <th className="px-4 py-3 text-left align-top">
+                  <th className="px-2 py-2.5 sm:px-3 text-left">Заведение</th>
+                  <th className="px-2 py-2.5 sm:px-3 text-left align-top">
                     <div className="mb-1.5">Тип</div>
                     <select
                       value={filterType}
@@ -639,7 +639,7 @@ function EstablishmentsTab() {
                     </select>
                   </th>
                   <th
-                    className="px-4 py-3 text-left min-w-[11rem] align-top"
+                    className="px-2 py-2.5 sm:px-3 text-left min-w-[9rem] align-top"
                     title="Статус Pro, способ оплаты (сейчас App Store IAP или промокод), код промо при погашении"
                   >
                     <div className="mb-1.5">Подписка</div>
@@ -658,9 +658,9 @@ function EstablishmentsTab() {
                       <option value="pro_other">Прочее</option>
                     </select>
                   </th>
-                  <th className="px-4 py-3 text-left">Владелец</th>
-                  <th className="px-4 py-3 text-left">Email</th>
-                  <th className="px-4 py-3 text-center align-top">
+                  <th className="px-2 py-2.5 sm:px-3 text-left">Владелец</th>
+                  <th className="px-2 py-2.5 sm:px-3 text-left">Email</th>
+                  <th className="px-2 py-2.5 sm:px-3 text-center align-top">
                     <div className="mb-1.5">Сотр.</div>
                     <select
                       value={filterEmployees}
@@ -676,12 +676,12 @@ function EstablishmentsTab() {
                     </select>
                   </th>
                   <th
-                    className="px-4 py-3 text-left min-w-[9.5rem]"
+                    className="px-2 py-2.5 sm:px-3 text-left min-w-[8rem]"
                     title="Дата и время создания записи заведения в БД. Без промокода: 72 ч Pro с этого момента (см. pro_trial_ends_at)."
                   >
                     Регистрация
                   </th>
-                  <th className="px-4 py-3 text-left">IP регистрации</th>
+                  <th className="px-2 py-2.5 sm:px-3 text-left">IP регистрации</th>
                   <th
                     className="px-3 py-3 text-right w-[5.5rem] sticky right-0 z-20 bg-gray-900 border-l border-gray-800 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.45)]"
                     title="Действия — при узком окне колонка закреплена справа"
@@ -696,9 +696,11 @@ function EstablishmentsTab() {
                     key={row.id}
                     className={`group border-b border-gray-800/50 hover:bg-gray-800/30 transition ${i === filtered.length - 1 ? 'border-0' : ''}`}
                   >
-                    <td className="px-4 py-3 font-medium text-white">
+                    <td className="px-2 py-2.5 sm:px-3 font-medium text-white max-w-[11rem] sm:max-w-[14rem] min-w-0">
                       <div className="flex items-center gap-2 flex-wrap min-w-0">
-                        <span className="min-w-0">{row.name}</span>
+                        <span className="min-w-0 truncate" title={row.name}>
+                          {row.name}
+                        </span>
                         <button
                           type="button"
                           onClick={() => handleDelete(row)}
@@ -710,24 +712,30 @@ function EstablishmentsTab() {
                         </button>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs">
+                    <td className="px-2 py-2.5 sm:px-3 text-xs whitespace-nowrap">
                       <span className={establishmentTypeBadgeClass(row)}>
                         {establishmentTypeLabel(row)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 align-top text-gray-300">
+                    <td className="px-2 py-2.5 sm:px-3 align-top text-gray-300 min-w-0 w-[11rem]">
                       <SubscriptionBlock row={row} />
                     </td>
-                    <td className="px-4 py-3 text-gray-300">{row.owner_name}</td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">{row.owner_email}</td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-2 py-2.5 sm:px-3 text-gray-300 max-w-[10rem] sm:max-w-[12rem] truncate min-w-0" title={row.owner_name}>
+                      {row.owner_name}
+                    </td>
+                    <td className="px-2 py-2.5 sm:px-3 text-gray-400 text-xs max-w-[12rem] sm:max-w-[14rem] truncate min-w-0" title={row.owner_email}>
+                      {row.owner_email}
+                    </td>
+                    <td className="px-2 py-2.5 sm:px-3 text-center">
                       <span className="bg-gray-800 px-2 py-0.5 rounded text-xs font-mono">{row.employee_count}</span>
                     </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap" title={row.created_at}>
+                    <td className="px-2 py-2.5 sm:px-3 text-gray-500 text-xs whitespace-nowrap" title={row.created_at}>
                       {formatDateTime(row.created_at)}
                     </td>
-                    <td className="px-4 py-3 text-gray-400 text-xs font-mono">{regInfo(row)}</td>
-                    <td className="px-3 py-3 text-right sticky right-0 z-10 bg-gray-900 group-hover:bg-gray-800/30 border-l border-gray-800 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.45)]">
+                    <td className="px-2 py-2.5 sm:px-3 text-gray-400 text-xs font-mono max-w-[min(14rem,22vw)] truncate min-w-0" title={regInfo(row)}>
+                      {regInfo(row)}
+                    </td>
+                    <td className="px-2 py-2.5 sm:px-3 text-right sticky right-0 z-10 bg-gray-900 group-hover:bg-gray-800/30 border-l border-gray-800 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.45)]">
                       <button
                         type="button"
                         onClick={() => handleDelete(row)}
