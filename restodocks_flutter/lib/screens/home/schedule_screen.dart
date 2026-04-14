@@ -1959,13 +1959,32 @@ class _SchedulePdfExportDialogState extends State<_SchedulePdfExportDialog> {
         ),
         FilledButton(
           onPressed: () {
-            if (_selectedSlots.isEmpty) return;
-            if (_to.isBefore(_from)) return;
-            final days = _to.difference(_from).inDays + 1;
-            if (days > 31) return;
+            final loc = widget.loc;
+            void toast(String key) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(loc.t(key))),
+              );
+            }
+
+            if (_selectedSlots.isEmpty) {
+              toast('schedule_pdf_validation_employees');
+              return;
+            }
+            final fromDay =
+                DateTime(_from.year, _from.month, _from.day);
+            final toDay = DateTime(_to.year, _to.month, _to.day);
+            if (toDay.isBefore(fromDay)) {
+              toast('schedule_pdf_validation_date_order');
+              return;
+            }
+            final days = toDay.difference(fromDay).inDays + 1;
+            if (days > 31) {
+              toast('schedule_pdf_validation_range');
+              return;
+            }
             Navigator.of(context).pop((
-              from: _from,
-              to: _to,
+              from: fromDay,
+              to: toDay,
               slotIds: _selectedSlots.toList(),
               lang: _lang,
             ));
