@@ -70,33 +70,19 @@ class ExcelStyleTtkTable extends StatefulWidget {
     this.omitTableHeader = false,
   });
 
-  /// Сумма ширин колонок — как у [tableCore], иначе закреплённая шапка и тело расходятся.
-  static const double compositionTableWidth = 1105;
-  static const double compositionHeaderHeight = 56;
-
   /// Одна строка шапки состава (для закрепа над страницей; ширина как у таблицы).
   static Widget compositionPinnedHeader(LocalizationService loc) {
-    Widget h(String key) => SizedBox(
-          height: compositionHeaderHeight,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-            child: Center(
-              child: Text(
-                loc.t(key),
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-                softWrap: true,
-                maxLines: 4,
-                overflow: TextOverflow.clip,
-              ),
-            ),
+    Widget h(String key) => Container(
+          height: 44,
+          alignment: Alignment.center,
+          child: Text(
+            loc.t(key),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
           ),
         );
     return ConstrainedBox(
-      constraints: const BoxConstraints(
-        minWidth: compositionTableWidth,
-        maxWidth: compositionTableWidth,
-      ),
+      constraints: const BoxConstraints(minWidth: 1145, maxWidth: 1145),
       child: Table(
         border: TableBorder.all(color: Colors.black, width: 1),
         defaultVerticalAlignment: TableCellVerticalAlignment.middle,
@@ -302,22 +288,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     try {
       // Проверяем обязательные поля widget
       if (widget.loc == null) {
-        return Text(
-          LocalizationService().t('excel_ttk_err_loc_null'),
-          style: const TextStyle(color: Colors.red),
-        );
+        return const Text('LocalizationService is null', style: TextStyle(color: Colors.red));
       }
       if (widget.productStore == null) {
-        return Text(
-          widget.loc.t('excel_ttk_err_product_store_null'),
-          style: const TextStyle(color: Colors.red),
-        );
+        return const Text('ProductStore is null', style: TextStyle(color: Colors.red));
       }
       if (widget.onUpdate == null) {
-        return Text(
-          widget.loc.t('excel_ttk_err_on_update_null'),
-          style: const TextStyle(color: Colors.red),
-        );
+        return const Text('onUpdate callback is null', style: TextStyle(color: Colors.red));
       }
 
       // Отложенный билд: избегаем замирания при большом числе ингредиентов.
@@ -358,14 +335,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              widget.loc.t('excel_ttk_err_build'),
-              style: const TextStyle(color: Colors.red),
-            ),
-            Text(
-              widget.loc.t('excel_ttk_err_generic', args: {'error': '$e'}),
-              style: const TextStyle(color: Colors.red, fontSize: 10),
-            ),
+            const Text('Error in ExcelStyleTtkTable build', style: TextStyle(color: Colors.red)),
+            Text('Error: $e', style: const TextStyle(color: Colors.red, fontSize: 10)),
           ],
         ),
       );
@@ -376,10 +347,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
     try {
       // Проверяем данные
       if (widget.ingredients == null) {
-        return Text(
-          widget.loc.t('excel_ttk_err_ingredients_null'),
-          style: const TextStyle(color: Colors.red),
-        );
+        return const Text('Ingredients is null', style: TextStyle(color: Colors.red));
       }
 
       // Строки с сохранением индексов для onUpdate (индекс в widget.ingredients)
@@ -387,11 +355,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       for (var i = 0; i < widget.ingredients.length; i++) {
         var ing = widget.ingredients[i];
         if (ing == null) {
-          return Text(
-            widget.loc.t('excel_ttk_err_ingredient_at_index',
-                args: {'index': '$i'}),
-            style: const TextStyle(color: Colors.red),
-          );
+          return Text('Ingredient at index $i is null', style: const TextStyle(color: Colors.red));
         }
         if (ing.productName.isNotEmpty && ing.outputWeight == 0) {
           ing = ing.copyWith(outputWeight: ing.netWeight * (1 - (ing.cookingLossPctOverride ?? 0) / 100));
@@ -437,15 +401,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       });
     }
 
-    final mergedOverlayTop = widget.omitTableHeader
-        ? 0.0
-        : ExcelStyleTtkTable.compositionHeaderHeight;
+    final mergedOverlayTop = widget.omitTableHeader ? 0.0 : 44.0;
 
     final Widget tableCore = ConstrainedBox(
             constraints: const BoxConstraints(
-              minWidth: ExcelStyleTtkTable.compositionTableWidth,
-              maxWidth: ExcelStyleTtkTable.compositionTableWidth,
-            ), // сумма FixedColumnWidth — без лишних px, шапка/тело совпадают
+              minWidth: 1145,
+              maxWidth: 1145,
+            ), // фиксируем ширину, чтобы контейнер не раздувался под доступную ширину
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -631,10 +593,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // порций(шт) — рассчитывается: outputWeight * (weightPerPortion / totalOutput)
                     _buildReadOnlyCell(_portionsPerOne(totalOutput, ingredient)),
 
-                    // Порядок как в шапке: Цена (за кг), затем Стоимость
-                    _buildPricePerKgCell(ingredient),
-
+                    // Стоимость
                     _buildCostCell(ingredient),
+
+                    // Цена за кг
+                    _buildPricePerKgCell(ingredient),
 
                     // Кнопка удаления
                     _buildDeleteButton(rowIndex),
@@ -654,7 +617,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // % отхода
                   const SizedBox.shrink(), // Нетто
                   const SizedBox.shrink(), // Способ
-                  const SizedBox.shrink(), // % ужарки (итого не суммируем)
                   // Выход г. итого: редактируемый — при изменении масштабируются все ингредиенты в реальном времени
                   widget.canEdit && widget.onTotalOutputChanged != null && totalOutput > 0
                       ? _buildNumericCell(
@@ -678,13 +640,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                         )
                       : _buildTotalCell(widget.weightPerPortion == 0 ? '' : widget.weightPerPortion.toStringAsFixed(0)),
                   _buildTotalCell('1'), // порций(шт) в итого всегда 1
-                  // Как в шапке: колонка «Цена», затем «Стоимость»
+                  const SizedBox.shrink(), // Стоимость (пусто)
                   widget.isCook
-                      ? const SizedBox.shrink()
-                      : _buildTotalCell(
-                          '${NumberFormatUtils.formatInt(costPerKgFinishedProduct)} $_currencySymbol',
-                        ), // цена за кг готового продукта
-                  const SizedBox.shrink(), // суммовая стоимость в итого — не дублируем
+                      ? const SizedBox.shrink() // Скрываем стоимость для поваров
+                      : _buildTotalCell('${NumberFormatUtils.formatInt(costPerKgFinishedProduct)} $_currencySymbol'), // Стоимость за кг готового продукта
                   const SizedBox.shrink(), // Удаление
                 ],
               ),
@@ -821,14 +780,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              widget.loc.t('excel_ttk_err_table'),
-              style: const TextStyle(color: Colors.red),
-            ),
-            Text(
-              widget.loc.t('excel_ttk_err_generic', args: {'error': '$e'}),
-              style: const TextStyle(color: Colors.red, fontSize: 10),
-            ),
+            const Text('Error in TTK table', style: TextStyle(color: Colors.red)),
+            Text('Error: $e', style: const TextStyle(color: Colors.red, fontSize: 10)),
           ],
         ),
       );
@@ -838,19 +791,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   // Вспомогательные методы для создания ячеек
 
   Widget _buildHeaderCell(String text) {
-    return SizedBox(
-      height: ExcelStyleTtkTable.compositionHeaderHeight,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-        child: Center(
-          child: Text(
-            text,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-            softWrap: true,
-            maxLines: 4,
-            overflow: TextOverflow.clip,
-          ),
+    return Container(
+      height: 44,
+      child: Center(
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
         ),
       ),
     );
@@ -1004,11 +951,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       return Container(
         height: 44,
         color: Colors.red.shade100,
-        child: Center(
-          child: Text(
-            widget.loc.t('excel_ttk_err_product_cell'),
-            style: const TextStyle(color: Colors.red, fontSize: 10),
-          ),
+        child: const Center(
+          child: Text('Error in product cell', style: TextStyle(color: Colors.red, fontSize: 10)),
         ),
       );
     }
@@ -1155,11 +1099,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       return Container(
         height: 44,
         color: Colors.red.shade100,
-        child: Center(
-          child: Text(
-            widget.loc.t('excel_ttk_err_dropdown'),
-            style: const TextStyle(color: Colors.red, fontSize: 10),
-          ),
+        child: const Center(
+          child: Text('Error in dropdown', style: TextStyle(color: Colors.red, fontSize: 10)),
         ),
       );
     }
@@ -1613,36 +1554,30 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                       ),
                     ),
                     Expanded(
-                      child: ListView.builder(
-                        itemCount: filtered.length +
-                            (searchCtrl.text.trim().isNotEmpty ? 1 : 0),
-                        itemBuilder: (context, i) {
-                          final hasAddByName = searchCtrl.text.trim().isNotEmpty;
-                          if (hasAddByName && i == 0) {
-                            final name = searchCtrl.text.trim();
-                            return ListTile(
-                              leading:
-                                  const Icon(Icons.add_circle_outline, size: 20),
+                      child: ListView(
+                        children: [
+                          if (searchCtrl.text.trim().isNotEmpty)
+                            ListTile(
+                              leading: const Icon(Icons.add_circle_outline, size: 20),
                               title: Text(
-                                '${widget.loc.t('add')} "$name"',
-                                style: const TextStyle(
-                                    fontSize: 14, fontStyle: FontStyle.italic),
+                                '${widget.loc.t('add')} "${searchCtrl.text.trim()}"',
+                                style: const TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
                               ),
                               onTap: () => Navigator.of(ctx).pop(SelectableItem(
                                 type: 'add_by_name',
-                                item: name,
-                                displayName: name,
-                                searchName: name.toLowerCase(),
+                                item: searchCtrl.text.trim(),
+                                displayName: searchCtrl.text.trim(),
+                                searchName: searchCtrl.text.trim().toLowerCase(),
                               )),
+                            ),
+                          ...List.generate(filtered.length, (i) {
+                            final item = filtered[i];
+                            return ListTile(
+                              title: Text(item.displayName, style: const TextStyle(fontSize: 14)),
+                              onTap: () => Navigator.of(ctx).pop(item),
                             );
-                          }
-                          final item = filtered[i - (hasAddByName ? 1 : 0)];
-                          return ListTile(
-                            title: Text(item.displayName,
-                                style: const TextStyle(fontSize: 14)),
-                            onTap: () => Navigator.of(ctx).pop(item),
-                          );
-                        },
+                          }),
+                        ],
                       ),
                     ),
                     const Divider(height: 1),
