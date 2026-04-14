@@ -41,8 +41,6 @@ List<Widget> _promoScopeDetailWidgets(
   final headingStyle = textTheme.titleSmall?.copyWith(
     fontWeight: FontWeight.w600,
   );
-  final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
-
   final tierRaw = (p.grantsSubscriptionType ?? '').trim();
   final tierLabel = tierRaw.isNotEmpty
       ? _promoTierDisplayName(loc, tierRaw)
@@ -62,15 +60,13 @@ List<Widget> _promoScopeDetailWidgets(
   }
 
   out.add(Text(
-    isRu ? 'Уровень доступа: $tierLabel' : 'Access tier: $tierLabel',
+    loc.t('pro_promo_scope_tier_prefix', args: {'tier': tierLabel}),
     style: bodyStyle,
   ));
   out.add(const SizedBox(height: 8));
 
   out.add(Text(
-    isRu
-        ? 'Пакет сотрудников: ${hasEmployeePacks ? loc.t('answer_yes') : loc.t('answer_no')}'
-        : 'Employee pack: ${hasEmployeePacks ? 'yes' : 'no'}',
+    '${loc.t('employees')}: ${hasEmployeePacks ? loc.t('answer_yes') : loc.t('answer_no')}',
     style: bodyStyle,
   ));
   out.add(const SizedBox(height: 8));
@@ -88,9 +84,7 @@ List<Widget> _promoScopeDetailWidgets(
     out.add(const SizedBox(height: 8));
   }
   out.add(Text(
-    isRu
-        ? 'Пакет заведений: ${hasBranchPacks ? loc.t('answer_yes') : loc.t('answer_no')}'
-        : 'Establishment pack: ${hasBranchPacks ? 'yes' : 'no'}',
+    '${loc.t('establishments')}: ${hasBranchPacks ? loc.t('answer_yes') : loc.t('answer_no')}',
     style: bodyStyle,
   ));
   out.add(const SizedBox(height: 8));

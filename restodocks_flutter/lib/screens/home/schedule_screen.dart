@@ -753,14 +753,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     if (days.isEmpty) return;
     if (days.length > 31) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Диапазон экспорта: не более 1 месяца.')),
+        SnackBar(content: Text(loc.t('schedule_pdf_validation_range'))),
       );
       return;
     }
     final selectedSlots = _model.slots.where((s) => slotIds.contains(s.id)).toList();
     if (selectedSlots.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Выберите хотя бы одного сотрудника.')),
+        SnackBar(content: Text(loc.t('schedule_pdf_validation_employees'))),
       );
       return;
     }
@@ -876,7 +876,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка экспорта PDF: $e')),
+        SnackBar(content: Text('${widget.loc.t('expenses_orders_export_error')}: $e')),
       );
     }
   }
@@ -893,14 +893,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     if (days.isEmpty) return;
     if (days.length > 31) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Диапазон экспорта: не более 1 месяца.')),
+        SnackBar(content: Text(loc.t('schedule_pdf_validation_range'))),
       );
       return;
     }
     final selectedSlots = _model.slots.where((s) => slotIds.contains(s.id)).toList();
     if (selectedSlots.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Выберите хотя бы одного сотрудника.')),
+        SnackBar(content: Text(loc.t('schedule_pdf_validation_employees'))),
       );
       return;
     }
@@ -971,7 +971,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка экспорта Excel: $e')),
+        SnackBar(content: Text('${widget.loc.t('expenses_orders_export_error')}: $e')),
       );
     }
   }
@@ -1982,8 +1982,9 @@ class _ScheduleExportDialogState extends State<_ScheduleExportDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = widget.loc;
     return AlertDialog(
-      title: const Text('Экспорт графика'),
+      title: Text(loc.t('schedule_export_dialog_title')),
       content: SizedBox(
         width: 500,
         child: SingleChildScrollView(
@@ -1994,7 +1995,7 @@ class _ScheduleExportDialogState extends State<_ScheduleExportDialog> {
                 children: [
                   Expanded(
                     child: _DatePickerButton(
-                      label: 'С',
+                      label: loc.t('schedule_export_from_label'),
                       selectedDate: _from,
                       dates: widget.dates,
                       initialDate: _from,
@@ -2004,7 +2005,7 @@ class _ScheduleExportDialogState extends State<_ScheduleExportDialog> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: _DatePickerButton(
-                      label: 'По',
+                      label: loc.t('schedule_export_to_label'),
                       selectedDate: _to,
                       dates: widget.dates,
                       initialDate: _to,
@@ -2016,13 +2017,16 @@ class _ScheduleExportDialogState extends State<_ScheduleExportDialog> {
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 value: _format,
-                decoration: const InputDecoration(
-                  labelText: 'Формат',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: loc.t('schedule_export_format_label'),
+                  border: const OutlineInputBorder(),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'pdf', child: Text('PDF')),
-                  DropdownMenuItem(value: 'excel', child: Text('Excel (.xlsx)')),
+                items: [
+                  DropdownMenuItem(
+                      value: 'pdf', child: Text(loc.t('schedule_export_format_pdf'))),
+                  DropdownMenuItem(
+                      value: 'excel',
+                      child: Text(loc.t('schedule_export_format_excel'))),
                 ],
                 onChanged: (v) {
                   if (v != null) setState(() => _format = v);
@@ -2031,9 +2035,9 @@ class _ScheduleExportDialogState extends State<_ScheduleExportDialog> {
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 value: _lang,
-                decoration: const InputDecoration(
-                  labelText: 'Язык',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: loc.t('schedule_export_language_label'),
+                  border: const OutlineInputBorder(),
                 ),
                 items: LocalizationService.productLanguageCodes
                     .map((code) => DropdownMenuItem(
@@ -2046,7 +2050,7 @@ class _ScheduleExportDialogState extends State<_ScheduleExportDialog> {
                 },
               ),
               const SizedBox(height: 10),
-              const Text('Сотрудники'),
+              Text(loc.t('schedule_export_employees_label')),
               const SizedBox(height: 6),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2058,7 +2062,7 @@ class _ScheduleExportDialogState extends State<_ScheduleExportDialog> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'Изначально выбраны все сотрудники. Нажмите на имя, чтобы исключить сотрудника из файла.',
+                      loc.t('schedule_export_selection_hint'),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),

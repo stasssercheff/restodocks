@@ -1642,12 +1642,12 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
             IconButton(
               icon: const Icon(Icons.file_download_outlined),
               onPressed: () => _showNomenclatureExcelExportDialog(loc),
-              tooltip: 'Выгрузка номенклатуры в Excel',
+              tooltip: loc.t('nomenclature_excel_export_title'),
             ),
             IconButton(
               icon: const Icon(Icons.file_upload_outlined),
               onPressed: () => _importNomenclatureExcel(loc),
-              tooltip: 'Импорт номенклатуры из Excel',
+              tooltip: loc.t('nomenclature_excel_import_tooltip'),
             ),
             IconButton(
               icon: const Icon(Icons.warning),
@@ -2209,7 +2209,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocalState) => AlertDialog(
-          title: const Text('Выгрузка номенклатуры в Excel'),
+          title: Text(loc.t('nomenclature_excel_export_title')),
           content: DropdownButtonFormField<String>(
             value: selected,
             items: options
@@ -2222,8 +2222,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               if (value == null) return;
               setLocalState(() => selected = value);
             },
-            decoration: const InputDecoration(
-              labelText: 'Язык названий в файле',
+            decoration: InputDecoration(
+              labelText: loc.t('nomenclature_excel_export_language_label'),
             ),
           ),
           actions: [
@@ -2233,7 +2233,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(selected),
-              child: const Text('Выгрузить'),
+              child: Text(loc.t('nomenclature_excel_export_action')),
             ),
           ],
         ),
@@ -2262,7 +2262,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (products.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Номенклатура пустая')),
+        SnackBar(content: Text(loc.t('nomenclature_empty'))),
       );
       return;
     }

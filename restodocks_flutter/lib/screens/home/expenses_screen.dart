@@ -51,10 +51,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       if (ent.effectiveTier == AppSubscriptionTier.pro ||
           ent.effectiveTier == AppSubscriptionTier.ultra)
         _ExpensesTab.productOrders,
-      if (ent.effectiveTier == AppSubscriptionTier.ultra) ...[
+      if (ent.effectiveTier == AppSubscriptionTier.pro ||
+          ent.effectiveTier == AppSubscriptionTier.ultra)
         _ExpensesTab.writeoffs,
+      if (ent.effectiveTier == AppSubscriptionTier.ultra)
         _ExpensesTab.procurementReceipts,
-      ],
     ];
     final selectedTab =
         tabs.contains(_selectedTab) ? _selectedTab : _ExpensesTab.fzp;
@@ -580,8 +581,8 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
       if (e.toString().contains('TRIAL_DEVICE_SAVE_CAP')) {
         scaffoldMessenger.showSnackBar(
-          const SnackBar(
-            content: Text('В триале можно сохранить не более 3 файлов этого типа'),
+          SnackBar(
+            content: Text(loc.t('trial_inventory_export_cap')),
           ),
         );
         return;
@@ -1246,8 +1247,8 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
       if (e.toString().contains('TRIAL_DEVICE_SAVE_CAP')) {
         scaffoldMessenger.showSnackBar(
-          const SnackBar(
-            content: Text('В триале можно сохранить не более 3 файлов этого типа'),
+          SnackBar(
+            content: Text(loc.t('trial_inventory_export_cap')),
           ),
         );
         return;

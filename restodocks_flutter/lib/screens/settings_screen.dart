@@ -1896,18 +1896,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               builder: (context, snapshot) {
                 final rows = snapshot.data ?? const [];
                 if (rows.isEmpty) {
-                  return const ListTile(
+                  return ListTile(
                     dense: true,
-                    leading: SizedBox(width: 24),
+                    leading: const SizedBox(width: 24),
                     title: Text(
-                      'Журнал техподдержки пуст',
-                      style: TextStyle(fontSize: 12),
+                      loc.t('support_access_audit_empty'),
+                      style: const TextStyle(fontSize: 12),
                     ),
                   );
                 }
                 return ExpansionTile(
                   leading: const SizedBox(width: 24),
-                  title: const Text('Журнал входов техподдержки'),
+                  title: Text(loc.t('support_access_audit_title')),
                   children: rows.map((row) {
                     return ListTile(
                       dense: true,

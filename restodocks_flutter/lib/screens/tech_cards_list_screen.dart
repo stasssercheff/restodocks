@@ -3461,7 +3461,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                       (loc.t('voice_input_unavailable')
                                                   .trim()
                                                   .isEmpty)
-                                          ? 'Голосовой ввод недоступен.'
+                                          ? loc.t('voice_input_unavailable')
                                           : loc.t('voice_input_unavailable');
                                 });
                                 return;
@@ -3475,10 +3475,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       label: Text(
                         sttBusy
                             ? (loc.t('speech_listening').trim().isEmpty
-                                ? 'Идёт запись. Нажмите ещё раз, чтобы остановить.'
+                                ? loc.t('speech_listening')
                                 : loc.t('speech_listening'))
                             : (loc.t('voice_input').trim().isEmpty
-                                ? 'Голосом'
+                                ? loc.t('voice_input')
                                 : loc.t('voice_input')),
                       ),
                     ),

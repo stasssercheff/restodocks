@@ -4327,7 +4327,7 @@ class _PasteTextDialogState extends State<_PasteTextDialog> {
       if (!supported) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Голосовой ввод не поддерживается в этом браузере')),
+          SnackBar(content: Text(loc.t('voice_input_unavailable_browser_hint'))),
         );
         return;
       }
@@ -4337,7 +4337,7 @@ class _PasteTextDialogState extends State<_PasteTextDialog> {
       if (!mounted) return;
       if (text == null || text.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Речь не распознана')),
+          SnackBar(content: Text(loc.t('speech_not_recognized'))),
         );
         return;
       }
@@ -4447,7 +4447,9 @@ class _PasteTextDialogState extends State<_PasteTextDialog> {
                     TextButton.icon(
                       onPressed: _speechBusy ? null : () => _insertVoiceText(loc),
                       icon: Icon(_speechBusy ? Icons.mic : Icons.mic_none),
-                      label: Text(_speechBusy ? 'Слушаю...' : 'Голосом'),
+                      label: Text(
+                        _speechBusy ? loc.t('speech_listening') : loc.t('voice_input'),
+                      ),
                     ),
                   ],
                 ),
@@ -4507,7 +4509,7 @@ class _InventoryPasteDialogState extends State<_InventoryPasteDialog> {
       if (!supported) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Голосовой ввод не поддерживается в этом браузере')),
+          SnackBar(content: Text(loc.t('voice_input_unavailable_browser_hint'))),
         );
         return;
       }
@@ -4517,7 +4519,7 @@ class _InventoryPasteDialogState extends State<_InventoryPasteDialog> {
       if (!mounted) return;
       if (text == null || text.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Речь не распознана')),
+          SnackBar(content: Text(loc.t('speech_not_recognized'))),
         );
         return;
       }
@@ -4594,7 +4596,9 @@ class _InventoryPasteDialogState extends State<_InventoryPasteDialog> {
                     TextButton.icon(
                       onPressed: _speechBusy ? null : () => _insertVoiceText(loc),
                       icon: Icon(_speechBusy ? Icons.mic : Icons.mic_none),
-                      label: Text(_speechBusy ? 'Слушаю...' : 'Голосом'),
+                      label: Text(
+                        _speechBusy ? loc.t('speech_listening') : loc.t('voice_input'),
+                      ),
                     ),
                   ],
                 ),
