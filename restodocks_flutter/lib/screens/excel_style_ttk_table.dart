@@ -437,7 +437,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       });
     }
 
-    final mergedOverlayTop = widget.omitTableHeader ? 0.0 : 44.0;
+    final mergedOverlayTop = widget.omitTableHeader
+        ? 0.0
+        : ExcelStyleTtkTable.compositionHeaderHeight;
 
     final Widget tableCore = ConstrainedBox(
             constraints: const BoxConstraints(
@@ -1611,30 +1613,36 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
                       ),
                     ),
                     Expanded(
-                      child: ListView(
-                        children: [
-                          if (searchCtrl.text.trim().isNotEmpty)
-                            ListTile(
-                              leading: const Icon(Icons.add_circle_outline, size: 20),
+                      child: ListView.builder(
+                        itemCount: filtered.length +
+                            (searchCtrl.text.trim().isNotEmpty ? 1 : 0),
+                        itemBuilder: (context, i) {
+                          final hasAddByName = searchCtrl.text.trim().isNotEmpty;
+                          if (hasAddByName && i == 0) {
+                            final name = searchCtrl.text.trim();
+                            return ListTile(
+                              leading:
+                                  const Icon(Icons.add_circle_outline, size: 20),
                               title: Text(
-                                '${widget.loc.t('add')} "${searchCtrl.text.trim()}"',
-                                style: const TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
+                                '${widget.loc.t('add')} "$name"',
+                                style: const TextStyle(
+                                    fontSize: 14, fontStyle: FontStyle.italic),
                               ),
                               onTap: () => Navigator.of(ctx).pop(SelectableItem(
                                 type: 'add_by_name',
-                                item: searchCtrl.text.trim(),
-                                displayName: searchCtrl.text.trim(),
-                                searchName: searchCtrl.text.trim().toLowerCase(),
+                                item: name,
+                                displayName: name,
+                                searchName: name.toLowerCase(),
                               )),
-                            ),
-                          ...List.generate(filtered.length, (i) {
-                            final item = filtered[i];
-                            return ListTile(
-                              title: Text(item.displayName, style: const TextStyle(fontSize: 14)),
-                              onTap: () => Navigator.of(ctx).pop(item),
                             );
-                          }),
-                        ],
+                          }
+                          final item = filtered[i - (hasAddByName ? 1 : 0)];
+                          return ListTile(
+                            title: Text(item.displayName,
+                                style: const TextStyle(fontSize: 14)),
+                            onTap: () => Navigator.of(ctx).pop(item),
+                          );
+                        },
                       ),
                     ),
                     const Divider(height: 1),
