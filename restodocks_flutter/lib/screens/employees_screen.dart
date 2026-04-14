@@ -22,8 +22,9 @@ const int _desktopEmployeeHeaderRateFlex = 2;
 const int _desktopEmployeeRowPositionFlex = 1;
 const int _desktopEmployeeRowRateFlex = 3;
 const double _desktopEmployeeRateRowLeftInset = 66;
-const double _desktopEmployeeDeptRowLeftShift = -6;
-const double _desktopEmployeePositionRowLeftShift = 3;
+const double _desktopEmployeeDeptRowLeftShift = 0;
+const double _desktopEmployeePositionHeaderLeftShift = -6;
+const double _desktopEmployeePositionRowLeftShift = -18;
 
 /// Список сотрудников. Владелец видит всех; остальные — по своему отделу. Редактирование для шефа/владельца. Добавление — только личная регистрация по PIN.
 class EmployeesScreen extends StatefulWidget {
@@ -396,7 +397,10 @@ class _EmployeeTableHeader extends StatelessWidget {
           const SizedBox(width: _desktopEmployeeColumnGap),
           Expanded(
             flex: _desktopEmployeeHeaderPositionFlex,
-            child: Text(loc.t('position') ?? 'Должность', style: style),
+            child: Transform.translate(
+              offset: const Offset(_desktopEmployeePositionHeaderLeftShift, 0),
+              child: Text(loc.t('position') ?? 'Должность', style: style),
+            ),
           ),
           const SizedBox(width: _desktopEmployeeColumnGap),
           Expanded(
@@ -543,16 +547,30 @@ class _EmployeeCard extends StatelessWidget {
               // Ставка (без иконки на ПК — экономит ширину и убирает overflow)
               Expanded(
                 flex: _desktopEmployeeRowRateFlex,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: _desktopEmployeeRateRowLeftInset),
-                  child: Text(
-                    rateStr,
-                    style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.left,
-                  ),
-                ),
+                child: rateStr == '—'
+                    ? Align(
+                        alignment: Alignment.center,
+                        child: Transform.translate(
+                          offset: const Offset(-4, 0),
+                          child: Text(
+                            rateStr,
+                            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.only(left: _desktopEmployeeRateRowLeftInset),
+                        child: Text(
+                          rateStr,
+                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.left,
+                        ),
+                      ),
               ),
               // Кнопки редактирования
               if (canEdit) ...[
