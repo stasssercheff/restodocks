@@ -2346,7 +2346,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       final isDisabled = rawDis == true || rawDis == 1;
       final grantType = m['grants_subscription_type']?.toString().trim();
       final estTierFallback = _establishment?.subscriptionType?.trim();
-      final resolvedGrantType = (grantType != null && grantType.isNotEmpty)
+      String? resolvedGrantType = (grantType != null && grantType.isNotEmpty)
           ? grantType
           : (estTierFallback != null && estTierFallback.isNotEmpty
               ? estTierFallback
@@ -2397,6 +2397,52 @@ class AccountManagerSupabase extends ChangeNotifier {
           if (rows is List && rows.isNotEmpty) {
             final row = Map<String, dynamic>.from(rows.first as Map);
             branchPacks = _parseRpcInt(row['branch_slot_packs']);
+          }
+        } catch (_) {}
+      }
+
+      // Последний фолбэк: читаем шаблон промокода из redemption->promo_codes
+      // для проектов, где RPC ещё старого формата.
+      if ((resolvedGrantType == null || empPacks <= 0 || branchPacks <= 0) &&
+          code != null &&
+          code.trim().isNotEmpty) {
+        try {
+          final rows = await _supabase.client
+              .from('promo_code_redemptions')
+              .select(
+                'promo_codes!inner(grants_subscription_type,grants_employee_slot_packs,grants_branch_slot_packs)',
+              )
+              .eq('establishment_id', est.id)
+              .order('redeemed_at', ascending: false)
+              .limit(1);
+          if (rows is List && rows.isNotEmpty) {
+            final row = Map<String, dynamic>.from(rows.first as Map);
+            final nested = row['promo_codes'];
+            Map<String, dynamic>? promoCode;
+            if (nested is Map) {
+              promoCode = Map<String, dynamic>.from(nested);
+            } else if (nested is List &&
+                nested.isNotEmpty &&
+                nested.first is Map) {
+              promoCode = Map<String, dynamic>.from(nested.first as Map);
+            }
+            if (promoCode != null) {
+              final nestedTier =
+                  promoCode['grants_subscription_type']?.toString().trim();
+              if (resolvedGrantType == null &&
+                  nestedTier != null &&
+                  nestedTier.isNotEmpty) {
+                resolvedGrantType = nestedTier;
+              }
+              if (empPacks <= 0) {
+                empPacks =
+                    _parseRpcInt(promoCode['grants_employee_slot_packs']);
+              }
+              if (branchPacks <= 0) {
+                branchPacks =
+                    _parseRpcInt(promoCode['grants_branch_slot_packs']);
+              }
+            }
           }
         } catch (_) {}
       }
