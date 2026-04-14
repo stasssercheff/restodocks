@@ -380,6 +380,13 @@ class AccountManagerSupabase extends ChangeNotifier {
       if (v == null) return 0;
       if (v is int) return v >= 0 ? v : 0;
       if (v is double) return v.toInt() >= 0 ? v.toInt() : 0;
+      if (v is Map) {
+        final m = Map<String, dynamic>.from(v as Map);
+        final candidate =
+            m['value'] ?? m['config_value'] ?? m['max_establishments_per_owner'];
+        final n = int.tryParse('${candidate ?? ''}');
+        return (n != null && n >= 0) ? n : 0;
+      }
       final n = int.tryParse(v.toString());
       return (n != null && n >= 0) ? n : 0;
     }
@@ -436,6 +443,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       }
       if (hasPaidAccess) {
         final paidCap = branchPacks >= 2 ? branchPacks : 2;
+        if (globalCap <= 0) return paidCap;
         return paidCap < globalCap ? paidCap : globalCap;
       }
       return 0;
