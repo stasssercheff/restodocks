@@ -3295,30 +3295,51 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     } catch (_) {
       sttSupported = false;
     }
+    var voiceInlineHint = '';
+    if (!sttSupported) {
+      final h = loc.t('voice_input_unavailable_browser_hint').trim();
+      voiceInlineHint =
+          h.isEmpty ? loc.t('voice_input_unavailable') : h;
+    }
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocalState) => AlertDialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        builder: (ctx, setLocalState) {
+          final mq = MediaQuery.of(ctx);
+          final screenH = mq.size.height;
+          final kb = mq.viewInsets.bottom;
+          final safePad = mq.padding.vertical;
+          // Заголовок + actions + отступы диалога (примерно)
+          const dialogChrome = 176.0;
+          // Доступная высота тела диалога над клавиатурой
+          final maxBody = (screenH - kb - safePad - dialogChrome)
+              .clamp(160.0, screenH * 0.92);
+          final extrasBelowField = 8.0 +
+              (voiceInlineHint.isNotEmpty ? 120.0 : 0.0) +
+              52.0; // кнопка «Голосом» + отступы
+          final fieldHeight = (maxBody - extrasBelowField).clamp(72.0, 520.0);
+          return AlertDialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           title: Text(loc.t('ttk_import_text') ?? 'Вставить из текста'),
           content: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: 420,
-              maxHeight: MediaQuery.of(ctx).size.height * 0.62,
+              maxHeight: maxBody,
             ),
             child: SingleChildScrollView(
-              padding:
-                  EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+              keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   SizedBox(
-                    height: 215,
+                    height: fieldHeight,
                     child: TextField(
                       controller: controller,
                       maxLines: null,
                       expands: true,
-                      scrollPadding: const EdgeInsets.only(bottom: 180),
+                      scrollPadding: EdgeInsets.only(bottom: kb + 32),
                       textInputAction: TextInputAction.newline,
                       decoration: InputDecoration(
                         hintText:
@@ -3335,50 +3356,57 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                               if (sttBusy) {
                                 final spoken = await speechToTextStop();
                                 if (!ctx.mounted) return;
-                                setLocalState(() => sttBusy = false);
-                                if (spoken != null && spoken.trim().isNotEmpty) {
+                                setLocalState(() {
+                                  sttBusy = false;
+                                  if (spoken != null &&
+                                      spoken.trim().isNotEmpty) {
+                                    voiceInlineHint = '';
+                                  } else {
+                                    voiceInlineHint =
+                                        (loc.t('speech_not_recognized')
+                                                    .trim()
+                                                    .isEmpty)
+                                            ? 'Речь не распознана'
+                                            : loc.t('speech_not_recognized');
+                                  }
+                                });
+                                if (spoken != null &&
+                                    spoken.trim().isNotEmpty) {
                                   final current = controller.text.trim();
                                   controller.text = current.isEmpty
                                       ? spoken.trim()
                                       : '$current\n${spoken.trim()}';
-                                } else {
-                                  ScaffoldMessenger.of(ctx).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        (loc.t('speech_not_recognized').trim().isEmpty)
-                                            ? 'Речь не распознана'
-                                            : loc.t('speech_not_recognized'),
-                                      ),
-                                    ),
-                                  );
                                 }
                                 return;
                               }
                               if (!sttSupported) {
-                                ScaffoldMessenger.of(ctx).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Голосовой ввод недоступен в этом браузере. Попробуйте IPA или другой браузер.',
-                                    ),
-                                  ),
-                                );
+                                setLocalState(() {
+                                  voiceInlineHint =
+                                      (loc.t('voice_input_unavailable_browser_hint')
+                                                  .trim()
+                                                  .isEmpty)
+                                          ? loc.t('voice_input_unavailable')
+                                          : loc.t(
+                                              'voice_input_unavailable_browser_hint',
+                                            );
+                                });
                                 return;
                               }
+                              setLocalState(() => voiceInlineHint = '');
                               final started = await speechToTextStart(
                                 languageCode: loc.currentLanguageCode,
                                 timeout: const Duration(seconds: 18),
                               );
                               if (!ctx.mounted) return;
                               if (!started) {
-                                ScaffoldMessenger.of(ctx).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      (loc.t('voice_input_unavailable').trim().isEmpty)
+                                setLocalState(() {
+                                  voiceInlineHint =
+                                      (loc.t('voice_input_unavailable')
+                                                  .trim()
+                                                  .isEmpty)
                                           ? 'Голосовой ввод недоступен.'
-                                          : loc.t('voice_input_unavailable'),
-                                    ),
-                                  ),
-                                );
+                                          : loc.t('voice_input_unavailable');
+                                });
                                 return;
                               }
                               setLocalState(() => sttBusy = true);
@@ -3395,6 +3423,46 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       ),
                     ),
                   ),
+                  if (voiceInlineHint.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Material(
+                      color: Theme.of(ctx).colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              size: 20,
+                              color: Theme.of(ctx)
+                                  .colorScheme
+                                  .onErrorContainer,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                voiceInlineHint,
+                                style: Theme.of(ctx)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: Theme.of(ctx)
+                                          .colorScheme
+                                          .onErrorContainer,
+                                      height: 1.35,
+                                    ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -3423,7 +3491,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
             ),
           ],
-        ),
+        );
+        },
       ),
     );
     controller.dispose();
