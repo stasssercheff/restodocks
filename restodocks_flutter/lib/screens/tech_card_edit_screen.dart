@@ -5484,12 +5484,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                             controller: _compositionTableHScrollController,
                             scrollDirection: Axis.horizontal,
                             clipBehavior: Clip.hardEdge,
-                            child: InteractiveViewer(
-                              panEnabled: false,
-                              scaleEnabled: true,
-                              minScale: 0.75,
-                              maxScale: 2.2,
-                              child: effectiveCanEdit
+                            // Без InteractiveViewer: pinch/scale-жест перехватывал касания и
+                            // ломал горизонтальный скролл таблицы и вертикальный скролл страницы (iOS Safari / web).
+                            physics: const BouncingScrollPhysics(
+                              parent: AlwaysScrollableScrollPhysics(),
+                            ),
+                            child: effectiveCanEdit
                                   ? RepaintBoundary(
                                       child: ExcelStyleTtkTable(
                                         loc: loc,
@@ -5625,7 +5625,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                         );
                                       },
                                     ),
-                            ),
                           ),
                         ),
                       ),
