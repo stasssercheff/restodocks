@@ -909,6 +909,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// Только для горизонтального скролла таблицы состава — иначе [Scrollbar] цепляется к вложенному вертикальному [SingleChildScrollView] и рисуется «по центру».
   final ScrollController _compositionTableHScrollController =
       ScrollController();
+  final Map<int, Offset> _compositionTablePointerPositions = {};
 
   /// Время последнего пользовательского взаимодействия (ввод/тап в таблице).
   /// Используется, чтобы не запускать тяжёлый reconcile в момент, когда пользователь
@@ -921,6 +922,53 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// Для web автосохранение черновика (localStorage + jsonEncode) может быть тяжёлым,
   /// поэтому откладываем сохранение до "паузы" после ввода, чтобы не фризить UI.
   Timer? _draftSaveIdleDebounceTimer;
+
+  void _handleCompositionTablePointerMove(
+      PointerMoveEvent event, BuildContext context) {
+    final previous = _compositionTablePointerPositions[event.pointer];
+    _compositionTablePointerPositions[event.pointer] = event.position;
+    if (previous == null) return;
+    final delta = event.position - previous;
+    if (delta == Offset.zero) return;
+
+    if (_compositionTableHScrollController.hasClients) {
+      final p = _compositionTableHScrollController.position;
+      final next = (p.pixels - delta.dx).clamp(p.minScrollExtent, p.maxScrollExtent);
+      if (next != p.pixels) {
+        _compositionTableHScrollController.jumpTo(next);
+      }
+    }
+
+    final v = PrimaryScrollController.maybeOf(context);
+    if (v != null && v.hasClients) {
+      final p = v.position;
+      final next = (p.pixels - delta.dy).clamp(p.minScrollExtent, p.maxScrollExtent);
+      if (next != p.pixels) {
+        v.jumpTo(next);
+      }
+    }
+  }
+
+  void _scrollCompositionTableByDelta(Offset delta, BuildContext context) {
+    if (delta == Offset.zero) return;
+
+    if (_compositionTableHScrollController.hasClients) {
+      final p = _compositionTableHScrollController.position;
+      final next = (p.pixels - delta.dx).clamp(p.minScrollExtent, p.maxScrollExtent);
+      if (next != p.pixels) {
+        _compositionTableHScrollController.jumpTo(next);
+      }
+    }
+
+    final v = PrimaryScrollController.maybeOf(context);
+    if (v != null && v.hasClients) {
+      final p = v.position;
+      final next = (p.pixels - delta.dy).clamp(p.minScrollExtent, p.maxScrollExtent);
+      if (next != p.pixels) {
+        v.jumpTo(next);
+      }
+    }
+  }
 
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
 
@@ -5489,7 +5537,36 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                             physics: const BouncingScrollPhysics(
                               parent: AlwaysScrollableScrollPhysics(),
                             ),
-                            child: effectiveCanEdit
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.translucent,
+                              onPanUpdate: (details) {
+                                if (!kIsWeb || MediaQuery.of(context).size.width > 900) {
+                                  return;
+                                }
+                                _scrollCompositionTableByDelta(details.delta, context);
+                              },
+                              child: Listener(
+                                behavior: HitTestBehavior.translucent,
+                                onPointerDown: (event) {
+                                  _compositionTablePointerPositions[event.pointer] =
+                                      event.position;
+                                },
+                                onPointerMove: (event) {
+                                  // Mobile web: интерактивные ячейки таблицы перехватывают drag.
+                                  // Через raw pointer прокручиваем и страницу, и горизонталь таблицы
+                                  // с любой области, не ломая tap/ввод в полях.
+                                  if (!kIsWeb || MediaQuery.of(context).size.width > 900) {
+                                    return;
+                                  }
+                                  _handleCompositionTablePointerMove(event, context);
+                                },
+                                onPointerUp: (event) {
+                                  _compositionTablePointerPositions.remove(event.pointer);
+                                },
+                                onPointerCancel: (event) {
+                                  _compositionTablePointerPositions.remove(event.pointer);
+                                },
+                                child: effectiveCanEdit
                                   ? RepaintBoundary(
                                       child: ExcelStyleTtkTable(
                                         loc: loc,
@@ -5625,6 +5702,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                         );
                                       },
                                     ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
