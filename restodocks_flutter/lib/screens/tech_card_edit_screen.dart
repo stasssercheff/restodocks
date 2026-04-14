@@ -909,7 +909,9 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// Только для горизонтального скролла таблицы состава — иначе [Scrollbar] цепляется к вложенному вертикальному [SingleChildScrollView] и рисуется «по центру».
   final ScrollController _compositionTableHScrollController =
       ScrollController();
-  final Map<int, Offset> _compositionTablePointerPositions = {};
+  final Map<int, Offset> _compositionTablePointerStart = {};
+  final Map<int, Offset> _compositionTablePointerLast = {};
+  final Set<int> _compositionTableDragActivePointers = <int>{};
 
   /// Время последнего пользовательского взаимодействия (ввод/тап в таблице).
   /// Используется, чтобы не запускать тяжёлый reconcile в момент, когда пользователь
@@ -922,32 +924,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
   /// Для web автосохранение черновика (localStorage + jsonEncode) может быть тяжёлым,
   /// поэтому откладываем сохранение до "паузы" после ввода, чтобы не фризить UI.
   Timer? _draftSaveIdleDebounceTimer;
-
-  void _handleCompositionTablePointerMove(
-      PointerMoveEvent event, BuildContext context) {
-    final previous = _compositionTablePointerPositions[event.pointer];
-    _compositionTablePointerPositions[event.pointer] = event.position;
-    if (previous == null) return;
-    final delta = event.position - previous;
-    if (delta == Offset.zero) return;
-
-    if (_compositionTableHScrollController.hasClients) {
-      final p = _compositionTableHScrollController.position;
-      final next = (p.pixels - delta.dx).clamp(p.minScrollExtent, p.maxScrollExtent);
-      if (next != p.pixels) {
-        _compositionTableHScrollController.jumpTo(next);
-      }
-    }
-
-    final v = PrimaryScrollController.maybeOf(context);
-    if (v != null && v.hasClients) {
-      final p = v.position;
-      final next = (p.pixels - delta.dy).clamp(p.minScrollExtent, p.maxScrollExtent);
-      if (next != p.pixels) {
-        v.jumpTo(next);
-      }
-    }
-  }
 
   void _scrollCompositionTableByDelta(Offset delta, BuildContext context) {
     if (delta == Offset.zero) return;
@@ -968,6 +944,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         v.jumpTo(next);
       }
     }
+  }
+
+  void _clearCompositionPointerState(int pointer) {
+    _compositionTablePointerStart.remove(pointer);
+    _compositionTablePointerLast.remove(pointer);
+    _compositionTableDragActivePointers.remove(pointer);
   }
 
   bool get _isNew => widget.techCardId.isEmpty || widget.techCardId == 'new';
@@ -5537,36 +5519,45 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                             physics: const BouncingScrollPhysics(
                               parent: AlwaysScrollableScrollPhysics(),
                             ),
-                            child: GestureDetector(
+                            child: Listener(
                               behavior: HitTestBehavior.translucent,
-                              onPanUpdate: (details) {
+                              onPointerDown: (event) {
                                 if (!kIsWeb || MediaQuery.of(context).size.width > 900) {
                                   return;
                                 }
-                                _scrollCompositionTableByDelta(details.delta, context);
+                                _compositionTablePointerStart[event.pointer] = event.position;
+                                _compositionTablePointerLast[event.pointer] = event.position;
                               },
-                              child: Listener(
-                                behavior: HitTestBehavior.translucent,
-                                onPointerDown: (event) {
-                                  _compositionTablePointerPositions[event.pointer] =
-                                      event.position;
-                                },
-                                onPointerMove: (event) {
-                                  // Mobile web: интерактивные ячейки таблицы перехватывают drag.
-                                  // Через raw pointer прокручиваем и страницу, и горизонталь таблицы
-                                  // с любой области, не ломая tap/ввод в полях.
-                                  if (!kIsWeb || MediaQuery.of(context).size.width > 900) {
-                                    return;
-                                  }
-                                  _handleCompositionTablePointerMove(event, context);
-                                },
-                                onPointerUp: (event) {
-                                  _compositionTablePointerPositions.remove(event.pointer);
-                                },
-                                onPointerCancel: (event) {
-                                  _compositionTablePointerPositions.remove(event.pointer);
-                                },
-                                child: effectiveCanEdit
+                              onPointerMove: (event) {
+                                // Mobile web: запускаем ручной скролл только после явного свайпа.
+                                // Обычный tap (для ввода/редактирования) не перехватываем.
+                                if (!kIsWeb || MediaQuery.of(context).size.width > 900) {
+                                  return;
+                                }
+                                final start = _compositionTablePointerStart[event.pointer];
+                                final last = _compositionTablePointerLast[event.pointer];
+                                if (start == null || last == null) return;
+
+                                final total = event.position - start;
+                                final isActive = _compositionTableDragActivePointers
+                                    .contains(event.pointer);
+                                if (!isActive && total.distance < 10) {
+                                  _compositionTablePointerLast[event.pointer] = event.position;
+                                  return;
+                                }
+
+                                _compositionTableDragActivePointers.add(event.pointer);
+                                final delta = event.position - last;
+                                _compositionTablePointerLast[event.pointer] = event.position;
+                                _scrollCompositionTableByDelta(delta, context);
+                              },
+                              onPointerUp: (event) {
+                                _clearCompositionPointerState(event.pointer);
+                              },
+                              onPointerCancel: (event) {
+                                _clearCompositionPointerState(event.pointer);
+                              },
+                              child: effectiveCanEdit
                                   ? RepaintBoundary(
                                       child: ExcelStyleTtkTable(
                                         loc: loc,
@@ -5702,7 +5693,6 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                         );
                                       },
                                     ),
-                              ),
                             ),
                           ),
                         ),
