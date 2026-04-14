@@ -602,11 +602,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // порций(шт) — рассчитывается: outputWeight * (weightPerPortion / totalOutput)
                     _buildReadOnlyCell(_portionsPerOne(totalOutput, ingredient)),
 
-                    // Стоимость
-                    _buildCostCell(ingredient),
-
-                    // Цена за кг
+                    // Как в шапке: сначала Цена, затем Стоимость
                     _buildPricePerKgCell(ingredient),
+
+                    _buildCostCell(ingredient),
 
                     // Кнопка удаления
                     _buildDeleteButton(rowIndex),
@@ -626,6 +625,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // % отхода
                   const SizedBox.shrink(), // Нетто
                   const SizedBox.shrink(), // Способ
+                  const SizedBox.shrink(), // % ужарки
                   // Выход г. итого: редактируемый — при изменении масштабируются все ингредиенты в реальном времени
                   widget.canEdit && widget.onTotalOutputChanged != null && totalOutput > 0
                       ? _buildNumericCell(
@@ -649,10 +649,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                         )
                       : _buildTotalCell(widget.weightPerPortion == 0 ? '' : widget.weightPerPortion.toStringAsFixed(0)),
                   _buildTotalCell('1'), // порций(шт) в итого всегда 1
-                  const SizedBox.shrink(), // Стоимость (пусто)
                   widget.isCook
-                      ? const SizedBox.shrink() // Скрываем стоимость для поваров
-                      : _buildTotalCell('${NumberFormatUtils.formatInt(costPerKgFinishedProduct)} $_currencySymbol'), // Стоимость за кг готового продукта
+                      ? const SizedBox.shrink() // Скрываем цену для поваров
+                      : _buildTotalCell('${NumberFormatUtils.formatInt(costPerKgFinishedProduct)} $_currencySymbol'), // Цена за кг готового продукта
+                  const SizedBox.shrink(), // Стоимость (пусто)
                   const SizedBox.shrink(), // Удаление
                 ],
               ),
@@ -969,9 +969,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
   Widget _buildSearchableProductDropdown(TTIngredient ingredient, int rowIndex) {
     try {
-      final allItems = _getProductItemsForDropdown();
       return _ProductSearchDropdown(
-        items: allItems,
+        getItems: _getProductItemsForDropdown,
         loc: widget.loc,
         onProductSelected: (selectedItem) {
           try {
@@ -1482,12 +1481,12 @@ class SelectableItem {
 }
 
 class _ProductSearchDropdown extends StatefulWidget {
-  final List<SelectableItem> items;
+  final List<SelectableItem> Function() getItems;
   final Function(SelectableItem) onProductSelected;
   final LocalizationService loc;
 
   const _ProductSearchDropdown({
-    required this.items,
+    required this.getItems,
     required this.onProductSelected,
     required this.loc,
   });
@@ -1499,6 +1498,7 @@ class _ProductSearchDropdown extends StatefulWidget {
 class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  List<SelectableItem>? _cachedItems;
 
   @override
   void dispose() {
@@ -1508,12 +1508,13 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   }
 
   List<SelectableItem> _filterItems(String query) {
+    final items = _cachedItems ?? const <SelectableItem>[];
     if (query.isEmpty) {
-      return widget.items.toList();
+      return items.toList();
     }
     final q = query.trim().toLowerCase();
     final qStripped = stripIikoPrefix(query).trim().toLowerCase();
-    return widget.items
+    return items
         .where((item) {
           final dn = item.displayName.toLowerCase();
           final sn = item.searchName;
@@ -1525,6 +1526,9 @@ class _ProductSearchDropdownState extends State<_ProductSearchDropdown> {
   }
 
   Future<void> _openPicker() async {
+    // Важно: тяжелую сборку списка не делаем в build таблицы,
+    // иначе первый тап/фокус на экране может "замирать" на несколько секунд.
+    _cachedItems ??= widget.getItems();
     final searchCtrl = TextEditingController(text: _searchController.text);
     List<SelectableItem> filtered = _filterItems(_searchController.text);
 
