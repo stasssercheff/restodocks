@@ -384,21 +384,55 @@ class AccountManagerSupabase extends ChangeNotifier {
       return (n != null && n >= 0) ? n : 0;
     }
 
+    int globalCap = 0;
     try {
-      final v = await _supabase.client.rpc(
+      globalCap = normalize(await _supabase.client.rpc(
         'get_effective_max_additional_establishments_for_owner',
-      );
-      return normalize(v);
+      ));
     } catch (_) {
       try {
-        final v = await _supabase.client.rpc(
+        globalCap = normalize(await _supabase.client.rpc(
           'get_platform_config',
           params: {'p_key': 'max_establishments_per_owner'},
-        );
-        return normalize(v);
+        ));
       } catch (_) {
-        return 0;
+        globalCap = 0;
       }
+    }
+
+    // Клиентский пересчёт лимита, чтобы UI совпадал с серверной логикой add_establishment_for_owner.
+    try {
+      final list = await getEstablishmentsForOwner();
+      final now = DateTime.now();
+      final hasOwnerTrial = list.any(
+        (e) => e.proTrialEndsAt != null && e.proTrialEndsAt!.isAfter(now),
+      );
+      final hasPaidAccess = list.any((e) => e.hasPaidProAccess);
+
+      int branchPacks = 0;
+      try {
+        final rows = await _supabase.client
+            .from('owner_entitlement_addons')
+            .select('branch_slot_packs')
+            .limit(1);
+        if (rows is List && rows.isNotEmpty) {
+          final row = Map<String, dynamic>.from(rows.first as Map);
+          branchPacks = normalize(row['branch_slot_packs']);
+        }
+      } catch (_) {
+        branchPacks = 0;
+      }
+
+      if (hasOwnerTrial) {
+        return globalCap < 2 ? globalCap : 2;
+      }
+      if (hasPaidAccess) {
+        final paidCap = branchPacks >= 2 ? branchPacks : 2;
+        return paidCap < globalCap ? paidCap : globalCap;
+      }
+      return 0;
+    } catch (_) {
+      return globalCap;
     }
   }
 
@@ -2303,8 +2337,24 @@ class AccountManagerSupabase extends ChangeNotifier {
       final rawDis = m['is_disabled'];
       final isDisabled = rawDis == true || rawDis == 1;
       final grantType = m['grants_subscription_type']?.toString().trim();
-      final empPacks = _parseRpcInt(m['grants_employee_slot_packs']);
-      final branchPacks = _parseRpcInt(m['grants_branch_slot_packs']);
+      final estTierFallback = _establishment?.subscriptionType?.trim();
+      final resolvedGrantType = (grantType != null && grantType.isNotEmpty)
+          ? grantType
+          : (estTierFallback != null && estTierFallback.isNotEmpty
+              ? estTierFallback
+              : null);
+      final empPacks = _parseRpcInt(
+        m['grants_employee_slot_packs'] ??
+            m['employee_slot_packs'] ??
+            m['employee_packs'] ??
+            m['grants_employee_packs'],
+      );
+      final branchPacks = _parseRpcInt(
+        m['grants_branch_slot_packs'] ??
+            m['branch_slot_packs'] ??
+            m['additional_establishment_packs'] ??
+            m['grants_additional_establishment_packs'],
+      );
       final additiveOnly = _parseRpcBool(m['grants_additive_only']);
       int? promoMaxEmployees;
       final rawMaxEmp = m['max_employees'];
@@ -2319,8 +2369,7 @@ class AccountManagerSupabase extends ChangeNotifier {
         code: code,
         expiresAt: exp,
         isDisabled: isDisabled,
-        grantsSubscriptionType:
-            grantType != null && grantType.isNotEmpty ? grantType : null,
+        grantsSubscriptionType: resolvedGrantType,
         grantsEmployeeSlotPacks: empPacks,
         grantsBranchSlotPacks: branchPacks,
         grantsAdditiveOnly: additiveOnly,

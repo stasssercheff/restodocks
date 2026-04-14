@@ -115,16 +115,16 @@ class _EstablishmentsManagementScreenState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '$_totalCount из $_totalCap',
+                            (loc.t('establishments_counter'))
+                                .replaceAll('{current}', '$_additionalCount')
+                                .replaceAll('{max}', '$_maxEstablishmentsPerOwner'),
                             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                   fontWeight: FontWeight.w700,
                                 ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            (loc.t('establishments_counter'))
-                                .replaceAll('{current}', '$_additionalCount')
-                                .replaceAll('{max}', '$_maxEstablishmentsPerOwner'),
+                            '$_totalCount из $_totalCap',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
