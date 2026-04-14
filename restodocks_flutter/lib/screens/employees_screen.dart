@@ -21,7 +21,7 @@ const int _desktopEmployeeHeaderPositionFlex = 2;
 const int _desktopEmployeeHeaderRateFlex = 2;
 const int _desktopEmployeeRowPositionFlex = 1;
 const int _desktopEmployeeRowRateFlex = 3;
-const double _desktopEmployeeRateRowLeftInset = 54;
+const double _desktopEmployeeRateRowLeftInset = 66;
 
 /// Список сотрудников. Владелец видит всех; остальные — по своему отделу. Редактирование для шефа/владельца. Добавление — только личная регистрация по PIN.
 class EmployeesScreen extends StatefulWidget {
