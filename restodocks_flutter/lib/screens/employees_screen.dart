@@ -24,6 +24,8 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
   List<Employee> _list = [];
   bool _loading = true;
   String? _error;
+  int _employeeUsedCount = 0;
+  int _employeeCap = 0;
 
   bool _canEditEmployees(Employee? current) {
     if (current == null) return false;
@@ -53,6 +55,17 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final all = await acc.getEmployeesForEstablishment(est.id);
+      int cap = 0;
+      try {
+        final capRaw = await acc.supabase.client.rpc(
+          'establishment_active_employee_cap',
+          params: {'p_establishment_id': est.id},
+        );
+        cap = int.tryParse('${capRaw ?? ''}') ?? 0;
+      } catch (_) {
+        cap = 0;
+      }
+      final usedCount = all.where(_countsTowardEmployeeCap).length;
       // Скрываем только собственника без должности; остальных показываем
       final visible = all.where((e) => !(e.hasRole('owner') && e.positionRole == null)).toList();
       // Владелец, шеф, су-шеф видят всех; остальные — только свой отдел
@@ -62,10 +75,24 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       // Дедупликация по id (на случай дублей из БД)
       final seen = <String>{};
       final list = filtered.where((e) => seen.add(e.id)).toList();
-      if (mounted) setState(() { _list = list; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _list = list;
+          _employeeUsedCount = usedCount;
+          _employeeCap = cap;
+          _loading = false;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
+  }
+
+  bool _countsTowardEmployeeCap(Employee e) {
+    if (!e.isActive) return false;
+    final hasOnlyOwnerRole =
+        e.roles.length == 1 && e.roles.first.trim().toLowerCase() == 'owner';
+    return !(hasOnlyOwnerRole && (e.positionRole == null || e.positionRole!.trim().isEmpty));
   }
 
   @override
@@ -88,6 +115,19 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
         leading: appBarBackButton(context),
         title: Text(loc.t('employees')),
         actions: [
+          if (_employeeCap > 0)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Center(
+                child: Text(
+                  '$_employeeUsedCount из $_employeeCap',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+            ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
         ],
       ),
