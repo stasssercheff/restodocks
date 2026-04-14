@@ -102,6 +102,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
         visible(key) ? child : const SizedBox.shrink();
 
     final ent = SubscriptionEntitlements.from(account.establishment);
+    final showBarBlock = screenPref.showBarSection && ent.hasUltraLevelFeatures;
     if (ent.isLiteTier) {
       final layoutSvc = context.watch<HomeLayoutConfigService>();
       const liteKeys = <String>[
@@ -337,7 +338,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 title: loc.t('checklists'),
                 onTap: () => context.go('/checklists?department=kitchen')),
             'home-checklists-kitchen')),
-        if (screenPref.showBarSection) ...[
+        if (showBarBlock) ...[
           const SizedBox(height: 16),
           _SectionTitle(title: loc.t('bar')),
           ownerTile(

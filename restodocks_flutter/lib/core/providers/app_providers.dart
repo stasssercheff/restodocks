@@ -32,9 +32,6 @@ class AppProviders {
         ChangeNotifierProvider<OwnerViewPreferenceService>(
           create: (_) => OwnerViewPreferenceService(),
         ),
-        ChangeNotifierProvider<TtkBranchFilterService>(
-          create: (_) => TtkBranchFilterService(),
-        ),
         ChangeNotifierProvider<ScreenLayoutPreferenceService>(
           create: (_) => ScreenLayoutPreferenceService(),
         ),

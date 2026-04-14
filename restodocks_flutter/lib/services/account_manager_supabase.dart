@@ -33,7 +33,6 @@ import 'secure_storage_service.dart';
 import 'supabase_service.dart';
 import 'fcm_push_service.dart';
 import 'localization_service.dart';
-import 'ttk_branch_filter_service.dart';
 
 const _keyEmployeeId = 'restodocks_employee_id';
 const _keyEstablishmentId = 'restodocks_establishment_id';
@@ -507,35 +506,10 @@ class AccountManagerSupabase extends ChangeNotifier {
     }
   }
 
-  /// Филиалы заведения (для шефа — фильтр ТТК по филиалам)
-  Future<List<Establishment>> getBranchesForEstablishment(
-      String establishmentId) async {
-    try {
-      final data = await _supabase.client.rpc(
-        'get_branches_for_establishment',
-        params: {'p_establishment_id': establishmentId},
-      );
-      if (data == null) return [];
-      final list = data as List;
-      return list
-          .map((e) =>
-              Establishment.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList();
-    } catch (e) {
-      devLog('AccountManager: getBranchesForEstablishment error: $e');
-      return [];
-    }
-  }
-
   /// Переключение на другое заведение (для владельца с несколькими заведениями)
   Future<void> switchEstablishment(Establishment establishment) async {
     _establishment = establishment;
     await _secureStorage.set(_keyEstablishmentId, establishment.id);
-    unawaited(
-      TtkBranchFilterService().setBranchFilter(null).catchError((Object e) {
-        devLog('AccountManager: TtkBranchFilter clear on switch: $e');
-      }),
-    );
     unawaited(
       _bindRealtimeSync().catchError((Object e, StackTrace st) {
         devLog('🔐 AccountManager: _bindRealtimeSync after switch: $e $st');
@@ -2328,10 +2302,26 @@ class AccountManagerSupabase extends ChangeNotifier {
       final exp = _parseRpcTimestamp(rawExp);
       final rawDis = m['is_disabled'];
       final isDisabled = rawDis == true || rawDis == 1;
+      final grantType = m['grants_subscription_type']?.toString().trim();
+      final empPacks = _parseRpcInt(m['grants_employee_slot_packs']);
+      final branchPacks = _parseRpcInt(m['grants_branch_slot_packs']);
+      final additiveOnly = _parseRpcBool(m['grants_additive_only']);
+      int? promoMaxEmployees;
+      final rawMaxEmp = m['max_employees'];
+      if (rawMaxEmp != null) {
+        final n = _parseRpcInt(rawMaxEmp, -1);
+        if (n >= 0) promoMaxEmployees = n;
+      }
       return EstablishmentPromoInfo(
         code: code,
         expiresAt: exp,
         isDisabled: isDisabled,
+        grantsSubscriptionType:
+            grantType != null && grantType.isNotEmpty ? grantType : null,
+        grantsEmployeeSlotPacks: empPacks,
+        grantsBranchSlotPacks: branchPacks,
+        grantsAdditiveOnly: additiveOnly,
+        promoMaxEmployees: promoMaxEmployees,
       );
     } catch (e, st) {
       devLog('getEstablishmentPromoForOwner: $e $st');
@@ -2453,6 +2443,11 @@ class EstablishmentPromoInfo {
     this.expiresAt,
     this.loadFailed = false,
     this.isDisabled = false,
+    this.grantsSubscriptionType,
+    this.grantsEmployeeSlotPacks = 0,
+    this.grantsBranchSlotPacks = 0,
+    this.grantsAdditiveOnly = false,
+    this.promoMaxEmployees,
   });
 
   final String? code;
@@ -2461,6 +2456,21 @@ class EstablishmentPromoInfo {
 
   /// Промокод отключён в админке ([is_disabled]); доступ блокируется на сервере.
   final bool isDisabled;
+
+  /// Шаблон из `promo_codes.grants_subscription_type` (pro, ultra, …).
+  final String? grantsSubscriptionType;
+
+  /// Пакеты по +5 к лимиту сотрудников.
+  final int grantsEmployeeSlotPacks;
+
+  /// Пакеты дополнительных заведений (филиалов).
+  final int grantsBranchSlotPacks;
+
+  /// Только начисление пакетов без смены тарифа.
+  final bool grantsAdditiveOnly;
+
+  /// Опциональный лимит сотрудников из шаблона промокода (`max_employees`).
+  final int? promoMaxEmployees;
 
   bool get hasPromo => !loadFailed && code != null && code!.isNotEmpty;
 
@@ -2481,4 +2491,17 @@ DateTime? _parseRpcTimestamp(dynamic raw) {
   if (raw == null) return null;
   if (raw is DateTime) return raw;
   return DateTime.tryParse(raw.toString());
+}
+
+int _parseRpcInt(dynamic raw, [int defaultValue = 0]) {
+  if (raw == null) return defaultValue;
+  if (raw is int) return raw;
+  if (raw is num) return raw.toInt();
+  return int.tryParse(raw.toString()) ?? defaultValue;
+}
+
+bool _parseRpcBool(dynamic raw, [bool defaultValue = false]) {
+  if (raw == true || raw == 1) return true;
+  if (raw == false || raw == 0) return false;
+  return defaultValue;
 }

@@ -29,6 +29,10 @@ class StaffHomeContent extends StatelessWidget {
     final account = context.watch<AccountManagerSupabase>();
     final subOk = account.hasProSubscription;
     final ent = SubscriptionEntitlements.from(account.establishment);
+    final rawDeptRoute = _deptForRoute(employee.department);
+    final deptRoute = !ent.hasUltraLevelFeatures && rawDeptRoute == 'bar'
+        ? 'kitchen'
+        : rawDeptRoute;
 
     // Без доступа к данным (в т.ч. временный с истёкшим периодом)
     if (!employee.hasRole('owner') && !employee.effectiveDataAccess) {
@@ -82,49 +86,43 @@ class StaffHomeContent extends StatelessWidget {
       HomeTileId.schedule: HomeFeatureTile(
         icon: Icons.calendar_month,
         title: loc.t('schedule'),
-        onTap: () =>
-            context.go('/schedule/${_deptForRoute(employee.department)}'),
+        onTap: () => context.go('/schedule/$deptRoute'),
       ),
       HomeTileId.productOrder: HomeFeatureTile(
         icon: Icons.shopping_cart,
         title: loc.t('product_order'),
         onTap: () => context.go(
-            '/product-order?department=${_deptForRoute(employee.department)}'),
+            '/product-order?department=$deptRoute'),
       ),
       HomeTileId.suppliers: HomeFeatureTile(
         icon: Icons.add_business,
         title:
             loc.t('suppliers') ?? loc.t('order_tab_suppliers') ?? 'Поставщики',
-        onTap: () =>
-            context.push('/suppliers/${_deptForRoute(employee.department)}'),
+        onTap: () => context.push('/suppliers/$deptRoute'),
       ),
       HomeTileId.menu: HomeFeatureTile(
         icon: Icons.restaurant_menu,
         title: loc.t('menu'),
-        onTap: () => context.go('/menu/${_deptForRoute(employee.department)}'),
+        onTap: () => context.go('/menu/$deptRoute'),
       ),
       HomeTileId.ttk: HomeFeatureTile(
         icon: Icons.description,
-        title: employee.department == 'bar'
+        title: deptRoute == 'bar'
             ? loc.t('ttk_bar')
-            : (employee.department == 'hall' ||
-                    employee.department == 'dining_room')
+            : (deptRoute == 'hall')
                 ? loc.t('ttk_hall')
                 : loc.t('ttk_kitchen'),
-        onTap: () =>
-            context.go('/tech-cards/${_deptForRoute(employee.department)}'),
+        onTap: () => context.go('/tech-cards/$deptRoute'),
       ),
       HomeTileId.checklists: HomeFeatureTile(
         icon: Icons.checklist,
         title: loc.t('checklists'),
-        onTap: () => context
-            .go('/checklists?department=${_deptForRoute(employee.department)}'),
+        onTap: () => context.go('/checklists?department=$deptRoute'),
       ),
       HomeTileId.nomenclature: HomeFeatureTile(
         icon: Icons.assignment,
         title: loc.t('nomenclature'),
-        onTap: () =>
-            context.go('/nomenclature/${_deptForRoute(employee.department)}'),
+        onTap: () => context.go('/nomenclature/$deptRoute'),
       ),
       HomeTileId.inventory: HomeFeatureTile(
           icon: Icons.assignment,
@@ -154,46 +152,25 @@ class StaffHomeContent extends StatelessWidget {
       HomeTileId.departmentOrders: HomeFeatureTile(
         icon: Icons.receipt_long,
         title: loc.t('order_tab_orders') ?? 'Заказы',
-        onTap: () =>
-            context.push('/pos/orders/${_deptForRoute(employee.department)}'),
+        onTap: () => context.push('/pos/orders/$deptRoute'),
       ),
       HomeTileId.departmentSales: HomeFeatureTile(
         icon: Icons.point_of_sale_outlined,
         title: loc.t('sales_title') ?? 'Продажи',
-        onTap: () =>
-            context.push('/sales/${_deptForRoute(employee.department)}'),
+        onTap: () => context.push('/sales/$deptRoute'),
       ),
     };
-    final showHallPos =
-        employee.department == 'hall' || employee.department == 'dining_room';
-    final showDeptOrdersTile =
-        employee.department == 'kitchen' || employee.department == 'bar';
+    final showHallPos = deptRoute == 'hall';
+    final showDeptOrdersTile = deptRoute == 'kitchen' || deptRoute == 'bar';
     final showDeptSalesTile = showDeptOrdersTile;
-    final showChecklists = employee.department == 'kitchen' ||
-        employee.department == 'bar' ||
-        employee.department == 'dining_room';
-    final showNomenclature = employee.department == 'kitchen' ||
-        employee.department == 'bar' ||
-        employee.department == 'hall' ||
-        employee.department == 'dining_room';
-    final showSuppliers = employee.department == 'kitchen' ||
-        employee.department == 'bar' ||
-        employee.department == 'hall' ||
-        employee.department == 'dining_room';
-    final showBanquet =
-        (employee.department == 'kitchen' || employee.department == 'bar') &&
+    final showChecklists = deptRoute == 'kitchen' || deptRoute == 'hall';
+    final showNomenclature = deptRoute == 'kitchen' || deptRoute == 'hall';
+    final showSuppliers = deptRoute == 'kitchen' || deptRoute == 'hall';
+    final showBanquet = (deptRoute == 'kitchen' || deptRoute == 'bar') &&
             screenPref.showBanquetCatering &&
             ent.canAccessBanquetCatering;
-    // ТТК: кухня, бар, зал — у каждого подразделения свои
-    final showTtk = employee.department == 'kitchen' ||
-        employee.department == 'bar' ||
-        employee.department == 'hall' ||
-        employee.department == 'dining_room';
-    // Меню: кухня, бар и зал (зал видит stop/go с подсветкой)
-    final showMenu = employee.department == 'kitchen' ||
-        employee.department == 'bar' ||
-        employee.department == 'hall' ||
-        employee.department == 'dining_room';
+    final showTtk = deptRoute == 'kitchen' || deptRoute == 'hall';
+    final showMenu = deptRoute == 'kitchen' || deptRoute == 'hall';
     final ordered = <Widget>[];
     for (final id in order) {
       if (!FeatureFlags.posModuleEnabled &&
@@ -223,7 +200,7 @@ class StaffHomeContent extends StatelessWidget {
       if (id == HomeTileId.banquetMenu && showBanquet) {
         ordered.add(ExpandableBanquetSection(
             loc: loc,
-            department: employee.department == 'bar' ? 'bar' : 'kitchen'));
+            department: deptRoute == 'bar' ? 'bar' : 'kitchen'));
         continue;
       }
       if (tiles.containsKey(id)) ordered.add(tiles[id]!);

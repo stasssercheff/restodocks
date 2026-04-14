@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/subscription_entitlements.dart';
 import '../../services/services.dart';
 import '../../utils/pos_order_department.dart';
 import '../../widgets/app_bar_home_button.dart';
@@ -8,7 +9,7 @@ import 'procurement_receiving_tab.dart';
 import '../order_lists_screen.dart';
 import '../suppliers_screen.dart';
 
-/// Закупка: три раздела — только переключение кнопками сверху (без свайпа между экранами).
+/// Закупка: переключение кнопками сверху (без свайпа). «Приём поставок» — только Ultra.
 class PosProcurementScreen extends StatefulWidget {
   const PosProcurementScreen({super.key, required this.department});
 
@@ -35,8 +36,9 @@ class _PosProcurementScreenState extends State<PosProcurementScreen> {
     final title =
         '${loc.t('pos_procurement_title')} ${deptLabel.toLowerCase()}';
 
-    // «Приём поставок» доступен и при выключенном POS на прод-витрине (см. FeatureFlags.posModuleEnabled).
-    final showReceiving = true;
+    final account = context.watch<AccountManagerSupabase>();
+    final showReceiving = SubscriptionEntitlements.from(account.establishment)
+        .hasUltraLevelFeatures;
     final tabs = [
       loc.t('pos_procurement_tab_product_order'),
       if (showReceiving) loc.t('pos_procurement_tab_receiving'),

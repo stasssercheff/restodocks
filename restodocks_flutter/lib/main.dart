@@ -181,7 +181,6 @@ Future<void> _bootstrapApp() async {
     ThemeService().initialize(),
     HomeButtonConfigService().initialize(),
     OwnerViewPreferenceService().initialize(),
-    TtkBranchFilterService().initialize(),
     ScreenLayoutPreferenceService().initialize(),
     MobileUiScaleService().initialize(),
     PosOrdersDisplaySettingsService().initialize(),

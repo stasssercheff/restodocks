@@ -567,54 +567,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
-  void _showTtkBranchFilterPicker(
-    BuildContext context,
-    LocalizationService loc,
-    AccountManagerSupabase accountManager,
-    List<Establishment> branches,
-  ) {
-    final branchFilter = context.read<TtkBranchFilterService>();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title:
-            Text(loc.t('ttk_branch_display') ?? 'Отображение ТТК по филиалам'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ...branches.map((b) => ListTile(
-                    leading: const Icon(Icons.account_tree),
-                    title: Text(b.name),
-                    trailing: branchFilter.selectedBranchId == b.id
-                        ? const Icon(Icons.check, color: Colors.green)
-                        : null,
-                    onTap: () async {
-                      await branchFilter.setBranchFilter(b.id);
-                      if (ctx.mounted) Navigator.of(ctx).pop();
-                    },
-                  )),
-            ],
-          ),
-        ),
-        actions: [
-          if (branchFilter.selectedBranchId != null)
-            TextButton(
-              onPressed: () async {
-                await branchFilter.setBranchFilter(null);
-                if (ctx.mounted) Navigator.of(ctx).pop();
-              },
-              child: Text(loc.t('ttk_branch_filter_reset')),
-            ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showHomeLayoutConfig(BuildContext context, LocalizationService loc) {
     final account = context.read<AccountManagerSupabase>();
     final emp = account.currentEmployee;
@@ -2172,22 +2124,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/settings/fiscal-tax'),
               ),
-            // Журнал ошибок — см. FeatureFlags.showSystemErrorsJournal (beta, не restodocks.com; все платформы).
-            if (FeatureFlags.showSystemErrorsJournal &&
-                (posCanRunWarehouseHealthCheck(currentEmployee) ||
-                    _isPlatformAdminEmail(currentEmployee.email)))
-              ListTile(
-                leading: const Icon(Icons.bug_report_outlined),
-                title: Text(localization.t('settings_system_errors_title') ??
-                    'Журнал ошибок'),
-                subtitle: Text(
-                  localization.t('settings_system_errors_subtitle') ??
-                      'POS, склад, фоновые сбои',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/settings/system-errors'),
-              ),
             if (posCanConfigureOrdersDisplay(currentEmployee))
               ExpansionTile(
                 initiallyExpanded: false,
@@ -2451,40 +2387,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _showInviteCoOwnerDialog(
                       context, localization, accountManager),
-                ),
-              if ((currentEmployee.hasRole('executive_chef') ||
-                      currentEmployee.hasRole('sous_chef')) &&
-                  accountManager.establishment?.isMain == true &&
-                  !accountManager.isLiteTier)
-                FutureBuilder<List<Establishment>>(
-                  future: accountManager.getBranchesForEstablishment(
-                      accountManager.establishment!.id),
-                  builder: (ctx, snap) {
-                    if (!snap.hasData || snap.data!.isEmpty)
-                      return const SizedBox.shrink();
-                    final branches = snap.data!;
-                    return Consumer<TtkBranchFilterService>(
-                      builder: (_, branchFilter, __) {
-                        final selId = branchFilter.selectedBranchId;
-                        final name = selId == null
-                            ? localization.t('ttk_branch_filter_current')
-                            : branches
-                                    .where((b) => b.id == selId)
-                                    .map((b) => b.name)
-                                    .firstOrNull ??
-                                selId;
-                        return ListTile(
-                          leading: const Icon(Icons.account_tree),
-                          title: Text(localization.t('ttk_branch_display') ??
-                              'Отображение ТТК по филиалам'),
-                          subtitle: Text(name),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () => _showTtkBranchFilterPicker(
-                              context, localization, accountManager, branches),
-                        );
-                      },
-                    );
-                  },
                 ),
               if (accountManager.isViewOnlyOwner)
                 ListTile(

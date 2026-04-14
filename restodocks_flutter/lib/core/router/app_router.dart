@@ -503,17 +503,6 @@ class AppRouter {
               const FiscalOutboxScreen(),
             ),
           ),
-          GoRoute(
-            path: '/settings/system-errors',
-            redirect: (context, state) {
-              if (!FeatureFlags.showSystemErrorsJournal) return '/settings';
-              return null;
-            },
-            pageBuilder: (context, state) => _slideTransitionPage(
-              state,
-              const SystemErrorsScreen(),
-            ),
-          ),
           // Добавить заведение (владелец)
           GoRoute(
             path: '/add-establishment',

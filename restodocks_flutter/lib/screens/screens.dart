@@ -76,4 +76,3 @@ export 'sales/kitchen_bar_sales_plan_screen.dart';
 export 'sales/kitchen_bar_sales_plan_form_screen.dart';
 export 'settings/fiscal_tax_settings_screen.dart';
 export 'settings/fiscal_outbox_screen.dart';
-export 'settings/system_errors_screen.dart';

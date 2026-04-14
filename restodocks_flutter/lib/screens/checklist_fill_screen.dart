@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/subscription_entitlements.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 import '../utils/checklist_reminder_summary.dart';
@@ -409,6 +410,9 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
 
     final c = _checklist!;
     final cfg = c.actionConfig;
+    final allowRichContent = SubscriptionEntitlements.from(
+      context.read<AccountManagerSupabase>().establishment,
+    ).hasUltraLevelFeatures;
 
     return Scaffold(
       appBar: AppBar(
@@ -430,7 +434,16 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                     child: _buildTableHeader(loc, cfg),
                   ),
                   const Divider(height: 24),
-                  ...List.generate(c.items.length, (i) => _buildRow(loc, c, cfg, i)),
+                  ...List.generate(
+                    c.items.length,
+                    (i) => _buildRow(
+                      loc,
+                      c,
+                      cfg,
+                      i,
+                      allowRichContent,
+                    ),
+                  ),
                   const SizedBox(height: 24),
                   TextField(
                     controller: _commentsController,
@@ -587,7 +600,13 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     return Row(children: children);
   }
 
-  Widget _buildRow(LocalizationService loc, Checklist checklist, ChecklistActionConfig cfg, int i) {
+  Widget _buildRow(
+    LocalizationService loc,
+    Checklist checklist,
+    ChecklistActionConfig cfg,
+    int i,
+    bool allowRichContent,
+  ) {
     final statusWidth =
         isHandheldNarrowLayout(context) ? 160.0 : 220.0;
     final it = checklist.items[i];
@@ -611,7 +630,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (it.techCardId != null)
+                  if (allowRichContent && it.techCardId != null)
                     InkWell(
                       onTap: () =>
                           context.push(checklistItemTechCardViewRoute(it)),
@@ -625,7 +644,9 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                     )
                   else
                     Text(_getTitle(it), style: Theme.of(context).textTheme.bodyMedium),
-                  if (it.imageUrl != null && it.imageUrl!.trim().isNotEmpty) ...[
+                  if (allowRichContent &&
+                      it.imageUrl != null &&
+                      it.imageUrl!.trim().isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Material(
                       color: Colors.transparent,

@@ -8,7 +8,7 @@ class FeatureFlags {
   /// Маркер беты. По умолчанию считаем, что это **prod**, если флаг не задан явно.
   static bool get isBeta => const bool.fromEnvironment('IS_BETA', defaultValue: false);
 
-  /// Основной прод-домен: для журнала ошибок (не смешивать с POS).
+  /// Основной прод-домен: скрываем POS на витрине (не смешивать с beta-хостами).
   static bool get _isProdMarketingHost {
     if (!kIsWeb) return false;
     final h = Uri.base.host.toLowerCase();
@@ -67,10 +67,4 @@ class FeatureFlags {
     if (_isProdMarketingHost) return false;
     return isBeta || _posModuleEnabledFromDefine || _posModuleEnabledWebNonProdHost;
   }
-
-  /// Экран «Журнал ошибок»: только в beta и не на основном прод-домене **restodocks.com**
-  /// (даже если в сборке ошибочно передан `IS_BETA=true`).
-  /// iOS / Android / web — одни и те же правила, чтобы не было «на сайте есть, в приложении нет».
-  static bool get showSystemErrorsJournal =>
-      isBeta && !_isProdMarketingHost;
 }

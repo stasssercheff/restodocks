@@ -37,9 +37,12 @@ class ManagementHomeContent extends StatelessWidget {
     final isBarManager = roles.contains('bar_manager');
     final isGeneral = roles.contains('general_manager');
     final isFloorManager = roles.contains('floor_manager');
-    final dept = ent.kitchenOnlyDepartments
+    final rawDept = ent.kitchenOnlyDepartments
         ? 'kitchen'
         : _deptForRoute(employee.department);
+    final dept = !ent.hasUltraLevelFeatures && rawDept == 'bar'
+        ? 'kitchen'
+        : rawDept;
     // ТТК: кухня, бар, зал — у каждого подразделения свои
     final showTtk = dept == 'kitchen' || dept == 'bar' || dept == 'hall';
     // Меню: только кухня и бар (у зала нет меню)
@@ -135,8 +138,7 @@ class ManagementHomeContent extends StatelessWidget {
     final firstTile = HomeFeatureTile(
         icon: Icons.calendar_month,
         title: loc.t('schedule'),
-        onTap: () =>
-            context.go('/schedule/${_deptForRoute(employee.department)}'));
+        onTap: () => context.go('/schedule/$dept'));
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -175,8 +177,7 @@ class ManagementHomeContent extends StatelessWidget {
           HomeFeatureTile(
               icon: Icons.checklist,
               title: loc.t('checklists'),
-              onTap: () => context.go(
-                  '/checklists?department=${_deptForRoute(employee.department)}')),
+              onTap: () => context.go('/checklists?department=$dept')),
         if (showMenu)
           HomeFeatureTile(
               icon: Icons.restaurant_menu,
@@ -302,7 +303,7 @@ class ManagementHomeContent extends StatelessWidget {
             title: loc.t('expenses') ?? 'Расходы',
             onTap: () {
               final d = isBarManager
-                  ? 'bar'
+                  ? (ent.hasUltraLevelFeatures ? 'bar' : 'kitchen')
                   : isFloorManager
                       ? 'hall'
                       : 'kitchen';
@@ -329,7 +330,7 @@ class ManagementHomeContent extends StatelessWidget {
                 icon: Icons.payments,
                 title: loc.t('salary_tab_fzp') ?? 'ФЗП',
                 subscriptionLocked: !subOk,
-                onTap: () => context.go('/expenses/salary?department=bar')),
+                onTap: () => context.go('/expenses/salary?department=${ent.hasUltraLevelFeatures ? 'bar' : 'kitchen'}')),
         ],
       ],
     );

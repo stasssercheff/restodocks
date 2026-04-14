@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../models/models.dart';
+import '../core/subscription_entitlements.dart';
 import '../services/app_toast_service.dart';
 import '../services/services.dart';
 import '../utils/checklist_reminder_summary.dart';
@@ -107,16 +108,21 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       final svc = context.read<ChecklistServiceSupabase>();
       final acc = context.read<AccountManagerSupabase>();
       final canEdit = emp.canEditChecklistsAndTechCards;
+      final isUltra =
+          SubscriptionEntitlements.from(acc.establishment).hasUltraLevelFeatures;
       final list = await svc.getChecklistsForEstablishment(
         est.id,
         department: widget.department,
         currentEmployeeId: emp.id,
         applyAssignmentFilter: !canEdit,
       );
+      final visibleList = isUltra
+          ? list
+          : list.where((c) => c.type != ChecklistType.prep).toList();
       final emps = await acc.getEmployeesForEstablishment(est.id);
       if (mounted) {
         setState(() {
-          _list = list;
+          _list = visibleList;
           _employees = emps;
           _loading = false;
         });

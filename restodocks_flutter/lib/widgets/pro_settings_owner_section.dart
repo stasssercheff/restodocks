@@ -12,6 +12,99 @@ import '../services/services.dart';
 import '../utils/iap_product_price_format.dart';
 import 'subscription_plans_dialog.dart';
 
+String _promoTierDisplayName(LocalizationService loc, String? raw) {
+  final t = (raw ?? 'pro').toLowerCase().trim();
+  switch (t) {
+    case 'ultra':
+    case 'premium':
+      return loc.t('pro_promo_scope_tier_ultra');
+    case 'pro':
+    case 'plus':
+    case 'starter':
+    case 'business':
+      return loc.t('pro_promo_scope_tier_pro');
+    case 'lite':
+    case 'free':
+      return loc.t('pro_promo_scope_tier_lite');
+    default:
+      return loc.t('pro_promo_scope_tier_other', args: {'name': raw ?? t});
+  }
+}
+
+/// Строки «на что промокод» для диалога (тариф, пакеты, лимит).
+List<Widget> _promoScopeDetailWidgets(
+  LocalizationService loc,
+  EstablishmentPromoInfo p,
+  TextTheme textTheme,
+) {
+  final tier = p.grantsSubscriptionType;
+  final hasAddons =
+      p.grantsEmployeeSlotPacks > 0 || p.grantsBranchSlotPacks > 0;
+  final hasTierLine =
+      !p.grantsAdditiveOnly && tier != null && tier.trim().isNotEmpty;
+  final hasAdditiveLine = p.grantsAdditiveOnly;
+  final hasMaxEmp = p.promoMaxEmployees != null;
+
+  if (!hasTierLine && !hasAdditiveLine && !hasAddons && !hasMaxEmp) {
+    return const [];
+  }
+
+  final bodyStyle = textTheme.bodyMedium;
+  final headingStyle = textTheme.titleSmall?.copyWith(
+    fontWeight: FontWeight.w600,
+  );
+
+  final out = <Widget>[
+    const SizedBox(height: 16),
+    Text(loc.t('pro_promo_scope_heading'), style: headingStyle),
+    const SizedBox(height: 8),
+  ];
+  if (hasAdditiveLine) {
+    out.add(Text(loc.t('pro_promo_scope_additive_only'), style: bodyStyle));
+    out.add(const SizedBox(height: 8));
+  }
+  if (hasTierLine) {
+    out.add(Text(
+      loc.t(
+        'pro_promo_scope_tier_prefix',
+        args: {'tier': _promoTierDisplayName(loc, tier)},
+      ),
+      style: bodyStyle,
+    ));
+    out.add(const SizedBox(height: 8));
+  }
+  if (p.grantsEmployeeSlotPacks > 0) {
+    final packs = p.grantsEmployeeSlotPacks;
+    final slots = packs * 5;
+    out.add(Text(
+      loc.t(
+        'pro_promo_scope_employee_packs',
+        args: {'packs': '$packs', 'slots': '$slots'},
+      ),
+      style: bodyStyle,
+    ));
+    out.add(const SizedBox(height: 8));
+  }
+  if (p.grantsBranchSlotPacks > 0) {
+    out.add(Text(
+      loc.t(
+        'pro_promo_scope_branch_packs',
+        args: {'packs': '${p.grantsBranchSlotPacks}'},
+      ),
+      style: bodyStyle,
+    ));
+    out.add(const SizedBox(height: 8));
+  }
+  if (hasMaxEmp) {
+    out.add(Text(
+      loc.t('pro_promo_scope_max_employees',
+          args: {'n': '${p.promoMaxEmployees}'}),
+      style: bodyStyle,
+    ));
+  }
+  return out;
+}
+
 String _iapSubscriptionPurchaseLabel(LocalizationService loc, String productId) {
   if (productId == kRestodocksUltraMonthlyProductId) {
     return loc.t('subscription_iap_purchase_ultra');
@@ -565,27 +658,40 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                   ? () {
                       showDialog<void>(
                         context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: Text(loc.t('pro_promo_title')),
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                  '${loc.t('pro_promo_code_label')}: ${promo.code}'),
-                              const SizedBox(height: 12),
-                              Text(
-                                  '${loc.t('pro_promo_valid_until_label')}: ${_formatDate(promo.expiresAt!)}'),
-                            ],
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: Text(
-                                  MaterialLocalizations.of(ctx).okButtonLabel),
+                        builder: (ctx) {
+                          final theme = Theme.of(ctx);
+                          return AlertDialog(
+                            title: Text(loc.t('pro_promo_title')),
+                            content: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${loc.t('pro_promo_code_label')}: ${promo.code}',
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    '${loc.t('pro_promo_valid_until_label')}: ${_formatDate(promo.expiresAt!)}',
+                                  ),
+                                  ..._promoScopeDetailWidgets(
+                                    loc,
+                                    promo,
+                                    theme.textTheme,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: Text(
+                                  MaterialLocalizations.of(ctx).okButtonLabel,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       );
                     }
                   : _showApplyPromoDialog,
