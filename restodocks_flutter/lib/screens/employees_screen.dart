@@ -12,6 +12,10 @@ import '../utils/employee_display_utils.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
+const double _desktopEmployeeAvatarAndGapWidth = 46; // 36 avatar + 10 gap
+const double _desktopEmployeeColumnGap = 8;
+const double _desktopEmployeeRowHorizontalPadding = 12;
+
 /// Список сотрудников. Владелец видит всех; остальные — по своему отделу. Редактирование для шефа/владельца. Добавление — только личная регистрация по PIN.
 class EmployeesScreen extends StatefulWidget {
   const EmployeesScreen({super.key});
@@ -370,13 +374,13 @@ class _EmployeeTableHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Row(
         children: [
-          const SizedBox(width: 36 + 10), // аватар + отступ
+          const SizedBox(width: _desktopEmployeeAvatarAndGapWidth),
           Expanded(flex: 5, child: Text(loc.t('full_name') ?? 'Сотрудник', style: style)),
-          const SizedBox(width: 8),
+          const SizedBox(width: _desktopEmployeeColumnGap),
           Expanded(flex: 3, child: Text(loc.t('subdivision') ?? 'Подразделение', style: style)),
-          const SizedBox(width: 8),
+          const SizedBox(width: _desktopEmployeeColumnGap),
           Expanded(flex: 3, child: Text(loc.t('position') ?? 'Должность', style: style)),
-          const SizedBox(width: 8),
+          const SizedBox(width: _desktopEmployeeColumnGap),
           Expanded(flex: 2, child: Text(rateHeader, style: style, textAlign: TextAlign.left)),
           if (canEdit) const SizedBox(width: 64),
         ],
@@ -453,7 +457,10 @@ class _EmployeeCard extends StatelessWidget {
         onTap: canEdit ? onEdit : null,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          padding: const EdgeInsets.symmetric(
+            horizontal: _desktopEmployeeRowHorizontalPadding,
+            vertical: 8,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -483,7 +490,7 @@ class _EmployeeCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: _desktopEmployeeColumnGap),
               // Подразделение (+ цех)
               Expanded(
                 flex: 3,
@@ -494,7 +501,7 @@ class _EmployeeCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: _desktopEmployeeColumnGap),
               // Должность
               Expanded(
                 flex: 3,
@@ -505,7 +512,7 @@ class _EmployeeCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: _desktopEmployeeColumnGap),
               // Ставка (без иконки на ПК — экономит ширину и убирает overflow)
               Expanded(
                 flex: 2,
