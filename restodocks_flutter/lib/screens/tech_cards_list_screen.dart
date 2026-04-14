@@ -3307,23 +3307,57 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
         builder: (ctx, setLocalState) {
           final mq = MediaQuery.of(ctx);
           final screenH = mq.size.height;
+          final screenW = mq.size.width;
           final kb = mq.viewInsets.bottom;
           final safePad = mq.padding.vertical;
-          // Заголовок + actions + отступы диалога (примерно)
-          const dialogChrome = 176.0;
-          // Доступная высота тела диалога над клавиатурой
-          final maxBody = (screenH - kb - safePad - dialogChrome)
-              .clamp(160.0, screenH * 0.92);
-          final extrasBelowField = 8.0 +
-              (voiceInlineHint.isNotEmpty ? 120.0 : 0.0) +
-              52.0; // кнопка «Голосом» + отступы
-          final fieldHeight = (maxBody - extrasBelowField).clamp(72.0, 520.0);
+          final isLandscape = mq.orientation == Orientation.landscape;
+          // Заголовок + actions + отступы диалога (без занижения: иначе в альбоме
+          // clamp «вверх» ломает раскладку и скрывает поле ввода).
+          final dialogChrome = isLandscape ? 100.0 : 176.0;
+          final availableH = screenH - kb - safePad;
+          final maxBody = (availableH - dialogChrome).clamp(48.0, screenH * 0.95);
+          final voiceHintReserve =
+              voiceInlineHint.isNotEmpty ? (isLandscape ? 64.0 : 120.0) : 0.0;
+          final voiceRowReserve = isLandscape ? 40.0 : 52.0;
+          final extrasBelowField = 8.0 + voiceHintReserve + voiceRowReserve;
+          final fieldHeight = (maxBody - extrasBelowField).clamp(48.0, 520.0);
+          final titleStyle = Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                fontSize: isLandscape ? 14 : null,
+                height: isLandscape ? 1.15 : null,
+              );
+          final fieldStyle = Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                fontSize: isLandscape ? 13 : 15,
+                height: isLandscape ? 1.25 : 1.3,
+              );
+          final hintStyle = Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                fontSize: isLandscape ? 11 : 13,
+                height: isLandscape ? 1.2 : 1.25,
+              );
+          final dialogMaxW =
+              isLandscape ? (screenW * 0.94).clamp(280.0, 920.0) : 420.0;
           return AlertDialog(
-          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          title: Text(loc.t('ttk_import_text') ?? 'Вставить из текста'),
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: isLandscape ? 8 : 16,
+            vertical: isLandscape ? 8 : 16,
+          ),
+          titlePadding: isLandscape
+              ? const EdgeInsets.fromLTRB(16, 10, 16, 6)
+              : null,
+          contentPadding: isLandscape
+              ? const EdgeInsets.fromLTRB(16, 0, 16, 8)
+              : null,
+          actionsPadding: isLandscape
+              ? const EdgeInsets.fromLTRB(12, 0, 12, 10)
+              : null,
+          title: Text(
+            loc.t('ttk_import_text') ?? 'Вставить из текста',
+            style: titleStyle,
+            maxLines: isLandscape ? 2 : 4,
+            overflow: TextOverflow.ellipsis,
+          ),
           content: ConstrainedBox(
             constraints: BoxConstraints(
-              maxWidth: 420,
+              maxWidth: dialogMaxW,
               maxHeight: maxBody,
             ),
             child: SingleChildScrollView(
@@ -3339,19 +3373,42 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       controller: controller,
                       maxLines: null,
                       expands: true,
+                      style: fieldStyle,
                       scrollPadding: EdgeInsets.only(bottom: kb + 32),
                       textInputAction: TextInputAction.newline,
                       decoration: InputDecoration(
                         hintText:
                             'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
+                        hintStyle: hintStyle,
+                        isDense: isLandscape,
+                        contentPadding: isLandscape
+                            ? const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              )
+                            : null,
                         border: const OutlineInputBorder(),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: isLandscape ? 4 : 8),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: isLandscape
+                            ? const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              )
+                            : null,
+                        tapTargetSize: isLandscape
+                            ? MaterialTapTargetSize.shrinkWrap
+                            : null,
+                        textStyle: Theme.of(ctx).textTheme.labelLarge?.copyWith(
+                              fontSize: isLandscape ? 12.5 : null,
+                            ),
+                      ),
                       onPressed: () async {
                               if (sttBusy) {
                                 final spoken = await speechToTextStop();
@@ -3411,7 +3468,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                               }
                               setLocalState(() => sttBusy = true);
                             },
-                      icon: Icon(sttBusy ? Icons.hearing : Icons.mic),
+                      icon: Icon(
+                        sttBusy ? Icons.hearing : Icons.mic,
+                        size: isLandscape ? 18 : 24,
+                      ),
                       label: Text(
                         sttBusy
                             ? (loc.t('speech_listening').trim().isEmpty
@@ -3424,21 +3484,21 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     ),
                   ),
                   if (voiceInlineHint.isNotEmpty) ...[
-                    const SizedBox(height: 10),
+                    SizedBox(height: isLandscape ? 6 : 10),
                     Material(
                       color: Theme.of(ctx).colorScheme.errorContainer,
                       borderRadius: BorderRadius.circular(8),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 10,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isLandscape ? 8 : 12,
+                          vertical: isLandscape ? 6 : 10,
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Icon(
                               Icons.info_outline,
-                              size: 20,
+                              size: isLandscape ? 16 : 20,
                               color: Theme.of(ctx)
                                   .colorScheme
                                   .onErrorContainer,
@@ -3451,10 +3511,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                     .textTheme
                                     .bodySmall
                                     ?.copyWith(
+                                      fontSize: isLandscape ? 11.5 : null,
                                       color: Theme.of(ctx)
                                           .colorScheme
                                           .onErrorContainer,
-                                      height: 1.35,
+                                      height: isLandscape ? 1.25 : 1.35,
                                     ),
                               ),
                             ),
@@ -3469,6 +3530,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           ),
           actions: [
             TextButton(
+              style: TextButton.styleFrom(
+                padding: isLandscape
+                    ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
+                    : null,
+                textStyle: Theme.of(ctx).textTheme.labelLarge?.copyWith(
+                      fontSize: isLandscape ? 13 : null,
+                    ),
+              ),
               onPressed: () async {
                 if (sttBusy) {
                   await speechToTextStop();
@@ -3479,6 +3548,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(
+                padding: isLandscape
+                    ? const EdgeInsets.symmetric(horizontal: 14, vertical: 8)
+                    : null,
+                textStyle: Theme.of(ctx).textTheme.labelLarge?.copyWith(
+                      fontSize: isLandscape ? 13 : null,
+                    ),
+              ),
               onPressed: () async {
                 if (sttBusy) {
                   await speechToTextStop();
