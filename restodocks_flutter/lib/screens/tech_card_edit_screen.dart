@@ -702,6 +702,7 @@ class TechCardEditScreen extends StatefulWidget {
     this.initialTypeRevision,
     this.initialHeaderSignature,
     this.initialSourceRows,
+    this.initialViewTargetOutputGrams,
   });
 
   /// Пусто для «новой», иначе id существующей ТТК.
@@ -727,6 +728,10 @@ class TechCardEditScreen extends StatefulWidget {
 
   /// Показать описание и состав для зала вместо полной ТТК (меню зала).
   final bool forceHallView;
+
+  /// Целевой выход (г) для режима просмотра из чеклиста.
+  /// Может передаваться роутером; в ручном редактировании не используется.
+  final double? initialViewTargetOutputGrams;
 
   /// Категория и цеха при открытии из импорта.
   final String? initialCategory;
