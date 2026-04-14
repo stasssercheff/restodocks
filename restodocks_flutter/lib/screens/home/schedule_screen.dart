@@ -876,7 +876,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${widget.loc.t('expenses_orders_export_error')}: $e')),
+        SnackBar(content: Text('${loc.t('expenses_orders_export_error')}: $e')),
       );
     }
   }
@@ -971,7 +971,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${widget.loc.t('expenses_orders_export_error')}: $e')),
+        SnackBar(content: Text('${loc.t('expenses_orders_export_error')}: $e')),
       );
     }
   }

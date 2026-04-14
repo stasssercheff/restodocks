@@ -1900,14 +1900,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     dense: true,
                     leading: const SizedBox(width: 24),
                     title: Text(
-                      loc.t('support_access_audit_empty'),
+                      localization.t('support_access_audit_empty'),
                       style: const TextStyle(fontSize: 12),
                     ),
                   );
                 }
                 return ExpansionTile(
                   leading: const SizedBox(width: 24),
-                  title: Text(loc.t('support_access_audit_title')),
+                  title: Text(localization.t('support_access_audit_title')),
                   children: rows.map((row) {
                     return ListTile(
                       dense: true,
