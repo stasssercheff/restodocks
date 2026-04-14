@@ -407,7 +407,9 @@ class AccountManagerSupabase extends ChangeNotifier {
       final hasOwnerTrial = list.any(
         (e) => e.proTrialEndsAt != null && e.proTrialEndsAt!.isAfter(now),
       );
-      final hasPaidAccess = list.any((e) => e.hasPaidProAccess);
+      final promo = await getEstablishmentPromoForOwner();
+      final hasPaidAccess =
+          list.any((e) => e.hasPaidProAccess) || promo.isPromoGrantActive;
 
       int branchPacks = 0;
       try {
@@ -421,6 +423,12 @@ class AccountManagerSupabase extends ChangeNotifier {
         }
       } catch (_) {
         branchPacks = 0;
+      }
+
+      // Если RPC промокода не вернул пакеты, но они уже начислены в entitlement-таблицы,
+      // учитываем фактическое значение владельца.
+      if (promo.grantsBranchSlotPacks > branchPacks) {
+        branchPacks = promo.grantsBranchSlotPacks;
       }
 
       if (hasOwnerTrial) {
@@ -2343,13 +2351,13 @@ class AccountManagerSupabase extends ChangeNotifier {
           : (estTierFallback != null && estTierFallback.isNotEmpty
               ? estTierFallback
               : null);
-      final empPacks = _parseRpcInt(
+      int empPacks = _parseRpcInt(
         m['grants_employee_slot_packs'] ??
             m['employee_slot_packs'] ??
             m['employee_packs'] ??
             m['grants_employee_packs'],
       );
-      final branchPacks = _parseRpcInt(
+      int branchPacks = _parseRpcInt(
         m['grants_branch_slot_packs'] ??
             m['branch_slot_packs'] ??
             m['additional_establishment_packs'] ??
@@ -2365,6 +2373,34 @@ class AccountManagerSupabase extends ChangeNotifier {
       final noteRaw = m['promo_template_note']?.toString().trim();
       final promoTemplateNote =
           noteRaw != null && noteRaw.isNotEmpty ? noteRaw : null;
+
+      // Фолбэк на фактические entitlement-пакеты, если старый RPC не отдал grants_* поля.
+      if (empPacks <= 0) {
+        try {
+          final rows = await _supabase.client
+              .from('establishment_entitlement_addons')
+              .select('employee_slot_packs')
+              .eq('establishment_id', est.id)
+              .limit(1);
+          if (rows is List && rows.isNotEmpty) {
+            final row = Map<String, dynamic>.from(rows.first as Map);
+            empPacks = _parseRpcInt(row['employee_slot_packs']);
+          }
+        } catch (_) {}
+      }
+      if (branchPacks <= 0) {
+        try {
+          final rows = await _supabase.client
+              .from('owner_entitlement_addons')
+              .select('branch_slot_packs')
+              .limit(1);
+          if (rows is List && rows.isNotEmpty) {
+            final row = Map<String, dynamic>.from(rows.first as Map);
+            branchPacks = _parseRpcInt(row['branch_slot_packs']);
+          }
+        } catch (_) {}
+      }
+
       return EstablishmentPromoInfo(
         code: code,
         expiresAt: exp,

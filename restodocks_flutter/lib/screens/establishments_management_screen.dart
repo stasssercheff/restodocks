@@ -122,11 +122,6 @@ class _EstablishmentsManagementScreenState
                                   fontWeight: FontWeight.w700,
                                 ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$_totalCount из $_totalCap',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
                         ],
                       ),
                     ),
