@@ -19,8 +19,10 @@ const int _desktopEmployeeNameFlex = 4;
 const int _desktopEmployeeDepartmentFlex = 3;
 const int _desktopEmployeeHeaderPositionFlex = 2;
 const int _desktopEmployeeHeaderRateFlex = 2;
-const int _desktopEmployeeRowPositionFlex = 1;
-const int _desktopEmployeeRowRateFlex = 3;
+const int _desktopEmployeeRowPositionFlex = 2;
+const int _desktopEmployeeRowRateFlex = 2;
+const double _desktopEmployeeDeptRowLeftShift = -18;
+const double _desktopEmployeePositionRowLeftShift = -18;
 const double _desktopEmployeeRateRowLeftInset = 66;
 
 /// Список сотрудников. Владелец видит всех; остальные — по своему отделу. Редактирование для шефа/владельца. Добавление — только личная регистрация по PIN.
@@ -513,22 +515,28 @@ class _EmployeeCard extends StatelessWidget {
               // Подразделение (+ цех)
               Expanded(
                 flex: _desktopEmployeeDepartmentFlex,
-                child: Text(
-                  deptStr,
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Transform.translate(
+                  offset: const Offset(_desktopEmployeeDeptRowLeftShift, 0),
+                  child: Text(
+                    deptStr,
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
               const SizedBox(width: _desktopEmployeeColumnGap),
               // Должность
               Expanded(
                 flex: _desktopEmployeeRowPositionFlex,
-                child: Text(
-                  positionDisplay(employee, loc),
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Transform.translate(
+                  offset: const Offset(_desktopEmployeePositionRowLeftShift, 0),
+                  child: Text(
+                    positionDisplay(employee, loc),
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
               const SizedBox(width: _desktopEmployeeColumnGap),
