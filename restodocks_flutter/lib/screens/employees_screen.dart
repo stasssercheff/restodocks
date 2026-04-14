@@ -551,7 +551,7 @@ class _EmployeeCard extends StatelessWidget {
                     ? Align(
                         alignment: Alignment.center,
                         child: Transform.translate(
-                          offset: const Offset(-22, 0),
+                          offset: const Offset(-62, 0),
                           child: Text(
                             rateStr,
                             style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
