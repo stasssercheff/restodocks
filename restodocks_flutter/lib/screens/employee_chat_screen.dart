@@ -364,8 +364,16 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
 
   Future<void> _pickSystemLink() async {
     final acc = context.read<AccountManagerSupabase>();
-    if (SubscriptionEntitlements.from(acc.establishment).isLiteTier) {
+    final ent = SubscriptionEntitlements.from(acc.establishment);
+    final loc = context.read<LocalizationService>();
+    if (ent.isLiteTier) {
       _toastLiteChatTextOnly();
+      return;
+    }
+    if (!ent.canUseChatSystemLinks) {
+      AppToastService.show(
+        loc.t('chat_system_links_ultra_only'),
+      );
       return;
     }
     if (_sending) return;
@@ -384,10 +392,16 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
     if (emp == null) return;
     final loc = context.read<LocalizationService>();
     final linksCopy = List<EmployeeMessageSystemLink>.from(_pendingLinks);
-    final lite = SubscriptionEntitlements.from(acc.establishment).isLiteTier;
+    final ent = SubscriptionEntitlements.from(acc.establishment);
+    final lite = ent.isLiteTier;
     var linksForSend = linksCopy;
     if (lite && linksCopy.isNotEmpty) {
       AppToastService.show(loc.t('lite_chat_text_only_hint'));
+      linksForSend = [];
+      if (text.isEmpty) return;
+    }
+    if (!ent.canUseChatSystemLinks && linksForSend.isNotEmpty) {
+      AppToastService.show(loc.t('chat_system_links_ultra_only'));
       linksForSend = [];
       if (text.isEmpty) return;
     }
@@ -433,8 +447,9 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
     final acc = context.watch<AccountManagerSupabase>();
-    final liteChatTextOnly =
-        SubscriptionEntitlements.from(acc.establishment).isLiteTier;
+    final ent = SubscriptionEntitlements.from(acc.establishment);
+    final liteChatTextOnly = ent.isLiteTier;
+    final canUseChatSystemLinks = ent.canUseChatSystemLinks;
     final otherName = _otherEmployee?.fullName ?? widget.otherEmployeeId;
 
     return Scaffold(
@@ -480,13 +495,14 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                           itemBuilder: (context, i) {
                           final msg = _messages[i];
                           final isMe = msg.senderEmployeeId == context.read<AccountManagerSupabase>().currentEmployee?.id;
-                          return Align(
+                            return Align(
                             alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                             child: _ChatMessageBubble(
                               message: msg,
                               isMe: isMe,
                               theme: theme,
                               textOnlyViewer: liteChatTextOnly,
+                              systemLinksOpenable: canUseChatSystemLinks,
                             ),
                           );
                         },
@@ -554,11 +570,12 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
                             onPressed: _sending ? null : _sendPhoto,
                             tooltip: loc.t('photo_from_gallery') ?? 'Фото',
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.add_circle_outline),
-                            onPressed: _sending ? null : _pickSystemLink,
-                            tooltip: loc.t('chat_attach_link_title') ?? 'Ссылка',
-                          ),
+                          if (canUseChatSystemLinks)
+                            IconButton(
+                              icon: const Icon(Icons.add_circle_outline),
+                              onPressed: _sending ? null : _pickSystemLink,
+                              tooltip: loc.t('chat_attach_link_title') ?? 'Ссылка',
+                            ),
                           IconButton(
                             icon: const Icon(Icons.mic_none_outlined),
                             onPressed: _sending ? null : _startVoiceRecording,
@@ -686,6 +703,7 @@ class _ChatMessageBubble extends StatefulWidget {
     required this.isMe,
     required this.theme,
     this.textOnlyViewer = false,
+    this.systemLinksOpenable = true,
   });
 
   final EmployeeDirectMessage message;
@@ -694,6 +712,9 @@ class _ChatMessageBubble extends StatefulWidget {
 
   /// Lite: не показывать фото, голос и системные ссылки (только текст).
   final bool textOnlyViewer;
+
+  /// Ultra: системные ссылки открывают экран. Pro: подписи без перехода.
+  final bool systemLinksOpenable;
 
   @override
   State<_ChatMessageBubble> createState() => _ChatMessageBubbleState();
@@ -813,20 +834,37 @@ class _ChatMessageBubbleState extends State<_ChatMessageBubble> {
                   runSpacing: 4,
                   children: [
                     for (final link in widget.message.systemLinks)
-                      ActionChip(
-                        avatar: const Icon(Icons.link, size: 18),
-                        label: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.sizeOf(context).width * 0.55,
-                          ),
-                          child: Text(link.label, maxLines: 2, overflow: TextOverflow.ellipsis),
-                        ),
-                        onPressed: () {
-                          try {
-                            context.push(link.path);
-                          } catch (_) {}
-                        },
-                      ),
+                      widget.systemLinksOpenable
+                          ? ActionChip(
+                              avatar: const Icon(Icons.link, size: 18),
+                              label: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth: MediaQuery.sizeOf(context).width * 0.55,
+                                ),
+                                child: Text(link.label, maxLines: 2, overflow: TextOverflow.ellipsis),
+                              ),
+                              onPressed: () {
+                                try {
+                                  context.push(link.path);
+                                } catch (_) {}
+                              },
+                            )
+                          : Chip(
+                              avatar: Icon(
+                                Icons.link_off_outlined,
+                                size: 18,
+                                color: widget.theme.colorScheme.onSurfaceVariant,
+                              ),
+                              label: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth: MediaQuery.sizeOf(context).width * 0.55,
+                                ),
+                                child: Text(link.label, maxLines: 2, overflow: TextOverflow.ellipsis),
+                              ),
+                              side: BorderSide(
+                                color: widget.theme.colorScheme.outlineVariant,
+                              ),
+                            ),
                   ],
                 ),
               ),
