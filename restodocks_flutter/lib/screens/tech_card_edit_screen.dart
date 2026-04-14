@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -5135,6 +5136,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   child: CustomScrollView(
                     keyboardDismissBehavior:
                         ScrollViewKeyboardDismissBehavior.onDrag,
+                    dragStartBehavior: DragStartBehavior.down,
                     slivers: [
                       SliverPadding(
                         padding: const EdgeInsets.fromLTRB(12, 24, 12, 12),
@@ -5278,7 +5280,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                 children: [
                                   SizedBox(
                                     width: 320,
-                                    height: 56,
+                                    height: 64,
                                     child: TextField(
                                       controller: _nameController,
                                       readOnly: !effectiveCanEdit,
@@ -5513,6 +5515,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                           child: SingleChildScrollView(
                             controller: _compositionTableHScrollController,
                             scrollDirection: Axis.horizontal,
+                            dragStartBehavior: DragStartBehavior.down,
                             clipBehavior: Clip.hardEdge,
                             // Без InteractiveViewer: pinch/scale-жест перехватывал касания и
                             // ломал горизонтальный скролл таблицы и вертикальный скролл страницы (iOS Safari / web).
