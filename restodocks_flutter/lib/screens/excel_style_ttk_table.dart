@@ -602,11 +602,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // порций(шт) — рассчитывается: outputWeight * (weightPerPortion / totalOutput)
                     _buildReadOnlyCell(_portionsPerOne(totalOutput, ingredient)),
 
-                    // Стоимость
-                    _buildCostCell(ingredient),
-
-                    // Цена за кг
+                    // Как в шапке: сначала Цена, затем Стоимость
                     _buildPricePerKgCell(ingredient),
+                    _buildCostCell(ingredient),
 
                     // Кнопка удаления
                     _buildDeleteButton(rowIndex),
@@ -626,6 +624,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // % отхода
                   const SizedBox.shrink(), // Нетто
                   const SizedBox.shrink(), // Способ
+                  const SizedBox.shrink(), // % ужарки
                   // Выход г. итого: редактируемый — при изменении масштабируются все ингредиенты в реальном времени
                   widget.canEdit && widget.onTotalOutputChanged != null && totalOutput > 0
                       ? _buildNumericCell(
@@ -649,10 +648,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                         )
                       : _buildTotalCell(widget.weightPerPortion == 0 ? '' : widget.weightPerPortion.toStringAsFixed(0)),
                   _buildTotalCell('1'), // порций(шт) в итого всегда 1
-                  const SizedBox.shrink(), // Стоимость (пусто)
                   widget.isCook
-                      ? const SizedBox.shrink() // Скрываем стоимость для поваров
-                      : _buildTotalCell('${NumberFormatUtils.formatInt(costPerKgFinishedProduct)} $_currencySymbol'), // Стоимость за кг готового продукта
+                      ? const SizedBox.shrink() // Скрываем цену для поваров
+                      : _buildTotalCell('${NumberFormatUtils.formatInt(costPerKgFinishedProduct)} $_currencySymbol'), // Цена за кг готового продукта
+                  const SizedBox.shrink(), // Стоимость (пусто)
                   const SizedBox.shrink(), // Удаление
                 ],
               ),
