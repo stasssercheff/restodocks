@@ -116,16 +116,16 @@ class ExcelStyleTtkTable extends StatefulWidget {
               h('ttk_type'),
               h('ttk_name'),
               h('ttk_product'),
-              h('ttk_gross_gr'),
+              hWithText(loc.t('ttk_gross_gr').replaceFirst(' ', '\n')),
               h('ttk_waste_pct'),
               h('ttk_net_gr'),
-              h('ttk_cooking_method'),
+              hWithText(loc.t('ttk_cooking_method').replaceFirst(' ', '\n')),
               h('ttk_cooking_loss_pct'),
               h('ttk_output_gr'),
               h('ttk_weight_prc'),
               h('ttk_portions_pcs'),
               h('ttk_price'),
-              h('ttk_cost'),
+              hWithText(loc.t('ttk_cost').replaceFirst(' ', '\n')),
               h(''),
             ],
           ),
@@ -133,6 +133,23 @@ class ExcelStyleTtkTable extends StatefulWidget {
       ),
     );
   }
+
+  static Widget hWithText(String text) => Container(
+        height: 44,
+        alignment: Alignment.center,
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            height: 1.1,
+          ),
+          textAlign: TextAlign.center,
+          softWrap: true,
+          maxLines: 2,
+          overflow: TextOverflow.clip,
+        ),
+      );
 
   @override
   State<ExcelStyleTtkTable> createState() => _ExcelStyleTtkTableState();
@@ -449,16 +466,19 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   _buildHeaderCell(widget.loc.t('ttk_type')),
                   _buildHeaderCell(widget.loc.t('ttk_name')),
                   _buildHeaderCell(widget.loc.t('ttk_product')),
-                  _buildHeaderCell(widget.loc.t('ttk_gross_gr')),
+                  _buildHeaderCell(
+                      widget.loc.t('ttk_gross_gr').replaceFirst(' ', '\n')),
                   _buildHeaderCell(widget.loc.t('ttk_waste_pct')),
                   _buildHeaderCell(widget.loc.t('ttk_net_gr')),
-                  _buildHeaderCell(widget.loc.t('ttk_cooking_method')),
+                  _buildHeaderCell(
+                      widget.loc.t('ttk_cooking_method').replaceFirst(' ', '\n')),
                   _buildHeaderCell(widget.loc.t('ttk_cooking_loss_pct')),
                   _buildHeaderCell(widget.loc.t('ttk_output_gr')),
                   _buildHeaderCell(widget.loc.t('ttk_weight_prc')),
                   _buildHeaderCell(widget.loc.t('ttk_portions_pcs')),
                   _buildHeaderCell(widget.loc.t('ttk_price')),
-                  _buildHeaderCell(widget.loc.t('ttk_cost')),
+                  _buildHeaderCell(
+                      widget.loc.t('ttk_cost').replaceFirst(' ', '\n')),
                   _buildHeaderCell(''), // Столбец удаления
                 ],
               ),
