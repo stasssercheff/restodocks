@@ -1604,8 +1604,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             // В режиме просмотра без редактирования не грузим все ТТК для справочников.
             // Текущую карточку (и технологию) загрузим ниже как обычно.
           } else {
-            () async {
+            unawaited(() async {
               try {
+                // На web сначала показываем форму, затем запускаем фоновую догрузку справочника.
+                if (kIsWeb) {
+                  await Future<void>.delayed(const Duration(milliseconds: 450));
+                  if (!mounted) return;
+                }
                 final tcSvc = context.read<TechCardServiceSupabase>();
 
                 final customCategoriesFuture = Future.wait([
@@ -1621,8 +1626,18 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 final customBar =
                     customResults[1] as List<({String id, String name})>;
 
-                void applyPickerSlice(List<TechCard> merged) {
+                DateTime _lastPickerProgressUiAt =
+                    DateTime.fromMillisecondsSinceEpoch(0);
+                void applyPickerSlice(List<TechCard> merged, {bool force = false}) {
                   if (!mounted) return;
+                  if (kIsWeb && !force) {
+                    final now = DateTime.now();
+                    if (now.difference(_lastPickerProgressUiAt) <
+                        const Duration(milliseconds: 700)) {
+                      return;
+                    }
+                    _lastPickerProgressUiAt = now;
+                  }
                   final slice =
                       merged.map(stripInvalidNestedPfSelfLinks).toList();
                   setState(() {
@@ -1692,6 +1707,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                   );
                   tcs = tcs.map(stripInvalidNestedPfSelfLinks).toList();
                 }
+                applyPickerSlice(tcs, force: true);
 
                 // Для расчёта цены ПФ в ExcelStyleTtkTable нужны ingredients + cost внутри самих ПФ.
                 // В режиме deferTcLoad мы грузим карточки без ingredients, поэтому догружаем только ПФ.
@@ -1727,7 +1743,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                 }());
                 _ensureTechCardTranslations(tcs);
               } catch (_) {}
-            }();
+            }());
           }
         }
       }
@@ -2497,15 +2513,23 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       // Так переход на экран ТТК не фризит посередине.
       unawaited(_startLoadAfterRouteTransition());
 
-      // Периодическая автодосвязка вложенных ПФ (например, чтобы "йогурт"
-      // появился в "соус салатный" без повторного открытия редактирования).
-      _reconcileNotifier = context.read<TechCardsReconcileNotifier>();
-      _lastReconcileNotifierVersion = _reconcileNotifier!.version;
-      _reconcileNotifier!.addListener(_handleTechCardsReconcileSignal);
-      _reconcileOpenCardTimer?.cancel();
-      _reconcileOpenCardTimer = Timer.periodic(const Duration(minutes: 5), (_) {
-        _tryReconcileOpenCard(force: false);
-      });
+      // Периодическая автодосвязка вложенных ПФ нужна только для существующей карточки.
+      // Для новой карточки не запускаем фоновую задачу, чтобы не нагружать экран на старте.
+      if (!_isNew) {
+        unawaited(() async {
+          // Даем экрану стабилизироваться после открытия, затем подключаем reconcile.
+          await Future<void>.delayed(const Duration(milliseconds: 1500));
+          if (!mounted || _isNew) return;
+          _reconcileNotifier = context.read<TechCardsReconcileNotifier>();
+          _lastReconcileNotifierVersion = _reconcileNotifier!.version;
+          _reconcileNotifier!.addListener(_handleTechCardsReconcileSignal);
+          _reconcileOpenCardTimer?.cancel();
+          _reconcileOpenCardTimer =
+              Timer.periodic(const Duration(minutes: 5), (_) {
+            _tryReconcileOpenCard(force: false);
+          });
+        }());
+      }
     });
   }
 
@@ -4913,6 +4937,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
 
     // Определяем, является ли устройство мобильным
     final isMobile = isHandheldNarrowLayout(context);
+    final shouldPinCompositionHeader = isMobile;
 
     if (_isNew && !effectiveCanEdit) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -5495,7 +5520,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                           ),
                         ),
                       ),
-                    if (false && effectiveCanEdit && !isCook)
+                    if (shouldPinCompositionHeader)
                       SliverPersistentHeader(
                         pinned: true,
                         delegate: _TtkCompositionPinnedHeaderDelegate(
@@ -5522,9 +5547,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                             physics: const BouncingScrollPhysics(
                               parent: AlwaysScrollableScrollPhysics(),
                             ),
-                            child: Listener(
-                              behavior: HitTestBehavior.deferToChild,
-                              child: effectiveCanEdit
+                            child: effectiveCanEdit
                                   ? RepaintBoundary(
                                       child: ExcelStyleTtkTable(
                                         loc: loc,
@@ -5604,7 +5627,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                         onRemove: _removeIngredient,
                                         onSuggestWaste: _suggestWasteForRow,
                                         hideTechnologyBlock: true,
-                                        omitTableHeader: false,
+                                        omitTableHeader:
+                                            shouldPinCompositionHeader,
                                         shrinkWrap: true,
                                         onTapPfIngredient: (id) =>
                                             context.push('/tech-cards/$id'),
@@ -5658,8 +5682,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                           ),
                                         );
                                       },
-                                    ),
-                            ),
+                                      ),
                           ),
                         ),
                       ),
@@ -5799,13 +5822,15 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                       ],
                                     ),
                                   ),
-                                  SingleChildScrollView(
+                                  Padding(
                                     padding: const EdgeInsets.all(12),
                                     child: effectiveCanEdit
                                         ? TextField(
                                             controller: _technologyController,
-                                            maxLines: null,
-                                            minLines: 2,
+                                            minLines: isMobile ? 2 : 3,
+                                            maxLines: isMobile ? 5 : 8,
+                                            textAlignVertical:
+                                                TextAlignVertical.top,
                                             style:
                                                 const TextStyle(fontSize: 13),
                                             decoration: InputDecoration(
@@ -5813,6 +5838,8 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                               isDense: true,
                                               filled: false,
                                               hintText: loc.t('ttk_technology'),
+                                              contentPadding:
+                                                  EdgeInsets.zero,
                                             ),
                                           )
                                         : Text(
@@ -6187,8 +6214,8 @@ class _TtkCompositionPinnedHeaderDelegate extends SliverPersistentHeaderDelegate
   final ScrollController hScroll;
   final Color surfaceColor;
 
-  /// Высота строки шапки с переносом текста (до 4 строк в ячейке).
-  static const double _extent = 72;
+  /// Высота строки шапки должна совпадать с внутренней шапкой таблицы.
+  static const double _extent = ExcelStyleTtkTable.compositionHeaderHeight;
 
   @override
   double get minExtent => _extent;

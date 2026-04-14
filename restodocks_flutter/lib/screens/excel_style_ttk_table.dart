@@ -72,19 +72,23 @@ class ExcelStyleTtkTable extends StatefulWidget {
 
   /// Сумма ширин колонок — как у [tableCore], иначе закреплённая шапка и тело расходятся.
   static const double compositionTableWidth = 1105;
+  static const double compositionHeaderHeight = 56;
 
   /// Одна строка шапки состава (для закрепа над страницей; ширина как у таблицы).
   static Widget compositionPinnedHeader(LocalizationService loc) {
-    Widget h(String key) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-          child: Center(
-            child: Text(
-              loc.t(key),
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-              softWrap: true,
-              maxLines: 4,
-              overflow: TextOverflow.clip,
+    Widget h(String key) => SizedBox(
+          height: compositionHeaderHeight,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+            child: Center(
+              child: Text(
+                loc.t(key),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+                softWrap: true,
+                maxLines: 4,
+                overflow: TextOverflow.clip,
+              ),
             ),
           ),
         );
@@ -832,16 +836,19 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   // Вспомогательные методы для создания ячеек
 
   Widget _buildHeaderCell(String text) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-      child: Center(
-        child: Text(
-          text,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-          textAlign: TextAlign.center,
-          softWrap: true,
-          maxLines: 4,
-          overflow: TextOverflow.clip,
+    return SizedBox(
+      height: ExcelStyleTtkTable.compositionHeaderHeight,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+        child: Center(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+            softWrap: true,
+            maxLines: 4,
+            overflow: TextOverflow.clip,
+          ),
         ),
       ),
     );
