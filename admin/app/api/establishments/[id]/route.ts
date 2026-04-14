@@ -79,7 +79,9 @@ export async function DELETE(
   if (!id) return NextResponse.json({ error: 'Establishment ID required' }, { status: 400 })
 
   try {
-    const { error } = await supabase.rpc('admin_delete_establishment', { p_establishment_id: id })
+    const { data: rpcData, error } = await supabase.rpc('admin_delete_establishment', {
+      p_establishment_id: id,
+    })
     if (error) {
       const err = error as {
         message?: string
@@ -89,9 +91,13 @@ export async function DELETE(
       }
       const msg = [err.message, err.details, err.hint].filter(Boolean).join(' — ') || String(error)
       console.error('Admin delete establishment error:', error)
-      return NextResponse.json({ error: msg, code: err.code }, { status: 500 })
+      const hint =
+        /function public\.admin_delete_establishment|does not exist|42883/i.test(msg)
+          ? ' Выполните миграции Supabase: 20260406234000_admin_delete_establishment_returns_jsonb.sql и зависимости _delete_establishment_cascade.'
+          : ''
+      return NextResponse.json({ error: msg + hint, code: err.code }, { status: 500 })
     }
-    return NextResponse.json({ ok: true })
+    return NextResponse.json({ ok: true, result: rpcData ?? null })
   } catch (e) {
     console.error('Admin delete establishment error:', e)
     const msg =

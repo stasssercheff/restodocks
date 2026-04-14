@@ -87,9 +87,22 @@ function promoRowStatus(row: PromoCode): 'disabled' | 'used' | 'expired' | 'free
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
+const RD_ADMIN_SUPPORT_KEY = 'rd_admin_support_active'
+
 export default function AdminClient() {
   const router = useRouter()
   const [tab, setTab] = useState<'establishments' | 'promo' | 'support' | 'security' | 'health' | 'settings'>('establishments')
+  const [supportShellHighlight, setSupportShellHighlight] = useState(false)
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && sessionStorage.getItem(RD_ADMIN_SUPPORT_KEY) === '1') {
+        setSupportShellHighlight(true)
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [])
 
   async function logout() {
     await fetch('/api/auth', { method: 'DELETE' })
@@ -98,10 +111,21 @@ export default function AdminClient() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <header className="border-b border-amber-900/40 bg-gray-950 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+      <header
+        className={`px-4 py-3 flex items-center justify-between sticky top-0 z-10 border-b transition-colors ${
+          supportShellHighlight
+            ? 'border-purple-500/70 bg-purple-950/95 shadow-[0_0_24px_rgba(147,51,234,0.25)]'
+            : 'border-amber-900/40 bg-gray-950'
+        }`}
+      >
         <div className="flex items-center gap-2">
           <span className="font-bold text-base">Restodocks</span>
           <span className="text-gray-500 text-sm hidden sm:inline">/ Admin</span>
+          {supportShellHighlight ? (
+            <span className="text-xs font-medium text-purple-200/95 hidden sm:inline">
+              — сеанс техподдержки открыт
+            </span>
+          ) : null}
         </div>
         <button onClick={logout} className="text-sm text-gray-500 hover:text-white transition">
           Выйти
@@ -136,7 +160,20 @@ export default function AdminClient() {
       <main className="max-w-6xl mx-auto px-3 py-4 sm:px-6 sm:py-8">
         {tab === 'establishments' && <EstablishmentsTab />}
         {tab === 'promo' && <PromoTab />}
-        {tab === 'support' && <SupportAccessTab />}
+        {tab === 'support' && (
+          <SupportAccessTab
+            onSupportShellActiveChange={active => {
+              setSupportShellHighlight(active)
+              try {
+                if (typeof window === 'undefined') return
+                if (active) sessionStorage.setItem(RD_ADMIN_SUPPORT_KEY, '1')
+                else sessionStorage.removeItem(RD_ADMIN_SUPPORT_KEY)
+              } catch {
+                /* ignore */
+              }
+            }}
+          />
+        )}
         {tab === 'security' && <SecurityTab />}
         {tab === 'health' && <SystemHealthTab />}
         {tab === 'settings' && <PlatformSettingsTab />}
@@ -145,7 +182,11 @@ export default function AdminClient() {
   )
 }
 
-function SupportAccessTab() {
+function SupportAccessTab({
+  onSupportShellActiveChange,
+}: {
+  onSupportShellActiveChange?: (active: boolean) => void
+}) {
   const [supportOperatorLogin, setSupportOperatorLogin] = useState('')
   const [accountLogin, setAccountLogin] = useState('')
   const [appOrigin, setAppOrigin] = useState('https://restodocks-beta.pages.dev')
@@ -164,6 +205,24 @@ function SupportAccessTab() {
     }
     setLogs(Array.isArray(data) ? data : [])
   }
+
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return
+      if (sessionStorage.getItem(RD_ADMIN_SUPPORT_KEY) !== '1') return
+      const raw = sessionStorage.getItem('rd_admin_support_meta')
+      if (!raw) return
+      const meta = JSON.parse(raw) as { id?: string; name?: string }
+      if (meta?.id) {
+        setActiveEstablishmentId(meta.id)
+        setActiveEstablishmentName(meta.name ?? null)
+        void loadLogs(meta.id)
+      }
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only restore
+  }, [])
 
   async function startSupportSession() {
     setBusy(true)
@@ -186,11 +245,27 @@ function SupportAccessTab() {
       const est = data?.establishment
       setActiveEstablishmentId(est?.id ?? null)
       setActiveEstablishmentName(est?.name ?? null)
-      if (est?.id) await loadLogs(est.id)
+      if (est?.id) {
+        try {
+          sessionStorage.setItem(
+            'rd_admin_support_meta',
+            JSON.stringify({ id: est.id, name: est.name }),
+          )
+        } catch {
+          /* ignore */
+        }
+        await loadLogs(est.id)
+      }
+      onSupportShellActiveChange?.(true)
+      if (typeof data?.warning === 'string' && data.warning.length > 0) {
+        alert(data.warning)
+      }
       if (typeof data?.action_link === 'string' && data.action_link.length > 0) {
         window.open(data.action_link, '_blank', 'noopener,noreferrer')
       }
-      alert('Сеанс техподдержки открыт и ссылка входа в аккаунт запущена в новой вкладке.')
+      alert(
+        'Сеанс техподдержки открыт: верхняя панель админки подсвечена фиолетовым — так видно, что вы в режиме входа в аккаунт пользователя. Ссылка для входа открыта в новой вкладке.',
+      )
     } finally {
       setBusy(false)
     }
@@ -211,6 +286,12 @@ function SupportAccessTab() {
         setError(typeof data?.error === 'string' ? data.error : `Ошибка (${res.status})`)
         return
       }
+      try {
+        sessionStorage.removeItem('rd_admin_support_meta')
+      } catch {
+        /* ignore */
+      }
+      onSupportShellActiveChange?.(false)
       await loadLogs(activeEstablishmentId)
       alert('Сеанс техподдержки завершён.')
     } finally {

@@ -79,39 +79,36 @@ export async function POST(req: NextRequest) {
 
   const hasAudit = await hasTable(supabase, 'support_access_audit_log')
   const hasEvents = await hasTable(supabase, 'support_access_event_log')
-  if (!hasAudit || !hasEvents) {
-    return NextResponse.json(
-      { error: 'Не применены миграции журнала техподдержки в Supabase (support_access_audit_log / support_access_event_log).' },
-      { status: 500 },
-    )
+  const auditTablesReady = hasAudit && hasEvents
+
+  if (auditTablesReady) {
+    const { data: activeRows, error: activeErr } = await supabase
+      .from('support_access_audit_log')
+      .select('id')
+      .eq('establishment_id', est.id)
+      .is('ended_at', null)
+      .limit(1)
+    if (activeErr) return NextResponse.json({ error: activeErr.message }, { status: 500 })
+    if ((activeRows ?? []).length > 0) {
+      return NextResponse.json({ error: 'Сеанс техподдержки уже активен для этого заведения' }, { status: 409 })
+    }
+
+    const { error: insErr } = await supabase.from('support_access_audit_log').insert({
+      establishment_id: est.id,
+      support_operator_login: supportOperatorLogin,
+      account_login: accountLogin,
+      pin_code: pinForAudit,
+    })
+    if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 })
+
+    const { error: evErr } = await supabase.from('support_access_event_log').insert({
+      establishment_id: est.id,
+      event_type: 'support_login',
+      support_operator_login: supportOperatorLogin,
+      account_login: accountLogin,
+    })
+    if (evErr) return NextResponse.json({ error: evErr.message }, { status: 500 })
   }
-
-  const { data: activeRows, error: activeErr } = await supabase
-    .from('support_access_audit_log')
-    .select('id')
-    .eq('establishment_id', est.id)
-    .is('ended_at', null)
-    .limit(1)
-  if (activeErr) return NextResponse.json({ error: activeErr.message }, { status: 500 })
-  if ((activeRows ?? []).length > 0) {
-    return NextResponse.json({ error: 'Сеанс техподдержки уже активен для этого заведения' }, { status: 409 })
-  }
-
-  const { error: insErr } = await supabase.from('support_access_audit_log').insert({
-    establishment_id: est.id,
-    support_operator_login: supportOperatorLogin,
-    account_login: accountLogin,
-    pin_code: pinForAudit,
-  })
-  if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 })
-
-  const { error: evErr } = await supabase.from('support_access_event_log').insert({
-    establishment_id: est.id,
-    event_type: 'support_login',
-    support_operator_login: supportOperatorLogin,
-    account_login: accountLogin,
-  })
-  if (evErr) return NextResponse.json({ error: evErr.message }, { status: 500 })
 
   const redirectTo = appOrigin
     ? `${appOrigin}/auth/confirm`
@@ -132,6 +129,13 @@ export async function POST(req: NextRequest) {
     establishment: est,
     account: emp,
     action_link: actionLink,
+    audit_log_disabled: !auditTablesReady,
+    ...(auditTablesReady
+      ? {}
+      : {
+          warning:
+            'Журнал техподдержки в БД не развёрнут: выполните миграции support_access_audit_log / support_access_event_log. Вход по ссылке работает, аудит в таблицах не пишется.',
+        }),
   })
 }
 
@@ -144,6 +148,16 @@ export async function PATCH(req: NextRequest) {
   const establishmentId = (body?.establishment_id ?? '').toString().trim()
   if (!establishmentId) {
     return NextResponse.json({ error: 'establishment_id is required' }, { status: 400 })
+  }
+
+  const hasAudit = await hasTable(supabase, 'support_access_audit_log')
+  const hasEvents = await hasTable(supabase, 'support_access_event_log')
+  if (!hasAudit || !hasEvents) {
+    return NextResponse.json({
+      ok: true,
+      audit_skipped: true,
+      message: 'Таблицы журнала отсутствуют — закрывать сеанс в БД нечего.',
+    })
   }
 
   const { data: activeRows, error: activeErr } = await supabase
@@ -182,6 +196,11 @@ export async function GET(req: NextRequest) {
 
   const establishmentId = req.nextUrl.searchParams.get('establishment_id')?.trim() ?? ''
   if (!establishmentId) return NextResponse.json({ error: 'establishment_id is required' }, { status: 400 })
+
+  const hasEvents = await hasTable(supabase, 'support_access_event_log')
+  if (!hasEvents) {
+    return NextResponse.json([])
+  }
 
   const { data, error } = await supabase
     .from('support_access_event_log')

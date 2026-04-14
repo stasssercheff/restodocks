@@ -54,6 +54,7 @@ class _AppShellState extends State<AppShell> {
   String? _lastPath;
   bool _pwaHintQueued = false;
   Timer? _supportPollTimer;
+  bool _supportAdminEntrySnackShown = false;
 
   bool _landscapeNarrowPhone(BuildContext context) {
     final mq = MediaQuery.of(context);
@@ -347,6 +348,22 @@ class _AppShellState extends State<AppShell> {
         ? _AccessPendingPlaceholder(loc: loc)
         : widget.child;
     final supportActive = accountManager.supportSessionActive;
+    if (!supportActive) {
+      _supportAdminEntrySnackShown = false;
+    } else if (isOwner && supportActive && !_supportAdminEntrySnackShown) {
+      _supportAdminEntrySnackShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (!accountManager.supportSessionActive) return;
+        final messenger = ScaffoldMessenger.maybeOf(context);
+        messenger?.showSnackBar(
+          SnackBar(
+            content: Text(loc.t('support_admin_session_snackbar')),
+            duration: const Duration(seconds: 9),
+          ),
+        );
+      });
+    }
     final mq = MediaQuery.of(context);
     // Совпадает с main.dart: веб в альбоме — сброс боков; нативно — только без выреза
     // (иначе сохраняем горизонтальный safe area под камеру / Dynamic Island).
@@ -393,7 +410,7 @@ class _AppShellState extends State<AppShell> {
                 left: 0,
                 right: 0,
                 child: Material(
-                  color: Colors.amber.shade900.withValues(alpha: 0.95),
+                  color: const Color(0xFF4A148C).withValues(alpha: 0.96),
                   elevation: 4,
                   child: SafeArea(
                     bottom: false,
@@ -407,7 +424,7 @@ class _AppShellState extends State<AppShell> {
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
-                              'Сейчас у системной техподдержки есть активный доступ к вашему заведению.',
+                              loc.t('support_admin_session_banner'),
                               style: const TextStyle(
                                   color: Colors.white, fontSize: 12),
                             ),
