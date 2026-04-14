@@ -6123,7 +6123,7 @@ class _TtkCompositionPinnedHeaderDelegate extends SliverPersistentHeaderDelegate
   final ScrollController hScroll;
   final Color surfaceColor;
 
-  static const double _extent = 44;
+  static const double _extent = 45;
 
   @override
   double get minExtent => _extent;

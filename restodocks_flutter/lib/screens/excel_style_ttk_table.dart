@@ -70,9 +70,6 @@ class ExcelStyleTtkTable extends StatefulWidget {
     this.omitTableHeader = false,
   });
 
-  /// Сумма ширин всех колонок таблицы состава.
-  static const double compositionTableWidth = 1105;
-
   /// Одна строка шапки состава (для закрепа над страницей; ширина как у таблицы).
   static Widget compositionPinnedHeader(LocalizationService loc) {
     Widget h(String key) => Container(
@@ -85,10 +82,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
           ),
         );
     return ConstrainedBox(
-      constraints: const BoxConstraints(
-        minWidth: compositionTableWidth,
-        maxWidth: compositionTableWidth,
-      ),
+      constraints: const BoxConstraints(minWidth: 1145, maxWidth: 1145),
       child: Table(
         border: TableBorder.all(color: Colors.black, width: 1),
         defaultVerticalAlignment: TableCellVerticalAlignment.middle,
@@ -306,10 +300,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       // Отложенный билд: избегаем замирания при большом числе ингредиентов.
       if (!_tableBuilt) {
         return ConstrainedBox(
-          constraints: const BoxConstraints(
-            minWidth: ExcelStyleTtkTable.compositionTableWidth,
-            minHeight: 200,
-          ),
+          constraints: const BoxConstraints(minWidth: 1145, minHeight: 200),
           child: Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
@@ -414,8 +405,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     final Widget tableCore = ConstrainedBox(
             constraints: const BoxConstraints(
-              minWidth: ExcelStyleTtkTable.compositionTableWidth,
-              maxWidth: ExcelStyleTtkTable.compositionTableWidth,
+              minWidth: 1145,
+              maxWidth: 1145,
             ), // фиксируем ширину, чтобы контейнер не раздувался под доступную ширину
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -602,9 +593,11 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                     // порций(шт) — рассчитывается: outputWeight * (weightPerPortion / totalOutput)
                     _buildReadOnlyCell(_portionsPerOne(totalOutput, ingredient)),
 
-                    // Как в шапке: сначала Цена, затем Стоимость
-                    _buildPricePerKgCell(ingredient),
+                    // Стоимость
                     _buildCostCell(ingredient),
+
+                    // Цена за кг
+                    _buildPricePerKgCell(ingredient),
 
                     // Кнопка удаления
                     _buildDeleteButton(rowIndex),
@@ -624,7 +617,6 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   const SizedBox.shrink(), // % отхода
                   const SizedBox.shrink(), // Нетто
                   const SizedBox.shrink(), // Способ
-                  const SizedBox.shrink(), // % ужарки
                   // Выход г. итого: редактируемый — при изменении масштабируются все ингредиенты в реальном времени
                   widget.canEdit && widget.onTotalOutputChanged != null && totalOutput > 0
                       ? _buildNumericCell(
@@ -648,10 +640,10 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                         )
                       : _buildTotalCell(widget.weightPerPortion == 0 ? '' : widget.weightPerPortion.toStringAsFixed(0)),
                   _buildTotalCell('1'), // порций(шт) в итого всегда 1
-                  widget.isCook
-                      ? const SizedBox.shrink() // Скрываем цену для поваров
-                      : _buildTotalCell('${NumberFormatUtils.formatInt(costPerKgFinishedProduct)} $_currencySymbol'), // Цена за кг готового продукта
                   const SizedBox.shrink(), // Стоимость (пусто)
+                  widget.isCook
+                      ? const SizedBox.shrink() // Скрываем стоимость для поваров
+                      : _buildTotalCell('${NumberFormatUtils.formatInt(costPerKgFinishedProduct)} $_currencySymbol'), // Стоимость за кг готового продукта
                   const SizedBox.shrink(), // Удаление
                 ],
               ),
