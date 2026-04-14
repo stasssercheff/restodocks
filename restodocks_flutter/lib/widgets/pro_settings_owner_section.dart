@@ -683,7 +683,6 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                               theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           );
-                          final adminNote = promo.promoTemplateNote?.trim();
                           return AlertDialog(
                             title: Text(loc.t('pro_promo_title')),
                             content: SingleChildScrollView(
@@ -694,22 +693,6 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                                   if (estName != null && estName.isNotEmpty) ...[
                                     Text(
                                       '${loc.t('pro_promo_establishment_label')}: $estName',
-                                      style: theme.textTheme.bodyMedium,
-                                    ),
-                                    const SizedBox(height: 12),
-                                  ],
-                                  if (adminNote != null &&
-                                      adminNote.isNotEmpty) ...[
-                                    Text(
-                                      loc.t('pro_promo_admin_note_label'),
-                                      style: theme.textTheme.titleSmall
-                                          ?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      adminNote,
                                       style: theme.textTheme.bodyMedium,
                                     ),
                                     const SizedBox(height: 12),
