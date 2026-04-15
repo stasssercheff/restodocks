@@ -407,7 +407,6 @@ ${loginLine}
 <p>${copy.yourLoginLabel}: <strong>${escapeHtml(email)}</strong></p>
 <p>${copy.passwordHint}</p>
 <p><strong>${copy.instructionLabel}:</strong><br>${copy.ownerInstruction}</p>
-<p style="color:#666;font-size:14px">${copy.spamHint}</p>
 <p>${copy.regards}<br>Restodocks</p>
       `.trim();
       } else {
@@ -422,7 +421,6 @@ ${loginLine}
 <p><strong>${copy.companyPinLabel}: ${escapeHtml(pinCode || "")}</strong></p>
 <p>${copy.yourLoginLabel}: <strong>${escapeHtml(email)}</strong></p>
 <p>${copy.passwordHint}</p>
-<p style="color:#666;font-size:14px">${copy.spamHint}</p>
 <p>${copy.regards}<br>Restodocks</p>
       `.trim();
       }

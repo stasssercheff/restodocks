@@ -1173,31 +1173,9 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// Fallback: создать employee для auth user через fix_owner_without_employee (когда complete_pending не сработал).
   Future<({Employee employee, Establishment establishment})?>
       _tryFixOwnerWithoutEmployee() async {
-    if (!_supabase.isAuthenticated) return null;
-    final email = _supabase.currentUser?.email?.trim();
-    if (email == null || email.isEmpty) return null;
-    try {
-      final res = await _supabase.client
-          .rpc('fix_owner_without_employee', params: {'p_email': email});
-      if (res == null) return null;
-      final empData = Map<String, dynamic>.from(res as Map);
-      empData['password'] = '';
-      empData['password_hash'] = '';
-      final employee = Employee.fromJson(empData);
-      final estData = await _supabase.client
-          .from('establishments')
-          .select()
-          .eq('id', employee.establishmentId)
-          .limit(1)
-          .single();
-      return (
-        employee: employee,
-        establishment: Establishment.fromJson(estData),
-      );
-    } catch (e) {
-      devLog('🔐 fix_owner_without_employee fallback: $e');
-      return null;
-    }
+    // Временное отключение fallback RPC из-за серии шумных 400 в owner-first потоке.
+    // Рабочий путь: completePendingOwnerRegistration + owner_has_pending_registration_without_company.
+    return null;
   }
 
   /// Создание владельца через RPC — только для co-owner (create_employee_for_company), не для первичной регистрации.
@@ -1286,28 +1264,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
         // Для owner-first без заведения RPC fix_owner_without_employee ожидаемо даёт 400.
         // Пропускаем его до шага создания компании.
-        if (!await _pendingOwnerAwaitingCompanyOnly(authUserId)) {
-          try {
-            final fixRes = await _supabase.client.rpc(
-                'fix_owner_without_employee',
-                params: {'p_email': emailTrim});
-            if (fixRes != null) {
-              final empData = Map<String, dynamic>.from(fixRes as Map);
-              empData['password'] = empData['password_hash'] ?? '';
-              final employee = Employee.fromJson(empData);
-              final estData = await _supabase.client
-                  .from('establishments')
-                  .select()
-                  .eq('id', employee.establishmentId)
-                  .limit(1)
-                  .single();
-              final establishment = Establishment.fromJson(estData);
-              return (employee: employee, establishment: establishment);
-            }
-          } catch (fixErr) {
-            devLog('🔐 fix_owner_without_employee failed: $fixErr');
-          }
-        }
+        // fix_owner_without_employee отключён (см. _tryFixOwnerWithoutEmployee()).
 
         // Owner-first: email подтверждён, заведение ещё не создано — не signOut и не SQL-скрипт.
         try {
