@@ -29,7 +29,9 @@ class StaffHomeContent extends StatelessWidget {
     final account = context.watch<AccountManagerSupabase>();
     final subOk = account.hasProSubscription;
     final ent = SubscriptionEntitlements.from(account.establishment);
-    final posOn = FeatureFlags.posEnabledForSubscription(ent);
+    final screenPref = context.watch<ScreenLayoutPreferenceService>();
+    final posOn =
+        FeatureFlags.posEnabledForSubscription(ent) && screenPref.showPosSection;
     final rawDeptRoute = _deptForRoute(employee.department);
     final deptRoute = !ent.hasUltraLevelFeatures && rawDeptRoute == 'bar'
         ? 'kitchen'
@@ -71,7 +73,6 @@ class StaffHomeContent extends StatelessWidget {
     }
 
     final layoutSvc = context.watch<HomeLayoutConfigService>();
-    final screenPref = context.watch<ScreenLayoutPreferenceService>();
     final order = layoutSvc.getOrder(employee.id);
     final tiles = <HomeTileId, Widget>{
       HomeTileId.messages: HomeFeatureTile(

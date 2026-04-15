@@ -102,7 +102,8 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
         visible(key) ? child : const SizedBox.shrink();
 
     final ent = SubscriptionEntitlements.from(account.establishment);
-    final posOn = FeatureFlags.posEnabledForSubscription(ent);
+    final posOn =
+        FeatureFlags.posEnabledForSubscription(ent) && screenPref.showPosSection;
     final showBarBlock = screenPref.showBarSection && ent.hasUltraLevelFeatures;
     if (ent.isLiteTier) {
       final layoutSvc = context.watch<HomeLayoutConfigService>();

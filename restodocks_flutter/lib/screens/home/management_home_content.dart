@@ -31,8 +31,9 @@ class ManagementHomeContent extends StatelessWidget {
     final account = context.watch<AccountManagerSupabase>();
     final subOk = account.hasProSubscription;
     final ent = SubscriptionEntitlements.from(account.establishment);
-    final posOn = FeatureFlags.posEnabledForSubscription(ent);
     final screenPref = context.watch<ScreenLayoutPreferenceService>();
+    final posOn =
+        FeatureFlags.posEnabledForSubscription(ent) && screenPref.showPosSection;
     final roles = employee.roles;
     final isChef = roles.contains('executive_chef');
     final isBarManager = roles.contains('bar_manager');

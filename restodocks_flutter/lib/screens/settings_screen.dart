@@ -656,7 +656,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (isOwnerHome) {
       final screenPref = context.read<ScreenLayoutPreferenceService>();
       final ownerSubEnt = SubscriptionEntitlements.from(account.establishment);
-      final posOn = FeatureFlags.posEnabledForSubscription(ownerSubEnt);
+      final posOn = FeatureFlags.posEnabledForSubscription(ownerSubEnt) &&
+          screenPref.showPosSection;
       final labels = <String, String>{
         'owner_doc': loc.t('documentation') ?? 'Документация',
         'owner_haccp': loc.t('haccp_journals') ?? 'Журналы и ХАССП',
@@ -1938,7 +1939,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final establishment = accountManager.establishment;
     final localization = context.watch<LocalizationService>();
     final subEnt = SubscriptionEntitlements.from(accountManager.establishment);
-    final posOn = FeatureFlags.posEnabledForSubscription(subEnt);
+    final screenPref = context.watch<ScreenLayoutPreferenceService>();
+    final posOn =
+        FeatureFlags.posEnabledForSubscription(subEnt) && screenPref.showPosSection;
 
     if (currentEmployee == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -2071,6 +2074,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 if (currentEmployee.hasRole('owner') &&
                     !accountManager.isLiteTier) ...[
+                  if (SubscriptionEntitlements.from(accountManager.establishment)
+                      .hasUltraLevelFeatures)
+                    Consumer<ScreenLayoutPreferenceService>(
+                      builder: (_, screenPref, __) => SwitchListTile(
+                        secondary: const Icon(Icons.point_of_sale_outlined),
+                        title: Text(localization.t('show_pos_section') ??
+                            'Раздел «POS» на главной'),
+                        subtitle: Text(localization.t('show_pos_section_hint') ??
+                            'Показывать POS-плитки на домашнем экране (заказы, касса, столы, склад, закупка, продажи)'),
+                        value: screenPref.showPosSection,
+                        onChanged: (v) => screenPref.setShowPosSection(v),
+                      ),
+                    ),
                   if (SubscriptionEntitlements.from(accountManager.establishment)
                       .hasUltraLevelFeatures)
                     Consumer<ScreenLayoutPreferenceService>(
