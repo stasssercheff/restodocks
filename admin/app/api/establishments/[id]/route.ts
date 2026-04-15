@@ -50,7 +50,7 @@ export async function DELETE(
       console.error('Admin delete establishment error:', error)
       const missingRpcHint =
         /function public\.admin_delete_establishment|does not exist|42883/i.test(msg)
-          ? ' Выполните миграции Supabase: 20260406234000_admin_delete_establishment_returns_jsonb.sql и зависимости _delete_establishment_cascade.'
+          ? ' Выполните миграции Supabase: 20260623190000_establishment_delete_purge_auth_users.sql и зависимости _delete_establishment_cascade.'
           : ''
       const appleIapColumnHint =
         /apple_iap_subscription_claims|column "establishment_id" does not exist|42703/i.test(msg)
@@ -59,7 +59,34 @@ export async function DELETE(
       const hint = `${missingRpcHint}${appleIapColumnHint}`
       return NextResponse.json({ error: msg + hint, code: err.code }, { status: 500 })
     }
-    return NextResponse.json({ ok: true, result: rpcData ?? null })
+
+    type RpcPayload = { ok?: boolean; purge_auth_user_ids?: unknown }
+    const payload = (rpcData ?? null) as RpcPayload | null
+    const purgeAuthUserIds: string[] = Array.isArray(payload?.purge_auth_user_ids)
+      ? (payload!.purge_auth_user_ids as unknown[]).filter(
+          (x): x is string => typeof x === 'string' && x.length > 0
+        )
+      : []
+
+    for (const uid of purgeAuthUserIds) {
+      const { error: delErr } = await supabase.auth.admin.deleteUser(uid)
+      if (delErr) {
+        console.error('Admin delete establishment: auth.admin.deleteUser failed', uid, delErr)
+        return NextResponse.json(
+          {
+            error: `Заведение удалено из БД, но не удалось удалить пользователя Auth (${uid}): ${delErr.message}`,
+            uid,
+          },
+          { status: 500 }
+        )
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      result: rpcData ?? null,
+      auth_users_purged: purgeAuthUserIds.length,
+    })
   } catch (e) {
     console.error('Admin delete establishment error:', e)
     const msg =

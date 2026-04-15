@@ -2032,7 +2032,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     required String pinCode,
     required String email,
   }) async {
-    await _supabase.client.rpc(
+    final raw = await _supabase.client.rpc(
       'delete_establishment_by_owner',
       params: {
         'p_establishment_id': establishmentId,
@@ -2040,6 +2040,42 @@ class AccountManagerSupabase extends ChangeNotifier {
         'p_email': email.trim(),
       },
     );
+
+    String? purgeToken;
+    if (raw is Map) {
+      final m = Map<String, dynamic>.from(raw);
+      final pt = m['purge_auth_token'];
+      if (pt != null) {
+        final s = pt.toString();
+        if (s.isNotEmpty && s != 'null') {
+          purgeToken = s;
+        }
+      }
+    }
+
+    if (purgeToken != null && purgeToken.isNotEmpty) {
+      final res = await postEdgeFunctionWithRetry(
+        'purge-establishment-auth-queue',
+        {'purge_token': purgeToken},
+        bearerAlwaysAnon: false,
+        retryOnceOn401AfterSessionRefresh: true,
+      );
+      if (res.status < 200 || res.status >= 300) {
+        final err = res.data?['error']?.toString() ?? 'HTTP ${res.status}';
+        throw Exception(err);
+      }
+      final deleted = (res.data?['deleted_user_ids'] as List?)
+              ?.map((e) => e.toString())
+              .toSet() ??
+          {};
+      final myId = _supabase.client.auth.currentUser?.id;
+      if (myId != null && deleted.contains(myId)) {
+        await logout();
+        notifyListeners();
+        return;
+      }
+    }
+
     // Обновить локальное состояние
     if (_establishment?.id == establishmentId) {
       _establishment = null;

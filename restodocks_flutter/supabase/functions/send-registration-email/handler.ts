@@ -20,6 +20,8 @@ function isAllowedAppOrigin(origin: string): boolean {
   }
   if (host === "restodocks.com" || host === "www.restodocks.com") return true;
   if (host === "restodocks.ru" || host === "www.restodocks.ru") return true;
+  if (host.endsWith(".restodocks.com")) return true;
+  if (host.endsWith(".restodocks.ru")) return true;
   if (
     host === "restodocks.pages.dev" ||
     host === "www.restodocks.pages.dev" ||
@@ -27,6 +29,8 @@ function isAllowedAppOrigin(origin: string): boolean {
   ) {
     return true;
   }
+  if (host.endsWith(".pages.dev") && host.includes("restodocks")) return true;
+  if (host === "localhost" || host.startsWith("127.0.0.1")) return true;
   const envUrl = Deno.env.get("APP_URL")?.trim();
   if (envUrl) {
     try {
@@ -46,14 +50,11 @@ function resolveAppBaseUrl(req: Request, body?: { appBaseUrl?: string }): string
     } catch (_) {}
   }
   const origin = req.headers.get("origin")?.trim();
-  if (origin && /^https:\/\/([a-z0-9-]+\.)*restodocks\.pages\.dev$/i.test(origin)) {
-    return origin;
-  }
-  if (origin && /^https:\/\/(www\.)?restodocks\.com$/i.test(origin)) {
-    return origin;
-  }
-  if (origin && /^https:\/\/(www\.)?restodocks\.ru$/i.test(origin)) {
-    return origin;
+  if (origin) {
+    try {
+      const o = new URL(origin).origin;
+      if (isAllowedAppOrigin(o)) return o;
+    } catch (_) {}
   }
   const envUrl = Deno.env.get("APP_URL")?.trim();
   if (envUrl && (envUrl.startsWith("https://") || envUrl.startsWith("http://"))) {
