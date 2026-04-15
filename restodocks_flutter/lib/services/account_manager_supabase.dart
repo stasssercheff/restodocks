@@ -788,11 +788,16 @@ class AccountManagerSupabase extends ChangeNotifier {
     unawaited(
       (() async {
         try {
+          // С anon Bearer Edge не видит владельца: у заведения уже есть owner_id → 403.
+          // После входа передаём JWT пользователя; до входа оставляем anon (сиротское окно).
+          final hasUserJwt =
+              _supabase.client.auth.currentSession?.accessToken != null &&
+                  _supabase.client.auth.currentSession!.accessToken.isNotEmpty;
           await postEdgeFunctionWithRetry(
             'register-metadata',
             {'establishment_id': establishmentId},
             maxRetries: 1,
-            bearerAlwaysAnon: true,
+            bearerAlwaysAnon: !hasUserJwt,
           );
         } catch (_) {}
       })(),
@@ -2322,11 +2327,17 @@ class AccountManagerSupabase extends ChangeNotifier {
       final rows = rawList is List ? rawList : <dynamic>[];
       if (rows.isEmpty) {
         ({Employee employee, Establishment establishment})? completed;
-        if (!await _pendingOwnerAwaitingCompanyOnly(authUserId)) {
+        final awaitingCompanyOnly =
+            await _pendingOwnerAwaitingCompanyOnly(authUserId);
+        if (!awaitingCompanyOnly) {
           completed = await completePendingOwnerRegistration();
         }
         completed ??= await PendingCoOwnerRegistration.tryComplete(this);
-        completed ??= await _tryFixOwnerWithoutEmployee();
+        // Не вызывать fix_owner_without_employee при «только владелец» без заведения — RPC даёт 400
+        // (нет establishment для owner).
+        if (completed == null && !awaitingCompanyOnly) {
+          completed = await _tryFixOwnerWithoutEmployee();
+        }
         if (completed != null) {
           _currentEmployee = completed.employee;
           _establishment = completed.establishment;

@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 import '../services/countries_cities_data.dart';
 import '../services/services.dart';
+import '../utils/dev_log.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Регистрация компании: язык, название, страна/город (выпадающие с поиском), PIN автоген + копирование.
@@ -150,11 +151,38 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
               interfaceLanguageCode: lang,
             );
             final estRaw = rpcResult['establishment'];
-            final estId = estRaw is Map
-                ? estRaw['id']?.toString()
-                : null;
-            if (estId != null && estId.isNotEmpty) {
-              acc.registerMetadataBestEffort(estId);
+            final empRaw = rpcResult['employee'];
+            if (estRaw is Map && empRaw is Map) {
+              final empData = Map<String, dynamic>.from(empRaw);
+              empData['password'] = '';
+              empData['password_hash'] = '';
+              final employee = Employee.fromJson(empData);
+              final establishment = Establishment.fromJson(
+                Map<String, dynamic>.from(estRaw),
+              );
+              final estId = establishment.id;
+              if (estId.isNotEmpty) {
+                acc.registerMetadataBestEffort(estId);
+              }
+              final emailTo = employee.email.trim();
+              if (emailTo.isNotEmpty) {
+                final mail = await EmailService().sendRegistrationEmail(
+                  isOwner: true,
+                  to: emailTo,
+                  companyName: establishment.name,
+                  email: emailTo,
+                  fullName: employee.fullName,
+                  registeredAtLocal: DateTime.now().toLocal().toString(),
+                  pinCode: establishment.pinCode,
+                  languageCode: lang,
+                );
+                if (!mail.ok) {
+                  devLog(
+                    'CompanyRegistration: owner PIN/credentials email failed: '
+                    '${mail.error}',
+                  );
+                }
+              }
             }
             if (!mounted) return;
             context.go('/home');

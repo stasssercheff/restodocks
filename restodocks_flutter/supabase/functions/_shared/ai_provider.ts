@@ -103,6 +103,28 @@ function getAvailableProviders(context?: AIContext): TextProvider[] {
   if (Deno.env.get("CEREBRAS_API_KEY")?.trim()) list.push("cerebras");
   if (Deno.env.get("OPENAI_API_KEY")?.trim()) list.push("openai");
   if (Deno.env.get("ANTHROPIC_API_KEY")?.trim()) list.push("claude");
+  // Генерация ТТК: ниже задержка важнее «порядка ключей в .env» — сначала быстрые провайдеры.
+  if (ctx === "ttk_create" && list.length > 1) {
+    const preferredOrder: TextProvider[] = [
+      "cerebras",
+      "groq",
+      "gemini",
+      "mistral",
+      "openrouter",
+      "deepseek",
+      "openai",
+      "gigachat",
+      "claude",
+    ];
+    const ordered: TextProvider[] = [];
+    for (const p of preferredOrder) {
+      if (list.includes(p)) ordered.push(p);
+    }
+    for (const p of list) {
+      if (!ordered.includes(p)) ordered.push(p);
+    }
+    return ordered;
+  }
   return list.length > 0 ? list : ["openai"];
 }
 

@@ -47,18 +47,16 @@ Deno.serve(async (req: Request) => {
         {
           role: "system",
           content:
-            "Ты технолог общественного питания. По запросу пользователя сгенерируй ТТК в JSON. " +
-            "Верни только JSON вида: {\"cards\":[{...}]}, где каждый элемент массива — одна ТТК. " +
-            "Если пользователь явно просит компоненты собственного производства (например, домашний хлеб, вяленые томаты собственного производства, соус собственного производства), " +
-            "создай ОТДЕЛЬНЫЕ ТТК-ПФ для этих компонентов (isSemiFinished=true), а в основной ТТК добавь их как ingredientType='semi_finished'. " +
-            "Для каждой ТТК поля: dishName:string, technologyText:string, isSemiFinished:boolean, " +
-            "ingredients:[{productName:string,grossGrams:number,unit:string,primaryWastePct:number,netGrams:number,cookingLossPct:number,outputGrams:number,ingredientType:string}], yieldGrams:number. " +
-            "Технология: 3–6 коротких предложений по шагам (без воды). Ингредиентов минимум 3. Без markdown.",
+            "Технолог ОП. По запросу — ТТК в JSON. Только {\"cards\":[{...}]}; элемент = одна ТТК. " +
+            "Компоненты «своего приготовления» (хлеб, соус и т.п.) — отдельные ПФ (isSemiFinished=true) + в основной ТТК ingredientType='semi_finished'. " +
+            "Поля: dishName, technologyText, isSemiFinished, yieldGrams, ingredients[] " +
+            "{productName,grossGrams,unit,primaryWastePct,netGrams,cookingLossPct,outputGrams,ingredientType}. " +
+            "Технология: 3–5 коротких шагов. ≥3 ингредиента. Без markdown.",
         },
         { role: "user", content: prompt },
       ],
       temperature: 0.35,
-      maxTokens: 3072,
+      maxTokens: 1792,
       context: "ttk_create",
     });
 

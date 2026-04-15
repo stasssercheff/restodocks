@@ -703,6 +703,7 @@ class TechCardEditScreen extends StatefulWidget {
     this.initialHeaderSignature,
     this.initialSourceRows,
     this.initialViewTargetOutputGrams,
+    this.fromAiGeneration = false,
   });
 
   /// Пусто для «новой», иначе id существующей ТТК.
@@ -713,6 +714,9 @@ class TechCardEditScreen extends StatefulWidget {
 
   /// Предзаполнение из ИИ (фото/Excel). Используется только при techCardId == 'new'.
   final TechCardRecognitionResult? initialFromAi;
+
+  /// ТТК создана запросом «Создать с ИИ» (текстовый промпт), не импорт из файла.
+  final bool fromAiGeneration;
 
   /// Подпись заголовка при импорте — для сохранения правок в tt_parse_corrections.
   final String? initialHeaderSignature;
@@ -1474,13 +1478,18 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (!_hasImportVerificationContext) return;
     if (!mounted) return;
     final loc = context.read<LocalizationService>();
+    final titleKey =
+        widget.fromAiGeneration ? 'ttk_ai_verify_title' : 'ttk_import_verify_title';
+    final messageKey = widget.fromAiGeneration
+        ? 'ttk_ai_verify_message'
+        : 'ttk_import_verify_message';
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('ttk_import_verify_title')),
+        title: Text(loc.t(titleKey)),
         content: SingleChildScrollView(
-          child: Text(loc.t('ttk_import_verify_message')),
+          child: Text(loc.t(messageKey)),
         ),
         actions: [
           TextButton(

@@ -1421,6 +1421,7 @@ class AppRouter {
               int? initialTypeRevision;
               String? initialHeaderSignature;
               List<List<String>>? initialSourceRows;
+              var fromAiGeneration = false;
               final extra = state.extra;
               if (extra is Map) {
                 initialFromAi = extra['result'] as TechCardRecognitionResult?;
@@ -1439,6 +1440,7 @@ class AppRouter {
                                 .toList())
                             .toList()
                         : null;
+                fromAiGeneration = extra['fromAiGeneration'] == true;
               } else if (extra is TechCardRecognitionResult) {
                 initialFromAi = extra;
               }
@@ -1448,6 +1450,7 @@ class AppRouter {
                   state,
                   _DeferredTechCardNew(
                     initialFromAi: initialFromAi,
+                    fromAiGeneration: fromAiGeneration,
                     department: department,
                     initialCategory: initialCategory,
                     initialSections: initialSections,
@@ -1663,6 +1666,7 @@ class _SplashScreenState extends State<SplashScreen> {
 class _DeferredTechCardNew extends StatefulWidget {
   const _DeferredTechCardNew({
     this.initialFromAi,
+    this.fromAiGeneration = false,
     this.department,
     this.initialCategory,
     this.initialSections,
@@ -1672,6 +1676,8 @@ class _DeferredTechCardNew extends StatefulWidget {
     this.initialSourceRows,
   });
   final TechCardRecognitionResult? initialFromAi;
+  /// Карточка пришла из потока «Создать с ИИ» (не импорт из файла).
+  final bool fromAiGeneration;
   final String? department;
   final String? initialCategory;
   final List<String>? initialSections;
@@ -1696,6 +1702,7 @@ class _DeferredTechCardNewState extends State<_DeferredTechCardNew> {
         _child = TechCardEditScreen(
           techCardId: 'new',
           initialFromAi: widget.initialFromAi,
+          fromAiGeneration: widget.fromAiGeneration,
           department: widget.department,
           initialCategory: widget.initialCategory,
           initialSections: widget.initialSections,

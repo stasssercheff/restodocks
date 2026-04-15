@@ -3288,23 +3288,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       return;
     }
     final controller = TextEditingController();
-    var sttBusy = false;
-    var sttSupported = false;
-    try {
-      sttSupported = await speechToTextSupported();
-    } catch (_) {
-      sttSupported = false;
-    }
-    var voiceInlineHint = '';
-    if (!sttSupported) {
-      final h = loc.t('voice_input_unavailable_browser_hint').trim();
-      voiceInlineHint =
-          h.isEmpty ? loc.t('voice_input_unavailable') : h;
-    }
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocalState) {
+      builder: (ctx) {
           final mq = MediaQuery.of(ctx);
           final screenH = mq.size.height;
           final screenW = mq.size.width;
@@ -3316,10 +3302,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           final dialogChrome = isLandscape ? 100.0 : 176.0;
           final availableH = screenH - kb - safePad;
           final maxBody = (availableH - dialogChrome).clamp(48.0, screenH * 0.95);
-          final voiceHintReserve =
-              voiceInlineHint.isNotEmpty ? (isLandscape ? 64.0 : 120.0) : 0.0;
-          final voiceRowReserve = isLandscape ? 40.0 : 52.0;
-          final extrasBelowField = 8.0 + voiceHintReserve + voiceRowReserve;
+          const extrasBelowField = 8.0;
           final fieldHeight = (maxBody - extrasBelowField).clamp(48.0, 520.0);
           final titleStyle = Theme.of(ctx).textTheme.titleMedium?.copyWith(
                 fontSize: isLandscape ? 14 : null,
@@ -3391,139 +3374,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       ),
                     ),
                   ),
-                  SizedBox(height: isLandscape ? 4 : 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      style: TextButton.styleFrom(
-                        padding: isLandscape
-                            ? const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              )
-                            : null,
-                        tapTargetSize: isLandscape
-                            ? MaterialTapTargetSize.shrinkWrap
-                            : null,
-                        textStyle: Theme.of(ctx).textTheme.labelLarge?.copyWith(
-                              fontSize: isLandscape ? 12.5 : null,
-                            ),
-                      ),
-                      onPressed: () async {
-                              if (sttBusy) {
-                                final spoken = await speechToTextStop();
-                                if (!ctx.mounted) return;
-                                setLocalState(() {
-                                  sttBusy = false;
-                                  if (spoken != null &&
-                                      spoken.trim().isNotEmpty) {
-                                    voiceInlineHint = '';
-                                  } else {
-                                    voiceInlineHint =
-                                        (loc.t('speech_not_recognized')
-                                                    .trim()
-                                                    .isEmpty)
-                                            ? 'Речь не распознана'
-                                            : loc.t('speech_not_recognized');
-                                  }
-                                });
-                                if (spoken != null &&
-                                    spoken.trim().isNotEmpty) {
-                                  final current = controller.text.trim();
-                                  controller.text = current.isEmpty
-                                      ? spoken.trim()
-                                      : '$current\n${spoken.trim()}';
-                                }
-                                return;
-                              }
-                              if (!sttSupported) {
-                                setLocalState(() {
-                                  voiceInlineHint =
-                                      (loc.t('voice_input_unavailable_browser_hint')
-                                                  .trim()
-                                                  .isEmpty)
-                                          ? loc.t('voice_input_unavailable')
-                                          : loc.t(
-                                              'voice_input_unavailable_browser_hint',
-                                            );
-                                });
-                                return;
-                              }
-                              setLocalState(() => voiceInlineHint = '');
-                              final started = await speechToTextStart(
-                                languageCode: loc.currentLanguageCode,
-                                timeout: const Duration(seconds: 18),
-                              );
-                              if (!ctx.mounted) return;
-                              if (!started) {
-                                setLocalState(() {
-                                  voiceInlineHint =
-                                      (loc.t('voice_input_unavailable')
-                                                  .trim()
-                                                  .isEmpty)
-                                          ? loc.t('voice_input_unavailable')
-                                          : loc.t('voice_input_unavailable');
-                                });
-                                return;
-                              }
-                              setLocalState(() => sttBusy = true);
-                            },
-                      icon: Icon(
-                        sttBusy ? Icons.hearing : Icons.mic,
-                        size: isLandscape ? 18 : 24,
-                      ),
-                      label: Text(
-                        sttBusy
-                            ? (loc.t('speech_listening').trim().isEmpty
-                                ? loc.t('speech_listening')
-                                : loc.t('speech_listening'))
-                            : (loc.t('voice_input').trim().isEmpty
-                                ? loc.t('voice_input')
-                                : loc.t('voice_input')),
-                      ),
-                    ),
-                  ),
-                  if (voiceInlineHint.isNotEmpty) ...[
-                    SizedBox(height: isLandscape ? 6 : 10),
-                    Material(
-                      color: Theme.of(ctx).colorScheme.errorContainer,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isLandscape ? 8 : 12,
-                          vertical: isLandscape ? 6 : 10,
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              Icons.info_outline,
-                              size: isLandscape ? 16 : 20,
-                              color: Theme.of(ctx)
-                                  .colorScheme
-                                  .onErrorContainer,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                voiceInlineHint,
-                                style: Theme.of(ctx)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
-                                      fontSize: isLandscape ? 11.5 : null,
-                                      color: Theme.of(ctx)
-                                          .colorScheme
-                                          .onErrorContainer,
-                                      height: isLandscape ? 1.25 : 1.35,
-                                    ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
@@ -3538,11 +3388,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       fontSize: isLandscape ? 13 : null,
                     ),
               ),
-              onPressed: () async {
-                if (sttBusy) {
-                  await speechToTextStop();
-                  sttBusy = false;
-                }
+              onPressed: () {
                 if (ctx.mounted) Navigator.of(ctx).pop(null);
               },
               child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
@@ -3556,11 +3402,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       fontSize: isLandscape ? 13 : null,
                     ),
               ),
-              onPressed: () async {
-                if (sttBusy) {
-                  await speechToTextStop();
-                  sttBusy = false;
-                }
+              onPressed: () {
                 if (ctx.mounted) {
                   Navigator.of(ctx).pop(controller.text.trim());
                 }
@@ -3569,8 +3411,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             ),
           ],
         );
-        },
-      ),
+      },
     );
     controller.dispose();
     if (result == null || result.isEmpty || !mounted) return;
@@ -3594,7 +3435,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               widget.department == 'bar'
                   ? '/tech-cards/new?department=bar'
                   : '/tech-cards/new',
-              extra: createdCards.first,
+              extra: <String, Object?>{
+                'result': createdCards.first,
+                'fromAiGeneration': true,
+              },
             );
           } else {
             context.push(
@@ -3645,7 +3489,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             widget.department == 'bar'
                 ? '/tech-cards/new?department=bar'
                 : '/tech-cards/new',
-            extra: fallback,
+            extra: <String, Object?>{
+              'result': fallback,
+              'fromAiGeneration': true,
+            },
           );
           return;
         }
