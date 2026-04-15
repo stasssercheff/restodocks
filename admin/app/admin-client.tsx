@@ -7,6 +7,7 @@ import type { Insight, SecuritySnapshotPayload } from '@/lib/security-snapshot'
 import type { SystemHealthPayload } from '@/lib/system-health'
 import {
   PROMO_GRANT_SUBSCRIPTION_TYPES,
+  isSelectablePromoGrantTier,
   subscriptionTierLabelRu,
   type PromoGrantSubscriptionType,
 } from '@/lib/promo-tiers'
@@ -49,6 +50,17 @@ type Establishment = {
 function formatDate(iso: string | null) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+/** Значение для `input type="date"` (календарь в локальной дате). */
+function isoToDateInputValue(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 /** Дата и время создания записи заведения в БД (для админки). */
@@ -795,6 +807,45 @@ function EstablishmentsTab() {
   )
 }
 
+/** Выбор тарифа промокода (pro/ultra); для старых строк в БД — доп. опция с текущим значением. */
+function PromoGrantTierSelect({
+  row,
+  saving,
+  onPick,
+  className,
+}: {
+  row: PromoCode
+  saving: boolean
+  onPick: (row: PromoCode, next: string) => void
+  className?: string
+}) {
+  const grantRaw = (row.grants_subscription_type ?? 'ultra').toLowerCase().trim()
+  const isLegacy = !isSelectablePromoGrantTier(grantRaw)
+  return (
+    <select
+      value={grantRaw}
+      onChange={e => onPick(row, e.target.value)}
+      disabled={saving}
+      title="Тариф при погашении кода (subscription_type в заведении на момент активации)"
+      className={
+        className ??
+        'mt-0.5 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-[10px] text-gray-200 max-w-[11rem]'
+      }
+    >
+      {isLegacy && (
+        <option value={grantRaw}>
+          Текущий (legacy): {subscriptionTierLabelRu(grantRaw)} ({grantRaw})
+        </option>
+      )}
+      {PROMO_GRANT_SUBSCRIPTION_TYPES.map(t => (
+        <option key={t} value={t}>
+          {subscriptionTierLabelRu(t)} ({t})
+        </option>
+      ))}
+    </select>
+  )
+}
+
 // ─── Promo Tab ────────────────────────────────────────────────────────────────
 
 function PromoTab() {
@@ -820,6 +871,9 @@ function PromoTab() {
   const [newAdditiveOnly, setNewAdditiveOnly] = useState(false)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'free' | 'used' | 'expired' | 'disabled'>('all')
+  /** Редактирование даты окончания / «ввести до» у существующего промокода (вместо prompt). */
+  const [expiryEditRow, setExpiryEditRow] = useState<PromoCode | null>(null)
+  const [expiryEditDraft, setExpiryEditDraft] = useState('')
 
   const loadCodes = useCallback(async () => {
     setLoading(true)
@@ -926,37 +980,61 @@ function PromoTab() {
     await loadCodes()
   }
 
-  async function setEndDate(id: number, row: PromoCode) {
-    const isActivation = (row.activation_duration_days ?? 0) > 0
-    const val = prompt(
-      isActivation
-        ? 'Последний день, когда код ещё можно ввести (YYYY-MM-DD). Пусто — без ограничения по дате ввода.'
-        : 'Действует до (YYYY-MM-DD), как у существующих промокодов без режима «дней с активации». Пусто — без даты.',
-    )
-    if (val === null) return
-    await fetch('/api/promo', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, expires_at: val || null }),
-    })
-    await loadCodes()
+  function openPromoExpiryEdit(row: PromoCode) {
+    setExpiryEditRow(row)
+    setExpiryEditDraft(isoToDateInputValue(row.expires_at))
   }
 
-  async function setGrantTier(row: PromoCode) {
-    const cur = (row.grants_subscription_type ?? 'ultra').toLowerCase()
-    const val = prompt('Выдаваемый тариф (subscription_type): pro или ultra', cur)
-    if (val === null) return
-    const g = val.trim().toLowerCase()
-    if (!(PROMO_GRANT_SUBSCRIPTION_TYPES as readonly string[]).includes(g)) {
-      alert('Недопустимое значение')
-      return
+  function closePromoExpiryEdit() {
+    setExpiryEditRow(null)
+    setExpiryEditDraft('')
+  }
+
+  async function savePromoExpiryEdit(forceValue?: string | null) {
+    if (!expiryEditRow) return
+    const id = expiryEditRow.id
+    const val = forceValue !== undefined ? forceValue : expiryEditDraft.trim() || null
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/promo', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, expires_at: val }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(typeof data?.error === 'string' ? data.error : `Не удалось сохранить дату (${res.status})`)
+        return
+      }
+      closePromoExpiryEdit()
+      await loadCodes()
+    } finally {
+      setSaving(false)
     }
-    await fetch('/api/promo', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: row.id, grants_subscription_type: g }),
-    })
-    await loadCodes()
+  }
+
+  async function patchPromoGrantTier(row: PromoCode, next: string) {
+    const cur = (row.grants_subscription_type ?? 'ultra').toLowerCase().trim()
+    const g = next.trim().toLowerCase()
+    if (cur === g) return
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/promo', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: row.id, grants_subscription_type: g }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(typeof data?.error === 'string' ? data.error : `Не удалось сохранить тариф (${res.status})`)
+        return
+      }
+      await loadCodes()
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function setActivationDays(id: number, current: number | null) {
@@ -1070,6 +1148,67 @@ function PromoTab() {
           {error}
         </div>
       )}
+      {expiryEditRow && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="promo-expiry-title"
+          onClick={() => {
+            if (!saving) closePromoExpiryEdit()
+          }}
+        >
+          <div
+            className="bg-gray-900 border border-gray-700 rounded-xl p-5 max-w-md w-full shadow-xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 id="promo-expiry-title" className="text-white font-medium mb-2">
+              Дата окончания / срок ввода
+            </h3>
+            <p className="text-gray-400 text-sm mb-3 leading-relaxed">
+              {(expiryEditRow.activation_duration_days ?? 0) > 0
+                ? 'Последний день, когда код ещё можно ввести. Без даты — нет ограничения по календарю.'
+                : 'Действует до (классический промокод без режима «дней с активации»). Без даты — без ограничения.'}
+            </p>
+            <p className="text-gray-500 text-xs font-mono mb-3">{expiryEditRow.code}</p>
+            <input
+              type="date"
+              value={expiryEditDraft}
+              onChange={e => setExpiryEditDraft(e.target.value)}
+              disabled={saving}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 mb-4 [color-scheme:dark]"
+            />
+            <div className="flex flex-wrap gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!saving) closePromoExpiryEdit()
+                }}
+                disabled={saving}
+                className="px-4 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white text-sm disabled:opacity-50"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={() => void savePromoExpiryEdit(null)}
+                disabled={saving}
+                className="px-4 py-2 rounded-lg border border-amber-800/80 text-amber-200/90 hover:bg-amber-950/40 text-sm disabled:opacity-50"
+              >
+                Без даты
+              </button>
+              <button
+                type="button"
+                onClick={() => void savePromoExpiryEdit()}
+                disabled={saving}
+                className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm disabled:opacity-50"
+              >
+                {saving ? '…' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-4 sm:gap-3 sm:mb-6">
         <StatCard label="Всего" value={total} />
         <StatCard label="Свободно" value={freeCount} />
@@ -1083,6 +1222,12 @@ function PromoTab() {
         <span className="text-gray-400">72 часа полного Pro</span> (см. вкладку «Заведения»: колонка «Регистрация» и
         поле <code className="text-gray-600 text-xs">pro_trial_ends_at</code>). Промокоды ниже — отдельный способ выдать
         тариф и срок.
+      </p>
+      <p className="text-gray-600 text-xs mb-4 leading-relaxed border-l-2 border-gray-800 pl-3">
+        Тариф в строке промокода задаёт, что запишется в{' '}
+        <code className="text-gray-500 text-[10px]">establishments.subscription_type</code> в момент{' '}
+        <span className="text-gray-500">первого погашения</span> кода. Уже активированный код не переписывает заведение —
+        смена тарифа здесь влияет на новые активации и на отображение в админке.
       </p>
 
       {/* Add form */}
@@ -1387,13 +1532,8 @@ function PromoTab() {
                           <span className="text-[10px] text-gray-600 font-normal tracking-normal">
                             {isNewType ? 'тип: с активации' : 'тип: классика'}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => setGrantTier(row)}
-                            className="text-[10px] text-left text-gray-500 hover:text-indigo-400"
-                          >
-                            тариф: {subscriptionTierLabelRu(row.grants_subscription_type ?? 'ultra')} — изм.
-                          </button>
+                          <span className="text-[10px] text-gray-500">тариф</span>
+                          <PromoGrantTierSelect row={row} saving={saving} onPick={patchPromoGrantTier} />
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -1415,7 +1555,7 @@ function PromoTab() {
                             {row.expires_at ? (
                               <button
                                 type="button"
-                                onClick={() => setEndDate(row.id, row)}
+                                onClick={() => openPromoExpiryEdit(row)}
                                 className={`block text-[10px] text-gray-500 hover:text-gray-300 ${isExpired(row.expires_at) ? 'text-red-400' : ''}`}
                               >
                                 ввести до {formatDate(row.expires_at)}
@@ -1427,7 +1567,7 @@ function PromoTab() {
                         ) : (
                           <button
                             type="button"
-                            onClick={() => setEndDate(row.id, row)}
+                            onClick={() => openPromoExpiryEdit(row)}
                             className={`hover:text-white transition text-xs ${isExpired(row.expires_at) ? 'text-red-400' : ''}`}
                           >
                             {formatDate(row.expires_at)}
@@ -1545,15 +1685,17 @@ function PromoTab() {
                       {row.is_used && row.establishments?.name ? row.establishments.name : row.note}
                     </div>
                   )}
-                  <div className="text-[10px] text-gray-600 mb-1 space-y-0.5">
+                  <div className="text-[10px] text-gray-600 mb-1 space-y-1">
                     <div>{(row.activation_duration_days ?? 0) > 0 ? 'тип: с активации' : 'тип: классика'}</div>
-                    <button
-                      type="button"
-                      onClick={() => setGrantTier(row)}
-                      className="text-indigo-400/90 active:text-indigo-300"
-                    >
-                      тариф: {subscriptionTierLabelRu(row.grants_subscription_type ?? 'ultra')} — изм.
-                    </button>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-gray-500">Тариф</span>
+                      <PromoGrantTierSelect
+                        row={row}
+                        saving={saving}
+                        onPick={patchPromoGrantTier}
+                        className="bg-gray-950 border border-gray-700 rounded-lg px-2 py-2 text-xs text-gray-200 w-full max-w-[16rem]"
+                      />
+                    </div>
                   </div>
 
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 mb-3">
@@ -1602,7 +1744,7 @@ function PromoTab() {
                       {row.is_used ? '↩ Сбросить' : '✓ Отметить исп.'}
                     </button>
                     <button
-                      onClick={() => setEndDate(row.id, row)}
+                      onClick={() => openPromoExpiryEdit(row)}
                       className="px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white active:text-white text-sm"
                       title="Дата окончания / ввода"
                     >

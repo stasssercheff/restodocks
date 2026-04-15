@@ -48,10 +48,15 @@ export async function DELETE(
       }
       const msg = [err.message, err.details, err.hint].filter(Boolean).join(' — ') || String(error)
       console.error('Admin delete establishment error:', error)
-      const hint =
+      const missingRpcHint =
         /function public\.admin_delete_establishment|does not exist|42883/i.test(msg)
           ? ' Выполните миграции Supabase: 20260406234000_admin_delete_establishment_returns_jsonb.sql и зависимости _delete_establishment_cascade.'
           : ''
+      const appleIapColumnHint =
+        /apple_iap_subscription_claims|column "establishment_id" does not exist|42703/i.test(msg)
+          ? ' Для новой схемы Apple IAP примените миграцию 20260623153000_fix_delete_establishment_cascade_apple_iap_column.sql (supabase/migrations и restodocks_flutter/supabase/migrations).'
+          : ''
+      const hint = `${missingRpcHint}${appleIapColumnHint}`
       return NextResponse.json({ error: msg + hint, code: err.code }, { status: 500 })
     }
     return NextResponse.json({ ok: true, result: rpcData ?? null })
