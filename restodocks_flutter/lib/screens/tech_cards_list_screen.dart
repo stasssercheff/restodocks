@@ -108,6 +108,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   // Временное бизнес-решение: скрываем колонку себестоимости в списке ТТК,
   // не удаляя логику расчёта.
   static const bool _hideCostColumnsInList = true;
+  static const int _aiTtkProMonthLimit = 15;
+  static const int _aiTtkUltraMonthLimit = 40;
   List<TechCard> _list = [];
   // Индексы/кэши для рекурсивного расчёта себестоимости (включая вложенные ПФ из импортированных ТТК).
   Map<String, TechCard> _techCardsById = {};
@@ -332,6 +334,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   bool _tabAutoSelectedOnce = false;
   int? _tabIndexFromUrl;
   bool _tabIndexResolvedFromUrl = false;
+  int? _aiTtkRemainingQuota;
 
   /// Старт загрузки только после завершения анимации перехода (не во время свайпа).
   bool _ttkInitialBootstrapDone = false;
@@ -460,7 +463,62 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     _reconcileTimer = Timer.periodic(const Duration(minutes: 5), (_) {
       _tryReconcileTechCards(force: false);
     });
+    unawaited(_refreshAiTtkRemainingQuota());
     _tryReconcileTechCards(force: false);
+  }
+
+  bool _canCreateTtkWithAi(AccountManagerSupabase account) =>
+      account.subscriptionEntitlements.hasPaidProOrUltra;
+
+  Future<void> _refreshAiTtkRemainingQuota() async {
+    final account = context.read<AccountManagerSupabase>();
+    if (!_canCreateTtkWithAi(account)) {
+      if (mounted && _aiTtkRemainingQuota != null) {
+        setState(() => _aiTtkRemainingQuota = null);
+      }
+      return;
+    }
+    final establishmentId = account.establishment?.dataEstablishmentId.trim();
+    if (establishmentId == null || establishmentId.isEmpty) return;
+    final paidTier = account.subscriptionEntitlements.paidTier;
+    final monthLimit =
+        paidTier == AppSubscriptionTier.ultra ? _aiTtkUltraMonthLimit : _aiTtkProMonthLimit;
+    final now = DateTime.now().toUtc();
+    final periodKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    try {
+      final row = await Supabase.instance.client
+          .from('ai_ttk_usage_counters')
+          .select('ai_parse_count')
+          .eq('establishment_id', establishmentId)
+          .eq('period_type', 'month')
+          .eq('period_key', periodKey)
+          .maybeSingle();
+      final used = (row?['ai_parse_count'] as num?)?.toInt() ?? 0;
+      final remaining = (monthLimit - used).clamp(0, monthLimit);
+      if (mounted) setState(() => _aiTtkRemainingQuota = remaining);
+    } catch (_) {
+      if (mounted) setState(() => _aiTtkRemainingQuota = null);
+    }
+  }
+
+  Widget _buildAiQuotaBadge() {
+    final text = _aiTtkRemainingQuota?.toString() ?? '?';
+    return Container(
+      width: 22,
+      height: 22,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary,
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.onPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
   }
 
   Future<void> _pullToRefresh() async {
@@ -3283,7 +3341,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     bool allowPromptFallback = false,
   }) async {
     final acc = context.read<AccountManagerSupabase>();
-    if (!acc.hasProSubscription) {
+    if (allowPromptFallback) {
+      if (!_canCreateTtkWithAi(acc)) {
+        await showSubscriptionRequiredDialog(context);
+        return;
+      }
+    } else if (!acc.hasProSubscription) {
       await showSubscriptionRequiredDialog(context);
       return;
     }
@@ -3548,6 +3611,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           _loadingExcel = false;
           _loadingTtkIsAiPrompt = false;
         });
+      }
+      if (allowPromptFallback) {
+        unawaited(_refreshAiTtkRemainingQuota());
       }
     }
   }
@@ -3965,6 +4031,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   List<Widget> _buildAppBarActions(
       LocalizationService loc, bool canEdit, bool hasProSubscription) {
     final ctrl = _ttkTourController;
+    final account = context.read<AccountManagerSupabase>();
+    final canCreateAi = _canCreateTtkWithAi(account);
     Widget wrap(String id, Widget w) =>
         ctrl != null ? SpotlightTarget(id: id, controller: ctrl, child: w) : w;
 
@@ -4015,18 +4083,29 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                       ),
                 ),
               ),
-              PopupMenuItem(
-                value: 'ai',
-                child: Text(
-                  loc.t('create_with_ai').trim().isEmpty
-                      ? 'Создать с ИИ'
-                      : loc.t('create_with_ai'),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.w500,
+              if (canCreateAi)
+                PopupMenuItem(
+                  value: 'ai',
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          loc.t('create_with_ai').trim().isEmpty
+                              ? 'Создать с ИИ'
+                              : loc.t('create_with_ai'),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                        ),
                       ),
+                      const SizedBox(width: 10),
+                      _buildAiQuotaBadge(),
+                    ],
+                  ),
                 ),
-              ),
             ],
           )
         : null;
