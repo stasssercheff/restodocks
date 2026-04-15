@@ -102,6 +102,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
         visible(key) ? child : const SizedBox.shrink();
 
     final ent = SubscriptionEntitlements.from(account.establishment);
+    final posOn = FeatureFlags.posEnabledForSubscription(ent);
     final showBarBlock = screenPref.showBarSection && ent.hasUltraLevelFeatures;
     if (ent.isLiteTier) {
       final layoutSvc = context.watch<HomeLayoutConfigService>();
@@ -277,7 +278,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                 title: loc.t('nomenclature'),
                 onTap: () => context.go('/nomenclature/kitchen')),
             'home-nomenclature-kitchen')),
-        if (!FeatureFlags.posModuleEnabled) ...[
+        if (!posOn) ...[
           ownerTile(
               'owner_procurement_kitchen',
               _wrap(
@@ -287,7 +288,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                   onTap: () => context.push('/procurement/kitchen')),
               'home-procurement-kitchen')),
         ],
-        if (FeatureFlags.posModuleEnabled) ...[
+        if (posOn) ...[
           ownerTile(
               'owner_pos_orders_kitchen',
               _wrap(
@@ -373,7 +374,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                   title: loc.t('nomenclature'),
                   onTap: () => context.go('/nomenclature/bar')),
               'home-nomenclature-bar')),
-          if (!FeatureFlags.posModuleEnabled) ...[
+          if (!posOn) ...[
             ownerTile(
                 'owner_procurement_bar',
                 _wrap(
@@ -383,7 +384,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                     onTap: () => context.push('/procurement/bar')),
                 'home-procurement-bar')),
           ],
-          if (FeatureFlags.posModuleEnabled) ...[
+          if (posOn) ...[
             ownerTile(
                 'owner_pos_orders_bar',
                 _wrap(
@@ -462,7 +463,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                   title: loc.t('checklists'),
                   onTap: () => context.go('/checklists?department=hall')),
               'home-checklists-hall')),
-          if (!FeatureFlags.posModuleEnabled) ...[
+          if (!posOn) ...[
             ownerTile(
                 'owner_procurement_hall',
                 _wrap(
@@ -472,7 +473,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
                     onTap: () => context.push('/procurement/hall')),
                 'home-procurement-hall')),
           ],
-          if (FeatureFlags.posModuleEnabled) ...[
+          if (posOn) ...[
             ownerTile(
                 'owner_pos_orders_hall',
                 _wrap(
@@ -530,7 +531,7 @@ class _OwnerHomeContentState extends State<OwnerHomeContent> {
         ],
         const SizedBox(height: 16),
         _SectionTitle(title: loc.t('expenses')),
-        if (FeatureFlags.posModuleEnabled) ...[
+        if (posOn) ...[
           ownerTile(
               'owner_pos_warehouse_est',
               _wrap(

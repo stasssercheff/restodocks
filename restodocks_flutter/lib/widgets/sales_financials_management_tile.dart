@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/feature_flags.dart';
+import '../core/subscription_entitlements.dart';
 import '../models/models.dart';
 import '../services/account_manager_supabase.dart';
 import '../services/localization_service.dart';
@@ -46,7 +47,12 @@ class _SalesFinancialsManagementTileState
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
-    if (!FeatureFlags.posModuleEnabled) return const SizedBox.shrink();
+    final ent = SubscriptionEntitlements.from(
+      context.watch<AccountManagerSupabase>().establishment,
+    );
+    if (!FeatureFlags.posEnabledForSubscription(ent)) {
+      return const SizedBox.shrink();
+    }
     if (!widget.employee.hasRole('owner') || widget.employee.isViewOnlyOwner) {
       return const SizedBox.shrink();
     }

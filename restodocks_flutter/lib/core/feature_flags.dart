@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'subscription_entitlements.dart';
 
 /// Feature flags.
 /// Prod (IS_BETA=false): кнопка импорта ТТК всегда. Beta: по --dart-define=ENABLE_TTK_IMPORT=true.
@@ -66,5 +67,11 @@ class FeatureFlags {
     if (_hidePosModule) return false;
     if (_isProdMarketingHost) return false;
     return isBeta || _posModuleEnabledFromDefine || _posModuleEnabledWebNonProdHost;
+  }
+
+  /// POS в UI: только когда модуль включён для окружения и тарифный доступ Ultra-уровня
+  /// (включая активный trial 72 часа).
+  static bool posEnabledForSubscription(SubscriptionEntitlements entitlements) {
+    return posModuleEnabled && entitlements.hasUltraLevelFeatures;
   }
 }

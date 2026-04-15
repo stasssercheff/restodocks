@@ -656,7 +656,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (isOwnerHome) {
       final screenPref = context.read<ScreenLayoutPreferenceService>();
       final ownerSubEnt = SubscriptionEntitlements.from(account.establishment);
-      final posOn = FeatureFlags.posModuleEnabled;
+      final posOn = FeatureFlags.posEnabledForSubscription(ownerSubEnt);
       final labels = <String, String>{
         'owner_doc': loc.t('documentation') ?? 'Документация',
         'owner_haccp': loc.t('haccp_journals') ?? 'Журналы и ХАССП',
@@ -829,7 +829,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               id != HomeTileId.departmentSales)
           .toList();
     }
-    if (!FeatureFlags.posModuleEnabled) {
+    if (!FeatureFlags.posEnabledForSubscription(ent)) {
       order = order
           .where((id) =>
               id != HomeTileId.hallOrders &&
@@ -1937,6 +1937,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final currentEmployee = accountManager.currentEmployee;
     final establishment = accountManager.establishment;
     final localization = context.watch<LocalizationService>();
+    final subEnt = SubscriptionEntitlements.from(accountManager.establishment);
+    final posOn = FeatureFlags.posEnabledForSubscription(subEnt);
 
     if (currentEmployee == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -2096,7 +2098,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ],
             ),
-            if (FeatureFlags.posModuleEnabled &&
+            if (posOn &&
                 posCanConfigureOrdersDisplay(currentEmployee) &&
                 !accountManager.isLiteTier)
               ListTile(
@@ -2112,9 +2114,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/settings/orders-display'),
               ),
-            if (FeatureFlags.posModuleEnabled && !accountManager.isLiteTier)
+            if (posOn && !accountManager.isLiteTier)
               SalesFinancialsManagementTile(employee: currentEmployee),
-            if (FeatureFlags.posModuleEnabled &&
+            if (posOn &&
                 posCanManageFiscalTaxSettings(currentEmployee) &&
                 !accountManager.isLiteTier)
               ListTile(

@@ -29,6 +29,7 @@ class StaffHomeContent extends StatelessWidget {
     final account = context.watch<AccountManagerSupabase>();
     final subOk = account.hasProSubscription;
     final ent = SubscriptionEntitlements.from(account.establishment);
+    final posOn = FeatureFlags.posEnabledForSubscription(ent);
     final rawDeptRoute = _deptForRoute(employee.department);
     final deptRoute = !ent.hasUltraLevelFeatures && rawDeptRoute == 'bar'
         ? 'kitchen'
@@ -173,7 +174,7 @@ class StaffHomeContent extends StatelessWidget {
     final showMenu = deptRoute == 'kitchen' || deptRoute == 'hall';
     final ordered = <Widget>[];
     for (final id in order) {
-      if (!FeatureFlags.posModuleEnabled &&
+      if (!posOn &&
           (id == HomeTileId.hallOrders ||
               id == HomeTileId.hallCashRegister ||
               id == HomeTileId.hallTables ||

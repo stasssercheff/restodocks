@@ -31,6 +31,7 @@ class ManagementHomeContent extends StatelessWidget {
     final account = context.watch<AccountManagerSupabase>();
     final subOk = account.hasProSubscription;
     final ent = SubscriptionEntitlements.from(account.establishment);
+    final posOn = FeatureFlags.posEnabledForSubscription(ent);
     final screenPref = context.watch<ScreenLayoutPreferenceService>();
     final roles = employee.roles;
     final isChef = roles.contains('executive_chef');
@@ -196,14 +197,14 @@ class ManagementHomeContent extends StatelessWidget {
               icon: Icons.assignment,
               title: loc.t('nomenclature'),
               onTap: () => context.go('/nomenclature/$dept')),
-        if (!FeatureFlags.posModuleEnabled) ...[
+        if (!posOn) ...[
           HomeFeatureTile(
             icon: Icons.local_shipping,
             title: loc.t('pos_nav_procurement') ?? 'Закупка',
             onTap: () => context.push('/procurement/$dept'),
           ),
         ],
-        if (FeatureFlags.posModuleEnabled && dept == 'hall') ...[
+        if (posOn && dept == 'hall') ...[
           HomeFeatureTile(
             icon: Icons.receipt_long,
             title: loc.t('order_tab_orders') ?? 'Заказы',
@@ -226,7 +227,7 @@ class ManagementHomeContent extends StatelessWidget {
               onTap: () => context.push('/pos/shift-report'),
             ),
         ],
-        if (FeatureFlags.posModuleEnabled && (dept == 'kitchen' || dept == 'bar')) ...[
+        if (posOn && (dept == 'kitchen' || dept == 'bar')) ...[
           HomeFeatureTile(
             icon: Icons.receipt_long,
             title: loc.t('order_tab_orders') ?? 'Заказы',
@@ -244,7 +245,7 @@ class ManagementHomeContent extends StatelessWidget {
             onTap: () => context.push('/pos/kds/$dept'),
           ),
         ],
-        if (FeatureFlags.posModuleEnabled) ...[
+        if (posOn) ...[
           HomeFeatureTile(
             icon: Icons.warehouse,
             title: loc.t('pos_nav_warehouse') ?? 'Склад',
@@ -279,7 +280,7 @@ class ManagementHomeContent extends StatelessWidget {
           ExpandableBanquetSection(loc: loc, department: 'bar'),
         ],
         if (isGeneral) ...[
-          if (FeatureFlags.posModuleEnabled)
+          if (posOn)
             HomeFeatureTile(
                 icon: Icons.warehouse,
                 title: loc.t('pos_warehouse_establishment_title') ??

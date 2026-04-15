@@ -203,10 +203,12 @@ class AppRouter {
       if (kIsWeb && loc.isNotEmpty && loc != '/' && loc != '/splash') {
         initial_loc.savePathForRefresh(loc);
       }
-      // Production: POS скрыт при IS_BETA=false (см. FeatureFlags.posModuleEnabled).
+      // POS скрыт, если модуль выключен флагом окружения или тариф не Ultra-уровня.
       // Исключение: /pos/procurement/:department используется как "Закупка" и в проде
       // (без POS-подсистемы: только Заказ продуктов + Поставщики).
-      if (account.isLoggedInSync && !FeatureFlags.posModuleEnabled) {
+      final ent = SubscriptionEntitlements.from(account.establishment);
+      final posOn = FeatureFlags.posEnabledForSubscription(ent);
+      if (account.isLoggedInSync && !posOn) {
         final p = loc.split('?').first;
         final isProcurementInProd = p.startsWith('/pos/procurement/');
         if ((p.startsWith('/pos') && !isProcurementInProd) ||
