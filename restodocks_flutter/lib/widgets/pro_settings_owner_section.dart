@@ -410,6 +410,14 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     return DateFormat('dd.MM.yyyy', tag).format(d.toLocal());
   }
 
+  /// Дата+время окончания триала в локальной зоне устройства.
+  String _formatProDateTime(DateTime d) {
+    final loc = widget.localization;
+    final tag =
+        loc.currentLanguageCode == 'ru' ? 'ru_RU' : loc.currentLanguageCode;
+    return DateFormat('dd.MM.yyyy HH:mm', tag).format(d.toLocal());
+  }
+
   String _formatDate(DateTime d) {
     final loc = widget.localization;
     final tag = loc.currentLanguageCode == 'ru' ? 'ru_RU' : loc.currentLanguageCode;
@@ -629,6 +637,19 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
         if (expanded) unawaited(_syncProSectionFromServer());
       },
       children: [
+        ListenableBuilder(
+          listenable: widget.accountManager,
+          builder: (context, _) {
+            final est = widget.accountManager.establishment;
+            final trialEndsAt = est?.proTrialEndsAt;
+            if (trialEndsAt == null) return const SizedBox.shrink();
+            return ListTile(
+              leading: const Icon(Icons.hourglass_top_outlined),
+              title: Text(loc.t('owner_trial_welcome_title')),
+              subtitle: Text(_formatProDateTime(trialEndsAt)),
+            );
+          },
+        ),
         FutureBuilder<EstablishmentPromoInfo>(
           future: _promoFuture,
           builder: (context, snap) {
