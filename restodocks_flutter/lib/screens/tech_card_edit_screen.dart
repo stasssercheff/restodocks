@@ -702,6 +702,8 @@ class TechCardEditScreen extends StatefulWidget {
     this.initialTypeRevision,
     this.initialHeaderSignature,
     this.initialSourceRows,
+    this.initialViewTargetOutputGrams,
+    this.fromAiGeneration = false,
   });
 
   /// Пусто для «новой», иначе id существующей ТТК.
@@ -712,6 +714,9 @@ class TechCardEditScreen extends StatefulWidget {
 
   /// Предзаполнение из ИИ (фото/Excel). Используется только при techCardId == 'new'.
   final TechCardRecognitionResult? initialFromAi;
+
+  /// ТТК создана запросом «Создать с ИИ» (текстовый промпт), не импорт из файла.
+  final bool fromAiGeneration;
 
   /// Подпись заголовка при импорте — для сохранения правок в tt_parse_corrections.
   final String? initialHeaderSignature;
@@ -727,6 +732,10 @@ class TechCardEditScreen extends StatefulWidget {
 
   /// Показать описание и состав для зала вместо полной ТТК (меню зала).
   final bool forceHallView;
+
+  /// Целевой выход (г) для режима просмотра из чеклиста.
+  /// Может передаваться роутером; в ручном редактировании не используется.
+  final double? initialViewTargetOutputGrams;
 
   /// Категория и цеха при открытии из импорта.
   final String? initialCategory;
@@ -1375,6 +1384,149 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       ..addAll(list);
   }
 
+  /// После привязки продуктов из номенклатуры — пересчитать нетто/КБЖУ с учётом способа и % ужарки.
+  void _syncIngredientsCookingNutrition() {
+    final store = context.read<ProductStoreSupabase>();
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    final list = <TTIngredient>[];
+    for (final ing in _ingredients) {
+      if (ing.isPlaceholder) {
+        list.add(ing);
+        continue;
+      }
+      final product =
+          store.findProductForIngredient(ing.productId, ing.productName);
+      final procId = ing.cookingProcessId?.trim();
+      if (product == null ||
+          procId == null ||
+          procId.isEmpty ||
+          procId == 'custom') {
+        list.add(ing);
+        continue;
+      }
+      final proc = CookingProcess.findById(procId);
+      if (proc == null) {
+        list.add(ing);
+        continue;
+      }
+      list.add(
+        ing.updateCookingLossPct(
+          ing.cookingLossPctOverride,
+          product,
+          proc,
+          languageCode: lang,
+        ),
+      );
+    }
+    _ingredients
+      ..clear()
+      ..addAll(list);
+  }
+
+  /// После выбора продукта в таблице — глобальные подсказки % отхода и % ужарки (системная БД).
+  void _refreshGlobalProcessingHintsForRow(int index) {
+    unawaited(_refreshGlobalProcessingHintsForRowAsync(index));
+  }
+
+  Future<void> _refreshGlobalProcessingHintsForRowAsync(int index) async {
+    if (!mounted) return;
+    if (index < 0 || index >= _ingredients.length) return;
+    var ing = _ingredients[index];
+    final pid = ing.productId?.trim();
+    if (pid == null || pid.isEmpty || ing.isPlaceholder) return;
+    if (ing.sourceTechCardId != null && ing.sourceTechCardId!.trim().isNotEmpty) {
+      return;
+    }
+    final store = context.read<ProductStoreSupabase>();
+    final product = store.findProductForIngredient(pid, ing.productName);
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+
+    final suggestedWaste =
+        await ProductCookingLossLearning.getSuggestedWastePct(productId: pid);
+    final catalogWaste = product?.primaryWastePct;
+    final wasteToApply = suggestedWaste ?? catalogWaste;
+
+    final procId = ing.cookingProcessId?.trim();
+    double? suggestedLoss;
+    if (procId != null && procId.isNotEmpty && procId != 'custom') {
+      suggestedLoss = await ProductCookingLossLearning.getSuggestedLossPct(
+        productId: pid,
+        cookingProcessId: procId,
+      );
+    }
+
+    if (!mounted) return;
+    if (index < 0 || index >= _ingredients.length) return;
+    ing = _ingredients[index];
+    if (ing.productId?.trim() != pid) return;
+
+    var next = ing;
+    if (wasteToApply != null) {
+      final w = wasteToApply.clamp(0.0, 99.9);
+      final proc = procId != null && procId.isNotEmpty && procId != 'custom'
+          ? CookingProcess.findById(procId)
+          : null;
+      next = next.updatePrimaryWastePct(w, product, proc);
+    }
+    if (suggestedLoss != null &&
+        procId != null &&
+        procId.isNotEmpty &&
+        procId != 'custom' &&
+        product != null) {
+      final proc = CookingProcess.findById(procId);
+      if (proc != null) {
+        next = next.updateCookingLossPct(
+          suggestedLoss,
+          product,
+          proc,
+          languageCode: lang,
+        );
+      }
+    }
+
+    setState(() {
+      if (index < _ingredients.length &&
+          _ingredients[index].productId?.trim() == pid) {
+        _ingredients[index] = next;
+      }
+    });
+    _scheduleDraftSave();
+  }
+
+  Future<void> _suggestCookingLossForRow(int index) async {
+    if (index < 0 || index >= _ingredients.length) return;
+    final ing = _ingredients[index];
+    if (ing.isPlaceholder) return;
+    final pid = ing.productId?.trim();
+    final procId = ing.cookingProcessId?.trim();
+    if (pid == null ||
+        pid.isEmpty ||
+        procId == null ||
+        procId.isEmpty ||
+        procId == 'custom') {
+      return;
+    }
+    final suggested = await ProductCookingLossLearning.getSuggestedLossPct(
+      productId: pid,
+      cookingProcessId: procId,
+    );
+    if (!mounted || suggested == null) return;
+    final store = context.read<ProductStoreSupabase>();
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    final product = store.findProductForIngredient(ing.productId, ing.productName);
+    final proc = CookingProcess.findById(procId);
+    if (product == null || proc == null) return;
+    setState(() {
+      _ingredients[index] = _ingredients[index].updateCookingLossPct(
+        suggested,
+        product,
+        proc,
+        languageCode: lang,
+      );
+    });
+    _scheduleDraftSave();
+  }
+
   /// Простой вывод категории из названия блюда (для предзаполнения из ИИ).
   String _inferCategory(String dishName) {
     final lower = dishName.toLowerCase();
@@ -1469,13 +1621,18 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     if (!_hasImportVerificationContext) return;
     if (!mounted) return;
     final loc = context.read<LocalizationService>();
+    final titleKey =
+        widget.fromAiGeneration ? 'ttk_ai_verify_title' : 'ttk_import_verify_title';
+    final messageKey = widget.fromAiGeneration
+        ? 'ttk_ai_verify_message'
+        : 'ttk_import_verify_message';
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) => AlertDialog(
-        title: Text(loc.t('ttk_import_verify_title')),
+        title: Text(loc.t(titleKey)),
         content: SingleChildScrollView(
-          child: Text(loc.t('ttk_import_verify_message')),
+          child: Text(loc.t(messageKey)),
         ),
         actions: [
           TextButton(
@@ -1718,8 +1875,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               _selectedSections = [];
             }
             _ingredients.clear();
+            final langForAi =
+                context.read<LocalizationService>().currentLanguageCode;
             for (final line in ai.ingredients) {
               if (line.productName.trim().isEmpty) continue;
+              final proc =
+                  CookingProcess.resolveFromAiToken(line.cookingMethod, langForAi);
               var gross = line.grossGrams ?? 0.0;
               var net = line.netGrams ?? line.grossGrams ?? gross;
               final unit =
@@ -1744,6 +1905,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                     _ingredients.length.toString(),
                 productId: null,
                 productName: line.productName.trim(),
+                cookingProcessId: proc?.id,
+                cookingProcessName: proc != null
+                    ? proc.getLocalizedName(langForAi)
+                    : null,
                 grossWeight: gross > 0 ? gross : 100,
                 netWeight: net > 0 ? net : (gross > 0 ? gross : 100),
                 outputWeight: outW.toDouble(),
@@ -1762,6 +1927,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               ));
             }
             _autoFillBruttoFromNomenclature();
+            _syncIngredientsCookingNutrition();
             _autoFillPriceFromNomenclature();
             // Вес порции при импорте: ПФ = 100, Блюдо = выход из файла (yieldGrams) или сумма выходов
             final sumOutput =
@@ -2997,6 +3163,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         }
         await svc.saveTechCard(updated,
             changedByEmployeeId: emp.id, changedByName: emp.fullName);
+        unawaited(
+          ProductCookingLossLearning.recordSamplesFromIngredients(
+            establishmentId: targetEstablishmentId,
+            ingredients: toSaveIngredients,
+            source: widget.fromAiGeneration ? 'ai' : 'user',
+          ),
+        );
         // Обучение: только при карточке из импорта. Иначе сбрасываем, чтобы не показывать старый тост.
         if (widget.initialFromAi == null ||
             widget.initialHeaderSignature == null) {
@@ -3208,6 +3381,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         }
         await svc.saveTechCard(updated,
             changedByEmployeeId: emp.id, changedByName: emp.fullName);
+        final learnEstId = est.isBranch ? est.id : (est.dataEstablishmentId ?? '');
+        if (learnEstId.isNotEmpty) {
+          unawaited(
+            ProductCookingLossLearning.recordSamplesFromIngredients(
+              establishmentId: learnEstId,
+              ingredients: toSaveIngredients,
+              source: 'user',
+            ),
+          );
+        }
         // Переводим название и технологию фоново
         final techText = _technologyController.text.trim();
         final fieldsToTranslate = <String, String>{'dish_name': name};
@@ -3906,13 +4089,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     final tcSvc = context.read<TechCardServiceSupabase>();
     final est = context.read<AccountManagerSupabase>().establishment;
     if (est == null) return;
-    await productStore.loadProducts();
-    await productStore.loadNomenclature(est.dataEstablishmentId);
+    final effectiveId = est.isBranch ? est.id : est.dataEstablishmentId!;
+    if (est.isBranch) {
+      await productStore.loadNomenclatureForBranch(
+          est.id, est.dataEstablishmentId!);
+    } else {
+      await productStore.loadNomenclature(est.dataEstablishmentId);
+    }
 
     if (!mounted) return;
-    final nomenclatureProducts =
-        productStore.getNomenclatureProducts(est.dataEstablishmentId);
-    final allProducts = productStore.allProducts;
+    final nomenclatureProducts = productStore.getNomenclatureProducts(effectiveId);
     final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId!;
     Future<TechCard> ensureHydratedTechCard(TechCard tc) async {
       var working = tc;
@@ -3944,7 +4130,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         maxChildSize: 0.95,
         expand: false,
         builder: (_, scroll) => DefaultTabController(
-          length: 3,
+          length: 2,
           child: Scaffold(
             appBar: AppBar(
               title: Text(replaceIndex != null
@@ -3953,29 +4139,23 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               bottom: TabBar(
                 tabs: [
                   Tab(text: loc.t('nomenclature')),
-                  Tab(text: loc.t('all_products')),
                   Tab(text: loc.t('semi_finished')),
                 ],
               ),
             ),
             body: TabBarView(
               children: [
-                _ProductPicker(
-                  products: nomenclatureProducts,
-                  onPick: (p, w, proc, waste, unit, gpp,
-                          {cookingLossPctOverride}) =>
-                      _addProductIngredient(p, w, proc, waste, unit, gpp,
-                          replaceIndex: replaceIndex,
-                          cookingLossPctOverride: cookingLossPctOverride),
-                ),
-                _ProductPicker(
-                  products: allProducts,
-                  onPick: (p, w, proc, waste, unit, gpp,
-                          {cookingLossPctOverride}) =>
-                      _addProductIngredient(p, w, proc, waste, unit, gpp,
-                          replaceIndex: replaceIndex,
-                          cookingLossPctOverride: cookingLossPctOverride),
-                ),
+                nomenclatureProducts.isEmpty
+                    ? _EmptyNomenclatureState(loc: loc)
+                    : _ProductPicker(
+                        products: nomenclatureProducts,
+                        onPick: (p, w, proc, waste, unit, gpp,
+                                {cookingLossPctOverride}) =>
+                            _addProductIngredient(p, w, proc, waste, unit, gpp,
+                                replaceIndex: replaceIndex,
+                                cookingLossPctOverride:
+                                    cookingLossPctOverride),
+                      ),
                 _TechCardPicker(
                   techCards: _pickerTechCards,
                   onPick: (t, w, unit, gpp) => _addTechCardIngredient(
@@ -4386,20 +4566,34 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     _scheduleDraftSave();
   }
 
-  /// Подсказка ИИ: процент отхода по названию продукта (для ручной строки).
+  /// Подсказка: глобальное среднее по продукту, иначе КБЖУ-карточка продукта, иначе ИИ по названию.
   Future<void> _suggestWasteForRow(int i) async {
     if (i < 0 || i >= _ingredients.length) return;
     final ing = _ingredients[i];
-    if (ing.productId != null) return;
     final name = ing.productName.trim();
     if (name.isEmpty) return;
-    final ai = context.read<AiService>();
-    final result = await ai.recognizeProduct(name);
-    if (!mounted || result?.suggestedWastePct == null) return;
-    final waste = result!.suggestedWastePct!.clamp(0.0, 99.9);
-    final net = ing.grossWeight * (1.0 - waste / 100.0);
-    setState(() => _ingredients[i] = ing.copyWith(
-        primaryWastePct: waste, netWeight: net, isNetWeightManual: false));
+    final store = context.read<ProductStoreSupabase>();
+    final product = store.findProductForIngredient(ing.productId, ing.productName);
+    double? waste;
+    final pid = ing.productId?.trim();
+    if (pid != null && pid.isNotEmpty) {
+      waste = await ProductCookingLossLearning.getSuggestedWastePct(productId: pid);
+    }
+    waste ??= product?.primaryWastePct;
+    if (waste == null) {
+      final ai = context.read<AiService>();
+      final result = await ai.recognizeProduct(name);
+      if (!mounted || result?.suggestedWastePct == null) return;
+      waste = result!.suggestedWastePct;
+    }
+    if (!mounted || waste == null) return;
+    final wFinal = waste.clamp(0.0, 99.9);
+    final procId = ing.cookingProcessId?.trim();
+    final proc = procId != null && procId.isNotEmpty && procId != 'custom'
+        ? CookingProcess.findById(procId)
+        : null;
+    setState(() => _ingredients[i] = ing.updatePrimaryWastePct(wFinal, product, proc));
+    _scheduleDraftSave();
   }
 
   /// Блок фото: ПФ — сетка до 10, блюдо — 1 фото. Под технологией.
@@ -5428,7 +5622,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                           ),
                         ),
                       ),
-                    if (effectiveCanEdit && !isCook)
+                    if (false && effectiveCanEdit && !isCook && isMobile)
                       SliverPersistentHeader(
                         pinned: true,
                         delegate: _TtkCompositionPinnedHeaderDelegate(
@@ -5533,9 +5727,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                         },
                                         onRemove: _removeIngredient,
                                         onSuggestWaste: _suggestWasteForRow,
+                                        onSuggestCookingLoss: _suggestCookingLossForRow,
+                                        onAfterProductLinked: _refreshGlobalProcessingHintsForRow,
                                         hideTechnologyBlock: true,
-                                        omitTableHeader:
-                                            effectiveCanEdit && !isCook,
+                                        omitTableHeader: false,
                                         shrinkWrap: true,
                                         onTapPfIngredient: (id) =>
                                             context.push('/tech-cards/$id'),
@@ -7794,6 +7989,39 @@ class _ProductPicker extends StatefulWidget {
 
   @override
   State<_ProductPicker> createState() => _ProductPickerState();
+}
+
+class _EmptyNomenclatureState extends StatelessWidget {
+  const _EmptyNomenclatureState({required this.loc});
+
+  final LocalizationService loc;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.inventory_2_outlined, size: 44),
+            const SizedBox(height: 12),
+            Text(
+              loc.t('products_list_empty_title'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              loc.t('products_list_empty_body'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ProductPickerState extends State<_ProductPicker> {

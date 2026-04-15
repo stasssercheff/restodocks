@@ -1,8 +1,11 @@
 import 'dart:async';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../utils/dev_log.dart';
+import 'establishment_local_hydration_service.dart';
 import 'product_store_supabase.dart';
 import 'tech_card_service_supabase.dart';
 
@@ -23,6 +26,7 @@ class RealtimeSyncService {
   Timer? _debounceTimer;
   StreamSubscription<List<Map<String, dynamic>>>? _techCardsSub;
   StreamSubscription<List<Map<String, dynamic>>>? _productsSub;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
   String? _activeEstablishmentId;
   String? _activeDataEstablishmentId;
@@ -63,6 +67,18 @@ class RealtimeSyncService {
     _periodicTimer = Timer.periodic(const Duration(seconds: 45), (_) {
       _scheduleSync('periodic');
     });
+
+    if (!kIsWeb) {
+      _connectivitySub?.cancel();
+      _connectivitySub = Connectivity().onConnectivityChanged.listen(
+        (results) {
+          final online = results.any((r) => r != ConnectivityResult.none);
+          if (!online) return;
+          _scheduleSync('connectivity');
+        },
+        onError: (_) => _scheduleSync('connectivity_error'),
+      );
+    }
   }
 
   Future<void> stop() async {
@@ -74,6 +90,8 @@ class RealtimeSyncService {
     _techCardsSub = null;
     await _productsSub?.cancel();
     _productsSub = null;
+    await _connectivitySub?.cancel();
+    _connectivitySub = null;
     _activeEstablishmentId = null;
     _activeDataEstablishmentId = null;
   }
@@ -91,20 +109,38 @@ class RealtimeSyncService {
     if (establishmentId == null || dataEstablishmentId == null) return;
     if (_syncInProgress) return;
 
+    // Полная перезагрузка ТТК с сервера — при событии realtime или возврате сети; иначе [refreshTechCardsFromServer]
+    // сама уважает TTL (после [runFullHydration] кэш уже свежий — без лишнего SELECT на initial_bind).
+    final forceTechCards = reason.startsWith('realtime') ||
+        reason.startsWith('connectivity');
+
     _syncInProgress = true;
     try {
-      // Сначала кэш/локальные данные (быстрый старт), обновление с сервера у ТТК — в фоне.
-      await _products.loadProducts(force: false);
-      if (dataEstablishmentId == establishmentId) {
-        await _products.loadNomenclature(establishmentId);
-      } else {
-        await _products.loadNomenclatureForBranch(
-            establishmentId, dataEstablishmentId);
+      try {
+        await _products.loadProducts(force: false);
+        if (dataEstablishmentId == establishmentId) {
+          await _products.loadNomenclature(establishmentId);
+        } else {
+          await _products.loadNomenclatureForBranch(
+              establishmentId, dataEstablishmentId);
+        }
+      } catch (e) {
+        devLog('RealtimeSyncService.syncNow($reason) catalog/nom: $e');
       }
-      unawaited(_techCards.refreshTechCardsFromServer(dataEstablishmentId));
-    } catch (e) {
-      // Не валим приложение при плохой сети: продолжаем работать с локальным кэшем.
-      devLog('RealtimeSyncService.syncNow($reason) failed: $e');
+      unawaited(_techCards.refreshTechCardsFromServer(
+        dataEstablishmentId,
+        force: forceTechCards,
+      ));
+      // Периодический тик — только лёгкий каталог выше; тяжёлые снимки (чеклисты, сотрудники…)
+      // оставляем для realtime/сеть/первого bind и для [runBackgroundDeltaSync].
+      if (!kIsWeb && reason != 'periodic') {
+        unawaited(
+          EstablishmentLocalHydrationService.instance.runSnapshotsOnlySync(
+            establishmentId: establishmentId,
+            dataEstablishmentId: dataEstablishmentId,
+          ),
+        );
+      }
     } finally {
       _syncInProgress = false;
     }

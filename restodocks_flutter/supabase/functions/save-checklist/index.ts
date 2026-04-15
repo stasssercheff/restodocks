@@ -16,6 +16,7 @@ interface ChecklistItemInput {
   tech_card_id?: string | null;
   target_quantity?: number | null;
   target_unit?: string | null;
+  image_url?: string | null;
 }
 
 Deno.serve(async (req: Request) => {
@@ -215,6 +216,7 @@ Deno.serve(async (req: Request) => {
       const techCardId = it.tech_card_id?.trim();
       const targetQty = it.target_quantity != null ? Number(it.target_quantity) : null;
       const targetUnit = it.target_unit?.trim() || null;
+      const imageUrl = it.image_url?.trim() || null;
 
       const { error: insertError } = await supabase.from("checklist_items").insert({
         checklist_id,
@@ -223,6 +225,7 @@ Deno.serve(async (req: Request) => {
         tech_card_id: techCardId && techCardId !== "" ? techCardId : null,
         target_quantity: targetQty,
         target_unit: targetUnit,
+        image_url: imageUrl && imageUrl !== "" ? imageUrl : null,
       });
 
       if (insertError) {

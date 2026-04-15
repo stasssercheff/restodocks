@@ -585,11 +585,8 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
     final approved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Важно перед загрузкой'),
-        content: const Text(
-          'ПФ будут добавлены как самостоятельные продукты и не будут отображаться как "ПФ" в системе Restodocks.\n\n'
-          'Рекомендуем загружать только чистые продукты.',
-        ),
+        title: Text(loc.t('product_upload_iiko_warning_title')),
+        content: Text(loc.t('product_upload_iiko_warning_body')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -597,7 +594,7 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Продолжить'),
+            child: Text(loc.t('continue_action')),
           ),
         ],
       ),
@@ -664,10 +661,11 @@ class _ProductUploadScreenState extends State<ProductUploadScreen> {
   }
 
   Future<String?> _pickIikoSheet(List<String> sheetNames) async {
+    final loc = context.read<LocalizationService>();
     return showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Выберите лист iiko'),
+        title: Text(loc.t('product_upload_iiko_select_sheet_title')),
         content: SizedBox(
           width: 420,
           child: ListView.builder(
@@ -2605,7 +2603,7 @@ ${text}
             duration: const Duration(seconds: 6),
           ),
         );
-        context.go('/nomenclature');
+        context.go('/nomenclature', extra: {'back': true});
       }
     } catch (e) {
       _addDebugLog('Excel processing error: $e');
@@ -2623,7 +2621,7 @@ ${text}
                 .t('product_upload_error_file_process', args: {'error': '$e'})),
           ),
         );
-        context.go('/nomenclature');
+        context.go('/nomenclature', extra: {'back': true});
       }
     }
   }
@@ -4319,6 +4317,40 @@ class _PasteTextDialog extends StatefulWidget {
 }
 
 class _PasteTextDialogState extends State<_PasteTextDialog> {
+  bool _speechBusy = false;
+
+  Future<void> _insertVoiceText(LocalizationService loc) async {
+    if (_speechBusy) return;
+    setState(() => _speechBusy = true);
+    try {
+      final supported = await speechToTextSupported();
+      if (!supported) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('voice_input_unavailable_browser_hint'))),
+        );
+        return;
+      }
+      final text = await speechToTextListenOnce(
+        languageCode: loc.currentLanguageCode,
+      );
+      if (!mounted) return;
+      if (text == null || text.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('speech_not_recognized'))),
+        );
+        return;
+      }
+      final prev = widget.controller.text.trimRight();
+      widget.controller.text = prev.isEmpty ? text : '$prev\n$text';
+      widget.controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: widget.controller.text.length),
+      );
+    } finally {
+      if (mounted) setState(() => _speechBusy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -4410,6 +4442,17 @@ class _PasteTextDialogState extends State<_PasteTextDialog> {
                   },
                 ),
                 const SizedBox(height: 12),
+                Row(
+                  children: [
+                    TextButton.icon(
+                      onPressed: _speechBusy ? null : () => _insertVoiceText(loc),
+                      icon: Icon(_speechBusy ? Icons.mic : Icons.mic_none),
+                      label: Text(
+                        _speechBusy ? loc.t('speech_listening') : loc.t('voice_input'),
+                      ),
+                    ),
+                  ],
+                ),
                 TextField(
                   controller: widget.controller,
                   maxLines: 6,
@@ -4456,6 +4499,40 @@ class _InventoryPasteDialog extends StatefulWidget {
 }
 
 class _InventoryPasteDialogState extends State<_InventoryPasteDialog> {
+  bool _speechBusy = false;
+
+  Future<void> _insertVoiceText(LocalizationService loc) async {
+    if (_speechBusy) return;
+    setState(() => _speechBusy = true);
+    try {
+      final supported = await speechToTextSupported();
+      if (!supported) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('voice_input_unavailable_browser_hint'))),
+        );
+        return;
+      }
+      final text = await speechToTextListenOnce(
+        languageCode: loc.currentLanguageCode,
+      );
+      if (!mounted) return;
+      if (text == null || text.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.t('speech_not_recognized'))),
+        );
+        return;
+      }
+      final prev = widget.controller.text.trimRight();
+      widget.controller.text = prev.isEmpty ? text : '$prev\n$text';
+      widget.controller.selection = TextSelection.fromPosition(
+        TextPosition(offset: widget.controller.text.length),
+      );
+    } finally {
+      if (mounted) setState(() => _speechBusy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -4514,6 +4591,17 @@ class _InventoryPasteDialogState extends State<_InventoryPasteDialog> {
                   ),
                 ),
                 const SizedBox(height: 10),
+                Row(
+                  children: [
+                    TextButton.icon(
+                      onPressed: _speechBusy ? null : () => _insertVoiceText(loc),
+                      icon: Icon(_speechBusy ? Icons.mic : Icons.mic_none),
+                      label: Text(
+                        _speechBusy ? loc.t('speech_listening') : loc.t('voice_input'),
+                      ),
+                    ),
+                  ],
+                ),
                 TextField(
                   controller: widget.controller,
                   maxLines: 8,

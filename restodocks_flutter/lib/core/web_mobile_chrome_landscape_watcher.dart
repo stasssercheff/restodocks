@@ -48,7 +48,7 @@ class _WebMobileChromeLandscapeWatcherState
     if (!mounted || !kIsWeb) return;
     final mq = MediaQuery.of(context);
     if (mq.orientation != Orientation.landscape) return;
-    if (mq.size.shortestSide >= 600) return;
+    if (chrome_nudge.mobileBrowserSkipChromeNudgeForWideTablet()) return;
     chrome_nudge.mobileBrowserChromeNudgeOnLandscapeIfPhone();
   }
 

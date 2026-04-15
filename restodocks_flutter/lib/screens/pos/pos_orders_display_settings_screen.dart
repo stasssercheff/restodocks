@@ -15,7 +15,7 @@ class PosOrdersDisplaySettingsScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        leading: appBarBackButton(context),
+        leading: shellReturnLeading(context) ?? appBarBackButton(context),
         title: Text(loc.t('pos_orders_display_settings_title')),
       ),
       body: ListView(

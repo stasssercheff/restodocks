@@ -1,45 +1,94 @@
-/**
- * Лимит парсинга ТТК через ИИ: 3 документа в день на заведение.
- * Шаблонный парсинг не учитывается.
- */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const LIMIT_PER_DAY = 3;
+const PRO_MONTH_LIMIT = 15;
+const ULTRA_MONTH_LIMIT = 35;
+const TRIAL_TOTAL_LIMIT = 3;
+const PAID_TIERS = new Set(["pro", "plus", "starter", "business", "ultra", "premium"]);
+const ULTRA_TIERS = new Set(["ultra", "premium"]);
 
 export async function checkAndIncrementAiTtkUsage(
   establishmentId: string,
-): Promise<{ allowed: boolean; countToday: number }> {
+): Promise<{ allowed: boolean; count: number; limit: number; reason?: string }> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceKey) {
-    return { allowed: true, countToday: 0 };
+    return { allowed: true, count: 0, limit: ULTRA_MONTH_LIMIT };
   }
   const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
-  const today = new Date().toISOString().slice(0, 10);
+
+  const { data: est, error: estError } = await supabase
+    .from("establishments")
+    .select("subscription_type, pro_trial_ends_at, pro_paid_until")
+    .eq("id", establishmentId)
+    .maybeSingle();
+  if (estError || !est) {
+    return { allowed: true, count: 0, limit: ULTRA_MONTH_LIMIT };
+  }
+
+  const now = new Date();
+  const subscriptionType = String(est.subscription_type ?? "free").toLowerCase().trim();
+  const paidUntil = est.pro_paid_until ? new Date(String(est.pro_paid_until)) : null;
+  const trialEndsAt = est.pro_trial_ends_at ? new Date(String(est.pro_trial_ends_at)) : null;
+  const isPaidTier = PAID_TIERS.has(subscriptionType);
+  const isPaidActive = isPaidTier && (!paidUntil || paidUntil > now);
+  const isTrialActive = trialEndsAt ? trialEndsAt > now : false;
+
+  let periodType = "";
+  let periodKey = "";
+  let limit = 0;
+  let denyReason = "";
+
+  if (isPaidActive) {
+    const monthKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+    periodType = "month";
+    periodKey = monthKey;
+    if (ULTRA_TIERS.has(subscriptionType)) {
+      limit = ULTRA_MONTH_LIMIT;
+      denyReason = "ai_ttk_limit_ultra_month";
+    } else {
+      limit = PRO_MONTH_LIMIT;
+      denyReason = "ai_ttk_limit_pro_month";
+    }
+  } else if (isTrialActive) {
+    periodType = "trial_total";
+    periodKey = "trial_total";
+    limit = TRIAL_TOTAL_LIMIT;
+    denyReason = "ai_ttk_limit_trial_total";
+  } else {
+    return {
+      allowed: false,
+      count: 0,
+      limit: 0,
+      reason: "ai_ttk_no_access_lite",
+    };
+  }
 
   const { data: row } = await supabase
-    .from("ai_ttk_daily_usage")
+    .from("ai_ttk_usage_counters")
     .select("ai_parse_count")
     .eq("establishment_id", establishmentId)
-    .eq("usage_date", today)
+    .eq("period_type", periodType)
+    .eq("period_key", periodKey)
     .maybeSingle();
 
   const currentCount = row?.ai_parse_count ?? 0;
-  if (currentCount >= LIMIT_PER_DAY) {
-    return { allowed: false, countToday: currentCount };
+  if (currentCount >= limit) {
+    return { allowed: false, count: currentCount, limit, reason: denyReason };
   }
 
-  const { error } = await supabase.from("ai_ttk_daily_usage").upsert(
+  const { error } = await supabase.from("ai_ttk_usage_counters").upsert(
     {
       establishment_id: establishmentId,
-      usage_date: today,
+      period_type: periodType,
+      period_key: periodKey,
       ai_parse_count: currentCount + 1,
+      updated_at: now.toISOString(),
     },
-    { onConflict: "establishment_id,usage_date" },
+    { onConflict: "establishment_id,period_type,period_key" },
   );
   if (error) {
     console.error("[ai_ttk_limit] upsert error:", error);
-    return { allowed: true, countToday: 0 };
+    return { allowed: true, count: 0, limit };
   }
-  return { allowed: true, countToday: currentCount + 1 };
+  return { allowed: true, count: currentCount + 1, limit };
 }

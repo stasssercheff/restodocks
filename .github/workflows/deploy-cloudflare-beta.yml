@@ -55,7 +55,8 @@ jobs:
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
             --dart-define=ENABLE_TTK_IMPORT=false \
-            --dart-define=IS_BETA=true
+            --dart-define=IS_BETA=true \
+            --dart-define=HIDE_POS_MODULE=true
 
       - name: Post-build (sw, _redirects, _routes, _headers)
         working-directory: restodocks_flutter

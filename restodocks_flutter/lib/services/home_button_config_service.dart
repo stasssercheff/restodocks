@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -24,7 +25,8 @@ enum HomeButtonAction {
 }
 
 extension HomeButtonActionExt on HomeButtonAction {
-  String routeFor(Employee? emp) {
+  /// [kitchenOnlySchedule]: Lite — график только кухня (`/schedule/kitchen`), не «все подразделения».
+  String routeFor(Employee? emp, {bool kitchenOnlySchedule = false}) {
     final dept = _deptForRoute(emp?.department);
     final isOwner = emp?.hasRole('owner') ?? false;
     switch (this) {
@@ -33,6 +35,7 @@ extension HomeButtonActionExt on HomeButtonAction {
       case HomeButtonAction.messages:
         return '/notifications?tab=messages';
       case HomeButtonAction.schedule:
+        if (kitchenOnlySchedule) return '/schedule/kitchen';
         return isOwner ? '/schedule/all' : '/schedule/$dept';
       case HomeButtonAction.productOrder:
         return '/product-order?department=$dept';
@@ -111,16 +114,19 @@ extension HomeButtonActionExt on HomeButtonAction {
 }
 
 /// Доступные действия для роли. [hasProSubscription] — раздел «Расходы» только при Pro.
+/// [ownerLiteHome] — у владельца на Lite средняя кнопка только график (без переключения на меню).
 List<HomeButtonAction> homeButtonActionsFor(Employee? emp,
-    {bool hasProSubscription = false}) {
+    {bool hasProSubscription = false, bool ownerLiteHome = false}) {
   if (emp == null) return [HomeButtonAction.schedule];
   final isOwner = emp.hasRole('owner');
   final isChef = emp.hasRole('executive_chef') || emp.hasRole('sous_chef');
   final isManagement = emp.department == 'management' || isChef ||
       emp.hasRole('bar_manager') || emp.hasRole('floor_manager') || emp.hasRole('general_manager');
-  final isLineStaff = !isOwner && !isManagement;
 
   if (isOwner) {
+    if (ownerLiteHome) {
+      return [HomeButtonAction.schedule];
+    }
     return [HomeButtonAction.inbox, HomeButtonAction.messages, HomeButtonAction.schedule, HomeButtonAction.menu];
   }
   if (isChef || isManagement) {
@@ -134,7 +140,7 @@ List<HomeButtonAction> homeButtonActionsFor(Employee? emp,
       HomeButtonAction.checklists,
       HomeButtonAction.nomenclature,
       HomeButtonAction.inventory,
-      if (hasProSubscription) HomeButtonAction.expenses,
+      if (hasProSubscription || kIsWeb) HomeButtonAction.expenses,
     ];
   }
   // Линейный сотрудник
@@ -160,9 +166,10 @@ class HomeButtonConfigService extends ChangeNotifier {
 
   /// Действие с учётом допустимых для роли (если сохранённое недоступно — первое из списка)
   HomeButtonAction effectiveAction(Employee? emp,
-      {bool hasProSubscription = false}) {
-    final allowed =
-        homeButtonActionsFor(emp, hasProSubscription: hasProSubscription);
+      {bool hasProSubscription = false, bool ownerLiteHome = false}) {
+    final allowed = homeButtonActionsFor(emp,
+        hasProSubscription: hasProSubscription,
+        ownerLiteHome: ownerLiteHome);
     return allowed.contains(_action)
         ? _action
         : (allowed.firstOrNull ?? HomeButtonAction.schedule);

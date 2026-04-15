@@ -10,4 +10,5 @@
 ## Обязательно
 
 - **Authentication** → **Email** → **Confirm email** = включён
-- **Authentication** → **URL Configuration** → **Redirect URLs** = `https://restodocks.com`, и т.д.
+- **Authentication** → **URL Configuration** → **Redirect URLs** = все базы, с которых реально идёт регистрация (прод, Pages, **поддомены бэты** вроде `https://beta.restodocks.com/auth/confirm*`), см. `restodocks_flutter/SUPABASE_AUTH_URL_CONFIG.md`.
+- Чтобы не было английской темы **Confirm Your Signup** при русском теле письма: включите хук **Send Email** → Edge `auth-send-email` (см. тот же файл про `SEND_EMAIL_HOOK_SECRET`).

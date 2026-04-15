@@ -16,6 +16,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:feature_spotlight/feature_spotlight.dart';
 
+import '../core/subscription_entitlements.dart';
 import '../models/models.dart';
 import '../services/page_tour_service.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -108,6 +109,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   // Временное бизнес-решение: скрываем колонку себестоимости в списке ТТК,
   // не удаляя логику расчёта.
   static const bool _hideCostColumnsInList = true;
+  static const int _aiTtkProMonthLimit = 15;
+  static const int _aiTtkUltraMonthLimit = 35;
+  static const int _aiTtkTrialTotalLimit = 3;
   List<TechCard> _list = [];
   // Индексы/кэши для рекурсивного расчёта себестоимости (включая вложенные ПФ из импортированных ТТК).
   Map<String, TechCard> _techCardsById = {};
@@ -293,6 +297,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   int _loadRequestToken = 0;
   bool _loadingExcel = false;
   bool _loadingTtkIsPdf = false;
+  bool _loadingTtkIsAiPrompt = false;
   String? _error;
   Set<String> _selectedTechCards = {}; // ID выбранных карточек
   bool _selectionMode = false;
@@ -331,10 +336,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   bool _tabAutoSelectedOnce = false;
   int? _tabIndexFromUrl;
   bool _tabIndexResolvedFromUrl = false;
+  int? _aiTtkRemainingQuota;
 
   /// Старт загрузки только после завершения анимации перехода (не во время свайпа).
   bool _ttkInitialBootstrapDone = false;
   Animation<double>? _ttkRouteAnimation;
+
+  void _onPersistentTechCardsOfflineCacheBump() {
+    if (!mounted) return;
+    unawaited(_load(showLoading: false));
+  }
 
   @override
   void initState() {
@@ -371,6 +382,12 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     };
     LocalizationService().addListener(_localizationPrefetchListener);
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowTtkTour());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || kIsWeb) return;
+      TechCardServiceSupabase()
+          .persistentTechCardsCacheGeneration
+          .addListener(_onPersistentTechCardsOfflineCacheBump);
+    });
     _scheduleTtkBootstrapAfterRoute();
   }
 
@@ -448,7 +465,87 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     _reconcileTimer = Timer.periodic(const Duration(minutes: 5), (_) {
       _tryReconcileTechCards(force: false);
     });
+    unawaited(_refreshAiTtkRemainingQuota());
     _tryReconcileTechCards(force: false);
+  }
+
+  bool _canCreateTtkWithAi(AccountManagerSupabase account) =>
+      account.subscriptionEntitlements.hasProLevelOrTrial;
+
+  ({int limit, String periodType, String periodKey}) _aiTtkQuotaWindow(
+    AccountManagerSupabase account,
+  ) {
+    if (account.isTrialOnlyWithoutPaid) {
+      return (
+        limit: _aiTtkTrialTotalLimit,
+        periodType: 'trial_total',
+        periodKey: 'trial_total',
+      );
+    }
+    final now = DateTime.now().toUtc();
+    final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final paidTier = account.subscriptionEntitlements.paidTier;
+    return (
+      limit:
+          paidTier == AppSubscriptionTier.ultra
+              ? _aiTtkUltraMonthLimit
+              : _aiTtkProMonthLimit,
+      periodType: 'month',
+      periodKey: monthKey,
+    );
+  }
+
+  String _aiTtkRemainingLabel(LocalizationService loc, int remaining, int total) {
+    final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
+    if (isRu) return 'Лимит ИИ-ТТК: осталось $remaining из $total';
+    return 'AI TTK limit: $remaining of $total left';
+  }
+
+  Future<void> _refreshAiTtkRemainingQuota() async {
+    final account = context.read<AccountManagerSupabase>();
+    if (!_canCreateTtkWithAi(account)) {
+      if (mounted && _aiTtkRemainingQuota != null) {
+        setState(() => _aiTtkRemainingQuota = null);
+      }
+      return;
+    }
+    final establishmentId = account.establishment?.dataEstablishmentId.trim();
+    if (establishmentId == null || establishmentId.isEmpty) return;
+    final quotaWindow = _aiTtkQuotaWindow(account);
+    try {
+      final row = await Supabase.instance.client
+          .from('ai_ttk_usage_counters')
+          .select('ai_parse_count')
+          .eq('establishment_id', establishmentId)
+          .eq('period_type', quotaWindow.periodType)
+          .eq('period_key', quotaWindow.periodKey)
+          .maybeSingle();
+      final used = (row?['ai_parse_count'] as num?)?.toInt() ?? 0;
+      final remaining = (quotaWindow.limit - used).clamp(0, quotaWindow.limit);
+      if (mounted) setState(() => _aiTtkRemainingQuota = remaining);
+    } catch (_) {
+      if (mounted) setState(() => _aiTtkRemainingQuota = null);
+    }
+  }
+
+  Widget _buildAiQuotaBadge() {
+    final text = _aiTtkRemainingQuota?.toString() ?? '?';
+    return Container(
+      width: 22,
+      height: 22,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary,
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.onPrimary,
+              fontWeight: FontWeight.w700,
+            ),
+      ),
+    );
   }
 
   Future<void> _pullToRefresh() async {
@@ -457,7 +554,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final est = acc.establishment;
     if (est != null) {
       final svc = context.read<TechCardServiceSupabase>();
-      await svc.clearTechCardsListCacheForEstablishment(est.dataEstablishmentId);
+      await svc
+          .clearTechCardsListCacheForEstablishment(est.dataEstablishmentId);
       if (est.isBranch) {
         await svc.clearTechCardsListCacheForEstablishment(est.id);
       }
@@ -717,6 +815,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
   @override
   void dispose() {
+    if (!kIsWeb) {
+      TechCardServiceSupabase()
+          .persistentTechCardsCacheGeneration
+          .removeListener(_onPersistentTechCardsOfflineCacheBump);
+    }
     _detachTtkRouteListener();
     LocalizationService().removeListener(_localizationPrefetchListener);
     _searchDebounceTimer?.cancel();
@@ -2332,8 +2435,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     if (!mounted || requestToken != _loadRequestToken) return;
     final prep = _prepareTechCardListFromRaw(est, merged, customBarIds);
     _priceProductStore = productStore;
-    _priceEstablishmentId =
-        est.isBranch ? est.id : est.dataEstablishmentId;
+    _priceEstablishmentId = est.isBranch ? est.id : est.dataEstablishmentId;
     setState(() {
       _list = prep.list;
       _listVersion++;
@@ -2342,8 +2444,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       _lastReviewCacheKey = null;
       _loading = false;
       _error = null;
-      _listDetailsHydrating =
-          primeCatalogAndPrices && prep.list.isNotEmpty;
+      _listDetailsHydrating = primeCatalogAndPrices && prep.list.isNotEmpty;
     });
     _techCardsById = {for (final tc in prep.processedAll) tc.id: tc};
     _resolvedCostMemo.clear();
@@ -2419,8 +2520,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               await productStore.loadProducts().catchError((_) {});
               if (est.isBranch) {
                 await productStore
-                    .loadNomenclatureForBranch(
-                        est.id, est.dataEstablishmentId!)
+                    .loadNomenclatureForBranch(est.id, est.dataEstablishmentId!)
                     .catchError((_) {});
               } else {
                 await productStore
@@ -2454,13 +2554,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             scopeIds,
             pageSize: 90,
             onProgress: (merged) => _applyPagedTtkListProgress(
-                  est: est,
-                  merged: merged,
-                  customBarIds: customBarIds,
-                  productStore: productStore,
-                  primeCatalogAndPrices: primeCatalogAndPrices,
-                  requestToken: requestToken,
-                ),
+              est: est,
+              merged: merged,
+              customBarIds: customBarIds,
+              productStore: productStore,
+              primeCatalogAndPrices: primeCatalogAndPrices,
+              requestToken: requestToken,
+            ),
           );
         }
       } else {
@@ -2654,6 +2754,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   Future<void> _exportSingleTechCard(TechCard techCard) async {
     final lang = context.read<LocalizationService>().currentLanguageCode;
     try {
+      final account = context.read<AccountManagerSupabase>();
+      final est = account.establishment;
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.ttk,
+        );
+      }
       await ExcelExportService()
           .exportSingleTechCard(techCard, languageCode: lang);
       if (mounted) {
@@ -2690,6 +2798,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
 
     try {
       final lang = context.read<LocalizationService>().currentLanguageCode;
+      final account = context.read<AccountManagerSupabase>();
+      final est = account.establishment;
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.ttk,
+        );
+      }
       await ExcelExportService()
           .exportSelectedTechCards(selectedCards, languageCode: lang);
       if (mounted) {
@@ -2728,6 +2844,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
 
     try {
+      final account = context.read<AccountManagerSupabase>();
+      final est = account.establishment;
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.ttk,
+        );
+      }
       await ExcelExportService()
           .exportAllTechCards(_list, languageCode: loc.currentLanguageCode);
       if (mounted) {
@@ -3136,8 +3260,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           if (context.read<AiService>() is AiServiceSupabase) {
             final reason = AiServiceSupabase.lastParseTechCardExcelReason ??
                 AiServiceSupabase.lastParseTechCardPdfReason;
-            if (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day') {
-              msg = loc.t('ai_ttk_limit_3_per_day') ?? '';
+            if (reason == 'ai_limit_exceeded' ||
+                reason == 'limit_3_per_day' ||
+                reason == 'ai_ttk_limit_trial_total' ||
+                reason == 'ai_ttk_limit_pro_month' ||
+                reason == 'ai_ttk_limit_ultra_month' ||
+                reason == 'ai_ttk_no_access_lite') {
+              msg = _aiTtkLimitMessage(reason ?? '', loc);
             } else if (reason == 'service_unavailable') {
               msg = loc.t('ai_ttk_pdf_service_unavailable') ??
                   'Сервис распознавания временно недоступен. Экспортируйте PDF в Word или Excel и загрузите снова.';
@@ -3234,52 +3363,274 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   }
 
   Future<void> _createFromText(
-      BuildContext context, LocalizationService loc) async {
+    BuildContext context,
+    LocalizationService loc, {
+    bool allowPromptFallback = false,
+  }) async {
     final acc = context.read<AccountManagerSupabase>();
-    if (!acc.hasProSubscription) {
+    if (allowPromptFallback) {
+      if (!_canCreateTtkWithAi(acc)) {
+        await showSubscriptionRequiredDialog(context);
+        return;
+      }
+    } else if (!acc.hasProSubscription) {
       await showSubscriptionRequiredDialog(context);
       return;
     }
+    final canShowAiQuota = allowPromptFallback && _canCreateTtkWithAi(acc);
+    final aiQuotaTotal = canShowAiQuota ? _aiTtkQuotaWindow(acc).limit : null;
+    final aiQuotaRemaining =
+        canShowAiQuota ? (_aiTtkRemainingQuota ?? aiQuotaTotal) : null;
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(loc.t('ttk_import_text') ?? 'Вставить из текста'),
-        content: SizedBox(
-          width: 400,
-          child: TextField(
-            controller: controller,
-            maxLines: 12,
-            decoration: InputDecoration(
-              hintText:
-                  'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
-              border: const OutlineInputBorder(),
+      builder: (ctx) {
+          final mq = MediaQuery.of(ctx);
+          final screenH = mq.size.height;
+          final screenW = mq.size.width;
+          final kb = mq.viewInsets.bottom;
+          final safePad = mq.padding.vertical;
+          final isLandscape = mq.orientation == Orientation.landscape;
+          final isDesktopLike = screenW >= 900;
+          final useCompactLayout = isLandscape && !isDesktopLike;
+          // Заголовок + actions + отступы диалога (без занижения: иначе в альбоме
+          // clamp «вверх» ломает раскладку и скрывает поле ввода).
+          final dialogChrome = useCompactLayout ? 100.0 : 176.0;
+          final availableH = screenH - kb - safePad;
+          final maxBody = (availableH - dialogChrome).clamp(48.0, screenH * 0.95);
+          const extrasBelowField = 8.0;
+          final fieldHeight =
+              (maxBody - extrasBelowField).clamp(48.0, isDesktopLike ? 620.0 : 520.0);
+          final titleStyle = Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                fontSize: useCompactLayout ? 14 : null,
+                height: useCompactLayout ? 1.15 : null,
+              );
+          final fieldStyle = Theme.of(ctx).textTheme.bodyMedium?.copyWith(
+                fontSize: useCompactLayout ? 13 : 15,
+                height: useCompactLayout ? 1.25 : 1.3,
+              );
+          final hintStyle = Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                fontSize: useCompactLayout ? 11 : 13,
+                height: useCompactLayout ? 1.2 : 1.25,
+              );
+          final dialogMinW = isDesktopLike ? 640.0 : 280.0;
+          final dialogMaxW =
+              isDesktopLike
+                  ? (screenW * 0.78).clamp(dialogMinW, 920.0)
+                  : (useCompactLayout ? (screenW * 0.94).clamp(280.0, 920.0) : 420.0);
+          return AlertDialog(
+          constraints: BoxConstraints(
+            minWidth: dialogMinW,
+            maxWidth: dialogMaxW,
+          ),
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: useCompactLayout ? 8 : 16,
+            vertical: useCompactLayout ? 8 : 16,
+          ),
+          titlePadding: useCompactLayout
+              ? const EdgeInsets.fromLTRB(16, 10, 16, 6)
+              : null,
+          contentPadding: useCompactLayout
+              ? const EdgeInsets.fromLTRB(16, 0, 16, 8)
+              : null,
+          actionsPadding: useCompactLayout
+              ? const EdgeInsets.fromLTRB(12, 0, 12, 10)
+              : null,
+          title: Text(
+            loc.t('ttk_import_text') ?? 'Вставить из текста',
+            style: titleStyle,
+            maxLines: useCompactLayout ? 2 : 4,
+            overflow: TextOverflow.ellipsis,
+          ),
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: dialogMinW,
+              maxWidth: dialogMaxW,
+              maxHeight: maxBody,
+            ),
+            child: SingleChildScrollView(
+              keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (canShowAiQuota &&
+                      aiQuotaTotal != null &&
+                      aiQuotaRemaining != null) ...[
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Theme.of(ctx)
+                            .colorScheme
+                            .surfaceContainerHighest
+                            .withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        child: Text(
+                          _aiTtkRemainingLabel(
+                            loc,
+                            aiQuotaRemaining,
+                            aiQuotaTotal,
+                          ),
+                          style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  SizedBox(
+                    height: fieldHeight,
+                    child: TextField(
+                      controller: controller,
+                      maxLines: null,
+                      expands: true,
+                      style: fieldStyle,
+                      scrollPadding: EdgeInsets.only(bottom: kb + 32),
+                      textInputAction: TextInputAction.newline,
+                      decoration: InputDecoration(
+                        hintText:
+                            'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
+                        hintStyle: hintStyle,
+                        isDense: useCompactLayout,
+                        contentPadding: useCompactLayout
+                            ? const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 8,
+                              )
+                            : null,
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
-            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              style: TextButton.styleFrom(
+                padding: useCompactLayout
+                    ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
+                    : null,
+                textStyle: Theme.of(ctx).textTheme.labelLarge?.copyWith(
+                      fontSize: useCompactLayout ? 13 : null,
+                    ),
+              ),
+              onPressed: () {
+                if (ctx.mounted) Navigator.of(ctx).pop(null);
+              },
+              child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                padding: useCompactLayout
+                    ? const EdgeInsets.symmetric(horizontal: 14, vertical: 8)
+                    : null,
+                textStyle: Theme.of(ctx).textTheme.labelLarge?.copyWith(
+                      fontSize: useCompactLayout ? 13 : null,
+                    ),
+              ),
+              onPressed: () {
+                if (ctx.mounted) {
+                  Navigator.of(ctx).pop(controller.text.trim());
+                }
+              },
+              child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+            ),
+          ],
+        );
+      },
     );
     controller.dispose();
     if (result == null || result.isEmpty || !mounted) return;
-    setState(() => _loadingExcel = true);
+    setState(() {
+      _loadingExcel = true;
+      _loadingTtkIsAiPrompt = allowPromptFallback;
+    });
     try {
       final est = context.read<AccountManagerSupabase>().establishment;
       final establishmentId = est?.dataEstablishmentId;
-      final list = await context
-          .read<AiService>()
-          .parseTechCardsFromText(result, establishmentId: establishmentId);
+      final aiService = context.read<AiService>();
+      if (allowPromptFallback && aiService is AiServiceSupabase) {
+        final createdCards = await aiService.createTechCardsFromPrompt(
+          result,
+          establishmentId: establishmentId,
+        );
+        if (!mounted) return;
+        if (createdCards.isNotEmpty) {
+          if (createdCards.length == 1) {
+            context.push(
+              widget.department == 'bar'
+                  ? '/tech-cards/new?department=bar'
+                  : '/tech-cards/new',
+              extra: <String, Object?>{
+                'result': createdCards.first,
+                'fromAiGeneration': true,
+              },
+            );
+          } else {
+            context.push(
+              '/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}',
+              extra: {'cards': createdCards},
+            );
+          }
+          return;
+        }
+        final reason = AiServiceSupabase.lastCreateTechCardReason ?? '';
+        if (reason.isNotEmpty &&
+            (reason == 'ai_ttk_limit_trial_total' ||
+                reason == 'ai_ttk_limit_pro_month' ||
+                reason == 'ai_ttk_limit_ultra_month' ||
+                reason == 'ai_ttk_no_access_lite' ||
+                reason == 'ai_limit_exceeded' ||
+                reason == 'limit_3_per_day')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(_aiTtkLimitMessage(reason, loc))),
+          );
+          return;
+        }
+      }
+
+      final list = await aiService.parseTechCardsFromText(
+        result,
+        establishmentId: establishmentId,
+      );
       if (!mounted) return;
       if (list.isEmpty) {
+        if (allowPromptFallback) {
+          final prompt = result.trim();
+          final firstLine = prompt.split('\n').first.trim();
+          final fallback = TechCardRecognitionResult(
+            dishName: firstLine.isEmpty ? prompt : firstLine,
+            technologyText: prompt,
+            ingredients: const [],
+            isSemiFinished: false,
+          );
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'ИИ не смог извлечь структуру автоматически. Открыт черновик ТТК с вашим запросом.',
+              ),
+            ),
+          );
+          context.push(
+            widget.department == 'bar'
+                ? '/tech-cards/new?department=bar'
+                : '/tech-cards/new',
+            extra: <String, Object?>{
+              'result': fallback,
+              'fromAiGeneration': true,
+            },
+          );
+          return;
+        }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(loc.t('ai_tech_card_excel_format_hint') ??
@@ -3316,7 +3667,15 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             });
       }
     } finally {
-      if (mounted) setState(() => _loadingExcel = false);
+      if (mounted) {
+        setState(() {
+          _loadingExcel = false;
+          _loadingTtkIsAiPrompt = false;
+        });
+      }
+      if (allowPromptFallback) {
+        unawaited(_refreshAiTtkRemainingQuota());
+      }
     }
   }
 
@@ -3401,16 +3760,16 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       final hasMeta = sig != null && sig.isNotEmpty;
       if (list.length == 1) {
         context.push(
-          widget.department == 'bar'
-              ? '/tech-cards/new?department=bar'
-              : '/tech-cards/new',
-          extra: hasMeta || sourceRows != null
-              ? {
-                  'result': list.single,
-                  'headerSignature': sig,
-                  'sourceRows': sourceRows,
-                }
-              : list.single);
+            widget.department == 'bar'
+                ? '/tech-cards/new?department=bar'
+                : '/tech-cards/new',
+            extra: hasMeta || sourceRows != null
+                ? {
+                    'result': list.single,
+                    'headerSignature': sig,
+                    'sourceRows': sourceRows,
+                  }
+                : list.single);
       } else {
         context.push(
           '/tech-cards/import-review?department=${Uri.encodeComponent(widget.department)}',
@@ -3476,8 +3835,13 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   }
 
   static String _pdfFailureMessage(String reason, LocalizationService loc) {
-    if (reason == 'ai_limit_exceeded' || reason == 'limit_3_per_day') {
-      return loc.t('ai_ttk_limit_3_per_day');
+    if (reason == 'ai_limit_exceeded' ||
+        reason == 'limit_3_per_day' ||
+        reason == 'ai_ttk_limit_trial_total' ||
+        reason == 'ai_ttk_limit_pro_month' ||
+        reason == 'ai_ttk_limit_ultra_month' ||
+        reason == 'ai_ttk_no_access_lite') {
+      return _aiTtkLimitMessage(reason, loc);
     }
     if (reason.startsWith('empty_text'))
       return 'PDF не содержит извлекаемого текста.';
@@ -3494,6 +3858,22 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     if (reason == 'invoke_null')
       return 'Сервер не ответил (503). Первый запрос после паузы может занять до минуты — подождите и попробуйте снова.';
     return loc.t('ai_tech_card_pdf_format_hint');
+  }
+
+  static String _aiTtkLimitMessage(String reason, LocalizationService loc) {
+    switch (reason) {
+      case 'ai_ttk_no_access_lite':
+        return 'Lite: создание ТТК с ИИ недоступно.';
+      case 'ai_ttk_limit_trial_total':
+      case 'limit_3_per_day':
+        return 'Триал: лимит создания ТТК с ИИ — 3 за первые 3 дня.';
+      case 'ai_ttk_limit_pro_month':
+        return 'Pro: лимит создания ТТК с ИИ — 15 в месяц.';
+      case 'ai_ttk_limit_ultra_month':
+        return 'Ultra: лимит создания ТТК с ИИ — 35 в месяц.';
+      default:
+        return loc.t('ai_ttk_limit_3_per_day');
+    }
   }
 
   /// Простой разбор Excel: столбец A или B — названия ПФ/блюд.
@@ -3643,9 +4023,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                                   child: CircularProgressIndicator(
                                       strokeWidth: 2)),
                               const SizedBox(height: 16),
-                              Text(_loadingTtkIsPdf
-                                  ? loc.t('loading_ttk_pdf')
-                                  : loc.t('loading_excel')),
+                              Text(_loadingTtkIsAiPrompt
+                                  ? 'Создание ТТК с ИИ...'
+                                  : (_loadingTtkIsPdf
+                                      ? loc.t('loading_ttk_pdf')
+                                      : loc.t('loading_excel'))),
                             ],
                           ),
                         ),
@@ -3661,7 +4043,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     );
   }
 
-  Future<void> _onTapCreateTechCard(LocalizationService loc) async {
+  Future<void> _openManualTechCardCreate(LocalizationService loc) async {
     if (_loading) return;
     const draftKey = 'tech_card_edit_new';
     final merged = await DraftStorageService()
@@ -3710,6 +4092,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   List<Widget> _buildAppBarActions(
       LocalizationService loc, bool canEdit, bool hasProSubscription) {
     final ctrl = _ttkTourController;
+    final account = context.read<AccountManagerSupabase>();
+    final canCreateAi = _canCreateTtkWithAi(account);
     Widget wrap(String id, Widget w) =>
         ctrl != null ? SpotlightTarget(id: id, controller: ctrl, child: w) : w;
 
@@ -3735,11 +4119,55 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           )
         : null;
     final createWidget = canEdit
-        ? IconButton(
+        ? PopupMenuButton<String>(
             icon: Icon(Icons.add,
                 color: _loading ? Theme.of(context).disabledColor : null),
             tooltip: loc.t('create_tech_card'),
-            onPressed: _loading ? null : () => _onTapCreateTechCard(loc),
+            enabled: !_loading,
+            onSelected: (value) async {
+              if (value == 'manual') {
+                await _openManualTechCardCreate(loc);
+                return;
+              }
+              if (value == 'ai') {
+                await _createFromText(context, loc, allowPromptFallback: true);
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'manual',
+                child: Text(
+                  loc.t('create_tech_card'),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
+              ),
+              if (canCreateAi)
+                PopupMenuItem(
+                  value: 'ai',
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          loc.t('create_with_ai').trim().isEmpty
+                              ? 'Создать с ИИ'
+                              : loc.t('create_with_ai'),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      _buildAiQuotaBadge(),
+                    ],
+                  ),
+                ),
+            ],
           )
         : null;
     final importWidget = canEdit && hasProSubscription

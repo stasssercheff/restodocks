@@ -177,6 +177,14 @@ class WriteoffSummaryInboxScreen extends StatelessWidget {
         final dateStr = parts.length == 3
             ? '${parts[2]}-${parts[1]}-${parts[0]}'
             : dateLabel.replaceAll('.', '-');
+        final account = context.read<AccountManagerSupabase>();
+        final est = account.establishment;
+        if (est != null && account.isTrialOnlyWithoutPaid) {
+          await account.trialIncrementDeviceSaveOrThrow(
+            establishmentId: est.id,
+            docKind: TrialDeviceSaveKinds.writeoff,
+          );
+        }
         await saveFileBytes('writeoff_summary_$dateStr.xlsx', out);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

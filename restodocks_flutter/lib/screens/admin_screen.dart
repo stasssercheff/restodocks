@@ -1,4 +1,5 @@
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -8,7 +9,7 @@ import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Кабинет платформенного администратора бэты.
-/// Вкладки: Дашборд, Промокоды, Заведения, Пользователи.
+/// Вкладки: Дашборд, Промокоды, Заведения, Пользователи, Поддержка.
 class AdminScreen extends StatefulWidget {
   const AdminScreen({super.key});
 

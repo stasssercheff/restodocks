@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/subscription_entitlements.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 import '../utils/checklist_reminder_summary.dart';
@@ -14,6 +15,24 @@ import '../utils/employee_display_utils.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
 import '../widgets/app_bar_home_button.dart';
+
+/// Просмотр ТТК из пункта чеклиста: `view=1` и при необходимости `targetOutputG` (г) для пересчёта «итого выход».
+String checklistItemTechCardViewRoute(ChecklistItem item) {
+  final id = item.techCardId?.trim();
+  if (id == null || id.isEmpty) return '';
+  final q = <String, String>{'view': '1'};
+  final qty = item.targetQuantity;
+  if (qty != null && qty > 0) {
+    final unit = (item.targetUnit != null && item.targetUnit!.trim().isNotEmpty)
+        ? item.targetUnit!.trim()
+        : 'g';
+    final g = CulinaryUnits.toGrams(qty, unit);
+    if (g > 0) {
+      q['targetOutputG'] = g.toStringAsFixed(0);
+    }
+  }
+  return Uri(path: '/tech-cards/$id', queryParameters: q).toString();
+}
 
 /// Заполнение чеклиста: шапка, №, наименование (ссылками на ТТК ПФ), окно действия, комментарии.
 /// Сохранение: localStorage + сервер каждые 15 сек. Кнопка «Завершить» — во входящие шефу и су-шефу.
@@ -271,6 +290,8 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
         'dropdownValue': i < _dropdownValues.length ? _dropdownValues[i] : null,
         if (c.items[i].targetQuantity != null) 'targetQuantity': c.items[i].targetQuantity,
         if (c.items[i].targetUnit != null) 'targetUnit': c.items[i].targetUnit,
+        if (c.items[i].imageUrl != null && c.items[i].imageUrl!.trim().isNotEmpty)
+          'imageUrl': c.items[i].imageUrl,
       });
     }
 
@@ -339,7 +360,8 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                 Text(loc.t('checklists_kitchen_only'), style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center),
                 const SizedBox(height: 24),
                 FilledButton.icon(
-                  onPressed: () => context.go('/home'),
+                  onPressed: () =>
+                      context.go('/home', extra: {'back': true}),
                   icon: const Icon(Icons.home),
                   label: Text(loc.t('home')),
                   style: FilledButton.styleFrom(
@@ -388,6 +410,9 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
 
     final c = _checklist!;
     final cfg = c.actionConfig;
+    final allowRichContent = SubscriptionEntitlements.from(
+      context.read<AccountManagerSupabase>().establishment,
+    ).hasUltraLevelFeatures;
 
     return Scaffold(
       appBar: AppBar(
@@ -409,7 +434,16 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                     child: _buildTableHeader(loc, cfg),
                   ),
                   const Divider(height: 24),
-                  ...List.generate(c.items.length, (i) => _buildRow(loc, c, cfg, i)),
+                  ...List.generate(
+                    c.items.length,
+                    (i) => _buildRow(
+                      loc,
+                      c,
+                      cfg,
+                      i,
+                      allowRichContent,
+                    ),
+                  ),
                   const SizedBox(height: 24),
                   TextField(
                     controller: _commentsController,
@@ -504,6 +538,29 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     );
   }
 
+  void _openFillItemPhoto(String url) {
+    final u = url.trim();
+    if (u.isEmpty) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        clipBehavior: Clip.antiAlias,
+        child: InteractiveViewer(
+          minScale: 0.5,
+          maxScale: 4,
+          child: Image.network(
+            u,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => const Padding(
+              padding: EdgeInsets.all(24),
+              child: Icon(Icons.broken_image_outlined, size: 64),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildTableHeader(LocalizationService loc, ChecklistActionConfig cfg) {
     final statusWidth =
         isHandheldNarrowLayout(context) ? 160.0 : 220.0;
@@ -543,7 +600,13 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
     return Row(children: children);
   }
 
-  Widget _buildRow(LocalizationService loc, Checklist checklist, ChecklistActionConfig cfg, int i) {
+  Widget _buildRow(
+    LocalizationService loc,
+    Checklist checklist,
+    ChecklistActionConfig cfg,
+    int i,
+    bool allowRichContent,
+  ) {
     final statusWidth =
         isHandheldNarrowLayout(context) ? 160.0 : 220.0;
     final it = checklist.items[i];
@@ -567,9 +630,10 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (it.techCardId != null)
+                  if (allowRichContent && it.techCardId != null)
                     InkWell(
-                      onTap: () => context.push('/tech-cards/${it.techCardId}?view=1'),
+                      onTap: () =>
+                          context.push(checklistItemTechCardViewRoute(it)),
                       child: Row(
                         children: [
                           Icon(Icons.link, size: 16, color: Theme.of(context).colorScheme.primary),
@@ -580,6 +644,34 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                     )
                   else
                     Text(_getTitle(it), style: Theme.of(context).textTheme.bodyMedium),
+                  if (allowRichContent &&
+                      it.imageUrl != null &&
+                      it.imageUrl!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _openFillItemPhoto(it.imageUrl!),
+                        borderRadius: BorderRadius.circular(8),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            it.imageUrl!.trim(),
+                            height: 120,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => SizedBox(
+                              height: 80,
+                              child: Icon(
+                                Icons.broken_image_outlined,
+                                color: Theme.of(context).colorScheme.outline,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                   // Если есть колонка "Цифра", количество показываем в ней, а не "под" названием.
                   if (!cfg.hasNumeric && it.quantityLabel != null) ...[
                     const SizedBox(height: 4),

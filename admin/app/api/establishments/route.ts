@@ -5,6 +5,7 @@ import { getAdminPassword, getSupabaseConfig } from '@/lib/admin-env'
 import { verifySessionToken } from '@/lib/session'
 import {
   hasEffectivePro,
+  subscriptionGroupKey,
   summarizeSubscriptionForAdmin,
   type PromoRedemptionRow,
 } from '@/lib/subscription-admin'
@@ -28,9 +29,8 @@ export async function GET() {
 
   /** Пока на БД не все миграции — перебираем селекты от полного к минимальному. */
   const selectVariants: string[] = [
-    `${selectCore}, subscription_type, pro_paid_until, pro_trial_ends_at, max_additional_establishments_override`,
     `${selectCore}, subscription_type, pro_paid_until, pro_trial_ends_at`,
-    `${selectCore}, subscription_type, max_additional_establishments_override`,
+    `${selectCore}, subscription_type, pro_trial_ends_at`,
     `${selectCore}, subscription_type`,
     selectCore,
   ]
@@ -42,8 +42,6 @@ export async function GET() {
   function normalizeEstablishmentRow(row: Record<string, unknown>) {
     return {
       ...row,
-      max_additional_establishments_override:
-        (row.max_additional_establishments_override as number | null | undefined) ?? null,
       subscription_type: (row.subscription_type as string | null | undefined) ?? null,
       pro_paid_until: (row.pro_paid_until as string | null | undefined) ?? null,
       pro_trial_ends_at: (row.pro_trial_ends_at as string | null | undefined) ?? null,
@@ -99,18 +97,38 @@ export async function GET() {
   if (ids.length > 0) {
     const { data: redemptionRows } = await supabase
       .from('promo_code_redemptions')
-      .select('establishment_id, promo_codes(code)')
+      .select(
+        'establishment_id, redeemed_at, promo_codes(code, activation_duration_days, expires_at)',
+      )
       .in('establishment_id', ids)
 
     for (const raw of redemptionRows ?? []) {
       const r = raw as unknown as {
         establishment_id: string
-        promo_codes: { code: string } | { code: string }[] | null
+        redeemed_at?: string | null
+        promo_codes:
+          | {
+              code: string
+              activation_duration_days?: number | null
+              expires_at?: string | null
+            }
+          | {
+              code: string
+              activation_duration_days?: number | null
+              expires_at?: string | null
+            }[]
+          | null
       }
       const nested = r.promo_codes
-      const code = Array.isArray(nested) ? nested[0]?.code : nested?.code
+      const pc = Array.isArray(nested) ? nested[0] : nested
+      const code = pc?.code
       if (!code || promoByEstId.has(r.establishment_id)) continue
-      promoByEstId.set(r.establishment_id, { code })
+      promoByEstId.set(r.establishment_id, {
+        code,
+        redeemed_at: r.redeemed_at ?? null,
+        activation_duration_days: pc?.activation_duration_days ?? null,
+        expires_at: pc?.expires_at ?? null,
+      })
     }
   }
 
@@ -171,14 +189,19 @@ export async function GET() {
 
   const result = list.map(est => {
     const estId = est.id
-    const promo = promoByEstId.get(estId)
+    const rootId = getRootParentId(estId)
+    // Для филиалов показываем источник подписки по корневому заведению владельца,
+    // если у самого филиала нет своей строки promo_code_redemptions.
+    const promo = promoByEstId.get(estId) ?? promoByEstId.get(rootId)
     const subFields = {
       subscription_type: est.subscription_type as string | null | undefined,
       pro_paid_until: est.pro_paid_until as string | null | undefined,
       pro_trial_ends_at: est.pro_trial_ends_at as string | null | undefined,
     }
-    const subscription_summary = summarizeSubscriptionForAdmin(subFields, promo)
-    const effective_pro = hasEffectivePro(subFields)
+    const createdAt = est.created_at as string | null | undefined
+    const subscription_summary = summarizeSubscriptionForAdmin(subFields, promo, Date.now(), createdAt)
+    const effective_pro = hasEffectivePro(subFields, promo)
+    const subscription_group = subscriptionGroupKey(subFields, promo, Date.now(), createdAt)
 
     const isMain = !est.parent_establishment_id
     const scopeIds = isMain ? [estId, ...collectDescendants(estId)] : [estId]
@@ -201,11 +224,11 @@ export async function GET() {
         establishment_type,
         subscription_summary,
         effective_pro,
+        subscription_group,
       }
     }
 
     // Если владелец не найден по самому филиалу, пробуем найти его у root parent.
-    const rootId = getRootParentId(estId)
     const rootEmployees = employeesByEstId.get(rootId) ?? []
     const rootOwner = rootEmployees.find(e => e.roles?.includes('owner'))
 
@@ -224,6 +247,7 @@ export async function GET() {
       establishment_type,
       subscription_summary,
       effective_pro,
+      subscription_group,
     }
   })
 

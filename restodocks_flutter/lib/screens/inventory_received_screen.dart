@@ -305,6 +305,14 @@ class _InventoryDocumentDetailScreen extends StatelessWidget {
       if (out != null && out.isNotEmpty) {
         final date =
             header['date'] ?? DateTime.now().toIso8601String().split('T').first;
+        final account = context.read<AccountManagerSupabase>();
+        final est = account.establishment;
+        if (est != null && account.isTrialOnlyWithoutPaid) {
+          await account.trialIncrementDeviceSaveOrThrow(
+            establishmentId: est.id,
+            docKind: TrialDeviceSaveKinds.procurementReceipt,
+          );
+        }
         await saveFileBytes('inventory_$date.xlsx', out);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

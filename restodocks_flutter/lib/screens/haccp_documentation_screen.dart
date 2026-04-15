@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/employee.dart';
 import '../models/models.dart';
+import '../legal/legal_compliance_provider.dart';
 import '../services/haccp_agreement_pdf_service.dart';
 import '../services/haccp_order_pdf_service.dart';
 import '../services/inventory_download.dart';
@@ -97,12 +98,37 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
         stampHint: loc.tForLanguage(pickedLang, 'haccp_agreement_stamp_hint'),
         workerSignLabel:
             loc.tForLanguage(pickedLang, 'haccp_agreement_worker_sign'),
-        agreementBody: loc.tForLanguage(pickedLang, 'haccp_agreement_body'),
+        agreementBody: LegalComplianceProvider.applyCompliancePlaceholders(
+          loc.tForLanguage(pickedLang, 'haccp_agreement_body'),
+          LegalComplianceProvider.complianceForLanguageCode(pickedLang),
+        ),
         employerPositionLabel:
             (employerPosition != null && employerPosition != 'role_$roleCode')
                 ? employerPosition
                 : null,
       );
+
+      if (account.isTrialOnlyWithoutPaid) {
+        try {
+          await account.trialIncrementDeviceSaveOrThrow(
+            establishmentId: est.id,
+            docKind: TrialDeviceSaveKinds.documentation,
+          );
+        } catch (e) {
+          if (e.toString().contains('TRIAL_DEVICE_SAVE_CAP')) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                      'В первые 72 часа можно сохранить не более 3 документов этого типа.'),
+                ),
+              );
+            }
+            return;
+          }
+          rethrow;
+        }
+      }
 
       await saveFileBytes('haccp_agreement_employee.pdf', bytes);
       if (context.mounted) {
@@ -252,10 +278,33 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
     if (thirdPageMode == null || !context.mounted) return;
     try {
       final bytes = await HaccpOrderPdfService.buildOrderPdfBytes(
+        tr: (String key, {Map<String, String>? args}) =>
+            loc.t(key, args: args),
         establishment: est,
         thirdPageMode: thirdPageMode.mode,
         selectedEmployees: thirdPageMode.selectedEmployees,
       );
+      if (account.isTrialOnlyWithoutPaid) {
+        try {
+          await account.trialIncrementDeviceSaveOrThrow(
+            establishmentId: est.id,
+            docKind: TrialDeviceSaveKinds.documentation,
+          );
+        } catch (e) {
+          if (e.toString().contains('TRIAL_DEVICE_SAVE_CAP')) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                      'В первые 72 часа можно сохранить не более 3 документов этого типа.'),
+                ),
+              );
+            }
+            return;
+          }
+          rethrow;
+        }
+      }
       await saveFileBytes('haccp_order.pdf', bytes);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

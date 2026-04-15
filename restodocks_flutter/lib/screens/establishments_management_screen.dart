@@ -53,6 +53,8 @@ class _EstablishmentsManagementScreenState
   }
 
   int get _additionalCount => (_list.length - 1).clamp(0, _maxEstablishmentsPerOwner);
+  int get _totalCount => _list.isEmpty ? 0 : _list.length;
+  int get _totalCap => _maxEstablishmentsPerOwner + 1;
 
   bool get _canAddMore => _additionalCount < _maxEstablishmentsPerOwner;
 
@@ -66,7 +68,7 @@ class _EstablishmentsManagementScreenState
     if (accountManager.currentEmployee?.hasRole('owner') != true) {
       return Scaffold(
         appBar: AppBar(
-          leading: appBarBackButton(context),
+          leading: shellReturnLeading(context) ?? appBarBackButton(context),
           title: Text(loc.t('establishments')),
         ),
         body: Center(child: Text(loc.t('error_no_establishment_or_employee'))),
@@ -75,7 +77,8 @@ class _EstablishmentsManagementScreenState
 
     return Scaffold(
       appBar: AppBar(
-        leading: GoRouter.of(context).canPop() ? appBarBackButton(context) : null,
+        leading: shellReturnLeading(context) ??
+            (GoRouter.of(context).canPop() ? appBarBackButton(context) : null),
         title: Text(loc.t('establishments')),
       ),
       body: _loading
@@ -108,11 +111,18 @@ class _EstablishmentsManagementScreenState
                       ),
                     Padding(
                       padding: const EdgeInsets.only(top: 8, bottom: 16),
-                      child: Text(
-                        (loc.t('establishments_counter'))
-                            .replaceAll('{current}', '$_additionalCount')
-                            .replaceAll('{max}', '$_maxEstablishmentsPerOwner'),
-                        style: Theme.of(context).textTheme.bodySmall,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            (loc.t('establishments_counter'))
+                                .replaceAll('{current}', '$_additionalCount')
+                                .replaceAll('{max}', '$_maxEstablishmentsPerOwner'),
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -163,7 +173,10 @@ class _EstablishmentsManagementScreenState
                                       icon: const Icon(Icons.swap_horiz),
                                       onPressed: () async {
                                         await accountManager.switchEstablishment(est);
-                                        if (mounted) context.go('/home');
+                                        if (mounted) {
+                                          context.go('/home',
+                                              extra: {'back': true});
+                                        }
                                       },
                                     ),
                                   if (!viewOnly)
@@ -197,7 +210,9 @@ class _EstablishmentsManagementScreenState
                             ? null
                             : () async {
                                 await accountManager.switchEstablishment(est);
-                                if (mounted) context.go('/home');
+                                if (mounted) {
+                                  context.go('/home', extra: {'back': true});
+                                }
                               },
                       ),
                     );

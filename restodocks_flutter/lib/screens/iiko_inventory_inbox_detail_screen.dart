@@ -11,6 +11,7 @@ import '../services/iiko_xlsx_patcher.dart';
 import '../services/localization_service.dart';
 import '../services/inbox_viewed_service.dart';
 import '../services/account_manager_supabase.dart';
+import '../services/trial_device_save_kinds.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Просмотр iiko-инвентаризации из входящих.
@@ -106,6 +107,29 @@ class _IikoInventoryInboxDetailScreenState
     }
 
     try {
+      final account = context.read<AccountManagerSupabase>();
+      final est = account.establishment;
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        try {
+          await account.trialIncrementDeviceSaveOrThrow(
+            establishmentId: est.id,
+            docKind: TrialDeviceSaveKinds.inventoryIiko,
+          );
+        } catch (e) {
+          if (e.toString().contains('TRIAL_DEVICE_SAVE_CAP')) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                      'В первые 72 часа можно сохранить не более 3 документов этого типа.'),
+                ),
+              );
+            }
+            return;
+          }
+          rethrow;
+        }
+      }
       await saveFileBytes(fileName, outBytes);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

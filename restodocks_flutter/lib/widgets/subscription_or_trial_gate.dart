@@ -7,10 +7,16 @@ import 'subscription_required_dialog.dart';
 
 /// Прямой заход по URL без подписки и после триала: диалог и выход (на домашний или назад).
 /// С главного экрана пользователь видит блеклые плитки ([HomeFeatureTile]), сюда обычно не попадает.
+/// [allowLiteTier] — для экранов, доступных на бесплатном Lite (например расчёт ФЗП без сохранения).
 class SubscriptionOrTrialGate extends StatefulWidget {
-  const SubscriptionOrTrialGate({super.key, required this.child});
+  const SubscriptionOrTrialGate({
+    super.key,
+    required this.child,
+    this.allowLiteTier = false,
+  });
 
   final Widget child;
+  final bool allowLiteTier;
 
   @override
   State<SubscriptionOrTrialGate> createState() => _SubscriptionOrTrialGateState();
@@ -24,7 +30,8 @@ class _SubscriptionOrTrialGateState extends State<SubscriptionOrTrialGate> {
     super.didChangeDependencies();
     final account = context.read<AccountManagerSupabase>();
     if (account.establishment == null) return;
-    if (account.hasProSubscription) return;
+    if (account.hasProSubscription ||
+        (widget.allowLiteTier && account.establishment != null)) return;
     if (_dialogScheduled) return;
     _dialogScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -34,7 +41,7 @@ class _SubscriptionOrTrialGateState extends State<SubscriptionOrTrialGate> {
       if (context.canPop()) {
         context.pop();
       } else {
-        context.go('/home');
+        context.go('/home', extra: {'back': true});
       }
     });
   }
@@ -47,7 +54,8 @@ class _SubscriptionOrTrialGateState extends State<SubscriptionOrTrialGate> {
         body: Center(child: CircularProgressIndicator()),
       );
     }
-    if (!account.hasProSubscription) {
+    if (!account.hasProSubscription &&
+        !(widget.allowLiteTier && account.establishment != null)) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );

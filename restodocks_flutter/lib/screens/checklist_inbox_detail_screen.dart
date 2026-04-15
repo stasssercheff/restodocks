@@ -234,6 +234,7 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
               final techCardId = itemData['techCardId']?.toString();
               final numericValue = itemData['numericValue']?.toString();
               final dropdownValue = itemData['dropdownValue']?.toString();
+              final imageUrl = itemData['imageUrl']?.toString().trim();
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -278,6 +279,19 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
                         it.done ? loc.t('done') : loc.t('not_done'),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
+                      if (imageUrl != null && imageUrl.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(
+                            imageUrl,
+                            height: 120,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                          ),
+                        ),
+                      ],
                       if (numericValue != null && numericValue.isNotEmpty)
                         Text(numericValue, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                       if (dropdownValue != null && dropdownValue.isNotEmpty)

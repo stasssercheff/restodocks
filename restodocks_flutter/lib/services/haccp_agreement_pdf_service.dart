@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../legal/legal_compliance_provider.dart';
 import '../models/establishment.dart';
 import '../models/employee.dart';
 
@@ -29,13 +30,14 @@ class HaccpAgreementPdfService {
     return _theme!;
   }
 
-  /// Русский текст соглашения (fallback).
+  /// Русский шаблон соглашения (fallback, если не передан [agreementBody]).
   static const String agreementBodyRu = '''
-Настоящим удостоверяет, что ввод данных в электронные журналы и учётные формы системы Restodocks под своим учётным логином (логин и пароль) признаётся им равнозначным собственноручной подписи в соответствии с:
+Настоящим подтверждается, что ввод данных в электронные журналы и учётные формы системы Restodocks под личным логином (логин и пароль) признаётся равнозначным собственноручной подписи в соответствии с:
 
-— Национальным законодательством об электронной цифровой подписи (включая 63-ФЗ РФ, Закон об ЭЦП РК, РБ, РУз и др. государств СНГ);
-— Международными стандартами безопасности пищевой продукции (HACCP / ХАССП);
-— Техническим регламентом Таможенного союза ТР ТС 021/2011 "О безопасности пищевой продукции" (действует на всей территории ЕАЭС).
+— {{E_SIGNATURE_LAW}};
+— {{SYSTEM_NAME}};
+— {{FOOD_LAW}};
+— {{DATA_PRIVACY_LAW}}.
 
 Работник обязуется соблюдать порядок учёта и не разглашать данные для входа в систему.
 ''';
@@ -80,7 +82,12 @@ class HaccpAgreementPdfService {
     final headerStyle = pw.TextStyle(fontSize: 9, color: PdfColors.grey800);
     final empPosition = employerPositionLabel ?? _employerPositionRu(employerEmployee);
     final empFullName = '${employerEmployee.fullName}${employerEmployee.surname != null ? ' ${employerEmployee.surname}' : ''}';
-    final body = agreementBody ?? agreementBodyRu;
+    final body = agreementBody != null
+        ? agreementBody
+        : LegalComplianceProvider.applyCompliancePlaceholders(
+            agreementBodyRu,
+            LegalComplianceProvider.complianceForLanguageCode('ru'),
+          );
 
     doc.addPage(
       pw.Page(

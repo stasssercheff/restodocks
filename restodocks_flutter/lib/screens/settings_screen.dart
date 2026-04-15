@@ -9,8 +9,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/haccp_log_type.dart';
 import '../models/models.dart';
 import '../core/feature_flags.dart';
+import '../core/subscription_entitlements.dart';
 import '../services/haccp_agreement_pdf_service.dart';
 import '../services/inventory_download.dart';
+import '../legal/legal_compliance_provider.dart';
 import '../services/services.dart';
 import '../services/home_layout_config_service.dart';
 import '../services/screen_layout_preference_service.dart';
@@ -28,6 +30,22 @@ bool _isPlatformAdminEmail(String email) =>
     _adminEmails.contains(email.toLowerCase().trim());
 
 /// Экран только настроек: язык, тема, валюта и т.д. Без данных профиля (профиль — отдельная кнопка).
+/// Суффикс подразделения для подписей плиток домашнего экрана (без хардкода all/kitchen на английском).
+String _homeLayoutBranchLabel(LocalizationService loc, String branch) {
+  switch (branch) {
+    case 'all':
+      return loc.t('department_all');
+    case 'kitchen':
+      return loc.t('department_kitchen');
+    case 'bar':
+      return loc.t('department_bar');
+    case 'hall':
+      return loc.t('department_dining_room');
+    default:
+      return branch;
+  }
+}
+
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -43,6 +61,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final acc = context.read<AccountManagerSupabase>();
       final est = acc.establishment;
       if (est != null) context.read<HaccpConfigService>().load(est.id);
+      // Отключение промо в админке / срок — сервер меняет тариф в check_establishment_access;
+      // при открытии настроек подтягиваем актуальное заведение без ожидания resume/таймера.
+      unawaited(acc.syncEstablishmentAccessFromServer());
       // Fast pull when settings are opened on another device/browser.
       unawaited(
           AccountUiSyncService.instance.refreshEmployeeProfileFromServer());
@@ -546,49 +567,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
-  void _showTtkBranchFilterPicker(
-    BuildContext context,
-    LocalizationService loc,
-    AccountManagerSupabase accountManager,
-    List<Establishment> branches,
-  ) {
-    final branchFilter = context.read<TtkBranchFilterService>();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title:
-            Text(loc.t('ttk_branch_display') ?? 'Отображение ТТК по филиалам'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.store),
-              title: Text(loc.t('main_establishment') ?? 'Основное'),
-              trailing: branchFilter.selectedBranchId == null
-                  ? const Icon(Icons.check, color: Colors.green)
-                  : null,
-              onTap: () async {
-                await branchFilter.setBranchFilter(null);
-                if (ctx.mounted) Navigator.of(ctx).pop();
-              },
-            ),
-            ...branches.map((b) => ListTile(
-                  leading: const Icon(Icons.account_tree),
-                  title: Text(b.name),
-                  trailing: branchFilter.selectedBranchId == b.id
-                      ? const Icon(Icons.check, color: Colors.green)
-                      : null,
-                  onTap: () async {
-                    await branchFilter.setBranchFilter(b.id);
-                    if (ctx.mounted) Navigator.of(ctx).pop();
-                  },
-                )),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showHomeLayoutConfig(BuildContext context, LocalizationService loc) {
     final account = context.read<AccountManagerSupabase>();
     final emp = account.currentEmployee;
@@ -597,54 +575,184 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final ownerPref = context.read<OwnerViewPreferenceService>();
     final isOwnerHome =
         emp.hasRole('owner') && (emp.positionRole == null || ownerPref.viewAsOwner);
+    final isLiteOwnerHome = isOwnerHome &&
+        SubscriptionEntitlements.from(account.establishment).isLiteTier;
+    if (isLiteOwnerHome) {
+      final labels = <String, String>{
+        'owner_schedule_all':
+            '${loc.t('schedule')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        'owner_menu_kitchen':
+            '${loc.t('menu')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        'owner_ttk_kitchen': loc.t('ttk_kitchen'),
+        'owner_nomenclature_kitchen':
+            '${loc.t('nomenclature')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        'owner_messages': loc.t('inbox_tab_messages') ?? 'Сообщения',
+        'owner_employees': loc.t('employees'),
+        'owner_expenses_lite': loc.t('expenses') ?? 'Расходы',
+      };
+      final hidden = Set<String>.from(layoutSvc.getHiddenKeys(emp.id));
+      var order = layoutSvc.getOwnerLiteOrder(emp.id, labels.keys.toList());
+      showDialog<void>(
+        context: context,
+        builder: (ctx) => StatefulBuilder(
+          builder: (ctx2, setState) => AlertDialog(
+            title: Text(loc.t('home_layout_config') ?? 'Настройка домашнего экрана'),
+            content: SizedBox(
+              width: 380,
+              height: 500,
+              child: ReorderableListView.builder(
+                itemCount: order.length,
+                onReorder: (oldIndex, newIndex) {
+                  setState(() {
+                    if (newIndex > oldIndex) newIndex -= 1;
+                    final item = order.removeAt(oldIndex);
+                    order.insert(newIndex, item);
+                  });
+                },
+                itemBuilder: (context, index) {
+                  final key = order[index];
+                  final enabled = !hidden.contains(key);
+                  return CheckboxListTile(
+                    key: ValueKey(key),
+                    dense: true,
+                    value: enabled,
+                    title: Text(labels[key] ?? key),
+                    subtitle: Text(
+                      'Перетащите для смены порядка',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    onChanged: (v) {
+                      setState(() {
+                        if (v == true) {
+                          hidden.remove(key);
+                        } else {
+                          hidden.add(key);
+                        }
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  await layoutSvc.setOwnerLiteOrder(emp.id, order);
+                  await layoutSvc.setHiddenKeys(emp.id, hidden);
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                },
+                child: Text(loc.t('save')),
+              ),
+            ],
+          ),
+        ),
+      );
+      return;
+    }
     if (isOwnerHome) {
       final screenPref = context.read<ScreenLayoutPreferenceService>();
-      final posOn = FeatureFlags.posModuleEnabled;
+      final ownerSubEnt = SubscriptionEntitlements.from(account.establishment);
+      final posOn = FeatureFlags.posEnabledForSubscription(ownerSubEnt) &&
+          screenPref.showPosSection;
       final labels = <String, String>{
         'owner_doc': loc.t('documentation') ?? 'Документация',
         'owner_haccp': loc.t('haccp_journals') ?? 'Журналы и ХАССП',
         'owner_messages': loc.t('inbox_tab_messages') ?? 'Сообщения',
         'owner_inbox': loc.t('inbox'),
         'owner_employees': loc.t('employees'),
-        'owner_schedule_all': '${loc.t('schedule')} (all)',
-        'owner_schedule_kitchen': '${loc.t('schedule')} (kitchen)',
-        'owner_menu_kitchen': '${loc.t('menu')} (kitchen)',
+        'owner_schedule_all':
+            '${loc.t('schedule')} (${_homeLayoutBranchLabel(loc, 'all')})',
+        'owner_schedule_kitchen':
+            '${loc.t('schedule')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        'owner_menu_kitchen':
+            '${loc.t('menu')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
         'owner_ttk_kitchen': loc.t('ttk_kitchen'),
-        'owner_nomenclature_kitchen': '${loc.t('nomenclature')} (kitchen)',
-        if (posOn) 'owner_pos_orders_kitchen': '${loc.t('order_tab_orders')} (kitchen)',
-        if (posOn) 'owner_pos_sales_kitchen': '${loc.t('sales_title') ?? 'Продажи'} (kitchen)',
-        if (posOn) 'owner_pos_warehouse_kitchen': '${loc.t('pos_nav_warehouse') ?? 'Склад'} (kitchen)',
-        if (posOn) 'owner_pos_procurement_kitchen': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (kitchen)',
-        if (!posOn) 'owner_procurement_kitchen': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (kitchen)',
-        'owner_writeoffs_kitchen': '${loc.t('writeoffs') ?? 'Списания'} (kitchen)',
-        'owner_checklists_kitchen': '${loc.t('checklists')} (kitchen)',
-        if (screenPref.showBarSection) ...{
-          'owner_schedule_bar': '${loc.t('schedule')} (bar)',
-          'owner_menu_bar': '${loc.t('menu')} (bar)',
+        'owner_nomenclature_kitchen':
+            '${loc.t('nomenclature')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        if (posOn)
+          'owner_pos_orders_kitchen':
+              '${loc.t('order_tab_orders')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        if (posOn)
+          'owner_pos_sales_kitchen':
+              '${loc.t('sales_title') ?? 'Продажи'} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        if (posOn)
+          'owner_pos_warehouse_kitchen':
+              '${loc.t('pos_nav_warehouse') ?? 'Склад'} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        if (posOn)
+          'owner_pos_procurement_kitchen':
+              '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        if (!posOn)
+          'owner_procurement_kitchen':
+              '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        'owner_writeoffs_kitchen':
+            '${loc.t('writeoffs') ?? 'Списания'} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        'owner_checklists_kitchen':
+            '${loc.t('checklists')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
+        if (screenPref.showBarSection && ownerSubEnt.hasUltraLevelFeatures) ...{
+          'owner_schedule_bar':
+              '${loc.t('schedule')} (${_homeLayoutBranchLabel(loc, 'bar')})',
+          'owner_menu_bar':
+              '${loc.t('menu')} (${_homeLayoutBranchLabel(loc, 'bar')})',
           'owner_ttk_bar': loc.t('ttk_bar') ?? 'ТТК бара',
-          'owner_nomenclature_bar': '${loc.t('nomenclature')} (bar)',
-          if (posOn) 'owner_pos_orders_bar': '${loc.t('order_tab_orders')} (bar)',
-          if (posOn) 'owner_pos_sales_bar': '${loc.t('sales_title') ?? 'Продажи'} (bar)',
-          if (posOn) 'owner_pos_warehouse_bar': '${loc.t('pos_nav_warehouse') ?? 'Склад'} (bar)',
-          if (posOn) 'owner_pos_procurement_bar': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (bar)',
-          if (!posOn) 'owner_procurement_bar': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (bar)',
-          'owner_writeoffs_bar': '${loc.t('writeoffs') ?? 'Списания'} (bar)',
-          'owner_checklists_bar': '${loc.t('checklists')} (bar)',
+          'owner_nomenclature_bar':
+              '${loc.t('nomenclature')} (${_homeLayoutBranchLabel(loc, 'bar')})',
+          if (posOn)
+            'owner_pos_orders_bar':
+                '${loc.t('order_tab_orders')} (${_homeLayoutBranchLabel(loc, 'bar')})',
+          if (posOn)
+            'owner_pos_sales_bar':
+                '${loc.t('sales_title') ?? 'Продажи'} (${_homeLayoutBranchLabel(loc, 'bar')})',
+          if (posOn)
+            'owner_pos_warehouse_bar':
+                '${loc.t('pos_nav_warehouse') ?? 'Склад'} (${_homeLayoutBranchLabel(loc, 'bar')})',
+          if (posOn)
+            'owner_pos_procurement_bar':
+                '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'bar')})',
+          if (!posOn)
+            'owner_procurement_bar':
+                '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'bar')})',
+          'owner_writeoffs_bar':
+              '${loc.t('writeoffs') ?? 'Списания'} (${_homeLayoutBranchLabel(loc, 'bar')})',
+          'owner_checklists_bar':
+              '${loc.t('checklists')} (${_homeLayoutBranchLabel(loc, 'bar')})',
         },
         if (screenPref.showHallSection) ...{
-          'owner_schedule_hall': '${loc.t('schedule')} (hall)',
-          'owner_menu_hall': '${loc.t('menu')} (hall)',
-          'owner_checklists_hall': '${loc.t('checklists')} (hall)',
-          if (posOn) 'owner_pos_orders_hall': '${loc.t('order_tab_orders')} (hall)',
-          if (posOn) 'owner_pos_cash_hall': '${loc.t('pos_nav_cash_register') ?? 'Касса'} (hall)',
-          if (posOn) 'owner_pos_tables_hall': '${loc.t('pos_nav_tables') ?? 'Столы'} (hall)',
-          if (posOn) 'owner_pos_warehouse_hall': '${loc.t('pos_nav_warehouse') ?? 'Склад'} (hall)',
-          if (posOn) 'owner_pos_procurement_hall': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (hall)',
-          if (!posOn) 'owner_procurement_hall': '${loc.t('pos_nav_procurement') ?? 'Закупка'} (hall)',
-          'owner_writeoffs_hall': '${loc.t('writeoffs') ?? 'Списания'} (hall)',
+          'owner_schedule_hall':
+              '${loc.t('schedule')} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          'owner_menu_hall':
+              '${loc.t('menu')} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          'owner_checklists_hall':
+              '${loc.t('checklists')} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          if (posOn)
+            'owner_pos_orders_hall':
+                '${loc.t('order_tab_orders')} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          if (posOn)
+            'owner_pos_cash_hall':
+                '${loc.t('pos_nav_cash_register') ?? 'Касса'} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          if (posOn)
+            'owner_pos_tables_hall':
+                '${loc.t('pos_nav_tables') ?? 'Столы'} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          if (posOn)
+            'owner_pos_warehouse_hall':
+                '${loc.t('pos_nav_warehouse') ?? 'Склад'} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          if (posOn)
+            'owner_pos_procurement_hall':
+                '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          if (!posOn)
+            'owner_procurement_hall':
+                '${loc.t('pos_nav_procurement') ?? 'Закупка'} (${_homeLayoutBranchLabel(loc, 'hall')})',
+          'owner_writeoffs_hall':
+              '${loc.t('writeoffs') ?? 'Списания'} (${_homeLayoutBranchLabel(loc, 'hall')})',
         },
-        if (screenPref.showBanquetCatering) 'owner_banquet': loc.t('banquet_catering') ?? 'Банкет / Кейтринг',
-        if (posOn) 'owner_pos_warehouse_est': loc.t('pos_warehouse_establishment_title') ?? 'Сводно по заведению',
+        if (screenPref.showBanquetCatering &&
+            SubscriptionEntitlements.from(account.establishment)
+                .canAccessBanquetCatering)
+          'owner_banquet': loc.t('banquet_catering') ?? 'Банкет / Кейтринг',
+        if (posOn) 'owner_pos_warehouse_est': loc.t('pos_warehouse_establishment_title') ?? 'Сводная по заведению',
         'owner_expenses': loc.t('expenses'),
       };
       final hidden = Set<String>.from(layoutSvc.getHiddenKeys(emp.id));
@@ -696,6 +804,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     var order = List<HomeTileId>.from(layoutSvc.getOrder(emp.id));
     final showBanquet = emp.department == 'kitchen';
+    final ent = SubscriptionEntitlements.from(account.establishment);
+    final isLiteTier = ent.isLiteTier;
     if (!showBanquet) {
       order = order
           .where((id) =>
@@ -720,7 +830,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               id != HomeTileId.departmentSales)
           .toList();
     }
-    if (!FeatureFlags.posModuleEnabled) {
+    if (!FeatureFlags.posEnabledForSubscription(ent)) {
       order = order
           .where((id) =>
               id != HomeTileId.hallOrders &&
@@ -730,6 +840,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               id != HomeTileId.departmentSales &&
               id != HomeTileId.inventory)
           .toList();
+    }
+    if (isLiteTier) {
+      // В Lite в настройке не показываем «премиальные»/недоступные плитки.
+      final allowedLite = <HomeTileId>{
+        HomeTileId.schedule,
+        HomeTileId.menu,
+        HomeTileId.ttk,
+        HomeTileId.nomenclature,
+        HomeTileId.messages,
+      };
+      order = order.where(allowedLite.contains).toList();
     }
     final tileLabels = <HomeTileId, String>{
       HomeTileId.messages: loc.t('inbox_tab_messages') ?? 'Сообщения',
@@ -805,10 +926,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       HomeButtonConfigService homeBtn) {
     final accountManager = context.read<AccountManagerSupabase>();
     final emp = accountManager.currentEmployee;
+    final ownerLite = SubscriptionEntitlements.from(accountManager.establishment)
+            .isLiteTier &&
+        (emp?.hasRole('owner') ?? false);
     final actions = homeButtonActionsFor(emp,
-        hasProSubscription: accountManager.hasProSubscription);
+        hasProSubscription: accountManager.hasProSubscription,
+        ownerLiteHome: ownerLite);
     final effective = homeBtn.effectiveAction(emp,
-        hasProSubscription: accountManager.hasProSubscription);
+        hasProSubscription: accountManager.hasProSubscription,
+        ownerLiteHome: ownerLite);
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -1097,7 +1223,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onTap: () {
                   Navigator.of(ctx).pop();
                   tourService.requestTourReplay(PageTourKeys.home);
-                  context.go('/home');
+                  context.go('/home', extra: {'back': true});
                 },
               ),
               ListTile(
@@ -1443,12 +1569,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         employerLabel: loc.tForLanguage(lang, 'haccp_agreement_employer'),
         stampHint: loc.tForLanguage(lang, 'haccp_agreement_stamp_hint'),
         workerSignLabel: loc.tForLanguage(lang, 'haccp_agreement_worker_sign'),
-        agreementBody: loc.tForLanguage(lang, 'haccp_agreement_body'),
+        agreementBody: LegalComplianceProvider.applyCompliancePlaceholders(
+          loc.tForLanguage(lang, 'haccp_agreement_body'),
+          LegalComplianceProvider.complianceForLanguageCode(lang),
+        ),
         employerPositionLabel:
             (employerPosition != null && employerPosition != 'role_$roleCode')
                 ? employerPosition
                 : null,
       );
+      if (account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.documentation,
+        );
+      }
       await saveFileBytes('haccp_agreement_employee.pdf', bytes);
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1658,12 +1793,155 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
   }
 
+  Future<bool> _confirmSupportAccessEnableWithPin(
+    BuildContext context,
+    LocalizationService loc,
+    Establishment establishment,
+  ) async {
+    final pinController = TextEditingController();
+    final pinKey = GlobalKey<FormState>();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('company_pin') ?? 'PIN компании'),
+        content: Form(
+          key: pinKey,
+          child: TextFormField(
+            controller: pinController,
+            autofocus: true,
+            obscureText: true,
+            textInputAction: TextInputAction.done,
+            decoration: InputDecoration(
+              labelText: loc.t('company_pin') ?? 'PIN компании',
+              hintText: loc.t('enter_company_pin') ?? 'Введите PIN компании',
+            ),
+            validator: (v) {
+              final value = (v ?? '').trim();
+              if (value.isEmpty) {
+                return loc.t('company_pin_required') ?? 'PIN обязателен';
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(MaterialLocalizations.of(ctx).cancelButtonLabel),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (!(pinKey.currentState?.validate() ?? false)) return;
+              final pin = pinController.text.trim();
+              if (!establishment.verifyPinCode(pin)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(loc.t('clear_nomenclature_wrong_pin') ??
+                        'Неверный PIN'),
+                  ),
+                );
+                return;
+              }
+              Navigator.of(ctx).pop(true);
+            },
+            child: Text(MaterialLocalizations.of(ctx).okButtonLabel),
+          ),
+        ],
+      ),
+    );
+    pinController.dispose();
+    return ok ?? false;
+  }
+
+  Widget _buildSupportAccessOwnerSection(LocalizationService localization) {
+    return Consumer<AccountManagerSupabase>(
+      builder: (context, account, _) {
+        final est = account.establishment;
+        if (est == null) return const SizedBox.shrink();
+        return Column(
+          children: [
+            SwitchListTile(
+              secondary: const Icon(Icons.support_agent_outlined),
+              title: Text(localization.t('support_access_toggle_title')),
+              subtitle: Text(localization.t('support_access_toggle_hint')),
+              value: est.supportAccessEnabled,
+              onChanged: (v) async {
+                try {
+                  if (v && !est.supportAccessEnabled) {
+                    final pinOk = await _confirmSupportAccessEnableWithPin(
+                      context,
+                      localization,
+                      est,
+                    );
+                    if (!pinOk) return;
+                  }
+                  await account.updateEstablishmentSupportAccess(
+                    establishmentId: est.id,
+                    enabled: v,
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        localization
+                            .t('error_with_message')
+                            .replaceAll('%s', e.toString()),
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+            FutureBuilder<List<Map<String, dynamic>>>(
+              future: account.loadSupportAccessAuditLog(limit: 20),
+              builder: (context, snapshot) {
+                final rows = snapshot.data ?? const [];
+                if (rows.isEmpty) {
+                  return ListTile(
+                    dense: true,
+                    leading: const SizedBox(width: 24),
+                    title: Text(
+                      localization.t('support_access_audit_empty'),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  );
+                }
+                return ExpansionTile(
+                  leading: const SizedBox(width: 24),
+                  title: Text(localization.t('support_access_audit_title')),
+                  children: rows.map((row) {
+                    return ListTile(
+                      dense: true,
+                      title: Text(
+                        '${row['support_operator_login'] ?? 'support'} · ${row['account_login'] ?? '—'}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      subtitle: Text(
+                        '${row['event_type'] ?? 'event'}: ${row['created_at'] ?? '—'}',
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final accountManager = context.watch<AccountManagerSupabase>();
     final currentEmployee = accountManager.currentEmployee;
     final establishment = accountManager.establishment;
     final localization = context.watch<LocalizationService>();
+    final subEnt = SubscriptionEntitlements.from(accountManager.establishment);
+    final screenPref = context.watch<ScreenLayoutPreferenceService>();
+    final posOn =
+        FeatureFlags.posEnabledForSubscription(subEnt) && screenPref.showPosSection;
 
     if (currentEmployee == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -1671,7 +1949,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: appBarBackButton(context),
+        leading: shellReturnLeading(context) ?? appBarBackButton(context),
         title: Text(localization.t('settings')),
       ),
       body: SingleChildScrollView(
@@ -1779,30 +2057,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _showHomeButtonPicker(context, localization, homeBtn),
                   ),
                 ),
-                Consumer<ScreenLayoutPreferenceService>(
-                  builder: (_, screenPref, __) => SwitchListTile(
-                    secondary: const Icon(Icons.restaurant_menu),
-                    title: Text(localization.t('show_banquet_catering') ??
-                        'Показ «банкеты и кейтринг» на экране'),
-                    subtitle: Text(localization
-                            .t('show_banquet_catering_hint') ??
-                        'Показывать «Меню — Банкет/Кейтринг» и «ТТК — Банкет/Кейтринг»'),
-                    value: screenPref.showBanquetCatering,
-                    onChanged: (v) => screenPref.setShowBanquetCatering(v),
-                  ),
-                ),
-                if (currentEmployee.hasRole('owner')) ...[
+                if (!accountManager.isLiteTier &&
+                    SubscriptionEntitlements.from(accountManager.establishment)
+                        .canAccessBanquetCatering)
                   Consumer<ScreenLayoutPreferenceService>(
                     builder: (_, screenPref, __) => SwitchListTile(
-                      secondary: const Icon(Icons.local_bar),
-                      title: Text(localization.t('show_bar_section') ??
-                          'Раздел «Бар» на главной'),
-                      subtitle: Text(localization.t('show_bar_section_hint') ??
-                          'Показывать секцию Бар (график, меню, ТТК и др.)'),
-                      value: screenPref.showBarSection,
-                      onChanged: (v) => screenPref.setShowBarSection(v),
+                      secondary: const Icon(Icons.restaurant_menu),
+                      title: Text(localization.t('show_banquet_catering') ??
+                          'Показ «банкеты и кейтринг» на экране'),
+                      subtitle: Text(localization
+                              .t('show_banquet_catering_hint') ??
+                          'Показывать «Меню — Банкет/Кейтринг» и «ТТК — Банкет/Кейтринг»'),
+                      value: screenPref.showBanquetCatering,
+                      onChanged: (v) => screenPref.setShowBanquetCatering(v),
                     ),
                   ),
+                if (currentEmployee.hasRole('owner') &&
+                    !accountManager.isLiteTier) ...[
+                  if (SubscriptionEntitlements.from(accountManager.establishment)
+                      .hasUltraLevelFeatures)
+                    Consumer<ScreenLayoutPreferenceService>(
+                      builder: (_, screenPref, __) => SwitchListTile(
+                        secondary: const Icon(Icons.point_of_sale_outlined),
+                        title: Text(localization.t('show_pos_section') ??
+                            'Раздел «POS» на главной'),
+                        subtitle: Text(localization.t('show_pos_section_hint') ??
+                            'Показывать POS-плитки на домашнем экране (заказы, касса, столы, склад, закупка, продажи)'),
+                        value: screenPref.showPosSection,
+                        onChanged: (v) => screenPref.setShowPosSection(v),
+                      ),
+                    ),
+                  if (SubscriptionEntitlements.from(accountManager.establishment)
+                      .hasUltraLevelFeatures)
+                    Consumer<ScreenLayoutPreferenceService>(
+                      builder: (_, screenPref, __) => SwitchListTile(
+                        secondary: const Icon(Icons.local_bar),
+                        title: Text(localization.t('show_bar_section') ??
+                            'Раздел «Бар» на главной'),
+                        subtitle: Text(localization.t('show_bar_section_hint') ??
+                            'Показывать секцию Бар (график, меню, ТТК и др.)'),
+                        value: screenPref.showBarSection,
+                        onChanged: (v) => screenPref.setShowBarSection(v),
+                      ),
+                    ),
                   Consumer<ScreenLayoutPreferenceService>(
                     builder: (_, screenPref, __) => SwitchListTile(
                       secondary: const Icon(Icons.table_restaurant),
@@ -1814,44 +2111,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       onChanged: (v) => screenPref.setShowHallSection(v),
                     ),
                   ),
-                  Consumer<AccountManagerSupabase>(
-                    builder: (context, account, _) {
-                      final est = account.establishment;
-                      if (est == null) return const SizedBox.shrink();
-                      return SwitchListTile(
-                        secondary: const Icon(Icons.support_agent_outlined),
-                        title:
-                            Text(localization.t('support_access_toggle_title')),
-                        subtitle:
-                            Text(localization.t('support_access_toggle_hint')),
-                        value: est.supportAccessEnabled,
-                        onChanged: (v) async {
-                          try {
-                            await account.updateEstablishmentSupportAccess(
-                              establishmentId: est.id,
-                              enabled: v,
-                            );
-                          } catch (e) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  localization
-                                      .t('error_with_message')
-                                      .replaceAll('%s', e.toString()),
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                      );
-                    },
-                  ),
                 ],
               ],
             ),
-            if (FeatureFlags.posModuleEnabled &&
-                posCanConfigureOrdersDisplay(currentEmployee))
+            if (posOn &&
+                posCanConfigureOrdersDisplay(currentEmployee) &&
+                !accountManager.isLiteTier)
               ListTile(
                 leading: const Icon(Icons.tune),
                 title: Text(
@@ -1865,10 +2130,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/settings/orders-display'),
               ),
-            if (FeatureFlags.posModuleEnabled)
+            if (posOn && !accountManager.isLiteTier)
               SalesFinancialsManagementTile(employee: currentEmployee),
-            if (FeatureFlags.posModuleEnabled &&
-                posCanManageFiscalTaxSettings(currentEmployee))
+            if (posOn &&
+                posCanManageFiscalTaxSettings(currentEmployee) &&
+                !accountManager.isLiteTier)
               ListTile(
                 leading: const Icon(Icons.account_balance_outlined),
                 title: Text(localization.t('fiscal_settings_title')),
@@ -1878,22 +2144,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push('/settings/fiscal-tax'),
-              ),
-            // Журнал ошибок — см. FeatureFlags.showSystemErrorsJournal (beta, не restodocks.com; все платформы).
-            if (FeatureFlags.showSystemErrorsJournal &&
-                (posCanRunWarehouseHealthCheck(currentEmployee) ||
-                    _isPlatformAdminEmail(currentEmployee.email)))
-              ListTile(
-                leading: const Icon(Icons.bug_report_outlined),
-                title: Text(localization.t('settings_system_errors_title') ??
-                    'Журнал ошибок'),
-                subtitle: Text(
-                  localization.t('settings_system_errors_subtitle') ??
-                      'POS, склад, фоновые сбои',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => context.push('/settings/system-errors'),
               ),
             if (posCanConfigureOrdersDisplay(currentEmployee))
               ExpansionTile(
@@ -1950,13 +2200,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             // Журналы и ХАССП (включая юридическую легитимность) — для руководителей.
-            if (currentEmployee.hasRole('owner') ||
-                currentEmployee.department == 'management' ||
-                currentEmployee.hasRole('executive_chef') ||
-                currentEmployee.hasRole('sous_chef') ||
-                currentEmployee.hasRole('bar_manager') ||
-                currentEmployee.hasRole('floor_manager') ||
-                currentEmployee.hasRole('general_manager')) ...[
+            if (!accountManager.isLiteTier &&
+                (currentEmployee.hasRole('owner') ||
+                    currentEmployee.department == 'management' ||
+                    currentEmployee.hasRole('executive_chef') ||
+                    currentEmployee.hasRole('sous_chef') ||
+                    currentEmployee.hasRole('bar_manager') ||
+                    currentEmployee.hasRole('floor_manager') ||
+                    currentEmployee.hasRole('general_manager'))) ...[
               ListTile(
                 leading: const Icon(Icons.menu_book),
                 title: Text(localization.t('documentation') ?? 'Документация'),
@@ -2158,40 +2409,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: () => _showInviteCoOwnerDialog(
                       context, localization, accountManager),
                 ),
-              if ((currentEmployee.hasRole('executive_chef') ||
-                      currentEmployee.hasRole('sous_chef')) &&
-                  accountManager.establishment?.isMain == true)
-                FutureBuilder<List<Establishment>>(
-                  future: accountManager.getBranchesForEstablishment(
-                      accountManager.establishment!.id),
-                  builder: (ctx, snap) {
-                    if (!snap.hasData || snap.data!.isEmpty)
-                      return const SizedBox.shrink();
-                    final branches = snap.data!;
-                    return Consumer<TtkBranchFilterService>(
-                      builder: (_, branchFilter, __) {
-                        final selId = branchFilter.selectedBranchId;
-                        final name = selId == null
-                            ? (localization.t('main_establishment') ??
-                                'Основное')
-                            : branches
-                                    .where((b) => b.id == selId)
-                                    .map((b) => b.name)
-                                    .firstOrNull ??
-                                selId;
-                        return ListTile(
-                          leading: const Icon(Icons.account_tree),
-                          title: Text(localization.t('ttk_branch_display') ??
-                              'Отображение ТТК по филиалам'),
-                          subtitle: Text(name),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () => _showTtkBranchFilterPicker(
-                              context, localization, accountManager, branches),
-                        );
-                      },
-                    );
-                  },
-                ),
               if (accountManager.isViewOnlyOwner)
                 ListTile(
                   leading: const Icon(Icons.visibility),
@@ -2233,6 +2450,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showSupportEmailForm(context, localization),
             ),
+            if (currentEmployee.hasRole('owner'))
+              _buildSupportAccessOwnerSection(localization),
             ListTile(
               leading: const Icon(Icons.gavel_outlined),
               title: Text(localization.t('public_offer')),

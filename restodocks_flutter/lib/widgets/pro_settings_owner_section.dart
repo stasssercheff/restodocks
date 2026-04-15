@@ -6,12 +6,117 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/iap_constants.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 import '../utils/iap_product_price_format.dart';
-import 'post_registration_trial_dialog.dart';
+import 'subscription_plans_dialog.dart';
 
-/// Блок настроек PRO для собственника: промокод, оплата (iOS IAP), условия.
+String _promoTierDisplayName(LocalizationService loc, String? raw) {
+  final t = (raw ?? 'pro').toLowerCase().trim();
+  switch (t) {
+    case 'ultra':
+    case 'premium':
+      return loc.t('pro_promo_scope_tier_ultra');
+    case 'pro':
+    case 'plus':
+    case 'starter':
+    case 'business':
+      return loc.t('pro_promo_scope_tier_pro');
+    case 'lite':
+    case 'free':
+      return loc.t('pro_promo_scope_tier_lite');
+    default:
+      return loc.t('pro_promo_scope_tier_other', args: {'name': raw ?? t});
+  }
+}
+
+/// Строки «на что промокод» для диалога (тариф, пакеты, лимит) — всегда с заголовком «Что даёт».
+List<Widget> _promoScopeDetailWidgets(
+  LocalizationService loc,
+  EstablishmentPromoInfo p,
+  TextTheme textTheme,
+) {
+  final bodyStyle = textTheme.bodyMedium;
+  final headingStyle = textTheme.titleSmall?.copyWith(
+    fontWeight: FontWeight.w600,
+  );
+  final tierRaw = (p.grantsSubscriptionType ?? '').trim();
+  final tierLabel = tierRaw.isNotEmpty
+      ? _promoTierDisplayName(loc, tierRaw)
+      : loc.t('pro_promo_scope_tier_unspecified');
+  final hasEmployeePacks = p.grantsEmployeeSlotPacks > 0;
+  final hasBranchPacks = p.grantsBranchSlotPacks > 0;
+
+  final out = <Widget>[
+    const SizedBox(height: 16),
+    Text(loc.t('pro_promo_scope_heading'), style: headingStyle),
+    const SizedBox(height: 8),
+  ];
+
+  if (p.grantsAdditiveOnly) {
+    out.add(Text(loc.t('pro_promo_scope_additive_only'), style: bodyStyle));
+    out.add(const SizedBox(height: 8));
+  }
+
+  out.add(Text(
+    loc.t('pro_promo_scope_tier_prefix', args: {'tier': tierLabel}),
+    style: bodyStyle,
+  ));
+  out.add(const SizedBox(height: 8));
+
+  out.add(Text(
+    '${loc.t('employees')}: ${hasEmployeePacks ? loc.t('answer_yes') : loc.t('answer_no')}',
+    style: bodyStyle,
+  ));
+  out.add(const SizedBox(height: 8));
+
+  if (hasEmployeePacks) {
+    final packs = p.grantsEmployeeSlotPacks;
+    final slots = packs * 5;
+    out.add(Text(
+      loc.t(
+        'pro_promo_scope_employee_packs',
+        args: {'packs': '$packs', 'slots': '$slots'},
+      ),
+      style: bodyStyle,
+    ));
+    out.add(const SizedBox(height: 8));
+  }
+  out.add(Text(
+    '${loc.t('establishments')}: ${hasBranchPacks ? loc.t('answer_yes') : loc.t('answer_no')}',
+    style: bodyStyle,
+  ));
+  out.add(const SizedBox(height: 8));
+
+  if (hasBranchPacks) {
+    out.add(Text(
+      loc.t(
+        'pro_promo_scope_branch_packs',
+        args: {'packs': '${p.grantsBranchSlotPacks}'},
+      ),
+      style: bodyStyle,
+    ));
+    out.add(const SizedBox(height: 8));
+  }
+  if (p.promoMaxEmployees != null) {
+    out.add(Text(
+      loc.t('pro_promo_scope_max_employees',
+          args: {'n': '${p.promoMaxEmployees}'}),
+      style: bodyStyle,
+    ));
+  }
+  return out;
+}
+
+String _iapSubscriptionPurchaseLabel(LocalizationService loc, String productId) {
+  if (productId == kRestodocksUltraMonthlyProductId) {
+    return loc.t('subscription_iap_purchase_ultra');
+  }
+  return loc.t('subscription_iap_purchase_pro');
+}
+
+/// Блок настроек подписки для собственника: промокод, тарифы, оплата (iOS IAP).
 class ProSettingsOwnerSection extends StatefulWidget {
   const ProSettingsOwnerSection({
     super.key,
@@ -305,6 +410,14 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     return DateFormat('dd.MM.yyyy', tag).format(d.toLocal());
   }
 
+  /// Дата+время окончания триала в локальной зоне устройства.
+  String _formatProDateTime(DateTime d) {
+    final loc = widget.localization;
+    final tag =
+        loc.currentLanguageCode == 'ru' ? 'ru_RU' : loc.currentLanguageCode;
+    return DateFormat('dd.MM.yyyy HH:mm', tag).format(d.toLocal());
+  }
+
   String _formatDate(DateTime d) {
     final loc = widget.localization;
     final tag = loc.currentLanguageCode == 'ru' ? 'ru_RU' : loc.currentLanguageCode;
@@ -404,6 +517,13 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                     hintText: loc.t('enter_promo_code'),
                   ),
                   enabled: !busy,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  loc.t('pro_promo_code_single_use_hint'),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 if (dialogError != null) ...[
                   const SizedBox(height: 12),
@@ -511,12 +631,25 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
     final loc = widget.localization;
     return ExpansionTile(
       leading: const Icon(Icons.workspace_premium_outlined),
-      title: Text(loc.t('pro_settings')),
-      subtitle: Text(loc.t('pro_settings_desc')),
+      title: Text(loc.t('subscription_settings')),
+      subtitle: Text(loc.t('subscription_settings_desc')),
       onExpansionChanged: (expanded) {
         if (expanded) unawaited(_syncProSectionFromServer());
       },
       children: [
+        ListenableBuilder(
+          listenable: widget.accountManager,
+          builder: (context, _) {
+            final est = widget.accountManager.establishment;
+            final trialEndsAt = est?.proTrialEndsAt;
+            if (trialEndsAt == null) return const SizedBox.shrink();
+            return ListTile(
+              leading: const Icon(Icons.hourglass_top_outlined),
+              title: Text(loc.t('owner_trial_welcome_title')),
+              subtitle: Text(_formatProDateTime(trialEndsAt)),
+            );
+          },
+        ),
         FutureBuilder<EstablishmentPromoInfo>(
           future: _promoFuture,
           builder: (context, snap) {
@@ -557,32 +690,86 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                   ? () {
                       showDialog<void>(
                         context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: Text(loc.t('pro_promo_title')),
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                  '${loc.t('pro_promo_code_label')}: ${promo.code}'),
-                              const SizedBox(height: 12),
-                              Text(
-                                  '${loc.t('pro_promo_valid_until_label')}: ${_formatDate(promo.expiresAt!)}'),
-                            ],
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: Text(
-                                  MaterialLocalizations.of(ctx).okButtonLabel),
+                        builder: (ctx) {
+                          final theme = Theme.of(ctx);
+                          final estName =
+                              widget.accountManager.establishment?.name.trim();
+                          final mutedStyle =
+                              theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          );
+                          return AlertDialog(
+                            title: Text(loc.t('pro_promo_title')),
+                            content: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (estName != null && estName.isNotEmpty) ...[
+                                    Text(
+                                      '${loc.t('pro_promo_establishment_label')}: $estName',
+                                      style: theme.textTheme.bodyMedium,
+                                    ),
+                                    const SizedBox(height: 12),
+                                  ],
+                                  Text(
+                                    '${loc.t('pro_promo_code_label')}: ${promo.code}',
+                                    style: theme.textTheme.bodyMedium,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        Icons.info_outline,
+                                        size: 16,
+                                        color:
+                                            theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Expanded(
+                                        child: Text(
+                                          loc.t('pro_promo_code_single_use_hint'),
+                                          style: mutedStyle,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    '${loc.t('pro_promo_valid_until_label')}: ${_formatDate(promo.expiresAt!)}',
+                                  ),
+                                  ..._promoScopeDetailWidgets(
+                                    loc,
+                                    promo,
+                                    theme.textTheme,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                child: Text(
+                                  MaterialLocalizations.of(ctx).okButtonLabel,
+                                ),
+                              ),
+                            ],
+                          );
+                        },
                       );
                     }
                   : _showApplyPromoDialog,
             );
           },
+        ),
+        ListTile(
+          leading: const Icon(Icons.list_alt_outlined),
+          title: Text(loc.t('subscription_plans_list_tile_title')),
+          subtitle: Text(loc.t('subscription_plans_list_tile_subtitle')),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () => showSubscriptionPlansDialog(context),
         ),
         FutureBuilder<EstablishmentPromoInfo>(
           future: _promoFuture,
@@ -596,7 +783,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                   builder: (context, iap, _) {
                     final busy = iap.busy;
                     final subtitle = !paidPro
-                        ? loc.t('pro_payment_subtitle')
+                        ? loc.t('subscription_payment_list_tile_subtitle')
                         : _paidProPaymentSubtitle(
                             loc,
                             promo,
@@ -604,7 +791,7 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
                           );
                     return ListTile(
                       leading: const Icon(Icons.payment_outlined),
-                      title: Text(loc.t('pro_payment_title')),
+                      title: Text(loc.t('subscription_payment_list_tile_title')),
                       subtitle: Text(subtitle),
                       trailing: busy
                           ? const SizedBox(
@@ -645,13 +832,6 @@ class _ProSettingsOwnerSectionState extends State<ProSettingsOwnerSection> {
               },
             );
           },
-        ),
-        ListTile(
-          leading: const Icon(Icons.description_outlined),
-          title: Text(loc.t('pro_conditions_title')),
-          subtitle: Text(loc.t('pro_conditions_subtitle')),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () => showPostRegistrationTrialDialog(context),
         ),
       ],
     );
@@ -743,7 +923,8 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
           builder: (context, _) {
             final paid = widget.accountManager.hasPaidProSubscription;
             final est = widget.accountManager.establishment;
-            final product = widget.iap.product;
+            final subs = widget.iap.subscriptionProducts;
+            final addons = widget.iap.addonProducts;
             final ready = widget.iap.ready;
             final theme = Theme.of(context);
             final cs = theme.colorScheme;
@@ -806,56 +987,87 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
                               height: 1.45,
                             ),
                           ),
-                          if (ready && product != null) ...[
+                          if (ready && subs.isNotEmpty) ...[
                             const SizedBox(height: 16),
-                            DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: cs.surfaceContainerHighest
-                                    .withValues(alpha: 0.65),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                  horizontal: 12,
+                            for (final d in subs) ...[
+                              DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: cs.surfaceContainerHighest
+                                      .withValues(alpha: 0.65),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    Text(
-                                      widget.formatIapPrice(product),
-                                      textAlign: TextAlign.center,
-                                      style: theme.textTheme.headlineSmall
-                                          ?.copyWith(
-                                        fontWeight: FontWeight.w700,
-                                        color: cs.primary,
-                                      ),
-                                    ),
-                                    if (product.currencyCode
-                                        .trim()
-                                        .isNotEmpty) ...[
-                                      const SizedBox(height: 6),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                    horizontal: 12,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.stretch,
+                                    children: [
                                       Text(
-                                        loc.t('pro_payment_iap_currency_line',
-                                            args: {
-                                              'code': product.currencyCode
-                                                  .trim()
-                                                  .toUpperCase(),
-                                            }),
+                                        widget.formatIapPrice(d),
                                         textAlign: TextAlign.center,
-                                        style: theme.textTheme.bodySmall
+                                        style: theme.textTheme.headlineSmall
                                             ?.copyWith(
-                                          color: cs.onSurfaceVariant,
-                                          height: 1.3,
+                                          fontWeight: FontWeight.w700,
+                                          color: cs.primary,
                                         ),
                                       ),
+                                      if (d.currencyCode.trim().isNotEmpty) ...[
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          loc.t('pro_payment_iap_currency_line',
+                                              args: {
+                                                'code': d.currencyCode
+                                                    .trim()
+                                                    .toUpperCase(),
+                                              }),
+                                          textAlign: TextAlign.center,
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                            color: cs.onSurfaceVariant,
+                                            height: 1.3,
+                                          ),
+                                        ),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 10),
+                              const SizedBox(height: 10),
+                            ],
+                            if (addons.isNotEmpty) ...[
+                              Text(
+                                loc.t('subscription_iap_addons_heading'),
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              for (final a in addons) ...[
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: FilledButton.tonal(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      unawaited(widget.iap.purchaseAddon(a.id));
+                                    },
+                                    child: Text(
+                                      '${a.title} - ${widget.formatIapPrice(a)}',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              Text(
+                                loc.t('subscription_iap_addons_hint'),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                  height: 1.35,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
                             Text(
                               loc.t('pro_payment_price_note'),
                               textAlign: TextAlign.center,
@@ -898,15 +1110,17 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
                           ),
                           const SizedBox(height: 12),
                         ],
-                        if (!paid && ready && product != null) ...[
-                          FilledButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              unawaited(widget.iap.purchasePro());
-                            },
-                            child: Text(loc.t('pro_purchase')),
-                          ),
-                          const SizedBox(height: 10),
+                        if (!paid && ready && subs.isNotEmpty) ...[
+                          for (final d in subs) ...[
+                            FilledButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                unawaited(widget.iap.purchaseSubscription(d.id));
+                              },
+                              child: Text(_iapSubscriptionPurchaseLabel(loc, d.id)),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
                         ],
                         if (paid) ...[
                           OutlinedButton(

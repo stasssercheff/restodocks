@@ -1,13 +1,16 @@
 import 'package:dio/dio.dart';
 import 'dart:async' show unawaited;
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show AuthException;
+import 'package:supabase_flutter/supabase_flutter.dart'
+    show AuthException, PostgrestException;
 import 'package:restodocks/core/supabase_url_resolver_stub.dart'
     if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart'
     as supabase_url;
 
 import '../core/clear_hash_stub.dart'
     if (dart.library.html) '../core/clear_hash_web.dart' as clear_hash;
+import '../core/subscription_entitlements.dart';
 import '../core/pending_co_owner_registration.dart';
 import '../core/public_app_origin.dart';
 import '../models/models.dart';
@@ -43,6 +46,14 @@ const _keyRememberPassword = 'restodocks_remember_password';
 String _dateOnly(DateTime d) =>
     '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
+/// Строка похожа на UUID (8-4-4-4-12 hex). Нормализуйте в lower-case перед RPC, иначе дубли в in-flight.
+bool _looksLikeEstablishmentUuid(String raw) {
+  final s = raw.trim();
+  return RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  ).hasMatch(s);
+}
+
 /// Сервис управления аккаунтами с использованием Supabase
 class AccountManagerSupabase extends ChangeNotifier {
   static final AccountManagerSupabase _instance =
@@ -57,10 +68,36 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Список сотрудников заведения в памяти (мобильный клиент): меньше повторных SELECT по экранам.
   final Map<String, ({DateTime at, List<Employee> list})> _employeesListCache = {};
-  static const _employeesCacheTtl = Duration(minutes: 20);
+
+  /// Один in-flight `check_establishment_access` на заведение (таймер + resume + гидратация не штормят RPC).
+  final Map<String, Future<void>> _syncEstablishmentAccessInflight = {};
+
+  static Duration _employeesMemoryTtl() =>
+      kIsWeb ? const Duration(minutes: 20) : const Duration(hours: 6);
   Establishment? _establishment;
   Employee? _currentEmployee;
   bool _initialized = false;
+  bool _supportSessionActive = false;
+  bool _supportAccessTablesUnavailable = false;
+  bool _checkEstablishmentAccessRpcUnavailable = false;
+
+  bool _looksLikeMissingSupportAccessSchema(PostgrestException e) {
+    final msg = '${e.message} ${e.details} ${e.hint}'.toLowerCase();
+    return e.code == '42P01' ||
+        msg.contains('support_access_audit_log') ||
+        msg.contains('support_access_event_log') ||
+        msg.contains('could not find the table') ||
+        (msg.contains('relation') && msg.contains('does not exist'));
+  }
+
+  bool _looksLikeMissingCheckAccessRpc(PostgrestException e) {
+    final msg = '${e.message} ${e.details} ${e.hint}'.toLowerCase();
+    return e.code == 'PGRST202' ||
+        (msg.contains('check_establishment_access') &&
+            (msg.contains('does not exist') ||
+                msg.contains('schema cache') ||
+                msg.contains('no function matches')));
+  }
 
   /// Callback вызывается после загрузки профиля — применяет preferred_language к LocalizationService.
   void Function(String languageCode)? onPreferredLanguageLoaded;
@@ -81,6 +118,7 @@ class AccountManagerSupabase extends ChangeNotifier {
   // Геттеры
   Establishment? get establishment => _establishment;
   Employee? get currentEmployee => _currentEmployee;
+  bool get supportSessionActive => _supportSessionActive;
 
   /// Предпочитаемый язык пользователя
   String get preferredLanguage => _currentEmployee?.preferredLanguage ?? 'ru';
@@ -90,6 +128,13 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Pro/Premium или активное окно 72 ч (см. establishments.pro_trial_ends_at).
   bool get hasProSubscription => _establishment?.hasEffectiveProAccess ?? false;
+
+  /// Бесплатный Lite после окончания триала (ограниченный функционал).
+  bool get isLiteTier =>
+      SubscriptionEntitlements.from(_establishment).isLiteTier;
+
+  SubscriptionEntitlements get subscriptionEntitlements =>
+      SubscriptionEntitlements.from(_establishment);
 
   /// Активное окно 72 ч без оплаченного Pro — лимиты триала (инвентаризация, импорт ТТК).
   bool get isTrialOnlyWithoutPaid {
@@ -131,6 +176,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
     await _tryRestoreSession();
     if (isLoggedInSync) {
+      await refreshSupportSessionState();
       unawaited(
         _bindRealtimeSync().catchError((Object e, StackTrace st) {
           devLog('🔐 AccountManager: _bindRealtimeSync at init: $e $st');
@@ -145,6 +191,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     await _tryRestoreSession();
     _initialized = true;
     if (isLoggedInSync) {
+      await refreshSupportSessionState();
       unawaited(
         _bindRealtimeSync().catchError((Object e, StackTrace st) {
           devLog('🔐 AccountManager: _bindRealtimeSync at init (retry): $e $st');
@@ -219,8 +266,36 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// вход и работа на free остаются. RPC может вернуть `expired` на старых БД — [logout] не вызываем.
   /// Вызывать после входа, при возврате приложения на передний план и после применения промокода.
   Future<void> syncEstablishmentAccessFromServer() async {
-    final estId = _establishment?.id;
-    if (estId == null) return;
+    final rawId = _establishment?.id.trim();
+    if (rawId == null || rawId.isEmpty) return;
+    if (!_looksLikeEstablishmentUuid(rawId)) {
+      devLog(
+        '🔐 AccountManager: syncEstablishmentAccessFromServer skip (invalid uuid): $rawId',
+      );
+      return;
+    }
+    final estId = rawId.toLowerCase();
+
+    final inflight = _syncEstablishmentAccessInflight[estId];
+    if (inflight != null) return inflight;
+
+    final run = _runSyncEstablishmentAccess(estId);
+    _syncEstablishmentAccessInflight[estId] = run;
+    try {
+      await run;
+    } finally {
+      final cur = _syncEstablishmentAccessInflight[estId];
+      if (identical(cur, run)) {
+        _syncEstablishmentAccessInflight.remove(estId);
+      }
+    }
+  }
+
+  Future<void> _runSyncEstablishmentAccess(String estId) async {
+    if (_checkEstablishmentAccessRpcUnavailable) {
+      await refreshCurrentEstablishmentFromServer();
+      return;
+    }
     try {
       final result = await _supabase.client.rpc(
         'check_establishment_access',
@@ -231,8 +306,26 @@ class AccountManagerSupabase extends ChangeNotifier {
             '🔐 AccountManager: check_establishment_access=expired (legacy) $estId — refresh establishment only, no logout');
       }
       await refreshCurrentEstablishmentFromServer();
-    } catch (e) {
-      devLog('🔐 AccountManager: syncEstablishmentAccessFromServer error (ignored): $e');
+    } catch (e, st) {
+      if (e is PostgrestException) {
+        if (_looksLikeMissingCheckAccessRpc(e)) {
+          _checkEstablishmentAccessRpcUnavailable = true;
+          devLog(
+            '🔐 AccountManager: check_establishment_access unavailable; '
+            'fallback to refreshCurrentEstablishmentFromServer only',
+          );
+          await refreshCurrentEstablishmentFromServer();
+          return;
+        }
+        devLog(
+          '🔐 AccountManager: syncEstablishmentAccessFromServer PostgREST '
+          'code=${e.code} message=${e.message} details=${e.details} hint=${e.hint}',
+        );
+      } else {
+        devLog(
+          '🔐 AccountManager: syncEstablishmentAccessFromServer error (ignored): $e $st',
+        );
+      }
     }
   }
 
@@ -283,30 +376,79 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Максимум дополнительных заведений на владельца (глобальная настройка ± переопределения по заведениям в БД).
   Future<int> getMaxEstablishmentsPerOwner() async {
-    try {
-      final v = await _supabase.client.rpc(
-        'get_effective_max_additional_establishments_for_owner',
-      );
-      if (v == null) return 999;
-      if (v is int) return v > 0 ? v : 999;
-      if (v is double) return v.toInt() > 0 ? v.toInt() : 999;
+    int normalize(dynamic v) {
+      if (v == null) return 0;
+      if (v is int) return v >= 0 ? v : 0;
+      if (v is double) return v.toInt() >= 0 ? v.toInt() : 0;
+      if (v is Map) {
+        final m = Map<String, dynamic>.from(v as Map);
+        final candidate =
+            m['value'] ?? m['config_value'] ?? m['max_establishments_per_owner'];
+        final n = int.tryParse('${candidate ?? ''}');
+        return (n != null && n >= 0) ? n : 0;
+      }
       final n = int.tryParse(v.toString());
-      return (n != null && n > 0) ? n : 999;
+      return (n != null && n >= 0) ? n : 0;
+    }
+
+    int globalCap = 0;
+    try {
+      globalCap = normalize(await _supabase.client.rpc(
+        'get_effective_max_additional_establishments_for_owner',
+      ));
     } catch (_) {
       try {
-        final v = await _supabase.client.rpc(
+        globalCap = normalize(await _supabase.client.rpc(
           'get_platform_config',
           params: {'p_key': 'max_establishments_per_owner'},
-        );
-        if (v == null) return 999;
-        if (v is int) return v > 0 ? v : 999;
-        if (v is double) return v.toInt() > 0 ? v.toInt() : 999;
-        final s = v.toString();
-        final n = int.tryParse(s);
-        return (n != null && n > 0) ? n : 999;
+        ));
       } catch (_) {
-        return 999;
+        globalCap = 0;
       }
+    }
+
+    // Клиентский пересчёт лимита, чтобы UI совпадал с серверной логикой add_establishment_for_owner.
+    try {
+      final list = await getEstablishmentsForOwner();
+      final now = DateTime.now();
+      final hasOwnerTrial = list.any(
+        (e) => e.proTrialEndsAt != null && e.proTrialEndsAt!.isAfter(now),
+      );
+      final promo = await getEstablishmentPromoForOwner();
+      final hasPaidAccess =
+          list.any((e) => e.hasPaidProAccess) || promo.isPromoGrantActive;
+
+      int branchPacks = 0;
+      try {
+        final rows = await _supabase.client
+            .from('owner_entitlement_addons')
+            .select('branch_slot_packs')
+            .limit(1);
+        if (rows is List && rows.isNotEmpty) {
+          final row = Map<String, dynamic>.from(rows.first as Map);
+          branchPacks = normalize(row['branch_slot_packs']);
+        }
+      } catch (_) {
+        branchPacks = 0;
+      }
+
+      // Если RPC промокода не вернул пакеты, но они уже начислены в entitlement-таблицы,
+      // учитываем фактическое значение владельца.
+      if (promo.grantsBranchSlotPacks > branchPacks) {
+        branchPacks = promo.grantsBranchSlotPacks;
+      }
+
+      if (hasOwnerTrial) {
+        return globalCap < 2 ? globalCap : 2;
+      }
+      if (hasPaidAccess) {
+        final paidCap = branchPacks >= 2 ? branchPacks : 2;
+        if (globalCap <= 0) return paidCap;
+        return paidCap < globalCap ? paidCap : globalCap;
+      }
+      return 0;
+    } catch (_) {
+      return globalCap;
     }
   }
 
@@ -411,26 +553,6 @@ class AccountManagerSupabase extends ChangeNotifier {
       throw Exception(
         res.data?['error']?.toString() ?? 'send_email_failed',
       );
-    }
-  }
-
-  /// Филиалы заведения (для шефа — фильтр ТТК по филиалам)
-  Future<List<Establishment>> getBranchesForEstablishment(
-      String establishmentId) async {
-    try {
-      final data = await _supabase.client.rpc(
-        'get_branches_for_establishment',
-        params: {'p_establishment_id': establishmentId},
-      );
-      if (data == null) return [];
-      final list = data as List;
-      return list
-          .map((e) =>
-              Establishment.fromJson(Map<String, dynamic>.from(e as Map)))
-          .toList();
-    } catch (e) {
-      devLog('AccountManager: getBranchesForEstablishment error: $e');
-      return [];
     }
   }
 
@@ -548,14 +670,23 @@ class AccountManagerSupabase extends ChangeNotifier {
     required String kind,
     int delta = 1,
   }) async {
-    await _supabase.client.rpc(
-      'trial_increment_usage',
-      params: {
-        'p_establishment_id': establishmentId,
-        'p_kind': kind,
-        'p_delta': delta,
-      },
-    );
+    try {
+      await _supabase.client.rpc(
+        'trial_increment_usage',
+        params: {
+          'p_establishment_id': establishmentId,
+          'p_kind': kind,
+          'p_delta': delta,
+        },
+      );
+    } on PostgrestException catch (e) {
+      // На старой/частично мигрированной БД не блокируем экспорт/импорт из-за счётчиков триала.
+      devLog(
+        'trial_increment_usage: PostgREST error code=${e.code} '
+        'message=${e.message}; skip trial usage increment',
+      );
+      return;
+    }
   }
 
   /// Счётчик импортированных в триале карточек ТТК (для предпроверки лимита 10 за 72 ч).
@@ -570,6 +701,18 @@ class AccountManagerSupabase extends ChangeNotifier {
     if (v is int) return v;
     if (v is num) return v.toInt();
     return 0;
+  }
+
+  /// Лимит «сохранение на устройстве» в первые 72 ч: 3 на каждый вид документа.
+  Future<void> trialIncrementDeviceSaveOrThrow({
+    required String establishmentId,
+    required String docKind,
+  }) async {
+    await trialIncrementUsageOrThrow(
+      establishmentId: establishmentId,
+      kind: 'device_save:${docKind.trim().toLowerCase()}',
+      delta: 1,
+    );
   }
 
   /// Первое заведение после шага «только владелец» (сессия auth, pending без establishment_id).
@@ -645,11 +788,16 @@ class AccountManagerSupabase extends ChangeNotifier {
     unawaited(
       (() async {
         try {
+          // С anon Bearer Edge не видит владельца: у заведения уже есть owner_id → 403.
+          // После входа передаём JWT пользователя; до входа оставляем anon (сиротское окно).
+          final hasUserJwt =
+              _supabase.client.auth.currentSession?.accessToken != null &&
+                  _supabase.client.auth.currentSession!.accessToken.isNotEmpty;
           await postEdgeFunctionWithRetry(
             'register-metadata',
             {'establishment_id': establishmentId},
             maxRetries: 1,
-            bearerAlwaysAnon: true,
+            bearerAlwaysAnon: !hasUserJwt,
           );
         } catch (_) {}
       })(),
@@ -1025,31 +1173,9 @@ class AccountManagerSupabase extends ChangeNotifier {
   /// Fallback: создать employee для auth user через fix_owner_without_employee (когда complete_pending не сработал).
   Future<({Employee employee, Establishment establishment})?>
       _tryFixOwnerWithoutEmployee() async {
-    if (!_supabase.isAuthenticated) return null;
-    final email = _supabase.currentUser?.email?.trim();
-    if (email == null || email.isEmpty) return null;
-    try {
-      final res = await _supabase.client
-          .rpc('fix_owner_without_employee', params: {'p_email': email});
-      if (res == null) return null;
-      final empData = Map<String, dynamic>.from(res as Map);
-      empData['password'] = '';
-      empData['password_hash'] = '';
-      final employee = Employee.fromJson(empData);
-      final estData = await _supabase.client
-          .from('establishments')
-          .select()
-          .eq('id', employee.establishmentId)
-          .limit(1)
-          .single();
-      return (
-        employee: employee,
-        establishment: Establishment.fromJson(estData),
-      );
-    } catch (e) {
-      devLog('🔐 fix_owner_without_employee fallback: $e');
-      return null;
-    }
+    // Временное отключение fallback RPC из-за серии шумных 400 в owner-first потоке.
+    // Рабочий путь: completePendingOwnerRegistration + owner_has_pending_registration_without_company.
+    return null;
   }
 
   /// Создание владельца через RPC — только для co-owner (create_employee_for_company), не для первичной регистрации.
@@ -1136,26 +1262,9 @@ class AccountManagerSupabase extends ChangeNotifier {
           }
         }
 
-        try {
-          final fixRes = await _supabase.client.rpc(
-              'fix_owner_without_employee',
-              params: {'p_email': emailTrim});
-          if (fixRes != null) {
-            final empData = Map<String, dynamic>.from(fixRes as Map);
-            empData['password'] = empData['password_hash'] ?? '';
-            final employee = Employee.fromJson(empData);
-            final estData = await _supabase.client
-                .from('establishments')
-                .select()
-                .eq('id', employee.establishmentId)
-                .limit(1)
-                .single();
-            final establishment = Establishment.fromJson(estData);
-            return (employee: employee, establishment: establishment);
-          }
-        } catch (fixErr) {
-          devLog('🔐 fix_owner_without_employee failed: $fixErr');
-        }
+        // Для owner-first без заведения RPC fix_owner_without_employee ожидаемо даёт 400.
+        // Пропускаем его до шага создания компании.
+        // fix_owner_without_employee отключён (см. _tryFixOwnerWithoutEmployee()).
 
         // Owner-first: email подтверждён, заведение ещё не создано — не signOut и не SQL-скрипт.
         try {
@@ -1515,6 +1624,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       await _secureStorage.remove(_keyRememberPassword);
     }
     await syncEstablishmentAccessFromServer();
+    await refreshSupportSessionState();
     if (!isLoggedInSync) {
       return;
     }
@@ -1558,6 +1668,7 @@ class AccountManagerSupabase extends ChangeNotifier {
 
   /// Выход из системы
   Future<void> logout() async {
+    await LocalizationService.clearPinnedLocaleOnLogout();
     await FcmPushService.unregisterBeforeLogout();
     final est = _establishment;
     if (est != null) {
@@ -1574,6 +1685,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     _establishment = null;
     _initialized = false;
     _needsCompanyRegistration = false;
+    _supportSessionActive = false;
     if (kIsWeb) {
       clear_hash.clearHashFromUrl();
     }
@@ -1599,7 +1711,7 @@ class AccountManagerSupabase extends ChangeNotifier {
       String establishmentId) async {
     final hit = _employeesListCache[establishmentId];
     if (hit != null &&
-        DateTime.now().difference(hit.at) <= _employeesCacheTtl) {
+        DateTime.now().difference(hit.at) <= _employeesMemoryTtl()) {
       return List<Employee>.from(hit.list);
     }
     try {
@@ -1614,6 +1726,22 @@ class AccountManagerSupabase extends ChangeNotifier {
       return list;
     } catch (e) {
       devLog('Ошибка получения сотрудников: $e');
+      if (!kIsWeb) {
+        try {
+          final raw = await LocalSnapshotStore.instance
+              .get('$establishmentId:employees');
+          if (raw != null && raw.isNotEmpty) {
+            final data = jsonDecode(raw) as List<dynamic>;
+            final list = data
+                .map((j) =>
+                    Employee.fromJson(Map<String, dynamic>.from(j as Map)))
+                .toList();
+            _employeesListCache[establishmentId] =
+                (at: DateTime.now(), list: list);
+            return List<Employee>.from(list);
+          }
+        } catch (_) {}
+      }
       return [];
     }
   }
@@ -1818,13 +1946,18 @@ class AccountManagerSupabase extends ChangeNotifier {
     required String employeeId,
     required String pinCode,
   }) async {
-    final res = await _supabase.client.functions.invoke(
-      'delete-employee',
-      body: {
-        'employee_id': employeeId,
-        'pin_code': pinCode.trim().toUpperCase(),
-      },
-    );
+    final res = await _supabase.client.functions
+        .invoke(
+          'delete-employee',
+          body: {
+            'employee_id': employeeId,
+            'pin_code': pinCode.trim().toUpperCase(),
+          },
+        )
+        .timeout(
+          const Duration(seconds: 30),
+          onTimeout: () => throw Exception('delete_employee_timeout'),
+        );
     if (res.status != 200) {
       final err = (res.data is Map && (res.data as Map)['error'] != null)
           ? (res.data as Map)['error'].toString()
@@ -1870,7 +2003,7 @@ class AccountManagerSupabase extends ChangeNotifier {
     required String pinCode,
     required String email,
   }) async {
-    await _supabase.client.rpc(
+    final raw = await _supabase.client.rpc(
       'delete_establishment_by_owner',
       params: {
         'p_establishment_id': establishmentId,
@@ -1878,6 +2011,42 @@ class AccountManagerSupabase extends ChangeNotifier {
         'p_email': email.trim(),
       },
     );
+
+    String? purgeToken;
+    if (raw is Map) {
+      final m = Map<String, dynamic>.from(raw);
+      final pt = m['purge_auth_token'];
+      if (pt != null) {
+        final s = pt.toString();
+        if (s.isNotEmpty && s != 'null') {
+          purgeToken = s;
+        }
+      }
+    }
+
+    if (purgeToken != null && purgeToken.isNotEmpty) {
+      final res = await postEdgeFunctionWithRetry(
+        'purge-establishment-auth-queue',
+        {'purge_token': purgeToken},
+        bearerAlwaysAnon: false,
+        retryOnceOn401AfterSessionRefresh: true,
+      );
+      if (res.status < 200 || res.status >= 300) {
+        final err = res.data?['error']?.toString() ?? 'HTTP ${res.status}';
+        throw Exception(err);
+      }
+      final deleted = (res.data?['deleted_user_ids'] as List?)
+              ?.map((e) => e.toString())
+              .toSet() ??
+          {};
+      final myId = _supabase.client.auth.currentUser?.id;
+      if (myId != null && deleted.contains(myId)) {
+        await logout();
+        notifyListeners();
+        return;
+      }
+    }
+
     // Обновить локальное состояние
     if (_establishment?.id == establishmentId) {
       _establishment = null;
@@ -1898,35 +2067,67 @@ class AccountManagerSupabase extends ChangeNotifier {
     required String password,
     required Map<String, String> pinsByEstablishmentId,
   }) async {
-    final authRes = await _supabase.client.auth.signInWithPassword(
-      email: email.trim(),
-      password: password,
-    );
-    if (authRes.user == null) {
-      throw Exception('Invalid email or password');
+    final emailNorm = email.trim().toLowerCase();
+    final currentUser = _supabase.client.auth.currentUser;
+    final currentEmail = currentUser?.email?.trim().toLowerCase();
+    final alreadyAuthenticatedAsSameUser =
+        currentUser != null && currentEmail == emailNorm;
+
+    // В web прямой signInWithPassword может зависать (нестабильная сеть/Auth endpoint).
+    // Если владелец уже в сессии и email совпадает, не переавторизуемся.
+    if (!alreadyAuthenticatedAsSameUser) {
+      final authRes = await _supabase.client.auth
+          .signInWithPassword(
+            email: email.trim(),
+            password: password,
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw Exception('owner_delete_sign_in_timeout'),
+          );
+      if (authRes.user == null) {
+        throw Exception('Invalid email or password');
+      }
     }
     final pinsJson = <String, dynamic>{};
     pinsByEstablishmentId.forEach((k, v) {
       pinsJson[k] = v.trim().toUpperCase();
     });
-    await _supabase.client.rpc(
-      'delete_owner_account_data',
-      params: {
-        'p_email': email.trim(),
-        'p_pins': pinsJson,
-      },
-    );
-    final res = await _supabase.client.functions.invoke(
+    await _supabase.client
+        .rpc(
+          'delete_owner_account_data',
+          params: {
+            'p_email': email.trim(),
+            'p_pins': pinsJson,
+          },
+        )
+        .timeout(
+          const Duration(seconds: 90),
+          onTimeout: () => throw Exception(
+            'delete_owner_account_data_timeout',
+          ),
+        );
+
+    final res = await postEdgeFunctionWithRetry(
       'purge-owner-auth',
-      body: const {},
+      const {},
+      bearerAlwaysAnon: false,
+      retryOnceOn401AfterSessionRefresh: true,
+    ).timeout(
+      const Duration(seconds: 45),
+      onTimeout: () => (
+        status: 0,
+        data: <String, dynamic>{'error': 'purge_owner_auth_timeout'},
+      ),
     );
-    if (res.status != 200) {
-      final err = (res.data is Map && (res.data as Map)['error'] != null)
-          ? (res.data as Map)['error'].toString()
-          : 'HTTP ${res.status}';
+    if (res.status < 200 || res.status >= 300) {
+      final err = res.data?['error']?.toString() ?? 'HTTP ${res.status}';
       throw Exception(err);
     }
-    await logout();
+    await logout().timeout(
+      const Duration(seconds: 20),
+      onTimeout: () => throw Exception('owner_delete_logout_timeout'),
+    );
   }
 
   /// Обновить данные заведения
@@ -1976,6 +2177,16 @@ class AccountManagerSupabase extends ChangeNotifier {
         })
         .eq('id', establishmentId)
         .select();
+    try {
+      final me = _currentEmployee;
+      await _supabase.client.from('support_access_event_log').insert({
+        'establishment_id': establishmentId,
+        'event_type': enabled
+            ? 'owner_enabled_access'
+            : 'owner_disabled_access',
+        'account_login': me?.email,
+      });
+    } catch (_) {}
     if (_establishment?.id == establishmentId) {
       _establishment = _establishment!.copyWith(
         supportAccessEnabled: enabled,
@@ -1985,21 +2196,40 @@ class AccountManagerSupabase extends ChangeNotifier {
     notifyListeners();
   }
 
+  DateTime? _lastReconcilePreferredLanguageAt;
+  String? _lastReconcilePreferredLanguageCode;
+
   /// Сохранить выбранный язык в профиле сотрудника (preferred_language в Supabase).
   /// Вызывается при смене языка из UI, чтобы язык сохранялся между сессиями и браузерами.
-  Future<void> savePreferredLanguage(String languageCode) async {
+  ///
+  /// [fromReconcile]: при рассинхроне устройство↔сервер — не дёргать RPC десятки раз подряд (лог 400).
+  Future<void> savePreferredLanguage(
+    String languageCode, {
+    bool fromReconcile = false,
+  }) async {
     final emp = _currentEmployee;
     if (emp == null) return;
     final code = languageCode.trim().toLowerCase();
-    try {
-      final res = await _supabase.client.rpc(
-        'patch_my_employee_profile',
-        params: {
-          'p_patch': {'preferred_language': code},
-        },
-      );
+    if (fromReconcile) {
+      final now = DateTime.now();
+      if (_lastReconcilePreferredLanguageCode == code &&
+          _lastReconcilePreferredLanguageAt != null &&
+          now.difference(_lastReconcilePreferredLanguageAt!) <
+              const Duration(seconds: 25)) {
+        return;
+      }
+    }
+    Future<void> applyRpcOrRows(dynamic res, List<dynamic>? rows) async {
+      if (fromReconcile) {
+        _lastReconcilePreferredLanguageAt = DateTime.now();
+        _lastReconcilePreferredLanguageCode = code;
+      }
       if (res is Map) {
         final m = Map<String, dynamic>.from(res);
+        m['password'] = m['password_hash'] ?? '';
+        _currentEmployee = Employee.fromJson(m);
+      } else if (rows != null && rows.isNotEmpty) {
+        final m = Map<String, dynamic>.from(rows.first as Map);
         m['password'] = m['password_hash'] ?? '';
         _currentEmployee = Employee.fromJson(m);
       } else {
@@ -2007,8 +2237,38 @@ class AccountManagerSupabase extends ChangeNotifier {
       }
       await LocalizationService().markLocaleChoiceFromAuthFlow();
       notifyListeners();
-    } catch (e) {
-      devLog('AccountManager: savePreferredLanguage error: $e');
+    }
+
+    try {
+      final res = await _supabase.client.rpc(
+        'patch_my_employee_profile',
+        params: {
+          'p_patch': {'preferred_language': code},
+        },
+      );
+      await applyRpcOrRows(res, null);
+    } catch (e, st) {
+      if (e is PostgrestException) {
+        devLog(
+          'AccountManager: savePreferredLanguage PostgREST ${e.code} '
+          'message=${e.message} details=${e.details} hint=${e.hint}',
+        );
+      } else {
+        devLog('AccountManager: savePreferredLanguage error: $e $st');
+      }
+      // Fallback: прямой UPDATE по строке сотрудника (RLS), если RPC 400/др.
+      try {
+        final authId = _supabase.currentUser?.id;
+        if (authId == null) return;
+        final rows = await _supabase.client
+            .from('employees')
+            .update({'preferred_language': code})
+            .or('id.eq.$authId,auth_user_id.eq.$authId')
+            .select();
+        await applyRpcOrRows(null, rows);
+      } catch (e2, st2) {
+        devLog('AccountManager: savePreferredLanguage fallback UPDATE: $e2 $st2');
+      }
     }
   }
 
@@ -2028,11 +2288,17 @@ class AccountManagerSupabase extends ChangeNotifier {
       final rows = rawList is List ? rawList : <dynamic>[];
       if (rows.isEmpty) {
         ({Employee employee, Establishment establishment})? completed;
-        if (!await _pendingOwnerAwaitingCompanyOnly(authUserId)) {
+        final awaitingCompanyOnly =
+            await _pendingOwnerAwaitingCompanyOnly(authUserId);
+        if (!awaitingCompanyOnly) {
           completed = await completePendingOwnerRegistration();
         }
         completed ??= await PendingCoOwnerRegistration.tryComplete(this);
-        completed ??= await _tryFixOwnerWithoutEmployee();
+        // Не вызывать fix_owner_without_employee при «только владелец» без заведения — RPC даёт 400
+        // (нет establishment для owner).
+        if (completed == null && !awaitingCompanyOnly) {
+          completed = await _tryFixOwnerWithoutEmployee();
+        }
         if (completed != null) {
           _currentEmployee = completed.employee;
           _establishment = completed.establishment;
@@ -2131,10 +2397,119 @@ class AccountManagerSupabase extends ChangeNotifier {
       final exp = _parseRpcTimestamp(rawExp);
       final rawDis = m['is_disabled'];
       final isDisabled = rawDis == true || rawDis == 1;
+      final grantType = m['grants_subscription_type']?.toString().trim();
+      final estTierFallback = _establishment?.subscriptionType?.trim();
+      String? resolvedGrantType = (grantType != null && grantType.isNotEmpty)
+          ? grantType
+          : (estTierFallback != null && estTierFallback.isNotEmpty
+              ? estTierFallback
+              : null);
+      int empPacks = _parseRpcInt(
+        m['grants_employee_slot_packs'] ??
+            m['employee_slot_packs'] ??
+            m['employee_packs'] ??
+            m['grants_employee_packs'],
+      );
+      int branchPacks = _parseRpcInt(
+        m['grants_branch_slot_packs'] ??
+            m['branch_slot_packs'] ??
+            m['additional_establishment_packs'] ??
+            m['grants_additional_establishment_packs'],
+      );
+      final additiveOnly = _parseRpcBool(m['grants_additive_only']);
+      int? promoMaxEmployees;
+      final rawMaxEmp = m['max_employees'];
+      if (rawMaxEmp != null) {
+        final n = _parseRpcInt(rawMaxEmp, -1);
+        if (n >= 0) promoMaxEmployees = n;
+      }
+      final noteRaw = m['promo_template_note']?.toString().trim();
+      final promoTemplateNote =
+          noteRaw != null && noteRaw.isNotEmpty ? noteRaw : null;
+
+      // Фолбэк на фактические entitlement-пакеты, если старый RPC не отдал grants_* поля.
+      if (empPacks <= 0) {
+        try {
+          final rows = await _supabase.client
+              .from('establishment_entitlement_addons')
+              .select('employee_slot_packs')
+              .eq('establishment_id', est.id)
+              .limit(1);
+          if (rows is List && rows.isNotEmpty) {
+            final row = Map<String, dynamic>.from(rows.first as Map);
+            empPacks = _parseRpcInt(row['employee_slot_packs']);
+          }
+        } catch (_) {}
+      }
+      if (branchPacks <= 0) {
+        try {
+          final rows = await _supabase.client
+              .from('owner_entitlement_addons')
+              .select('branch_slot_packs')
+              .limit(1);
+          if (rows is List && rows.isNotEmpty) {
+            final row = Map<String, dynamic>.from(rows.first as Map);
+            branchPacks = _parseRpcInt(row['branch_slot_packs']);
+          }
+        } catch (_) {}
+      }
+
+      // Последний фолбэк: читаем шаблон промокода из redemption->promo_codes
+      // для проектов, где RPC ещё старого формата.
+      if ((resolvedGrantType == null || empPacks <= 0 || branchPacks <= 0) &&
+          code != null &&
+          code.trim().isNotEmpty) {
+        try {
+          final rows = await _supabase.client
+              .from('promo_code_redemptions')
+              .select(
+                'promo_codes!inner(grants_subscription_type,grants_employee_slot_packs,grants_branch_slot_packs)',
+              )
+              .eq('establishment_id', est.id)
+              .order('redeemed_at', ascending: false)
+              .limit(1);
+          if (rows is List && rows.isNotEmpty) {
+            final row = Map<String, dynamic>.from(rows.first as Map);
+            final nested = row['promo_codes'];
+            Map<String, dynamic>? promoCode;
+            if (nested is Map) {
+              promoCode = Map<String, dynamic>.from(nested);
+            } else if (nested is List &&
+                nested.isNotEmpty &&
+                nested.first is Map) {
+              promoCode = Map<String, dynamic>.from(nested.first as Map);
+            }
+            if (promoCode != null) {
+              final nestedTier =
+                  promoCode['grants_subscription_type']?.toString().trim();
+              if (resolvedGrantType == null &&
+                  nestedTier != null &&
+                  nestedTier.isNotEmpty) {
+                resolvedGrantType = nestedTier;
+              }
+              if (empPacks <= 0) {
+                empPacks =
+                    _parseRpcInt(promoCode['grants_employee_slot_packs']);
+              }
+              if (branchPacks <= 0) {
+                branchPacks =
+                    _parseRpcInt(promoCode['grants_branch_slot_packs']);
+              }
+            }
+          }
+        } catch (_) {}
+      }
+
       return EstablishmentPromoInfo(
         code: code,
         expiresAt: exp,
         isDisabled: isDisabled,
+        grantsSubscriptionType: resolvedGrantType,
+        grantsEmployeeSlotPacks: empPacks,
+        grantsBranchSlotPacks: branchPacks,
+        grantsAdditiveOnly: additiveOnly,
+        promoMaxEmployees: promoMaxEmployees,
+        promoTemplateNote: promoTemplateNote,
       );
     } catch (e, st) {
       devLog('getEstablishmentPromoForOwner: $e $st');
@@ -2154,6 +2529,7 @@ class AccountManagerSupabase extends ChangeNotifier {
           .limit(1)
           .single();
       _establishment = Establishment.fromJson(estData);
+      await refreshSupportSessionState();
       notifyListeners();
     } catch (e, st) {
       devLog('refreshCurrentEstablishmentFromServer: $e $st');
@@ -2178,6 +2554,74 @@ class AccountManagerSupabase extends ChangeNotifier {
     await refreshCurrentEstablishmentFromServer();
     await syncEstablishmentAccessFromServer();
   }
+
+  /// Проверить, есть ли активный сеанс техподдержки по текущему заведению.
+  Future<void> refreshSupportSessionState() async {
+    final estId = _establishment?.id;
+    final emp = _currentEmployee;
+    if (estId == null || emp == null || !emp.hasRole('owner')) {
+      _supportSessionActive = false;
+      return;
+    }
+    if (_supportAccessTablesUnavailable) {
+      _supportSessionActive = false;
+      return;
+    }
+    try {
+      final rows = await _supabase.client
+          .from('support_access_audit_log')
+          .select('id')
+          .eq('establishment_id', estId)
+          .isFilter('ended_at', null)
+          .order('started_at', ascending: false)
+          .limit(1);
+      final next = rows is List && rows.isNotEmpty;
+      if (next != _supportSessionActive) {
+        _supportSessionActive = next;
+        notifyListeners();
+      }
+    } on PostgrestException catch (e) {
+      if (_looksLikeMissingSupportAccessSchema(e)) {
+        _supportAccessTablesUnavailable = true;
+      }
+      // На старой БД таблицы может не быть — не ломаем UI.
+      _supportSessionActive = false;
+    } catch (_) {
+      _supportAccessTablesUnavailable = true;
+      _supportSessionActive = false;
+    }
+  }
+
+  /// Журнал входов/выходов системной поддержки для собственника.
+  Future<List<Map<String, dynamic>>> loadSupportAccessAuditLog({
+    int limit = 100,
+  }) async {
+    final estId = _establishment?.id;
+    final emp = _currentEmployee;
+    if (estId == null || emp == null || !emp.hasRole('owner')) return const [];
+    if (_supportAccessTablesUnavailable) return const [];
+    try {
+      final rows = await _supabase.client
+          .from('support_access_event_log')
+          .select(
+              'id, event_type, support_operator_login, account_login, created_at')
+          .eq('establishment_id', estId)
+          .order('created_at', ascending: false)
+          .limit(limit);
+      if (rows is! List) return const [];
+      return rows
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .toList(growable: false);
+    } on PostgrestException catch (e) {
+      if (_looksLikeMissingSupportAccessSchema(e)) {
+        _supportAccessTablesUnavailable = true;
+      }
+      return const [];
+    } catch (_) {
+      _supportAccessTablesUnavailable = true;
+      return const [];
+    }
+  }
 }
 
 /// Данные промокода, выданного заведению при регистрации с кодом из админки.
@@ -2187,6 +2631,12 @@ class EstablishmentPromoInfo {
     this.expiresAt,
     this.loadFailed = false,
     this.isDisabled = false,
+    this.grantsSubscriptionType,
+    this.grantsEmployeeSlotPacks = 0,
+    this.grantsBranchSlotPacks = 0,
+    this.grantsAdditiveOnly = false,
+    this.promoMaxEmployees,
+    this.promoTemplateNote,
   });
 
   final String? code;
@@ -2195,6 +2645,24 @@ class EstablishmentPromoInfo {
 
   /// Промокод отключён в админке ([is_disabled]); доступ блокируется на сервере.
   final bool isDisabled;
+
+  /// Шаблон из `promo_codes.grants_subscription_type` (pro, ultra, …).
+  final String? grantsSubscriptionType;
+
+  /// Пакеты по +5 к лимиту сотрудников.
+  final int grantsEmployeeSlotPacks;
+
+  /// Пакеты дополнительных заведений (филиалов).
+  final int grantsBranchSlotPacks;
+
+  /// Только начисление пакетов без смены тарифа.
+  final bool grantsAdditiveOnly;
+
+  /// Опциональный лимит сотрудников из шаблона промокода (`max_employees`).
+  final int? promoMaxEmployees;
+
+  /// Примечание из `promo_codes.note` (админка).
+  final String? promoTemplateNote;
 
   bool get hasPromo => !loadFailed && code != null && code!.isNotEmpty;
 
@@ -2215,4 +2683,17 @@ DateTime? _parseRpcTimestamp(dynamic raw) {
   if (raw == null) return null;
   if (raw is DateTime) return raw;
   return DateTime.tryParse(raw.toString());
+}
+
+int _parseRpcInt(dynamic raw, [int defaultValue = 0]) {
+  if (raw == null) return defaultValue;
+  if (raw is int) return raw;
+  if (raw is num) return raw.toInt();
+  return int.tryParse(raw.toString()) ?? defaultValue;
+}
+
+bool _parseRpcBool(dynamic raw, [bool defaultValue = false]) {
+  if (raw == true || raw == 1) return true;
+  if (raw == false || raw == 0) return false;
+  return defaultValue;
 }

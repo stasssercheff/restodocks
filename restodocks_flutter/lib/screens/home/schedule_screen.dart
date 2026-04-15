@@ -1,18 +1,23 @@
 import 'package:flutter/cupertino.dart'
     show CupertinoTimerPicker, CupertinoTimerPickerMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import '../../utils/dev_log.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:excel/excel.dart' as xls;
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/subscription_entitlements.dart';
 import '../../models/models.dart';
 import '../../services/schedule_storage_service.dart';
 import '../../services/services.dart';
 import '../../utils/layout_breakpoints.dart';
 import '../../utils/translit_utils.dart';
 import '../../widgets/app_bar_home_button.dart';
+import '../../services/inventory_download.dart';
 
 /// График: слоты (должности/имена) задаются вручную, можно выбрать сотрудника из списка или вписать имя.
 /// Один график на заведение, прокрутка по неделям (неделя влезает на экран, ограничений нет).
@@ -163,6 +168,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     'bakery'
   };
 
+  /// Lite: в графике только кухня (маршруты all/bar/hall → фильтр как у кухни).
+  String _effectiveScheduleDepartment(SubscriptionEntitlements ent) {
+    if (!ent.kitchenOnlyDepartments) return widget.department;
+    final d = widget.department;
+    if (d == 'all' || d == 'bar' || d == 'hall' || d == 'dining_room') {
+      return 'kitchen';
+    }
+    return d;
+  }
+
   /// Блоки отображения при department='all': Кухня (управление + цеха), Бар (управление + сотрудники), Зал (управление + сотрудники).
   List<
       ({
@@ -171,9 +186,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         String? sectionId,
         String sectionLabel,
         List<ScheduleSlot> slots
-      })> _displayBlocks(LocalizationService loc) {
-    if (widget.department != 'all') {
-      return _displaySections
+      })> _displayBlocks(
+    LocalizationService loc,
+    SubscriptionEntitlements ent,
+    String? personalScheduleEmployeeId,
+  ) {
+    if (_effectiveScheduleDepartment(ent) != 'all') {
+      return _displaySections(ent, personalScheduleEmployeeId)
           .map((s) => (
                 isDeptHeader: false,
                 deptLabel: '',
@@ -181,12 +200,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 sectionLabel: loc.translate(s.nameKey) != s.nameKey
                     ? loc.translate(s.nameKey)
                     : s.id,
-                slots: _displaySlotsBySection[s.id] ?? [],
+                slots: _displaySlotsBySection(ent, personalScheduleEmployeeId)[s.id] ??
+                    [],
               ))
           .where((b) => b.slots.isNotEmpty)
           .toList();
     }
-    final bySection = _displaySlotsBySection;
+    final bySection = _displaySlotsBySection(ent, personalScheduleEmployeeId);
     final blocks = <({
       bool isDeptHeader,
       String deptLabel,
@@ -272,9 +292,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   /// ID сотрудников выбранного подразделения (для фильтрации графика).
   /// Для кухни: department=kitchen + шеф/су-шеф (могут иметь department=management).
-  Set<String> get _employeeIdsForDepartment {
-    if (widget.department == 'all') return _employees.map((e) => e.id).toSet();
-    final dept = widget.department;
+  Set<String> _employeeIdsForDepartment(SubscriptionEntitlements ent) {
+    final dept = _effectiveScheduleDepartment(ent);
+    if (dept == 'all') return _employees.map((e) => e.id).toSet();
     return _employees
         .where((e) {
           if (dept == 'kitchen') {
@@ -295,17 +315,28 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   /// Слоты для отображения: при выборе подразделения — только сотрудники этого подразделения
-  List<ScheduleSlot> get _displaySlots {
-    if (widget.department == 'all') return _model.slots;
-    final ids = _employeeIdsForDepartment;
+  List<ScheduleSlot> _displaySlots(
+    SubscriptionEntitlements ent,
+    String? personalScheduleEmployeeId,
+  ) {
+    if (widget.personalOnly && ent.kitchenOnlyDepartments) {
+      final id = personalScheduleEmployeeId;
+      if (id == null) return [];
+      return _model.slots.where((s) => s.employeeId == id).toList();
+    }
+    if (_effectiveScheduleDepartment(ent) == 'all') return _model.slots;
+    final ids = _employeeIdsForDepartment(ent);
     return _model.slots
         .where((s) => s.employeeId != null && ids.contains(s.employeeId!))
         .toList();
   }
 
   /// Секции и слоты по секциям для отображения (с учётом фильтра по подразделению)
-  Map<String, List<ScheduleSlot>> get _displaySlotsBySection {
-    final filtered = _displaySlots;
+  Map<String, List<ScheduleSlot>> _displaySlotsBySection(
+    SubscriptionEntitlements ent,
+    String? personalScheduleEmployeeId,
+  ) {
+    final filtered = _displaySlots(ent, personalScheduleEmployeeId);
     final map = <String, List<ScheduleSlot>>{};
     for (final section in _model.sections) {
       final list = filtered.where((s) => s.sectionId == section.id).toList();
@@ -322,8 +353,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return map;
   }
 
-  List<ScheduleSection> get _displaySections {
-    final bySection = _displaySlotsBySection;
+  List<ScheduleSection> _displaySections(
+    SubscriptionEntitlements ent,
+    String? personalScheduleEmployeeId,
+  ) {
+    final bySection = _displaySlotsBySection(ent, personalScheduleEmployeeId);
     final ordered = ScheduleModel.sectionsInDisplayOrder(_model.sections);
     final fromModel =
         ordered.where((s) => bySection.containsKey(s.id)).toList();
@@ -660,6 +694,288 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     return dates;
   }
 
+  Future<void> _showScheduleExportDialog() async {
+    final loc = context.read<LocalizationService>();
+    final acc = context.read<AccountManagerSupabase>();
+    final subEnt = SubscriptionEntitlements.from(acc.establishment);
+    final personalEmpId = widget.personalOnly ? acc.currentEmployee?.id : null;
+    final blocks = _displayBlocks(loc, subEnt, personalEmpId);
+    final slots = <ScheduleSlot>[];
+    for (final b in blocks) {
+      if (b.isDeptHeader) continue;
+      slots.addAll(b.slots);
+    }
+    final uniqueSlots = <String, ScheduleSlot>{};
+    for (final s in slots) {
+      uniqueSlots[s.id] = s;
+    }
+    final result = await showDialog<({
+      String format,
+      DateTime from,
+      DateTime to,
+      List<String> slotIds,
+      String lang,
+    })>(
+      context: context,
+      builder: (ctx) => _ScheduleExportDialog(
+        dates: _visibleDates,
+        slots: uniqueSlots.values.toList(),
+        loc: loc,
+      ),
+    );
+    if (result == null || !mounted) return;
+    if (result.format == 'excel') {
+      await _exportScheduleExcel(
+        from: result.from,
+        to: result.to,
+        slotIds: result.slotIds,
+        lang: result.lang,
+      );
+    } else {
+      await _exportSchedulePdf(
+        from: result.from,
+        to: result.to,
+        slotIds: result.slotIds,
+        lang: result.lang,
+      );
+    }
+  }
+
+  Future<void> _exportSchedulePdf({
+    required DateTime from,
+    required DateTime to,
+    required List<String> slotIds,
+    required String lang,
+  }) async {
+    final loc = context.read<LocalizationService>();
+    final acc = context.read<AccountManagerSupabase>();
+    final days = _getDatesInRange(from, to);
+    if (days.isEmpty) return;
+    if (days.length > 31) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('schedule_pdf_validation_range'))),
+      );
+      return;
+    }
+    final selectedSlots = _model.slots.where((s) => slotIds.contains(s.id)).toList();
+    if (selectedSlots.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('schedule_pdf_validation_employees'))),
+      );
+      return;
+    }
+
+    try {
+      final fontRegular = pw.Font.ttf(
+        await rootBundle.load('assets/fonts/Roboto-Regular.ttf'),
+      );
+      final fontBold = pw.Font.ttf(
+        await rootBundle.load('assets/fonts/Roboto-Bold.ttf'),
+      );
+      final doc = pw.Document();
+      final localeTag = switch (lang) {
+        'ru' => 'ru_RU',
+        'es' => 'es_ES',
+        'it' => 'it_IT',
+        'tr' => 'tr_TR',
+        'kk' => 'kk_KZ',
+        _ => 'en_US',
+      };
+      final showTranslit = lang != 'ru';
+      final title = loc.tForLanguage(lang, 'schedule');
+      final fromText = DateFormat('dd.MM.yyyy', localeTag).format(from);
+      final toText = DateFormat('dd.MM.yyyy', localeTag).format(to);
+      final headers = <String>[
+        loc.tForLanguage(lang, 'employees'),
+        ...days.map((d) => DateFormat('dd.MM\nEEE', localeTag).format(d)),
+      ];
+
+      pw.TableRow rowFor(ScheduleSlot slot) {
+        final employeeName = _slotDisplayName(slot, translit: showTranslit);
+        final cells = <pw.Widget>[
+          pw.Padding(
+            padding: const pw.EdgeInsets.all(3),
+            child: pw.Text(employeeName, style: const pw.TextStyle(fontSize: 8)),
+          ),
+        ];
+        for (final d in days) {
+          final v = _cellValue(slot.id, d);
+          final tr = _model.getTimeRange(slot.id, d);
+          String text = '';
+          if (v == '0') text = '0';
+          if (v == '1') {
+            if (tr != null && tr.contains('|')) {
+              final parts = tr.split('|');
+              text = '${parts[0]}-${parts[1]}';
+            } else {
+              text = '1';
+            }
+          }
+          cells.add(
+            pw.Padding(
+              padding: const pw.EdgeInsets.all(2),
+              child: pw.Center(
+                child: pw.Text(text, style: const pw.TextStyle(fontSize: 7)),
+              ),
+            ),
+          );
+        }
+        return pw.TableRow(children: cells);
+      }
+
+      doc.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4.landscape,
+          theme: pw.ThemeData.withFont(base: fontRegular, bold: fontBold),
+          build: (_) => [
+            pw.Text(
+              '$title: $fromText - $toText',
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 8),
+            pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+              defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
+              children: [
+                pw.TableRow(
+                  children: headers
+                      .map(
+                        (h) => pw.Padding(
+                          padding: const pw.EdgeInsets.all(3),
+                          child: pw.Text(
+                            h,
+                            style: pw.TextStyle(
+                                fontSize: 7, fontWeight: pw.FontWeight.bold),
+                            textAlign: pw.TextAlign.center,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+                ...selectedSlots.map(rowFor),
+              ],
+            ),
+          ],
+        ),
+      );
+
+      final fileName =
+          'schedule_${DateFormat('yyyyMMdd').format(from)}_${DateFormat('yyyyMMdd').format(to)}.pdf';
+      final est = acc.establishment;
+      if (est != null && acc.isTrialOnlyWithoutPaid) {
+        await acc.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.schedule,
+        );
+      }
+      await saveFileBytes(fileName, await doc.save());
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${loc.t('expenses_orders_export_error')}: $e')),
+      );
+    }
+  }
+
+  Future<void> _exportScheduleExcel({
+    required DateTime from,
+    required DateTime to,
+    required List<String> slotIds,
+    required String lang,
+  }) async {
+    final loc = context.read<LocalizationService>();
+    final acc = context.read<AccountManagerSupabase>();
+    final days = _getDatesInRange(from, to);
+    if (days.isEmpty) return;
+    if (days.length > 31) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('schedule_pdf_validation_range'))),
+      );
+      return;
+    }
+    final selectedSlots = _model.slots.where((s) => slotIds.contains(s.id)).toList();
+    if (selectedSlots.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('schedule_pdf_validation_employees'))),
+      );
+      return;
+    }
+
+    try {
+      final localeTag = switch (lang) {
+        'ru' => 'ru_RU',
+        'es' => 'es_ES',
+        'it' => 'it_IT',
+        'tr' => 'tr_TR',
+        'kk' => 'kk_KZ',
+        _ => 'en_US',
+      };
+      final showTranslit = lang != 'ru';
+      final excel = xls.Excel.createExcel();
+      final sheet = excel['Schedule'];
+      final fromText = DateFormat('dd.MM.yyyy', localeTag).format(from);
+      final toText = DateFormat('dd.MM.yyyy', localeTag).format(to);
+      final headers = <String>[
+        loc.tForLanguage(lang, 'employees'),
+        ...days.map((d) => DateFormat('dd.MM EEE', localeTag).format(d)),
+      ];
+
+      sheet.appendRow([xls.TextCellValue('${loc.tForLanguage(lang, 'schedule')}: $fromText - $toText')]);
+      sheet.appendRow([]);
+      sheet.appendRow(headers.map((h) => xls.TextCellValue(h)).toList());
+
+      for (final slot in selectedSlots) {
+        final row = <xls.CellValue>[
+          xls.TextCellValue(_slotDisplayName(slot, translit: showTranslit)),
+        ];
+        for (final d in days) {
+          final v = _cellValue(slot.id, d);
+          final tr = _model.getTimeRange(slot.id, d);
+          String text = '';
+          if (v == '0') text = '0';
+          if (v == '1') {
+            if (tr != null && tr.contains('|')) {
+              final parts = tr.split('|');
+              text = '${parts[0]}-${parts[1]}';
+            } else {
+              text = '1';
+            }
+          }
+          row.add(xls.TextCellValue(text));
+        }
+        sheet.appendRow(row);
+      }
+
+      final fileBytes = excel.encode();
+      if (fileBytes == null || fileBytes.isEmpty) {
+        throw Exception('Excel encode failed');
+      }
+      final fileName =
+          'schedule_${DateFormat('yyyyMMdd').format(from)}_${DateFormat('yyyyMMdd').format(to)}.xlsx';
+      final est = acc.establishment;
+      if (est != null && acc.isTrialOnlyWithoutPaid) {
+        await acc.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.schedule,
+        );
+      }
+      await saveFileBytes(fileName, fileBytes);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.t('inventory_excel_downloaded') ?? 'Файл сохранён')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${loc.t('expenses_orders_export_error')}: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
@@ -680,7 +996,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: Text(loc.t('schedule'))),
+        appBar: AppBar(
+          leading: widget.embedded
+              ? null
+              : (shellReturnLeading(context) ?? appBarBackButton(context)),
+          title: Text(loc.t('schedule')),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -773,7 +1094,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           border: Border(right: BorderSide(color: borderColor))),
     ));
 
-    final blocks = _displayBlocks(loc);
+    final subEnt = SubscriptionEntitlements.from(acc.establishment);
+    final personalEmpId =
+        widget.personalOnly ? acc.currentEmployee?.id : null;
+    final blocks = _displayBlocks(loc, subEnt, personalEmpId);
     final sectionBg = theme.colorScheme.secondaryContainer.withOpacity(0.6);
     final sectionFg = theme.colorScheme.onSecondaryContainer;
     final deptHeaderBg = theme.colorScheme.primary.withOpacity(0.25);
@@ -972,11 +1296,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: widget.embedded ? null : appBarBackButton(context),
+        leading: widget.embedded
+            ? null
+            : (shellReturnLeading(context) ?? appBarBackButton(context)),
         title: Text(widget.personalOnly
             ? loc.t('personal_schedule')
             : loc.t('schedule')),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.file_download_outlined),
+            onPressed: _showScheduleExportDialog,
+            tooltip: loc.t('export'),
+          ),
           IconButton(
             icon: const Icon(Icons.today),
             onPressed: _scrollToCenterToday,
@@ -1609,6 +1940,199 @@ class _DatePickerDialogState extends State<_DatePickerDialog> {
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+        ),
+      ],
+    );
+  }
+}
+
+class _ScheduleExportDialog extends StatefulWidget {
+  const _ScheduleExportDialog({
+    required this.dates,
+    required this.slots,
+    required this.loc,
+  });
+
+  final List<DateTime> dates;
+  final List<ScheduleSlot> slots;
+  final LocalizationService loc;
+
+  @override
+  State<_ScheduleExportDialog> createState() => _ScheduleExportDialogState();
+}
+
+class _ScheduleExportDialogState extends State<_ScheduleExportDialog> {
+  late DateTime _from;
+  late DateTime _to;
+  late String _lang;
+  String _format = 'pdf';
+  final Set<String> _selectedSlots = {};
+
+  @override
+  void initState() {
+    super.initState();
+    final today = DateTime.now();
+    _from = DateTime(today.year, today.month, today.day);
+    _to = _from;
+    _lang = widget.loc.currentLanguageCode;
+    for (final s in widget.slots) {
+      _selectedSlots.add(s.id);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = widget.loc;
+    return AlertDialog(
+      title: Text(loc.t('schedule_export_dialog_title')),
+      content: SizedBox(
+        width: 500,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: _DatePickerButton(
+                      label: loc.t('schedule_export_from_label'),
+                      selectedDate: _from,
+                      dates: widget.dates,
+                      initialDate: _from,
+                      onChanged: (d) => setState(() => _from = d),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _DatePickerButton(
+                      label: loc.t('schedule_export_to_label'),
+                      selectedDate: _to,
+                      dates: widget.dates,
+                      initialDate: _to,
+                      onChanged: (d) => setState(() => _to = d),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: _format,
+                decoration: InputDecoration(
+                  labelText: loc.t('schedule_export_format_label'),
+                  border: const OutlineInputBorder(),
+                ),
+                items: [
+                  DropdownMenuItem(
+                      value: 'pdf', child: Text(loc.t('schedule_export_format_pdf'))),
+                  DropdownMenuItem(
+                      value: 'excel',
+                      child: Text(loc.t('schedule_export_format_excel'))),
+                ],
+                onChanged: (v) {
+                  if (v != null) setState(() => _format = v);
+                },
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: _lang,
+                decoration: InputDecoration(
+                  labelText: loc.t('schedule_export_language_label'),
+                  border: const OutlineInputBorder(),
+                ),
+                items: LocalizationService.productLanguageCodes
+                    .map((code) => DropdownMenuItem(
+                          value: code,
+                          child: Text(widget.loc.getLanguageName(code)),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _lang = v);
+                },
+              ),
+              const SizedBox(height: 10),
+              Text(loc.t('schedule_export_employees_label')),
+              const SizedBox(height: 6),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2),
+                    child: Icon(Icons.info_outline, size: 16),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      loc.t('schedule_export_selection_hint'),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: widget.slots
+                    .map(
+                      (s) => FilterChip(
+                        label: Text(s.name),
+                        selected: _selectedSlots.contains(s.id),
+                        onSelected: (on) {
+                          setState(() {
+                            if (on) {
+                              _selectedSlots.add(s.id);
+                            } else {
+                              _selectedSlots.remove(s.id);
+                            }
+                          });
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+        ),
+        FilledButton(
+          onPressed: () {
+            final loc = widget.loc;
+            void toast(String key) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(loc.t(key))),
+              );
+            }
+
+            if (_selectedSlots.isEmpty) {
+              toast('schedule_pdf_validation_employees');
+              return;
+            }
+            final fromDay =
+                DateTime(_from.year, _from.month, _from.day);
+            final toDay = DateTime(_to.year, _to.month, _to.day);
+            if (toDay.isBefore(fromDay)) {
+              toast('schedule_pdf_validation_date_order');
+              return;
+            }
+            final days = toDay.difference(fromDay).inDays + 1;
+            if (days > 31) {
+              toast('schedule_pdf_validation_range');
+              return;
+            }
+            Navigator.of(context).pop((
+              format: _format,
+              from: fromDay,
+              to: toDay,
+              slotIds: _selectedSlots.toList(),
+              lang: _lang,
+            ));
+          },
+          child: Text(_format == 'excel' ? 'Сохранить Excel' : 'Сохранить PDF'),
         ),
       ],
     );

@@ -170,8 +170,19 @@ Deno.serve(async (req: Request) => {
       employeeIds = [rid];
       const content = String(rec.content ?? "").trim();
       const hasImage = Boolean(rec.image_url);
+      const hasAudio = Boolean(rec.audio_url);
+      const rawLinks = rec.system_links;
+      const hasLinks = Array.isArray(rawLinks) && (rawLinks as unknown[]).length > 0;
       title = "Сообщение";
-      body = hasImage ? "Новое сообщение (фото)" : (content ? content.slice(0, 160) : "Новое сообщение");
+      body = hasImage
+        ? "Новое сообщение (фото)"
+        : hasAudio
+        ? "Новое сообщение (голос)"
+        : hasLinks
+        ? "Новое сообщение (ссылки)"
+        : content
+        ? content.slice(0, 160)
+        : "Новое сообщение";
       const sid = String(rec.sender_employee_id ?? "");
       data.route = `/inbox/chat/${sid}`;
       data.type = "messages";

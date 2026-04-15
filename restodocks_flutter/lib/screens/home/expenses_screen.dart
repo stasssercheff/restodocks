@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/subscription_entitlements.dart';
 import '../../models/models.dart';
 import '../../services/inventory_download.dart';
 import '../../services/services.dart';
@@ -43,6 +44,22 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final account = context.watch<AccountManagerSupabase>();
+    final ent = SubscriptionEntitlements.from(account.establishment);
+    final tabs = <_ExpensesTab>[
+      _ExpensesTab.fzp,
+      if (ent.effectiveTier == AppSubscriptionTier.pro ||
+          ent.effectiveTier == AppSubscriptionTier.ultra)
+        _ExpensesTab.productOrders,
+      if (ent.effectiveTier == AppSubscriptionTier.pro ||
+          ent.effectiveTier == AppSubscriptionTier.ultra)
+        _ExpensesTab.writeoffs,
+      if (ent.effectiveTier == AppSubscriptionTier.ultra)
+        _ExpensesTab.procurementReceipts,
+    ];
+    final selectedTab =
+        tabs.contains(_selectedTab) ? _selectedTab : _ExpensesTab.fzp;
+    final fzpOnly = tabs.length == 1;
 
     return Scaffold(
       appBar: AppBar(
@@ -51,51 +68,75 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           child: Text(loc.t('expenses') ?? 'Расходы'),
         ),
       ),
-      body: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              border: Border(
-                bottom: BorderSide(color: Theme.of(context).dividerColor, width: 1),
-              ),
-            ),
-            child: Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildTabChip(_ExpensesTab.fzp, loc.t('salary_tab_fzp') ?? 'ФЗП', loc),
-                  const SizedBox(width: 8),
-                  _buildTabChip(_ExpensesTab.productOrders, loc.t('expenses_tab_product_orders') ?? 'Заказы продуктов', loc),
-                  const SizedBox(width: 8),
-                  _buildTabChip(_ExpensesTab.writeoffs, loc.t('expenses_tab_writeoffs') ?? 'Списания', loc),
-                  const SizedBox(width: 8),
-                  _buildTabChip(
-                    _ExpensesTab.procurementReceipts,
-                    loc.t('expenses_tab_procurement') ?? 'Поставки',
-                    loc,
+      body: fzpOnly
+          ? const SalaryExpenseScreen(embedInScaffold: false)
+          : Column(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    border: Border(
+                      bottom: BorderSide(
+                          color: Theme.of(context).dividerColor, width: 1),
+                    ),
                   ),
-                ],
-              ),
+                  child: Center(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildTabChip(_ExpensesTab.fzp,
+                            loc.t('salary_tab_fzp') ?? 'ФЗП', loc, selectedTab),
+                        if (tabs.contains(_ExpensesTab.productOrders)) ...[
+                          const SizedBox(width: 8),
+                          _buildTabChip(
+                            _ExpensesTab.productOrders,
+                            loc.t('expenses_tab_product_orders') ??
+                                'Заказы продуктов',
+                            loc,
+                            selectedTab,
+                          ),
+                        ],
+                        if (tabs.contains(_ExpensesTab.writeoffs)) ...[
+                          const SizedBox(width: 8),
+                          _buildTabChip(
+                            _ExpensesTab.writeoffs,
+                            loc.t('expenses_tab_writeoffs') ?? 'Списания',
+                            loc,
+                            selectedTab,
+                          ),
+                        ],
+                        if (tabs.contains(_ExpensesTab.procurementReceipts)) ...[
+                          const SizedBox(width: 8),
+                          _buildTabChip(
+                            _ExpensesTab.procurementReceipts,
+                            loc.t('expenses_tab_procurement') ?? 'Поставки',
+                            loc,
+                            selectedTab,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: selectedTab == _ExpensesTab.fzp
+                      ? const SalaryExpenseScreen(embedInScaffold: false)
+                      : selectedTab == _ExpensesTab.productOrders
+                          ? const _ProductOrdersTab()
+                          : selectedTab == _ExpensesTab.writeoffs
+                              ? const _WriteoffsTab()
+                              : const _ProcurementReceiptsTab(),
+                ),
+              ],
             ),
-          ),
-          Expanded(
-            child: _selectedTab == _ExpensesTab.fzp
-                ? const SalaryExpenseScreen(embedInScaffold: false)
-                : _selectedTab == _ExpensesTab.productOrders
-                    ? const _ProductOrdersTab()
-                    : _selectedTab == _ExpensesTab.writeoffs
-                        ? const _WriteoffsTab()
-                        : const _ProcurementReceiptsTab(),
-          ),
-        ],
-      ),
     );
   }
 
-  Widget _buildTabChip(_ExpensesTab tab, String label, LocalizationService loc) {
-    final isSelected = _selectedTab == tab;
+  Widget _buildTabChip(_ExpensesTab tab, String label, LocalizationService loc,
+      _ExpensesTab selectedTab) {
+    final isSelected = selectedTab == tab;
     return FilterChip(
       label: Text(label),
       selected: isSelected,
@@ -519,6 +560,13 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
         fileName =
             'product_orders_${dateFormat.format(exportStart)}_${dateFormat.format(exportEnd)}.xlsx';
       }
+      final est = account.establishment;
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.expenses,
+        );
+      }
       await saveFileBytes(fileName, bytes);
 
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
@@ -531,6 +579,14 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
       );
     } catch (e) {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (e.toString().contains('TRIAL_DEVICE_SAVE_CAP')) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(loc.t('trial_inventory_export_cap')),
+          ),
+        );
+        return;
+      }
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(
@@ -1170,6 +1226,13 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
       }
       final fileName =
           'procurement_receipts_${dateFormat.format(_dateStart)}_${dateFormat.format(_dateEnd)}.$ext';
+      final est = account.establishment;
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: TrialDeviceSaveKinds.expenses,
+        );
+      }
       await saveFileBytes(fileName, bytes);
 
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
@@ -1182,6 +1245,14 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
       );
     } catch (e) {
       if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (e.toString().contains('TRIAL_DEVICE_SAVE_CAP')) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(loc.t('trial_inventory_export_cap')),
+          ),
+        );
+        return;
+      }
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(
@@ -1740,6 +1811,8 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
         return loc.t('writeoff_category_breakage') ?? 'Брекераж';
       case 'guestRefusal':
         return loc.t('writeoff_category_guest_refusal') ?? 'Отказ гостя';
+      case 'generic':
+        return loc.t('writeoff_category_simple') ?? 'Списание';
       default:
         return code ?? '—';
     }

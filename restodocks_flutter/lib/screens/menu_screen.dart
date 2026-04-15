@@ -12,6 +12,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../core/subscription_entitlements.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 import '../services/inventory_download.dart';
@@ -125,7 +126,7 @@ class _MenuScreenState extends State<MenuScreen> {
         await productStore.loadNomenclatureForBranch(
             est.id, est.dataEstablishmentId);
       } else {
-        await productStore.loadNomenclature(est.dataEstablishmentId);
+      await productStore.loadNomenclature(est.dataEstablishmentId);
       }
       final emp = acc.currentEmployee;
       final allTcs = await techCardService
@@ -137,14 +138,14 @@ class _MenuScreenState extends State<MenuScreen> {
       if (widget.department == 'banquet-catering') {
         tcs = allTcs
             .where((tc) =>
-                !tc.isSemiFinished &&
+            !tc.isSemiFinished &&
                 (tc.category == 'banquet' || tc.category == 'catering'))
             .toList();
       } else if (widget.department == 'banquet-catering-bar') {
         tcs = allTcs
             .where((tc) =>
-                !tc.isSemiFinished &&
-                (tc.category == 'banquet' || tc.category == 'catering') &&
+            !tc.isSemiFinished &&
+            (tc.category == 'banquet' || tc.category == 'catering') &&
                 (tc.sections.contains('bar') || tc.sections.contains('all')))
             .toList();
       } else if (widget.department == 'hall' ||
@@ -153,16 +154,16 @@ class _MenuScreenState extends State<MenuScreen> {
       } else if (widget.department == 'bar') {
         tcs = allTcs
             .where((tc) =>
-                !tc.isSemiFinished &&
-                (_barCategories.contains(tc.category) ||
-                    tc.sections.contains('bar') ||
+            !tc.isSemiFinished &&
+            (_barCategories.contains(tc.category) ||
+                tc.sections.contains('bar') ||
                     tc.sections.contains('all')))
             .toList();
       } else {
         // Кухня/бар: показываем ВСЕ блюда отдела в меню для сотрудников подразделения (без фильтра по цехам).
         final byDept = allTcs
             .where((tc) =>
-                !tc.isSemiFinished &&
+            !tc.isSemiFinished &&
                 (!_barCategories.contains(tc.category) ||
                     tc.sections.contains('all')))
             .toList();
@@ -298,6 +299,7 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   /// Вкладка «Фудкост»: шеф/су-шеф, барменеджер, менеджер зала, ген. директор, собственник, руководство (офис).
+  /// На тарифе Lite недоступна ([_foodcostTabEligible]).
   bool _showFoodcostTab(Employee? emp) {
     if (emp == null) return false;
     if (widget.department == 'banquet-catering' ||
@@ -323,6 +325,12 @@ class _MenuScreenState extends State<MenuScreen> {
             emp.hasRole('sous_chef') ||
             mgmtFoodcost;
     }
+  }
+
+  /// Фудкост в меню — не в Lite (п. 4 спецификации Lite).
+  bool _foodcostTabEligible(Employee? emp, Establishment? est) {
+    if (SubscriptionEntitlements.from(est).isLiteTier) return false;
+    return _showFoodcostTab(emp);
   }
 
   /// Скачать карточку блюда могут только руководители подразделения.
@@ -426,6 +434,14 @@ class _MenuScreenState extends State<MenuScreen> {
     final list = _downloadableDishes;
     if (list.isEmpty) return;
     try {
+      final account = context.read<AccountManagerSupabase>();
+      final estObj = account.establishment;
+      if (estObj != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: estObj.id,
+          docKind: TrialDeviceSaveKinds.menu,
+        );
+      }
       final sym = context
               .read<AccountManagerSupabase>()
               .establishment
@@ -451,6 +467,14 @@ class _MenuScreenState extends State<MenuScreen> {
     final list = _downloadableDishes;
     if (list.isEmpty) return;
     try {
+      final account = context.read<AccountManagerSupabase>();
+      final estObj = account.establishment;
+      if (estObj != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: estObj.id,
+          docKind: TrialDeviceSaveKinds.menu,
+        );
+      }
       final sym = context
               .read<AccountManagerSupabase>()
               .establishment
@@ -483,6 +507,14 @@ class _MenuScreenState extends State<MenuScreen> {
   Future<void> _downloadDish(TechCard tc) async {
     final loc = context.read<LocalizationService>();
     try {
+      final account = context.read<AccountManagerSupabase>();
+      final estObj = account.establishment;
+      if (estObj != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: estObj.id,
+          docKind: TrialDeviceSaveKinds.menu,
+        );
+      }
       final fileName = await MenuExportService.saveHallDishPdf(
         dish: tc,
         t: loc.t,
@@ -524,20 +556,22 @@ class _MenuScreenState extends State<MenuScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(isFoodcostTab ? 'Фудкост меню' : 'Меню'),
+                Text(isFoodcostTab
+                    ? loc.t('menu_export_doc_title_foodcost')
+                    : loc.t('menu')),
                 const SizedBox(height: 10),
                 RadioListTile<String>(
                   dense: true,
                   value: 'all',
                   groupValue: exportScope,
-                  title: const Text('Все'),
+                  title: Text(loc.t('menu_export_scope_all')),
                   onChanged: (v) => setLocal(() => exportScope = v ?? 'all'),
                 ),
                 RadioListTile<String>(
                   dense: true,
                   value: 'selected',
                   groupValue: exportScope,
-                  title: const Text('Выборочно'),
+                  title: Text(loc.t('menu_export_scope_selected')),
                   onChanged: (v) =>
                       setLocal(() => exportScope = v ?? 'selected'),
                 ),
@@ -546,7 +580,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     dense: true,
                     value: 'above',
                     groupValue: exportScope,
-                    title: const Text('Выгодно (выше цели)'),
+                    title: Text(loc.t('menu_export_profitable_above_target')),
                     onChanged: (v) =>
                         setLocal(() => exportScope = v ?? 'above'),
                   ),
@@ -554,7 +588,7 @@ class _MenuScreenState extends State<MenuScreen> {
                     dense: true,
                     value: 'below',
                     groupValue: exportScope,
-                    title: const Text('Невыгодно (ниже цели)'),
+                    title: Text(loc.t('menu_export_unprofitable_below_target')),
                     onChanged: (v) =>
                         setLocal(() => exportScope = v ?? 'below'),
                   ),
@@ -579,27 +613,36 @@ class _MenuScreenState extends State<MenuScreen> {
                     ),
                   ),
                 const SizedBox(height: 6),
-                const Text('Язык сохранения'),
+                Text(loc.t('salary_export_lang')),
                 const SizedBox(height: 6),
                 DropdownButtonFormField<String>(
                   value: exportLang,
-                  items: const [
-                    DropdownMenuItem(value: 'ru', child: Text('🇷🇺 Русский')),
-                    DropdownMenuItem(value: 'en', child: Text('🇺🇸 English')),
-                    DropdownMenuItem(value: 'es', child: Text('🇪🇸 Español')),
-                    DropdownMenuItem(value: 'it', child: Text('🇮🇹 Italiano')),
-                    DropdownMenuItem(value: 'tr', child: Text('🇹🇷 Türkçe')),
-                  ],
+                  items: LocalizationService.supportedLocales
+                      .map(
+                        (l) => DropdownMenuItem<String>(
+                          value: l.languageCode,
+                          child: Text(
+                            '${LocalizationService.flagEmoji(l.languageCode)} ${loc.getLanguageName(l.languageCode)}',
+                          ),
+                        ),
+                      )
+                      .toList(),
                   onChanged: (v) =>
                       setLocal(() => exportLang = v ?? exportLang),
                 ),
                 const SizedBox(height: 10),
-                const Text('Формат файла'),
+                Text(loc.t('expenses_procurement_export_format_title')),
                 const SizedBox(height: 6),
                 SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'pdf', label: Text('PDF')),
-                    ButtonSegment(value: 'xlsx', label: Text('Excel')),
+                  segments: [
+                    ButtonSegment(
+                      value: 'pdf',
+                      label: Text(loc.t('expenses_procurement_export_pdf')),
+                    ),
+                    ButtonSegment(
+                      value: 'xlsx',
+                      label: Text(loc.t('file_format_short_excel')),
+                    ),
                   ],
                   selected: {exportFormat},
                   onSelectionChanged: (s) =>
@@ -740,8 +783,15 @@ class _MenuScreenState extends State<MenuScreen> {
     final estName = (est?.name.trim().isNotEmpty ?? false) ? est!.name : '—';
     final dateStr = DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now());
     try {
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: est.id,
+          docKind: isFoodcost ? 'foodcost' : 'menu',
+        );
+      }
       if (exportFormat == 'pdf') {
         final bytes = await _buildSimpleMenuPdfBytes(
+          loc: loc,
           dishes: dishes,
           isFoodcost: isFoodcost,
           exportLang: exportLang,
@@ -763,32 +813,31 @@ class _MenuScreenState extends State<MenuScreen> {
       final excel = Excel.createExcel();
       final sheet = excel['Export'];
       sheet.appendRow(_textRow([
-        'Дата',
+        loc.t('menu_excel_cell_date'),
         dateStr,
       ]));
       sheet.appendRow(_textRow([
-        'Заведение',
+        loc.t('menu_excel_cell_establishment'),
         estName,
       ]));
       sheet.appendRow(_textRow([
-        'Шеф',
+        loc.t('menu_excel_cell_chef'),
         chefName,
       ]));
       sheet.appendRow(_textRow(['']));
       sheet.appendRow(_textRow([
-        '№',
-        'Блюдо',
-        if (isFoodcost) 'Себестоимость',
-        isFoodcost
-            ? (foodcostConfig.mode == FoodcostPricingMode.markupOnCost
-                ? 'Наценка'
-                : '% себестоимости')
-            : '',
+        loc.t('foodcost_col_num'),
+        loc.t('foodcost_col_name'),
+        if (isFoodcost) loc.t('foodcost_col_cost'),
         if (isFoodcost)
-          (foodcostConfig.mode == FoodcostPricingMode.markupOnCost
-              ? 'Наценка'
-              : 'С наценкой'),
-        if (isFoodcost) 'В меню',
+          foodcostConfig.mode == FoodcostPricingMode.markupOnCost
+              ? loc.t('foodcost_col_markup_actual')
+              : loc.t('foodcost_col_cost_share_actual'),
+        if (isFoodcost)
+          foodcostConfig.mode == FoodcostPricingMode.markupOnCost
+              ? loc.t('foodcost_mode_markup')
+              : loc.t('foodcost_price_optimal'),
+        if (isFoodcost) loc.t('foodcost_price_actual'),
       ]));
       var idx = 1;
       for (final tc in dishes) {
@@ -884,6 +933,7 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 
   Future<Uint8List> _buildSimpleMenuPdfBytes({
+    required LocalizationService loc,
     required List<TechCard> dishes,
     required bool isFoodcost,
     required String exportLang,
@@ -907,18 +957,18 @@ class _MenuScreenState extends State<MenuScreen> {
     );
 
     final headers = <String>[
-      '№',
-      'Блюдо',
-      if (isFoodcost) 'Себестоимость',
+      loc.t('foodcost_col_num'),
+      loc.t('foodcost_col_name'),
+      if (isFoodcost) loc.t('foodcost_col_cost'),
       if (isFoodcost)
-        (cfg.mode == FoodcostPricingMode.markupOnCost
-            ? 'Наценка'
-            : '% себестоимости'),
+        cfg.mode == FoodcostPricingMode.markupOnCost
+            ? loc.t('foodcost_col_markup_actual')
+            : loc.t('foodcost_col_cost_share_actual'),
       if (isFoodcost)
-        (cfg.mode == FoodcostPricingMode.markupOnCost
-            ? 'Наценка'
-            : 'С наценкой'),
-      if (isFoodcost) 'В меню',
+        cfg.mode == FoodcostPricingMode.markupOnCost
+            ? loc.t('foodcost_mode_markup')
+            : loc.t('foodcost_price_optimal'),
+      if (isFoodcost) loc.t('foodcost_price_actual'),
     ];
 
     final rows = <List<String>>[];
@@ -963,13 +1013,17 @@ class _MenuScreenState extends State<MenuScreen> {
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(24),
         build: (_) => [
-          pw.Text(isFoodcost ? 'Фудкост меню' : 'Меню',
+          pw.Text(
+              isFoodcost
+                  ? loc.t('menu_export_doc_title_foodcost')
+                  : loc.t('menu'),
               style:
                   pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 6),
-          pw.Text('Дата: $dateStr'),
-          pw.Text('Заведение: $establishmentName'),
-          pw.Text('Шеф: $chefName'),
+          pw.Text('${loc.t('menu_pdf_label_date')} $dateStr'),
+          pw.Text(
+              '${loc.t('menu_pdf_label_establishment')} $establishmentName'),
+          pw.Text('${loc.t('menu_pdf_label_chef')} $chefName'),
           pw.SizedBox(height: 12),
           pw.TableHelper.fromTextArray(
             headers: headers,
@@ -1182,7 +1236,7 @@ class _MenuScreenState extends State<MenuScreen> {
     final sym = estForCur?.currencySymbol ??
         empForCur?.currencySymbol ??
         Establishment.currencySymbolFor(currencyCode);
-    final showFoodcost = _showFoodcostTab(emp);
+    final showFoodcost = _foodcostTabEligible(emp, estForCur);
     final menuSeg = showFoodcost ? _menuSegment : 0;
     final isPhoneLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape &&
@@ -1213,13 +1267,16 @@ class _MenuScreenState extends State<MenuScreen> {
     if (showAppBarBottom) {
       // В альбоме на телефоне — минимальные отступы под сегменты (без «полосы» под шапкой).
       var h = isPhoneLandscape ? 2.0 : 8.0;
-      if (showTopFoodcostSwitch) h += isPhoneLandscape ? 42.0 : 52.0;
+      if (showTopFoodcostSwitch) {
+        h += isPhoneLandscape ? 42.0 : 52.0;
+        if (!isPhoneLandscape) h += 2; // запас под увеличенный отступ от красной шапки
+      }
       if (hallChips) h += isPhoneLandscape ? 38.0 : 48.0;
       bottomHeight = h;
     }
     final appBarBottomOuterPad = isPhoneLandscape
-        ? const EdgeInsets.fromLTRB(12, 0, 12, 4)
-        : const EdgeInsets.fromLTRB(16, 6, 16, 8);
+        ? const EdgeInsets.fromLTRB(12, 2, 12, 4)
+        : const EdgeInsets.fromLTRB(16, 8, 16, 8);
     final appBarBottomSegPad = isPhoneLandscape
         ? const EdgeInsets.only(top: 2, bottom: 2)
         : const EdgeInsets.only(top: 8, bottom: 4);
@@ -1236,18 +1293,18 @@ class _MenuScreenState extends State<MenuScreen> {
               : mq.viewPadding,
         ),
         child: Scaffold(
-          appBar: AppBar(
+      appBar: AppBar(
             toolbarHeight: isPhoneLandscape ? 44 : kToolbarHeight,
             elevation: isPhoneLandscape ? 0 : null,
             scrolledUnderElevation: isPhoneLandscape ? 0 : null,
             shadowColor: isPhoneLandscape ? Colors.transparent : null,
             surfaceTintColor: isPhoneLandscape ? Colors.transparent : null,
-            title: ScrollToTopAppBarTitle(
-              child: Text(loc.t('menu')),
-            ),
-            leading: appBarBackButton(context),
+        title: ScrollToTopAppBarTitle(
+          child: Text(loc.t('menu')),
+        ),
+        leading: appBarBackButton(context),
             bottom: bottomHeight != null
-                ? PreferredSize(
+            ? PreferredSize(
                     preferredSize: Size.fromHeight(bottomHeight),
                     child: Material(
                       color: Theme.of(context).colorScheme.surface,
@@ -1300,48 +1357,48 @@ class _MenuScreenState extends State<MenuScreen> {
                               ),
                             if (hallChips)
                               Row(
-                                children: [
-                                  Expanded(
-                                    child: _HallTabChip(
-                                      label: loc.t('dept_bar'),
-                                      selected: _hallTab == 'bar',
+                    children: [
+                      Expanded(
+                        child: _HallTabChip(
+                          label: loc.t('dept_bar'),
+                          selected: _hallTab == 'bar',
                                       onTap: () =>
                                           setState(() => _hallTab = 'bar'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: _HallTabChip(
-                                      label: loc.t('dept_kitchen'),
-                                      selected: _hallTab == 'kitchen',
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _HallTabChip(
+                          label: loc.t('dept_kitchen'),
+                          selected: _hallTab == 'kitchen',
                                       onTap: () =>
                                           setState(() => _hallTab = 'kitchen'),
-                                    ),
-                                  ),
-                                ],
+                        ),
+                      ),
+                    ],
                               ),
                           ],
                         ),
-                      ),
-                    ),
-                  )
-                : null,
-            actions: [
+                  ),
+                ),
+              )
+            : null,
+        actions: [
               if (_displayDishes.isNotEmpty && !_loading)
                 IconButton(
                   icon: const Icon(Icons.save_alt),
-                  tooltip: 'Скачать',
+                  tooltip: loc.t('download'),
                   onPressed: _openDeviceExportDialog,
                 ),
               if (menuSeg == 0 && _downloadableDishes.isNotEmpty && !_loading)
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.download),
-                  tooltip: loc.t('download'),
-                  onSelected: (v) async {
-                    if (v == 'menu') await _downloadMenu();
-                    if (v == 'all') await _downloadAllDishes();
-                  },
-                  itemBuilder: (_) => [
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.download),
+              tooltip: loc.t('download'),
+              onSelected: (v) async {
+                if (v == 'menu') await _downloadMenu();
+                if (v == 'all') await _downloadAllDishes();
+              },
+              itemBuilder: (_) => [
                     PopupMenuItem(
                         value: 'menu', child: Text(loc.t('download_menu'))),
                     PopupMenuItem(
@@ -1389,7 +1446,7 @@ class _MenuScreenState extends State<MenuScreen> {
     final account = context.read<AccountManagerSupabase>();
     final emp = account.currentEmployee;
     final est = account.establishment;
-    final showFoodcost = _showFoodcostTab(emp);
+    final showFoodcost = _foodcostTabEligible(emp, est);
     final menuSeg = showFoodcost ? _menuSegment : 0;
     if (showFoodcost && menuSeg == 1 && est != null) {
       return MenuFoodcostPanel(
@@ -1880,13 +1937,13 @@ class _MenuDishTable extends StatelessWidget {
     final effectiveColCount = showCost ? colCount : colCount - 1;
 
     List<Widget> headerCells() => [
-          _cell(context, loc.t('ttk_product'), bold: true),
-          _cell(context, loc.t('ttk_gross'), bold: true),
-          _cell(context, loc.t('ttk_net'), bold: true),
-          _cell(context, loc.t('ttk_cooking_method'), bold: true),
-          _cell(context, loc.t('ttk_output'), bold: true),
-          if (showCost) _cell(context, loc.t('ttk_cost'), bold: true),
-        ];
+      _cell(context, loc.t('ttk_product'), bold: true),
+      _cell(context, loc.t('ttk_gross'), bold: true),
+      _cell(context, loc.t('ttk_net'), bold: true),
+      _cell(context, loc.t('ttk_cooking_method'), bold: true),
+      _cell(context, loc.t('ttk_output'), bold: true),
+      if (showCost) _cell(context, loc.t('ttk_cost'), bold: true),
+    ];
 
     List<Widget> ingCells(TTIngredient ing) => [
           _cell(context, ing.sourceTechCardName ?? ing.productName,
@@ -1895,7 +1952,7 @@ class _MenuDishTable extends StatelessWidget {
               ing.grossWeight > 0 ? ing.grossWeight.toStringAsFixed(0) : ''),
           _cell(context,
               ing.netWeight > 0 ? ing.netWeight.toStringAsFixed(0) : ''),
-          _cell(context, ing.cookingProcessName ?? loc.t('dash')),
+      _cell(context, ing.cookingProcessName ?? loc.t('dash')),
           _cell(context,
               ing.outputWeight > 0 ? ing.outputWeight.toStringAsFixed(0) : ''),
           if (showCost)
@@ -1906,13 +1963,13 @@ class _MenuDishTable extends StatelessWidget {
                       ing.cost, currencyCode, currencySym)
                   : '',
             ),
-        ];
+    ];
 
     List<Widget> totalCells() => [
-          _cell(context, loc.t('ttk_total'), bold: true),
-          _cell(context, ''),
-          _cell(context, ''),
-          _cell(context, ''),
+      _cell(context, loc.t('ttk_total'), bold: true),
+      _cell(context, ''),
+      _cell(context, ''),
+      _cell(context, ''),
           _cell(context, '${totalOutput.toStringAsFixed(0)} ${loc.t('gram')}',
               bold: true),
           if (showCost)
@@ -1922,7 +1979,7 @@ class _MenuDishTable extends StatelessWidget {
                   totalCost, currencyCode, currencySym),
               bold: true,
             ),
-        ];
+    ];
 
     final tableScroll = SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -2174,16 +2231,16 @@ class _MenuPhotoViewerState extends State<_MenuPhotoViewer> {
                   ...List.generate(
                       total,
                       (i) => AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            width: _current == i ? 12 : 8,
-                            height: _current == i ? 12 : 8,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    width: _current == i ? 12 : 8,
+                    height: _current == i ? 12 : 8,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
                               color:
                                   _current == i ? Colors.white : Colors.white38,
-                            ),
-                          )),
+                    ),
+                  )),
                   if (_current < total - 1)
                     IconButton(
                       icon: const Icon(Icons.chevron_right,

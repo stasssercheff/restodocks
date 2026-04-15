@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../core/subscription_entitlements.dart';
 import '../models/models.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -177,7 +178,13 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   }
 
   Future<void> _sendPhoto() async {
-    final emp = context.read<AccountManagerSupabase>().currentEmployee;
+    final acc = context.read<AccountManagerSupabase>();
+    if (SubscriptionEntitlements.from(acc.establishment).isLiteTier) {
+      final loc = context.read<LocalizationService>();
+      AppToastService.show(loc.t('lite_chat_text_only_hint'));
+      return;
+    }
+    final emp = acc.currentEmployee;
     if (emp == null || _sending) return;
     Uint8List? bytes;
     if (kIsWeb) {
@@ -273,7 +280,10 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
-    final myId = context.read<AccountManagerSupabase>().currentEmployee?.id;
+    final acc = context.watch<AccountManagerSupabase>();
+    final liteChatTextOnly =
+        SubscriptionEntitlements.from(acc.establishment).isLiteTier;
+    final myId = acc.currentEmployee?.id;
 
     return Scaffold(
       appBar: AppBar(
@@ -331,6 +341,7 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                                 isMe: isMe,
                                 senderName: isMe ? null : senderName,
                                 theme: theme,
+                                textOnlyViewer: liteChatTextOnly,
                               ),
                             );
                           },
@@ -346,11 +357,12 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
               ),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.add_photo_alternate_outlined),
-                    onPressed: _sending ? null : _sendPhoto,
-                    tooltip: loc.t('photo_from_gallery') ?? 'Фото',
-                  ),
+                  if (!liteChatTextOnly)
+                    IconButton(
+                      icon: const Icon(Icons.add_photo_alternate_outlined),
+                      onPressed: _sending ? null : _sendPhoto,
+                      tooltip: loc.t('photo_from_gallery') ?? 'Фото',
+                    ),
                   Expanded(
                     child: TextField(
                       controller: _controller,
@@ -463,12 +475,16 @@ class _GroupMessageBubble extends StatefulWidget {
     required this.isMe,
     required this.senderName,
     required this.theme,
+    this.textOnlyViewer = false,
   });
 
   final ChatRoomMessage message;
   final bool isMe;
   final String? senderName;
   final ThemeData theme;
+
+  /// Lite: не показывать фото (только текст).
+  final bool textOnlyViewer;
 
   @override
   State<_GroupMessageBubble> createState() => _GroupMessageBubbleState();
@@ -524,7 +540,9 @@ class _GroupMessageBubbleState extends State<_GroupMessageBubble> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = context.watch<LocalizationService>();
     final content = _translatedContent ?? widget.message.content;
+    final lite = widget.textOnlyViewer;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -557,7 +575,7 @@ class _GroupMessageBubbleState extends State<_GroupMessageBubble> {
                 ),
               ),
             ),
-          if (widget.message.hasImage)
+          if (!lite && widget.message.hasImage)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
               child: GestureDetector(
@@ -572,6 +590,20 @@ class _GroupMessageBubbleState extends State<_GroupMessageBubble> {
                     loadingBuilder: (_, child, progress) =>
                         progress == null ? child : const SizedBox(width: 200, height: 200, child: Center(child: CircularProgressIndicator())),
                     errorBuilder: (_, __, ___) => const Icon(Icons.broken_image, size: 48),
+                  ),
+                ),
+              ),
+            ),
+          if (lite && widget.message.hasImage && content.trim().isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  loc.t('lite_chat_rich_not_shown'),
+                  style: widget.theme.textTheme.bodySmall?.copyWith(
+                    color: widget.theme.colorScheme.onSurfaceVariant,
+                    fontStyle: FontStyle.italic,
                   ),
                 ),
               ),

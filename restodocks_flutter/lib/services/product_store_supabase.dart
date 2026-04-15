@@ -68,8 +68,10 @@ class ProductStoreSupabase {
 
   /// На iOS/Android держим данные в памяти/SharedPreferences и не дёргаем сеть на каждый экран,
   /// пока кэш не устарел (на web — чаще обновляем, там localStorage и ожидание сети дешевле для консистентности).
-  static const _mobileProductsCacheTtl = Duration(minutes: 20);
-  static const _mobileNomenclatureCacheTtl = Duration(minutes: 12);
+  static const _webProductsCacheTtl = Duration(minutes: 20);
+  static const _mobileProductsCacheTtl = Duration(hours: 24);
+  static const _webNomenclatureCacheTtl = Duration(minutes: 12);
+  static const _mobileNomenclatureCacheTtl = Duration(hours: 6);
 
   // Геттеры
   List<Product> get allProducts => _allProducts;
@@ -99,8 +101,10 @@ class ProductStoreSupabase {
           ..sort();
         _hasFullProductCatalog = true;
         _bumpCatalogRevision();
+        final ttl =
+            kIsWeb ? _webProductsCacheTtl : _mobileProductsCacheTtl;
         final bgSync = kIsWeb ||
-            !await _offlineCache.isKeyFresh(cacheKey, _mobileProductsCacheTtl);
+            !await _offlineCache.isKeyFresh(cacheKey, ttl);
         if (bgSync) {
           unawaited(_loadProductsFromServer());
         }
@@ -187,14 +191,15 @@ class ProductStoreSupabase {
 
   Future<void> _scheduleNutritionBackfillAfterCatalogLoad() async {
     await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (kIsWeb) return;
     if (!AccountManagerSupabase().isLoggedInSync) return;
     try {
       final client = Supabase.instance.client;
       if (client.auth.currentSession == null) return;
       await client.auth.refreshSession();
     } catch (_) {}
-    NutritionBackfillService().startBackgroundBackfill(this);
+    final backfill = NutritionBackfillService();
+    backfill.startBackgroundBackfill(this);
+    backfill.startCatchUpBackfill(this);
   }
 
   /// Получить продукты с фильтрами
@@ -782,9 +787,9 @@ class ProductStoreSupabase {
       }
       // Web: ждём сеть — иначе при быстром переходе виден рассинхрон.
       // Mobile: при свежем локальном кэше не блокируем UI; устаревший — фоновое обновление.
-      if (!kIsWeb &&
-          await _offlineCache.isKeyFresh(
-              cacheKey, _mobileNomenclatureCacheTtl)) {
+      final nomTtl =
+          kIsWeb ? _webNomenclatureCacheTtl : _mobileNomenclatureCacheTtl;
+      if (!kIsWeb && await _offlineCache.isKeyFresh(cacheKey, nomTtl)) {
         return;
       }
       if (!kIsWeb) {
@@ -862,6 +867,25 @@ class ProductStoreSupabase {
         await _processNomenclatureResponse(list, establishmentId);
       }
     } catch (e) {
+      if (_isLikelyGatewayOrNetworkError(e)) {
+        devLog(
+            '⚠️ ProductStore: nomenclature network/gateway error, restore offline cache: $e');
+        try {
+          final cacheKey = await _offlineCache.scopedKey(
+            dataset: _nomenclatureCacheDataset,
+            establishmentId: establishmentId,
+            suffix: 'main',
+          );
+          final cached = await _offlineCache.readJsonMap(cacheKey);
+          if (cached != null) {
+            _applyNomenclatureCache(establishmentId, cached);
+            await _ensureNomenclatureProductsInStore();
+            _bumpCatalogRevision();
+            return;
+          }
+        } catch (_) {}
+        return;
+      }
       devLog(
           '⚠️ ProductStore: Primary loading failed, trying fallback method: $e');
       _branchOnlyProductIds.clear();
@@ -869,11 +893,6 @@ class ProductStoreSupabase {
       _nomenclatureDeptByProduct.clear();
       _priceCache
           .removeWhere((key, _) => key.startsWith('${establishmentId}_'));
-      if (_isLikelyGatewayOrNetworkError(e)) {
-        devLog(
-            '⚠️ ProductStore: skip RPC/alt fallbacks while upstream is gateway/network (avoids request storm)');
-        rethrow;
-      }
       try {
         await _loadNomenclatureFallback(establishmentId);
       } catch (fallbackError) {
@@ -914,9 +933,9 @@ class ProductStoreSupabase {
         await _reloadNomenclatureForBranchFromServer(branchId, mainId);
         return;
       }
-      if (!kIsWeb &&
-          await _offlineCache.isKeyFresh(
-              cacheKey, _mobileNomenclatureCacheTtl)) {
+      final nomTtl =
+          kIsWeb ? _webNomenclatureCacheTtl : _mobileNomenclatureCacheTtl;
+      if (!kIsWeb && await _offlineCache.isKeyFresh(cacheKey, nomTtl)) {
         return;
       }
       if (!kIsWeb) {

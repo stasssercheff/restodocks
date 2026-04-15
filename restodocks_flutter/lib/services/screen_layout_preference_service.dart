@@ -5,6 +5,7 @@ import 'localization_service.dart';
 const _keyShowBanquetCatering = 'restodocks_show_banquet_catering';
 const _keyShowBarSection = 'restodocks_show_bar_section';
 const _keyShowHallSection = 'restodocks_show_hall_section';
+const _keyShowPosSection = 'restodocks_show_pos_section';
 const _keyBirthdayNotifyDays = 'restodocks_birthday_notify_days';
 const _keyBirthdayNotifyTime = 'restodocks_birthday_notify_time';
 
@@ -34,12 +35,14 @@ class ScreenLayoutPreferenceService extends ChangeNotifier {
   bool _showBanquetCatering = true;
   bool _showBarSection = true;
   bool _showHallSection = true;
+  bool _showPosSection = true;
   int _birthdayNotifyDays = 0;
   String _birthdayNotifyTime = '09:00';
 
   bool get showBanquetCatering => _showBanquetCatering;
   bool get showBarSection => _showBarSection;
   bool get showHallSection => _showHallSection;
+  bool get showPosSection => _showPosSection;
 
   /// Транслит имен сотрудников теперь автоматический:
   /// для не-русского интерфейса включен всегда, для русского — выключен.
@@ -58,6 +61,7 @@ class ScreenLayoutPreferenceService extends ChangeNotifier {
       _showBanquetCatering = prefs.getBool(_keyShowBanquetCatering) ?? true;
       _showBarSection = prefs.getBool(_keyShowBarSection) ?? true;
       _showHallSection = prefs.getBool(_keyShowHallSection) ?? true;
+      _showPosSection = prefs.getBool(_keyShowPosSection) ?? true;
       _birthdayNotifyDays = prefs.getInt(_keyBirthdayNotifyDays) ?? 0;
       _birthdayNotifyTime = prefs.getString(_keyBirthdayNotifyTime) ?? '09:00';
       if (!birthdayNotifyTimeOptions.contains(_birthdayNotifyTime))
@@ -92,6 +96,16 @@ class ScreenLayoutPreferenceService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_keyShowHallSection, value);
+    } catch (_) {}
+  }
+
+  Future<void> setShowPosSection(bool value) async {
+    if (_showPosSection == value) return;
+    _showPosSection = value;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyShowPosSection, value);
     } catch (_) {}
   }
 

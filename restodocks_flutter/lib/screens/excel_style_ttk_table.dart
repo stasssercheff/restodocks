@@ -28,6 +28,8 @@ class ExcelStyleTtkTable extends StatefulWidget {
   final void Function(int) onRemove;
   final void Function(int)? onSuggestWaste;
   final void Function(int)? onSuggestCookingLoss;
+  /// После привязки продукта к строке — подтянуть глобальные % отхода / ужарки из БД.
+  final void Function(int)? onAfterProductLinked;
   final bool isCook; // true для поваров - скрываем стоимость
   /// Если true, блок технологии не отображается (рендерится отдельно в родителе)
   final bool hideTechnologyBlock;
@@ -60,6 +62,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
     required this.onRemove,
     this.onSuggestWaste,
     this.onSuggestCookingLoss,
+    this.onAfterProductLinked,
     this.isCook = false,
     this.hideTechnologyBlock = false,
     this.weightPerPortion = 100,
@@ -77,29 +80,36 @@ class ExcelStyleTtkTable extends StatefulWidget {
           alignment: Alignment.center,
           child: Text(
             loc.t(key),
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              height: 1.1,
+            ),
             textAlign: TextAlign.center,
+            softWrap: true,
+            maxLines: 2,
+            overflow: TextOverflow.clip,
           ),
         );
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 1145, maxWidth: 1145),
+      constraints: const BoxConstraints(minWidth: 1295, maxWidth: 1295),
       child: Table(
         border: TableBorder.all(color: Colors.black, width: 1),
         defaultVerticalAlignment: TableCellVerticalAlignment.middle,
         columnWidths: const {
           0: FixedColumnWidth(50),
           1: FixedColumnWidth(120),
-          2: FixedColumnWidth(160),
-          3: FixedColumnWidth(70),
-          4: FixedColumnWidth(80),
-          5: FixedColumnWidth(70),
-          6: FixedColumnWidth(80),
-          7: FixedColumnWidth(80),
-          8: FixedColumnWidth(70),
-          9: FixedColumnWidth(70),
-          10: FixedColumnWidth(75),
-          11: FixedColumnWidth(70),
-          12: FixedColumnWidth(70),
+          2: FixedColumnWidth(175),
+          3: FixedColumnWidth(85),
+          4: FixedColumnWidth(95),
+          5: FixedColumnWidth(75),
+          6: FixedColumnWidth(115),
+          7: FixedColumnWidth(100),
+          8: FixedColumnWidth(75),
+          9: FixedColumnWidth(75),
+          10: FixedColumnWidth(90),
+          11: FixedColumnWidth(95),
+          12: FixedColumnWidth(105),
           13: FixedColumnWidth(40),
         },
         children: [
@@ -109,16 +119,16 @@ class ExcelStyleTtkTable extends StatefulWidget {
               h('ttk_type'),
               h('ttk_name'),
               h('ttk_product'),
-              h('ttk_gross_gr'),
+              hWithText(loc.t('ttk_gross_gr').replaceFirst(' ', '\n')),
               h('ttk_waste_pct'),
               h('ttk_net_gr'),
-              h('ttk_cooking_method'),
+              hWithText(loc.t('ttk_cooking_method').replaceFirst(' ', '\n')),
               h('ttk_cooking_loss_pct'),
               h('ttk_output_gr'),
               h('ttk_weight_prc'),
               h('ttk_portions_pcs'),
               h('ttk_price'),
-              h('ttk_cost'),
+              hWithText(loc.t('ttk_cost').replaceFirst(' ', '\n')),
               h(''),
             ],
           ),
@@ -126,6 +136,23 @@ class ExcelStyleTtkTable extends StatefulWidget {
       ),
     );
   }
+
+  static Widget hWithText(String text) => Container(
+        height: 44,
+        alignment: Alignment.center,
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            height: 1.1,
+          ),
+          textAlign: TextAlign.center,
+          softWrap: true,
+          maxLines: 2,
+          overflow: TextOverflow.clip,
+        ),
+      );
 
   @override
   State<ExcelStyleTtkTable> createState() => _ExcelStyleTtkTableState();
@@ -300,7 +327,7 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       // Отложенный билд: избегаем замирания при большом числе ингредиентов.
       if (!_tableBuilt) {
         return ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 1145, minHeight: 200),
+          constraints: const BoxConstraints(minWidth: 1295, minHeight: 200),
           child: Center(
             child: Padding(
               padding: const EdgeInsets.all(24),
@@ -405,8 +432,8 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
 
     final Widget tableCore = ConstrainedBox(
             constraints: const BoxConstraints(
-              minWidth: 1145,
-              maxWidth: 1145,
+              minWidth: 1295,
+              maxWidth: 1295,
             ), // фиксируем ширину, чтобы контейнер не раздувался под доступную ширину
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -421,17 +448,17 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             columnWidths: const {
               0: FixedColumnWidth(50),   // Тип ТТК
               1: FixedColumnWidth(120),  // Название
-              2: FixedColumnWidth(160),  // Продукт
-              3: FixedColumnWidth(70),   // Брутто г. (как столбец Цена)
-              4: FixedColumnWidth(80),   // % отхода
-              5: FixedColumnWidth(70),   // Нетто г. (как столбец Цена)
-              6: FixedColumnWidth(80),   // Способ
-              7: FixedColumnWidth(80),   // % ужарки
-              8: FixedColumnWidth(70),   // Выход г. (как столбец Цена)
-              9: FixedColumnWidth(70),   // вес прц
-              10: FixedColumnWidth(75),  // порций(шт)
-              11: FixedColumnWidth(70), // Стоимость
-              12: FixedColumnWidth(70), // Цена за кг
+              2: FixedColumnWidth(175),  // Продукт
+              3: FixedColumnWidth(85),   // Брутто г./шт
+              4: FixedColumnWidth(95),   // % отхода
+              5: FixedColumnWidth(75),   // Нетто г.
+              6: FixedColumnWidth(115),  // Способ приготовления
+              7: FixedColumnWidth(100),  // % ужарки
+              8: FixedColumnWidth(75),   // Выход г.
+              9: FixedColumnWidth(75),   // вес прц
+              10: FixedColumnWidth(90),  // порций(шт)
+              11: FixedColumnWidth(95),  // Стоимость
+              12: FixedColumnWidth(105), // Цена за кг
               13: FixedColumnWidth(40), // Удаление
             },
             children: [
@@ -442,16 +469,19 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   _buildHeaderCell(widget.loc.t('ttk_type')),
                   _buildHeaderCell(widget.loc.t('ttk_name')),
                   _buildHeaderCell(widget.loc.t('ttk_product')),
-                  _buildHeaderCell(widget.loc.t('ttk_gross_gr')),
+                  _buildHeaderCell(
+                      widget.loc.t('ttk_gross_gr').replaceFirst(' ', '\n')),
                   _buildHeaderCell(widget.loc.t('ttk_waste_pct')),
                   _buildHeaderCell(widget.loc.t('ttk_net_gr')),
-                  _buildHeaderCell(widget.loc.t('ttk_cooking_method')),
+                  _buildHeaderCell(
+                      widget.loc.t('ttk_cooking_method').replaceFirst(' ', '\n')),
                   _buildHeaderCell(widget.loc.t('ttk_cooking_loss_pct')),
                   _buildHeaderCell(widget.loc.t('ttk_output_gr')),
                   _buildHeaderCell(widget.loc.t('ttk_weight_prc')),
                   _buildHeaderCell(widget.loc.t('ttk_portions_pcs')),
                   _buildHeaderCell(widget.loc.t('ttk_price')),
-                  _buildHeaderCell(widget.loc.t('ttk_cost')),
+                  _buildHeaderCell(
+                      widget.loc.t('ttk_cost').replaceFirst(' ', '\n')),
                   _buildHeaderCell(''), // Столбец удаления
                 ],
               ),
@@ -796,8 +826,15 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
       child: Center(
         child: Text(
           text,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            height: 1.1,
+          ),
           textAlign: TextAlign.center,
+          softWrap: true,
+          maxLines: 2,
+          overflow: TextOverflow.clip,
         ),
       ),
     );
@@ -1079,6 +1116,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             }
             if (updated != null) {
               _updateIngredient(idx, updated);
+              final pid = updated.productId?.trim();
+              if (pid != null &&
+                  pid.isNotEmpty &&
+                  (updated.sourceTechCardId == null ||
+                      updated.sourceTechCardId!.trim().isEmpty)) {
+                widget.onAfterProductLinked?.call(idx);
+              }
             }
           } catch (e, st) {
             devLog('TTK onProductSelected error: $e\n$st');
@@ -1191,8 +1235,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   final process = CookingProcess.defaultProcesses.firstWhere((p) => p.id == processId);
                   _updateIngredient(rowIndex, ingredient.copyWith(
                     cookingProcessId: processId,
-                    cookingProcessName: process.name,
+                    cookingProcessName: process.getLocalizedName(widget.loc.currentLanguageCode),
                   ));
+                  widget.onSuggestCookingLoss?.call(rowIndex);
                 }
               },
               underline: const SizedBox(),

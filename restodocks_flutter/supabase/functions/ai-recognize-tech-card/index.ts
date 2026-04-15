@@ -26,7 +26,7 @@ Deno.serve(async (req: Request) => {
     const imageBase64 = body.imageBase64;
     const rows = body.rows;
 
-    const hasTextProvider = Deno.env.get("GROQ_API_KEY")?.trim() || Deno.env.get("GEMINI_API_KEY")?.trim() || Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() || Deno.env.get("OPENAI_API_KEY")?.trim();
+    const hasTextProvider = Deno.env.get("DEEPSEEK_API_KEY")?.trim() || Deno.env.get("GROQ_API_KEY")?.trim() || Deno.env.get("GEMINI_API_KEY")?.trim() || Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() || Deno.env.get("OPENAI_API_KEY")?.trim();
 
     const normalizeJson = (content: string): string => {
       let c = content.trim();
@@ -39,7 +39,7 @@ Deno.serve(async (req: Request) => {
 
     if (imageBase64 && typeof imageBase64 === "string") {
       if (!hasTextProvider) {
-        return new Response(JSON.stringify({ error: "AI_PROVIDER_MISSING", message: "Set GROQ_API_KEY or OPENAI_API_KEY for photo OCR." }), {
+        return new Response(JSON.stringify({ error: "AI_PROVIDER_MISSING", message: "Set DEEPSEEK_API_KEY, GROQ_API_KEY or OPENAI_API_KEY for photo OCR." }), {
           status: 500,
           headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
         });
@@ -108,7 +108,7 @@ Rules:
 
     if (rows && Array.isArray(rows)) {
       if (!hasTextProvider) {
-        return new Response(JSON.stringify({ error: "GROQ_API_KEY, GEMINI_API_KEY, GIGACHAT_AUTH_KEY or OPENAI_API_KEY required" }), {
+        return new Response(JSON.stringify({ error: "DEEPSEEK_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, GIGACHAT_AUTH_KEY or OPENAI_API_KEY required" }), {
           status: 500,
           headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
         });
@@ -125,7 +125,7 @@ No markdown.`;
           { role: "user", content: `Table:\n${JSON.stringify(rows)}` },
         ],
         maxTokens: 2048,
-        context: "ttk",
+        context: "ttk_parse",
       });
 
       if (!content?.trim()) {

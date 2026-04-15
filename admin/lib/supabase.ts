@@ -28,7 +28,18 @@ export type PromoCode = {
   created_at: string
   note: string | null
   starts_at: string | null
+  /** Классика: срок действия по календарю. Новый тип: при activation_duration_days — окно «ввести код до». */
   expires_at: string | null
+  /** Если задано — второй тип промокода (дни Pro с применения). Если null — классическая логика как раньше. */
+  activation_duration_days?: number | null
+  /** Тариф заведения при погашении: в админке создаём только pro | ultra; в БД могут быть legacy-значения. */
+  grants_subscription_type?: string | null
+  /** Пакеты +5 сотрудников на заведение при погашении */
+  grants_employee_slot_packs?: number | null
+  /** Пакеты +1 филиал на владельца при погашении */
+  grants_branch_slot_packs?: number | null
+  /** Только аддоны, без смены тарифа заведения */
+  grants_additive_only?: boolean | null
   max_employees: number | null
   establishments?: { name: string } | null
 }

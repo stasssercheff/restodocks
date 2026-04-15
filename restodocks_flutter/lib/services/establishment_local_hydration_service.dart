@@ -217,7 +217,7 @@ class EstablishmentLocalHydrationService {
   Future<void> _hydrateTechCards(String dataEstablishmentId) async {
     try {
       await TechCardServiceSupabase()
-          .refreshTechCardsFromServer(dataEstablishmentId);
+          .refreshTechCardsFromServer(dataEstablishmentId, force: true);
     } catch (e) {
       devLog('EstablishmentLocalHydration: tech cards $e');
     }
@@ -331,8 +331,9 @@ class EstablishmentLocalHydrationService {
         dataset: _productsCacheDataset,
         establishmentId: 'global',
       );
-      final productTtl =
-          kIsWeb ? const Duration(minutes: 25) : const Duration(minutes: 120);
+      final productTtl = kIsWeb
+          ? const Duration(minutes: 25)
+          : const Duration(hours: 24);
       if (!await _offlineCache.isKeyFresh(pk, productTtl)) {
         await ps.loadProducts(force: true);
       }
@@ -343,33 +344,58 @@ class EstablishmentLocalHydrationService {
         suffix: 'main',
       );
       final nomTtl =
-          kIsWeb ? const Duration(minutes: 15) : const Duration(minutes: 60);
+          kIsWeb ? const Duration(minutes: 15) : const Duration(hours: 6);
       if (!await _offlineCache.isKeyFresh(nk, nomTtl)) {
         await ps.loadNomenclatureForce(dataId);
       }
 
-      await Future.wait([
-        _hydrateEmployees(estId),
-        DocumentationServiceSupabase().prefetchDocumentsCacheForMobile(estId),
-        loadSchedule(estId),
-        _prefetchOrderListsPrefs(estId),
-        _hydrateChecklistsSnapshot(estId),
-        _hydrateTechCards(dataId),
-        _hydrateHaccp(estId),
-        _hydratePosTables(estId),
-        _hydrateMenuStopGo(estId),
-        _hydrateSalesPlans(estId),
-        _hydrateInventoryDrafts(estId),
-      ].map((f) => f.catchError((Object e, _) {
-            devLog('EstablishmentLocalHydration: delta task $e');
-          })));
-
+      await _runSnapshotHydrationTasks(estId, dataId);
       if (!kIsWeb) {
-        await _mirrorEmployeesToSqlite(estId);
         await _hydrateIikoIfPossible(estId);
       }
     } catch (e, st) {
       devLog('EstablishmentLocalHydration: delta $e $st');
+    }
+  }
+
+  /// Без проверки TTL каталога: чеклисты, черновики инвентаризаций, зал, HACCP, график, сотрудники в SQLite.
+  /// Вызывается после восстановления сети / из [RealtimeSyncService].
+  Future<void> runSnapshotsOnlySync({
+    required String establishmentId,
+    required String dataEstablishmentId,
+  }) async {
+    if (kIsWeb) return;
+    final acc = AccountManagerSupabase();
+    if (!acc.isLoggedInSync) return;
+    try {
+      await _runSnapshotHydrationTasks(establishmentId, dataEstablishmentId);
+    } catch (e, st) {
+      devLog('EstablishmentLocalHydration: snapshots-only $e $st');
+    }
+  }
+
+  Future<void> _runSnapshotHydrationTasks(
+    String estId,
+    String dataId,
+  ) async {
+    await Future.wait([
+      _hydrateEmployees(estId),
+      DocumentationServiceSupabase().prefetchDocumentsCacheForMobile(estId),
+      loadSchedule(estId),
+      _prefetchOrderListsPrefs(estId),
+      _hydrateChecklistsSnapshot(estId),
+      _hydrateTechCards(dataId),
+      _hydrateHaccp(estId),
+      _hydratePosTables(estId),
+      _hydrateMenuStopGo(estId),
+      _hydrateSalesPlans(estId),
+      _hydrateInventoryDrafts(estId),
+    ].map((f) => f.catchError((Object e, _) {
+          devLog('EstablishmentLocalHydration: snapshot task $e');
+        })));
+
+    if (!kIsWeb) {
+      await _mirrorEmployeesToSqlite(estId);
     }
   }
 }

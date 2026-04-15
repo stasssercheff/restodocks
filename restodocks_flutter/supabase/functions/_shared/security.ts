@@ -1,6 +1,20 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { jwtVerify } from "npm:jose@5";
 
+function hasAnonRoleInJwtPayload(token: string | null | undefined): boolean {
+  const t = token?.trim();
+  if (!t || !t.includes(".")) return false;
+  const parts = t.split(".");
+  if (parts.length < 2) return false;
+  try {
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = JSON.parse(atob(base64));
+    return json?.role === "anon";
+  } catch {
+    return false;
+  }
+}
+
 /** Anon-ключ в билде (Cloudflare) может отличаться строкой от SUPABASE_ANON_KEY в рантайме после ротации — оба валидны. */
 async function isValidSupabaseAnonJwt(
   token: string | null | undefined,
@@ -204,6 +218,11 @@ export function hasValidApiKey(req: Request): boolean {
     if (service && apiKey === service) return true;
     // Стандартный клиент Supabase шлёт публичный anon key в apikey (не JWT пользователя).
     if (anon && apiKey === anon) return true;
+    // Новые publishable ключи Supabase (sb_publishable_...) должны считаться валидными
+    // для публичных edge-эндпоинтов регистрации.
+    if (apiKey.startsWith("sb_publishable_")) return true;
+    // Переходный режим: допускаем legacy anon JWT из старых веб-бандлов.
+    if (hasAnonRoleInJwtPayload(apiKey)) return true;
   }
 
   // Только Authorization: Bearer <anon> (редко, но без дубля apikey в заголовке).
@@ -211,6 +230,8 @@ export function hasValidApiKey(req: Request): boolean {
     req.headers.get("authorization") ?? req.headers.get("Authorization"),
   );
   if (anon && bearerOnly === anon) return true;
+  if (bearerOnly?.startsWith("sb_publishable_") == true) return true;
+  if (hasAnonRoleInJwtPayload(bearerOnly)) return true;
 
   return false;
 }
@@ -237,20 +258,23 @@ export async function hasValidApiKeyOrUser(req: Request): Promise<boolean> {
   if (isServiceRoleBearer(req)) return true;
 
   const apiKeyHeader = req.headers.get("apikey")?.trim();
-  if (await isValidSupabaseAnonJwt(apiKeyHeader)) return true;
-
   const token = parseBearerToken(
     req.headers.get("authorization") ?? req.headers.get("Authorization"),
   );
-  if (await isValidSupabaseAnonJwt(token)) return true;
 
-  const seen = new Set<string>();
+  // Раньше jwtVerify (нужен SUPABASE_JWT_SECRET) и точное совпадение с SUPABASE_ANON_KEY в env.
+  // Клиент (Flutter web) может слать актуальный anon после ротации ключа в Dashboard, а секрет
+  // функции ещё не обновили — PostgREST тот же проект уже принимает JWT.
+  const seenGateway = new Set<string>();
   for (const cand of [apiKeyHeader, token]) {
     const c = cand?.trim();
-    if (!c || seen.has(c)) continue;
-    seen.add(c);
+    if (!c || seenGateway.has(c)) continue;
+    seenGateway.add(c);
     if (await isJwtAcceptedByPostgrestGateway(c)) return true;
   }
+
+  if (await isValidSupabaseAnonJwt(apiKeyHeader)) return true;
+  if (await isValidSupabaseAnonJwt(token)) return true;
 
   if (!token) return false;
 
@@ -290,3 +314,4 @@ export async function getAuthenticatedUserId(req: Request): Promise<string | nul
     return null;
   }
 }
+

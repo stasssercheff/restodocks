@@ -97,6 +97,7 @@ class CookingProcess extends Equatable {
   ];
 
   /// Предопределенные процессы приготовления
+  /// Дефолтные weightLossPercentage должны совпадать с SQL `public._default_cooking_loss_rows()` (миграция seed глобальных % ужарки).
   static List<CookingProcess> get defaultProcesses => [
     // Варка
     CookingProcess(
@@ -349,6 +350,25 @@ class CookingProcess extends Equatable {
   /// Найти процесс по ID
   static CookingProcess? findById(String id) {
     return defaultProcesses.where((process) => process.id == id).firstOrNull;
+  }
+
+  /// Сопоставить значение из ИИ/импорта: id (`baking`), локализованное имя или EN-имя.
+  static CookingProcess? resolveFromAiToken(String? token, [String languageCode = 'ru']) {
+    final raw = token?.trim() ?? '';
+    if (raw.isEmpty) return null;
+    final byId = findById(raw);
+    if (byId != null) return byId;
+    final lower = raw.toLowerCase();
+    for (final p in defaultProcesses) {
+      if (p.id.toLowerCase() == lower) return p;
+      if (p.name.trim().toLowerCase() == lower) return p;
+      final loc = p.getLocalizedName(languageCode).trim().toLowerCase();
+      if (loc == lower) return p;
+      for (final v in p.localizedNames.values) {
+        if (v.trim().toLowerCase() == lower) return p;
+      }
+    }
+    return null;
   }
 
   /// Получить процессы для категории продукта

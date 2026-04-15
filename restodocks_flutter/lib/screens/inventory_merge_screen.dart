@@ -222,6 +222,14 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
         final header = payload['header'] as Map<String, dynamic>?;
         final dateStr = header?['date']?.toString() ??
             DateTime.now().toIso8601String().split('T').first;
+        final account = context.read<AccountManagerSupabase>();
+        final est = account.establishment;
+        if (est != null && account.isTrialOnlyWithoutPaid) {
+          await account.trialIncrementDeviceSaveOrThrow(
+            establishmentId: est.id,
+            docKind: TrialDeviceSaveKinds.writeoff,
+          );
+        }
         await saveFileBytes('writeoff_merged_$dateStr.xlsx', out);
         await _saveMergedToInbox(payload);
         if (mounted) {
@@ -538,6 +546,14 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
       if (out != null && out.isNotEmpty) {
         final date =
             header['date'] ?? DateTime.now().toIso8601String().split('T').first;
+        final account = context.read<AccountManagerSupabase>();
+        final est = account.establishment;
+        if (est != null && account.isTrialOnlyWithoutPaid) {
+          await account.trialIncrementDeviceSaveOrThrow(
+            establishmentId: est.id,
+            docKind: TrialDeviceSaveKinds.productSummary,
+          );
+        }
         await saveFileBytes('inventory_merged_$date.xlsx', out);
         if (mounted) {
           final inboxPayload = Map<String, dynamic>.from(payload);
@@ -657,6 +673,13 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     setState(() => _loading = false);
 
     if (outBytes.isNotEmpty) {
+      final estObj = account.establishment;
+      if (estObj != null && account.isTrialOnlyWithoutPaid) {
+        await account.trialIncrementDeviceSaveOrThrow(
+          establishmentId: estObj.id,
+          docKind: TrialDeviceSaveKinds.productSummary,
+        );
+      }
       await saveFileBytes(fileName, outBytes);
       if (mounted) {
         final inboxHeader = Map<String, dynamic>.from(firstHeader ?? {});

@@ -20,6 +20,7 @@ import 'core/mobile_deep_link_listener.dart';
 import 'core/supabase_env.dart';
 import 'core/public_app_origin.dart';
 import 'core/supabase_retry_http_client.dart';
+import 'l10n/flutter_quill_kk_delegate.dart';
 import 'utils/dev_log.dart';
 import 'utils/layout_breakpoints.dart';
 import 'core/initial_location_stub.dart'
@@ -36,16 +37,9 @@ import 'services/services.dart';
 import 'services/translation_manager.dart';
 import 'widgets/widgets.dart';
 
-/// Язык интерфейса из профиля сотрудника: хранится в учётной записи и совпадает на всех устройствах.
+/// Язык интерфейса из профиля сотрудника: при refresh сессии не затираем явный выбор на устройстве.
 Future<void> _applyLocaleFromEmployeeProfile(String profileLang) async {
-  final loc = LocalizationService();
-  final p = profileLang.trim().toLowerCase();
-  if (!LocalizationService.supportedLocales.any((l) => l.languageCode == p)) {
-    return;
-  }
-  if (loc.currentLanguageCode != p) {
-    await loc.setLocale(Locale(p));
-  }
+  await LocalizationService().reconcileServerPreferredLanguage(profileLang);
 }
 
 Future<void> main() async {
@@ -150,6 +144,10 @@ Future<void> _bootstrapApp() async {
   // Сначала переводы + сохранённая локаль (SharedPreferences), затем аккаунт.
   // Иначе загрузка профиля вызывает onPreferredLanguageLoaded и затирает язык из prefs.
   await LocalizationService.initialize();
+  LocalizationService.onPinnedLocaleNeedsServerSync = (code) async {
+    await AccountManagerSupabase()
+        .savePreferredLanguage(code, fromReconcile: true);
+  };
   await AccountManagerSupabase().initialize();
 
   // Оверлей переводов ТТК не сбрасываем при смене языка — слои по языкам копятся локально; догрузка — в onAfterLocaleChanged.
@@ -173,7 +171,7 @@ Future<void> _bootstrapApp() async {
     );
   };
 
-  // При загрузке профиля: язык из БД + локальный выбор (prefs не затираем языком из БД).
+  // При загрузке профиля: язык из БД, но не поверх явного выбора в настройках (см. reconcile).
   AccountManagerSupabase().onPreferredLanguageLoaded = (langCode) {
     unawaited(_applyLocaleFromEmployeeProfile(langCode));
   };
@@ -183,7 +181,6 @@ Future<void> _bootstrapApp() async {
     ThemeService().initialize(),
     HomeButtonConfigService().initialize(),
     OwnerViewPreferenceService().initialize(),
-    TtkBranchFilterService().initialize(),
     ScreenLayoutPreferenceService().initialize(),
     MobileUiScaleService().initialize(),
     PosOrdersDisplaySettingsService().initialize(),
@@ -340,10 +337,9 @@ class RestodocksApp extends StatelessWidget {
   /// Если текущая локаль не поддержана ими, даём fallback на en_US для Material/Cupertino delegate,
   /// сохраняя при этом язык интерфейса в нашем LocalizationService (ключи `loc.t(...)`).
   Locale _safeDelegateLocale(Locale locale) {
-    if (const FlutterQuillLocalizations.delegate.isSupported(locale)) {
-      return locale;
-    }
-    return const Locale('en', 'US');
+    // Не откатываем Material/DateFormat на en только из‑за Quill: при kk интерфейс
+    // оказывался с английскими узкими днями недели и т.п. Quill подхватывает локаль отдельно.
+    return locale;
   }
 
   @override
@@ -372,6 +368,7 @@ class RestodocksApp extends StatelessWidget {
                 locale: _safeDelegateLocale(localization.currentLocale),
                 supportedLocales: LocalizationService.supportedLocales,
                 localizationsDelegates: const [
+                  FlutterQuillKkDelegate(),
                   GlobalMaterialLocalizations.delegate,
                   GlobalWidgetsLocalizations.delegate,
                   GlobalCupertinoLocalizations.delegate,

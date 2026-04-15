@@ -3,6 +3,14 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PromoCode } from '@/lib/supabase'
+import type { Insight, SecuritySnapshotPayload } from '@/lib/security-snapshot'
+import type { SystemHealthPayload } from '@/lib/system-health'
+import {
+  PROMO_GRANT_SUBSCRIPTION_TYPES,
+  isSelectablePromoGrantTier,
+  subscriptionTierLabelRu,
+  type PromoGrantSubscriptionType,
+} from '@/lib/promo-tiers'
 
 type SubscriptionSummary = {
   statusLabel: string
@@ -11,6 +19,14 @@ type SubscriptionSummary = {
   proUntilIso: string | null
   detail: string | null
 }
+
+type SubscriptionGroup =
+  | 'no_pro'
+  | 'trial'
+  | 'promo'
+  | 'paid_iap'
+  | 'expired'
+  | 'pro_other'
 
 type Establishment = {
   id: string
@@ -24,16 +40,39 @@ type Establishment = {
   registration_ip?: string | null
   registration_country?: string | null
   registration_city?: string | null
-  /** Админ: лимит доп. заведений для владельца; null = общая настройка «Настройки» */
-  max_additional_establishments_override?: number | null
   establishment_type?: 'main' | 'branch' | 'separate'
   subscription_summary?: SubscriptionSummary
   effective_pro?: boolean
+  /** Сводная категория подписки для фильтра колонки */
+  subscription_group?: SubscriptionGroup
 }
 
 function formatDate(iso: string | null) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+/** Значение для `input type="date"` (календарь в локальной дате). */
+function isoToDateInputValue(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Дата и время создания записи заведения в БД (для админки). */
+function formatDateTime(iso: string | null) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function isExpired(iso: string | null) {
@@ -58,9 +97,22 @@ function promoRowStatus(row: PromoCode): 'disabled' | 'used' | 'expired' | 'free
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
+const RD_ADMIN_SUPPORT_KEY = 'rd_admin_support_active'
+
 export default function AdminClient() {
   const router = useRouter()
-  const [tab, setTab] = useState<'establishments' | 'promo' | 'settings'>('establishments')
+  const [tab, setTab] = useState<'establishments' | 'promo' | 'support' | 'security' | 'health'>('establishments')
+  const [supportShellHighlight, setSupportShellHighlight] = useState(false)
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && sessionStorage.getItem(RD_ADMIN_SUPPORT_KEY) === '1') {
+        setSupportShellHighlight(true)
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [])
 
   async function logout() {
     await fetch('/api/auth', { method: 'DELETE' })
@@ -69,10 +121,21 @@ export default function AdminClient() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white">
-      <header className="border-b border-amber-900/40 bg-gray-950 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+      <header
+        className={`px-4 py-3 flex items-center justify-between sticky top-0 z-10 border-b transition-colors ${
+          supportShellHighlight
+            ? 'border-purple-500/70 bg-purple-950/95 shadow-[0_0_24px_rgba(147,51,234,0.25)]'
+            : 'border-amber-900/40 bg-gray-950'
+        }`}
+      >
         <div className="flex items-center gap-2">
           <span className="font-bold text-base">Restodocks</span>
           <span className="text-gray-500 text-sm hidden sm:inline">/ Admin</span>
+          {supportShellHighlight ? (
+            <span className="text-xs font-medium text-purple-200/95 hidden sm:inline">
+              — сеанс техподдержки открыт
+            </span>
+          ) : null}
         </div>
         <button onClick={logout} className="text-sm text-gray-500 hover:text-white transition">
           Выйти
@@ -84,7 +147,9 @@ export default function AdminClient() {
           {([
             { key: 'establishments', label: 'Заведения' },
             { key: 'promo', label: 'Промокоды' },
-            { key: 'settings', label: 'Настройки' },
+            { key: 'support', label: 'Техподдержка' },
+            { key: 'security', label: 'Безопасность' },
+            { key: 'health', label: 'Нагрузка' },
           ] as const).map(t => (
             <button
               key={t.key}
@@ -101,11 +166,185 @@ export default function AdminClient() {
         </div>
       </div>
 
-      <main className="max-w-6xl mx-auto px-3 py-4 sm:px-6 sm:py-8">
+      <main className="max-w-[min(1600px,calc(100vw-1.5rem))] mx-auto px-3 py-4 sm:px-6 sm:py-8">
         {tab === 'establishments' && <EstablishmentsTab />}
         {tab === 'promo' && <PromoTab />}
-        {tab === 'settings' && <PlatformSettingsTab />}
+        {tab === 'support' && (
+          <SupportAccessTab
+            onSupportShellActiveChange={active => {
+              setSupportShellHighlight(active)
+              try {
+                if (typeof window === 'undefined') return
+                if (active) sessionStorage.setItem(RD_ADMIN_SUPPORT_KEY, '1')
+                else sessionStorage.removeItem(RD_ADMIN_SUPPORT_KEY)
+              } catch {
+                /* ignore */
+              }
+            }}
+          />
+        )}
+        {tab === 'security' && <SecurityTab />}
+        {tab === 'health' && <SystemHealthTab />}
       </main>
+    </div>
+  )
+}
+
+function SupportAccessTab({
+  onSupportShellActiveChange,
+}: {
+  onSupportShellActiveChange?: (active: boolean) => void
+}) {
+  const [supportOperatorLogin, setSupportOperatorLogin] = useState('')
+  const [accountLogin, setAccountLogin] = useState('')
+  const [appOrigin, setAppOrigin] = useState('https://restodocks-beta.pages.dev')
+  const [activeEstablishmentId, setActiveEstablishmentId] = useState<string | null>(null)
+  const [activeEstablishmentName, setActiveEstablishmentName] = useState<string | null>(null)
+  const [logs, setLogs] = useState<Array<{ id: number; event_type: string; support_operator_login: string | null; account_login: string | null; created_at: string }>>([])
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function loadLogs(establishmentId: string) {
+    const res = await fetch(`/api/support?establishment_id=${encodeURIComponent(establishmentId)}`)
+    const data = await res.json()
+    if (!res.ok) {
+      setError(typeof data?.error === 'string' ? data.error : 'Ошибка журнала')
+      return
+    }
+    setLogs(Array.isArray(data) ? data : [])
+  }
+
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return
+      if (sessionStorage.getItem(RD_ADMIN_SUPPORT_KEY) !== '1') return
+      const raw = sessionStorage.getItem('rd_admin_support_meta')
+      if (!raw) return
+      const meta = JSON.parse(raw) as { id?: string; name?: string }
+      if (meta?.id) {
+        setActiveEstablishmentId(meta.id)
+        setActiveEstablishmentName(meta.name ?? null)
+        void loadLogs(meta.id)
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  async function startSupportSession() {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/support', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          support_operator_login: supportOperatorLogin.trim() || 'admin',
+          account_login: accountLogin.trim().toLowerCase(),
+          app_origin: appOrigin.trim(),
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(typeof data?.error === 'string' ? data.error : `Ошибка (${res.status})`)
+        return
+      }
+      const est = data?.establishment
+      setActiveEstablishmentId(est?.id ?? null)
+      setActiveEstablishmentName(est?.name ?? null)
+      if (est?.id) {
+        try {
+          sessionStorage.setItem(
+            'rd_admin_support_meta',
+            JSON.stringify({ id: est.id, name: est.name }),
+          )
+        } catch {
+          /* ignore */
+        }
+        await loadLogs(est.id)
+      }
+      onSupportShellActiveChange?.(true)
+      if (typeof data?.warning === 'string' && data.warning.length > 0) {
+        alert(data.warning)
+      }
+      if (typeof data?.action_link === 'string' && data.action_link.length > 0) {
+        window.open(data.action_link, '_blank', 'noopener,noreferrer')
+      }
+      alert(
+        'Сеанс техподдержки открыт: верхняя панель админки подсвечена фиолетовым — так видно, что вы в режиме входа в аккаунт пользователя. Ссылка для входа открыта в новой вкладке.',
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function endSupportSession() {
+    if (!activeEstablishmentId) return
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/support', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ establishment_id: activeEstablishmentId }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(typeof data?.error === 'string' ? data.error : `Ошибка (${res.status})`)
+        return
+      }
+      try {
+        sessionStorage.removeItem('rd_admin_support_meta')
+      } catch {
+        /* ignore */
+      }
+      onSupportShellActiveChange?.(false)
+      await loadLogs(activeEstablishmentId)
+      alert('Сеанс техподдержки завершён.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4 max-w-3xl">
+      {error && <div className="p-3 rounded-lg border border-red-800 bg-red-950/40 text-red-200 text-sm">{error}</div>}
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 space-y-3">
+        <h2 className="text-sm font-semibold text-white">Доступ техподдержки</h2>
+        <p className="text-xs text-gray-500">
+          Введите логин учётной записи (email). PIN вводит владелец на своей стороне вместе с тумблером доступа.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-2">
+          <input value={supportOperatorLogin} onChange={e => setSupportOperatorLogin(e.target.value)} placeholder="Логин оператора" className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
+          <input value={accountLogin} onChange={e => setAccountLogin(e.target.value)} placeholder="Логин учётной записи (email)" className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" />
+        </div>
+        <input value={appOrigin} onChange={e => setAppOrigin(e.target.value)} placeholder="Origin веб-приложения, куда входить (например https://restodocks-beta.pages.dev)" className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs" />
+        <div className="flex gap-2">
+          <button onClick={startSupportSession} disabled={busy || !accountLogin.trim()} className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-4 py-2 rounded-lg text-sm">
+            Открыть доступ
+          </button>
+          <button onClick={endSupportSession} disabled={busy || !activeEstablishmentId} className="bg-gray-800 border border-gray-700 hover:bg-gray-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm">
+            Закрыть доступ
+          </button>
+        </div>
+      </div>
+
+      {activeEstablishmentId && (
+        <div className="bg-gray-900 rounded-xl border border-gray-800 p-4">
+          <div className="text-sm text-gray-300 mb-2">Активное заведение: <span className="text-white">{activeEstablishmentName ?? activeEstablishmentId}</span></div>
+          <div className="space-y-1 text-xs text-gray-400">
+            {logs.map(row => (
+              <div key={row.id} className="flex flex-wrap gap-2 border-b border-gray-800 pb-1">
+                <span>{row.event_type}</span>
+                <span>Оператор: {row.support_operator_login ?? '—'}</span>
+                <span>Логин: {row.account_login ?? '—'}</span>
+                <span>{formatDateTime(row.created_at)}</span>
+              </div>
+            ))}
+            {logs.length === 0 && <div className="text-gray-600">Записей пока нет</div>}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -140,12 +379,12 @@ function EstablishmentsTab() {
   }
 
   function subscriptionStatusTextClass(status: string): string {
-    if (status === 'Без Pro') return 'text-gray-500'
+    if (status === 'Без подписки' || status === 'Без Pro') return 'text-gray-500'
     if (status.startsWith('Пробный')) return 'text-sky-300'
-    if (status === 'Pro истёк') return 'text-red-300/90'
-    if (status.includes('промокод')) return 'text-amber-200'
-    if (status.includes('оплачен')) return 'text-emerald-300'
-    if (status === 'Pro') return 'text-emerald-200'
+    if (status.includes('истёк')) return 'text-red-300/90'
+    if (status.includes('промокод') && !status.includes('истёк')) return 'text-amber-200'
+    if (status.includes('(оплата)') || status.includes('оплачен')) return 'text-emerald-300'
+    if (!status.includes('Без')) return 'text-emerald-200'
     return 'text-gray-200'
   }
 
@@ -159,7 +398,7 @@ function EstablishmentsTab() {
         ? 'Подписка через App Store (In-App Purchase). Дата окончания в БД обычно уже учитывает отсрочку оплаты (grace period), если она пришла в чеке из App Store Connect.'
         : undefined
     return (
-      <div className="space-y-0.5 max-w-[15rem]">
+      <div className="space-y-0.5 max-w-[11rem] min-w-0">
         <div className={`text-xs font-medium ${subscriptionStatusTextClass(s.statusLabel)}`}>
           {s.statusLabel}
         </div>
@@ -179,6 +418,9 @@ function EstablishmentsTab() {
   const [data, setData] = useState<Establishment[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [filterType, setFilterType] = useState<'all' | 'main' | 'branch' | 'separate'>('all')
+  const [filterSubscription, setFilterSubscription] = useState<'all' | SubscriptionGroup>('all')
+  const [filterEmployees, setFilterEmployees] = useState<'all' | '0' | '1' | '2-5' | '6+'>('all')
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState<string | null>(null)
   const [refreshingGeo, setRefreshingGeo] = useState(false)
@@ -199,21 +441,35 @@ function EstablishmentsTab() {
 
   useEffect(() => { load() }, [load])
 
+  function matchesEmployeeFilter(n: number): boolean {
+    if (filterEmployees === 'all') return true
+    if (filterEmployees === '0') return n === 0
+    if (filterEmployees === '1') return n === 1
+    if (filterEmployees === '2-5') return n >= 2 && n <= 5
+    return n >= 6
+  }
+
   const filtered = data.filter(e => {
     const q = search.toLowerCase()
     const sub = e.subscription_summary
     const subText = sub
       ? [sub.statusLabel, sub.paymentLabel, sub.promoCode, sub.detail].filter(Boolean).join(' ').toLowerCase()
       : ''
-    return (
+    const textMatch =
       e.name.toLowerCase().includes(q) ||
       e.owner_email.toLowerCase().includes(q) ||
       e.owner_name.toLowerCase().includes(q) ||
       (e.registration_ip ?? '').toLowerCase().includes(q) ||
       (e.registration_country ?? '').toLowerCase().includes(q) ||
       (e.registration_city ?? '').toLowerCase().includes(q) ||
+      (e.created_at ?? '').toLowerCase().includes(q) ||
+      formatDateTime(e.created_at).toLowerCase().includes(q) ||
       subText.includes(q)
-    )
+    if (!textMatch) return false
+    if (filterType !== 'all' && e.establishment_type !== filterType) return false
+    if (filterSubscription !== 'all' && (e.subscription_group ?? 'no_pro') !== filterSubscription) return false
+    if (!matchesEmployeeFilter(e.employee_count)) return false
+    return true
   })
 
   function regInfo(row: Establishment) {
@@ -244,32 +500,6 @@ function EstablishmentsTab() {
     }
   }
 
-  async function setMaxAdditionalOverride(row: Establishment) {
-    const current = row.max_additional_establishments_override
-    const val = prompt(
-      'Макс. дополнительных заведений для аккаунта этого владельца (как общая настройка). Пусто — брать лимит из вкладки «Настройки»:',
-      current != null ? String(current) : '',
-    )
-    if (val === null) return
-    const trimmed = val.trim()
-    const parsed = trimmed === '' ? null : parseInt(trimmed, 10)
-    if (trimmed !== '' && (Number.isNaN(parsed!) || parsed! < 0 || parsed! > 999)) {
-      alert('Введи целое от 0 до 999 или оставь пустым')
-      return
-    }
-    const res = await fetch(`/api/establishments/${row.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ max_additional_establishments_override: parsed }),
-    })
-    const json = await res.json()
-    if (!res.ok) {
-      setError(typeof json?.error === 'string' ? json.error : 'Ошибка сохранения')
-      return
-    }
-    await load()
-  }
-
   async function handleDelete(row: Establishment) {
     if (!confirm(`Удалить заведение «${row.name}»?\n\nБудут удалены все данные: номенклатура, ТТК, чеклисты, сотрудники и т.д. Действие необратимо.`)) return
     const typed = prompt(`Для подтверждения введите "${CONFIRM_DELETE_TEXT}":`)
@@ -286,8 +516,11 @@ function EstablishmentsTab() {
         throw new Error(parts.join(' ') || 'Ошибка удаления')
       }
       await load()
+      alert(`Заведение «${row.name}» удалено из базы (строка establishments).`)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Ошибка удаления')
+      const msg = e instanceof Error ? e.message : 'Ошибка удаления'
+      setError(msg)
+      alert(`Не удалось удалить заведение «${row.name}».\n\n${msg}\n\nЕсли здесь про миграцию или функцию admin_delete_establishment — выполните её в Supabase (см. репозиторий, папка supabase/migrations).`)
       await load()
     } finally {
       setDeleting(null)
@@ -302,9 +535,7 @@ function EstablishmentsTab() {
           <span className="block mt-2 text-gray-500 text-xs">
             Нет колонки или схема старая — открой Supabase → SQL Editor и выполни миграции:{' '}
             <code className="text-gray-400">supabase/migrations/20260502120000_pro_paid_until_and_status_rpc.sql</code>
-            {' '}(колонка <code className="text-gray-500">pro_paid_until</code>), при необходимости{' '}
-            <code className="text-gray-400">supabase/migrations/20260430230000_establishments_max_additional_override.sql</code>
-            . Ошибка входа/401 — проверь Secrets в Cloudflare (<code className="text-gray-500">SUPABASE_URL</code>,{' '}
+            {' '}(колонка <code className="text-gray-500">pro_paid_until</code>). Ошибка входа/401 — проверь Secrets в Cloudflare (<code className="text-gray-500">SUPABASE_URL</code>,{' '}
             <code className="text-gray-500">SERVICE_ROLE_KEY</code>) и перелогинься в админке.
           </span>
         </div>
@@ -312,7 +543,64 @@ function EstablishmentsTab() {
       <div className="grid grid-cols-3 gap-2 mb-4 sm:gap-3 sm:mb-8">
         <StatCard label="Заведений" value={total} />
         <StatCard label="Сотрудников" value={totalEmployees} />
-        <StatCard label="Активных Pro" value={totalProActive} />
+        <StatCard label="С платным тарифом" value={totalProActive} />
+      </div>
+
+      <div className="mb-4 p-4 bg-gray-900/80 border border-gray-800 rounded-xl text-gray-400 text-sm leading-relaxed">
+        <p className="font-medium text-gray-300 mb-1">Регистрация и пробный Pro</p>
+        <p>
+          Колонка «Регистрация» — дата и время создания <span className="text-gray-500">записи заведения</span> в базе (
+          <code className="text-gray-500 text-xs">establishments.created_at</code>). Для входа{' '}
+          <span className="text-gray-300">без промокода</span> в продукте действует{' '}
+          <span className="text-gray-300">72 часа полного Pro</span> с этого момента (в БД — поле{' '}
+          <code className="text-gray-500 text-xs">pro_trial_ends_at</code>
+          ). С промокодом триал обычно не заполняется — тариф даёт промо.
+        </p>
+        <p className="mt-2 text-xs text-gray-600">
+          Если у старых аккаунтов без промо пропала дата окончания триала, выполни в Supabase миграцию{' '}
+          <code className="text-gray-500">20260621120000_backfill_pro_trial_ends_at_no_promo_main.sql</code>.
+        </p>
+        <p className="mt-3 text-xs text-gray-500 leading-relaxed border-t border-gray-800 pt-3">
+          <span className="text-gray-400">Заведения и филиалы</span> создаются только в приложении (регистрация, экран «Мои заведения» / добавление филиала). В этой админке нет кнопки «создать заведение» — здесь только список из БД, удаление и гео. Если
+          строка «видна в админке, но не в приложении», это всё равно записи в Supabase; после успешного удаления появится подтверждение; при ошибке — текст в алерте и в красном блоке выше.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-3 md:hidden">
+        <select
+          value={filterType}
+          onChange={e => setFilterType(e.target.value as typeof filterType)}
+          className="bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs flex-1 min-w-[6rem]"
+        >
+          <option value="all">Тип: все</option>
+          <option value="main">Основное</option>
+          <option value="branch">Филиал</option>
+          <option value="separate">Отдельное</option>
+        </select>
+        <select
+          value={filterSubscription}
+          onChange={e => setFilterSubscription(e.target.value as typeof filterSubscription)}
+          className="bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs flex-1 min-w-[8rem]"
+        >
+          <option value="all">Подписка: все</option>
+          <option value="no_pro">Без подписки</option>
+          <option value="trial">Пробный</option>
+          <option value="promo">Pro (промокод)</option>
+          <option value="paid_iap">Pro (оплата)</option>
+          <option value="expired">Истёк</option>
+          <option value="pro_other">Прочее</option>
+        </select>
+        <select
+          value={filterEmployees}
+          onChange={e => setFilterEmployees(e.target.value as typeof filterEmployees)}
+          className="bg-gray-900 border border-gray-800 rounded-lg px-2 py-2 text-white text-xs flex-1 min-w-[6rem]"
+        >
+          <option value="all">Сотр.: все</option>
+          <option value="0">0</option>
+          <option value="1">1</option>
+          <option value="2-5">2–5</option>
+          <option value="6+">6+</option>
+        </select>
       </div>
 
       <div className="flex gap-2 mb-4 flex-wrap">
@@ -344,68 +632,127 @@ function EstablishmentsTab() {
         <>
           {/* Desktop table */}
           <div className="hidden md:block bg-gray-900 rounded-xl border border-gray-800 overflow-x-auto">
-            <table className="w-full text-sm min-w-[960px]">
+            <table className="w-full text-xs sm:text-sm min-w-full">
               <thead>
                 <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
-                  <th className="px-4 py-3 text-left">Заведение</th>
-                  <th className="px-4 py-3 text-left">Тип</th>
+                  <th className="px-2 py-2.5 sm:px-3 text-left">Заведение</th>
+                  <th className="px-2 py-2.5 sm:px-3 text-left align-top">
+                    <div className="mb-1.5">Тип</div>
+                    <select
+                      value={filterType}
+                      onChange={e => setFilterType(e.target.value as typeof filterType)}
+                      title="Фильтр по типу заведения"
+                      className="w-full max-w-[9rem] bg-gray-950 border border-gray-700 rounded-md px-1.5 py-1 text-[11px] text-gray-200 font-normal normal-case tracking-normal"
+                    >
+                      <option value="all">Все</option>
+                      <option value="main">Основное</option>
+                      <option value="branch">Филиал</option>
+                      <option value="separate">Отдельное</option>
+                    </select>
+                  </th>
                   <th
-                    className="px-4 py-3 text-left min-w-[11rem]"
+                    className="px-2 py-2.5 sm:px-3 text-left min-w-[9rem] align-top"
                     title="Статус Pro, способ оплаты (сейчас App Store IAP или промокод), код промо при погашении"
                   >
-                    Подписка
+                    <div className="mb-1.5">Подписка</div>
+                    <select
+                      value={filterSubscription}
+                      onChange={e => setFilterSubscription(e.target.value as typeof filterSubscription)}
+                      title="Фильтр по подписке"
+                      className="w-full max-w-[12rem] bg-gray-950 border border-gray-700 rounded-md px-1.5 py-1 text-[11px] text-gray-200 font-normal normal-case tracking-normal"
+                    >
+                      <option value="all">Все</option>
+                      <option value="no_pro">Без подписки</option>
+                      <option value="trial">Пробный</option>
+                      <option value="promo">Pro (промокод)</option>
+                      <option value="paid_iap">Pro (оплата)</option>
+                      <option value="expired">Истёк</option>
+                      <option value="pro_other">Прочее</option>
+                    </select>
                   </th>
-                  <th className="px-4 py-3 text-left">Владелец</th>
-                  <th className="px-4 py-3 text-left">Email</th>
-                  <th className="px-4 py-3 text-center">Сотр.</th>
-                  <th className="px-4 py-3 text-center" title="Переопределение лимита доп. заведений для владельца; при нескольких — минимум">
-                    Лимит доп.
+                  <th className="px-2 py-2.5 sm:px-3 text-left">Владелец</th>
+                  <th className="px-2 py-2.5 sm:px-3 text-left">Email</th>
+                  <th className="px-2 py-2.5 sm:px-3 text-center align-top">
+                    <div className="mb-1.5">Сотр.</div>
+                    <select
+                      value={filterEmployees}
+                      onChange={e => setFilterEmployees(e.target.value as typeof filterEmployees)}
+                      title="Фильтр по числу сотрудников"
+                      className="w-full max-w-[6rem] mx-auto bg-gray-950 border border-gray-700 rounded-md px-1.5 py-1 text-[11px] text-gray-200 font-normal normal-case tracking-normal"
+                    >
+                      <option value="all">Все</option>
+                      <option value="0">0</option>
+                      <option value="1">1</option>
+                      <option value="2-5">2–5</option>
+                      <option value="6+">6+</option>
+                    </select>
                   </th>
-                  <th className="px-4 py-3 text-left">Дата</th>
-                  <th className="px-4 py-3 text-left">IP регистрации</th>
-                  <th className="px-4 py-3 text-right w-20"></th>
+                  <th
+                    className="px-2 py-2.5 sm:px-3 text-left min-w-[8rem]"
+                    title="Дата и время создания записи заведения в БД. Без промокода: 72 ч Pro с этого момента (см. pro_trial_ends_at)."
+                  >
+                    Регистрация
+                  </th>
+                  <th className="px-2 py-2.5 sm:px-3 text-left">IP регистрации</th>
+                  <th
+                    className="px-3 py-3 text-right w-[5.5rem] sticky right-0 z-20 bg-gray-900 border-l border-gray-800 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.45)]"
+                    title="Действия — при узком окне колонка закреплена справа"
+                  >
+                    <span className="sr-only">Действия</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((row, i) => (
-                  <tr key={row.id} className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition ${i === filtered.length - 1 ? 'border-0' : ''}`}>
-                    <td className="px-4 py-3 font-medium text-white">{row.name}</td>
-                    <td className="px-4 py-3 text-xs">
+                  <tr
+                    key={row.id}
+                    className={`group border-b border-gray-800/50 hover:bg-gray-800/30 transition ${i === filtered.length - 1 ? 'border-0' : ''}`}
+                  >
+                    <td className="px-2 py-2.5 sm:px-3 font-medium text-white max-w-[11rem] sm:max-w-[14rem] min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <span className="min-w-0 truncate" title={row.name}>
+                          {row.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(row)}
+                          disabled={deleting === row.id}
+                          className="hidden max-xl:inline-flex shrink-0 text-red-400/90 hover:text-red-300 text-[11px] font-medium underline underline-offset-2 disabled:opacity-50"
+                          title="Удалить без прокрутки таблицы вправо"
+                        >
+                          {deleting === row.id ? '…' : 'Удалить'}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-2 py-2.5 sm:px-3 text-xs whitespace-nowrap">
                       <span className={establishmentTypeBadgeClass(row)}>
                         {establishmentTypeLabel(row)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 align-top text-gray-300">
+                    <td className="px-2 py-2.5 sm:px-3 align-top text-gray-300 min-w-0 w-[11rem]">
                       <SubscriptionBlock row={row} />
                     </td>
-                    <td className="px-4 py-3 text-gray-300">{row.owner_name}</td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">{row.owner_email}</td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-2 py-2.5 sm:px-3 text-gray-300 max-w-[10rem] sm:max-w-[12rem] truncate min-w-0" title={row.owner_name}>
+                      {row.owner_name}
+                    </td>
+                    <td className="px-2 py-2.5 sm:px-3 text-gray-400 text-xs max-w-[12rem] sm:max-w-[14rem] truncate min-w-0" title={row.owner_email}>
+                      {row.owner_email}
+                    </td>
+                    <td className="px-2 py-2.5 sm:px-3 text-center">
                       <span className="bg-gray-800 px-2 py-0.5 rounded text-xs font-mono">{row.employee_count}</span>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-2 py-2.5 sm:px-3 text-gray-500 text-xs whitespace-nowrap" title={row.created_at}>
+                      {formatDateTime(row.created_at)}
+                    </td>
+                    <td className="px-2 py-2.5 sm:px-3 text-gray-400 text-xs font-mono max-w-[min(14rem,22vw)] truncate min-w-0" title={regInfo(row)}>
+                      {regInfo(row)}
+                    </td>
+                    <td className="px-2 py-2.5 sm:px-3 text-right sticky right-0 z-10 bg-gray-900 group-hover:bg-gray-800/30 border-l border-gray-800 shadow-[-6px_0_12px_-4px_rgba(0,0,0,0.45)]">
                       <button
                         type="button"
-                        onClick={() => setMaxAdditionalOverride(row)}
-                        className="text-xs font-mono hover:text-indigo-400 transition"
-                        title="Переопределить лимит доп. заведений для этого владельца"
-                      >
-                        {row.max_additional_establishments_override != null ? (
-                          <span className="bg-indigo-900/40 text-indigo-300 px-2 py-0.5 rounded">
-                            {row.max_additional_establishments_override}
-                          </span>
-                        ) : (
-                          <span className="text-gray-600">платформа</span>
-                        )}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(row.created_at)}</td>
-                    <td className="px-4 py-3 text-gray-400 text-xs font-mono">{regInfo(row)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button
                         onClick={() => handleDelete(row)}
                         disabled={deleting === row.id}
-                        className="text-red-400 hover:text-red-300 text-xs disabled:opacity-50"
+                        className="text-red-400 hover:text-red-300 text-xs disabled:opacity-50 min-w-[2rem]"
                         title="Удалить заведение"
                       >
                         {deleting === row.id ? '...' : '🗑'}
@@ -445,26 +792,12 @@ function EstablishmentsTab() {
                   <SubscriptionBlock row={row} />
                 </div>
                 <div className="text-gray-500 text-xs">{row.owner_email}</div>
-                <div className="text-gray-600 text-xs mt-1">{formatDate(row.created_at)}</div>
+                <div className="text-gray-600 text-xs mt-1" title={row.created_at}>
+                  Регистрация: {formatDateTime(row.created_at)}
+                </div>
                 {row.registration_ip && (
                   <div className="text-gray-500 text-xs mt-1 font-mono">{regInfo(row)}</div>
                 )}
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-gray-600 text-xs">Лимит доп.:</span>
-                  <button
-                    type="button"
-                    onClick={() => setMaxAdditionalOverride(row)}
-                    className="text-xs font-mono hover:text-indigo-400"
-                  >
-                    {row.max_additional_establishments_override != null ? (
-                      <span className="bg-indigo-900/40 text-indigo-300 px-2 py-0.5 rounded">
-                        {row.max_additional_establishments_override}
-                      </span>
-                    ) : (
-                      <span className="text-gray-600">платформа</span>
-                    )}
-                  </button>
-                </div>
               </div>
             ))}
           </div>
@@ -474,9 +807,50 @@ function EstablishmentsTab() {
   )
 }
 
+/** Выбор тарифа промокода (pro/ultra); для старых строк в БД — доп. опция с текущим значением. */
+function PromoGrantTierSelect({
+  row,
+  saving,
+  onPick,
+  className,
+}: {
+  row: PromoCode
+  saving: boolean
+  onPick: (row: PromoCode, next: string) => void
+  className?: string
+}) {
+  const grantRaw = (row.grants_subscription_type ?? 'ultra').toLowerCase().trim()
+  const isLegacy = !isSelectablePromoGrantTier(grantRaw)
+  return (
+    <select
+      value={grantRaw}
+      onChange={e => onPick(row, e.target.value)}
+      disabled={saving}
+      title="Тариф при погашении кода (subscription_type в заведении на момент активации)"
+      className={
+        className ??
+        'mt-0.5 bg-gray-900 border border-gray-700 rounded px-2 py-1 text-[10px] text-gray-200 max-w-[11rem]'
+      }
+    >
+      {isLegacy && (
+        <option value={grantRaw}>
+          Текущий (legacy): {subscriptionTierLabelRu(grantRaw)} ({grantRaw})
+        </option>
+      )}
+      {PROMO_GRANT_SUBSCRIPTION_TYPES.map(t => (
+        <option key={t} value={t}>
+          {subscriptionTierLabelRu(t)} ({t})
+        </option>
+      ))}
+    </select>
+  )
+}
+
 // ─── Promo Tab ────────────────────────────────────────────────────────────────
 
 function PromoTab() {
+  const EMPLOYEE_PACK_OPTIONS = [0, 5, 8, 12, 15] as const
+  const BRANCH_PACK_OPTIONS = [0, 1, 3, 5, 10] as const
   const [codes, setCodes] = useState<PromoCode[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -485,9 +859,21 @@ function PromoTab() {
   const [newNote, setNewNote] = useState('')
   const [newStartDate, setNewStartDate] = useState('')
   const [newEndDate, setNewEndDate] = useState('')
+  const [newActivationDays, setNewActivationDays] = useState('')
+  /** «Классика» = как у уже существующих кодов (поле activation_duration_days пустое). «С активации» — второй, дополнительный тип. */
+  const [newPromoLogic, setNewPromoLogic] = useState<'legacy' | 'activation'>('legacy')
+  const [newGrantTier, setNewGrantTier] = useState<PromoGrantSubscriptionType>('ultra')
   const [newMaxEmployees, setNewMaxEmployees] = useState('')
+  /** Подписка расширения сотрудников: значение из фиксированного набора пакетов. */
+  const [newEmpSlotPacks, setNewEmpSlotPacks] = useState('0')
+  /** Подписка расширения заведений: значение из фиксированного набора пакетов. */
+  const [newBranchSlotPacks, setNewBranchSlotPacks] = useState('0')
+  const [newAdditiveOnly, setNewAdditiveOnly] = useState(false)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'free' | 'used' | 'expired' | 'disabled'>('all')
+  /** Редактирование даты окончания / «ввести до» у существующего промокода (вместо prompt). */
+  const [expiryEditRow, setExpiryEditRow] = useState<PromoCode | null>(null)
+  const [expiryEditDraft, setExpiryEditDraft] = useState('')
 
   const loadCodes = useCallback(async () => {
     setLoading(true)
@@ -507,21 +893,67 @@ function PromoTab() {
 
   async function addCode() {
     if (!newCode.trim()) return
+    const empN = newEmpSlotPacks.trim() ? parseInt(newEmpSlotPacks.trim(), 10) : 0
+    const brN = newBranchSlotPacks.trim() ? parseInt(newBranchSlotPacks.trim(), 10) : 0
+    if (
+      Number.isNaN(empN) ||
+      Number.isNaN(brN) ||
+      !EMPLOYEE_PACK_OPTIONS.includes(empN as typeof EMPLOYEE_PACK_OPTIONS[number]) ||
+      !BRANCH_PACK_OPTIONS.includes(brN as typeof BRANCH_PACK_OPTIONS[number])
+    ) {
+      alert('Выберите пакет из списка для сотрудников и заведений.')
+      return
+    }
+    if (newPromoLogic === 'activation') {
+      const d = newActivationDays.trim()
+      const n = d ? parseInt(d, 10) : NaN
+      if (!d || Number.isNaN(n) || n < 1) {
+        alert('Для нового типа укажи целое число дней Pro с активации (или переключись на «как раньше»).')
+        return
+      }
+    }
     setSaving(true)
-    await fetch('/api/promo', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        code: newCode.trim().toUpperCase(),
-        note: newNote.trim() || null,
-        starts_at: newStartDate || null,
-        expires_at: newEndDate || null,
-        max_employees: newMaxEmployees ? parseInt(newMaxEmployees) : null,
-      }),
-    })
-    setNewCode(''); setNewNote(''); setNewStartDate(''); setNewEndDate(''); setNewMaxEmployees('')
-    await loadCodes()
-    setSaving(false)
+    setError(null)
+    try {
+      const res = await fetch('/api/promo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: newCode.trim().toUpperCase(),
+          note: newNote.trim() || null,
+          starts_at: newStartDate || null,
+          expires_at: newEndDate || null,
+          max_employees: newMaxEmployees ? parseInt(newMaxEmployees) : null,
+          activation_duration_days:
+            newPromoLogic === 'activation' && newActivationDays.trim()
+              ? parseInt(newActivationDays.trim(), 10)
+              : null,
+          grants_subscription_type: newGrantTier,
+          grants_employee_slot_packs: empN,
+          grants_branch_slot_packs: brN,
+          grants_additive_only: newAdditiveOnly,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(typeof data?.error === 'string' ? data.error : `Не удалось создать промокод (${res.status})`)
+        return
+      }
+      setNewCode('')
+      setNewNote('')
+      setNewStartDate('')
+      setNewEndDate('')
+      setNewActivationDays('')
+      setNewPromoLogic('legacy')
+      setNewGrantTier('ultra')
+      setNewMaxEmployees('')
+      setNewEmpSlotPacks('0')
+      setNewBranchSlotPacks('0')
+      setNewAdditiveOnly(false)
+      await loadCodes()
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function deleteCode(id: number) {
@@ -548,13 +980,79 @@ function PromoTab() {
     await loadCodes()
   }
 
-  async function setEndDate(id: number) {
-    const val = prompt('Действует до (YYYY-MM-DD), пусто — без срока:')
+  function openPromoExpiryEdit(row: PromoCode) {
+    setExpiryEditRow(row)
+    setExpiryEditDraft(isoToDateInputValue(row.expires_at))
+  }
+
+  function closePromoExpiryEdit() {
+    setExpiryEditRow(null)
+    setExpiryEditDraft('')
+  }
+
+  async function savePromoExpiryEdit(forceValue?: string | null) {
+    if (!expiryEditRow) return
+    const id = expiryEditRow.id
+    const val = forceValue !== undefined ? forceValue : expiryEditDraft.trim() || null
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/promo', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, expires_at: val }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(typeof data?.error === 'string' ? data.error : `Не удалось сохранить дату (${res.status})`)
+        return
+      }
+      closePromoExpiryEdit()
+      await loadCodes()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function patchPromoGrantTier(row: PromoCode, next: string) {
+    const cur = (row.grants_subscription_type ?? 'ultra').toLowerCase().trim()
+    const g = next.trim().toLowerCase()
+    if (cur === g) return
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/promo', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: row.id, grants_subscription_type: g }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(typeof data?.error === 'string' ? data.error : `Не удалось сохранить тариф (${res.status})`)
+        return
+      }
+      await loadCodes()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function setActivationDays(id: number, current: number | null) {
+    const val = prompt(
+      'Дней Pro с момента активации (1–36500). Пусто — вернуть промокод к классической логике (как раньше в базе), только дата «действует до»:',
+      current != null ? String(current) : '',
+    )
     if (val === null) return
+    const t = val.trim()
+    const parsed = t === '' ? null : parseInt(t, 10)
+    if (t !== '' && (Number.isNaN(parsed!) || parsed! < 1 || parsed! > 36500)) {
+      alert('Введи целое от 1 до 36500 или оставь пустым')
+      return
+    }
     await fetch('/api/promo', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, expires_at: val || null }),
+      body: JSON.stringify({ id, activation_duration_days: parsed }),
     })
     await loadCodes()
   }
@@ -568,6 +1066,42 @@ function PromoTab() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, max_employees: parsed }),
+    })
+    await loadCodes()
+  }
+
+  async function setEmpSlotPacks(id: number, nextValue: number) {
+    if (!EMPLOYEE_PACK_OPTIONS.includes(nextValue as typeof EMPLOYEE_PACK_OPTIONS[number])) return
+    await fetch('/api/promo', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, grants_employee_slot_packs: nextValue }),
+    })
+    await loadCodes()
+  }
+
+  async function setBranchSlotPacks(id: number, nextValue: number) {
+    if (!BRANCH_PACK_OPTIONS.includes(nextValue as typeof BRANCH_PACK_OPTIONS[number])) return
+    await fetch('/api/promo', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, grants_branch_slot_packs: nextValue }),
+    })
+    await loadCodes()
+  }
+
+  async function toggleAdditiveOnly(row: PromoCode) {
+    const next = !row.grants_additive_only
+    const ok = next
+      ? confirm(
+          'Включить «только расширения»? Код не меняет тариф Pro/Ultra — только начисляет подписки расширения (+5 сотр. / +1 филиал), если они заданы.',
+        )
+      : confirm('Выключить «только расширения»?')
+    if (!ok) return
+    await fetch('/api/promo', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: row.id, grants_additive_only: next }),
     })
     await loadCodes()
   }
@@ -614,6 +1148,67 @@ function PromoTab() {
           {error}
         </div>
       )}
+      {expiryEditRow && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="promo-expiry-title"
+          onClick={() => {
+            if (!saving) closePromoExpiryEdit()
+          }}
+        >
+          <div
+            className="bg-gray-900 border border-gray-700 rounded-xl p-5 max-w-md w-full shadow-xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 id="promo-expiry-title" className="text-white font-medium mb-2">
+              Дата окончания / срок ввода
+            </h3>
+            <p className="text-gray-400 text-sm mb-3 leading-relaxed">
+              {(expiryEditRow.activation_duration_days ?? 0) > 0
+                ? 'Последний день, когда код ещё можно ввести. Без даты — нет ограничения по календарю.'
+                : 'Действует до (классический промокод без режима «дней с активации»). Без даты — без ограничения.'}
+            </p>
+            <p className="text-gray-500 text-xs font-mono mb-3">{expiryEditRow.code}</p>
+            <input
+              type="date"
+              value={expiryEditDraft}
+              onChange={e => setExpiryEditDraft(e.target.value)}
+              disabled={saving}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500 mb-4 [color-scheme:dark]"
+            />
+            <div className="flex flex-wrap gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!saving) closePromoExpiryEdit()
+                }}
+                disabled={saving}
+                className="px-4 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white text-sm disabled:opacity-50"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                onClick={() => void savePromoExpiryEdit(null)}
+                disabled={saving}
+                className="px-4 py-2 rounded-lg border border-amber-800/80 text-amber-200/90 hover:bg-amber-950/40 text-sm disabled:opacity-50"
+              >
+                Без даты
+              </button>
+              <button
+                type="button"
+                onClick={() => void savePromoExpiryEdit()}
+                disabled={saving}
+                className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm disabled:opacity-50"
+              >
+                {saving ? '…' : 'Сохранить'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-4 sm:gap-3 sm:mb-6">
         <StatCard label="Всего" value={total} />
         <StatCard label="Свободно" value={freeCount} />
@@ -622,9 +1217,79 @@ function PromoTab() {
         <StatCard label="Отключено" value={disabledCount} />
       </div>
 
+      <p className="text-gray-500 text-sm mb-4 leading-relaxed">
+        Регистрация <span className="text-gray-400">без промокода</span> в приложении даёт владельцу{' '}
+        <span className="text-gray-400">72 часа полного Pro</span> (см. вкладку «Заведения»: колонка «Регистрация» и
+        поле <code className="text-gray-600 text-xs">pro_trial_ends_at</code>). Промокоды ниже — отдельный способ выдать
+        тариф и срок.
+      </p>
+      <p className="text-gray-600 text-xs mb-4 leading-relaxed border-l-2 border-gray-800 pl-3">
+        Тариф в строке промокода задаёт, что запишется в{' '}
+        <code className="text-gray-500 text-[10px]">establishments.subscription_type</code> в момент{' '}
+        <span className="text-gray-500">первого погашения</span> кода. Уже активированный код не переписывает заведение —
+        смена тарифа здесь влияет на новые активации и на отображение в админке.
+      </p>
+
       {/* Add form */}
       <div className="bg-gray-900 rounded-xl p-4 border border-gray-800 mb-4">
         <h2 className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">Новый промокод</h2>
+        <p className="text-[11px] text-gray-600 mb-3 leading-snug">
+          <span className="text-gray-500 font-medium">Промокод</span> — код выдачи тарифа (Pro/Ultra), сроков и при необходимости лимита сотрудников; это не то же самое, что платные подписки расширения в приложении.
+          Уже созданные коды <span className="text-gray-500">не меняются</span> автоматически: у старых пустое «дней с активации».
+          Ниже можно завести <span className="text-gray-500">второй тип срока</span> — дни Pro с момента активации кода.
+        </p>
+        <p className="text-[11px] text-gray-600 mb-3 leading-snug border-l-2 border-indigo-700/50 pl-3">
+          <span className="text-gray-500 font-medium">Подписки расширения Lite</span>: выбор только из фиксированных пакетов.
+          Для сотрудников: <span className="text-gray-400">+5 / +8 / +12 / +15</span>.
+          Для заведений: <span className="text-gray-400">+1 / +3 / +5 / +10</span>.
+        </p>
+        <div className="flex flex-col gap-2 mb-3">
+          <span className="text-[11px] text-gray-500 uppercase tracking-wide">Логика</span>
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-4">
+            <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+              <input
+                type="radio"
+                name="promoLogic"
+                className="accent-indigo-500"
+                checked={newPromoLogic === 'legacy'}
+                onChange={() => {
+                  setNewPromoLogic('legacy')
+                  setNewActivationDays('')
+                }}
+              />
+              Как раньше (классика)
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+              <input
+                type="radio"
+                name="promoLogic"
+                className="accent-indigo-500"
+                checked={newPromoLogic === 'activation'}
+                onChange={() => setNewPromoLogic('activation')}
+              />
+              Новый тип: дни Pro с активации
+            </label>
+          </div>
+          <p className="text-[11px] text-gray-600 mb-2">
+            Тариф промокода — отдельно от «классика / с активации»: попадёт в{' '}
+            <span className="text-gray-500">subscription_type</span> (Pro или Ultra), если не включён только режим расширений.
+          </p>
+          <div className="flex flex-col gap-1 mb-3 max-w-xs">
+            <label className="text-xs text-gray-500">Выдаваемый тариф</label>
+            <select
+              value={newGrantTier}
+              onChange={e => setNewGrantTier(e.target.value as PromoGrantSubscriptionType)}
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-indigo-500"
+            >
+              {PROMO_GRANT_SUBSCRIPTION_TYPES.map(t => (
+                <option key={t} value={t}>
+                  {subscriptionTierLabelRu(t)} ({t})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Промокод — код, заметка, даты</div>
         <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 sm:items-end">
           <input
             type="text"
@@ -641,7 +1306,7 @@ function PromoTab() {
             className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm"
           />
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Действует с</label>
+            <label className="text-xs text-gray-500">{newPromoLogic === 'legacy' ? 'Действует с' : 'Ввод кода с'}</label>
             <input
               type="date"
               value={newStartDate}
@@ -650,7 +1315,7 @@ function PromoTab() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-gray-500">Действует до</label>
+            <label className="text-xs text-gray-500">{newPromoLogic === 'legacy' ? 'Действует до' : 'Ввод кода до'}</label>
             <input
               type="date"
               value={newEndDate}
@@ -658,6 +1323,22 @@ function PromoTab() {
               className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500 text-sm"
             />
           </div>
+          {newPromoLogic === 'activation' && (
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-500" title="Только для нового типа: длина Pro от момента применения кода">
+                Дней Pro с активации
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="36500"
+                value={newActivationDays}
+                onChange={e => setNewActivationDays(e.target.value)}
+                placeholder="напр. 30"
+                className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28"
+              />
+            </div>
+          )}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-gray-500">Макс. сотр.</label>
             <input
@@ -669,6 +1350,48 @@ function PromoTab() {
               className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-24"
             />
           </div>
+        </div>
+        <div className="text-[10px] text-gray-500 uppercase tracking-wide mt-3 mb-1">
+          Подписки расширения (отдельно от промокода тарифа)
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 sm:items-end rounded-lg border border-gray-800 bg-gray-950/40 p-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-400">Увеличение сотрудников (пакет)</label>
+            <select
+              value={newEmpSlotPacks}
+              onChange={e => setNewEmpSlotPacks(e.target.value)}
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28"
+            >
+              {EMPLOYEE_PACK_OPTIONS.map(v => (
+                <option key={v} value={v}>
+                  {v === 0 ? 'нет' : `+${v}`}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-400">Доп. заведения/филиалы (пакет)</label>
+            <select
+              value={newBranchSlotPacks}
+              onChange={e => setNewBranchSlotPacks(e.target.value)}
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28"
+            >
+              {BRANCH_PACK_OPTIONS.map(v => (
+                <option key={v} value={v}>
+                  {v === 0 ? 'нет' : `+${v}`}
+                </option>
+              ))}
+            </select>
+          </div>
+          <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer sm:mb-0 col-span-2 sm:col-auto">
+            <input
+              type="checkbox"
+              className="accent-indigo-500 rounded"
+              checked={newAdditiveOnly}
+              onChange={e => setNewAdditiveOnly(e.target.checked)}
+            />
+            Только расширения (без смены тарифа промокодом)
+          </label>
           <button
             onClick={addCode}
             disabled={saving || !newCode.trim()}
@@ -676,6 +1399,48 @@ function PromoTab() {
           >
             {saving ? '...' : '+ Создать'}
           </button>
+        </div>
+        <div className="text-[11px] text-gray-600 mt-3 border-t border-gray-800 pt-3 leading-snug space-y-1.5">
+          <div>
+            <span className="text-gray-500">Промокод при погашении: </span>
+            <span className="text-gray-400">
+              {newAdditiveOnly
+                ? 'только расширения (тариф по коду не меняется)'
+                : `тариф ${subscriptionTierLabelRu(newGrantTier)}; даты и макс. сотр. — как в полях выше`}
+            </span>
+          </div>
+          {(() => {
+            const de = newEmpSlotPacks.trim() === '' ? 0 : parseInt(newEmpSlotPacks.trim(), 10)
+            const db = newBranchSlotPacks.trim() === '' ? 0 : parseInt(newBranchSlotPacks.trim(), 10)
+            if (
+              Number.isNaN(de) ||
+              Number.isNaN(db) ||
+              !EMPLOYEE_PACK_OPTIONS.includes(de as typeof EMPLOYEE_PACK_OPTIONS[number]) ||
+              !BRANCH_PACK_OPTIONS.includes(db as typeof BRANCH_PACK_OPTIONS[number])
+            ) {
+              return (
+                <div className="text-amber-600/90">
+                  Выберите пакеты только из фиксированного списка.
+                </div>
+              )
+            }
+            return (
+              <>
+                <div>
+                  <span className="text-gray-500">Пакет сотрудников: </span>
+                  <span className="text-gray-400">
+                    {de === 0 ? 'не включен' : `+${de}`}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Пакет заведений: </span>
+                  <span className="text-gray-400">
+                    {db === 0 ? 'не включен' : `+${db}`}
+                  </span>
+                </div>
+              </>
+            )
+          })()}
         </div>
       </div>
 
@@ -715,8 +1480,31 @@ function PromoTab() {
                   <th className="px-4 py-3 text-left">Код</th>
                   <th className="px-4 py-3 text-left">Статус</th>
                   <th className="px-4 py-3 text-left">Заметка / Заведение</th>
-                  <th className="px-4 py-3 text-left">До</th>
+                  <th
+                    className="px-4 py-3 text-left"
+                    title="Классика: дата «действует до». Новый тип: дни с активации и при необходимости срок ввода кода."
+                  >
+                    Логика / срок
+                  </th>
                   <th className="px-4 py-3 text-center">Сотр.</th>
+                  <th
+                    className="px-4 py-3 text-center text-[10px] uppercase max-w-[5.5rem]"
+                    title="Отдельная подписка расширения Lite: число активаций в коде, каждая даёт +5 к лимиту сотрудников на заведение погашения"
+                  >
+                    +5 сотр.
+                  </th>
+                  <th
+                    className="px-4 py-3 text-center text-[10px] uppercase max-w-[5.5rem]"
+                    title="Отдельная подписка расширения: число активаций в коде, каждая даёт +1 филиал на владельца"
+                  >
+                    +1 фил.
+                  </th>
+                  <th
+                    className="px-4 py-3 text-center text-[10px] uppercase"
+                    title="Только подписки расширения в коде, без выдачи тарифа Pro/Ultra"
+                  >
+                    Только расш.
+                  </th>
                   <th className="px-4 py-3 text-left">Создан</th>
                   <th className="px-4 py-3 text-right">Действия</th>
                 </tr>
@@ -733,12 +1521,20 @@ function PromoTab() {
                   const codeBtnClass = row.is_disabled
                     ? 'font-mono font-bold text-red-400 hover:text-red-300 transition'
                     : 'font-mono font-bold text-white hover:text-indigo-400 transition'
+                  const isNewType = (row.activation_duration_days ?? 0) > 0
                   return (
                     <tr key={row.id} className={`border-b border-gray-800/50 hover:bg-gray-800/30 transition ${i === filtered.length - 1 ? 'border-0' : ''}`}>
                       <td className="px-4 py-3">
-                        <button type="button" onClick={() => navigator.clipboard.writeText(row.code)} className={codeBtnClass}>
-                          {row.code}
-                        </button>
+                        <div className="flex flex-col gap-0.5 items-start">
+                          <button type="button" onClick={() => navigator.clipboard.writeText(row.code)} className={codeBtnClass}>
+                            {row.code}
+                          </button>
+                          <span className="text-[10px] text-gray-600 font-normal tracking-normal">
+                            {isNewType ? 'тип: с активации' : 'тип: классика'}
+                          </span>
+                          <span className="text-[10px] text-gray-500">тариф</span>
+                          <PromoGrantTierSelect row={row} saving={saving} onPick={patchPromoGrantTier} />
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusCfg.cls}`}>{statusCfg.label}</span>
@@ -746,10 +1542,37 @@ function PromoTab() {
                       <td className="px-4 py-3 text-gray-400">
                         {row.is_used && row.establishments?.name ? <span className="text-white">{row.establishments.name}</span> : row.note || '—'}
                       </td>
-                      <td className="px-4 py-3 text-gray-400">
-                        <button onClick={() => setEndDate(row.id)} className={`hover:text-white transition text-xs ${isExpired(row.expires_at) ? 'text-red-400' : ''}`}>
-                          {formatDate(row.expires_at)}
-                        </button>
+                      <td className="px-4 py-3 text-gray-400 align-top">
+                        {row.activation_duration_days != null && row.activation_duration_days > 0 ? (
+                          <div className="space-y-1">
+                            <button
+                              type="button"
+                              onClick={() => setActivationDays(row.id, row.activation_duration_days ?? null)}
+                              className="block text-left text-emerald-300/95 hover:text-emerald-200 text-xs"
+                            >
+                              {row.activation_duration_days} дн. с активации
+                            </button>
+                            {row.expires_at ? (
+                              <button
+                                type="button"
+                                onClick={() => openPromoExpiryEdit(row)}
+                                className={`block text-[10px] text-gray-500 hover:text-gray-300 ${isExpired(row.expires_at) ? 'text-red-400' : ''}`}
+                              >
+                                ввести до {formatDate(row.expires_at)}
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-gray-600">ввод кода без крайней даты</span>
+                            )}
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openPromoExpiryEdit(row)}
+                            className={`hover:text-white transition text-xs ${isExpired(row.expires_at) ? 'text-red-400' : ''}`}
+                          >
+                            {formatDate(row.expires_at)}
+                          </button>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <button onClick={() => setMaxEmployees(row.id, row.max_employees)} className="text-xs font-mono hover:text-indigo-400 transition">
@@ -758,7 +1581,51 @@ function PromoTab() {
                             : <span className="text-gray-600">∞</span>}
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">{formatDate(row.created_at)}</td>
+                      <td className="px-4 py-3 text-center align-top">
+                        <select
+                          title="Пакет сотрудников"
+                          value={String(row.grants_employee_slot_packs ?? 0)}
+                          onChange={e => setEmpSlotPacks(row.id, parseInt(e.target.value, 10))}
+                          className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200"
+                        >
+                          {EMPLOYEE_PACK_OPTIONS.map(v => (
+                            <option key={v} value={v}>
+                              {v === 0 ? 'нет' : `+${v}`}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-4 py-3 text-center align-top">
+                        <select
+                          title="Пакет заведений"
+                          value={String(row.grants_branch_slot_packs ?? 0)}
+                          onChange={e => setBranchSlotPacks(row.id, parseInt(e.target.value, 10))}
+                          className="bg-gray-900 border border-gray-700 rounded px-2 py-1 text-xs text-gray-200"
+                        >
+                          {BRANCH_PACK_OPTIONS.map(v => (
+                            <option key={v} value={v}>
+                              {v === 0 ? 'нет' : `+${v}`}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <button
+                          type="button"
+                          title="Только подписки расширения, без смены тарифа"
+                          onClick={() => toggleAdditiveOnly(row)}
+                          className={`text-[10px] px-2 py-0.5 rounded border transition ${
+                            row.grants_additive_only
+                              ? 'border-amber-600/60 text-amber-200 bg-amber-950/40'
+                              : 'border-gray-700 text-gray-600 hover:border-gray-500'
+                          }`}
+                        >
+                          {row.grants_additive_only ? 'да' : 'нет'}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap" title={row.created_at}>
+                        {formatDateTime(row.created_at)}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-2 justify-end flex-wrap">
                           <button
@@ -818,16 +1685,45 @@ function PromoTab() {
                       {row.is_used && row.establishments?.name ? row.establishments.name : row.note}
                     </div>
                   )}
+                  <div className="text-[10px] text-gray-600 mb-1 space-y-1">
+                    <div>{(row.activation_duration_days ?? 0) > 0 ? 'тип: с активации' : 'тип: классика'}</div>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-gray-500">Тариф</span>
+                      <PromoGrantTierSelect
+                        row={row}
+                        saving={saving}
+                        onPick={patchPromoGrantTier}
+                        className="bg-gray-950 border border-gray-700 rounded-lg px-2 py-2 text-xs text-gray-200 w-full max-w-[16rem]"
+                      />
+                    </div>
+                  </div>
 
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 mb-3">
+                    {row.activation_duration_days != null && row.activation_duration_days > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setActivationDays(row.id, row.activation_duration_days ?? null)}
+                        className="text-emerald-300"
+                      >
+                        {row.activation_duration_days} дн. с активации
+                      </button>
+                    )}
                     {row.expires_at && (
                       <span className={isExpired(row.expires_at) ? 'text-red-400' : ''}>
-                        до {formatDate(row.expires_at)}
+                        {(row.activation_duration_days ?? 0) > 0 ? 'ввести до ' : 'до '}
+                        {formatDate(row.expires_at)}
                       </span>
                     )}
                     {row.max_employees != null && (
                       <span className="text-indigo-300">≤{row.max_employees} сотр.</span>
                     )}
+                    <span className="text-gray-600 block">
+                      Пакет сотрудников: {((row.grants_employee_slot_packs ?? 0) > 0) ? `+${row.grants_employee_slot_packs}` : 'нет'}
+                    </span>
+                    <span className="text-gray-600 block">
+                      Пакет заведений: {((row.grants_branch_slot_packs ?? 0) > 0) ? `+${row.grants_branch_slot_packs}` : 'нет'}
+                      {row.grants_additive_only ? ' · только расширения' : ''}
+                    </span>
                     <span>создан {formatDate(row.created_at)}</span>
                   </div>
 
@@ -848,16 +1744,50 @@ function PromoTab() {
                       {row.is_used ? '↩ Сбросить' : '✓ Отметить исп.'}
                     </button>
                     <button
-                      onClick={() => setEndDate(row.id)}
+                      onClick={() => openPromoExpiryEdit(row)}
                       className="px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white active:text-white text-sm"
+                      title="Дата окончания / ввода"
                     >
                       📅
                     </button>
                     <button
                       onClick={() => setMaxEmployees(row.id, row.max_employees)}
                       className="px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-white active:text-white text-sm"
+                      title="Макс. сотрудников (промо)"
                     >
                       👥
+                    </button>
+                    <select
+                      value={String(row.grants_employee_slot_packs ?? 0)}
+                      onChange={e => setEmpSlotPacks(row.id, parseInt(e.target.value, 10))}
+                      className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-900 text-gray-200 text-sm"
+                      title="Пакет сотрудников"
+                    >
+                      {EMPLOYEE_PACK_OPTIONS.map(v => (
+                        <option key={v} value={v}>
+                          {v === 0 ? 'Сотр.: нет' : `Сотр.: +${v}`}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={String(row.grants_branch_slot_packs ?? 0)}
+                      onChange={e => setBranchSlotPacks(row.id, parseInt(e.target.value, 10))}
+                      className="px-3 py-2 rounded-lg border border-gray-700 bg-gray-900 text-gray-200 text-sm"
+                      title="Пакет заведений"
+                    >
+                      {BRANCH_PACK_OPTIONS.map(v => (
+                        <option key={v} value={v}>
+                          {v === 0 ? 'Филиалы: нет' : `Филиалы: +${v}`}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => toggleAdditiveOnly(row)}
+                      className="px-3 py-2 rounded-lg border border-gray-700 text-gray-400 hover:text-amber-200 text-sm"
+                      title="Только подписки расширения"
+                    >
+                      +
                     </button>
                     <button
                       onClick={() => deleteCode(row.id)}
@@ -876,79 +1806,409 @@ function PromoTab() {
   )
 }
 
-// ─── Platform Settings Tab ────────────────────────────────────────────────────
+// ─── Security Tab ─────────────────────────────────────────────────────────────
 
-function PlatformSettingsTab() {
-  const [maxEstablishments, setMaxEstablishments] = useState<number>(5)
+function insightTextRu(i: Insight): string {
+  const nf = (n: number) => n.toLocaleString('ru-RU')
+  switch (i.kind) {
+    case 'traffic_volume':
+      return `За ~24 ч около ${nf(i.requests24h)} HTTP-запросов к зоне. Сравните с обычным днём: резкий рост часто совпадает с ботами или парсингом.`
+    case 'waf_activity':
+      return `Срабатывания WAF: блокировок ${i.blocks}, challenge ${i.challenges}. Возможны сканирование, перебор или нетипичный клиент — смотрите Security в Cloudflare.`
+    case 'ip_noisy':
+      return `IP ${i.ip} даёт ${i.events} событий в выборке — проверьте rate limit / правило для IP (возможен парсинг или скрипт).`
+    case 'probe_path':
+      return `В выборке есть запрос к подозрительному пути (${i.pathSample}) — похоже на сканирование уязвимостей.`
+    case 'db_attack_note':
+      return 'Прямой доступ к БД из интернета здесь обычно не виден: Postgres за закрытым API. Риски — через ключи и эндпоинты; полные логи Auth/Edge — в Supabase.'
+    default:
+      return ''
+  }
+}
+
+function SecurityTab() {
+  const [data, setData] = useState<SecuritySnapshotPayload | null>(null)
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const res = await fetch('/api/platform-config')
-    const data = await res.json()
+    const res = await fetch('/api/security-snapshot')
+    const json = (await res.json()) as SecuritySnapshotPayload & { error?: string }
     if (!res.ok) {
-      setError(data?.error || 'Ошибка загрузки')
+      setError(typeof json?.error === 'string' ? json.error : 'Ошибка загрузки')
+      setData(null)
     } else {
-      setMaxEstablishments(data.max_establishments_per_owner ?? 5)
+      setData(json as SecuritySnapshotPayload)
     }
     setLoading(false)
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
-  async function save() {
-    setSaving(true)
-    setError(null)
-    const res = await fetch('/api/platform-config', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ max_establishments_per_owner: maxEstablishments }),
-    })
-    const data = await res.json()
-    if (!res.ok) {
-      setError(data?.error || 'Ошибка сохранения')
-    }
-    setSaving(false)
+  if (loading) {
+    return <div className="p-12 text-center text-gray-500">Загрузка...</div>
   }
-
-  if (loading) return <div className="p-12 text-center text-gray-500">Загрузка...</div>
-
-  return (
-    <>
-      {error && (
-        <div className="mb-4 p-4 bg-red-900/30 border border-red-700 rounded-lg text-red-200 text-sm">
-          {error}
-        </div>
-      )}
-      <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 max-w-md">
-        <h2 className="text-base font-medium text-white mb-4">Лимит заведений на одного владельца</h2>
-        <p className="text-gray-400 text-sm mb-4">
-          Максимум дополнительных заведений (первое не в счёт). Владелец может добавить до этого числа дополнительных заведений.
-          Для отдельных аккаунтов лимит можно переопределить на вкладке «Заведения» (колонка «Лимит доп.»); если задано на нескольких заведениях одного владельца, действует минимальное значение.
-        </p>
-        <div className="flex items-center gap-3">
-          <input
-            type="number"
-            min={0}
-            max={999}
-            value={maxEstablishments}
-            onChange={e => setMaxEstablishments(Math.max(0, Math.min(999, parseInt(e.target.value, 10) || 0)))}
-            className="bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white w-24 focus:outline-none focus:border-indigo-500"
-          />
-          <span className="text-gray-400 text-sm">дополнительных заведений</span>
-        </div>
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <p className="text-red-300 text-sm">{error}</p>
         <button
-          onClick={save}
-          disabled={saving}
-          className="mt-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-4 py-2 rounded-lg font-medium text-sm"
+          type="button"
+          onClick={() => load()}
+          className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm font-medium"
         >
-          {saving ? 'Сохранение...' : 'Сохранить'}
+          Обновить
         </button>
       </div>
-    </>
+    )
+  }
+  if (!data) return null
+
+  const cf = data.cloudflare
+  const reqStr =
+    typeof cf.requests24hApprox === 'number'
+      ? cf.requests24hApprox.toLocaleString('ru-RU')
+      : '—'
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <p className="text-gray-400 text-sm leading-relaxed">
+        Сводка периметра: трафик и WAF (Cloudflare, если заданы CLOUDFLARE_API_TOKEN и CLOUDFLARE_ZONE_ID в
+        секретах Worker), эвристики и ссылки в консоли. Полные сырые логи — в Cloudflare и Supabase.
+      </p>
+      <p className="text-gray-500 text-xs">Снимок: {data.generatedAt}</p>
+
+      <section>
+        <h2 className="text-base font-semibold text-white mb-2">Cloudflare</h2>
+        {!cf.configured ? (
+          <p className="text-gray-400 text-sm">
+            API Cloudflare не настроен. В Secrets/переменных Worker задайте CLOUDFLARE_API_TOKEN и
+            CLOUDFLARE_ZONE_ID (Analytics + Firewall Read) — появятся счётчик и события WAF. Опционально
+            CLOUDFLARE_ACCOUNT_ID — для прямых ссылок в дашборд.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-gray-200 text-sm">
+              Запросы (~24 ч): <span className="font-mono text-indigo-300">{reqStr}</span>
+            </p>
+            {cf.graphqlErrors && cf.graphqlErrors.length > 0 && (
+              <p className="text-amber-300/90 text-xs">{cf.graphqlErrors.join('; ')}</p>
+            )}
+          </div>
+        )}
+      </section>
+
+      {data.hint ? (
+        <p className="text-amber-200/90 text-sm border border-amber-800/50 rounded-lg p-3 bg-amber-950/20">
+          {data.hint}
+        </p>
+      ) : null}
+
+      <section>
+        <h2 className="text-base font-semibold text-white mb-3">Интерпретация</h2>
+        <ul className="space-y-3">
+          {data.insights.map((row, idx) => (
+            <li key={idx} className="flex gap-2 text-sm text-gray-300">
+              <span className="shrink-0" title={row.severity}>
+                {row.severity === 'warning' ? '⚠️' : 'ℹ️'}
+              </span>
+              <span>{insightTextRu(row)}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section>
+        <h2 className="text-base font-semibold text-white mb-2">События WAF (последние)</h2>
+        {!cf.configured || cf.firewallEvents.length === 0 ? (
+          <p className="text-gray-500 text-sm">
+            {cf.configured ? 'Нет событий в выборке или недоступно на тарифе/API.' : '—'}
+          </p>
+        ) : (
+          <div className="overflow-x-auto bg-gray-900 rounded-xl border border-gray-800">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-800 text-gray-500 text-left">
+                  <th className="px-3 py-2">Действие</th>
+                  <th className="px-3 py-2">IP</th>
+                  <th className="px-3 py-2">Путь</th>
+                  <th className="px-3 py-2">Время</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cf.firewallEvents.slice(0, 25).map((e, i) => {
+                  const path = (e.clientRequestPath ?? '').toString()
+                  const short = path.length > 56 ? `${path.slice(0, 56)}…` : path
+                  return (
+                    <tr key={i} className="border-b border-gray-800/60">
+                      <td className="px-3 py-2 text-gray-300">{e.action ?? '—'}</td>
+                      <td className="px-3 py-2 font-mono text-gray-400">{e.clientIP ?? '—'}</td>
+                      <td className="px-3 py-2 text-gray-400 max-w-[14rem] truncate" title={path}>
+                        {short || '—'}
+                      </td>
+                      <td className="px-3 py-2 text-gray-500 whitespace-nowrap">{e.datetime ?? '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section>
+        <h2 className="text-base font-semibold text-white mb-2">Полные логи</h2>
+        <ul className="space-y-2 text-sm">
+          <li>
+            <a
+              href={data.links.cloudflareSecurity}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Cloudflare — Security / Analytics
+            </a>
+          </li>
+          <li>
+            <a
+              href={data.links.cloudflareWaf}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Cloudflare — WAF
+            </a>
+          </li>
+          <li>
+            <a
+              href={data.links.supabaseLogs}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Supabase — Logs
+            </a>
+          </li>
+          <li>
+            <a
+              href={data.links.supabaseAuth}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Supabase — Auth
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <button
+        type="button"
+        onClick={() => load()}
+        className="bg-gray-800 hover:bg-gray-700 border border-gray-700 px-4 py-2 rounded-lg text-sm"
+      >
+        Обновить данные
+      </button>
+    </div>
+  )
+}
+
+// ─── System health / load Tab ─────────────────────────────────────────────────
+
+function SystemHealthTab() {
+  const [data, setData] = useState<SystemHealthPayload | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    const res = await fetch('/api/system-health')
+    const json = (await res.json()) as SystemHealthPayload & { error?: string }
+    if (!res.ok) {
+      setError(typeof json?.error === 'string' ? json.error : 'Ошибка загрузки')
+      setData(null)
+    } else {
+      setData(json as SystemHealthPayload)
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  if (loading) {
+    return <div className="p-12 text-center text-gray-500">Загрузка...</div>
+  }
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <p className="text-red-300 text-sm">{error}</p>
+        <button
+          type="button"
+          onClick={() => load()}
+          className="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-lg text-sm font-medium"
+        >
+          Повторить
+        </button>
+      </div>
+    )
+  }
+  if (!data) return null
+
+  const reqStr =
+    typeof data.cloudflare.requests24hApprox === 'number'
+      ? data.cloudflare.requests24hApprox.toLocaleString('ru-RU')
+      : '—'
+
+  function latencyClass(ms: number, ok: boolean): string {
+    if (!ok) return 'text-red-400'
+    if (ms >= 1200) return 'text-amber-300'
+    return 'text-emerald-300'
+  }
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <p className="text-gray-400 text-sm leading-relaxed">
+        Быстрые проверки из админки: доступность Supabase (Auth и API к БД) и объём HTTP-запросов к зоне сайта в
+        Cloudflare за ~24 ч. Это не замена мониторингу в Supabase (CPU, квоты, логи Edge), но помогает заметить
+        отказ или аномальный трафик до того, как «ляжет» приложение у пользователей.
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <span
+          className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+            data.ok ? 'bg-emerald-950/60 text-emerald-200 border border-emerald-800/50' : 'bg-red-950/60 text-red-200 border border-red-800/50'
+          }`}
+        >
+          {data.ok ? 'Критичные проверки пройдены' : 'Есть проблемы доступности'}
+        </span>
+        <span className="text-gray-500 text-xs">Снимок: {data.generatedAt}</span>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        <StatCard
+          label="Auth (GoTrue)"
+          value={data.authHealth ? `${data.authHealth.latencyMs} мс` : '—'}
+          dimmed={!data.authHealth?.ok}
+        />
+        <StatCard
+          label="API БД (PostgREST)"
+          value={data.restSmoke ? `${data.restSmoke.latencyMs} мс` : '—'}
+          dimmed={!data.restSmoke?.ok}
+        />
+        <StatCard
+          label="Заведений (оценка)"
+          value={data.restRowEstimate != null ? data.restRowEstimate : '—'}
+        />
+        <StatCard label="HTTP к зоне (~24 ч)" value={reqStr} />
+      </div>
+
+      {(data.authHealth || data.restSmoke) && (
+        <div className="text-xs text-gray-500 space-y-1 font-mono">
+          {data.authHealth ? (
+            <p className={latencyClass(data.authHealth.latencyMs, data.authHealth.ok)}>
+              Auth: {data.authHealth.ok ? 'OK' : 'FAIL'}
+              {data.authHealth.status != null ? ` ${data.authHealth.status}` : ''}
+              {data.authHealth.detail ? ` — ${data.authHealth.detail}` : ''}
+            </p>
+          ) : null}
+          {data.restSmoke ? (
+            <p className={latencyClass(data.restSmoke.latencyMs, data.restSmoke.ok)}>
+              REST HEAD establishments: {data.restSmoke.ok ? 'OK' : 'FAIL'}
+              {data.restSmoke.status != null ? ` ${data.restSmoke.status}` : ''}
+              {data.restSmoke.detail ? ` — ${data.restSmoke.detail}` : ''}
+            </p>
+          ) : null}
+          {data.supabaseUrlHost ? (
+            <p className="text-gray-600 truncate" title={data.supabaseUrlHost}>
+              Хост: {data.supabaseUrlHost}
+            </p>
+          ) : null}
+        </div>
+      )}
+
+      {!data.cloudflare.configured && (
+        <p className="text-amber-200/90 text-sm border border-amber-800/50 rounded-lg p-3 bg-amber-950/20">
+          Трафик Cloudflare не подключён: добавьте CLOUDFLARE_API_TOKEN и CLOUDFLARE_ZONE_ID в секреты Worker — как для
+          вкладки «Безопасность».
+        </p>
+      )}
+      {data.cloudflare.configured && data.cloudflare.graphqlError && (
+        <p className="text-amber-300/90 text-xs">{data.cloudflare.graphqlError}</p>
+      )}
+
+      {data.hints.length > 0 && (
+        <section>
+          <h2 className="text-base font-semibold text-white mb-2">Подсказки</h2>
+          <ul className="space-y-2">
+            {data.hints.map((h, i) => (
+              <li key={i} className="text-sm text-gray-400 border-l-2 border-gray-700 pl-3">
+                {h}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section>
+        <h2 className="text-base font-semibold text-white mb-2">Где смотреть полные метрики</h2>
+        <ul className="space-y-2 text-sm">
+          <li>
+            <a
+              href={data.links.supabaseProject}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Supabase — проект (отчёты, логи, биллинг)
+            </a>
+          </li>
+          <li>
+            <a
+              href={data.links.supabaseAdvisor}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Supabase — Advisors (медленные запросы, индексы)
+            </a>
+          </li>
+          <li>
+            <a
+              href={data.links.cloudflareAnalytics}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Cloudflare — аналитика трафика зоны
+            </a>
+          </li>
+          <li>
+            <a
+              href={data.links.cloudflareWorkersOverview}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:text-indigo-300 underline"
+            >
+              Cloudflare — Workers &amp; Pages (в т.ч. эта админка)
+            </a>
+          </li>
+        </ul>
+      </section>
+
+      <button
+        type="button"
+        onClick={() => load()}
+        className="bg-gray-800 hover:bg-gray-700 border border-gray-700 px-4 py-2 rounded-lg text-sm"
+      >
+        Обновить проверки
+      </button>
+    </div>
   )
 }
 

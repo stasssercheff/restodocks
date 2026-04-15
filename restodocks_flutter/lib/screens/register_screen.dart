@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/roles_config.dart';
 import '../services/services.dart';
+import '../utils/employee_limit_message.dart';
 import '../utils/person_name_format.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/apple_email_prefill_button.dart';
@@ -194,7 +195,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         devLog('DEBUG: Supabase Auth signUp failed: $e');
       }
 
-      // Проверяем лимит сотрудников по промокоду заведения
+      // Лимит сотрудников (тариф + пакеты; owner без должности не в счёте — см. RPC)
       try {
         final limitResult = await Supabase.instance.client.rpc(
           'check_employee_limit',
@@ -203,7 +204,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
         if (limitResult == 'limit_reached') {
           if (!mounted) return;
           final loc = context.read<LocalizationService>();
-          setState(() => _errorMessage = loc.t('employee_limit_reached'));
+          var msg = loc.t('employee_limit_reached');
+          try {
+            final capRaw = await Supabase.instance.client.rpc(
+              'establishment_active_employee_cap',
+              params: {'p_establishment_id': establishment.id},
+            );
+            final capStr = capRaw?.toString();
+            if (capStr != null && capStr.isNotEmpty) {
+              msg = loc.t('employee_limit_reached_cap', args: {'cap': capStr});
+            }
+          } catch (_) {}
+          setState(() => _errorMessage = msg);
           return;
         }
       } catch (_) {
@@ -223,7 +235,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         birthday: _birthday,
       );
 
-      final infoMail = await EmailService().sendRegistrationEmail(
+      var infoMail = await EmailService().sendRegistrationEmail(
         isOwner: false,
         to: email,
         companyName: establishment.name,
@@ -233,11 +245,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
         languageCode: locUi,
       );
       if (!infoMail.ok) {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        infoMail = await EmailService().sendRegistrationEmail(
+          isOwner: false,
+          to: email,
+          companyName: establishment.name,
+          email: email,
+          fullName: fullName,
+          registeredAtLocal: registeredAtLocal,
+          languageCode: locUi,
+        );
+      }
+      if (!infoMail.ok) {
         devLog('RegisterEmployee: sendRegistrationEmail failed: ${infoMail.error}');
       }
-      // Письмо со ссылкой: Edge confirmation_only (Resend). Auth/Hook часто не шлёт второе письмо в том же проекте.
+      // Письмо со ссылкой: Edge confirmation_only (Resend). Пауза снижает риск лимита Resend на втором письме.
       var resendFailed = false;
       if (!hasSession) {
+        await Future<void>.delayed(const Duration(milliseconds: 900));
         final confirmMail = await EmailService().sendConfirmationLinkRequest(
           email,
           languageCode: locUi,
@@ -265,6 +290,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } catch (e) {
       if (!mounted) return;
       final loc = context.read<LocalizationService>();
+      if (employeeLimitCapFromMessage(e.toString()) != null ||
+          e.toString().toLowerCase().contains('employee_limit_reached')) {
+        setState(() => _errorMessage = employeeLimitUserMessage(loc, e));
+        return;
+      }
       setState(() => _errorMessage = loc.t('register_error', args: {'error': e.toString()}));
     } finally {
       if (mounted) setState(() => _isLoading = false);

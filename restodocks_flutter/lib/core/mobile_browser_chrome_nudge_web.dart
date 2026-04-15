@@ -13,12 +13,38 @@ bool _targetMobileBrowser(html.Window w) {
       ua.contains('mobile');
 }
 
+/// iPad и iPadOS в режиме «настольного» Safari (UA как Macintosh + touch).
+bool _isIpadLikeBrowser(html.Window w) {
+  final ua = w.navigator.userAgent.toLowerCase();
+  if (ua.contains('ipad')) return true;
+  try {
+    if (ua.contains('macintosh') && (w.navigator.maxTouchPoints ?? 0) > 1) {
+      return true;
+    }
+  } catch (_) {}
+  return false;
+}
+
+/// Широкие планшеты (≥600dp): нудж отключали как «не телефон»; для iPad снова включаем.
+bool mobileBrowserSkipChromeNudgeForWideTablet() {
+  try {
+    final w = html.window;
+    if (!_targetMobileBrowser(w)) return true;
+    if (_isIpadLikeBrowser(w)) return false;
+    final iw = (w.innerWidth ?? 0).toDouble();
+    final ih = (w.innerHeight ?? 0).toDouble();
+    return math.min(iw, ih) >= 600;
+  } catch (_) {
+    return true;
+  }
+}
+
 /// Лёгкий сдвиг scroll документа при прокрутке списков во Flutter: мобильные браузеры
 /// чаще убирают адресную строку/панель вкладок только при движении страницы, а не канваса.
 void mobileBrowserChromeNudgeFromFlutterScroll() {
   try {
     final now = DateTime.now().millisecondsSinceEpoch;
-    if (now - _lastChromeNudgeMs < 200) return;
+    if (now - _lastChromeNudgeMs < 130) return;
     _lastChromeNudgeMs = now;
 
     final w = html.window;
@@ -52,7 +78,9 @@ void mobileBrowserChromeNudgeOnLandscapeIfPhone() {
     final iw = (w.innerWidth ?? 0).toDouble();
     final ih = (w.innerHeight ?? 0).toDouble();
     if (iw <= ih) return;
-    if (math.min(iw, ih) >= 600) return;
+    // Планшеты ≥600px раньше исключали: на iPad в Safari панель вкладок тоже
+    // иногда убирается только через scroll документа — для iPad нудж включаем снова.
+    if (math.min(iw, ih) >= 600 && !_isIpadLikeBrowser(w)) return;
 
     final doc = html.document.documentElement;
     final sh = (doc?.scrollHeight ?? 0).toDouble();

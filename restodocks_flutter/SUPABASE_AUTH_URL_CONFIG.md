@@ -28,6 +28,17 @@ https://restodocks.pages.dev/auth/confirm
 https://restodocks.pages.dev/auth/confirm-click
 ```
 
+Для **бэты** на поддомене (`https://beta.restodocks.com`, `https://demo.restodocks.com` и т.д.) добавьте те же пути с вашим хостом, иначе Supabase отрежет `redirect_to` и подставит **Site URL** (часто прод):
+
+```
+https://beta.restodocks.com/auth/confirm
+https://beta.restodocks.com/auth/confirm-click
+```
+
+Либо используйте wildcard, если ваш тариф/панель это поддерживает (проверьте в Dashboard).
+
+**Тема письма «Confirm Your Signup» на английском при русском интерфейсе:** это шаблон **встроенной** отправки GoTrue. Чтобы тема и кнопка шли из вашего текста (как в Edge `auth-send-email`), включите **Authentication → Hooks → Send Email** на функцию `auth-send-email` и задайте `SEND_EMAIL_HOOK_SECRET` в Secrets функции и в настройках хука. Тогда `redirect_to` берётся из `emailRedirectTo` при `signUp` (в коде он совпадает с хостом регистрации после правок `public_app_origin`).
+
 **Остальные (по необходимости):**
 ```
 https://restodocks.pages.dev
@@ -50,7 +61,7 @@ http://127.0.0.1:3000
 http://127.0.0.1:8080
 ```
 
-Сейчас в коде и в письмах используется только prod: ссылка в письме ведёт на `https://restodocks.com/auth/confirm-click`. Если позже будете слать для beta ссылку на `restodocks.pages.dev`, добавленные выше URL для pages.dev должны быть в списке.
+В приложении `emailRedirectTo` и ссылки Resend используют **текущий origin на вебе**, если хост распознан как «наш» (`restodocks.com`, поддомены `*.restodocks.com`, `*.restodocks.ru`, `*.restodocks.pages.dev`, `*.pages.dev` с `restodocks` в имени, localhost). Иначе подставляется `PUBLIC_APP_ORIGIN` из сборки — задайте его для нативных сборок бэты отдельно от прода.
 
 **Важно при переносе хостинга:** каждый новый домен (Vercel, Netlify, Cloudflare Pages и т.д.) нужно добавить сюда. Иначе Auth может давать «неверный пароль» или другие ошибки.
 

@@ -30,18 +30,18 @@ Deno.serve(async (req: Request) => {
     // Лимит: 3 парсинга через AI в день на заведение
     if (establishmentId) {
       const { checkAndIncrementAiTtkUsage } = await import("../_shared/ai_ttk_limit.ts");
-      const { allowed } = await checkAndIncrementAiTtkUsage(establishmentId);
+      const { allowed, reason } = await checkAndIncrementAiTtkUsage(establishmentId);
       if (!allowed) {
         return new Response(
-          JSON.stringify({ cards: [], error: "limit_3_per_day", reason: "ai_limit_exceeded" }),
+          JSON.stringify({ cards: [], error: reason ?? "ai_limit_exceeded", reason: reason ?? "ai_limit_exceeded" }),
           { status: 200, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } },
         );
       }
     }
 
-    const hasTextProvider = Deno.env.get("GROQ_API_KEY")?.trim() || Deno.env.get("GEMINI_API_KEY")?.trim() || Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() || Deno.env.get("OPENAI_API_KEY");
+    const hasTextProvider = Deno.env.get("DEEPSEEK_API_KEY")?.trim() || Deno.env.get("GROQ_API_KEY")?.trim() || Deno.env.get("GEMINI_API_KEY")?.trim() || Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() || Deno.env.get("OPENAI_API_KEY");
     if (!hasTextProvider) {
-      return new Response(JSON.stringify({ error: "GROQ_API_KEY, GEMINI_API_KEY, GIGACHAT_AUTH_KEY or OPENAI_API_KEY required" }), {
+      return new Response(JSON.stringify({ error: "DEEPSEEK_API_KEY, GROQ_API_KEY, GEMINI_API_KEY, GIGACHAT_AUTH_KEY or OPENAI_API_KEY required" }), {
         status: 500,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
@@ -115,7 +115,7 @@ Return ALL cards found (up to hundreds). If no cards, return { "cards": [] }.`;
         { role: "user", content: `Document table rows:\n${JSON.stringify(rows)}` },
       ],
       maxTokens: 16384,
-      context: "ttk",
+      context: "ttk_parse",
     });
 
     if (!content?.trim()) {

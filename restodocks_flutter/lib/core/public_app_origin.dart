@@ -43,12 +43,18 @@ bool isPublicAppHost(String host) {
   final h = host.toLowerCase();
   if (h == 'restodocks.com' || h == 'www.restodocks.com') return true;
   if (h == 'restodocks.ru' || h == 'www.restodocks.ru') return true;
+  // Поддомены (beta, demo и т.д.) — тот же redirect/emailRedirect, что и у текущей вкладки.
+  if (h.endsWith('.restodocks.com')) return true;
+  if (h.endsWith('.restodocks.ru')) return true;
   // Cloudflare Pages: прод-ветка и превью — часто *.restodocks.pages.dev
   if (h == 'restodocks.pages.dev' ||
       h == 'www.restodocks.pages.dev' ||
       h.endsWith('.restodocks.pages.dev')) {
     return true;
   }
+  // Иные *.pages.dev проекта (ветка staging и т.п.) — только если в имени есть restodocks.
+  if (h.endsWith('.pages.dev') && h.contains('restodocks')) return true;
+  if (h == 'localhost' || h.startsWith('127.0.0.1')) return true;
   try {
     final configured = Uri.parse(publicAppOrigin).host.toLowerCase();
     if (configured.isNotEmpty && h == configured) return true;

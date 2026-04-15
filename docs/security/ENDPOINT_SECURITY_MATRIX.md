@@ -25,7 +25,6 @@ Scope: web, iOS app, and Yandex web entry points.
 | `/api/auth` | admin login | brute-force on shared password flow | WAF + route rate-limit + lockout + MFA roadmap |
 | `/api/establishments*` | admin session | high impact if session stolen | signed httpOnly session + strict origin + audit logs |
 | `/api/promo` | admin session | abuse if auth bypassed | role check + request audit + rate-limit |
-| `/api/platform-config` | admin session | config tampering | role check + immutable change log |
 
 ## DB/RLS verification targets
 

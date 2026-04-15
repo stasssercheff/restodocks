@@ -15,6 +15,9 @@ const _minIntervalHours = 1;
 const _maxPerRun = 10;
 const _delayBetweenRequests = Duration(seconds: 2);
 const _maxPerDay = 50;
+const _catchUpMaxPerRun = 200;
+const _catchUpBatchSize = 25;
+const _catchUpDelayBetweenRequests = Duration(milliseconds: 350);
 
 /// Фоновая подгрузка КБЖУ для продуктов без калорий.
 /// Запускается после загрузки продуктов, не чаще раза в час, до 50 продуктов в сутки.
@@ -24,11 +27,19 @@ class NutritionBackfillService {
   NutritionBackfillService._();
 
   bool _running = false;
+  bool _catchUpRunning = false;
 
   /// Запустить фоновую подгрузку (неблокирующе).
   void startBackgroundBackfill(ProductStoreSupabase store) {
     if (_running) return;
     unawaited(_runBackfill(store));
+  }
+
+  /// Догоняющий проход без суточных/часовых лимитов:
+  /// пытаемся заполнить максимум старых пропусков за один запуск.
+  void startCatchUpBackfill(ProductStoreSupabase store) {
+    if (_running || _catchUpRunning) return;
+    unawaited(_runCatchUpBackfill(store));
   }
 
   Future<void> _runBackfill(ProductStoreSupabase store) async {
@@ -91,6 +102,51 @@ class NutritionBackfillService {
       }
     } finally {
       _running = false;
+    }
+  }
+
+  Future<void> _runCatchUpBackfill(ProductStoreSupabase store) async {
+    if (_running || _catchUpRunning) return;
+    final client = Supabase.instance.client;
+    if (client.auth.currentSession == null || client.auth.currentUser == null) {
+      return;
+    }
+    final am = AccountManagerSupabase();
+    if (!am.isLoggedInSync) return;
+    final dataEst = am.dataEstablishmentId?.trim();
+    if (dataEst == null || dataEst.isEmpty) return;
+    _catchUpRunning = true;
+    try {
+      try {
+        await client.auth.refreshSession();
+      } catch (_) {}
+      final attemptedIds = <String>{};
+      var processed = 0;
+
+      while (processed < _catchUpMaxPerRun) {
+        final candidates = store.allProducts
+            .where((p) => _needsKbju(p) && !attemptedIds.contains(p.id))
+            .take(_catchUpBatchSize)
+            .toList();
+        if (candidates.isEmpty) break;
+
+        for (final p in candidates) {
+          attemptedIds.add(p.id);
+          try {
+            final did =
+                await NutritionProfileResolver().resolveAndApplyMissingNutrition(
+              store: store,
+              product: p,
+              reason: 'catch_up_missing_fields',
+            );
+            if (did) processed++;
+          } catch (_) {}
+          await Future.delayed(_catchUpDelayBetweenRequests);
+          if (processed >= _catchUpMaxPerRun) break;
+        }
+      }
+    } finally {
+      _catchUpRunning = false;
     }
   }
 

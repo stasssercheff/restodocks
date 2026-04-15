@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../utils/dev_log.dart';
 
 import '../models/employee_direct_message.dart';
+import '../models/employee_message_system_link.dart';
+import '../utils/chat_system_link_paths.dart';
 import 'image_service.dart';
 import 'supabase_service.dart';
 
@@ -39,6 +41,25 @@ class EmployeeMessageService {
   }
 
   static const _chatImagesBucket = 'chat_images';
+  static const _chatVoiceBucket = 'chat_voice';
+
+  /// Макс. размер загрузки (согласовано с лимитом бакета `chat_voice`, см. миграцию).
+  static const int maxChatVoiceUploadBytes = 3 * 1024 * 1024;
+
+  /// m4a/mp4 из приложения или webm из записи в браузере.
+  static (String extension, String contentType) _voiceFileExtensionAndContentType(Uint8List bytes) {
+    if (bytes.length >= 4 && bytes[0] == 0x1a && bytes[1] == 0x45 && bytes[2] == 0xdf && bytes[3] == 0xa3) {
+      return ('.webm', 'audio/webm');
+    }
+    if (bytes.length >= 8 &&
+        bytes[4] == 0x66 &&
+        bytes[5] == 0x74 &&
+        bytes[6] == 0x79 &&
+        bytes[7] == 0x70) {
+      return ('.m4a', 'audio/mp4');
+    }
+    return ('.m4a', 'audio/mp4');
+  }
 
   /// Отправить фото.
   Future<EmployeeDirectMessage?> sendPhoto(
@@ -60,22 +81,82 @@ class EmployeeMessageService {
     }
   }
 
+  /// Отправить голосовое сообщение (aac в контейнере m4a).
+  ///
+  /// Передача в Supabase идёт по HTTPS (TLS). Отдельное сквозное шифрование файла
+  /// у получателя без расшифровки на стороне клиента здесь не делается.
+  Future<EmployeeDirectMessage?> sendVoiceBytes(
+    String senderEmployeeId,
+    String recipientEmployeeId,
+    Uint8List bytes,
+    int durationSeconds,
+  ) async {
+    if (durationSeconds < 1 || bytes.isEmpty) return null;
+    if (bytes.length > maxChatVoiceUploadBytes) {
+      devLog(
+        'EmployeeMessageService sendVoiceBytes: file too large '
+        '(${bytes.length} > $maxChatVoiceUploadBytes)',
+      );
+      return null;
+    }
+    try {
+      final extCt = _voiceFileExtensionAndContentType(bytes);
+      final objectPath =
+          '$senderEmployeeId/${DateTime.now().millisecondsSinceEpoch}${extCt.$1}';
+      await _supabase.client.storage.from(_chatVoiceBucket).uploadBinary(
+            objectPath,
+            bytes,
+            fileOptions: FileOptions(
+              upsert: true,
+              contentType: extCt.$2,
+            ),
+          );
+      final url = _supabase.client.storage.from(_chatVoiceBucket).getPublicUrl(objectPath);
+      return send(
+        senderEmployeeId,
+        recipientEmployeeId,
+        '',
+        audioUrl: url,
+        audioDurationSeconds: durationSeconds,
+      );
+    } catch (e) {
+      devLog('EmployeeMessageService sendVoiceBytes: $e');
+      rethrow;
+    }
+  }
+
   /// Отправить сообщение.
   Future<EmployeeDirectMessage?> send(
     String senderEmployeeId,
     String recipientEmployeeId,
     String content, {
     String? imageUrl,
+    String? audioUrl,
+    int? audioDurationSeconds,
+    List<EmployeeMessageSystemLink>? systemLinks,
   }) async {
     final trimmed = content.trim();
-    if (trimmed.isEmpty && (imageUrl == null || imageUrl.isEmpty)) return null;
+    final hasImage = imageUrl != null && imageUrl.isNotEmpty;
+    final hasAudio = audioUrl != null && audioUrl.isNotEmpty;
+    final links = sanitizeSystemLinks(systemLinks);
+    final hasLinks = links.isNotEmpty;
+    if (trimmed.isEmpty && !hasImage && !hasAudio && !hasLinks) return null;
     try {
       final payload = <String, dynamic>{
         'sender_employee_id': senderEmployeeId,
         'recipient_employee_id': recipientEmployeeId,
         'content': trimmed,
       };
-      if (imageUrl != null && imageUrl.isNotEmpty) payload['image_url'] = imageUrl;
+      if (hasImage) payload['image_url'] = imageUrl;
+      if (hasAudio) {
+        payload['audio_url'] = audioUrl;
+        if (audioDurationSeconds != null && audioDurationSeconds > 0) {
+          payload['audio_duration_seconds'] = audioDurationSeconds;
+        }
+      }
+      if (hasLinks) {
+        payload['system_links'] = links.map((e) => e.toJson()).toList();
+      }
       final data = await _supabase.client
           .from('employee_direct_messages')
           .insert(payload)

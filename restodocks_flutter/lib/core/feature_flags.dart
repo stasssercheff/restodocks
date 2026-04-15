@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'subscription_entitlements.dart';
 
 /// Feature flags.
 /// Prod (IS_BETA=false): кнопка импорта ТТК всегда. Beta: по --dart-define=ENABLE_TTK_IMPORT=true.
@@ -8,7 +9,7 @@ class FeatureFlags {
   /// Маркер беты. По умолчанию считаем, что это **prod**, если флаг не задан явно.
   static bool get isBeta => const bool.fromEnvironment('IS_BETA', defaultValue: false);
 
-  /// Основной прод-домен: для журнала ошибок (не смешивать с POS).
+  /// Основной прод-домен: скрываем POS на витрине (не смешивать с beta-хостами).
   static bool get _isProdMarketingHost {
     if (!kIsWeb) return false;
     final h = Uri.base.host.toLowerCase();
@@ -51,19 +52,26 @@ class FeatureFlags {
   static bool get _posModuleEnabledFromDefine =>
       const String.fromEnvironment('ENABLE_POS', defaultValue: 'false') == 'true';
 
+  /// Временно выключить весь POS UI (зал, столы, касса, KDS, склад/закупка POS, заказы подразделений, продажи POS).
+  /// Для бэты можно передать `--dart-define=HIDE_POS_MODULE=true` (см. `cloudflare-build.sh` / deploy-cloudflare-beta).
+  /// Обычная инвентаризация `/inventory` не относится к POS и не скрывается.
+  static bool get _hidePosModule =>
+      const String.fromEnvironment('HIDE_POS_MODULE', defaultValue: 'false') == 'true';
+
   /// Включается если: `IS_BETA=true`, или `ENABLE_POS=true`, или открыт известный не-прод веб-хост (Cloudflare Pages и т.д.).
   ///
   /// На **restodocks.com** / **www.restodocks.com** пункты POS в меню **никогда** не показываем — даже если в сборке
   /// ошибочно переданы `IS_BETA` / `ENABLE_POS` (витрина и основной прод без POS в навигации).
   /// Beta / превью / localhost — по правилам ниже.
   static bool get posModuleEnabled {
+    if (_hidePosModule) return false;
     if (_isProdMarketingHost) return false;
     return isBeta || _posModuleEnabledFromDefine || _posModuleEnabledWebNonProdHost;
   }
 
-  /// Экран «Журнал ошибок»: только в beta и не на основном прод-домене **restodocks.com**
-  /// (даже если в сборке ошибочно передан `IS_BETA=true`).
-  /// iOS / Android / web — одни и те же правила, чтобы не было «на сайте есть, в приложении нет».
-  static bool get showSystemErrorsJournal =>
-      isBeta && !_isProdMarketingHost;
+  /// POS в UI: только когда модуль включён для окружения и тарифный доступ Ultra-уровня
+  /// (включая активный trial 72 часа).
+  static bool posEnabledForSubscription(SubscriptionEntitlements entitlements) {
+    return posModuleEnabled && entitlements.hasUltraLevelFeatures;
+  }
 }

@@ -1047,9 +1047,11 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
     );
 
     final compactControls = isPhoneLayout;
+    // Отступ от AppBar / края body: иначе ряд сегментов визуально «прилипает» к красной шапке.
+    final controlsTopInset = landscapePhone ? 6.0 : 8.0;
     Widget controls = Padding(
-      padding: EdgeInsets.fromLTRB(
-          narrow ? 8 : 14, 0, narrow ? 8 : 14, isLandscape ? 4 : 6),
+      padding: EdgeInsets.fromLTRB(narrow ? 8 : 14, controlsTopInset,
+          narrow ? 8 : 14, isLandscape ? 4 : 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1101,13 +1103,6 @@ class _MenuFoodcostPanelState extends State<MenuFoodcostPanel> {
         ],
       ),
     );
-
-    if (landscapePhone) {
-      controls = Transform.translate(
-        offset: const Offset(0, -6),
-        child: controls,
-      );
-    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

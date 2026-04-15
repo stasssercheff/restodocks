@@ -107,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!context.mounted) return;
 
     final st = est.subscriptionType?.toLowerCase().trim();
-    if (st == 'pro' || st == 'premium') return;
+    if (st != null && Establishment.kPaidSubscriptionTiers.contains(st)) return;
     final trialEnd = est.proTrialEndsAt ?? DateTime.now().add(const Duration(hours: 72));
     if (!DateTime.now().isBefore(trialEnd)) return;
 
@@ -510,7 +510,10 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
     if (employee == null) return const Scaffold(body: SizedBox());
 
     return Scaffold(
-      appBar: AppBar(title: Text(loc.t('personal_cabinet'))),
+      appBar: AppBar(
+        leading: shellReturnLeading(context),
+        title: Text(loc.t('personal_cabinet')),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

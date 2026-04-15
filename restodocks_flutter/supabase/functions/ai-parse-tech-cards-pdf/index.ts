@@ -144,12 +144,13 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const hasProvider = Deno.env.get("GROQ_API_KEY")?.trim() ||
+    const hasProvider = Deno.env.get("DEEPSEEK_API_KEY")?.trim() ||
+      Deno.env.get("GROQ_API_KEY")?.trim() ||
       Deno.env.get("GEMINI_API_KEY")?.trim() ||
       Deno.env.get("GIGACHAT_AUTH_KEY")?.trim() ||
       Deno.env.get("OPENAI_API_KEY");
     if (!hasProvider) {
-      return new Response(JSON.stringify({ error: "AI provider key required" }), {
+      return new Response(JSON.stringify({ error: "AI provider key required (DEEPSEEK_API_KEY/GROQ_API_KEY/GEMINI_API_KEY/GIGACHAT_AUTH_KEY/OPENAI_API_KEY)" }), {
         status: 500,
         headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" },
       });
@@ -379,12 +380,16 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // 3. Шаблон и каталог не сработали — AI. Проверяем лимит (3 ТТК/день на заведение)
+    // 3. Шаблон и каталог не сработали — AI. Проверяем лимит по тарифу.
     if (establishmentId) {
       const { checkAndIncrementAiTtkUsage } = await import("../_shared/ai_ttk_limit.ts");
-      const { allowed } = await checkAndIncrementAiTtkUsage(establishmentId);
+      const { allowed, reason } = await checkAndIncrementAiTtkUsage(establishmentId);
       if (!allowed) {
-        const payload: Record<string, unknown> = { cards: [], reason: "ai_limit_exceeded", error: "limit_3_per_day" };
+        const payload: Record<string, unknown> = {
+          cards: [],
+          reason: reason ?? "ai_limit_exceeded",
+          error: reason ?? "ai_limit_exceeded",
+        };
         if (rows.length >= 2) payload.rows = rows;
         return new Response(JSON.stringify(payload), {
           status: 200, headers: { ...corsHeaders(req.headers.get("Origin")), "Content-Type": "application/json" } },
@@ -404,7 +409,7 @@ Deno.serve(async (req: Request) => {
           { role: "user", content: `PDF extracted text:\n\n${textForAi}` },
         ],
         maxTokens: 16384,
-        context: "ttk",
+        context: "ttk_parse",
       }) ?? "";
     } catch (aiErr) {
       return new Response(JSON.stringify({ cards: [], reason: `ai_error: ${aiErr}` }), {
@@ -447,7 +452,7 @@ Deno.serve(async (req: Request) => {
             { role: "user", content: text },
           ],
           maxTokens: 8192,
-          context: "ttk",
+          context: "ttk_parse",
         });
         if (simpleContent?.trim()) {
           const simpleCleaned = simpleContent.replace(/^```\w*\n?|\n?```$/g, "").trim();

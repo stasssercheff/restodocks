@@ -12,6 +12,20 @@ import '../utils/employee_display_utils.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
 
+const double _desktopEmployeeAvatarAndGapWidth = 46; // 36 avatar + 10 gap
+const double _desktopEmployeeColumnGap = 8;
+const double _desktopEmployeeRowHorizontalPadding = 12;
+const int _desktopEmployeeNameFlex = 4;
+const int _desktopEmployeeDepartmentFlex = 3;
+const int _desktopEmployeeHeaderPositionFlex = 2;
+const int _desktopEmployeeHeaderRateFlex = 2;
+const int _desktopEmployeeRowPositionFlex = 1;
+const int _desktopEmployeeRowRateFlex = 3;
+const double _desktopEmployeeRateRowLeftInset = 66;
+const double _desktopEmployeeDeptRowLeftShift = 0;
+const double _desktopEmployeePositionHeaderLeftShift = -6;
+const double _desktopEmployeePositionRowLeftShift = -18;
+
 /// Список сотрудников. Владелец видит всех; остальные — по своему отделу. Редактирование для шефа/владельца. Добавление — только личная регистрация по PIN.
 class EmployeesScreen extends StatefulWidget {
   const EmployeesScreen({super.key});
@@ -24,6 +38,8 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
   List<Employee> _list = [];
   bool _loading = true;
   String? _error;
+  int _employeeUsedCount = 0;
+  int _employeeCap = 0;
 
   bool _canEditEmployees(Employee? current) {
     if (current == null) return false;
@@ -53,6 +69,17 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final all = await acc.getEmployeesForEstablishment(est.id);
+      int cap = 0;
+      try {
+        final capRaw = await acc.supabase.client.rpc(
+          'establishment_active_employee_cap',
+          params: {'p_establishment_id': est.id},
+        );
+        cap = int.tryParse('${capRaw ?? ''}') ?? 0;
+      } catch (_) {
+        cap = 0;
+      }
+      final usedCount = all.where(_countsTowardEmployeeCap).length;
       // Скрываем только собственника без должности; остальных показываем
       final visible = all.where((e) => !(e.hasRole('owner') && e.positionRole == null)).toList();
       // Владелец, шеф, су-шеф видят всех; остальные — только свой отдел
@@ -62,10 +89,30 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
       // Дедупликация по id (на случай дублей из БД)
       final seen = <String>{};
       final list = filtered.where((e) => seen.add(e.id)).toList();
-      if (mounted) setState(() { _list = list; _loading = false; });
+      if (mounted) {
+        setState(() {
+          _list = list;
+          _employeeUsedCount = usedCount;
+          _employeeCap = cap;
+          _loading = false;
+        });
+      }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
     }
+  }
+
+  bool _countsTowardEmployeeCap(Employee e) {
+    if (!e.isActive) return false;
+    final hasOnlyOwnerRole =
+        e.roles.length == 1 && e.roles.first.trim().toLowerCase() == 'owner';
+    return !(hasOnlyOwnerRole && (e.positionRole == null || e.positionRole!.trim().isEmpty));
+  }
+
+  String _resolvedRateHeader(LocalizationService loc) {
+    final translated = loc.t('rate').trim();
+    if (translated.isEmpty || translated == 'rate') return 'Ставка';
+    return translated;
   }
 
   @override
@@ -91,7 +138,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: loc.t('refresh')),
         ],
       ),
-      body: _buildBody(loc, theme, canEdit, showTranslit),
+      body: _buildBody(loc, theme, canEdit, showTranslit, _resolvedRateHeader(loc)),
     );
   }
 
@@ -100,6 +147,7 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     ThemeData theme,
     bool canEdit,
     bool showTranslit,
+    String rateHeader,
   ) {
     if (_loading) return const Center(child: CircularProgressIndicator());
     if (_error != null) {
@@ -151,13 +199,28 @@ class _EmployeesScreenState extends State<EmployeesScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _EmployeeTableHeader(loc: loc, canEdit: canEdit),
+        if (_employeeCap > 0)
+          Padding(
+            padding: const EdgeInsets.only(right: 6, bottom: 4),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                '$_employeeUsedCount из $_employeeCap',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
+          ),
+        _EmployeeTableHeader(loc: loc, canEdit: canEdit, rateHeader: rateHeader),
         const SizedBox(height: 4),
         ...List.generate(_list.length, (i) => _EmployeeCard(
         employee: _list[i],
         loc: loc,
         showTranslit: showTranslit,
         canEdit: canEdit,
+        rateHeader: rateHeader,
         onEdit: () => _openEditEmployee(context, _list[i]),
         onDelete: () => _deleteEmployee(context, _list[i]),
       )),
@@ -298,10 +361,12 @@ class _EmployeeTableHeader extends StatelessWidget {
   const _EmployeeTableHeader({
     required this.loc,
     required this.canEdit,
+    required this.rateHeader,
   });
 
   final LocalizationService loc;
   final bool canEdit;
+  final String rateHeader;
 
   @override
   Widget build(BuildContext context) {
@@ -319,14 +384,29 @@ class _EmployeeTableHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Row(
         children: [
-          const SizedBox(width: 36 + 10), // аватар + отступ
-          Expanded(flex: 5, child: Text(loc.t('full_name') ?? 'Сотрудник', style: style)),
-          const SizedBox(width: 8),
-          Expanded(flex: 3, child: Text(loc.t('subdivision') ?? 'Подразделение', style: style)),
-          const SizedBox(width: 8),
-          Expanded(flex: 3, child: Text(loc.t('position') ?? 'Должность', style: style)),
-          const SizedBox(width: 8),
-          Expanded(flex: 2, child: Text(loc.t('rate') ?? 'Ставка', style: style)),
+          const SizedBox(width: _desktopEmployeeAvatarAndGapWidth),
+          Expanded(
+            flex: _desktopEmployeeNameFlex,
+            child: Text(loc.t('full_name') ?? 'Сотрудник', style: style),
+          ),
+          const SizedBox(width: _desktopEmployeeColumnGap),
+          Expanded(
+            flex: _desktopEmployeeDepartmentFlex,
+            child: Text(loc.t('subdivision') ?? 'Подразделение', style: style),
+          ),
+          const SizedBox(width: _desktopEmployeeColumnGap),
+          Expanded(
+            flex: _desktopEmployeeHeaderPositionFlex,
+            child: Transform.translate(
+              offset: const Offset(_desktopEmployeePositionHeaderLeftShift, 0),
+              child: Text(loc.t('position') ?? 'Должность', style: style),
+            ),
+          ),
+          const SizedBox(width: _desktopEmployeeColumnGap),
+          Expanded(
+            flex: _desktopEmployeeHeaderRateFlex,
+            child: Text(rateHeader, style: style, textAlign: TextAlign.left),
+          ),
           if (canEdit) const SizedBox(width: 64),
         ],
       ),
@@ -340,6 +420,7 @@ class _EmployeeCard extends StatelessWidget {
     required this.loc,
     required this.showTranslit,
     required this.canEdit,
+    required this.rateHeader,
     required this.onEdit,
     required this.onDelete,
   });
@@ -348,6 +429,7 @@ class _EmployeeCard extends StatelessWidget {
   final LocalizationService loc;
   final bool showTranslit;
   final bool canEdit;
+  final String rateHeader;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -355,6 +437,15 @@ class _EmployeeCard extends StatelessWidget {
     final pos = e.positionRole;
     if (pos == null || pos.isEmpty) return '—';
     return loc.roleDisplayName(pos);
+  }
+
+  String _rateUnitLabel() {
+    final isRu = loc.currentLanguageCode == 'ru';
+    final isPerShift = employee.paymentType == 'per_shift';
+    if (isRu) return isPerShift ? 'за смену' : 'за час';
+    return isPerShift
+        ? (loc.t('payment_per_shift') ?? 'per shift').toLowerCase()
+        : (loc.t('payment_hourly') ?? 'hourly').toLowerCase();
   }
 
   @override
@@ -370,13 +461,14 @@ class _EmployeeCard extends StatelessWidget {
     final currencySymbol = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
     final isPerShift = employee.paymentType == 'per_shift';
     final rate = isPerShift ? employee.ratePerShift : employee.hourlyRate;
+    final rateUnit = _rateUnitLabel();
     final rateStr = rate != null && rate > 0
-        ? '${NumberFormatUtils.formatInt(rate)} $currencySymbol'
+        ? '${NumberFormatUtils.formatInt(rate)} $currencySymbol · ${rateUnit.toLowerCase()}'
         : '—';
     final sectionStr = (employee.department == 'kitchen' && employee.section != null && employee.section!.isNotEmpty)
         ? (loc.t('section_${employee.section}') != 'section_${employee.section}'
             ? loc.t('section_${employee.section}')
-            : (employee.sectionDisplayName ?? employee.section!))
+            : (employee.kitchenSection?.getLocalizedName(loc.currentLanguageCode) ?? employee.section!))
         : null;
     final deptLabel = loc.departmentDisplayName(employee.department) != employee.department
         ? loc.departmentDisplayName(employee.department)
@@ -390,7 +482,10 @@ class _EmployeeCard extends StatelessWidget {
         onTap: canEdit ? onEdit : null,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(
+            horizontal: _desktopEmployeeRowHorizontalPadding,
+            vertical: 8,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -399,7 +494,7 @@ class _EmployeeCard extends StatelessWidget {
               const SizedBox(width: 10),
               // Имя + email
               Expanded(
-                flex: 5,
+                flex: _desktopEmployeeNameFlex,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -420,47 +515,62 @@ class _EmployeeCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: _desktopEmployeeColumnGap),
               // Подразделение (+ цех)
               Expanded(
-                flex: 3,
-                child: Text(
-                  deptStr,
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                flex: _desktopEmployeeDepartmentFlex,
+                child: Transform.translate(
+                  offset: const Offset(_desktopEmployeeDeptRowLeftShift, 0),
+                  child: Text(
+                    deptStr,
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: _desktopEmployeeColumnGap),
               // Должность
               Expanded(
-                flex: 3,
-                child: Text(
-                  positionDisplay(employee, loc),
-                  style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                flex: _desktopEmployeeRowPositionFlex,
+                child: Transform.translate(
+                  offset: const Offset(_desktopEmployeePositionRowLeftShift, 0),
+                  child: Text(
+                    positionDisplay(employee, loc),
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              // Ставка
+              const SizedBox(width: _desktopEmployeeColumnGap),
+              // Ставка (без иконки на ПК — экономит ширину и убирает overflow)
               Expanded(
-                flex: 2,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.payments_outlined, size: 14, color: theme.colorScheme.primary),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        rateStr,
-                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                flex: _desktopEmployeeRowRateFlex,
+                child: rateStr == '—'
+                    ? Align(
+                        alignment: Alignment.center,
+                        child: Transform.translate(
+                          offset: const Offset(-53, 0),
+                          child: Text(
+                            rateStr,
+                            style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.only(left: _desktopEmployeeRateRowLeftInset),
+                        child: Text(
+                          rateStr,
+                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.left,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
               ),
               // Кнопки редактирования
               if (canEdit) ...[
@@ -495,13 +605,14 @@ class _EmployeeCard extends StatelessWidget {
     final currencySymbol = est?.currencySymbol ?? Establishment.currencySymbolFor(est?.defaultCurrency ?? 'VND');
     final isPerShift = employee.paymentType == 'per_shift';
     final rate = isPerShift ? employee.ratePerShift : employee.hourlyRate;
+    final rateUnit = _rateUnitLabel();
     final rateStr = rate != null && rate > 0
-        ? '${NumberFormatUtils.formatInt(rate)} $currencySymbol'
+        ? '${NumberFormatUtils.formatInt(rate)} $currencySymbol · ${rateUnit.toLowerCase()}'
         : '—';
     final sectionStr = (employee.department == 'kitchen' && employee.section != null && employee.section!.isNotEmpty)
         ? (loc.t('section_${employee.section}') != 'section_${employee.section}'
             ? loc.t('section_${employee.section}')
-            : (employee.sectionDisplayName ?? employee.section!))
+            : (employee.kitchenSection?.getLocalizedName(loc.currentLanguageCode) ?? employee.section!))
         : null;
     final deptLabel = loc.departmentDisplayName(employee.department) != employee.department
         ? loc.departmentDisplayName(employee.department)
@@ -560,7 +671,12 @@ class _EmployeeCard extends StatelessWidget {
                       children: [
                         Icon(Icons.payments_outlined, size: 12, color: theme.colorScheme.primary),
                         const SizedBox(width: 4),
-                        Text(rateStr, style: subStyle?.copyWith(fontWeight: FontWeight.w500)),
+                        Text(
+                          '${rateHeader.toLowerCase()}: $rateStr',
+                          style: subStyle?.copyWith(fontWeight: FontWeight.w500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ],
@@ -773,7 +889,9 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
               const SizedBox(height: 16),
               Flexible(
                 child: SingleChildScrollView(
-                  child: Column(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       TextField(
@@ -782,6 +900,9 @@ class _EmployeeEditSheetState extends State<_EmployeeEditSheet> {
                           labelText: loc.t('full_name') ?? 'ФИО',
                           border: const OutlineInputBorder(),
                           filled: true,
+                          isDense: false,
+                          contentPadding: const EdgeInsets.fromLTRB(12, 18, 12, 14),
+                          floatingLabelAlignment: FloatingLabelAlignment.start,
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -1004,6 +1125,7 @@ ALTER TABLE employees ADD COLUMN IF NOT EXISTS hourly_rate REAL;''';
                   ),
                 ),
               ),
+            ),
             ],
           ),
         ),

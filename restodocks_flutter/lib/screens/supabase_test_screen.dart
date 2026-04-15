@@ -257,8 +257,13 @@ class _SupabaseTestScreenState extends State<SupabaseTestScreen> {
       final url = supabaseService.getFileUrl('test-bucket', 'test-file.jpg');
 
       if (mounted) {
+        final loc = context.read<LocalizationService>();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('URL файла: $url')),
+          SnackBar(
+            content: Text(
+              loc.t('dev_test_file_url', args: {'url': url}),
+            ),
+          ),
         );
       }
     } catch (e) {

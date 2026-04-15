@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../subscription_entitlements.dart';
 import '../initial_location_stub.dart'
     if (dart.library.html) '../initial_location_web.dart' as initial_loc;
 import '../../models/models.dart';
@@ -84,6 +85,15 @@ bool _isPublicPath(String loc) {
       loc.startsWith('/auth/confirm') ||
       loc.startsWith('/confirm-establishment-clone')) return true;
   return false;
+}
+
+String _normalizeDepartmentForTier(BuildContext context, String department) {
+  final d = department.trim();
+  if (d != 'bar') return d;
+  final ent = SubscriptionEntitlements.from(
+    context.read<AccountManagerSupabase>().establishment,
+  );
+  return ent.hasUltraLevelFeatures ? d : 'kitchen';
 }
 
 /// Начальный путь: при F5 (web) — текущая страница из URL, без сброса на домашний
@@ -193,10 +203,12 @@ class AppRouter {
       if (kIsWeb && loc.isNotEmpty && loc != '/' && loc != '/splash') {
         initial_loc.savePathForRefresh(loc);
       }
-      // Production: POS скрыт при IS_BETA=false (см. FeatureFlags.posModuleEnabled).
+      // POS скрыт, если модуль выключен флагом окружения или тариф не Ultra-уровня.
       // Исключение: /pos/procurement/:department используется как "Закупка" и в проде
       // (без POS-подсистемы: только Заказ продуктов + Поставщики).
-      if (account.isLoggedInSync && !FeatureFlags.posModuleEnabled) {
+      final ent = SubscriptionEntitlements.from(account.establishment);
+      final posOn = FeatureFlags.posEnabledForSubscription(ent);
+      if (account.isLoggedInSync && !posOn) {
         final p = loc.split('?').first;
         final isProcurementInProd = p.startsWith('/pos/procurement/');
         if ((p.startsWith('/pos') && !isProcurementInProd) ||
@@ -502,17 +514,6 @@ class AppRouter {
               const FiscalOutboxScreen(),
             ),
           ),
-          GoRoute(
-            path: '/settings/system-errors',
-            redirect: (context, state) {
-              if (!FeatureFlags.showSystemErrorsJournal) return '/settings';
-              return null;
-            },
-            pageBuilder: (context, state) => _slideTransitionPage(
-              state,
-              const SystemErrorsScreen(),
-            ),
-          ),
           // Добавить заведение (владелец)
           GoRoute(
             path: '/add-establishment',
@@ -547,6 +548,12 @@ class AppRouter {
           ),
           GoRoute(
             path: '/schedule/:department',
+            redirect: (context, state) {
+              final d = state.pathParameters['department'] ?? 'all';
+              final normalized = _normalizeDepartmentForTier(context, d);
+              if (normalized != d) return '/schedule/$normalized';
+              return null;
+            },
             pageBuilder: (context, state) {
               final department = state.pathParameters['department'] ?? 'all';
               final personal = state.queryParameters['personal'] == '1';
@@ -722,18 +729,30 @@ class AppRouter {
             pageBuilder: (context, state) => _slideTransitionPage(
               state,
               const SubscriptionOrTrialGate(
+                allowLiteTier: true,
                 child: ExpensesScreen(),
               ),
             ),
           ),
           GoRoute(
             path: '/expenses/salary',
+            redirect: (context, state) {
+              final d = state.queryParameters['department'];
+              if (d == null || d.isEmpty) return null;
+              final normalized = _normalizeDepartmentForTier(context, d);
+              if (normalized == d) return null;
+              final qp = Map<String, String>.from(state.queryParameters);
+              qp['department'] = normalized;
+              return Uri(path: '/expenses/salary', queryParameters: qp)
+                  .toString();
+            },
             pageBuilder: (context, state) {
               final department = state.queryParameters[
                   'department']; // kitchen|bar|hall для ФЗП по подразделению
               return _slideTransitionPage(
                 state,
                 SubscriptionOrTrialGate(
+                  allowLiteTier: true,
                   child: SalaryExpenseScreen(departmentFilter: department),
                 ),
               );
@@ -804,6 +823,12 @@ class AppRouter {
           ),
           GoRoute(
             path: '/pos/orders/:department',
+            redirect: (context, state) {
+              final d = state.pathParameters['department'] ?? 'kitchen';
+              final normalized = _normalizeDepartmentForTier(context, d);
+              if (normalized != d) return '/pos/orders/$normalized';
+              return null;
+            },
             pageBuilder: (context, state) {
               final dept = state.pathParameters['department'] ?? 'kitchen';
               return _slideTransitionPage(
@@ -814,6 +839,12 @@ class AppRouter {
           ),
           GoRoute(
             path: '/pos/warehouse/:scope',
+            redirect: (context, state) {
+              final scope = state.pathParameters['scope'] ?? 'kitchen';
+              final normalized = _normalizeDepartmentForTier(context, scope);
+              if (normalized != scope) return '/pos/warehouse/$normalized';
+              return null;
+            },
             pageBuilder: (context, state) {
               final scope = state.pathParameters['scope'] ?? 'kitchen';
               return _slideTransitionPage(
@@ -821,6 +852,20 @@ class AppRouter {
                 PosWarehouseHubScreen(scope: scope),
               );
             },
+          ),
+          GoRoute(
+            path: '/pos/sales-export',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const PosSalesExportScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/pos/establishment-summary',
+            pageBuilder: (context, state) => _slideTransitionPage(
+              state,
+              const PosEstablishmentProductSummaryScreen(),
+            ),
           ),
           GoRoute(
             path: '/pos/stock',
@@ -831,6 +876,12 @@ class AppRouter {
           ),
           GoRoute(
             path: '/procurement/:department',
+            redirect: (context, state) {
+              final d = state.pathParameters['department'] ?? 'kitchen';
+              final normalized = _normalizeDepartmentForTier(context, d);
+              if (normalized != d) return '/procurement/$normalized';
+              return null;
+            },
             pageBuilder: (context, state) {
               final dept = state.pathParameters['department'] ?? 'kitchen';
               return _slideTransitionPage(
@@ -841,6 +892,12 @@ class AppRouter {
           ),
           GoRoute(
             path: '/pos/procurement/:department',
+            redirect: (context, state) {
+              final d = state.pathParameters['department'] ?? 'kitchen';
+              final normalized = _normalizeDepartmentForTier(context, d);
+              if (normalized != d) return '/pos/procurement/$normalized';
+              return null;
+            },
             pageBuilder: (context, state) {
               final dept = state.pathParameters['department'] ?? 'kitchen';
               return _slideTransitionPage(
@@ -851,6 +908,12 @@ class AppRouter {
           ),
           GoRoute(
             path: '/pos/operations/:department',
+            redirect: (context, state) {
+              final d = state.pathParameters['department'] ?? 'kitchen';
+              final normalized = _normalizeDepartmentForTier(context, d);
+              if (normalized != d) return '/pos/operations/$normalized';
+              return null;
+            },
             pageBuilder: (context, state) {
               final dept = state.pathParameters['department'] ?? 'kitchen';
               return _slideTransitionPage(
@@ -868,6 +931,12 @@ class AppRouter {
           ),
           GoRoute(
             path: '/pos/kds/:department',
+            redirect: (context, state) {
+              final d = state.pathParameters['department'] ?? 'kitchen';
+              final normalized = _normalizeDepartmentForTier(context, d);
+              if (normalized != d) return '/pos/kds/$normalized';
+              return null;
+            },
             pageBuilder: (context, state) {
               final dept = state.pathParameters['department'] ?? 'kitchen';
               return _slideTransitionPage(
@@ -879,6 +948,12 @@ class AppRouter {
 
           GoRoute(
             path: '/sales/:department',
+            redirect: (context, state) {
+              final d = state.pathParameters['department'] ?? 'kitchen';
+              final normalized = _normalizeDepartmentForTier(context, d);
+              if (normalized != d) return '/sales/$normalized';
+              return null;
+            },
             pageBuilder: (context, state) {
               final dept = state.pathParameters['department'] ?? 'kitchen';
               return _slideTransitionPage(
@@ -934,6 +1009,17 @@ class AppRouter {
           ),
           GoRoute(
             path: '/menu/:department',
+            redirect: (context, state) {
+              final d = state.pathParameters['department'] ?? '';
+              final normalized = _normalizeDepartmentForTier(context, d);
+              if (normalized != d) return '/menu/$normalized';
+              if (d == 'banquet-catering' || d == 'banquet-catering-bar') {
+                final ent = SubscriptionEntitlements.from(
+                    context.read<AccountManagerSupabase>().establishment);
+                if (!ent.canAccessBanquetCatering) return '/home';
+              }
+              return null;
+            },
             pageBuilder: (context, state) {
               final department =
                   state.pathParameters['department'] ?? 'kitchen';
@@ -957,6 +1043,17 @@ class AppRouter {
           ),
           GoRoute(
             path: '/nomenclature/:department',
+            redirect: (context, state) {
+              final d = state.pathParameters['department'] ?? '';
+              final normalized = _normalizeDepartmentForTier(context, d);
+              if (normalized != d) return '/nomenclature/$normalized';
+              if (d == 'banquet-catering' || d == 'banquet-catering-bar') {
+                final ent = SubscriptionEntitlements.from(
+                    context.read<AccountManagerSupabase>().establishment);
+                if (!ent.canAccessBanquetCatering) return '/home';
+              }
+              return null;
+            },
             pageBuilder: (context, state) {
               final department =
                   state.pathParameters['department'] ?? 'general';
@@ -966,6 +1063,16 @@ class AppRouter {
           ),
           GoRoute(
             path: '/products/upload',
+            redirect: (context, state) {
+              final d = state.queryParameters['department'];
+              if (d == null || d.isEmpty) return null;
+              final normalized = _normalizeDepartmentForTier(context, d);
+              if (normalized == d) return null;
+              final qp = Map<String, String>.from(state.queryParameters);
+              qp['department'] = normalized;
+              return Uri(path: '/products/upload', queryParameters: qp)
+                  .toString();
+            },
             pageBuilder: (context, state) {
               final addToNom = state.queryParameters['addToNomenclature'];
               final defaultAddToNomenclature = addToNom != 'false';
@@ -1043,6 +1150,15 @@ class AppRouter {
 
           GoRoute(
             path: '/product-order',
+            redirect: (context, state) {
+              final d = state.queryParameters['department'];
+              if (d == null || d.isEmpty) return null;
+              final normalized = _normalizeDepartmentForTier(context, d);
+              if (normalized == d) return null;
+              final qp = Map<String, String>.from(state.queryParameters);
+              qp['department'] = normalized;
+              return Uri(path: '/product-order', queryParameters: qp).toString();
+            },
             pageBuilder: (context, state) {
               final dept = state.queryParameters['department'] ?? 'kitchen';
               return _slideTransitionPage(
@@ -1103,6 +1219,12 @@ class AppRouter {
           ),
           GoRoute(
             path: '/suppliers/:department',
+            redirect: (context, state) {
+              final d = state.pathParameters['department'] ?? 'kitchen';
+              final normalized = _normalizeDepartmentForTier(context, d);
+              if (normalized != d) return '/suppliers/$normalized';
+              return null;
+            },
             pageBuilder: (context, state) {
               final dept = state.pathParameters['department'] ?? 'kitchen';
               return _slideTransitionPage(
@@ -1111,6 +1233,19 @@ class AppRouter {
           ),
           GoRoute(
             path: '/product-order/:id',
+            redirect: (context, state) {
+              final d = state.queryParameters['department'];
+              if (d == null || d.isEmpty) return null;
+              final normalized = _normalizeDepartmentForTier(context, d);
+              if (normalized == d) return null;
+              final qp = Map<String, String>.from(state.queryParameters);
+              qp['department'] = normalized;
+              final id = state.pathParameters['id'] ?? '';
+              return Uri(
+                path: '/product-order/$id',
+                queryParameters: qp,
+              ).toString();
+            },
             pageBuilder: (context, state) {
               final id = state.pathParameters['id'] ?? '';
               final dept = state.queryParameters['department'] ?? 'kitchen';
@@ -1121,6 +1256,15 @@ class AppRouter {
 
           GoRoute(
             path: '/checklists',
+            redirect: (context, state) {
+              final d = state.queryParameters['department'];
+              if (d == null || d.isEmpty) return null;
+              final normalized = _normalizeDepartmentForTier(context, d);
+              if (normalized == d) return null;
+              final qp = Map<String, String>.from(state.queryParameters);
+              qp['department'] = normalized;
+              return Uri(path: '/checklists', queryParameters: qp).toString();
+            },
             pageBuilder: (context, state) {
               final dept = state.queryParameters['department'] ?? 'kitchen';
               final refresh = state.queryParameters['refresh'] == '1';
@@ -1279,6 +1423,7 @@ class AppRouter {
               int? initialTypeRevision;
               String? initialHeaderSignature;
               List<List<String>>? initialSourceRows;
+              var fromAiGeneration = false;
               final extra = state.extra;
               if (extra is Map) {
                 initialFromAi = extra['result'] as TechCardRecognitionResult?;
@@ -1297,6 +1442,7 @@ class AppRouter {
                                 .toList())
                             .toList()
                         : null;
+                fromAiGeneration = extra['fromAiGeneration'] == true;
               } else if (extra is TechCardRecognitionResult) {
                 initialFromAi = extra;
               }
@@ -1306,6 +1452,7 @@ class AppRouter {
                   state,
                   _DeferredTechCardNew(
                     initialFromAi: initialFromAi,
+                    fromAiGeneration: fromAiGeneration,
                     department: department,
                     initialCategory: initialCategory,
                     initialSections: initialSections,
@@ -1355,6 +1502,18 @@ class AppRouter {
           ),
           GoRoute(
             path: '/tech-cards/:segment',
+            redirect: (context, state) {
+              final segment = state.pathParameters['segment'] ?? '';
+              final normalized = _normalizeDepartmentForTier(context, segment);
+              if (normalized != segment) return '/tech-cards/$normalized';
+              if (segment == 'banquet-catering' ||
+                  segment == 'banquet-catering-bar') {
+                final ent = SubscriptionEntitlements.from(
+                    context.read<AccountManagerSupabase>().establishment);
+                if (!ent.canAccessBanquetCatering) return '/home';
+              }
+              return null;
+            },
             pageBuilder: (context, state) {
               final segment = state.pathParameters['segment'] ?? '';
               const knownDepartments = [
@@ -1379,6 +1538,8 @@ class AppRouter {
               }
               final viewOnly = state.queryParameters['view'] == '1';
               final hallView = state.queryParameters['hall'] == '1';
+              final targetOutputG =
+                  double.tryParse(state.queryParameters['targetOutputG'] ?? '');
               TechCard? initialTechCard;
               final extra = state.extra;
               if (extra is Map && extra['initialTechCard'] is TechCard) {
@@ -1391,6 +1552,11 @@ class AppRouter {
                     forceViewMode: viewOnly,
                     forceHallView: hallView,
                     initialTechCard: initialTechCard,
+                    initialViewTargetOutputGrams: viewOnly &&
+                            targetOutputG != null &&
+                            targetOutputG > 0
+                        ? targetOutputG
+                        : null,
                   ));
             },
           ),
@@ -1502,6 +1668,7 @@ class _SplashScreenState extends State<SplashScreen> {
 class _DeferredTechCardNew extends StatefulWidget {
   const _DeferredTechCardNew({
     this.initialFromAi,
+    this.fromAiGeneration = false,
     this.department,
     this.initialCategory,
     this.initialSections,
@@ -1511,6 +1678,8 @@ class _DeferredTechCardNew extends StatefulWidget {
     this.initialSourceRows,
   });
   final TechCardRecognitionResult? initialFromAi;
+  /// Карточка пришла из потока «Создать с ИИ» (не импорт из файла).
+  final bool fromAiGeneration;
   final String? department;
   final String? initialCategory;
   final List<String>? initialSections;
@@ -1535,6 +1704,7 @@ class _DeferredTechCardNewState extends State<_DeferredTechCardNew> {
         _child = TechCardEditScreen(
           techCardId: 'new',
           initialFromAi: widget.initialFromAi,
+          fromAiGeneration: widget.fromAiGeneration,
           department: widget.department,
           initialCategory: widget.initialCategory,
           initialSections: widget.initialSections,

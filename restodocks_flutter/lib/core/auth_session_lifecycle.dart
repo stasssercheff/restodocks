@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+
+import '../services/realtime_sync_service.dart';
 import 'package:flutter/widgets.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -87,6 +89,9 @@ class _AuthSessionLifecycleState extends State<AuthSessionLifecycle>
     unawaited(AccountManagerSupabase().syncEstablishmentAccessFromServer());
     unawaited(AccountUiSyncService.instance.refreshEmployeeProfileFromServer());
     unawaited(EstablishmentLocalHydrationService.instance.runBackgroundDeltaSync());
+    if (!kIsWeb) {
+      unawaited(RealtimeSyncService().syncNow(reason: 'app_resumed'));
+    }
   }
 
   @override

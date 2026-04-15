@@ -295,9 +295,9 @@ class _ImportReviewScreenState extends State<ImportReviewScreen> {
         if (widget.supplierOrderListId != null &&
             widget.supplierOrderListId!.trim().isNotEmpty) {
           final d = widget.supplierDepartment ?? 'kitchen';
-          context.go('/suppliers/$d');
+          context.go('/suppliers/$d', extra: {'back': true});
         } else {
-          context.go('/nomenclature?refresh=1');
+          context.go('/nomenclature?refresh=1', extra: {'back': true});
         }
       }
     } catch (e, st) {

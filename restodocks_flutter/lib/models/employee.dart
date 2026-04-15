@@ -62,16 +62,16 @@ enum KitchenSection {
   final String displayName;
 
   static const _translations = <String, Map<String, String>>{
-    'hot_kitchen':  {'ru': 'Горячий цех',    'en': 'Hot Kitchen',   'es': 'Cocina caliente', 'de': 'Warme Küche',    'fr': 'Cuisine chaude', 'tr': 'Sıcak mutfak'},
-    'cold_kitchen': {'ru': 'Холодный цех',   'en': 'Cold Kitchen',  'es': 'Cocina fría',     'de': 'Kalte Küche',    'fr': 'Cuisine froide', 'tr': 'Soğuk mutfak'},
-    'grill':        {'ru': 'Гриль',          'en': 'Grill',         'es': 'Parrilla',        'de': 'Grill',          'fr': 'Grill',         'tr': 'Izgara'},
-    'pizza':        {'ru': 'Пицца',          'en': 'Pizza',         'es': 'Pizza',           'de': 'Pizza',          'fr': 'Pizza',         'tr': 'Pizza'},
-    'sushi':        {'ru': 'Суши',           'en': 'Sushi',         'es': 'Sushi',           'de': 'Sushi',          'fr': 'Sushi',         'tr': 'Suşi'},
-    'prep':         {'ru': 'Заготовки',      'en': 'Prep',          'es': 'Preparación',     'de': 'Vorbereitung',   'fr': 'Préparation',   'tr': 'Hazırlık'},
-    'pastry':       {'ru': 'Кондитерский',   'en': 'Pastry',        'es': 'Pastelería',      'de': 'Konditorei',     'fr': 'Pâtisserie',    'tr': 'Tatlıcı'},
-    'bakery':       {'ru': 'Пекарня',        'en': 'Bakery',        'es': 'Panadería',       'de': 'Bäckerei',       'fr': 'Boulangerie',   'tr': 'Fırın'},
-    'cleaning':     {'ru': 'Уборка',         'en': 'Cleaning',      'es': 'Limpieza',        'de': 'Reinigung',      'fr': 'Nettoyage',     'tr': 'Temizlik'},
-    'banquet_catering': {'ru': 'Банкет / Кейтринг', 'en': 'Banquet / Catering', 'es': 'Banquete / Catering', 'de': 'Bankett / Catering', 'fr': 'Banquet / Traiteur', 'tr': 'Banket / Catering'},
+    'hot_kitchen':  {'ru': 'Горячий цех',    'en': 'Hot Kitchen',   'kk': 'Ыстық цех', 'es': 'Cocina caliente', 'de': 'Warme Küche',    'fr': 'Cuisine chaude', 'tr': 'Sıcak mutfak'},
+    'cold_kitchen': {'ru': 'Холодный цех',   'en': 'Cold Kitchen',  'kk': 'Суық цех', 'es': 'Cocina fría',     'de': 'Kalte Küche',    'fr': 'Cuisine froide', 'tr': 'Soğuk mutfak'},
+    'grill':        {'ru': 'Гриль',          'en': 'Grill',         'kk': 'Гриль', 'es': 'Parrilla',        'de': 'Grill',          'fr': 'Grill',         'tr': 'Izgara'},
+    'pizza':        {'ru': 'Пицца',          'en': 'Pizza',         'kk': 'Пицца', 'es': 'Pizza',           'de': 'Pizza',          'fr': 'Pizza',         'tr': 'Pizza'},
+    'sushi':        {'ru': 'Суши',           'en': 'Sushi',         'kk': 'Суши', 'es': 'Sushi',           'de': 'Sushi',          'fr': 'Sushi',         'tr': 'Suşi'},
+    'prep':         {'ru': 'Заготовки',      'en': 'Prep',          'kk': 'Дайындықтар', 'es': 'Preparación',     'de': 'Vorbereitung',   'fr': 'Préparation',   'tr': 'Hazırlık'},
+    'pastry':       {'ru': 'Кондитерский',   'en': 'Pastry',        'kk': 'Кондитерлік', 'es': 'Pastelería',      'de': 'Konditorei',     'fr': 'Pâtisserie',    'tr': 'Tatlıcı'},
+    'bakery':       {'ru': 'Пекарня',        'en': 'Bakery',        'kk': 'Нан пеші', 'es': 'Panadería',       'de': 'Bäckerei',       'fr': 'Boulangerie',   'tr': 'Fırın'},
+    'cleaning':     {'ru': 'Уборка',         'en': 'Cleaning',      'kk': 'Тазалау', 'es': 'Limpieza',        'de': 'Reinigung',      'fr': 'Nettoyage',     'tr': 'Temizlik'},
+    'banquet_catering': {'ru': 'Банкет / Кейтринг', 'en': 'Banquet / Catering', 'kk': 'Банкет / кейтеринг', 'es': 'Banquete / Catering', 'de': 'Bankett / Catering', 'fr': 'Banquet / Traiteur', 'tr': 'Banket / Catering'},
   };
 
   String getLocalizedName(String lang) =>
@@ -441,8 +441,11 @@ class Employee extends Equatable {
     return roles.first;
   }
 
-  /// Имеет ли сотрудник PRO подписку
-  bool get hasProSubscription => subscriptionPlan == 'pro' || subscriptionPlan == 'premium';
+  /// Платный тариф (не только Pro — см. [Establishment.kPaidSubscriptionTiers]).
+  bool get hasProSubscription {
+    final p = subscriptionPlan?.toLowerCase().trim();
+    return p != null && Establishment.kPaidSubscriptionTiers.contains(p);
+  }
 
   /// Тип подписки (free/pro)
   String get subscriptionType => subscriptionPlan ?? 'free';

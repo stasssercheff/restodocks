@@ -94,7 +94,26 @@ function toExpiresMs(raw: unknown): number | null {
   return null;
 }
 
-const TARGET_PRODUCT_ID = "restodocks_pro_monthly";
+/** Подписки Restodocks в одном чеке: Pro и Ultra (разные product_id в App Store Connect). */
+const TARGET_SUBSCRIPTION_PRODUCT_IDS = new Set([
+  "restodocks_pro_monthly",
+  "restodocks_ultra_monthly",
+]);
+
+const TARGET_ADDON_PRODUCT_IDS = new Set([
+  "restodocks_addon_employee_pack_5",
+  "restodocks_addon_branch_pack_1",
+]);
+
+const ULTRA_PRODUCT_ID = "restodocks_ultra_monthly";
+
+function isTargetSubscriptionProductId(id: string): boolean {
+  return TARGET_SUBSCRIPTION_PRODUCT_IDS.has(String(id ?? "").trim());
+}
+
+function isTargetAddonProductId(id: string): boolean {
+  return TARGET_ADDON_PRODUCT_IDS.has(String(id ?? "").trim());
+}
 
 function extractMaxExpiryMs(data: AppleVerifyReceiptResponse): number | null {
   let maxMs: number | null = null;
@@ -109,7 +128,7 @@ function extractMaxExpiryMs(data: AppleVerifyReceiptResponse): number | null {
     ...((data.receipt?.in_app as Array<Record<string, unknown>> | undefined) ?? []),
   ];
   const forOurProduct = fromReceipt.filter((row) =>
-    String(row["product_id"] ?? "") === TARGET_PRODUCT_ID
+    isTargetSubscriptionProductId(String(row["product_id"] ?? ""))
   );
   const rows = forOurProduct.length > 0 ? forOurProduct : fromReceipt;
 
@@ -120,7 +139,7 @@ function extractMaxExpiryMs(data: AppleVerifyReceiptResponse): number | null {
 
   // Billing grace / retry: конец доступа может быть позже `expires_date_ms` строки подписки.
   for (const row of data.pending_renewal_info ?? []) {
-    if (String(row["product_id"] ?? "") !== TARGET_PRODUCT_ID && forOurProduct.length > 0) {
+    if (!isTargetSubscriptionProductId(String(row["product_id"] ?? "")) && forOurProduct.length > 0) {
       continue;
     }
     consider(row["grace_period_expires_date_ms"]);
@@ -136,9 +155,33 @@ function pickReceiptRows(data: AppleVerifyReceiptResponse): Array<Record<string,
     ...((data.receipt?.in_app as Array<Record<string, unknown>> | undefined) ?? []),
   ];
   const forOurProduct = fromReceipt.filter((row) =>
-    String(row["product_id"] ?? "") === TARGET_PRODUCT_ID
+    isTargetSubscriptionProductId(String(row["product_id"] ?? ""))
   );
   return forOurProduct.length > 0 ? forOurProduct : fromReceipt;
+}
+
+/** Среди активных по времени строк чека выбираем Ultra, если есть активная подписка Ultra. */
+function subscriptionTypeFromReceipt(
+  data: AppleVerifyReceiptResponse,
+  expiryMs: number | null,
+  nowMs: number,
+): "pro" | "ultra" {
+  if (expiryMs == null || expiryMs <= nowMs) return "pro";
+  const rows = [
+    ...(data.latest_receipt_info ?? []),
+    ...((data.receipt?.in_app as Array<Record<string, unknown>> | undefined) ?? []),
+  ];
+  const ours = rows.filter((row) =>
+    isTargetSubscriptionProductId(String(row["product_id"] ?? ""))
+  );
+  for (const row of ours) {
+    const ms = rowExpiryMs(row);
+    if (ms == null || ms <= nowMs) continue;
+    if (String(row["product_id"] ?? "").trim() === ULTRA_PRODUCT_ID) {
+      return "ultra";
+    }
+  }
+  return "pro";
 }
 
 function rowExpiryMs(row: Record<string, unknown>): number | null {
@@ -146,6 +189,12 @@ function rowExpiryMs(row: Record<string, unknown>): number | null {
   const b = toExpiresMs(row["expires_date"]);
   if (a != null && b != null) return Math.max(a, b);
   return a ?? b;
+}
+
+function rowPurchaseMs(row: Record<string, unknown>): number {
+  const a = toExpiresMs(row["purchase_date_ms"]);
+  const b = toExpiresMs(row["purchase_date"]);
+  return a ?? b ?? 0;
 }
 
 /** Apple в JSON иногда отдаёт original_transaction_id числом. */
@@ -156,11 +205,34 @@ function rawOtid(row: Record<string, unknown>): string {
   return String(v).trim();
 }
 
+function rawTransactionId(row: Record<string, unknown>): string {
+  const v = row["transaction_id"];
+  if (v == null || v === "") return "";
+  if (typeof v === "number" && Number.isFinite(v)) return String(Math.trunc(v));
+  return String(v).trim();
+}
+
+function pickAddonRows(
+  data: AppleVerifyReceiptResponse,
+  targetProductId: string | null,
+): Array<Record<string, unknown>> {
+  const fromReceipt = [
+    ...(data.latest_receipt_info ?? []),
+    ...((data.receipt?.in_app as Array<Record<string, unknown>> | undefined) ?? []),
+  ];
+  return fromReceipt.filter((row) => {
+    const pid = String(row["product_id"] ?? "").trim();
+    if (!isTargetAddonProductId(pid)) return false;
+    if (targetProductId && targetProductId.length > 0) return pid === targetProductId;
+    return true;
+  });
+}
+
 /** Apple auto-renewable: стабильный идентификатор цепочки подписки (не путать с transaction_id). */
 function extractOriginalTransactionId(data: AppleVerifyReceiptResponse): string | null {
   const rows = pickReceiptRows(data);
   const pending = (data.pending_renewal_info ?? []).filter((row) =>
-    String(row["product_id"] ?? "") === TARGET_PRODUCT_ID ||
+    isTargetSubscriptionProductId(String(row["product_id"] ?? "")) ||
     rows.length === 0
   );
   const combined = [...rows, ...pending];
@@ -284,9 +356,9 @@ Deno.serve(async (req: Request) => {
   });
 
   try {
-    let body: { establishment_id?: string; receipt_data?: string };
+    let body: { establishment_id?: string; receipt_data?: string; product_id?: string };
     try {
-      body = (await req.json()) as { establishment_id?: string; receipt_data?: string };
+      body = (await req.json()) as { establishment_id?: string; receipt_data?: string; product_id?: string };
     } catch {
       return new Response(JSON.stringify({ error: "Invalid or empty JSON body" }), {
         status: 400,
@@ -295,6 +367,14 @@ Deno.serve(async (req: Request) => {
     }
     const establishmentId = String(body.establishment_id ?? "").trim();
     const receiptData = String(body.receipt_data ?? "").trim();
+    const purchasedProductIdRaw = String(body.product_id ?? "").trim();
+    const purchasedProductId = purchasedProductIdRaw.length > 0 ? purchasedProductIdRaw : null;
+    if (purchasedProductId && !isTargetSubscriptionProductId(purchasedProductId) && !isTargetAddonProductId(purchasedProductId)) {
+      return new Response(JSON.stringify({ error: "unsupported_product_id" }), {
+        status: 400,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
     if (!establishmentId || !receiptData) {
       return new Response(JSON.stringify({ error: "establishment_id and receipt_data are required" }), {
         status: 400,
@@ -307,6 +387,7 @@ Deno.serve(async (req: Request) => {
         fn: "billing-verify-apple",
         phase: "start",
         establishment_id: establishmentId,
+        product_id: purchasedProductId,
         receipt_len: receiptData.length,
         auth: isService ? "service" : (authUid ?? "none"),
       }),
@@ -471,6 +552,77 @@ Deno.serve(async (req: Request) => {
     if (appleResp.status !== 0) {
       return new Response(JSON.stringify({ error: "Apple receipt validation failed", status: appleResp.status }), {
         status: 400,
+        headers: { ...cors, "Content-Type": "application/json" },
+      });
+    }
+
+    if (purchasedProductId && isTargetAddonProductId(purchasedProductId)) {
+      const addonRows = pickAddonRows(appleResp, purchasedProductId);
+      const sorted = addonRows
+        .map((row) => ({
+          productId: String(row["product_id"] ?? "").trim(),
+          transactionId: rawTransactionId(row),
+          purchaseMs: rowPurchaseMs(row),
+        }))
+        .filter((r) => r.productId.length > 0 && r.transactionId.length > 0)
+        .sort((a, b) => b.purchaseMs - a.purchaseMs);
+
+      if (sorted.length === 0) {
+        return new Response(
+          JSON.stringify({
+            error: "addon_transaction_not_found",
+            product_id: purchasedProductId,
+          }),
+          {
+            status: 400,
+            headers: { ...cors, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      const picked = sorted[0];
+      const purchaseDateIso = picked.purchaseMs > 0 ? new Date(picked.purchaseMs).toISOString() : null;
+
+      const { data: appliedData, error: applyErr } = await supabase.rpc("apply_apple_iap_addon_claim", {
+        p_transaction_id: picked.transactionId,
+        p_product_id: picked.productId,
+        p_owner_id: ownerId,
+        p_establishment_id: establishmentId,
+        p_purchase_date: purchaseDateIso,
+      });
+      if (applyErr) {
+        const msg = String(applyErr.message ?? "").toLowerCase();
+        if (msg.includes("apply_apple_iap_addon_claim") || msg.includes("does not exist")) {
+          return new Response(
+            JSON.stringify({ error: "addon_claim_function_unavailable" }),
+            {
+              status: 500,
+              headers: { ...cors, "Content-Type": "application/json" },
+            },
+          );
+        }
+        return new Response(JSON.stringify({ error: applyErr.message }), {
+          status: 500,
+          headers: { ...cors, "Content-Type": "application/json" },
+        });
+      }
+
+      const addonApplied = Boolean(appliedData);
+      const { data: estSnapshot } = await supabase
+        .from("establishments")
+        .select("subscription_type, pro_paid_until, pro_trial_ends_at")
+        .eq("id", establishmentId)
+        .maybeSingle();
+      return new Response(JSON.stringify({
+        ok: true,
+        is_active: null,
+        addon_applied: addonApplied,
+        addon_product_id: picked.productId,
+        addon_transaction_id: picked.transactionId,
+        apple_environment: appleResp.environment ?? null,
+        establishment: estSnapshot ?? null,
+      }), {
+        status: 200,
         headers: { ...cors, "Content-Type": "application/json" },
       });
     }
@@ -700,8 +852,13 @@ Deno.serve(async (req: Request) => {
     }
 
     const nowIso = new Date().toISOString();
+    const paidTier = subscriptionTypeFromReceipt(appleResp, expiryMs, nowMs);
     const updatePayload = isActive
-      ? { subscription_type: "pro", pro_paid_until: paidUntilIso, updated_at: nowIso }
+      ? {
+        subscription_type: paidTier,
+        pro_paid_until: paidUntilIso,
+        updated_at: nowIso,
+      }
       : { subscription_type: "free", pro_paid_until: paidUntilIso, updated_at: nowIso };
 
     const { error: updateError } = await supabase

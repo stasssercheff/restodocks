@@ -313,6 +313,8 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
         return loc.t('writeoff_category_breakage') ?? 'Брекераж';
       case 'guestRefusal':
         return loc.t('writeoff_category_guest_refusal') ?? 'Отказ гостя';
+      case 'generic':
+        return loc.t('writeoff_category_simple') ?? 'Списание';
       default:
         return code ?? '—';
     }
@@ -365,6 +367,29 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
     if (result == null || !mounted) return;
 
     try {
+      final account = context.read<AccountManagerSupabase>();
+      final est = account.establishment;
+      if (est != null && account.isTrialOnlyWithoutPaid) {
+        try {
+          await account.trialIncrementDeviceSaveOrThrow(
+            establishmentId: est.id,
+            docKind: TrialDeviceSaveKinds.writeoff,
+          );
+        } catch (e) {
+          if (e.toString().contains('TRIAL_DEVICE_SAVE_CAP')) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                      'В первые 72 часа можно сохранить не более 3 документов этого типа.'),
+                ),
+              );
+            }
+            return;
+          }
+          rethrow;
+        }
+      }
       final bytes = _buildExcelBytes(payload, result);
       if (bytes != null && bytes.isNotEmpty) {
         final header = payload['header'] as Map<String, dynamic>? ?? {};

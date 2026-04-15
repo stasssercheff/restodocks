@@ -20,6 +20,8 @@ function isAllowedAppOrigin(origin: string): boolean {
   }
   if (host === "restodocks.com" || host === "www.restodocks.com") return true;
   if (host === "restodocks.ru" || host === "www.restodocks.ru") return true;
+  if (host.endsWith(".restodocks.com")) return true;
+  if (host.endsWith(".restodocks.ru")) return true;
   if (
     host === "restodocks.pages.dev" ||
     host === "www.restodocks.pages.dev" ||
@@ -27,6 +29,8 @@ function isAllowedAppOrigin(origin: string): boolean {
   ) {
     return true;
   }
+  if (host.endsWith(".pages.dev") && host.includes("restodocks")) return true;
+  if (host === "localhost" || host.startsWith("127.0.0.1")) return true;
   const envUrl = Deno.env.get("APP_URL")?.trim();
   if (envUrl) {
     try {
@@ -46,14 +50,11 @@ function resolveAppBaseUrl(req: Request, body?: { appBaseUrl?: string }): string
     } catch (_) {}
   }
   const origin = req.headers.get("origin")?.trim();
-  if (origin && /^https:\/\/([a-z0-9-]+\.)*restodocks\.pages\.dev$/i.test(origin)) {
-    return origin;
-  }
-  if (origin && /^https:\/\/(www\.)?restodocks\.com$/i.test(origin)) {
-    return origin;
-  }
-  if (origin && /^https:\/\/(www\.)?restodocks\.ru$/i.test(origin)) {
-    return origin;
+  if (origin) {
+    try {
+      const o = new URL(origin).origin;
+      if (isAllowedAppOrigin(o)) return o;
+    } catch (_) {}
   }
   const envUrl = Deno.env.get("APP_URL")?.trim();
   if (envUrl && (envUrl.startsWith("https://") || envUrl.startsWith("http://"))) {
@@ -100,6 +101,14 @@ function isResendNoopRecipient(raw: string): boolean {
 
 export async function handleRequest(req: Request): Promise<Response> {
   const cors = resolveCorsHeaders(req);
+  const reqApikey = req.headers.get("apikey")?.trim() ?? "";
+  const reqAuth = req.headers.get("authorization")?.trim() ??
+    req.headers.get("Authorization")?.trim() ??
+    "";
+  const authPrefix = reqAuth.split(" ")[0] ?? "";
+  const authTokenPreview = reqAuth.includes(" ")
+    ? (reqAuth.split(" ")[1] ?? "").slice(0, 16)
+    : reqAuth.slice(0, 16);
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
@@ -136,6 +145,13 @@ export async function handleRequest(req: Request): Promise<Response> {
   }
 
   if (!(await hasValidApiKeyOrUser(req))) {
+    console.log(JSON.stringify({
+      event: "send_registration_email_unauthorized",
+      apikey_prefix: reqApikey.slice(0, 16),
+      authorization_scheme: authPrefix,
+      authorization_token_prefix: authTokenPreview,
+      has_origin: !!req.headers.get("origin"),
+    }));
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...cors, "Content-Type": "application/json" },
@@ -152,6 +168,15 @@ export async function handleRequest(req: Request): Promise<Response> {
     const { type, to, companyName, email, fullName, pinCode, password } = body;
     const lang = normalizeLanguage(body.language);
     const appBaseUrl = resolveAppBaseUrl(req, body);
+    console.log(JSON.stringify({
+      event: "send_registration_email_request",
+      type: type ?? null,
+      to_domain: (to?.split("@")[1] ?? "").toLowerCase(),
+      language: lang,
+      has_password: !!password,
+      apikey_prefix: reqApikey.slice(0, 16),
+      authorization_scheme: authPrefix,
+    }));
 
     if (to && isResendNoopRecipient(to)) {
       console.log(
@@ -223,13 +248,25 @@ export async function handleRequest(req: Request): Promise<Response> {
         const greeting = fullName?.trim()
           ? `${copy.greetingNamePrefix}, ${escapeHtml(fullName.trim())}!`
           : copy.greeting;
-        const html = `
+        const html = lang === "ru"
+          ? `
+<p>${greeting}</p>
+<p>Чтобы завершить регистрацию в Restodocks, нажмите на ссылку:</p>
+<p><a href="${escapeHtml(wrappedHref)}" style="color:#2754C5;text-decoration:none">Подтвердить email</a></p>
+<p>Если кнопка не открывается, скопируйте ссылку в браузер:</p>
+<p><a href="${escapeHtml(wrappedHref)}" style="color:#2754C5;text-decoration:none;word-break:break-all">${escapeHtml(wrappedHref)}</a></p>
+<p>Если вы не регистрировались — проигнорируйте это письмо.</p>
+<p>С уважением,<br>Команда Restodocks</p>
+        `.trim()
+          : `
 <p>${greeting}</p>
 <p>${copy.confirmIntro}</p>
 <p><a href="${escapeHtml(wrappedHref)}" style="color:#2754C5;text-decoration:none">${copy.confirmCta}</a></p>
 <p>${copy.regards}<br>Restodocks</p>
         `.trim();
-        const text = `${greeting}\n\n${copy.confirmIntro}\n\n${copy.regards}\nRestodocks`;
+        const text = lang === "ru"
+          ? `${greeting}\n\nЧтобы завершить регистрацию в Restodocks, нажмите на ссылку:\n${wrappedHref}\n\nЕсли кнопка не открывается, скопируйте ссылку в браузер:\n${wrappedHref}\n\nЕсли вы не регистрировались — проигнорируйте это письмо.\n\nС уважением,\nКоманда Restodocks`
+          : `${greeting}\n\n${copy.confirmIntro}\n${wrappedHref}\n\n${copy.regards}\nRestodocks`;
         const res = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
@@ -243,6 +280,12 @@ export async function handleRequest(req: Request): Promise<Response> {
         });
         const payload = await res.json();
         if (!res.ok) {
+          console.log(JSON.stringify({
+            event: "send_registration_email_resend_error",
+            type: "confirmation_only",
+            status: res.status,
+            message: payload?.message ?? null,
+          }));
           return new Response(JSON.stringify({ error: payload?.message || res.statusText }), {
             status: res.status,
             headers: { ...cors, "Content-Type": "application/json" },
@@ -275,14 +318,25 @@ export async function handleRequest(req: Request): Promise<Response> {
       }
       const copy = i18nCopy(lang);
       const subject = copy.confirmedSubject;
+      const greeting = fullName?.trim()
+        ? `${copy.greetingNamePrefix}, ${escapeHtml(fullName.trim())}!`
+        : copy.greeting;
+      const safeEmail = email?.trim();
       const companyText = companyName
         ? (lang === "ru"
             ? ` в заведении <strong>${escapeHtml(companyName)}</strong>`
             : ` <strong>${escapeHtml(companyName)}</strong>`)
         : "";
+      const intro = companyName
+        ? `${copy.confirmedIntro}${companyText}.`
+        : (lang === "ru" ? "Ваша регистрация подтверждена." : `${copy.confirmedIntro}.`);
+      const loginLine = safeEmail
+        ? `<p>${copy.yourLoginLabel}: <strong>${escapeHtml(safeEmail)}</strong></p>`
+        : "";
       const html = `
-<p>${copy.greeting}</p>
-<p>${copy.confirmedIntro}${companyText}.</p>
+<p>${greeting}</p>
+<p>${intro}</p>
+${loginLine}
 <p>${copy.confirmedSigninHint}</p>
 <p>${copy.regards}<br>Restodocks</p>
       `.trim();
@@ -293,11 +347,25 @@ export async function handleRequest(req: Request): Promise<Response> {
           "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ from, to: [to], subject, html }),
+        body: JSON.stringify({
+          from,
+          to: [to],
+          subject,
+          html,
+          text: `${greeting}\n\n${intro.replace(/<[^>]+>/g, "")}\n${
+            safeEmail ? `${copy.yourLoginLabel}: ${safeEmail}\n` : ""
+          }\n${copy.confirmedSigninHint}\n\n${copy.regards}\nRestodocks`,
+        }),
       });
 
       const payload = await res.json();
       if (!res.ok) {
+        console.log(JSON.stringify({
+          event: "send_registration_email_resend_error",
+          type: "registration_confirmed",
+          status: res.status,
+          message: payload?.message ?? null,
+        }));
         return new Response(JSON.stringify({ error: payload?.message || res.statusText }), {
           status: res.status,
           headers: { ...cors, "Content-Type": "application/json" },
@@ -332,13 +400,13 @@ export async function handleRequest(req: Request): Promise<Response> {
         subject = copy.ownerSubject;
         html = `
 <p>${greeting}</p>
+<p>${copy.welcomeLead}</p>
 <p>${copy.ownerRegisteredPrefix} <strong>${escapeHtml(companyName)}</strong> ${copy.ownerRegisteredSuffix}</p>
 <p>${copy.ownerIdentifierHint}</p>
 <p><strong>${copy.companyPinLabel}: ${escapeHtml(pinCode || "")}</strong></p>
 <p>${copy.yourLoginLabel}: <strong>${escapeHtml(email)}</strong></p>
 <p>${copy.passwordHint}</p>
 <p><strong>${copy.instructionLabel}:</strong><br>${copy.ownerInstruction}</p>
-<p style="color:#666;font-size:14px">${copy.spamHint}</p>
 <p>${copy.regards}<br>Restodocks</p>
       `.trim();
       } else {
@@ -347,12 +415,12 @@ export async function handleRequest(req: Request): Promise<Response> {
         subject = copy.ownerSubject;
         html = `
 <p>${greeting}</p>
+<p>${copy.welcomeLead}</p>
 <p>${copy.ownerRegisteredPrefix} <strong>${escapeHtml(companyName)}</strong> ${copy.ownerRegisteredSuffix}</p>
 <p>${copy.ownerIdentifierHint}</p>
 <p><strong>${copy.companyPinLabel}: ${escapeHtml(pinCode || "")}</strong></p>
 <p>${copy.yourLoginLabel}: <strong>${escapeHtml(email)}</strong></p>
 <p>${copy.passwordHint}</p>
-<p style="color:#666;font-size:14px">${copy.spamHint}</p>
 <p>${copy.regards}<br>Restodocks</p>
       `.trim();
       }
@@ -362,6 +430,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       subject = copy.coOwnerSubject;
       html = `
 <p>${greeting}</p>
+<p>${copy.welcomeLead}</p>
 <p>${copy.coOwnerRegisteredPrefix} <strong>${escapeHtml(companyName)}</strong> ${copy.coOwnerRegisteredSuffix}</p>
 <p>${copy.ownerIdentifierHint}</p>
 <p><strong>${copy.companyPinLabel}: ${escapeHtml(pinCode || "")}</strong></p>
@@ -421,6 +490,12 @@ export async function handleRequest(req: Request): Promise<Response> {
     const payload = await res.json();
 
     if (!res.ok) {
+      console.log(JSON.stringify({
+        event: "send_registration_email_resend_error",
+        type: type ?? null,
+        status: res.status,
+        message: payload?.message ?? null,
+      }));
       return new Response(JSON.stringify({ error: payload?.message || res.statusText }), {
         status: res.status,
         headers: { ...cors, "Content-Type": "application/json" },
@@ -488,6 +563,8 @@ type MailCopy = {
   employeeRegisteredPrefix: string;
   spamHint: string;
   registrationTimeLabel: string;
+  /** Одна строка после приветствия: «добро пожаловать» + контекст письма с PIN/логином */
+  welcomeLead: string;
 };
 
 function i18nCopy(lang: MailLanguage): MailCopy {
@@ -518,8 +595,11 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         coOwnerInstruction: "Используйте PIN-код заведения при работе команды. Для входа в систему используйте email и пароль, указанные при регистрации.",
         employeeSubjectPrefix: "Доступ к корпоративному пространству",
         employeeRegisteredPrefix: "Ваша учетная запись успешно привязана к системе управления заведением",
-        spamHint: "Отдельно придёт письмо со ссылкой для подтверждения email. Если не увидите его — проверьте папку «Спам».",
+        spamHint:
+          "Вторым письмом (чуть позже) может прийти ссылка для подтверждения email — проверьте «Спам» и вкладку «Промоакции». Если письма с PIN не было — смотрите логи Edge send-registration-email в Supabase.",
         registrationTimeLabel: "Время регистрации",
+        welcomeLead:
+          "<strong>Добро пожаловать в Restodocks!</strong> Ниже — данные заведения: PIN для персонала и ваш логин (email) для входа.",
       };
     case "es":
       return {
@@ -549,6 +629,8 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         employeeRegisteredPrefix: "Su cuenta se vinculó correctamente a",
         spamHint: "También llegará un correo de confirmación. Revise Spam si no aparece.",
         registrationTimeLabel: "Hora de registro",
+        welcomeLead:
+          "<strong>¡Bienvenido a Restodocks!</strong> A continuación: PIN del establecimiento y su acceso (email) para iniciar sesión.",
       };
     case "it":
       return {
@@ -578,6 +660,8 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         employeeRegisteredPrefix: "Il tuo account è stato collegato a",
         spamHint: "Arriverà anche un'email di conferma. Controlla Spam se necessario.",
         registrationTimeLabel: "Orario registrazione",
+        welcomeLead:
+          "<strong>Benvenuto in Restodocks!</strong> Di seguito: PIN della struttura e il tuo login (email) per l'accesso.",
       };
     case "tr":
       return {
@@ -607,6 +691,8 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         employeeRegisteredPrefix: "Hesabınız şu işletmeye bağlandı:",
         spamHint: "Ayrıca onay bağlantısı e-postası gelir. Gerekirse Spam'i kontrol edin.",
         registrationTimeLabel: "Kayıt zamanı",
+        welcomeLead:
+          "<strong>Restodocks'a hoş geldiniz!</strong> Aşağıda: işletme PIN'i ve giriş için e-postanız.",
       };
     case "vi":
       return {
@@ -636,6 +722,8 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         employeeRegisteredPrefix: "Tài khoản của bạn đã được liên kết với",
         spamHint: "Một email xác nhận riêng sẽ được gửi. Hãy kiểm tra Spam nếu cần.",
         registrationTimeLabel: "Thời gian đăng ký",
+        welcomeLead:
+          "<strong>Chào mừng đến Restodocks!</strong> Bên dưới: PIN cơ sở và email đăng nhập của bạn.",
       };
     case "en":
     default:
@@ -664,8 +752,10 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         coOwnerInstruction: "Share the establishment PIN with your team. Sign in using your email and password.",
         employeeSubjectPrefix: "Access to",
         employeeRegisteredPrefix: "Your account has been linked to",
-        spamHint: "A separate email with confirmation link is sent by auth provider. Please check Spam if needed.",
+        spamHint: "A separate email with the confirmation link may follow shortly — please check Spam. If the PIN email is missing, check Edge logs for send-registration-email.",
         registrationTimeLabel: "Registration time",
+        welcomeLead:
+          "<strong>Welcome to Restodocks!</strong> Below: your establishment PIN and login (email) for sign-in.",
       };
   }
 }

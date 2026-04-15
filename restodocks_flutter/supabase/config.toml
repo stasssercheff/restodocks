@@ -63,3 +63,7 @@ verify_jwt = false
 # push-inbox-dispatch: Database Webhook → FCM; авторизация через PUSH_WEBHOOK_SECRET в заголовке
 [functions.push-inbox-dispatch]
 verify_jwt = false
+
+# purge-establishment-auth-queue: JWT владельца (initiator) + purge_token из RPC delete_establishment_by_owner
+[functions.purge-establishment-auth-queue]
+verify_jwt = true

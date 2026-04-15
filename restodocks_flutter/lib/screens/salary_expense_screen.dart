@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../core/subscription_entitlements.dart';
 import '../models/models.dart';
 import '../services/schedule_storage_service.dart';
 import '../utils/employee_display_utils.dart';
@@ -17,6 +18,7 @@ import '../services/salary_export_service.dart';
 import '../services/inventory_download.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
+import '../widgets/subscription_required_dialog.dart';
 import '../widgets/schedule_export_widget.dart';
 
 enum _AdjustmentType { bonus, fine, advance }
@@ -565,24 +567,6 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
         _loading = false;
         return;
       }
-      try {
-        await SupabaseService().client.rpc(
-          'require_establishment_pro_for_expenses',
-          params: {'p_establishment_id': estab.id},
-        );
-      } catch (e) {
-        final msg = e.toString();
-        final friendly = msg.contains('EXPENSES_PRO_REQUIRED') || msg.contains('P0001')
-            ? loc.t('pro_required_expenses')
-            : msg;
-        if (mounted) {
-          setState(() {
-            _error = friendly;
-            _loading = false;
-          });
-        }
-        return;
-      }
       final list = await acc.getEmployeesForEstablishment(estab.id);
       final schedule = await loadSchedule(estab.id);
 
@@ -812,6 +796,12 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
     if (_employees == null || _employees!.isEmpty || _schedule == null) return;
     final loc = context.read<LocalizationService>();
     final accountManager = context.read<AccountManagerSupabase>();
+    final exportOk = SubscriptionEntitlements.from(accountManager.establishment)
+        .canExportSalaryPayrollToDevice;
+    if (!exportOk) {
+      await showSubscriptionRequiredDialog(context);
+      return;
+    }
     final currency = accountManager.establishment?.currencySymbol ??
         accountManager.currentEmployee?.currencySymbol ??
         Establishment.currencySymbolFor(
@@ -860,6 +850,14 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
     );
 
     try {
+      final est = context.read<AccountManagerSupabase>().establishment;
+      if (est != null &&
+          context.read<AccountManagerSupabase>().isTrialOnlyWithoutPaid) {
+        await context.read<AccountManagerSupabase>().trialIncrementDeviceSaveOrThrow(
+              establishmentId: est.id,
+              docKind: TrialDeviceSaveKinds.expenses,
+            );
+      }
       final t = (String key) => loc.tForLanguage(selectedLang, key);
       final dateFormat = DateFormat('dd.MM.yyyy');
 
@@ -984,7 +982,9 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
-    final accountManager = context.read<AccountManagerSupabase>();
+    final accountManager = context.watch<AccountManagerSupabase>();
+    final canExportPayroll = SubscriptionEntitlements.from(accountManager.establishment)
+        .canExportSalaryPayrollToDevice;
     final currency = accountManager.establishment?.currencySymbol ??
         accountManager.currentEmployee?.currencySymbol ??
         Establishment.currencySymbolFor(
@@ -1061,10 +1061,18 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                                 _employees!.isNotEmpty) ...[
                               const SizedBox(width: 8),
                               IconButton.filled(
-                                icon: const Icon(Icons.download),
+                                icon: Icon(
+                                  Icons.download,
+                                  color: canExportPayroll
+                                      ? null
+                                      : theme.colorScheme.onSurface
+                                          .withValues(alpha: 0.38),
+                                ),
                                 onPressed: () => _exportPayroll(context),
-                                tooltip:
-                                    loc.t('salary_export_btn') ?? 'Выгрузить',
+                                tooltip: canExportPayroll
+                                    ? (loc.t('salary_export_btn') ?? 'Выгрузить')
+                                    : (loc.t('pro_required_expenses') ??
+                                        'Нужен Pro или Ultra'),
                               ),
                             ],
                           ],
@@ -1166,9 +1174,16 @@ class _SalaryExpenseScreenState extends State<SalaryExpenseScreen> {
                 _employees != null &&
                 _employees!.isNotEmpty)
               IconButton(
-                icon: const Icon(Icons.download),
+                icon: Icon(
+                  Icons.download,
+                  color: canExportPayroll
+                      ? null
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.38),
+                ),
                 onPressed: () => _exportPayroll(context),
-                tooltip: loc.t('salary_export_btn') ?? 'Выгрузить',
+                tooltip: canExportPayroll
+                    ? (loc.t('salary_export_btn') ?? 'Выгрузить')
+                    : (loc.t('pro_required_expenses') ?? 'Нужен Pro или Ultra'),
               ),
           ],
         ),

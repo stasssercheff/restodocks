@@ -39,7 +39,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
 
     return Scaffold(
       appBar: AppBar(
-        leading: appBarBackButton(context),
+        leading: shellReturnLeading(context) ?? appBarBackButton(context),
         title: Text(loc.t('notifications')),
         actions: [
           IconButton(

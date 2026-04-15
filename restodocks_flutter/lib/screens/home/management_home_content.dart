@@ -1,4 +1,5 @@
 import 'package:feature_spotlight/feature_spotlight.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../services/services.dart';
 import '../../models/models.dart';
 import '../../core/feature_flags.dart';
+import '../../core/subscription_entitlements.dart';
 import '../../utils/pos_hall_permissions.dart';
 import '../../widgets/home_feature_tile.dart';
 import 'expandable_banquet_section.dart';
@@ -26,14 +28,23 @@ class ManagementHomeContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
-    final subOk = context.watch<AccountManagerSupabase>().hasProSubscription;
+    final account = context.watch<AccountManagerSupabase>();
+    final subOk = account.hasProSubscription;
+    final ent = SubscriptionEntitlements.from(account.establishment);
     final screenPref = context.watch<ScreenLayoutPreferenceService>();
+    final posOn =
+        FeatureFlags.posEnabledForSubscription(ent) && screenPref.showPosSection;
     final roles = employee.roles;
     final isChef = roles.contains('executive_chef');
     final isBarManager = roles.contains('bar_manager');
     final isGeneral = roles.contains('general_manager');
     final isFloorManager = roles.contains('floor_manager');
-    final dept = _deptForRoute(employee.department);
+    final rawDept = ent.kitchenOnlyDepartments
+        ? 'kitchen'
+        : _deptForRoute(employee.department);
+    final dept = !ent.hasUltraLevelFeatures && rawDept == 'bar'
+        ? 'kitchen'
+        : rawDept;
     // ТТК: кухня, бар, зал — у каждого подразделения свои
     final showTtk = dept == 'kitchen' || dept == 'bar' || dept == 'hall';
     // Меню: только кухня и бар (у зала нет меню)
@@ -81,11 +92,55 @@ class ManagementHomeContent extends StatelessWidget {
       );
     }
 
+    if (ent.isLiteTier && employee.effectiveDataAccess) {
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          HomeFeatureTile(
+            icon: Icons.calendar_month,
+            title: loc.t('schedule'),
+            onTap: () => context.go('/schedule/kitchen'),
+          ),
+          HomeFeatureTile(
+            icon: Icons.restaurant_menu,
+            title: loc.t('menu'),
+            onTap: () => context.go('/menu/kitchen'),
+          ),
+          HomeFeatureTile(
+            icon: Icons.description,
+            title: loc.t('ttk_kitchen'),
+            onTap: () => context.go('/tech-cards/kitchen'),
+          ),
+          HomeFeatureTile(
+            icon: Icons.assignment,
+            title: loc.t('nomenclature'),
+            onTap: () => context.go('/nomenclature/kitchen'),
+          ),
+          HomeFeatureTile(
+            icon: Icons.chat_bubble_outline,
+            title: loc.t('inbox_tab_messages') ?? 'Сообщения',
+            onTap: () => context.go('/notifications?tab=messages'),
+          ),
+          HomeFeatureTile(
+            icon: Icons.people,
+            title: loc.t('employees'),
+            onTap: () => context.go('/employees'),
+          ),
+          if ((isChef || roles.contains('sous_chef')) && !isGeneral)
+            HomeFeatureTile(
+              icon: Icons.payments,
+              title: kIsWeb ? (loc.t('expenses') ?? 'Расходы') : (loc.t('salary_tab_fzp') ?? 'ФЗП'),
+              onTap: () =>
+                  context.go('/expenses/salary?department=kitchen'),
+            ),
+        ],
+      );
+    }
+
     final firstTile = HomeFeatureTile(
         icon: Icons.calendar_month,
         title: loc.t('schedule'),
-        onTap: () =>
-            context.go('/schedule/${_deptForRoute(employee.department)}'));
+        onTap: () => context.go('/schedule/$dept'));
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -124,8 +179,7 @@ class ManagementHomeContent extends StatelessWidget {
           HomeFeatureTile(
               icon: Icons.checklist,
               title: loc.t('checklists'),
-              onTap: () => context.go(
-                  '/checklists?department=${_deptForRoute(employee.department)}')),
+              onTap: () => context.go('/checklists?department=$dept')),
         if (showMenu)
           HomeFeatureTile(
               icon: Icons.restaurant_menu,
@@ -144,14 +198,14 @@ class ManagementHomeContent extends StatelessWidget {
               icon: Icons.assignment,
               title: loc.t('nomenclature'),
               onTap: () => context.go('/nomenclature/$dept')),
-        if (!FeatureFlags.posModuleEnabled) ...[
+        if (!posOn) ...[
           HomeFeatureTile(
             icon: Icons.local_shipping,
             title: loc.t('pos_nav_procurement') ?? 'Закупка',
             onTap: () => context.push('/procurement/$dept'),
           ),
         ],
-        if (FeatureFlags.posModuleEnabled && dept == 'hall') ...[
+        if (posOn && dept == 'hall') ...[
           HomeFeatureTile(
             icon: Icons.receipt_long,
             title: loc.t('order_tab_orders') ?? 'Заказы',
@@ -174,7 +228,7 @@ class ManagementHomeContent extends StatelessWidget {
               onTap: () => context.push('/pos/shift-report'),
             ),
         ],
-        if (FeatureFlags.posModuleEnabled && (dept == 'kitchen' || dept == 'bar')) ...[
+        if (posOn && (dept == 'kitchen' || dept == 'bar')) ...[
           HomeFeatureTile(
             icon: Icons.receipt_long,
             title: loc.t('order_tab_orders') ?? 'Заказы',
@@ -192,7 +246,7 @@ class ManagementHomeContent extends StatelessWidget {
             onTap: () => context.push('/pos/kds/$dept'),
           ),
         ],
-        if (FeatureFlags.posModuleEnabled) ...[
+        if (posOn) ...[
           HomeFeatureTile(
             icon: Icons.warehouse,
             title: loc.t('pos_nav_warehouse') ?? 'Склад',
@@ -215,46 +269,71 @@ class ManagementHomeContent extends StatelessWidget {
             subscriptionLocked: !subOk,
             onTap: () => context.push('/writeoffs')),
         if ((isChef || roles.contains('sous_chef')) &&
-            screenPref.showBanquetCatering) ...[
+            screenPref.showBanquetCatering &&
+            ent.canAccessBanquetCatering) ...[
           const SizedBox(height: 8),
           ExpandableBanquetSection(loc: loc, department: 'kitchen'),
         ],
-        if (isBarManager && screenPref.showBanquetCatering) ...[
+        if (isBarManager &&
+            screenPref.showBanquetCatering &&
+            ent.canAccessBanquetCatering) ...[
           const SizedBox(height: 8),
           ExpandableBanquetSection(loc: loc, department: 'bar'),
         ],
         if (isGeneral) ...[
-          if (FeatureFlags.posModuleEnabled)
+          if (posOn)
             HomeFeatureTile(
                 icon: Icons.warehouse,
                 title: loc.t('pos_warehouse_establishment_title') ??
-                    'Сводно по заведению',
+                    'Сводная по заведению',
                 onTap: () => context.push('/pos/warehouse/establishment')),
           HomeFeatureTile(
               icon: Icons.savings,
               title: loc.t('expenses'),
-              subscriptionLocked: !subOk,
+              subscriptionLocked: !subOk && !kIsWeb,
               onTap: () => context.go('/expenses')),
         ],
-        // ФЗП подразделения для руководителей: шеф/су-шеф (кухня), менеджер зала (зал), барменеджер (бар)
-        if ((isChef || roles.contains('sous_chef')) && !isGeneral)
+        // Веб: одна кнопка «Расходы» → ФЗП по подразделению (без дубля «ФЗП» ×3).
+        if (kIsWeb &&
+            !isGeneral &&
+            (isChef ||
+                roles.contains('sous_chef') ||
+                isBarManager ||
+                isFloorManager))
           HomeFeatureTile(
-              icon: Icons.payments,
-              title: loc.t('salary_tab_fzp') ?? 'ФЗП',
-              subscriptionLocked: !subOk,
-              onTap: () => context.go('/expenses/salary?department=kitchen')),
-        if (roles.contains('floor_manager') && !isGeneral)
-          HomeFeatureTile(
-              icon: Icons.payments,
-              title: loc.t('salary_tab_fzp') ?? 'ФЗП',
-              subscriptionLocked: !subOk,
-              onTap: () => context.go('/expenses/salary?department=hall')),
-        if (isBarManager && !isGeneral)
-          HomeFeatureTile(
-              icon: Icons.payments,
-              title: loc.t('salary_tab_fzp') ?? 'ФЗП',
-              subscriptionLocked: !subOk,
-              onTap: () => context.go('/expenses/salary?department=bar')),
+            icon: Icons.payments,
+            title: loc.t('expenses') ?? 'Расходы',
+            onTap: () {
+              final d = isBarManager
+                  ? (ent.hasUltraLevelFeatures ? 'bar' : 'kitchen')
+                  : isFloorManager
+                      ? 'hall'
+                      : 'kitchen';
+              context.go('/expenses/salary?department=$d');
+            },
+          ),
+        // Натив: отдельные плитки ФЗП по отделам.
+        if (!kIsWeb) ...[
+          if ((isChef || roles.contains('sous_chef')) && !isGeneral)
+            HomeFeatureTile(
+                icon: Icons.payments,
+                title: loc.t('salary_tab_fzp') ?? 'ФЗП',
+                subscriptionLocked: !subOk,
+                onTap: () =>
+                    context.go('/expenses/salary?department=kitchen')),
+          if (roles.contains('floor_manager') && !isGeneral)
+            HomeFeatureTile(
+                icon: Icons.payments,
+                title: loc.t('salary_tab_fzp') ?? 'ФЗП',
+                subscriptionLocked: !subOk,
+                onTap: () => context.go('/expenses/salary?department=hall')),
+          if (isBarManager && !isGeneral)
+            HomeFeatureTile(
+                icon: Icons.payments,
+                title: loc.t('salary_tab_fzp') ?? 'ФЗП',
+                subscriptionLocked: !subOk,
+                onTap: () => context.go('/expenses/salary?department=${ent.hasUltraLevelFeatures ? 'bar' : 'kitchen'}')),
+        ],
       ],
     );
   }

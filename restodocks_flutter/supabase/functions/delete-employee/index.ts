@@ -59,17 +59,23 @@ async function sendManagerEmail(
     return;
   }
   const from = Deno.env.get("RESEND_FROM_EMAIL")?.trim() || "Restodocks <noreply@restodocks.com>";
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${resendKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from, to: [to], subject, html }),
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    console.error("[delete-employee] Resend failed:", res.status, err);
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${resendKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ from, to: [to], subject, html }),
+      // Уведомление не должно блокировать удаление профиля.
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("[delete-employee] Resend failed:", res.status, err);
+    }
+  } catch (e) {
+    console.error("[delete-employee] Resend timeout/error:", e);
   }
 }
 

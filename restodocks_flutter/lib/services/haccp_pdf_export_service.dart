@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../legal/legal_compliance_provider.dart';
 import '../models/haccp_log.dart';
 import '../models/haccp_log_type.dart';
 import 'localization_service.dart';
@@ -49,6 +50,20 @@ class HaccpPdfExportService {
           ),
         ),
       );
+
+  static pw.Widget _euPdfComplianceFooter(String? text) {
+    if (text == null || text.isEmpty) return pw.SizedBox.shrink();
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(top: 8),
+      child: pw.Center(
+        child: pw.Text(
+          text,
+          textAlign: pw.TextAlign.center,
+          style: pw.TextStyle(fontSize: 6.2, color: PdfColors.grey700),
+        ),
+      ),
+    );
+  }
 
   /// Гигиенический журнал: макет по образцу — графы как в рекомендуемой форме.
   static pw.Widget _buildHealthHygienePage({
@@ -913,6 +928,8 @@ class HaccpPdfExportService {
     final sanpinLine = tr('haccp_sanpin_line_${logType.code}');
     final title = tr(logType.displayNameKey);
     final footerText = tr('haccp_sanpin_footer_${logType.code}');
+    final euPdfComplianceFooter =
+        LegalComplianceProvider.journalPdfComplianceFooter(pdfLanguageCode);
 
     final doc = pw.Document(
       theme: theme,
@@ -964,6 +981,8 @@ class HaccpPdfExportService {
                   style: pw.TextStyle(fontSize: 10),
                 ),
               ),
+              pw.Spacer(),
+              _euPdfComplianceFooter(euPdfComplianceFooter),
             ],
           ),
         ),
@@ -1009,6 +1028,7 @@ class HaccpPdfExportService {
                   child: pw.Text(footerText,
                       style: pw.TextStyle(
                           fontSize: 9, fontWeight: pw.FontWeight.bold))),
+              _euPdfComplianceFooter(euPdfComplianceFooter),
             ],
           ),
         ),
@@ -1053,6 +1073,7 @@ class HaccpPdfExportService {
                   child: pw.Text(footerText,
                       style: pw.TextStyle(
                           fontSize: 9, fontWeight: pw.FontWeight.bold))),
+              _euPdfComplianceFooter(euPdfComplianceFooter),
             ],
           ),
         ),
@@ -1095,6 +1116,7 @@ class HaccpPdfExportService {
                   child: pw.Text(footerText,
                       style: pw.TextStyle(
                           fontSize: 9, fontWeight: pw.FontWeight.bold))),
+              _euPdfComplianceFooter(euPdfComplianceFooter),
             ],
           ),
         ),
@@ -1135,6 +1157,7 @@ class HaccpPdfExportService {
                   child: pw.Text(footerText,
                       style: pw.TextStyle(
                           fontSize: 9, fontWeight: pw.FontWeight.bold))),
+              _euPdfComplianceFooter(euPdfComplianceFooter),
             ],
           ),
         ),
@@ -1176,6 +1199,7 @@ class HaccpPdfExportService {
                   child: pw.Text(footerText,
                       style: pw.TextStyle(
                           fontSize: 9, fontWeight: pw.FontWeight.bold))),
+              _euPdfComplianceFooter(euPdfComplianceFooter),
             ],
           ),
         ),
@@ -1218,6 +1242,7 @@ class HaccpPdfExportService {
                   child: pw.Text(footerText,
                       style: pw.TextStyle(
                           fontSize: 9, fontWeight: pw.FontWeight.bold))),
+              _euPdfComplianceFooter(euPdfComplianceFooter),
             ],
           ),
         ),
@@ -1258,6 +1283,7 @@ class HaccpPdfExportService {
                   child: pw.Text(footerText,
                       style: pw.TextStyle(
                           fontSize: 9, fontWeight: pw.FontWeight.bold))),
+              _euPdfComplianceFooter(euPdfComplianceFooter),
             ],
           ),
         ),
@@ -1290,7 +1316,8 @@ class HaccpPdfExportService {
                     pw.Center(
                         child: pw.Text(footerText,
                             style: pw.TextStyle(
-                                fontSize: 9, fontWeight: pw.FontWeight.bold)))
+                                fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                    _euPdfComplianceFooter(euPdfComplianceFooter),
                   ])));
     } else if (logType == HaccpLogType.disinfectantAccounting) {
       doc.addPage(pw.Page(
@@ -1319,7 +1346,8 @@ class HaccpPdfExportService {
                     pw.Center(
                         child: pw.Text(footerText,
                             style: pw.TextStyle(
-                                fontSize: 9, fontWeight: pw.FontWeight.bold)))
+                                fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                    _euPdfComplianceFooter(euPdfComplianceFooter),
                   ])));
     } else if (logType == HaccpLogType.equipmentWashing) {
       doc.addPage(pw.Page(
@@ -1349,7 +1377,8 @@ class HaccpPdfExportService {
                     pw.Center(
                         child: pw.Text(footerText,
                             style: pw.TextStyle(
-                                fontSize: 9, fontWeight: pw.FontWeight.bold)))
+                                fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                    _euPdfComplianceFooter(euPdfComplianceFooter),
                   ])));
     } else if (logType == HaccpLogType.generalCleaningSchedule) {
       doc.addPage(pw.Page(
@@ -1379,7 +1408,8 @@ class HaccpPdfExportService {
                     pw.Center(
                         child: pw.Text(footerText,
                             style: pw.TextStyle(
-                                fontSize: 9, fontWeight: pw.FontWeight.bold)))
+                                fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                    _euPdfComplianceFooter(euPdfComplianceFooter),
                   ])));
     } else if (logType == HaccpLogType.sieveFilterMagnet) {
       doc.addPage(pw.Page(
@@ -1409,7 +1439,8 @@ class HaccpPdfExportService {
                     pw.Center(
                         child: pw.Text(footerText,
                             style: pw.TextStyle(
-                                fontSize: 9, fontWeight: pw.FontWeight.bold)))
+                                fontSize: 9, fontWeight: pw.FontWeight.bold))),
+                    _euPdfComplianceFooter(euPdfComplianceFooter),
                   ])));
     } else {
       final colKeys = logs.isNotEmpty
@@ -1437,12 +1468,32 @@ class HaccpPdfExportService {
               ),
             ],
           ),
-          footer: (ctx) => pw.Center(
-            child: pw.Text(
-              footerText,
-              style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
-            ),
-          ),
+          footer: (ctx) {
+            final eu = euPdfComplianceFooter;
+            return pw.Column(
+              mainAxisSize: pw.MainAxisSize.min,
+              children: [
+                pw.Center(
+                  child: pw.Text(
+                    footerText,
+                    style: pw.TextStyle(
+                        fontSize: 9, fontWeight: pw.FontWeight.bold),
+                  ),
+                ),
+                if (eu != null && eu.isNotEmpty)
+                  pw.Padding(
+                    padding:
+                        const pw.EdgeInsets.only(top: 6, left: 24, right: 24),
+                    child: pw.Text(
+                      eu,
+                      textAlign: pw.TextAlign.center,
+                      style: pw.TextStyle(
+                          fontSize: 6.2, color: PdfColors.grey700),
+                    ),
+                  ),
+              ],
+            );
+          },
           build: (ctx) {
             final rows = <pw.TableRow>[
               pw.TableRow(
@@ -1510,6 +1561,7 @@ class HaccpPdfExportService {
               pw.SizedBox(height: 24),
               pw.Text(tr('haccp_pdf_stitching_sign'),
                   style: pw.TextStyle(fontSize: 10)),
+              _euPdfComplianceFooter(euPdfComplianceFooter),
             ],
           ),
         ),

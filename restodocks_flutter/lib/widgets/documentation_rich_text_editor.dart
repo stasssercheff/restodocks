@@ -114,71 +114,26 @@ class _DocumentationRichTextEditorState extends State<DocumentationRichTextEdito
       builder: (context, _) {
         final loc = LocalizationService();
         final placeholder = loc.t('documentation_editor_placeholder');
+        final appLocale = loc.currentLocale;
 
-        if (widget.readOnly) {
-          return Container(
-            constraints: BoxConstraints(minHeight: widget.minHeight),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border.all(color: Theme.of(context).dividerColor),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: QuillEditor(
-              focusNode: _focusNode,
-              scrollController: _scrollController,
-              controller: widget.controller,
-              config: QuillEditorConfig(
-                padding: EdgeInsets.zero,
-                placeholder: '',
-                embedBuilders: kIsWeb
-                    ? FlutterQuillEmbeds.editorWebBuilders()
-                    : FlutterQuillEmbeds.editorBuilders(),
-              ),
-            ),
+        Widget withAppLocale(Widget child) {
+          // Quill/Material pick up the nearest Localizations; keep toolbar and editor
+          // aligned with LocalizationService (avoids mixed app language vs device/UI).
+          // Kazakh Quill strings: [FlutterQuillKkDelegate] in main.dart.
+          return Localizations.override(
+            context: context,
+            locale: appLocale,
+            child: child,
           );
         }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            QuillSimpleToolbar(
-              controller: widget.controller,
-              config: QuillSimpleToolbarConfig(
-                showBoldButton: true,
-                showItalicButton: true,
-                showUnderLineButton: true,
-                showStrikeThrough: true,
-                showFontFamily: true,
-                showFontSize: true,
-                showIndent: true,
-                showAlignmentButtons: true,
-                showHeaderStyle: true,
-                showListNumbers: true,
-                showListBullets: true,
-                showListCheck: true,
-                showCodeBlock: true,
-                showInlineCode: true,
-                showLink: true,
-                showClipboardCut: true,
-                showClipboardCopy: true,
-                showClipboardPaste: true,
-                showUndo: true,
-                showRedo: true,
-                showClearFormat: true,
-                embedButtons: FlutterQuillEmbeds.toolbarButtons(
-                  imageButtonOptions: QuillToolbarImageButtonOptions(
-                    imageButtonConfig: QuillToolbarImageConfig(
-                      onRequestPickImage: _onRequestPickImage,
-                    ),
-                  ),
-                  videoButtonOptions: null,
-                ),
-              ),
-            ),
+        if (widget.readOnly) {
+          return withAppLocale(
             Container(
               constraints: BoxConstraints(minHeight: widget.minHeight),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
                 border: Border.all(color: Theme.of(context).dividerColor),
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -187,15 +142,78 @@ class _DocumentationRichTextEditorState extends State<DocumentationRichTextEdito
                 scrollController: _scrollController,
                 controller: widget.controller,
                 config: QuillEditorConfig(
-                  padding: const EdgeInsets.all(16),
-                  placeholder: placeholder,
+                  padding: EdgeInsets.zero,
+                  placeholder: '',
                   embedBuilders: kIsWeb
                       ? FlutterQuillEmbeds.editorWebBuilders()
                       : FlutterQuillEmbeds.editorBuilders(),
                 ),
               ),
             ),
-          ],
+          );
+        }
+
+        return withAppLocale(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              QuillSimpleToolbar(
+                controller: widget.controller,
+                config: QuillSimpleToolbarConfig(
+                  showBoldButton: true,
+                  showItalicButton: true,
+                  showUnderLineButton: true,
+                  showStrikeThrough: true,
+                  showFontFamily: true,
+                  showFontSize: true,
+                  showIndent: true,
+                  showAlignmentButtons: true,
+                  showHeaderStyle: true,
+                  showListNumbers: true,
+                  showListBullets: true,
+                  showListCheck: true,
+                  showCodeBlock: true,
+                  showInlineCode: true,
+                  showLink: true,
+                  showClipboardCut: true,
+                  showClipboardCopy: true,
+                  showClipboardPaste: true,
+                  showUndo: true,
+                  showRedo: true,
+                  showClearFormat: true,
+                  embedButtons: FlutterQuillEmbeds.toolbarButtons(
+                    imageButtonOptions: QuillToolbarImageButtonOptions(
+                      imageButtonConfig: QuillToolbarImageConfig(
+                        onRequestPickImage: _onRequestPickImage,
+                      ),
+                    ),
+                    videoButtonOptions: null,
+                  ),
+                ),
+              ),
+              Container(
+                constraints: BoxConstraints(minHeight: widget.minHeight),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  border: Border.all(color: Theme.of(context).dividerColor),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: QuillEditor(
+                  focusNode: _focusNode,
+                  scrollController: _scrollController,
+                  controller: widget.controller,
+                  config: QuillEditorConfig(
+                    padding: const EdgeInsets.all(16),
+                    placeholder: placeholder,
+                    embedBuilders: kIsWeb
+                        ? FlutterQuillEmbeds.editorWebBuilders()
+                        : FlutterQuillEmbeds.editorBuilders(),
+                  ),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );

@@ -19,6 +19,23 @@ String employeeDisplayName(Employee e, {bool translit = false}) {
   return translit ? cyrillicToLatin(raw) : raw;
 }
 
+/// ФИО из поля/снимка (журнал, форма): как [LocalizationService.displayPersonNameForUi],
+/// плюс для русского UI — уважение [ScreenLayoutPreferenceService.showNameTranslit].
+String displayStoredPersonName(
+  String? raw,
+  LocalizationService loc, {
+  bool showNameTranslit = false,
+}) {
+  if (raw == null || raw.trim().isEmpty) return '—';
+  final t = raw.trim();
+  if (loc.currentLanguageCode == 'ru' &&
+      showNameTranslit &&
+      RegExp(r'[\u0400-\u04FF]').hasMatch(t)) {
+    return cyrillicToLatin(t);
+  }
+  return loc.displayPersonNameForLanguage(t, loc.currentLanguageCode);
+}
+
 /// Должность: кастом у владельца из заведения или локализованная роль.
 String employeePositionLine(
   Employee e,

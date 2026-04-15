@@ -8,6 +8,7 @@ import '../core/public_app_origin.dart';
 import '../models/models.dart';
 import '../services/countries_cities_data.dart';
 import '../services/services.dart';
+import '../utils/dev_log.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Добавление заведения существующим владельцем (без регистрации владельца).
@@ -89,10 +90,45 @@ class _AddEstablishmentScreenState extends State<AddEstablishmentScreen> {
         parentEstablishmentId: _type == _EstablishmentType.branch ? _selectedParent!.id : null,
       );
 
+      final emailTo = Supabase.instance.client.auth.currentUser?.email?.trim() ??
+          accountManager.currentEmployee?.email.trim() ??
+          '';
+      if (emailTo.isNotEmpty) {
+        final ownerName = accountManager.currentEmployee?.fullName.trim();
+        var pinMailOk = false;
+        String? pinMailErr;
+        for (var mailAttempt = 0; mailAttempt < 2; mailAttempt++) {
+          if (mailAttempt > 0) {
+            await Future<void>.delayed(const Duration(milliseconds: 800));
+          }
+          final mail = await EmailService().sendRegistrationEmail(
+            isOwner: true,
+            to: emailTo,
+            companyName: establishment.name,
+            email: emailTo,
+            fullName: (ownerName != null && ownerName.isNotEmpty) ? ownerName : null,
+            registeredAtLocal: DateTime.now().toLocal().toString(),
+            pinCode: establishment.pinCode,
+            languageCode: lang,
+          );
+          pinMailErr = mail.error;
+          if (mail.ok) {
+            pinMailOk = true;
+            break;
+          }
+        }
+        if (!pinMailOk) {
+          devLog(
+            'AddEstablishment: owner PIN/credentials email failed: $pinMailErr',
+          );
+        }
+      }
+
       if (!mounted) return;
+      setState(() => _isLoading = false);
       await accountManager.switchEstablishment(establishment);
       if (!mounted) return;
-      context.go('/home');
+      context.go('/home', extra: {'back': true});
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${loc.t('establishment_added') ?? 'Заведение добавлено'}: ${establishment.name}')),
       );

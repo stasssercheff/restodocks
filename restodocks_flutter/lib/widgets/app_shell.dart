@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:feature_spotlight/feature_spotlight.dart';
 import 'package:flutter/foundation.dart';
@@ -12,11 +13,13 @@ import '../core/mobile_browser_chrome_nudge_stub.dart'
 import '../core/pwa_fullscreen_hint_gate_stub.dart'
     if (dart.library.html) '../core/pwa_fullscreen_hint_gate_web.dart'
     as pwa_hint_gate;
+import '../core/subscription_entitlements.dart';
 import '../core/theme/app_theme.dart';
 import '../models/models.dart';
 import '../services/localization_service.dart';
 import '../services/account_manager_supabase.dart';
 import '../services/home_button_config_service.dart';
+import '../services/shell_return_service.dart';
 import '../services/page_tour_service.dart';
 import 'subscription_required_dialog.dart';
 
@@ -50,6 +53,8 @@ class _AppShellState extends State<AppShell> {
   double _lastScrollPixels = 0;
   String? _lastPath;
   bool _pwaHintQueued = false;
+  Timer? _supportPollTimer;
+  bool _supportAdminEntrySnackShown = false;
 
   bool _landscapeNarrowPhone(BuildContext context) {
     final mq = MediaQuery.of(context);
@@ -76,6 +81,28 @@ class _AppShellState extends State<AppShell> {
       }
     }
     _queuePwaHintIfNeeded();
+    _ensureSupportPolling();
+  }
+
+  @override
+  void dispose() {
+    _supportPollTimer?.cancel();
+    super.dispose();
+  }
+
+  void _ensureSupportPolling() {
+    final account = context.read<AccountManagerSupabase>();
+    final isOwner = account.currentEmployee?.hasRole('owner') ?? false;
+    if (!isOwner) {
+      _supportPollTimer?.cancel();
+      _supportPollTimer = null;
+      return;
+    }
+    _supportPollTimer ??=
+        Timer.periodic(const Duration(seconds: 30), (_) async {
+      if (!mounted) return;
+      await account.refreshSupportSessionState();
+    });
   }
 
   void _queuePwaHintIfNeeded() {
@@ -151,14 +178,21 @@ class _AppShellState extends State<AppShell> {
 
     final isOwner = currentEmployee.hasRole('owner');
     final homeBtnConfig = context.watch<HomeButtonConfigService>();
+    final ownerLite = SubscriptionEntitlements.from(accountManager.establishment)
+            .isLiteTier &&
+        (currentEmployee.hasRole('owner'));
+    final kitchenOnlySchedule = SubscriptionEntitlements.from(
+            accountManager.establishment)
+        .kitchenOnlyDepartments;
     final middleAction = homeBtnConfig.effectiveAction(currentEmployee,
-        hasProSubscription: accountManager.hasProSubscription);
+        hasProSubscription: accountManager.hasProSubscription,
+        ownerLiteHome: ownerLite);
     final noDataAccess = !isOwner && !currentEmployee.effectiveDataAccess;
     final isKitchenNoData =
         noDataAccess && currentEmployee.department == 'kitchen';
     final location = GoRouterState.of(context).matchedLocation;
-    final selectedIndex = _indexForLocation(
-        location, middleAction, noDataAccess, isKitchenNoData, currentEmployee);
+    final selectedIndex = _indexForLocation(location, middleAction, noDataAccess,
+        isKitchenNoData, currentEmployee, kitchenOnlySchedule);
 
     final isDataRequiredRoute =
         _kDataAccessRequiredPaths.any((p) => location.startsWith(p));
@@ -210,7 +244,8 @@ class _AppShellState extends State<AppShell> {
                         noDataAccess,
                         isKitchenNoData,
                         currentEmployee,
-                        selectedIndex);
+                        selectedIndex,
+                        kitchenOnlySchedule);
                   },
                 ),
                 _NativeNavIconSlot(
@@ -229,7 +264,8 @@ class _AppShellState extends State<AppShell> {
                         noDataAccess,
                         isKitchenNoData,
                         currentEmployee,
-                        selectedIndex);
+                        selectedIndex,
+                        kitchenOnlySchedule);
                   },
                 ),
                 _NativeNavIconSlot(
@@ -245,7 +281,8 @@ class _AppShellState extends State<AppShell> {
                         noDataAccess,
                         isKitchenNoData,
                         currentEmployee,
-                        selectedIndex);
+                        selectedIndex,
+                        kitchenOnlySchedule);
                   },
                 ),
               ],
@@ -310,6 +347,23 @@ class _AppShellState extends State<AppShell> {
     final bodyChild = showAccessPendingStub
         ? _AccessPendingPlaceholder(loc: loc)
         : widget.child;
+    final supportActive = accountManager.supportSessionActive;
+    if (!supportActive) {
+      _supportAdminEntrySnackShown = false;
+    } else if (isOwner && supportActive && !_supportAdminEntrySnackShown) {
+      _supportAdminEntrySnackShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (!accountManager.supportSessionActive) return;
+        final messenger = ScaffoldMessenger.maybeOf(context);
+        messenger?.showSnackBar(
+          SnackBar(
+            content: Text(loc.t('support_admin_session_snackbar')),
+            duration: const Duration(seconds: 9),
+          ),
+        );
+      });
+    }
     final mq = MediaQuery.of(context);
     // Совпадает с main.dart: веб в альбоме — сброс боков; нативно — только без выреза
     // (иначе сохраняем горизонтальный safe area под камеру / Dynamic Island).
@@ -325,6 +379,15 @@ class _AppShellState extends State<AppShell> {
           )
         : mq;
 
+    // Когда 71af6b31 скрывает bottomNavigationBar в веб+альбоме, пропадает Listener
+    // с жестом «вверх» → mobileBrowserChromeScrollDocumentBy (1c342b89). Зона у нижнего
+    // края (home indicator / узкая полоса) восстанавливает тот же жест без показа табов.
+    final webLandscapeChromeDrag =
+        kIsWeb && landscapeNarrow && hideNav;
+    final webChromeStripHeight = webLandscapeChromeDrag
+        ? math.max(36.0, mq.padding.bottom + 6.0)
+        : 0.0;
+
     // When hidden, omit the slot entirely — a zero-height bar still reserves
     // theme/shadow and reads as a second strip under the real nav.
     return MediaQuery(
@@ -334,9 +397,61 @@ class _AppShellState extends State<AppShell> {
         // trailing controls/lists on desktop and web pages.
         extendBody: false,
         backgroundColor: Theme.of(context).colorScheme.surface,
-        body: NotificationListener<ScrollNotification>(
-          onNotification: _onScroll,
-          child: bodyChild,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            NotificationListener<ScrollNotification>(
+              onNotification: _onScroll,
+              child: bodyChild,
+            ),
+            if (supportActive)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Material(
+                  color: const Color(0xFF4A148C).withValues(alpha: 0.96),
+                  elevation: 4,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.support_agent,
+                              color: Colors.white, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              loc.t('support_admin_session_banner'),
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 12),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            if (webLandscapeChromeDrag)
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: webChromeStripHeight,
+                child: Listener(
+                  behavior: HitTestBehavior.translucent,
+                  onPointerMove: (e) {
+                    if (e.delta.dy >= -0.25) return;
+                    browser_chrome_doc
+                        .mobileBrowserChromeScrollDocumentBy(-e.delta.dy);
+                  },
+                  child: const SizedBox.expand(),
+                ),
+              ),
+          ],
         ),
         bottomNavigationBar: hideNav
             ? null
@@ -363,8 +478,13 @@ class _AppShellState extends State<AppShell> {
   }
 
   int _indexForLocation(
-      String location, HomeButtonAction action, bool noDataAccess,
-      [bool isKitchenNoData = false, Employee? employee]) {
+    String location,
+    HomeButtonAction action,
+    bool noDataAccess, [
+    bool isKitchenNoData = false,
+    Employee? employee,
+    bool kitchenOnlySchedule = false,
+  ]) {
     if (location == '/home' || location == '/') return 0;
     if (location.startsWith('/personal-cabinet') ||
         location.startsWith('/profile') ||
@@ -373,7 +493,10 @@ class _AppShellState extends State<AppShell> {
       return 2;
     }
 
-    final middleRoute = noDataAccess ? '/schedule' : action.routeFor(employee);
+    final middleRoute = noDataAccess
+        ? '/schedule'
+        : action.routeFor(employee,
+            kitchenOnlySchedule: kitchenOnlySchedule);
     if (location.startsWith(middleRoute)) return 1;
 
     // Дополнительные маршруты для средней вкладки
@@ -394,18 +517,31 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _onTap(
-      BuildContext context,
-      int index,
-      HomeButtonAction action,
-      bool noDataAccess,
-      bool isKitchenNoData,
-      Employee? employee,
-      int currentIndex) {
+    BuildContext context,
+    int index,
+    HomeButtonAction action,
+    bool noDataAccess,
+    bool isKitchenNoData,
+    Employee? employee,
+    int currentIndex,
+    bool kitchenOnlySchedule,
+  ) {
+    // Уже на домашнем экране: повторный тап «Дом» не должен вызывать go() — иначе
+    // лишняя анимация (как «вперёд») поверх того же маршрута.
+    if (index == 0) {
+      final loc = GoRouterState.of(context).matchedLocation;
+      final pathOnly = loc.split('?').first;
+      if (pathOnly == '/home' || pathOnly == '/') {
+        return;
+      }
+    }
+
     // Если переходим на вкладку с меньшим индексом — анимируем как «назад» (вправо)
     final isBackward = index < currentIndex;
     final extra = isBackward ? {'back': true} : null;
 
-    String middleRoute = action.routeFor(employee);
+    String middleRoute = action.routeFor(employee,
+        kitchenOnlySchedule: kitchenOnlySchedule);
     if (!noDataAccess &&
         action == HomeButtonAction.inbox &&
         (employee?.hasInboxDocuments ?? true) == false) {
@@ -414,23 +550,32 @@ class _AppShellState extends State<AppShell> {
       middleRoute = isKitchenNoData ? '/schedule' : '/schedule?personal=1';
     }
 
+    final shellReturn = context.read<ShellReturnService>();
     switch (index) {
       case 0:
+        shellReturn.onFooterWillNavigate(context,
+            tabIndex: 0, middleRoute: middleRoute);
         context.go('/home', extra: extra);
       case 1:
         if (!noDataAccess) {
           final am = context.read<AccountManagerSupabase>();
           if (!am.hasProSubscription &&
               (action == HomeButtonAction.inventory ||
-                  action == HomeButtonAction.expenses)) {
+                  (action == HomeButtonAction.expenses && !kIsWeb))) {
             unawaited(showSubscriptionRequiredDialog(context));
             return;
           }
         }
+        shellReturn.onFooterWillNavigate(context,
+            tabIndex: 1, middleRoute: middleRoute);
         context.go(middleRoute, extra: extra);
       case 2:
+        shellReturn.onFooterWillNavigate(context,
+            tabIndex: 2, middleRoute: middleRoute);
         context.go('/personal-cabinet', extra: extra);
       default:
+        shellReturn.onFooterWillNavigate(context,
+            tabIndex: 0, middleRoute: middleRoute);
         context.go('/home', extra: extra);
     }
   }

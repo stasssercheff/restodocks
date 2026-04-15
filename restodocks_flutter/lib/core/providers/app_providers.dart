@@ -23,14 +23,14 @@ class AppProviders {
         ChangeNotifierProvider<HomeButtonConfigService>(
           create: (_) => HomeButtonConfigService(),
         ),
+        ChangeNotifierProvider<ShellReturnService>(
+          create: (_) => ShellReturnService(),
+        ),
         ChangeNotifierProvider<HomeLayoutConfigService>(
           create: (_) => HomeLayoutConfigService(),
         ),
         ChangeNotifierProvider<OwnerViewPreferenceService>(
           create: (_) => OwnerViewPreferenceService(),
-        ),
-        ChangeNotifierProvider<TtkBranchFilterService>(
-          create: (_) => TtkBranchFilterService(),
         ),
         ChangeNotifierProvider<ScreenLayoutPreferenceService>(
           create: (_) => ScreenLayoutPreferenceService(),
