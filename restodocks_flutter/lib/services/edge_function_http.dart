@@ -5,6 +5,9 @@ import '../utils/dev_log.dart';
 import 'package:restodocks/core/supabase_url_resolver_stub.dart'
     if (dart.library.html) 'package:restodocks/core/supabase_url_resolver_web.dart' as supabase_url;
 
+bool _isPublishableKey(String? v) =>
+    v != null && v.trim().startsWith('sb_publishable_');
+
 Dio _buildEdgeDio({
   required String anonKey,
   required String authorizationBearer,
@@ -52,7 +55,13 @@ Future<({int status, Map<String, dynamic>? data})> postEdgeFunctionWithRetry(
       final client = Supabase.instance.client;
       final fromRest = client.rest.headers['apikey']?.trim();
       if (fromRest != null && fromRest.isNotEmpty) {
-        resolvedAnonKey = fromRest;
+        // Предпочитаем publishable ключ из конфигурации приложения.
+        // Старый JWT из rest.headers может приводить к 401 в Edge.
+        if (_isPublishableKey(resolvedAnonKey) && !_isPublishableKey(fromRest)) {
+          devLog('EdgeFunction: keeping publishable apikey from app config');
+        } else {
+          resolvedAnonKey = fromRest;
+        }
       }
       final restUrl = client.rest.url.trim();
       if (restUrl.isNotEmpty) {
