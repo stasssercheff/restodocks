@@ -1,71 +1,102 @@
 #!/usr/bin/env bash
-# Добавляет Cloudflare Pages URL в Supabase Auth (Redirect URLs + Site URL).
-# Требует: SUPABASE_ACCESS_TOKEN (из https://supabase.com/dashboard/account/tokens)
-#           SUPABASE_PROJECT_REF (например osglfptwbuqqmqunttha)
+# Патчит Supabase Auth config:
+# 1) добавляет/сохраняет Redirect URLs для prod/beta/pages/local
+# 2) включает Send Email Hook на Edge auth-send-email (если передан секрет)
 #
-# Использование:
-#   SUPABASE_ACCESS_TOKEN=sbp_xxx SUPABASE_PROJECT_REF=osglfptwbuqqmqunttha ./scripts/supabase-add-cloudflare-urls.sh
+# Требует:
+#   SUPABASE_ACCESS_TOKEN
+#   SUPABASE_PROJECT_REF
+# Опционально:
+#   SUPABASE_SEND_EMAIL_HOOK_SECRET (v1,whsec_...) — если задан, синхронизирует hook_send_email_*
 
-set -e
+set -euo pipefail
 
 TOKEN="${SUPABASE_ACCESS_TOKEN:-}"
 REF="${SUPABASE_PROJECT_REF:-}"
+HOOK_SECRET="${SUPABASE_SEND_EMAIL_HOOK_SECRET:-}"
 API="https://api.supabase.com/v1"
 
 if [ -z "$TOKEN" ] || [ -z "$REF" ]; then
   echo "Usage: SUPABASE_ACCESS_TOKEN=xxx SUPABASE_PROJECT_REF=xxx $0"
-  echo "  SUPABASE_ACCESS_TOKEN: Personal Access Token from https://supabase.com/dashboard/account/tokens"
-  echo "  SUPABASE_PROJECT_REF: project ref from your Supabase URL (e.g. osglfptwbuqqmqunttha)"
   exit 1
 fi
 
-# Cloudflare Pages URLs для prod + beta
-CLOUDFLARE_URLS=(
+HOOK_URL="https://${REF}.supabase.co/functions/v1/auth-send-email"
+
+required_urls=(
+  "https://restodocks.com"
+  "https://restodocks.com/**"
+  "https://www.restodocks.com"
+  "https://www.restodocks.com/**"
+  "https://restodocks.com/auth/confirm"
+  "https://restodocks.com/auth/confirm-click"
+  "https://www.restodocks.com/auth/confirm"
+  "https://www.restodocks.com/auth/confirm-click"
   "https://restodocks.pages.dev"
   "https://restodocks.pages.dev/**"
+  "https://restodocks.pages.dev/auth/confirm"
+  "https://restodocks.pages.dev/auth/confirm-click"
+  "https://*.restodocks.pages.dev/auth/confirm"
+  "https://*.restodocks.pages.dev/auth/confirm-click"
   "https://*.pages.dev"
   "https://*.pages.dev/**"
+  "https://demo.restodocks.com"
+  "https://demo.restodocks.com/**"
+  "https://demo.restodocks.com/auth/confirm"
+  "https://demo.restodocks.com/auth/confirm-click"
+  "http://localhost:3000"
+  "http://localhost:8080"
+  "http://127.0.0.1:3000"
+  "http://127.0.0.1:8080"
 )
 
-# Собираем полный список (Cloudflare + localhost)
-REDIRECT_JSON=$(printf '%s\n' "${CLOUDFLARE_URLS[@]}" \
-  "http://localhost:3000" \
-  "http://localhost:8080" \
-  "http://127.0.0.1:3000" \
-  "http://127.0.0.1:8080" \
-  "https://restodocks.com" \
-  "https://restodocks.com/**" \
-  "https://www.restodocks.com" \
-  "https://www.restodocks.com/**" \
-  "https://demo.restodocks.com" \
-  "https://demo.restodocks.com/**" \
-  | jq -R . | jq -s .)
-
-# PATCH с site_url и additional_redirect_urls
-# Документация: https://supabase.com/docs/guides/auth/redirect-urls
-BODY=$(jq -n \
-  --arg site "https://restodocks.pages.dev" \
-  --argjson urls "$REDIRECT_JSON" \
-  '{site_url: $site, additional_redirect_urls: $urls}')
-
-echo "==> Patching auth config (site_url + additional_redirect_urls)..."
-RESP=$(curl -s -w "\n%{http_code}" -X PATCH \
-  -H "Authorization: Bearer $TOKEN" \
+echo "==> Fetching current auth config..."
+CURRENT_JSON="$(curl -fsS \
+  -H "Authorization: Bearer ${TOKEN}" \
   -H "Content-Type: application/json" \
-  -d "$BODY" \
-  "$API/projects/$REF/config/auth")
+  "${API}/projects/${REF}/config/auth")"
 
-HTTP_CODE=$(echo "$RESP" | tail -n1)
-BODY_RESP=$(echo "$RESP" | sed '$d')
+CURRENT_URLS="$(printf '%s' "${CURRENT_JSON}" | jq -c '.additional_redirect_urls // []')"
+REQUIRED_URLS_JSON="$(printf '%s\n' "${required_urls[@]}" | jq -R . | jq -s .)"
+MERGED_URLS="$(jq -cn --argjson a "${CURRENT_URLS}" --argjson b "${REQUIRED_URLS_JSON}" '$a + $b | unique')"
 
-if [ "$HTTP_CODE" = "200" ]; then
-  echo "OK: Auth config updated. Cloudflare URLs added."
+if [ -n "$HOOK_SECRET" ]; then
+  PATCH_BODY="$(jq -cn \
+    --argjson urls "${MERGED_URLS}" \
+    --arg hook_url "${HOOK_URL}" \
+    --arg hook_secret "${HOOK_SECRET}" \
+    '{
+      additional_redirect_urls: $urls,
+      hook_send_email_enabled: true,
+      hook_send_email_uri: $hook_url,
+      hook_send_email_secrets: $hook_secret
+    }')"
+  echo "==> Patching redirect URLs + send_email hook..."
 else
-  echo "HTTP $HTTP_CODE: $BODY_RESP"
-  echo ""
-  echo "Если API не поддерживает additional_redirect_urls, добавьте вручную:"
-  echo "  Supabase Dashboard -> Project -> Authentication -> URL Configuration"
-  echo "  Redirect URLs:"
-  printf '    %s\n' "${CLOUDFLARE_URLS[@]}"
+  PATCH_BODY="$(jq -cn --argjson urls "${MERGED_URLS}" '{additional_redirect_urls: $urls}')"
+  echo "==> Patching redirect URLs only (hook secret not provided)..."
+fi
+
+RESP="$(curl -sS -w '\n%{http_code}' -X PATCH \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "${PATCH_BODY}" \
+  "${API}/projects/${REF}/config/auth")"
+
+HTTP_CODE="$(printf '%s\n' "${RESP}" | tail -n1)"
+BODY_RESP="$(printf '%s\n' "${RESP}" | sed '$d')"
+
+if [ "${HTTP_CODE}" != "200" ]; then
+  echo "PATCH failed: HTTP ${HTTP_CODE}"
+  echo "${BODY_RESP}"
   exit 1
 fi
+
+echo "OK: Auth config updated."
+
+VERIFY_JSON="$(curl -fsS \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  "${API}/projects/${REF}/config/auth")"
+
+printf '%s' "${VERIFY_JSON}" | jq '{hook_send_email_enabled, hook_send_email_uri, redirects_count: (.additional_redirect_urls|length)}'
