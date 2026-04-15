@@ -111,6 +111,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   static const bool _hideCostColumnsInList = true;
   static const int _aiTtkProMonthLimit = 15;
   static const int _aiTtkUltraMonthLimit = 35;
+  static const int _aiTtkTrialTotalLimit = 3;
   List<TechCard> _list = [];
   // Индексы/кэши для рекурсивного расчёта себестоимости (включая вложенные ПФ из импортированных ТТК).
   Map<String, TechCard> _techCardsById = {};
@@ -469,13 +470,29 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   }
 
   bool _canCreateTtkWithAi(AccountManagerSupabase account) =>
-      account.subscriptionEntitlements.hasPaidProOrUltra;
+      account.subscriptionEntitlements.hasProLevelOrTrial;
 
-  int _aiTtkMonthLimit(AccountManagerSupabase account) {
+  ({int limit, String periodType, String periodKey}) _aiTtkQuotaWindow(
+    AccountManagerSupabase account,
+  ) {
+    if (account.isTrialOnlyWithoutPaid) {
+      return (
+        limit: _aiTtkTrialTotalLimit,
+        periodType: 'trial_total',
+        periodKey: 'trial_total',
+      );
+    }
+    final now = DateTime.now().toUtc();
+    final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final paidTier = account.subscriptionEntitlements.paidTier;
-    return paidTier == AppSubscriptionTier.ultra
-        ? _aiTtkUltraMonthLimit
-        : _aiTtkProMonthLimit;
+    return (
+      limit:
+          paidTier == AppSubscriptionTier.ultra
+              ? _aiTtkUltraMonthLimit
+              : _aiTtkProMonthLimit,
+      periodType: 'month',
+      periodKey: monthKey,
+    );
   }
 
   String _aiTtkRemainingLabel(LocalizationService loc, int remaining, int total) {
@@ -494,19 +511,17 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
     final establishmentId = account.establishment?.dataEstablishmentId.trim();
     if (establishmentId == null || establishmentId.isEmpty) return;
-    final monthLimit = _aiTtkMonthLimit(account);
-    final now = DateTime.now().toUtc();
-    final periodKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final quotaWindow = _aiTtkQuotaWindow(account);
     try {
       final row = await Supabase.instance.client
           .from('ai_ttk_usage_counters')
           .select('ai_parse_count')
           .eq('establishment_id', establishmentId)
-          .eq('period_type', 'month')
-          .eq('period_key', periodKey)
+          .eq('period_type', quotaWindow.periodType)
+          .eq('period_key', quotaWindow.periodKey)
           .maybeSingle();
       final used = (row?['ai_parse_count'] as num?)?.toInt() ?? 0;
-      final remaining = (monthLimit - used).clamp(0, monthLimit);
+      final remaining = (quotaWindow.limit - used).clamp(0, quotaWindow.limit);
       if (mounted) setState(() => _aiTtkRemainingQuota = remaining);
     } catch (_) {
       if (mounted) setState(() => _aiTtkRemainingQuota = null);
@@ -3363,7 +3378,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       return;
     }
     final canShowAiQuota = allowPromptFallback && _canCreateTtkWithAi(acc);
-    final aiQuotaTotal = canShowAiQuota ? _aiTtkMonthLimit(acc) : null;
+    final aiQuotaTotal = canShowAiQuota ? _aiTtkQuotaWindow(acc).limit : null;
     final aiQuotaRemaining =
         canShowAiQuota ? (_aiTtkRemainingQuota ?? aiQuotaTotal) : null;
     final controller = TextEditingController();

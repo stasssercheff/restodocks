@@ -34,8 +34,8 @@ dart run flutter_launcher_icons
 
 echo "==> flutter build web (--no-web-resources-cdn, with source maps to avoid 404 parse error)"
 ENABLE_TTK="${ENABLE_TTK_IMPORT:-false}"
-# Временно скрыть POS на бэте (подписки / вёрстка). Вернуть: HIDE_POS_MODULE=false или убрать define.
-HIDE_POS="${HIDE_POS_MODULE:-true}"
+# По умолчанию POS в бэте включён; скрываем только при явном HIDE_POS_MODULE=true.
+HIDE_POS="${HIDE_POS_MODULE:-false}"
 flutter build web --release --no-web-resources-cdn \
   --dart-define=SUPABASE_URL="$SUPABASE_URL" \
   --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
