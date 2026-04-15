@@ -16,24 +16,40 @@ import '../widgets/supplier_contact_links.dart';
 /// Высота области диалога «поставщик»: между safe area и клавиатурой (iOS / web mobile).
 double _supplierSheetMaxHeight(BuildContext context) {
   final mq = MediaQuery.of(context);
+  final keyboardInset = mq.viewInsets.bottom;
+  final effectiveKeyboardInset = keyboardInset > 0 ? keyboardInset : 0.0;
   return math.max(
-    200.0,
+    320.0,
     mq.size.height -
         mq.padding.top -
         mq.padding.bottom -
-        mq.viewInsets.bottom -
+        effectiveKeyboardInset -
         20,
   );
 }
 
 EdgeInsets _supplierDialogOuterInsets(BuildContext context) {
   final mq = MediaQuery.of(context);
+  final keyboardInset = mq.viewInsets.bottom;
   return EdgeInsets.only(
     left: 16,
     right: 16,
     top: mq.padding.top + 8,
-    bottom: 12 + mq.viewInsets.bottom,
+    bottom: 12 + (keyboardInset > 0 ? 8 : 0),
   );
+}
+
+EdgeInsets _supplierCenteredDialogInsets(BuildContext context) {
+  final mq = MediaQuery.of(context);
+  final vPad = math.max(16.0, math.max(mq.padding.top, mq.padding.bottom) + 12);
+  return EdgeInsets.symmetric(horizontal: 16, vertical: vPad);
+}
+
+Alignment _supplierStep1DialogAlignment(BuildContext context) {
+  final mq = MediaQuery.of(context);
+  if (mq.viewInsets.bottom > 0) return Alignment.topCenter;
+  if (mq.size.height < 700) return Alignment.topCenter;
+  return Alignment.center;
 }
 
 /// Экран «Поставщики» — только карточки поставщиков со списком продуктов, без заказов.
@@ -181,7 +197,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
 
     final step1 = await showDialog<_SupplierStep1Result>(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: false,
       builder: (dialogContext) => _SupplierStep1Dialog(loc: loc),
     );
     if (step1 == null || !mounted) return;
@@ -212,7 +228,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
 
     await showDialog<void>(
       context: context,
-      barrierDismissible: true,
+      barrierDismissible: false,
       builder: (dialogContext) {
         final theme = Theme.of(dialogContext);
         final cs = theme.colorScheme;
@@ -221,8 +237,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           backgroundColor: cs.primary,
         );
         return Dialog(
-          alignment: Alignment.topCenter,
-          insetPadding: _supplierDialogOuterInsets(dialogContext),
+          alignment: Alignment.center,
+          insetPadding: _supplierCenteredDialogInsets(dialogContext),
           backgroundColor: cs.surfaceContainerHigh,
           clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
@@ -1061,8 +1077,11 @@ class _SupplierStep1DialogState extends State<_SupplierStep1Dialog> {
     final cs = theme.colorScheme;
     final maxH = _supplierSheetMaxHeight(context);
 
-    return Dialog(
-      alignment: Alignment.topCenter,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Dialog(
+      alignment: _supplierStep1DialogAlignment(context),
       insetPadding: _supplierDialogOuterInsets(context),
       backgroundColor: cs.surfaceContainerHigh,
       clipBehavior: Clip.antiAlias,
@@ -1099,6 +1118,8 @@ class _SupplierStep1DialogState extends State<_SupplierStep1Dialog> {
                 const SizedBox(height: 12),
                 TextField(
                   controller: _nameCtrl,
+                  textInputAction: TextInputAction.next,
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
                   decoration: InputDecoration(
                     labelText: loc.t('order_list_supplier_name'),
                     border: const OutlineInputBorder(),
@@ -1114,6 +1135,8 @@ class _SupplierStep1DialogState extends State<_SupplierStep1Dialog> {
                 const SizedBox(height: 8),
                 TextField(
                   controller: _contactCtrl,
+                  textInputAction: TextInputAction.next,
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
                   decoration: InputDecoration(
                     labelText: loc.t('supplier_contact_person'),
                     border: const OutlineInputBorder(),
@@ -1140,6 +1163,8 @@ class _SupplierStep1DialogState extends State<_SupplierStep1Dialog> {
                 TextField(
                   controller: _emailCtrl,
                   enabled: _includeEmail,
+                  textInputAction: TextInputAction.next,
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
                   decoration: InputDecoration(
                     labelText: loc.t('order_list_contact_email'),
                     border: const OutlineInputBorder(),
@@ -1172,6 +1197,9 @@ class _SupplierStep1DialogState extends State<_SupplierStep1Dialog> {
                 TextField(
                   controller: _phoneCtrl,
                   enabled: _includePhone,
+                  textInputAction: TextInputAction.done,
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                  onEditingComplete: () => FocusScope.of(context).unfocus(),
                   decoration: InputDecoration(
                     labelText: loc.t('order_list_contact_phone'),
                     border: const OutlineInputBorder(),
@@ -1204,6 +1232,7 @@ class _SupplierStep1DialogState extends State<_SupplierStep1Dialog> {
             ),
           ),
         ),
+      ),
     );
   }
 }
