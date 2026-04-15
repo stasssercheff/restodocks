@@ -101,6 +101,14 @@ function isResendNoopRecipient(raw: string): boolean {
 
 export async function handleRequest(req: Request): Promise<Response> {
   const cors = resolveCorsHeaders(req);
+  const reqApikey = req.headers.get("apikey")?.trim() ?? "";
+  const reqAuth = req.headers.get("authorization")?.trim() ??
+    req.headers.get("Authorization")?.trim() ??
+    "";
+  const authPrefix = reqAuth.split(" ")[0] ?? "";
+  const authTokenPreview = reqAuth.includes(" ")
+    ? (reqAuth.split(" ")[1] ?? "").slice(0, 16)
+    : reqAuth.slice(0, 16);
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
@@ -137,6 +145,13 @@ export async function handleRequest(req: Request): Promise<Response> {
   }
 
   if (!(await hasValidApiKeyOrUser(req))) {
+    console.log(JSON.stringify({
+      event: "send_registration_email_unauthorized",
+      apikey_prefix: reqApikey.slice(0, 16),
+      authorization_scheme: authPrefix,
+      authorization_token_prefix: authTokenPreview,
+      has_origin: !!req.headers.get("origin"),
+    }));
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
       headers: { ...cors, "Content-Type": "application/json" },
@@ -153,6 +168,15 @@ export async function handleRequest(req: Request): Promise<Response> {
     const { type, to, companyName, email, fullName, pinCode, password } = body;
     const lang = normalizeLanguage(body.language);
     const appBaseUrl = resolveAppBaseUrl(req, body);
+    console.log(JSON.stringify({
+      event: "send_registration_email_request",
+      type: type ?? null,
+      to_domain: (to?.split("@")[1] ?? "").toLowerCase(),
+      language: lang,
+      has_password: !!password,
+      apikey_prefix: reqApikey.slice(0, 16),
+      authorization_scheme: authPrefix,
+    }));
 
     if (to && isResendNoopRecipient(to)) {
       console.log(
@@ -244,6 +268,12 @@ export async function handleRequest(req: Request): Promise<Response> {
         });
         const payload = await res.json();
         if (!res.ok) {
+          console.log(JSON.stringify({
+            event: "send_registration_email_resend_error",
+            type: "confirmation_only",
+            status: res.status,
+            message: payload?.message ?? null,
+          }));
           return new Response(JSON.stringify({ error: payload?.message || res.statusText }), {
             status: res.status,
             headers: { ...cors, "Content-Type": "application/json" },
@@ -299,6 +329,12 @@ export async function handleRequest(req: Request): Promise<Response> {
 
       const payload = await res.json();
       if (!res.ok) {
+        console.log(JSON.stringify({
+          event: "send_registration_email_resend_error",
+          type: "registration_confirmed",
+          status: res.status,
+          message: payload?.message ?? null,
+        }));
         return new Response(JSON.stringify({ error: payload?.message || res.statusText }), {
           status: res.status,
           headers: { ...cors, "Content-Type": "application/json" },
@@ -425,6 +461,12 @@ export async function handleRequest(req: Request): Promise<Response> {
     const payload = await res.json();
 
     if (!res.ok) {
+      console.log(JSON.stringify({
+        event: "send_registration_email_resend_error",
+        type: type ?? null,
+        status: res.status,
+        message: payload?.message ?? null,
+      }));
       return new Response(JSON.stringify({ error: payload?.message || res.statusText }), {
         status: res.status,
         headers: { ...cors, "Content-Type": "application/json" },
