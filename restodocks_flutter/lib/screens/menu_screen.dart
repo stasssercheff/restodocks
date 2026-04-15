@@ -279,9 +279,15 @@ class _MenuScreenState extends State<MenuScreen> {
   bool get _isHallMenu =>
       widget.department == 'hall' || widget.department == 'dining_room';
 
+  bool get _hasUltraOrTrialAccess {
+    final est = context.read<AccountManagerSupabase>().establishment;
+    return SubscriptionEntitlements.from(est).hasUltraLevelFeatures;
+  }
+
   /// Редактирование stop/go: кухня и бар (не зал, не банкет).
   bool get _canEditStopGo =>
-      widget.department == 'kitchen' || widget.department == 'bar';
+      (widget.department == 'kitchen' || widget.department == 'bar') &&
+      _hasUltraOrTrialAccess;
 
   /// Подразделение блюда для stop/go: bar или kitchen.
   String _dishDepartment(TechCard tc) => _isBarDish(tc) ? 'bar' : 'kitchen';
