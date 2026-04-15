@@ -235,7 +235,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         birthday: _birthday,
       );
 
-      final infoMail = await EmailService().sendRegistrationEmail(
+      var infoMail = await EmailService().sendRegistrationEmail(
         isOwner: false,
         to: email,
         companyName: establishment.name,
@@ -245,11 +245,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
         languageCode: locUi,
       );
       if (!infoMail.ok) {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        infoMail = await EmailService().sendRegistrationEmail(
+          isOwner: false,
+          to: email,
+          companyName: establishment.name,
+          email: email,
+          fullName: fullName,
+          registeredAtLocal: registeredAtLocal,
+          languageCode: locUi,
+        );
+      }
+      if (!infoMail.ok) {
         devLog('RegisterEmployee: sendRegistrationEmail failed: ${infoMail.error}');
       }
-      // Письмо со ссылкой: Edge confirmation_only (Resend). Auth/Hook часто не шлёт второе письмо в том же проекте.
+      // Письмо со ссылкой: Edge confirmation_only (Resend). Пауза снижает риск лимита Resend на втором письме.
       var resendFailed = false;
       if (!hasSession) {
+        await Future<void>.delayed(const Duration(milliseconds: 900));
         final confirmMail = await EmailService().sendConfirmationLinkRequest(
           email,
           languageCode: locUi,

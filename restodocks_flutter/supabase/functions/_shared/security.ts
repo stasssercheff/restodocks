@@ -237,20 +237,23 @@ export async function hasValidApiKeyOrUser(req: Request): Promise<boolean> {
   if (isServiceRoleBearer(req)) return true;
 
   const apiKeyHeader = req.headers.get("apikey")?.trim();
-  if (await isValidSupabaseAnonJwt(apiKeyHeader)) return true;
-
   const token = parseBearerToken(
     req.headers.get("authorization") ?? req.headers.get("Authorization"),
   );
-  if (await isValidSupabaseAnonJwt(token)) return true;
 
-  const seen = new Set<string>();
+  // Раньше jwtVerify (нужен SUPABASE_JWT_SECRET) и точное совпадение с SUPABASE_ANON_KEY в env.
+  // Клиент (Flutter web) может слать актуальный anon после ротации ключа в Dashboard, а секрет
+  // функции ещё не обновили — PostgREST тот же проект уже принимает JWT.
+  const seenGateway = new Set<string>();
   for (const cand of [apiKeyHeader, token]) {
     const c = cand?.trim();
-    if (!c || seen.has(c)) continue;
-    seen.add(c);
+    if (!c || seenGateway.has(c)) continue;
+    seenGateway.add(c);
     if (await isJwtAcceptedByPostgrestGateway(c)) return true;
   }
+
+  if (await isValidSupabaseAnonJwt(apiKeyHeader)) return true;
+  if (await isValidSupabaseAnonJwt(token)) return true;
 
   if (!token) return false;
 

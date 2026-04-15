@@ -166,20 +166,32 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
               }
               final emailTo = employee.email.trim();
               if (emailTo.isNotEmpty) {
-                final mail = await EmailService().sendRegistrationEmail(
-                  isOwner: true,
-                  to: emailTo,
-                  companyName: establishment.name,
-                  email: emailTo,
-                  fullName: employee.fullName,
-                  registeredAtLocal: DateTime.now().toLocal().toString(),
-                  pinCode: establishment.pinCode,
-                  languageCode: lang,
-                );
-                if (!mail.ok) {
+                var pinMailOk = false;
+                String? pinMailErr;
+                for (var attempt = 0; attempt < 2; attempt++) {
+                  if (attempt > 0) {
+                    await Future<void>.delayed(const Duration(milliseconds: 800));
+                  }
+                  final mail = await EmailService().sendRegistrationEmail(
+                    isOwner: true,
+                    to: emailTo,
+                    companyName: establishment.name,
+                    email: emailTo,
+                    fullName: employee.fullName,
+                    registeredAtLocal: DateTime.now().toLocal().toString(),
+                    pinCode: establishment.pinCode,
+                    languageCode: lang,
+                  );
+                  pinMailErr = mail.error;
+                  if (mail.ok) {
+                    pinMailOk = true;
+                    break;
+                  }
+                }
+                if (!pinMailOk) {
                   devLog(
                     'CompanyRegistration: owner PIN/credentials email failed: '
-                    '${mail.error}',
+                    '$pinMailErr',
                   );
                 }
               }

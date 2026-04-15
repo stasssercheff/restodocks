@@ -128,21 +128,41 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       final companyNameForEmail = estab?.name ??
           loc.t('register_company');
 
-      final infoMail = await EmailService().sendRegistrationEmail(
-        isOwner: true,
-        to: email,
-        companyName: companyNameForEmail,
-        email: email,
-        fullName: fullName,
-        registeredAtLocal: registeredAtLocal,
-        pinCode: estab?.pinCode,
-        languageCode: loc.currentLanguageCode,
-      );
-      if (!infoMail.ok) {
-        devLog('OwnerRegistration: sendRegistrationEmail failed: ${infoMail.error}');
+      // Письмо с PIN и логином — только когда заведение уже есть (старый порядок).
+      // При owner-first PIN появляется на шаге «данные компании» — там отдельная отправка.
+      if (estab != null) {
+        var infoMail = await EmailService().sendRegistrationEmail(
+          isOwner: true,
+          to: email,
+          companyName: companyNameForEmail,
+          email: email,
+          fullName: fullName,
+          registeredAtLocal: registeredAtLocal,
+          pinCode: estab.pinCode,
+          languageCode: loc.currentLanguageCode,
+        );
+        if (!infoMail.ok) {
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+          infoMail = await EmailService().sendRegistrationEmail(
+            isOwner: true,
+            to: email,
+            companyName: companyNameForEmail,
+            email: email,
+            fullName: fullName,
+            registeredAtLocal: registeredAtLocal,
+            pinCode: estab.pinCode,
+            languageCode: loc.currentLanguageCode,
+          );
+        }
+        if (!infoMail.ok) {
+          devLog('OwnerRegistration: sendRegistrationEmail failed: ${infoMail.error}');
+        }
       }
       var resendFailed = false;
       if (!signUpResult.hasSession) {
+        if (estab != null) {
+          await Future<void>.delayed(const Duration(milliseconds: 900));
+        }
         final confirmMail = await EmailService().sendConfirmationLinkRequest(
           email,
           languageCode: loc.currentLanguageCode,

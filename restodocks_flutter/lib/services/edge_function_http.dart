@@ -45,8 +45,24 @@ Future<({int status, Map<String, dynamic>? data})> postEdgeFunctionWithRetry(
   bool retryOnceOn401AfterSessionRefresh = false,
   int max401RecoveryAttempts = 1,
 }) async {
-  final url = '${supabase_url.getSupabaseBaseUrl()}/functions/v1/$functionPath';
-  final anonKey = supabase_url.getSupabaseAnonKey().trim();
+  var resolvedAnonKey = supabase_url.getSupabaseAnonKey().trim();
+  var resolvedBaseUrl = supabase_url.getSupabaseBaseUrl().trim().replaceAll(RegExp(r'/+$'), '');
+  try {
+    if (Supabase.instance.isInitialized) {
+      final client = Supabase.instance.client;
+      final fromRest = client.rest.headers['apikey']?.trim();
+      if (fromRest != null && fromRest.isNotEmpty) {
+        resolvedAnonKey = fromRest;
+      }
+      final restUrl = client.rest.url.trim();
+      if (restUrl.isNotEmpty) {
+        resolvedBaseUrl = Uri.parse(restUrl).origin;
+      }
+    }
+  } catch (e, st) {
+    devLog('EdgeFunction: resolve URL/anon from Supabase client skipped: $e\n$st');
+  }
+  final url = '$resolvedBaseUrl/functions/v1/$functionPath';
 
   Future<void> tryRefresh() async {
     try {
@@ -80,7 +96,7 @@ Future<({int status, Map<String, dynamic>? data})> postEdgeFunctionWithRetry(
 
     final String authBearer;
     if (bearerAlwaysAnon) {
-      authBearer = anonKey;
+      authBearer = resolvedAnonKey;
     } else {
       final jwt = await userJwtAfterRefresh();
       if (jwt == null || jwt.isEmpty) {
@@ -96,7 +112,7 @@ Future<({int status, Map<String, dynamic>? data})> postEdgeFunctionWithRetry(
     }
 
     try {
-      final dio = _buildEdgeDio(anonKey: anonKey, authorizationBearer: authBearer);
+      final dio = _buildEdgeDio(anonKey: resolvedAnonKey, authorizationBearer: authBearer);
       final resp = await dio.post<dynamic>(url, data: body);
       final data = resp.data is Map<String, dynamic>
           ? resp.data as Map<String, dynamic>

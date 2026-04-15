@@ -333,6 +333,7 @@ export async function handleRequest(req: Request): Promise<Response> {
         subject = copy.ownerSubject;
         html = `
 <p>${greeting}</p>
+<p>${copy.welcomeLead}</p>
 <p>${copy.ownerRegisteredPrefix} <strong>${escapeHtml(companyName)}</strong> ${copy.ownerRegisteredSuffix}</p>
 <p>${copy.ownerIdentifierHint}</p>
 <p><strong>${copy.companyPinLabel}: ${escapeHtml(pinCode || "")}</strong></p>
@@ -348,6 +349,7 @@ export async function handleRequest(req: Request): Promise<Response> {
         subject = copy.ownerSubject;
         html = `
 <p>${greeting}</p>
+<p>${copy.welcomeLead}</p>
 <p>${copy.ownerRegisteredPrefix} <strong>${escapeHtml(companyName)}</strong> ${copy.ownerRegisteredSuffix}</p>
 <p>${copy.ownerIdentifierHint}</p>
 <p><strong>${copy.companyPinLabel}: ${escapeHtml(pinCode || "")}</strong></p>
@@ -363,6 +365,7 @@ export async function handleRequest(req: Request): Promise<Response> {
       subject = copy.coOwnerSubject;
       html = `
 <p>${greeting}</p>
+<p>${copy.welcomeLead}</p>
 <p>${copy.coOwnerRegisteredPrefix} <strong>${escapeHtml(companyName)}</strong> ${copy.coOwnerRegisteredSuffix}</p>
 <p>${copy.ownerIdentifierHint}</p>
 <p><strong>${copy.companyPinLabel}: ${escapeHtml(pinCode || "")}</strong></p>
@@ -489,6 +492,8 @@ type MailCopy = {
   employeeRegisteredPrefix: string;
   spamHint: string;
   registrationTimeLabel: string;
+  /** Одна строка после приветствия: «добро пожаловать» + контекст письма с PIN/логином */
+  welcomeLead: string;
 };
 
 function i18nCopy(lang: MailLanguage): MailCopy {
@@ -519,8 +524,11 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         coOwnerInstruction: "Используйте PIN-код заведения при работе команды. Для входа в систему используйте email и пароль, указанные при регистрации.",
         employeeSubjectPrefix: "Доступ к корпоративному пространству",
         employeeRegisteredPrefix: "Ваша учетная запись успешно привязана к системе управления заведением",
-        spamHint: "Отдельно придёт письмо со ссылкой для подтверждения email. Если не увидите его — проверьте папку «Спам».",
+        spamHint:
+          "Вторым письмом (чуть позже) может прийти ссылка для подтверждения email — проверьте «Спам» и вкладку «Промоакции». Если письма с PIN не было — смотрите логи Edge send-registration-email в Supabase.",
         registrationTimeLabel: "Время регистрации",
+        welcomeLead:
+          "<strong>Добро пожаловать в Restodocks!</strong> Ниже — данные заведения: PIN для персонала и ваш логин (email) для входа.",
       };
     case "es":
       return {
@@ -550,6 +558,8 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         employeeRegisteredPrefix: "Su cuenta se vinculó correctamente a",
         spamHint: "También llegará un correo de confirmación. Revise Spam si no aparece.",
         registrationTimeLabel: "Hora de registro",
+        welcomeLead:
+          "<strong>¡Bienvenido a Restodocks!</strong> A continuación: PIN del establecimiento y su acceso (email) para iniciar sesión.",
       };
     case "it":
       return {
@@ -579,6 +589,8 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         employeeRegisteredPrefix: "Il tuo account è stato collegato a",
         spamHint: "Arriverà anche un'email di conferma. Controlla Spam se necessario.",
         registrationTimeLabel: "Orario registrazione",
+        welcomeLead:
+          "<strong>Benvenuto in Restodocks!</strong> Di seguito: PIN della struttura e il tuo login (email) per l'accesso.",
       };
     case "tr":
       return {
@@ -608,6 +620,8 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         employeeRegisteredPrefix: "Hesabınız şu işletmeye bağlandı:",
         spamHint: "Ayrıca onay bağlantısı e-postası gelir. Gerekirse Spam'i kontrol edin.",
         registrationTimeLabel: "Kayıt zamanı",
+        welcomeLead:
+          "<strong>Restodocks'a hoş geldiniz!</strong> Aşağıda: işletme PIN'i ve giriş için e-postanız.",
       };
     case "vi":
       return {
@@ -637,6 +651,8 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         employeeRegisteredPrefix: "Tài khoản của bạn đã được liên kết với",
         spamHint: "Một email xác nhận riêng sẽ được gửi. Hãy kiểm tra Spam nếu cần.",
         registrationTimeLabel: "Thời gian đăng ký",
+        welcomeLead:
+          "<strong>Chào mừng đến Restodocks!</strong> Bên dưới: PIN cơ sở và email đăng nhập của bạn.",
       };
     case "en":
     default:
@@ -665,8 +681,10 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         coOwnerInstruction: "Share the establishment PIN with your team. Sign in using your email and password.",
         employeeSubjectPrefix: "Access to",
         employeeRegisteredPrefix: "Your account has been linked to",
-        spamHint: "A separate email with confirmation link is sent by auth provider. Please check Spam if needed.",
+        spamHint: "A separate email with the confirmation link may follow shortly — please check Spam. If the PIN email is missing, check Edge logs for send-registration-email.",
         registrationTimeLabel: "Registration time",
+        welcomeLead:
+          "<strong>Welcome to Restodocks!</strong> Below: your establishment PIN and login (email) for sign-in.",
       };
   }
 }

@@ -655,6 +655,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
     if (isOwnerHome) {
       final screenPref = context.read<ScreenLayoutPreferenceService>();
+      final ownerSubEnt = SubscriptionEntitlements.from(account.establishment);
       final posOn = FeatureFlags.posModuleEnabled;
       final labels = <String, String>{
         'owner_doc': loc.t('documentation') ?? 'Документация',
@@ -690,7 +691,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             '${loc.t('writeoffs') ?? 'Списания'} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
         'owner_checklists_kitchen':
             '${loc.t('checklists')} (${_homeLayoutBranchLabel(loc, 'kitchen')})',
-        if (screenPref.showBarSection) ...{
+        if (screenPref.showBarSection && ownerSubEnt.hasUltraLevelFeatures) ...{
           'owner_schedule_bar':
               '${loc.t('schedule')} (${_homeLayoutBranchLabel(loc, 'bar')})',
           'owner_menu_bar':
@@ -2068,17 +2069,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 if (currentEmployee.hasRole('owner') &&
                     !accountManager.isLiteTier) ...[
-                  Consumer<ScreenLayoutPreferenceService>(
-                    builder: (_, screenPref, __) => SwitchListTile(
-                      secondary: const Icon(Icons.local_bar),
-                      title: Text(localization.t('show_bar_section') ??
-                          'Раздел «Бар» на главной'),
-                      subtitle: Text(localization.t('show_bar_section_hint') ??
-                          'Показывать секцию Бар (график, меню, ТТК и др.)'),
-                      value: screenPref.showBarSection,
-                      onChanged: (v) => screenPref.setShowBarSection(v),
+                  if (SubscriptionEntitlements.from(accountManager.establishment)
+                      .hasUltraLevelFeatures)
+                    Consumer<ScreenLayoutPreferenceService>(
+                      builder: (_, screenPref, __) => SwitchListTile(
+                        secondary: const Icon(Icons.local_bar),
+                        title: Text(localization.t('show_bar_section') ??
+                            'Раздел «Бар» на главной'),
+                        subtitle: Text(localization.t('show_bar_section_hint') ??
+                            'Показывать секцию Бар (график, меню, ТТК и др.)'),
+                        value: screenPref.showBarSection,
+                        onChanged: (v) => screenPref.setShowBarSection(v),
+                      ),
                     ),
-                  ),
                   Consumer<ScreenLayoutPreferenceService>(
                     builder: (_, screenPref, __) => SwitchListTile(
                       secondary: const Icon(Icons.table_restaurant),

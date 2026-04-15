@@ -28,6 +28,8 @@ class ExcelStyleTtkTable extends StatefulWidget {
   final void Function(int) onRemove;
   final void Function(int)? onSuggestWaste;
   final void Function(int)? onSuggestCookingLoss;
+  /// После привязки продукта к строке — подтянуть глобальные % отхода / ужарки из БД.
+  final void Function(int)? onAfterProductLinked;
   final bool isCook; // true для поваров - скрываем стоимость
   /// Если true, блок технологии не отображается (рендерится отдельно в родителе)
   final bool hideTechnologyBlock;
@@ -60,6 +62,7 @@ class ExcelStyleTtkTable extends StatefulWidget {
     required this.onRemove,
     this.onSuggestWaste,
     this.onSuggestCookingLoss,
+    this.onAfterProductLinked,
     this.isCook = false,
     this.hideTechnologyBlock = false,
     this.weightPerPortion = 100,
@@ -1113,6 +1116,13 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             }
             if (updated != null) {
               _updateIngredient(idx, updated);
+              final pid = updated.productId?.trim();
+              if (pid != null &&
+                  pid.isNotEmpty &&
+                  (updated.sourceTechCardId == null ||
+                      updated.sourceTechCardId!.trim().isEmpty)) {
+                widget.onAfterProductLinked?.call(idx);
+              }
             }
           } catch (e, st) {
             devLog('TTK onProductSelected error: $e\n$st');

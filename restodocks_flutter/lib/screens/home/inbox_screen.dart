@@ -171,7 +171,7 @@ class _InboxScreenState extends State<InboxScreen> {
       if (isOwner || isManagement) {
         if (ultraTier) tabs.add(_InboxTab.goodsReceipt);
         tabs.add(_InboxTab.inventory);
-        if (ultraTier) {
+        if (ultraTier || proPaid) {
           tabs.add(_InboxTab.writeoff);
         }
         if ((ultraTier || proPaid) &&
@@ -193,17 +193,17 @@ class _InboxScreenState extends State<InboxScreen> {
     return tabs;
   }
 
-  /// Вкладки типов для собственника: Ultra — полный набор; Pro — без приёмки и списаний; iiko — Pro и Ultra (не зал).
+  /// Вкладки типов для собственника: приёмка и отдельная вкладка «поставки» — Ultra; списания — Pro и Ultra; iiko — Pro и Ultra (не зал).
   List<_InboxTypeTab> _ownerVisibleTypeTabs(
       AppSubscriptionTier tier, bool isHall) {
     final ultraTier = tier == AppSubscriptionTier.ultra;
-    final proOrUltra = tier == AppSubscriptionTier.pro ||
-        tier == AppSubscriptionTier.ultra;
+    final proPaid = tier == AppSubscriptionTier.pro;
+    final proOrUltra = proPaid || ultraTier;
     return [
       _InboxTypeTab.order,
       if (ultraTier) _InboxTypeTab.goodsReceipt,
       _InboxTypeTab.inventory,
-      if (ultraTier) _InboxTypeTab.writeoff,
+      if (ultraTier || proPaid) _InboxTypeTab.writeoff,
       if (!isHall && proOrUltra) _InboxTypeTab.iikoInventory,
       _InboxTypeTab.notifications,
       _InboxTypeTab.checklist,
@@ -622,6 +622,8 @@ class _InboxScreenState extends State<InboxScreen> {
               ),
             if (_isInventoryMergeTabSelected(isOwner) &&
                 _mergeableDocumentsForCurrentTab.isNotEmpty &&
+                SubscriptionEntitlements.from(accountManager.establishment)
+                    .hasUltraLevelFeatures &&
                 (employee?.hasRole('executive_chef') == true ||
                     employee?.hasRole('sous_chef') == true ||
                     employee?.hasRole('owner') == true ||

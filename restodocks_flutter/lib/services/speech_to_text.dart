@@ -1,3 +1,4 @@
-export 'speech_to_text_stub.dart'
-    if (dart.library.html) 'speech_to_text_web.dart'
-    if (dart.library.io) 'speech_to_text_io.dart';
+/// Один модуль для всех платформ: пакет `speech_to_text` сам подключает web (Chrome и др.)
+/// и мобильные реализации. Кастомный `speech_to_text_web.dart` не используем — на iOS Safari
+/// API распознавания речи в браузере по-прежнему недоступен (ограничение платформы).
+export 'speech_to_text_io.dart';

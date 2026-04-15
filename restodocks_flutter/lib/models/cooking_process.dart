@@ -97,6 +97,7 @@ class CookingProcess extends Equatable {
   ];
 
   /// Предопределенные процессы приготовления
+  /// Дефолтные weightLossPercentage должны совпадать с SQL `public._default_cooking_loss_rows()` (миграция seed глобальных % ужарки).
   static List<CookingProcess> get defaultProcesses => [
     // Варка
     CookingProcess(
