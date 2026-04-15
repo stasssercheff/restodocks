@@ -2096,12 +2096,27 @@ class AccountManagerSupabase extends ChangeNotifier {
     required String password,
     required Map<String, String> pinsByEstablishmentId,
   }) async {
-    final authRes = await _supabase.client.auth.signInWithPassword(
-      email: email.trim(),
-      password: password,
-    );
-    if (authRes.user == null) {
-      throw Exception('Invalid email or password');
+    final emailNorm = email.trim().toLowerCase();
+    final currentUser = _supabase.client.auth.currentUser;
+    final currentEmail = currentUser?.email?.trim().toLowerCase();
+    final alreadyAuthenticatedAsSameUser =
+        currentUser != null && currentEmail == emailNorm;
+
+    // В web прямой signInWithPassword может зависать (нестабильная сеть/Auth endpoint).
+    // Если владелец уже в сессии и email совпадает, не переавторизуемся.
+    if (!alreadyAuthenticatedAsSameUser) {
+      final authRes = await _supabase.client.auth
+          .signInWithPassword(
+            email: email.trim(),
+            password: password,
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => throw Exception('owner_delete_sign_in_timeout'),
+          );
+      if (authRes.user == null) {
+        throw Exception('Invalid email or password');
+      }
     }
     final pinsJson = <String, dynamic>{};
     pinsByEstablishmentId.forEach((k, v) {
