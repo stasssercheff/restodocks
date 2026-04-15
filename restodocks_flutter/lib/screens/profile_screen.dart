@@ -596,11 +596,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
     List<Establishment> list;
     try {
-      list = await account.getEstablishmentsForOwner();
+      list = await account.getEstablishmentsForOwner().timeout(
+        const Duration(seconds: 30),
+        onTimeout: () => throw Exception('owner_delete_establishments_timeout'),
+      );
     } catch (e) {
-      if (context.mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
+      closeProgressDialogIfOpen();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('${loc.t('error')}: $e')),
@@ -609,7 +610,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
     if (!context.mounted) return;
-    if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+    closeProgressDialogIfOpen();
 
     final roots = _ownerDeletionRoots(list);
     final emailController = TextEditingController(
