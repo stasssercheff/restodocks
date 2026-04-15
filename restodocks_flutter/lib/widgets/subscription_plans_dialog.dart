@@ -3,6 +3,13 @@ import 'package:provider/provider.dart';
 
 import '../services/localization_service.dart';
 
+String _stripTierPrice(String title) {
+  return title.replaceFirst(
+    RegExp(r'\s*[-–—]\s*\d+(?:[.,]\d+)?\s*\$.*$'),
+    '',
+  ).trimRight();
+}
+
 /// Полное описание тарифов Lite / Pro / Ultra и расширений (из локализации).
 Future<void> showSubscriptionPlansDialog(BuildContext context) async {
   final loc = context.read<LocalizationService>();
@@ -17,7 +24,7 @@ Future<void> showSubscriptionPlansDialog(BuildContext context) async {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              loc.t('subscription_tier_lite_title'),
+              _stripTierPrice(loc.t('subscription_tier_lite_title')),
               style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
@@ -27,7 +34,7 @@ Future<void> showSubscriptionPlansDialog(BuildContext context) async {
             ),
             const SizedBox(height: 16),
             Text(
-              loc.t('subscription_tier_pro_title'),
+              _stripTierPrice(loc.t('subscription_tier_pro_title')),
               style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
@@ -37,7 +44,7 @@ Future<void> showSubscriptionPlansDialog(BuildContext context) async {
             ),
             const SizedBox(height: 16),
             Text(
-              loc.t('subscription_tier_ultra_title'),
+              _stripTierPrice(loc.t('subscription_tier_ultra_title')),
               style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 6),
@@ -68,14 +75,6 @@ Future<void> showSubscriptionPlansDialog(BuildContext context) async {
               loc.t('subscription_plans_trial_72h_note'),
               style: theme.textTheme.bodySmall?.copyWith(
                 height: 1.38,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              loc.t('subscription_plans_iap_price_note'),
-              style: theme.textTheme.bodySmall?.copyWith(
-                height: 1.35,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
