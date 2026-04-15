@@ -3297,49 +3297,60 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           final kb = mq.viewInsets.bottom;
           final safePad = mq.padding.vertical;
           final isLandscape = mq.orientation == Orientation.landscape;
+          final isDesktopLike = screenW >= 900;
+          final useCompactLayout = isLandscape && !isDesktopLike;
           // Заголовок + actions + отступы диалога (без занижения: иначе в альбоме
           // clamp «вверх» ломает раскладку и скрывает поле ввода).
-          final dialogChrome = isLandscape ? 100.0 : 176.0;
+          final dialogChrome = useCompactLayout ? 100.0 : 176.0;
           final availableH = screenH - kb - safePad;
           final maxBody = (availableH - dialogChrome).clamp(48.0, screenH * 0.95);
           const extrasBelowField = 8.0;
-          final fieldHeight = (maxBody - extrasBelowField).clamp(48.0, 520.0);
+          final fieldHeight =
+              (maxBody - extrasBelowField).clamp(48.0, isDesktopLike ? 620.0 : 520.0);
           final titleStyle = Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                fontSize: isLandscape ? 14 : null,
-                height: isLandscape ? 1.15 : null,
+                fontSize: useCompactLayout ? 14 : null,
+                height: useCompactLayout ? 1.15 : null,
               );
           final fieldStyle = Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                fontSize: isLandscape ? 13 : 15,
-                height: isLandscape ? 1.25 : 1.3,
+                fontSize: useCompactLayout ? 13 : 15,
+                height: useCompactLayout ? 1.25 : 1.3,
               );
           final hintStyle = Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                fontSize: isLandscape ? 11 : 13,
-                height: isLandscape ? 1.2 : 1.25,
+                fontSize: useCompactLayout ? 11 : 13,
+                height: useCompactLayout ? 1.2 : 1.25,
               );
+          final dialogMinW = isDesktopLike ? 640.0 : 280.0;
           final dialogMaxW =
-              isLandscape ? (screenW * 0.94).clamp(280.0, 920.0) : 420.0;
+              isDesktopLike
+                  ? (screenW * 0.78).clamp(dialogMinW, 920.0)
+                  : (useCompactLayout ? (screenW * 0.94).clamp(280.0, 920.0) : 420.0);
           return AlertDialog(
-          insetPadding: EdgeInsets.symmetric(
-            horizontal: isLandscape ? 8 : 16,
-            vertical: isLandscape ? 8 : 16,
+          constraints: BoxConstraints(
+            minWidth: dialogMinW,
+            maxWidth: dialogMaxW,
           ),
-          titlePadding: isLandscape
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: useCompactLayout ? 8 : 16,
+            vertical: useCompactLayout ? 8 : 16,
+          ),
+          titlePadding: useCompactLayout
               ? const EdgeInsets.fromLTRB(16, 10, 16, 6)
               : null,
-          contentPadding: isLandscape
+          contentPadding: useCompactLayout
               ? const EdgeInsets.fromLTRB(16, 0, 16, 8)
               : null,
-          actionsPadding: isLandscape
+          actionsPadding: useCompactLayout
               ? const EdgeInsets.fromLTRB(12, 0, 12, 10)
               : null,
           title: Text(
             loc.t('ttk_import_text') ?? 'Вставить из текста',
             style: titleStyle,
-            maxLines: isLandscape ? 2 : 4,
+            maxLines: useCompactLayout ? 2 : 4,
             overflow: TextOverflow.ellipsis,
           ),
           content: ConstrainedBox(
             constraints: BoxConstraints(
+              minWidth: dialogMinW,
               maxWidth: dialogMaxW,
               maxHeight: maxBody,
             ),
@@ -3363,8 +3374,8 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                         hintText:
                             'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
                         hintStyle: hintStyle,
-                        isDense: isLandscape,
-                        contentPadding: isLandscape
+                        isDense: useCompactLayout,
+                        contentPadding: useCompactLayout
                             ? const EdgeInsets.symmetric(
                                 horizontal: 10,
                                 vertical: 8,
@@ -3381,11 +3392,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           actions: [
             TextButton(
               style: TextButton.styleFrom(
-                padding: isLandscape
+                padding: useCompactLayout
                     ? const EdgeInsets.symmetric(horizontal: 10, vertical: 6)
                     : null,
                 textStyle: Theme.of(ctx).textTheme.labelLarge?.copyWith(
-                      fontSize: isLandscape ? 13 : null,
+                      fontSize: useCompactLayout ? 13 : null,
                     ),
               ),
               onPressed: () {
@@ -3395,11 +3406,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             ),
             FilledButton(
               style: FilledButton.styleFrom(
-                padding: isLandscape
+                padding: useCompactLayout
                     ? const EdgeInsets.symmetric(horizontal: 14, vertical: 8)
                     : null,
                 textStyle: Theme.of(ctx).textTheme.labelLarge?.copyWith(
-                      fontSize: isLandscape ? 13 : null,
+                      fontSize: useCompactLayout ? 13 : null,
                     ),
               ),
               onPressed: () {
@@ -3951,63 +3962,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
   }
 
-  Future<void> _onTapCreateTechCard(LocalizationService loc) async {
-    if (_loading) return;
-    String tWithFallback(String key, String fallback) {
-      final v = loc.t(key);
-      if (v.trim().isEmpty || v == key) return fallback;
-      return v;
-    }
-
-    final action = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: Card(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.edit_note),
-                    title: Text(loc.t('create_tech_card')),
-                    subtitle: Text(tWithFallback(
-                      'ttk_create_manual_hint',
-                      'Fill tech card manually',
-                    )),
-                    onTap: () => Navigator.of(ctx).pop('manual'),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.auto_awesome),
-                    title: Text(
-                      tWithFallback('create_with_ai', 'Create with AI'),
-                    ),
-                    subtitle: Text(tWithFallback(
-                      'ttk_create_ai_hint',
-                      'Describe a dish and AI will fill the card',
-                    )),
-                    onTap: () => Navigator.of(ctx).pop('ai'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    if (!mounted || action == null) return;
-    if (action == 'manual') {
-      await _openManualTechCardCreate(loc);
-      return;
-    }
-    if (action == 'ai') {
-      await _createFromText(context, loc, allowPromptFallback: true);
-    }
-  }
-
   List<Widget> _buildAppBarActions(
       LocalizationService loc, bool canEdit, bool hasProSubscription) {
     final ctrl = _ttkTourController;
@@ -4036,11 +3990,44 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           )
         : null;
     final createWidget = canEdit
-        ? IconButton(
+        ? PopupMenuButton<String>(
             icon: Icon(Icons.add,
                 color: _loading ? Theme.of(context).disabledColor : null),
             tooltip: loc.t('create_tech_card'),
-            onPressed: _loading ? null : () => _onTapCreateTechCard(loc),
+            enabled: !_loading,
+            onSelected: (value) async {
+              if (value == 'manual') {
+                await _openManualTechCardCreate(loc);
+                return;
+              }
+              if (value == 'ai') {
+                await _createFromText(context, loc, allowPromptFallback: true);
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'manual',
+                child: Text(
+                  loc.t('create_tech_card'),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'ai',
+                child: Text(
+                  loc.t('create_with_ai').trim().isEmpty
+                      ? 'Создать с ИИ'
+                      : loc.t('create_with_ai'),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w500,
+                      ),
+                ),
+              ),
+            ],
           )
         : null;
     final importWidget = canEdit && hasProSubscription
