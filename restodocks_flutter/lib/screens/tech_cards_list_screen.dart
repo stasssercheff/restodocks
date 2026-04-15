@@ -471,6 +471,19 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   bool _canCreateTtkWithAi(AccountManagerSupabase account) =>
       account.subscriptionEntitlements.hasPaidProOrUltra;
 
+  int _aiTtkMonthLimit(AccountManagerSupabase account) {
+    final paidTier = account.subscriptionEntitlements.paidTier;
+    return paidTier == AppSubscriptionTier.ultra
+        ? _aiTtkUltraMonthLimit
+        : _aiTtkProMonthLimit;
+  }
+
+  String _aiTtkRemainingLabel(LocalizationService loc, int remaining, int total) {
+    final isRu = loc.currentLanguageCode.toLowerCase().startsWith('ru');
+    if (isRu) return 'Лимит ИИ-ТТК: осталось $remaining из $total';
+    return 'AI TTK limit: $remaining of $total left';
+  }
+
   Future<void> _refreshAiTtkRemainingQuota() async {
     final account = context.read<AccountManagerSupabase>();
     if (!_canCreateTtkWithAi(account)) {
@@ -481,9 +494,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
     final establishmentId = account.establishment?.dataEstablishmentId.trim();
     if (establishmentId == null || establishmentId.isEmpty) return;
-    final paidTier = account.subscriptionEntitlements.paidTier;
-    final monthLimit =
-        paidTier == AppSubscriptionTier.ultra ? _aiTtkUltraMonthLimit : _aiTtkProMonthLimit;
+    final monthLimit = _aiTtkMonthLimit(account);
     final now = DateTime.now().toUtc();
     final periodKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     try {
@@ -3351,6 +3362,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       await showSubscriptionRequiredDialog(context);
       return;
     }
+    final canShowAiQuota = allowPromptFallback && _canCreateTtkWithAi(acc);
+    final aiQuotaTotal = canShowAiQuota ? _aiTtkMonthLimit(acc) : null;
+    final aiQuotaRemaining =
+        canShowAiQuota ? (_aiTtkRemainingQuota ?? aiQuotaTotal) : null;
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
@@ -3425,6 +3440,36 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (canShowAiQuota &&
+                      aiQuotaTotal != null &&
+                      aiQuotaRemaining != null) ...[
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Theme.of(ctx)
+                            .colorScheme
+                            .surfaceContainerHighest
+                            .withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        child: Text(
+                          _aiTtkRemainingLabel(
+                            loc,
+                            aiQuotaRemaining,
+                            aiQuotaTotal,
+                          ),
+                          style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   SizedBox(
                     height: fieldHeight,
                     child: TextField(
