@@ -16,6 +16,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:feature_spotlight/feature_spotlight.dart';
 
+import '../core/subscription_entitlements.dart';
 import '../models/models.dart';
 import '../services/page_tour_service.dart';
 import '../widgets/app_bar_home_button.dart';
