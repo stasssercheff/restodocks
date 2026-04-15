@@ -164,39 +164,8 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
               if (estId.isNotEmpty) {
                 acc.registerMetadataBestEffort(estId);
               }
-              final emailTo = (employee.email.trim().isNotEmpty
-                      ? employee.email.trim()
-                      : (Supabase.instance.client.auth.currentUser?.email ?? '').trim());
-              if (emailTo.isNotEmpty) {
-                var pinMailOk = false;
-                String? pinMailErr;
-                for (var attempt = 0; attempt < 2; attempt++) {
-                  if (attempt > 0) {
-                    await Future<void>.delayed(const Duration(milliseconds: 800));
-                  }
-                  final mail = await EmailService().sendRegistrationEmail(
-                    isOwner: true,
-                    to: emailTo,
-                    companyName: establishment.name,
-                    email: emailTo,
-                    fullName: employee.fullName,
-                    registeredAtLocal: DateTime.now().toLocal().toString(),
-                    pinCode: establishment.pinCode,
-                    languageCode: lang,
-                  );
-                  pinMailErr = mail.error;
-                  if (mail.ok) {
-                    pinMailOk = true;
-                    break;
-                  }
-                }
-                if (!pinMailOk) {
-                  devLog(
-                    'CompanyRegistration: owner PIN/credentials email failed: '
-                    '$pinMailErr',
-                  );
-                }
-              }
+              // Письмо о регистрации компании/PIN отправляется серверным триггером БД
+              // (on_establishment_created_send_owner_email), чтобы не зависеть от клиентских 4xx.
             }
             if (!mounted) return;
             context.go('/home');
