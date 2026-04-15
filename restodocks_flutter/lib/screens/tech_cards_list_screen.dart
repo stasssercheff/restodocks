@@ -109,7 +109,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
   // не удаляя логику расчёта.
   static const bool _hideCostColumnsInList = true;
   static const int _aiTtkProMonthLimit = 15;
-  static const int _aiTtkUltraMonthLimit = 40;
+  static const int _aiTtkUltraMonthLimit = 35;
   List<TechCard> _list = [];
   // Индексы/кэши для рекурсивного расчёта себестоимости (включая вложенные ПФ из импортированных ТТК).
   Map<String, TechCard> _techCardsById = {};
@@ -3809,7 +3809,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       case 'ai_ttk_limit_pro_month':
         return 'Pro: лимит создания ТТК с ИИ — 15 в месяц.';
       case 'ai_ttk_limit_ultra_month':
-        return 'Ultra: лимит создания ТТК с ИИ — 40 в месяц.';
+        return 'Ultra: лимит создания ТТК с ИИ — 35 в месяц.';
       default:
         return loc.t('ai_ttk_limit_3_per_day');
     }

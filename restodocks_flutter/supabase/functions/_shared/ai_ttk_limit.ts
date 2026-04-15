@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const PRO_MONTH_LIMIT = 15;
-const ULTRA_MONTH_LIMIT = 40;
+const ULTRA_MONTH_LIMIT = 35;
 const TRIAL_TOTAL_LIMIT = 3;
 const PAID_TIERS = new Set(["pro", "plus", "starter", "business", "ultra", "premium"]);
 const ULTRA_TIERS = new Set(["ultra", "premium"]);
