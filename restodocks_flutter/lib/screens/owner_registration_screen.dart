@@ -127,21 +127,10 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
 
       // Для владельца не отправляем "приветственное" письмо на шаге signUp.
       // Письмо должно приходить после подтверждения email (тип registration_confirmed из триггера БД).
+      // Авто-отправка confirmation_only отключена для owner signup:
+      // письмо со ссылкой приходит только одним каналом (Auth Hook/GoTrue),
+      // а повторная отправка остаётся на экране ConfirmEmail по кнопке.
       var resendFailed = false;
-      if (!signUpResult.hasSession) {
-        if (estab != null) {
-          await Future<void>.delayed(const Duration(milliseconds: 900));
-        }
-        final confirmMail = await EmailService().sendConfirmationLinkRequest(
-          email,
-          languageCode: loc.currentLanguageCode,
-          password: password,
-        );
-        if (!confirmMail.ok) {
-          devLog('OwnerRegistration: sendConfirmationLinkRequest failed: ${confirmMail.error}');
-          resendFailed = true;
-        }
-      }
 
       if (!mounted) return;
       if (signUpResult.hasSession) {
