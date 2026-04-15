@@ -12,9 +12,14 @@ import '../widgets/app_bar_home_button.dart';
 /// Создание поставщика: наименование поставщика, контакты (почта, телефон).
 /// Название списка не вводится — используется наименование поставщика.
 class OrderListCreateScreen extends StatefulWidget {
-  const OrderListCreateScreen({super.key, this.department = 'kitchen'});
+  const OrderListCreateScreen({
+    super.key,
+    this.department = 'kitchen',
+    this.returnDraftOnly = false,
+  });
 
   final String department;
+  final bool returnDraftOnly;
 
   @override
   State<OrderListCreateScreen> createState() => _OrderListCreateScreenState();
@@ -68,6 +73,10 @@ class _OrderListCreateScreenState extends State<OrderListCreateScreen> {
       phone: normalizedSupplierPhoneOrNull(_phoneCtrl.text),
       department: widget.department,
     );
+    if (widget.returnDraftOnly) {
+      Navigator.of(context).pop(draft);
+      return;
+    }
     context.push('/product-order/new/products', extra: draft);
   }
 
