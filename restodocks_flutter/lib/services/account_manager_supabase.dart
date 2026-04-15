@@ -1980,13 +1980,18 @@ class AccountManagerSupabase extends ChangeNotifier {
     required String employeeId,
     required String pinCode,
   }) async {
-    final res = await _supabase.client.functions.invoke(
-      'delete-employee',
-      body: {
-        'employee_id': employeeId,
-        'pin_code': pinCode.trim().toUpperCase(),
-      },
-    );
+    final res = await _supabase.client.functions
+        .invoke(
+          'delete-employee',
+          body: {
+            'employee_id': employeeId,
+            'pin_code': pinCode.trim().toUpperCase(),
+          },
+        )
+        .timeout(
+          const Duration(seconds: 30),
+          onTimeout: () => throw Exception('delete_employee_timeout'),
+        );
     if (res.status != 200) {
       final err = (res.data is Map && (res.data as Map)['error'] != null)
           ? (res.data as Map)['error'].toString()
@@ -2153,7 +2158,10 @@ class AccountManagerSupabase extends ChangeNotifier {
       final err = res.data?['error']?.toString() ?? 'HTTP ${res.status}';
       throw Exception(err);
     }
-    await logout();
+    await logout().timeout(
+      const Duration(seconds: 20),
+      onTimeout: () => throw Exception('owner_delete_logout_timeout'),
+    );
   }
 
   /// Обновить данные заведения

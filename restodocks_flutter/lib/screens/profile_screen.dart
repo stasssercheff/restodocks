@@ -784,6 +784,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     AccountManagerSupabase account,
     Employee employee,
   ) async {
+    void closeProgressDialogIfOpen() {
+      if (!context.mounted) return;
+      final rootNav = Navigator.of(context, rootNavigator: true);
+      if (rootNav.canPop()) {
+        rootNav.pop();
+      }
+    }
+
     final pinController = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
@@ -847,11 +855,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
     try {
-      await account.deleteEmployeeWithPin(employeeId: employee.id, pinCode: pin);
-      if (context.mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
-      await account.logout();
+      await account
+          .deleteEmployeeWithPin(employeeId: employee.id, pinCode: pin)
+          .timeout(
+            const Duration(seconds: 45),
+            onTimeout: () => throw Exception('delete_profile_timeout'),
+          );
+      closeProgressDialogIfOpen();
+      await account.logout().timeout(
+        const Duration(seconds: 20),
+        onTimeout: () => throw Exception('delete_profile_logout_timeout'),
+      );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(loc.t('delete_profile_done'))),
@@ -859,9 +873,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         context.go('/login');
       }
     } catch (e) {
-      if (context.mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
+      closeProgressDialogIfOpen();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
