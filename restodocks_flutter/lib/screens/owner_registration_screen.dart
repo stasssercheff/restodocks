@@ -128,35 +128,33 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
       final companyNameForEmail = estab?.name ??
           loc.t('register_company');
 
-      // Письмо с PIN и логином — только когда заведение уже есть (старый порядок).
-      // При owner-first PIN появляется на шаге «данные компании» — там отдельная отправка.
-      if (estab != null) {
-        var infoMail = await EmailService().sendRegistrationEmail(
+      // Письмо владельцу отправляем сразу после регистрации.
+      // В owner-first PIN ещё не создан — он придёт отдельным письмом после шага создания компании.
+      var infoMail = await EmailService().sendRegistrationEmail(
+        isOwner: true,
+        to: email,
+        companyName: companyNameForEmail,
+        email: email,
+        fullName: fullName,
+        registeredAtLocal: registeredAtLocal,
+        pinCode: estab?.pinCode,
+        languageCode: loc.currentLanguageCode,
+      );
+      if (!infoMail.ok) {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+        infoMail = await EmailService().sendRegistrationEmail(
           isOwner: true,
           to: email,
           companyName: companyNameForEmail,
           email: email,
           fullName: fullName,
           registeredAtLocal: registeredAtLocal,
-          pinCode: estab.pinCode,
+          pinCode: estab?.pinCode,
           languageCode: loc.currentLanguageCode,
         );
-        if (!infoMail.ok) {
-          await Future<void>.delayed(const Duration(milliseconds: 500));
-          infoMail = await EmailService().sendRegistrationEmail(
-            isOwner: true,
-            to: email,
-            companyName: companyNameForEmail,
-            email: email,
-            fullName: fullName,
-            registeredAtLocal: registeredAtLocal,
-            pinCode: estab.pinCode,
-            languageCode: loc.currentLanguageCode,
-          );
-        }
-        if (!infoMail.ok) {
-          devLog('OwnerRegistration: sendRegistrationEmail failed: ${infoMail.error}');
-        }
+      }
+      if (!infoMail.ok) {
+        devLog('OwnerRegistration: sendRegistrationEmail failed: ${infoMail.error}');
       }
       var resendFailed = false;
       if (!signUpResult.hasSession) {
