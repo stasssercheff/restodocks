@@ -59,21 +59,27 @@ CURRENT_JSON="$(curl -fsS \
 CURRENT_URLS="$(printf '%s' "${CURRENT_JSON}" | jq -c '.additional_redirect_urls // []')"
 REQUIRED_URLS_JSON="$(printf '%s\n' "${required_urls[@]}" | jq -R . | jq -s .)"
 MERGED_URLS="$(jq -cn --argjson a "${CURRENT_URLS}" --argjson b "${REQUIRED_URLS_JSON}" '$a + $b | unique')"
+MERGED_URLS_CSV="$(printf '%s' "${MERGED_URLS}" | jq -r 'join(",")')"
 
 if [ -n "$HOOK_SECRET" ]; then
   PATCH_BODY="$(jq -cn \
     --argjson urls "${MERGED_URLS}" \
+    --arg urls_csv "${MERGED_URLS_CSV}" \
     --arg hook_url "${HOOK_URL}" \
     --arg hook_secret "${HOOK_SECRET}" \
     '{
       additional_redirect_urls: $urls,
+      uri_allow_list: $urls_csv,
       hook_send_email_enabled: true,
       hook_send_email_uri: $hook_url,
       hook_send_email_secrets: $hook_secret
     }')"
   echo "==> Patching redirect URLs + send_email hook..."
 else
-  PATCH_BODY="$(jq -cn --argjson urls "${MERGED_URLS}" '{additional_redirect_urls: $urls}')"
+  PATCH_BODY="$(jq -cn \
+    --argjson urls "${MERGED_URLS}" \
+    --arg urls_csv "${MERGED_URLS_CSV}" \
+    '{additional_redirect_urls: $urls, uri_allow_list: $urls_csv}')"
   echo "==> Patching redirect URLs only (hook secret not provided)..."
 fi
 
@@ -99,4 +105,4 @@ VERIFY_JSON="$(curl -fsS \
   -H "Content-Type: application/json" \
   "${API}/projects/${REF}/config/auth")"
 
-printf '%s' "${VERIFY_JSON}" | jq '{hook_send_email_enabled, hook_send_email_uri, redirects_count: (.additional_redirect_urls|length)}'
+printf '%s' "${VERIFY_JSON}" | jq '{hook_send_email_enabled, hook_send_email_uri, redirects_count: (.additional_redirect_urls|length), uri_allow_list}'
