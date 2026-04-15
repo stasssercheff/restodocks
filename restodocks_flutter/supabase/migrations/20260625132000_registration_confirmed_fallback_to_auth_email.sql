@@ -9,6 +9,9 @@ SET search_path = public
 AS $$
 DECLARE
   emp_email text;
+  emp_full_name text;
+  pending_full_name text;
+  pending_email text;
   est_name text;
   anon_key text;
   func_url text;
@@ -24,16 +27,23 @@ BEGIN
   END IF;
 
   IF OLD.email_confirmed_at IS NULL AND NEW.email_confirmed_at IS NOT NULL AND NEW.email IS NOT NULL THEN
-    SELECT e.email, est.name
-    INTO emp_email, est_name
+    SELECT e.email, e.full_name, est.name
+    INTO emp_email, emp_full_name, est_name
     FROM public.employees e
     LEFT JOIN public.establishments est ON est.id = e.establishment_id
     WHERE e.id = NEW.id OR e.auth_user_id = NEW.id
     LIMIT 1;
 
+    SELECT por.full_name, por.email
+    INTO pending_full_name, pending_email
+    FROM public.pending_owner_registrations por
+    WHERE por.auth_user_id = NEW.id
+    ORDER BY por.updated_at DESC NULLS LAST
+    LIMIT 1;
+
     -- owner-first до создания компании: employee может отсутствовать.
     IF emp_email IS NULL OR btrim(emp_email) = '' THEN
-      emp_email := NEW.email;
+      emp_email := COALESCE(pending_email, NEW.email);
     END IF;
 
     v_lang := lower(trim(COALESCE(NEW.raw_user_meta_data->>'interface_language', 'en')));
@@ -52,6 +62,8 @@ BEGIN
         body := jsonb_build_object(
           'type', 'registration_confirmed',
           'to', emp_email,
+          'fullName', COALESCE(emp_full_name, pending_full_name, ''),
+          'email', COALESCE(emp_email, NEW.email, ''),
           'companyName', COALESCE(est_name, ''),
           'language', v_lang
         ),

@@ -318,14 +318,25 @@ export async function handleRequest(req: Request): Promise<Response> {
       }
       const copy = i18nCopy(lang);
       const subject = copy.confirmedSubject;
+      const greeting = fullName?.trim()
+        ? `${copy.greetingNamePrefix}, ${escapeHtml(fullName.trim())}!`
+        : copy.greeting;
+      const safeEmail = email?.trim();
       const companyText = companyName
         ? (lang === "ru"
             ? ` в заведении <strong>${escapeHtml(companyName)}</strong>`
             : ` <strong>${escapeHtml(companyName)}</strong>`)
         : "";
+      const intro = companyName
+        ? `${copy.confirmedIntro}${companyText}.`
+        : (lang === "ru" ? "Ваша регистрация подтверждена." : `${copy.confirmedIntro}.`);
+      const loginLine = safeEmail
+        ? `<p>${copy.yourLoginLabel}: <strong>${escapeHtml(safeEmail)}</strong></p>`
+        : "";
       const html = `
-<p>${copy.greeting}</p>
-<p>${copy.confirmedIntro}${companyText}.</p>
+<p>${greeting}</p>
+<p>${intro}</p>
+${loginLine}
 <p>${copy.confirmedSigninHint}</p>
 <p>${copy.regards}<br>Restodocks</p>
       `.trim();
@@ -336,7 +347,15 @@ export async function handleRequest(req: Request): Promise<Response> {
           "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ from, to: [to], subject, html }),
+        body: JSON.stringify({
+          from,
+          to: [to],
+          subject,
+          html,
+          text: `${greeting}\n\n${intro.replace(/<[^>]+>/g, "")}\n${
+            safeEmail ? `${copy.yourLoginLabel}: ${safeEmail}\n` : ""
+          }\n${copy.confirmedSigninHint}\n\n${copy.regards}\nRestodocks`,
+        }),
       });
 
       const payload = await res.json();

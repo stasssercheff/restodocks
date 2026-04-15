@@ -164,7 +164,9 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
               if (estId.isNotEmpty) {
                 acc.registerMetadataBestEffort(estId);
               }
-              final emailTo = employee.email.trim();
+              final emailTo = (employee.email.trim().isNotEmpty
+                      ? employee.email.trim()
+                      : (Supabase.instance.client.auth.currentUser?.email ?? '').trim());
               if (emailTo.isNotEmpty) {
                 var pinMailOk = false;
                 String? pinMailErr;
