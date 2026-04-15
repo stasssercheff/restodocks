@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import 'order_list_create_screen.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/scroll_to_top_app_bar_title.dart';
 import '../utils/supplier_contact_validation.dart';
@@ -195,18 +195,21 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     final estId = acc.establishment?.id;
     if (estId == null) return;
 
-    final step1 = await showDialog<_SupplierStep1Result>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => _SupplierStep1Dialog(loc: loc),
+    final draft = await Navigator.of(context).push<OrderList>(
+      MaterialPageRoute(
+        builder: (_) => OrderListCreateScreen(
+          department: widget.department,
+          returnDraftOnly: true,
+        ),
+      ),
     );
-    if (step1 == null || !mounted) return;
+    if (draft == null || !mounted) return;
 
     await _showSupplierAddProductsStep(
       establishmentId: estId,
       loc: loc,
       acc: acc,
-      step1: step1,
+      draft: draft,
     );
   }
 
@@ -214,18 +217,8 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
     required String establishmentId,
     required LocalizationService loc,
     required AccountManagerSupabase acc,
-    required _SupplierStep1Result step1,
+    required OrderList draft,
   }) async {
-    final draft = OrderList(
-      id: const Uuid().v4(),
-      name: step1.name,
-      supplierName: step1.name,
-      contactPerson: step1.contactPerson,
-      email: step1.email,
-      phone: step1.phone,
-      department: widget.department,
-    );
-
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -798,12 +791,6 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              FilledButton.icon(
-                icon: const Icon(Icons.shopping_cart),
-                label: Text(loc.t('product_order') ?? 'Заказ продуктов'),
-                onPressed: () => context.go('/product-order?department=${widget.department}'),
-              ),
-              const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: _openExternalSupplierSheet,
                 icon: const Icon(Icons.add_business_outlined),
