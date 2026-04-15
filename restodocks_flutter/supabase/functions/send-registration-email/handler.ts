@@ -248,13 +248,25 @@ export async function handleRequest(req: Request): Promise<Response> {
         const greeting = fullName?.trim()
           ? `${copy.greetingNamePrefix}, ${escapeHtml(fullName.trim())}!`
           : copy.greeting;
-        const html = `
+        const html = lang === "ru"
+          ? `
+<p>${greeting}</p>
+<p>Чтобы завершить регистрацию в Restodocks, нажмите на ссылку:</p>
+<p><a href="${escapeHtml(wrappedHref)}" style="color:#2754C5;text-decoration:none">Подтвердить email</a></p>
+<p>Если кнопка не открывается, скопируйте ссылку в браузер:</p>
+<p><a href="${escapeHtml(wrappedHref)}" style="color:#2754C5;text-decoration:none;word-break:break-all">${escapeHtml(wrappedHref)}</a></p>
+<p>Если вы не регистрировались — проигнорируйте это письмо.</p>
+<p>С уважением,<br>Команда Restodocks</p>
+        `.trim()
+          : `
 <p>${greeting}</p>
 <p>${copy.confirmIntro}</p>
 <p><a href="${escapeHtml(wrappedHref)}" style="color:#2754C5;text-decoration:none">${copy.confirmCta}</a></p>
 <p>${copy.regards}<br>Restodocks</p>
         `.trim();
-        const text = `${greeting}\n\n${copy.confirmIntro}\n\n${copy.regards}\nRestodocks`;
+        const text = lang === "ru"
+          ? `${greeting}\n\nЧтобы завершить регистрацию в Restodocks, нажмите на ссылку:\n${wrappedHref}\n\nЕсли кнопка не открывается, скопируйте ссылку в браузер:\n${wrappedHref}\n\nЕсли вы не регистрировались — проигнорируйте это письмо.\n\nС уважением,\nКоманда Restodocks`
+          : `${greeting}\n\n${copy.confirmIntro}\n${wrappedHref}\n\n${copy.regards}\nRestodocks`;
         const res = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
