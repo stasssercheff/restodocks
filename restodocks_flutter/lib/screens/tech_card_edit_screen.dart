@@ -4089,13 +4089,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
     final tcSvc = context.read<TechCardServiceSupabase>();
     final est = context.read<AccountManagerSupabase>().establishment;
     if (est == null) return;
-    await productStore.loadProducts();
-    await productStore.loadNomenclature(est.dataEstablishmentId);
+    final effectiveId = est.isBranch ? est.id : est.dataEstablishmentId!;
+    if (est.isBranch) {
+      await productStore.loadNomenclatureForBranch(
+          est.id, est.dataEstablishmentId!);
+    } else {
+      await productStore.loadNomenclature(est.dataEstablishmentId);
+    }
 
     if (!mounted) return;
-    final nomenclatureProducts =
-        productStore.getNomenclatureProducts(est.dataEstablishmentId);
-    final allProducts = productStore.allProducts;
+    final nomenclatureProducts = productStore.getNomenclatureProducts(effectiveId);
     final estPriceId = est.isBranch ? est.id : est.dataEstablishmentId!;
     Future<TechCard> ensureHydratedTechCard(TechCard tc) async {
       var working = tc;
@@ -4127,7 +4130,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         maxChildSize: 0.95,
         expand: false,
         builder: (_, scroll) => DefaultTabController(
-          length: 3,
+          length: 2,
           child: Scaffold(
             appBar: AppBar(
               title: Text(replaceIndex != null
@@ -4136,29 +4139,23 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               bottom: TabBar(
                 tabs: [
                   Tab(text: loc.t('nomenclature')),
-                  Tab(text: loc.t('all_products')),
                   Tab(text: loc.t('semi_finished')),
                 ],
               ),
             ),
             body: TabBarView(
               children: [
-                _ProductPicker(
-                  products: nomenclatureProducts,
-                  onPick: (p, w, proc, waste, unit, gpp,
-                          {cookingLossPctOverride}) =>
-                      _addProductIngredient(p, w, proc, waste, unit, gpp,
-                          replaceIndex: replaceIndex,
-                          cookingLossPctOverride: cookingLossPctOverride),
-                ),
-                _ProductPicker(
-                  products: allProducts,
-                  onPick: (p, w, proc, waste, unit, gpp,
-                          {cookingLossPctOverride}) =>
-                      _addProductIngredient(p, w, proc, waste, unit, gpp,
-                          replaceIndex: replaceIndex,
-                          cookingLossPctOverride: cookingLossPctOverride),
-                ),
+                nomenclatureProducts.isEmpty
+                    ? _EmptyNomenclatureState(loc: loc)
+                    : _ProductPicker(
+                        products: nomenclatureProducts,
+                        onPick: (p, w, proc, waste, unit, gpp,
+                                {cookingLossPctOverride}) =>
+                            _addProductIngredient(p, w, proc, waste, unit, gpp,
+                                replaceIndex: replaceIndex,
+                                cookingLossPctOverride:
+                                    cookingLossPctOverride),
+                      ),
                 _TechCardPicker(
                   techCards: _pickerTechCards,
                   onPick: (t, w, unit, gpp) => _addTechCardIngredient(
@@ -7992,6 +7989,39 @@ class _ProductPicker extends StatefulWidget {
 
   @override
   State<_ProductPicker> createState() => _ProductPickerState();
+}
+
+class _EmptyNomenclatureState extends StatelessWidget {
+  const _EmptyNomenclatureState({required this.loc});
+
+  final LocalizationService loc;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.inventory_2_outlined, size: 44),
+            const SizedBox(height: 12),
+            Text(
+              loc.t('products_list_empty_title'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              loc.t('products_list_empty_body'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ProductPickerState extends State<_ProductPicker> {

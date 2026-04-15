@@ -904,9 +904,23 @@ class _TechCardsImportReviewScreenState
                 .where((p) => _norm(p.name) == norm)
                 .toList();
             if (existing.isNotEmpty) {
+              final existingProduct = existing.first;
+              final docPrice = priceFromDoc[norm];
+              // В duplicate-ветке продукт уже есть в общем каталоге.
+              // Гарантируем привязку к номенклатуре текущего заведения.
+              try {
+                await productStore.addToNomenclature(
+                  est.dataEstablishmentId,
+                  existingProduct.id,
+                  price: docPrice,
+                  currency: defCur,
+                );
+              } catch (_) {
+                // Ничего: запись может уже существовать, это безопасно.
+              }
               productsForMapping = [
                 ...productsForMapping,
-                (id: existing.first.id, name: existing.first.name)
+                (id: existingProduct.id, name: existingProduct.name)
               ];
             }
           }
