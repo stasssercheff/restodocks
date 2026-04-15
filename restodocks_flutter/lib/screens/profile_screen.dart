@@ -635,6 +635,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(loc.t('delete_owner_account_confirm_body')),
+              const SizedBox(height: 8),
+              Text(
+                loc.t('delete_owner_account_confirm_warning'),
+                style: const TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                loc.t('delete_owner_account_confirm_final_check'),
+                style: const TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 12),
               _buildManualOnlyRestrictedInput(
                 child: TextField(

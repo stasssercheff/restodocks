@@ -3185,7 +3185,9 @@
     "inventory_selective_template_name_hint": "Например: Бар вечер",
     "inventory_selective_template_saved_active": "Шаблон \"%s\" сохранён и выбран активным",
     "ttk_ai_verify_title": "Карточка создана с помощью ИИ",
-    "ttk_ai_verify_message": "Проверьте состав, веса и технологию: ИИ может ошибаться или упустить детали. При необходимости отредактируйте поля вручную."
+    "ttk_ai_verify_message": "Проверьте состав, веса и технологию: ИИ может ошибаться или упустить детали. При необходимости отредактируйте поля вручную.",
+    "delete_owner_account_confirm_warning": "Вы уверены? Будут удалены все данные: аккаунт собственника, все заведения, все сотрудники и связанные записи без возможности восстановления.",
+    "delete_owner_account_confirm_final_check": "Подтвердите удаление: будет удалено абсолютно всё, включая заведения, сотрудников и связанные данные."
   },
   "en": {
     "app_name": "Restodocks",
@@ -6373,7 +6375,9 @@
     "inventory_selective_template_name_hint": "For example: Bar evening",
     "inventory_selective_template_saved_active": "Template \"%s\" has been saved and set active",
     "ttk_ai_verify_title": "AI-generated tech card",
-    "ttk_ai_verify_message": "Please review ingredients, weights, and steps — AI can be wrong or miss details. Edit the card if something looks off."
+    "ttk_ai_verify_message": "Please review ingredients, weights, and steps — AI can be wrong or miss details. Edit the card if something looks off.",
+    "delete_owner_account_confirm_warning": "Are you sure? All data will be deleted permanently: owner account, all establishments, all employees, and related records.",
+    "delete_owner_account_confirm_final_check": "Confirm deletion: absolutely everything will be removed, including establishments, employees, and related data."
   },
   "es": {
     "app_name": "Restodocks",
@@ -9561,7 +9565,9 @@
     "nomenclature_excel_export_action": "Descargar",
     "schedule_export_employees_label": "Empleados",
     "ttk_ai_verify_title": "Ficha técnica generada por IA",
-    "ttk_ai_verify_message": "Revise ingredientes, pesos y pasos: la IA puede equivocarse u omitir detalles. Corrija la ficha si algo no cuadra."
+    "ttk_ai_verify_message": "Revise ingredientes, pesos y pasos: la IA puede equivocarse u omitir detalles. Corrija la ficha si algo no cuadra.",
+    "delete_owner_account_confirm_warning": "¿Está seguro? Se eliminarán permanentemente todos los datos: cuenta del propietario, todos los establecimientos, todos los empleados y los registros relacionados.",
+    "delete_owner_account_confirm_final_check": "Confirme la eliminación: se borrará absolutamente todo, incluidos establecimientos, empleados y datos relacionados."
   },
   "kk": {
     "app_name": "Restodocks",
@@ -12749,7 +12755,9 @@
     "nomenclature_excel_export_action": "Түсіру",
     "schedule_export_employees_label": "Қызметкерлер",
     "ttk_ai_verify_title": "ЖИ көмегімен жасалған ТТК",
-    "ttk_ai_verify_message": "Құрамы, салмақтар мен технологияны тексеріңіз: ЖИ қателесуі немесе мәліметтерді жіберіп алуы мүмкін. Керек болса өрістерді қолмен түзетіңіз."
+    "ttk_ai_verify_message": "Құрамы, салмақтар мен технологияны тексеріңіз: ЖИ қателесуі немесе мәліметтерді жіберіп алуы мүмкін. Керек болса өрістерді қолмен түзетіңіз.",
+    "delete_owner_account_confirm_warning": "Сенімдісіз бе? Барлық деректер біржола жойылады: иесінің аккаунты, барлық мекемелер, барлық қызметкерлер және байланысты жазбалар.",
+    "delete_owner_account_confirm_final_check": "Жоюды растаңыз: мекемелер, қызметкерлер және байланысты деректерді қоса алғанда, барлығы толық жойылады."
   },
   "de": {
     "app_name": "Restodocks",
@@ -15937,7 +15945,9 @@
     "nomenclature_excel_export_action": "Entladen",
     "schedule_export_employees_label": "Mitarbeiter",
     "ttk_ai_verify_title": "Technologische Karte (KI-generiert)",
-    "ttk_ai_verify_message": "Bitte prüfen Sie Zutaten, Gewichte und Arbeitsschritte — die KI kann irren oder Details auslassen. Passen Sie die Karte bei Bedarf an."
+    "ttk_ai_verify_message": "Bitte prüfen Sie Zutaten, Gewichte und Arbeitsschritte — die KI kann irren oder Details auslassen. Passen Sie die Karte bei Bedarf an.",
+    "delete_owner_account_confirm_warning": "Sind Sie sicher? Alle Daten werden dauerhaft gelöscht: Eigentümerkonto, alle Betriebe, alle Mitarbeitenden und alle zugehörigen Einträge.",
+    "delete_owner_account_confirm_final_check": "Bitte bestätigen Sie die Löschung: Es wird wirklich alles entfernt, einschließlich Betriebe, Mitarbeitende und zugehörige Daten."
   },
   "fr": {
     "app_name": "Restodocks",
@@ -19125,7 +19135,9 @@
     "nomenclature_excel_export_action": "Décharger",
     "schedule_export_employees_label": "Employés",
     "ttk_ai_verify_title": "Fiche technique générée par l’IA",
-    "ttk_ai_verify_message": "Vérifiez ingrédients, quantités et étapes : l’IA peut se tromper ou omettre des détails. Modifiez la fiche si nécessaire."
+    "ttk_ai_verify_message": "Vérifiez ingrédients, quantités et étapes : l’IA peut se tromper ou omettre des détails. Modifiez la fiche si nécessaire.",
+    "delete_owner_account_confirm_warning": "Êtes-vous sûr ? Toutes les données seront supprimées définitivement : compte du propriétaire, tous les établissements, tous les employés et les enregistrements associés.",
+    "delete_owner_account_confirm_final_check": "Confirmez la suppression : absolument tout sera effacé, y compris les établissements, les employés et les données associées."
   },
   "it": {
     "app_name": "Restodocks",
@@ -22313,7 +22325,9 @@
     "nomenclature_excel_export_action": "Scaricare",
     "schedule_export_employees_label": "Dipendenti",
     "ttk_ai_verify_title": "Scheda tecnica generata dall’IA",
-    "ttk_ai_verify_message": "Controllate ingredienti, pesi e passaggi: l’IA può sbagliare o tralasciare dettagli. Modificate la scheda se serve."
+    "ttk_ai_verify_message": "Controllate ingredienti, pesi e passaggi: l’IA può sbagliare o tralasciare dettagli. Modificate la scheda se serve.",
+    "delete_owner_account_confirm_warning": "Sei sicuro? Tutti i dati verranno eliminati definitivamente: account proprietario, tutte le strutture, tutti i dipendenti e i record correlati.",
+    "delete_owner_account_confirm_final_check": "Conferma l'eliminazione: verrà rimosso assolutamente tutto, incluse strutture, dipendenti e dati correlati."
   },
   "tr": {
     "app_name": "Yeniden stoklamalar",
@@ -25501,7 +25515,9 @@
     "nomenclature_excel_export_action": "Boşalt",
     "schedule_export_employees_label": "Çalışanlar",
     "ttk_ai_verify_title": "Yapay zekâ ile oluşturulan TTK",
-    "ttk_ai_verify_message": "Malzemeleri, gramajları ve adımları kontrol edin — yapay zekâ hata yapabilir veya ayrıntı kaçırabilir. Gerekirse düzenleyin."
+    "ttk_ai_verify_message": "Malzemeleri, gramajları ve adımları kontrol edin — yapay zekâ hata yapabilir veya ayrıntı kaçırabilir. Gerekirse düzenleyin.",
+    "delete_owner_account_confirm_warning": "Emin misiniz? Tüm veriler kalıcı olarak silinecek: işletme sahibi hesabı, tüm işletmeler, tüm çalışanlar ve ilişkili kayıtlar.",
+    "delete_owner_account_confirm_final_check": "Silmeyi onaylayın: işletmeler, çalışanlar ve ilişkili veriler dahil olmak üzere her şey tamamen silinecek."
   },
   "vi": {
     "app_name": "Khôi phục lại",
@@ -28689,6 +28705,8 @@
     "nomenclature_excel_export_action": "Dỡ bỏ",
     "schedule_export_employees_label": "Người lao động",
     "ttk_ai_verify_title": "Thẻ công nghệ do AI tạo",
-    "ttk_ai_verify_message": "Hãy kiểm tra nguyên liệu, khối lượng và các bước — AI có thể sai hoặc bỏ sót chi tiết. Sửa thẻ nếu cần."
+    "ttk_ai_verify_message": "Hãy kiểm tra nguyên liệu, khối lượng và các bước — AI có thể sai hoặc bỏ sót chi tiết. Sửa thẻ nếu cần.",
+    "delete_owner_account_confirm_warning": "Bạn có chắc không? Tất cả dữ liệu sẽ bị xóa vĩnh viễn: tài khoản chủ sở hữu, tất cả cơ sở, tất cả nhân viên và các bản ghi liên quan.",
+    "delete_owner_account_confirm_final_check": "Xác nhận xóa: toàn bộ dữ liệu sẽ bị xóa hoàn toàn, bao gồm cơ sở, nhân viên và dữ liệu liên quan."
   }
 }
