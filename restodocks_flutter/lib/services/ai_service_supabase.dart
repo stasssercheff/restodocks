@@ -4242,13 +4242,14 @@ class AiServiceSupabase implements AiService {
         if (e is! Map) continue;
         final m = Map<String, dynamic>.from(e as Map);
         final it = (m['ingredientType'] as String?)?.toLowerCase();
+        final cookRaw = (m['cookingProcessId'] ?? m['cookingMethod'])?.toString();
         ingredients.add(TechCardIngredientLine(
           productName: (m['productName'] as String?) ?? '',
           grossGrams: _toDouble(m['grossGrams']),
           netGrams: _toDouble(m['netGrams']),
           outputGrams: _toDouble(m['outputGrams']),
           unit: m['unit'] as String?,
-          cookingMethod: m['cookingMethod'] as String?,
+          cookingMethod: cookRaw,
           primaryWastePct: _toDouble(m['primaryWastePct']),
           cookingLossPct: _toDouble(m['cookingLossPct']),
           ingredientType: (it == 'product' || it == 'semi_finished') ? it : null,

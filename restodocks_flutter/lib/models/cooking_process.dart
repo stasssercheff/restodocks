@@ -351,6 +351,25 @@ class CookingProcess extends Equatable {
     return defaultProcesses.where((process) => process.id == id).firstOrNull;
   }
 
+  /// Сопоставить значение из ИИ/импорта: id (`baking`), локализованное имя или EN-имя.
+  static CookingProcess? resolveFromAiToken(String? token, [String languageCode = 'ru']) {
+    final raw = token?.trim() ?? '';
+    if (raw.isEmpty) return null;
+    final byId = findById(raw);
+    if (byId != null) return byId;
+    final lower = raw.toLowerCase();
+    for (final p in defaultProcesses) {
+      if (p.id.toLowerCase() == lower) return p;
+      if (p.name.trim().toLowerCase() == lower) return p;
+      final loc = p.getLocalizedName(languageCode).trim().toLowerCase();
+      if (loc == lower) return p;
+      for (final v in p.localizedNames.values) {
+        if (v.trim().toLowerCase() == lower) return p;
+      }
+    }
+    return null;
+  }
+
   /// Получить процессы для категории продукта
   static List<CookingProcess> forCategory(String category) {
     return defaultProcesses.where((process) => process.isApplicableToCategory(category)).toList();

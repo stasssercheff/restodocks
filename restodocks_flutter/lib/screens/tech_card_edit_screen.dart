@@ -1384,6 +1384,88 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       ..addAll(list);
   }
 
+  /// После привязки продуктов из номенклатуры — пересчитать нетто/КБЖУ с учётом способа и % ужарки.
+  void _syncIngredientsCookingNutrition() {
+    final store = context.read<ProductStoreSupabase>();
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    final list = <TTIngredient>[];
+    for (final ing in _ingredients) {
+      if (ing.isPlaceholder) {
+        list.add(ing);
+        continue;
+      }
+      final product =
+          store.findProductForIngredient(ing.productId, ing.productName);
+      final procId = ing.cookingProcessId?.trim();
+      if (product == null ||
+          procId == null ||
+          procId.isEmpty ||
+          procId == 'custom') {
+        list.add(ing);
+        continue;
+      }
+      final proc = CookingProcess.findById(procId);
+      if (proc == null) {
+        list.add(ing);
+        continue;
+      }
+      list.add(
+        ing.updateCookingLossPct(
+          ing.cookingLossPctOverride,
+          product,
+          proc,
+          languageCode: lang,
+        ),
+      );
+    }
+    _ingredients
+      ..clear()
+      ..addAll(list);
+  }
+
+  String _establishmentIdForLearning() {
+    final est = context.read<AccountManagerSupabase>().establishment;
+    if (est == null) return '';
+    return est.isBranch ? est.id : (est.dataEstablishmentId ?? '');
+  }
+
+  Future<void> _suggestCookingLossForRow(int index) async {
+    if (index < 0 || index >= _ingredients.length) return;
+    final ing = _ingredients[index];
+    if (ing.isPlaceholder) return;
+    final pid = ing.productId?.trim();
+    final procId = ing.cookingProcessId?.trim();
+    if (pid == null ||
+        pid.isEmpty ||
+        procId == null ||
+        procId.isEmpty ||
+        procId == 'custom') {
+      return;
+    }
+    final eid = _establishmentIdForLearning();
+    if (eid.isEmpty) return;
+    final suggested = await ProductCookingLossLearning.getSuggestedLossPct(
+      establishmentId: eid,
+      productId: pid,
+      cookingProcessId: procId,
+    );
+    if (!mounted || suggested == null) return;
+    final store = context.read<ProductStoreSupabase>();
+    final lang = context.read<LocalizationService>().currentLanguageCode;
+    final product = store.findProductForIngredient(ing.productId, ing.productName);
+    final proc = CookingProcess.findById(procId);
+    if (product == null || proc == null) return;
+    setState(() {
+      _ingredients[index] = _ingredients[index].updateCookingLossPct(
+        suggested,
+        product,
+        proc,
+        languageCode: lang,
+      );
+    });
+    _scheduleDraftSave();
+  }
+
   /// Простой вывод категории из названия блюда (для предзаполнения из ИИ).
   String _inferCategory(String dishName) {
     final lower = dishName.toLowerCase();
@@ -1732,8 +1814,12 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               _selectedSections = [];
             }
             _ingredients.clear();
+            final langForAi =
+                context.read<LocalizationService>().currentLanguageCode;
             for (final line in ai.ingredients) {
               if (line.productName.trim().isEmpty) continue;
+              final proc =
+                  CookingProcess.resolveFromAiToken(line.cookingMethod, langForAi);
               var gross = line.grossGrams ?? 0.0;
               var net = line.netGrams ?? line.grossGrams ?? gross;
               final unit =
@@ -1758,6 +1844,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                     _ingredients.length.toString(),
                 productId: null,
                 productName: line.productName.trim(),
+                cookingProcessId: proc?.id,
+                cookingProcessName: proc != null
+                    ? proc.getLocalizedName(langForAi)
+                    : null,
                 grossWeight: gross > 0 ? gross : 100,
                 netWeight: net > 0 ? net : (gross > 0 ? gross : 100),
                 outputWeight: outW.toDouble(),
@@ -1776,6 +1866,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
               ));
             }
             _autoFillBruttoFromNomenclature();
+            _syncIngredientsCookingNutrition();
             _autoFillPriceFromNomenclature();
             // Вес порции при импорте: ПФ = 100, Блюдо = выход из файла (yieldGrams) или сумма выходов
             final sumOutput =
@@ -3011,6 +3102,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         }
         await svc.saveTechCard(updated,
             changedByEmployeeId: emp.id, changedByName: emp.fullName);
+        unawaited(
+          ProductCookingLossLearning.recordSamplesFromIngredients(
+            establishmentId: targetEstablishmentId,
+            ingredients: toSaveIngredients,
+            source: widget.fromAiGeneration ? 'ai' : 'user',
+          ),
+        );
         // Обучение: только при карточке из импорта. Иначе сбрасываем, чтобы не показывать старый тост.
         if (widget.initialFromAi == null ||
             widget.initialHeaderSignature == null) {
@@ -3222,6 +3320,16 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         }
         await svc.saveTechCard(updated,
             changedByEmployeeId: emp.id, changedByName: emp.fullName);
+        final learnEstId = est.isBranch ? est.id : (est.dataEstablishmentId ?? '');
+        if (learnEstId.isNotEmpty) {
+          unawaited(
+            ProductCookingLossLearning.recordSamplesFromIngredients(
+              establishmentId: learnEstId,
+              ingredients: toSaveIngredients,
+              source: 'user',
+            ),
+          );
+        }
         // Переводим название и технологию фоново
         final techText = _technologyController.text.trim();
         final fieldsToTranslate = <String, String>{'dish_name': name};
@@ -5547,6 +5655,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                         },
                                         onRemove: _removeIngredient,
                                         onSuggestWaste: _suggestWasteForRow,
+                                        onSuggestCookingLoss: _suggestCookingLossForRow,
                                         hideTechnologyBlock: true,
                                         omitTableHeader: false,
                                         shrinkWrap: true,

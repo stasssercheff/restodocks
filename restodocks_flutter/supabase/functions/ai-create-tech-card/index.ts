@@ -50,7 +50,11 @@ Deno.serve(async (req: Request) => {
             "Технолог ОП. По запросу — ТТК в JSON. Только {\"cards\":[{...}]}; элемент = одна ТТК. " +
             "Компоненты «своего приготовления» (хлеб, соус и т.п.) — отдельные ПФ (isSemiFinished=true) + в основной ТТК ingredientType='semi_finished'. " +
             "Поля: dishName, technologyText, isSemiFinished, yieldGrams, ingredients[] " +
-            "{productName,grossGrams,unit,primaryWastePct,netGrams,cookingLossPct,outputGrams,ingredientType}. " +
+            "{productName,grossGrams,unit,primaryWastePct,netGrams,cookingLossPct,outputGrams,ingredientType,cookingProcessId}. " +
+            "cookingProcessId — ОБЯЗАТЕЛЬНО для каждого ингредиента, одно из значений (латиница): " +
+            "boiling,frying,baking,stewing,sous_vide,fermentation,grilling,torch_browning,sauteing,blanching,steaming,canning,cutting. " +
+            "Подбери по смыслу (овощи на гриле → grilling, запечь → baking, нарезка сырого → cutting). " +
+            "cookingLossPct — оценка % ужарки для этой строки (0–60), согласованная с cookingProcessId. " +
             "Технология: 3–5 коротких шагов. ≥3 ингредиента. Без markdown.",
         },
         { role: "user", content: prompt },

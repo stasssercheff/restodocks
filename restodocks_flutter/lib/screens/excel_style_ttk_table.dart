@@ -1225,8 +1225,9 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
                   final process = CookingProcess.defaultProcesses.firstWhere((p) => p.id == processId);
                   _updateIngredient(rowIndex, ingredient.copyWith(
                     cookingProcessId: processId,
-                    cookingProcessName: process.name,
+                    cookingProcessName: process.getLocalizedName(widget.loc.currentLanguageCode),
                   ));
+                  widget.onSuggestCookingLoss?.call(rowIndex);
                 }
               },
               underline: const SizedBox(),

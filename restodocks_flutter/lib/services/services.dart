@@ -61,6 +61,7 @@ export 'inventory_history_service.dart';
 export 'offline_cache_service.dart';
 export 'realtime_sync_service.dart';
 export 'email_service.dart';
+export 'product_cooking_loss_learning.dart';
 export 'app_toast_service.dart';
 export 'menu_stop_go_service.dart';
 export 'haccp_log_service_supabase.dart';
