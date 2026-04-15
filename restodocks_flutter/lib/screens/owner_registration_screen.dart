@@ -125,39 +125,8 @@ class _OwnerRegistrationScreenState extends State<OwnerRegistrationScreen> {
         }
       }
 
-      final companyNameForEmail = estab?.name ??
-          loc.t('register_company');
-
-      // Письмо с PIN и логином — только когда заведение уже есть (старый порядок).
-      // При owner-first PIN появляется на шаге «данные компании» — там отдельная отправка.
-      if (estab != null) {
-        var infoMail = await EmailService().sendRegistrationEmail(
-          isOwner: true,
-          to: email,
-          companyName: companyNameForEmail,
-          email: email,
-          fullName: fullName,
-          registeredAtLocal: registeredAtLocal,
-          pinCode: estab.pinCode,
-          languageCode: loc.currentLanguageCode,
-        );
-        if (!infoMail.ok) {
-          await Future<void>.delayed(const Duration(milliseconds: 500));
-          infoMail = await EmailService().sendRegistrationEmail(
-            isOwner: true,
-            to: email,
-            companyName: companyNameForEmail,
-            email: email,
-            fullName: fullName,
-            registeredAtLocal: registeredAtLocal,
-            pinCode: estab.pinCode,
-            languageCode: loc.currentLanguageCode,
-          );
-        }
-        if (!infoMail.ok) {
-          devLog('OwnerRegistration: sendRegistrationEmail failed: ${infoMail.error}');
-        }
-      }
+      // Для владельца не отправляем "приветственное" письмо на шаге signUp.
+      // Письмо должно приходить после подтверждения email (тип registration_confirmed из триггера БД).
       var resendFailed = false;
       if (!signUpResult.hasSession) {
         if (estab != null) {
