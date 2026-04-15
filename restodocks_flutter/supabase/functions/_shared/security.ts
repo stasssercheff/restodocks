@@ -204,6 +204,9 @@ export function hasValidApiKey(req: Request): boolean {
     if (service && apiKey === service) return true;
     // Стандартный клиент Supabase шлёт публичный anon key в apikey (не JWT пользователя).
     if (anon && apiKey === anon) return true;
+    // Новые publishable ключи Supabase (sb_publishable_...) должны считаться валидными
+    // для публичных edge-эндпоинтов регистрации.
+    if (apiKey.startsWith("sb_publishable_")) return true;
   }
 
   // Только Authorization: Bearer <anon> (редко, но без дубля apikey в заголовке).
@@ -211,6 +214,7 @@ export function hasValidApiKey(req: Request): boolean {
     req.headers.get("authorization") ?? req.headers.get("Authorization"),
   );
   if (anon && bearerOnly === anon) return true;
+  if (bearerOnly?.startsWith("sb_publishable_") == true) return true;
 
   return false;
 }
