@@ -458,13 +458,24 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function normalizeLanguage(input?: string): "ru" | "en" | "es" | "it" | "tr" | "vi" {
+function normalizeLanguage(input?: string): "ru" | "en" | "es" | "it" | "tr" | "vi" | "de" | "fr" {
   const v = (input ?? "").trim().toLowerCase();
-  if (v === "ru" || v === "en" || v === "es" || v === "it" || v === "tr" || v === "vi") return v;
+  if (
+    v === "ru" ||
+    v === "en" ||
+    v === "es" ||
+    v === "it" ||
+    v === "tr" ||
+    v === "vi" ||
+    v === "de" ||
+    v === "fr"
+  ) {
+    return v;
+  }
   return "en";
 }
 
-type MailLanguage = "ru" | "en" | "es" | "it" | "tr" | "vi";
+type MailLanguage = "ru" | "en" | "es" | "it" | "tr" | "vi" | "de" | "fr";
 type MailCopy = {
   greeting: string;
   greetingNamePrefix: string;
@@ -653,6 +664,78 @@ function i18nCopy(lang: MailLanguage): MailCopy {
         registrationTimeLabel: "Thời gian đăng ký",
         welcomeLead:
           "<strong>Chào mừng đến Restodocks!</strong> Bên dưới: PIN cơ sở và email đăng nhập của bạn.",
+      };
+    case "de":
+      return {
+        greeting: "Guten Tag!",
+        greetingNamePrefix: "Guten Tag",
+        regards: "Mit freundlichen Grüßen,",
+        confirmSubject: "Restodocks: Registrierung abschließen",
+        confirmIntro: "Bitte schließen Sie Ihre Restodocks-Registrierung über diesen Link ab:",
+        confirmCta: "Registrierung abschließen",
+        confirmedSubject: "Registrierung bestätigt — Restodocks",
+        confirmedIntro: "Ihre Registrierung für",
+        confirmedSigninHint:
+          "Sie können sich jetzt mit E-Mail und Passwort bei Restodocks anmelden.",
+        ownerSubject: "Betriebsregistrierung in Restodocks",
+        ownerRegisteredPrefix: "Ihr Betrieb",
+        ownerRegisteredSuffix: "wurde erfolgreich registriert.",
+        ownerIdentifierHint: "Verwenden Sie diesen Kenncode für Ihr Team:",
+        companyPinLabel: "PIN des Betriebs",
+        yourLoginLabel: "Ihre Anmeldung (E-Mail)",
+        passwordHint:
+          "Verwenden Sie das bei der Registrierung festgelegte Passwort. Bei Bedarf setzen Sie es im System zurück.",
+        instructionLabel: "Hinweis",
+        ownerInstruction:
+          "Teilen Sie den PIN mit dem Team. Bei der ersten Registrierung im System wird er einmal benötigt.",
+        coOwnerSubject: "Miteigentümer-Registrierung in Restodocks",
+        coOwnerRegisteredPrefix: "Ihr Miteigentümer-Zugang für",
+        coOwnerRegisteredSuffix: "wurde aktiviert.",
+        coOwnerInstruction:
+          "Teilen Sie den Betriebs-PIN mit dem Team. Zur Anmeldung verwenden Sie E-Mail und Passwort.",
+        employeeSubjectPrefix: "Zugang zum Bereich von",
+        employeeRegisteredPrefix: "Ihr Konto wurde erfolgreich verknüpft mit",
+        spamHint:
+          "Eine separate E-Mail mit dem Bestätigungslink kann folgen — bitte den Spam-Ordner prüfen. Fehlt die PIN-E-Mail, prüfen Sie die Edge-Logs für send-registration-email in Supabase.",
+        registrationTimeLabel: "Registrierungszeit",
+        welcomeLead:
+          "<strong>Willkommen bei Restodocks!</strong> Unten: PIN des Betriebs und Ihre Anmeldung (E-Mail).",
+      };
+    case "fr":
+      return {
+        greeting: "Bonjour !",
+        greetingNamePrefix: "Bonjour",
+        regards: "Cordialement,",
+        confirmSubject: "Restodocks : finalisez votre inscription",
+        confirmIntro: "Finalisez votre inscription Restodocks via ce lien :",
+        confirmCta: "Finaliser l'inscription",
+        confirmedSubject: "Inscription confirmée — Restodocks",
+        confirmedIntro: "Votre inscription pour",
+        confirmedSigninHint:
+          "Vous pouvez maintenant vous connecter à Restodocks avec votre e-mail et votre mot de passe.",
+        ownerSubject: "Inscription d'établissement dans Restodocks",
+        ownerRegisteredPrefix: "Votre établissement",
+        ownerRegisteredSuffix: "a bien été enregistré.",
+        ownerIdentifierHint: "Utilisez cet identifiant pour votre équipe :",
+        companyPinLabel: "PIN de l'établissement",
+        yourLoginLabel: "Votre identifiant (e-mail)",
+        passwordHint:
+          "Utilisez le mot de passe défini à l'inscription. Si besoin, réinitialisez-le dans le système.",
+        instructionLabel: "Consigne",
+        ownerInstruction:
+          "Communiquez le PIN à l'équipe. Il sera demandé une fois lors de l'inscription dans le système.",
+        coOwnerSubject: "Inscription co-propriétaire dans Restodocks",
+        coOwnerRegisteredPrefix: "Votre accès co-propriétaire pour",
+        coOwnerRegisteredSuffix: "a été activé.",
+        coOwnerInstruction:
+          "Partagez le PIN de l'établissement avec l'équipe. Connectez-vous avec votre e-mail et votre mot de passe.",
+        employeeSubjectPrefix: "Accès à l'espace de",
+        employeeRegisteredPrefix: "Votre compte a été lié à",
+        spamHint:
+          "Un second e-mail avec le lien de confirmation peut suivre — vérifiez les courriers indésirables. Si l'e-mail avec le PIN manque, consultez les journaux Edge send-registration-email dans Supabase.",
+        registrationTimeLabel: "Heure d'inscription",
+        welcomeLead:
+          "<strong>Bienvenue sur Restodocks !</strong> Ci-dessous : PIN de l'établissement et votre identifiant (e-mail) pour la connexion.",
       };
     case "en":
     default:
