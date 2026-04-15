@@ -1,13 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { jwtVerify } from "npm:jose@5";
 
-function getSupabaseProjectUrl(): string | null {
-  const fromEnv = Deno.env.get("SUPABASE_URL")?.trim()?.replace(/\/+$/, "");
-  if (fromEnv) return fromEnv;
-  // Fallback for runtimes where SUPABASE_URL is not exposed to user code.
-  return "https://osglfptwbuqqmqunttha.supabase.co";
-}
-
 /** Anon-ключ в билде (Cloudflare) может отличаться строкой от SUPABASE_ANON_KEY в рантайме после ротации — оба валидны. */
 async function isValidSupabaseAnonJwt(
   token: string | null | undefined,
@@ -34,7 +27,7 @@ async function isValidSupabaseAnonJwt(
 async function isJwtAcceptedByPostgrestGateway(token: string): Promise<boolean> {
   const t = token?.trim();
   if (!t || !t.includes(".")) return false;
-  const base = getSupabaseProjectUrl();
+  const base = Deno.env.get("SUPABASE_URL")?.trim()?.replace(/\/+$/, "");
   if (!base) return false;
   const headers: Record<string, string> = {
     apikey: t,
@@ -265,7 +258,7 @@ export async function hasValidApiKeyOrUser(req: Request): Promise<boolean> {
   if (!token) return false;
 
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
-  const supabaseUrl = getSupabaseProjectUrl();
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
   if (!supabaseUrl || !anonKey) return false;
 
   try {
@@ -285,7 +278,7 @@ export async function getAuthenticatedUserId(req: Request): Promise<string | nul
   );
   if (!token) return null;
 
-  const supabaseUrl = getSupabaseProjectUrl();
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim();
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY")?.trim();
   if (!supabaseUrl || !anonKey) return null;
 
