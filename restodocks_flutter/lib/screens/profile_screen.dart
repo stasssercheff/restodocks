@@ -581,6 +581,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     LocalizationService loc,
     AccountManagerSupabase account,
   ) async {
+    void closeProgressDialogIfOpen() {
+      if (!context.mounted) return;
+      final rootNav = Navigator.of(context, rootNavigator: true);
+      if (rootNav.canPop()) {
+        rootNav.pop();
+      }
+    }
+
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -733,9 +741,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         password: password,
         pinsByEstablishmentId: pins,
       );
-      if (context.mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
+      closeProgressDialogIfOpen();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(loc.t('delete_owner_account_done'))),
@@ -743,9 +749,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         context.go('/login');
       }
     } catch (e) {
-      if (context.mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
+      closeProgressDialogIfOpen();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
