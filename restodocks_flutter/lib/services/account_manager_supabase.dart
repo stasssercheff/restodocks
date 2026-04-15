@@ -2107,21 +2107,35 @@ class AccountManagerSupabase extends ChangeNotifier {
     pinsByEstablishmentId.forEach((k, v) {
       pinsJson[k] = v.trim().toUpperCase();
     });
-    await _supabase.client.rpc(
-      'delete_owner_account_data',
-      params: {
-        'p_email': email.trim(),
-        'p_pins': pinsJson,
-      },
-    );
-    final res = await _supabase.client.functions.invoke(
+    await _supabase.client
+        .rpc(
+          'delete_owner_account_data',
+          params: {
+            'p_email': email.trim(),
+            'p_pins': pinsJson,
+          },
+        )
+        .timeout(
+          const Duration(seconds: 90),
+          onTimeout: () => throw Exception(
+            'delete_owner_account_data_timeout',
+          ),
+        );
+
+    final res = await postEdgeFunctionWithRetry(
       'purge-owner-auth',
-      body: const {},
+      const {},
+      bearerAlwaysAnon: false,
+      retryOnceOn401AfterSessionRefresh: true,
+    ).timeout(
+      const Duration(seconds: 45),
+      onTimeout: () => (
+        status: 0,
+        data: <String, dynamic>{'error': 'purge_owner_auth_timeout'},
+      ),
     );
-    if (res.status != 200) {
-      final err = (res.data is Map && (res.data as Map)['error'] != null)
-          ? (res.data as Map)['error'].toString()
-          : 'HTTP ${res.status}';
+    if (res.status < 200 || res.status >= 300) {
+      final err = res.data?['error']?.toString() ?? 'HTTP ${res.status}';
       throw Exception(err);
     }
     await logout();
