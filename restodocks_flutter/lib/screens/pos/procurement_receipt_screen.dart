@@ -1073,7 +1073,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         final vPad = narrow ? 2.0 : 6.0;
         // Одна FlexColumnWidth забирала всё до minWidth — колонка «Наимен.» растягивалась.
         // Фиксированная ширина (~в 2× уже прежнего flex-остатка при minW 720/1040).
-        final nameColW = narrow ? 70.0 : 120.0;
+        final nameColW = narrow ? 110.0 : 160.0;
         final tableMinW = narrow
             ? 22.0 + nameColW + 44 + 52 + 56 + 52 + 56 + 56 + 36
             : 32.0 + nameColW + 56 + 72 + 84 + 72 + 84 + 88 + 56;

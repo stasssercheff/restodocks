@@ -528,16 +528,6 @@ class _AppShellState extends State<AppShell> {
     int currentIndex,
     bool kitchenOnlySchedule,
   ) {
-    // Уже на домашнем экране: повторный тап «Дом» не должен вызывать go() — иначе
-    // лишняя анимация (как «вперёд») поверх того же маршрута.
-    if (index == 0) {
-      final loc = GoRouterState.of(context).matchedLocation;
-      final pathOnly = loc.split('?').first;
-      if (pathOnly == '/home' || pathOnly == '/') {
-        return;
-      }
-    }
-
     // Если переходим на вкладку с меньшим индексом — анимируем как «назад» (вправо)
     final isBackward = index < currentIndex;
     final extra = isBackward ? {'back': true} : null;
