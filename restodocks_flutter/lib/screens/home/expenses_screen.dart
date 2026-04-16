@@ -2,9 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:excel/excel.dart' hide Border, TextSpan;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -28,7 +32,7 @@ String _expensesRpcErrorMessage(Object e, LocalizationService loc) {
   return s;
 }
 
-/// Экран «Расходы» для собственника: вкладки «ФЗП», «Заказы продуктов», «Списания», «Поставки».
+/// Экран «Расходы» для собственника: вкладки «ФЗП», «Заказы», «Списания», «Поставки».
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key});
 
@@ -41,18 +45,174 @@ enum _ExpensesTab { fzp, productOrders, writeoffs, procurementReceipts }
 class _ExpensesScreenState extends State<ExpensesScreen> {
   _ExpensesTab _selectedTab = _ExpensesTab.fzp;
 
+  Future<void> _exportMergedExpenses(
+    BuildContext context, {
+    required SubscriptionEntitlements ent,
+  }) async {
+    final loc = context.read<LocalizationService>();
+    final account = context.read<AccountManagerSupabase>();
+    final establishmentId = account.establishment?.id;
+    if (establishmentId == null) return;
+
+    final format = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.t('expenses_orders_export_dialog_title') ?? 'Выгрузка'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.table_chart_outlined),
+              title: const Text('Excel'),
+              onTap: () => Navigator.of(ctx).pop('excel'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: const Text('PDF'),
+              onTap: () => Navigator.of(ctx).pop('pdf'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.t('cancel') ?? 'Отмена'),
+          ),
+        ],
+      ),
+    );
+    if (format == null || !mounted) return;
+
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+      initialDateRange: DateTimeRange(
+        start: DateTime(DateTime.now().year, DateTime.now().month, 1),
+        end: DateTime(DateTime.now().year, DateTime.now().month + 1, 0),
+      ),
+      helpText: loc.t('expenses_orders_export_date_range') ??
+          'Диапазон дат для выгрузки',
+    );
+    if (range == null || !mounted) return;
+    final dateStart = DateTime(range.start.year, range.start.month, range.start.day);
+    final dateEnd = DateTime(range.end.year, range.end.month, range.end.day, 23, 59, 59);
+
+    final selectedLang = await showDialog<String>(
+      context: context,
+      builder: (ctx) => _ExpensesExportLanguageDialog(loc: loc),
+    );
+    if (selectedLang == null || !mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Center(
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(height: 12),
+                Text(loc.t('expenses_orders_export_loading') ?? 'Выгрузка...'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      List<Map<String, dynamic>> orders;
+      try {
+        orders = await OrderDocumentService()
+            .listForEstablishmentExpenses(establishmentId);
+      } catch (e) {
+        final err = e.toString();
+        if (ent.hasUltraLevelFeatures &&
+            (err.contains('EXPENSES_PRO_REQUIRED') || err.contains('P0001'))) {
+          orders = await OrderDocumentService().listForEstablishment(establishmentId);
+        } else {
+          rethrow;
+        }
+      }
+      List<Map<String, dynamic>> writeoffRaw;
+      try {
+        writeoffRaw = await InventoryDocumentService()
+            .listForEstablishmentExpenses(establishmentId);
+      } catch (e) {
+        final err = e.toString();
+        if (ent.hasUltraLevelFeatures &&
+            (err.contains('EXPENSES_PRO_REQUIRED') || err.contains('P0001'))) {
+          writeoffRaw =
+              await InventoryDocumentService().listForEstablishment(establishmentId);
+        } else {
+          rethrow;
+        }
+      }
+      final writeoffs = writeoffRaw.where((d) {
+        final p = d['payload'] as Map<String, dynamic>?;
+        return p?['type']?.toString() == 'writeoff';
+      }).toList();
+      final procurement = ent.hasUltraLevelFeatures
+          ? await ProcurementReceiptService.instance.listDeduped(establishmentId)
+          : <Map<String, dynamic>>[];
+
+      final report = _MergedExpensesReport.fromSources(
+        dateStart: dateStart,
+        dateEnd: dateEnd,
+        orders: orders,
+        writeoffs: writeoffs,
+        procurementReceipts: procurement,
+      );
+
+      final bytes = format == 'pdf'
+          ? await _ExpensesMergedExportService.buildPdfBytes(
+              report: report,
+              lang: selectedLang,
+              currency: account.establishment?.defaultCurrency ?? 'RUB',
+            )
+          : await _ExpensesMergedExportService.buildExcelBytes(
+              report: report,
+              lang: selectedLang,
+              currency: account.establishment?.defaultCurrency ?? 'RUB',
+            );
+
+      final dateFmt = DateFormat('dd.MM.yyyy');
+      final ext = format == 'pdf' ? 'pdf' : 'xlsx';
+      final fileName =
+          'expenses_merged_${dateFmt.format(dateStart)}_${dateFmt.format(dateEnd)}.$ext';
+      await saveFileBytes(fileName, bytes);
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Сводный отчёт сохранён: $fileName')),
+      );
+    } catch (e) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка выгрузки: $e'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final account = context.watch<AccountManagerSupabase>();
     final ent = SubscriptionEntitlements.from(account.establishment);
+    final hasProOrUltra = ent.effectiveTier == AppSubscriptionTier.pro ||
+        ent.effectiveTier == AppSubscriptionTier.ultra;
     final tabs = <_ExpensesTab>[
       _ExpensesTab.fzp,
-      if (ent.effectiveTier == AppSubscriptionTier.pro ||
-          ent.effectiveTier == AppSubscriptionTier.ultra)
+      if (hasProOrUltra)
         _ExpensesTab.productOrders,
-      if (ent.effectiveTier == AppSubscriptionTier.pro ||
-          ent.effectiveTier == AppSubscriptionTier.ultra)
+      if (hasProOrUltra)
         _ExpensesTab.writeoffs,
       if (ent.effectiveTier == AppSubscriptionTier.ultra)
         _ExpensesTab.procurementReceipts,
@@ -67,6 +227,17 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         title: ScrollToTopAppBarTitle(
           child: Text(loc.t('expenses') ?? 'Расходы'),
         ),
+        actions: [
+          if (hasProOrUltra)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton.icon(
+                onPressed: () => _exportMergedExpenses(context, ent: ent),
+                icon: const Icon(Icons.merge_type_outlined),
+                label: const Text('Слияние'),
+              ),
+            ),
+        ],
       ),
       body: fzpOnly
           ? const SalaryExpenseScreen(embedInScaffold: false)
@@ -82,42 +253,37 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                           color: Theme.of(context).dividerColor, width: 1),
                     ),
                   ),
-                  child: Center(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildTabChip(_ExpensesTab.fzp,
-                            loc.t('salary_tab_fzp') ?? 'ФЗП', loc, selectedTab),
-                        if (tabs.contains(_ExpensesTab.productOrders)) ...[
-                          const SizedBox(width: 8),
-                          _buildTabChip(
-                            _ExpensesTab.productOrders,
-                            loc.t('expenses_tab_product_orders') ??
-                                'Заказы продуктов',
-                            loc,
-                            selectedTab,
+                  child: Row(
+                    children: [
+                      ...tabs.asMap().entries.map((entry) {
+                        final i = entry.key;
+                        final tab = entry.value;
+                        String label;
+                        switch (tab) {
+                          case _ExpensesTab.fzp:
+                            label = loc.t('salary_tab_fzp') ?? 'ФЗП';
+                            break;
+                          case _ExpensesTab.productOrders:
+                            label = loc.t('expenses_tab_product_orders') ??
+                                'Заказы';
+                            break;
+                          case _ExpensesTab.writeoffs:
+                            label = loc.t('expenses_tab_writeoffs') ?? 'Списания';
+                            break;
+                          case _ExpensesTab.procurementReceipts:
+                            label = loc.t('expenses_tab_procurement') ?? 'Поставки';
+                            break;
+                        }
+                        return Expanded(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              right: i < tabs.length - 1 ? 4 : 0,
+                            ),
+                            child: _buildTabChip(tab, label, loc, selectedTab),
                           ),
-                        ],
-                        if (tabs.contains(_ExpensesTab.writeoffs)) ...[
-                          const SizedBox(width: 8),
-                          _buildTabChip(
-                            _ExpensesTab.writeoffs,
-                            loc.t('expenses_tab_writeoffs') ?? 'Списания',
-                            loc,
-                            selectedTab,
-                          ),
-                        ],
-                        if (tabs.contains(_ExpensesTab.procurementReceipts)) ...[
-                          const SizedBox(width: 8),
-                          _buildTabChip(
-                            _ExpensesTab.procurementReceipts,
-                            loc.t('expenses_tab_procurement') ?? 'Поставки',
-                            loc,
-                            selectedTab,
-                          ),
-                        ],
-                      ],
-                    ),
+                        );
+                      }),
+                    ],
                   ),
                 ),
                 Expanded(
@@ -137,15 +303,273 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
   Widget _buildTabChip(_ExpensesTab tab, String label, LocalizationService loc,
       _ExpensesTab selectedTab) {
     final isSelected = selectedTab == tab;
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      showCheckmark: false,
-      onSelected: (_) => setState(() => _selectedTab = tab),
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      selectedColor: Theme.of(context).colorScheme.primaryContainer,
-      checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
+    final text = Text(
+      label,
+      textAlign: TextAlign.center,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
+    if (isSelected) {
+      return FilledButton(
+        onPressed: () => setState(() => _selectedTab = tab),
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: const VisualDensity(horizontal: -2, vertical: -1),
+        ),
+        child: text,
+      );
+    }
+    return OutlinedButton(
+      onPressed: () => setState(() => _selectedTab = tab),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: const VisualDensity(horizontal: -2, vertical: -1),
+      ),
+      child: text,
+    );
+  }
+}
+
+class _MergedExpensesReport {
+  const _MergedExpensesReport({
+    required this.dateStart,
+    required this.dateEnd,
+    required this.ordersCount,
+    required this.ordersTotal,
+    required this.writeoffsCount,
+    required this.writeoffsTotal,
+    required this.procurementCount,
+    required this.procurementTotal,
+  });
+
+  final DateTime dateStart;
+  final DateTime dateEnd;
+  final int ordersCount;
+  final double ordersTotal;
+  final int writeoffsCount;
+  final double writeoffsTotal;
+  final int procurementCount;
+  final double procurementTotal;
+
+  double get grandTotal => ordersTotal + writeoffsTotal + procurementTotal;
+
+  static _MergedExpensesReport fromSources({
+    required DateTime dateStart,
+    required DateTime dateEnd,
+    required List<Map<String, dynamic>> orders,
+    required List<Map<String, dynamic>> writeoffs,
+    required List<Map<String, dynamic>> procurementReceipts,
+  }) {
+    bool inRange(String? rawDate) {
+      final dt = DateTime.tryParse(rawDate ?? '');
+      if (dt == null) return false;
+      return !dt.isBefore(dateStart) && !dt.isAfter(dateEnd);
+    }
+
+    int ordersCount = 0;
+    double ordersTotal = 0;
+    for (final o in orders) {
+      if (!inRange(o['created_at']?.toString())) continue;
+      final payload = o['payload'] as Map<String, dynamic>? ?? {};
+      final grand = (payload['grandTotal'] as num?)?.toDouble();
+      if (grand == null) continue;
+      ordersCount += 1;
+      ordersTotal += grand;
+    }
+
+    int writeoffsCount = 0;
+    double writeoffsTotal = 0;
+    for (final d in writeoffs) {
+      if (!inRange(d['created_at']?.toString())) continue;
+      final payload = d['payload'] as Map<String, dynamic>? ?? {};
+      final total = (payload['costTotal'] as num?)?.toDouble();
+      if (total == null) continue;
+      writeoffsCount += 1;
+      writeoffsTotal += total;
+    }
+
+    int procurementCount = 0;
+    double procurementTotal = 0;
+    for (final d in procurementReceipts) {
+      if (!inRange(d['created_at']?.toString())) continue;
+      final payload = d['payload'] as Map<String, dynamic>? ?? {};
+      final header = payload['header'] as Map<String, dynamic>? ?? {};
+      final total = (payload['grandTotal'] as num?)?.toDouble() ??
+          (header['receivedGrandTotal'] as num?)?.toDouble();
+      if (total == null) continue;
+      procurementCount += 1;
+      procurementTotal += total;
+    }
+
+    return _MergedExpensesReport(
+      dateStart: dateStart,
+      dateEnd: dateEnd,
+      ordersCount: ordersCount,
+      ordersTotal: ordersTotal,
+      writeoffsCount: writeoffsCount,
+      writeoffsTotal: writeoffsTotal,
+      procurementCount: procurementCount,
+      procurementTotal: procurementTotal,
+    );
+  }
+}
+
+class _ExpensesMergedExportService {
+  static pw.ThemeData? _theme;
+
+  static Future<pw.ThemeData> _pdfTheme() async {
+    if (_theme != null) return _theme!;
+    final baseData = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
+    final boldData = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
+    final base = pw.Font.ttf(baseData);
+    final bold = pw.Font.ttf(boldData);
+    _theme = pw.ThemeData.withFont(
+      base: base,
+      bold: bold,
+      italic: base,
+      boldItalic: bold,
+    );
+    return _theme!;
+  }
+
+  static Future<Uint8List> buildExcelBytes({
+    required _MergedExpensesReport report,
+    required String lang,
+    required String currency,
+  }) async {
+    final excel = Excel.createExcel();
+    final sheet = excel[excel.getDefaultSheet()!];
+    final dateFmt = DateFormat('dd.MM.yyyy');
+    final dec = NumberFormat.decimalPattern(lang);
+
+    sheet.appendRow([
+      TextCellValue('Раздел'),
+      TextCellValue('Кол-во документов'),
+      TextCellValue('Сумма'),
+      TextCellValue('Валюта'),
+      TextCellValue('Период'),
+    ]);
+    final period =
+        '${dateFmt.format(report.dateStart)} - ${dateFmt.format(report.dateEnd)}';
+    sheet.appendRow([
+      TextCellValue('Заказы'),
+      IntCellValue(report.ordersCount),
+      TextCellValue(dec.format(report.ordersTotal)),
+      TextCellValue(currency),
+      TextCellValue(period),
+    ]);
+    sheet.appendRow([
+      TextCellValue('Списания'),
+      IntCellValue(report.writeoffsCount),
+      TextCellValue(dec.format(report.writeoffsTotal)),
+      TextCellValue(currency),
+      TextCellValue(period),
+    ]);
+    sheet.appendRow([
+      TextCellValue('Поставки'),
+      IntCellValue(report.procurementCount),
+      TextCellValue(dec.format(report.procurementTotal)),
+      TextCellValue(currency),
+      TextCellValue(period),
+    ]);
+    sheet.appendRow([
+      TextCellValue('Итого'),
+      TextCellValue(''),
+      TextCellValue(dec.format(report.grandTotal)),
+      TextCellValue(currency),
+      TextCellValue(period),
+    ]);
+    final out = excel.encode();
+    if (out == null) throw StateError('expenses merged excel encode');
+    return Uint8List.fromList(out);
+  }
+
+  static Future<Uint8List> buildPdfBytes({
+    required _MergedExpensesReport report,
+    required String lang,
+    required String currency,
+  }) async {
+    final doc = pw.Document(theme: await _pdfTheme());
+    final dateFmt = DateFormat('dd.MM.yyyy');
+    final dec = NumberFormat.decimalPattern(lang);
+    final period =
+        '${dateFmt.format(report.dateStart)} - ${dateFmt.format(report.dateEnd)}';
+
+    pw.Widget c(String v, {bool bold = false}) => pw.Padding(
+          padding: const pw.EdgeInsets.all(6),
+          child: pw.Text(
+            v,
+            style: pw.TextStyle(
+              fontSize: 10,
+              fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+            ),
+          ),
+        );
+
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        build: (_) => [
+          pw.Text(
+            'Сводный отчёт по расходам',
+            style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text('Период: $period'),
+          pw.SizedBox(height: 14),
+          pw.Table(
+            border: pw.TableBorder.all(color: PdfColors.grey500),
+            columnWidths: {
+              0: const pw.FlexColumnWidth(2.2),
+              1: const pw.FlexColumnWidth(1.2),
+              2: const pw.FlexColumnWidth(1.4),
+              3: const pw.FlexColumnWidth(1.0),
+            },
+            children: [
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+                children: [
+                  c('Раздел', bold: true),
+                  c('Документы', bold: true),
+                  c('Сумма', bold: true),
+                  c('Валюта', bold: true),
+                ],
+              ),
+              pw.TableRow(children: [
+                c('Заказы'),
+                c('${report.ordersCount}'),
+                c(dec.format(report.ordersTotal)),
+                c(currency),
+              ]),
+              pw.TableRow(children: [
+                c('Списания'),
+                c('${report.writeoffsCount}'),
+                c(dec.format(report.writeoffsTotal)),
+                c(currency),
+              ]),
+              pw.TableRow(children: [
+                c('Поставки'),
+                c('${report.procurementCount}'),
+                c(dec.format(report.procurementTotal)),
+                c(currency),
+              ]),
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                children: [
+                  c('Итого', bold: true),
+                  c(''),
+                  c(dec.format(report.grandTotal), bold: true),
+                  c(currency, bold: true),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+    return doc.save();
   }
 }
 
@@ -195,8 +619,20 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
         });
         return;
       }
-      final docs =
-          await OrderDocumentService().listForEstablishmentExpenses(establishmentId);
+      List<Map<String, dynamic>> docs;
+      try {
+        docs = await OrderDocumentService()
+            .listForEstablishmentExpenses(establishmentId);
+      } catch (e) {
+        final ent = SubscriptionEntitlements.from(account.establishment);
+        final err = e.toString();
+        if (ent.hasUltraLevelFeatures &&
+            (err.contains('EXPENSES_PRO_REQUIRED') || err.contains('P0001'))) {
+          docs = await OrderDocumentService().listForEstablishment(establishmentId);
+        } else {
+          rethrow;
+        }
+      }
 
       if (mounted) {
         final excluded = await _loadExcludedOrderIds(establishmentId);
@@ -1679,8 +2115,20 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
       _error = null;
     });
     try {
-      final raw = await InventoryDocumentService()
-          .listForEstablishmentExpenses(establishmentId);
+      List<Map<String, dynamic>> raw;
+      try {
+        raw = await InventoryDocumentService()
+            .listForEstablishmentExpenses(establishmentId);
+      } catch (e) {
+        final ent = SubscriptionEntitlements.from(account.establishment);
+        final err = e.toString();
+        if (ent.hasUltraLevelFeatures &&
+            (err.contains('EXPENSES_PRO_REQUIRED') || err.contains('P0001'))) {
+          raw = await InventoryDocumentService().listForEstablishment(establishmentId);
+        } else {
+          rethrow;
+        }
+      }
       final docs = raw.where((d) {
         final p = d['payload'] as Map<String, dynamic>?;
         return p?['type']?.toString() == 'writeoff';

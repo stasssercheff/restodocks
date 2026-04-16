@@ -302,30 +302,32 @@ class _AppShellState extends State<AppShell> {
             children: [
               navBar,
               Positioned.fill(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: SpotlightTarget(
-                        id: 'home-nav-home',
-                        controller: tourController,
-                        child: const SizedBox.expand(),
+                child: IgnorePointer(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SpotlightTarget(
+                          id: 'home-nav-home',
+                          controller: tourController,
+                          child: const SizedBox.expand(),
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: SpotlightTarget(
-                        id: 'home-nav-middle',
-                        controller: tourController,
-                        child: const SizedBox.expand(),
+                      Expanded(
+                        child: SpotlightTarget(
+                          id: 'home-nav-middle',
+                          controller: tourController,
+                          child: const SizedBox.expand(),
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: SpotlightTarget(
-                        id: 'home-nav-cabinet',
-                        controller: tourController,
-                        child: const SizedBox.expand(),
+                      Expanded(
+                        child: SpotlightTarget(
+                          id: 'home-nav-cabinet',
+                          controller: tourController,
+                          child: const SizedBox.expand(),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -526,16 +528,6 @@ class _AppShellState extends State<AppShell> {
     int currentIndex,
     bool kitchenOnlySchedule,
   ) {
-    // Уже на домашнем экране: повторный тап «Дом» не должен вызывать go() — иначе
-    // лишняя анимация (как «вперёд») поверх того же маршрута.
-    if (index == 0) {
-      final loc = GoRouterState.of(context).matchedLocation;
-      final pathOnly = loc.split('?').first;
-      if (pathOnly == '/home' || pathOnly == '/') {
-        return;
-      }
-    }
-
     // Если переходим на вкладку с меньшим индексом — анимируем как «назад» (вправо)
     final isBackward = index < currentIndex;
     final extra = isBackward ? {'back': true} : null;
@@ -556,6 +548,7 @@ class _AppShellState extends State<AppShell> {
         shellReturn.onFooterWillNavigate(context,
             tabIndex: 0, middleRoute: middleRoute);
         context.go('/home', extra: extra);
+        return;
       case 1:
         if (!noDataAccess) {
           final am = context.read<AccountManagerSupabase>();
@@ -569,14 +562,17 @@ class _AppShellState extends State<AppShell> {
         shellReturn.onFooterWillNavigate(context,
             tabIndex: 1, middleRoute: middleRoute);
         context.go(middleRoute, extra: extra);
+        return;
       case 2:
         shellReturn.onFooterWillNavigate(context,
             tabIndex: 2, middleRoute: middleRoute);
         context.go('/personal-cabinet', extra: extra);
+        return;
       default:
         shellReturn.onFooterWillNavigate(context,
             tabIndex: 0, middleRoute: middleRoute);
         context.go('/home', extra: extra);
+        return;
     }
   }
 }

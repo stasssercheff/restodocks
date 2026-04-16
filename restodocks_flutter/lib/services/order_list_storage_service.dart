@@ -12,6 +12,15 @@ const _table = 'establishment_order_list_data';
 /// Подразделения (kitchen, bar, hall)
 const _departments = ['kitchen', 'bar', 'hall'];
 
+String _normalizeDepartment(String? department) {
+  final d = (department ?? '').trim().toLowerCase();
+  if (d == 'kitchen' || d == 'bar' || d == 'hall') return d;
+  // Legacy aliases used in older builds.
+  if (d == 'dining_room') return 'hall';
+  if (d == 'management') return 'kitchen';
+  return 'kitchen';
+}
+
 /// Парсит сырые данные в List<OrderList>. Старый формат (массив без department) → kitchen.
 List<OrderList> _parseList(dynamic data) {
   if (data == null || data is! List) return [];
@@ -47,8 +56,10 @@ Future<List<OrderList>> loadOrderLists(String establishmentId, {String departmen
     }
   }
 
-  final dept = _departments.contains(department) ? department : 'kitchen';
-  return all.where((l) => (l.department == dept) || (l.department.isEmpty && dept == 'kitchen')).toList();
+  final dept = _normalizeDepartment(department);
+  return all
+      .where((l) => _normalizeDepartment(l.department) == dept)
+      .toList();
 }
 
 /// Загружает все списки (все подразделения) для merge при сохранении.
@@ -76,11 +87,13 @@ Future<List<OrderList>> _loadAllOrderLists(String establishmentId) async {
 Future<void> saveOrderLists(String establishmentId, List<OrderList> lists, {String department = 'kitchen'}) async {
   final prefs = await SharedPreferences.getInstance();
   final key = '$_keyPrefix$establishmentId';
-  final dept = _departments.contains(department) ? department : 'kitchen';
+  final dept = _normalizeDepartment(department);
   final listsWithDept = lists.map((l) => l.department == dept ? l : l.copyWith(department: dept)).toList();
 
   final all = await _loadAllOrderLists(establishmentId);
-  final others = all.where((l) => l.department != dept && l.department.isNotEmpty).toList();
+  final others = all
+      .where((l) => _normalizeDepartment(l.department) != dept)
+      .toList();
   final merged = [...others, ...listsWithDept];
   final data = merged.map((e) => e.toJson()).toList();
   final encoded = jsonEncode(data);

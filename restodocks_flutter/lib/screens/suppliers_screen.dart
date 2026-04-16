@@ -204,97 +204,12 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
       ),
     );
     if (draft == null || !mounted) return;
-
-    await _showSupplierAddProductsStep(
+    await _persistNewSupplierAndNavigate(
       establishmentId: estId,
+      draft: draft,
+      uploadFlow: false,
       loc: loc,
       acc: acc,
-      draft: draft,
-    );
-  }
-
-  Future<void> _showSupplierAddProductsStep({
-    required String establishmentId,
-    required LocalizationService loc,
-    required AccountManagerSupabase acc,
-    required OrderList draft,
-  }) async {
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        final theme = Theme.of(dialogContext);
-        final cs = theme.colorScheme;
-        final onPrimaryStyle = FilledButton.styleFrom(
-          foregroundColor: cs.onPrimary,
-          backgroundColor: cs.primary,
-        );
-        return Dialog(
-          alignment: Alignment.center,
-          insetPadding: _supplierCenteredDialogInsets(dialogContext),
-          backgroundColor: cs.surfaceContainerHigh,
-          clipBehavior: Clip.antiAlias,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: 440,
-              maxHeight: _supplierSheetMaxHeight(dialogContext),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    loc.t('supplier_choose_add_products'),
-                    style: theme.textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 14),
-                  FilledButton.icon(
-                    style: onPrimaryStyle,
-                    onPressed: () async {
-                      Navigator.of(dialogContext).pop();
-                      await _persistNewSupplierAndNavigate(
-                        establishmentId: establishmentId,
-                        draft: draft,
-                        uploadFlow: false,
-                        loc: loc,
-                        acc: acc,
-                      );
-                    },
-                    icon: const Icon(Icons.playlist_add_check_outlined),
-                    label: Text(loc.t('supplier_products_from_nomenclature')),
-                  ),
-                  const SizedBox(height: 10),
-                  FilledButton.icon(
-                    style: onPrimaryStyle,
-                    onPressed: () async {
-                      Navigator.of(dialogContext).pop();
-                      await _persistNewSupplierAndNavigate(
-                        establishmentId: establishmentId,
-                        draft: draft,
-                        uploadFlow: true,
-                        loc: loc,
-                        acc: acc,
-                      );
-                    },
-                    icon: const Icon(Icons.upload_file),
-                    label: Text(loc.t('upload_products')),
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(),
-                    child: Text(loc.t('cancel')),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
     );
   }
 
