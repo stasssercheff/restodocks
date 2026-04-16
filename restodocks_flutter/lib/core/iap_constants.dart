@@ -1,34 +1,48 @@
-/// App Store Connect — In-App Purchase.
-///
-/// Чек-лист для **трёх продуктов кроме уже существующего Pro** (итого 4 SKU в коде):
-///
-/// 1) **restodocks_ultra_monthly** — Auto-Renewable Subscription, 1 месяц, группа подписок та же,
-///    что у Pro (чтобы был upgrade/downgrade). Reference name: e.g. «Ultra Monthly».
-///    Цена: уровень ~40 USD (или региональные эквиваленты).
-///
-/// 2) **restodocks_addon_employee_pack_5** — тип **Consumable** (можно покупать много раз).
-///    Display name: «+5 employee slots» / «+5 сотрудников». Ориентир цены ~10 USD.
-///    Связанный App Store Review: кратко, что после серверной активации лимит +5 на заведение.
-///
-/// 3) **restodocks_addon_branch_pack_1** — **Consumable**. Display name: «+1 branch» / «+1 филиал».
-///    Ориентир ~10 USD. После сервера — +1 слот филиала на владельца.
-///
-/// Общее в Connect: Agreements / Paid Apps, налоги, банковский контракт, Shared Secret для
-/// verifyReceipt (тот же, что в Edge `billing-verify-apple`). Для подписок — прикрепить к версии
-/// приложения в разделе In-App Purchases.
-///
-/// Идентификаторы ниже должны совпадать с Product ID в App Store Connect **буква в букву**.
-const String kRestodocksProMonthlyProductId = 'restodocks_pro_monthly';
-const String kRestodocksUltraMonthlyProductId = 'restodocks_ultra_monthly';
+/// App Store Connect — In-App Purchase identifiers.
+/// Must match Product ID values in App Store Connect exactly (case-sensitive).
+const String kRestodocksProMonthlyProductId = 'Pro_monthly';
+const String kRestodocksUltraMonthlyProductId = 'Ultra_monthly';
 
-/// Расширения (по одному продукту на покупку). Подключение на сервере — по мере готовности;
-/// клиент может запрашивать цены для отображения.
-const String kRestodocksAddonEmployeePack5ProductId = 'restodocks_addon_employee_pack_5';
-const String kRestodocksAddonBranchPack1ProductId = 'restodocks_addon_branch_pack_1';
+/// Establishment slot add-ons (consumables).
+const String kRestodocksAddonBranchPack1ProductId =
+    '1_extra_establishment_monthly';
+const String kRestodocksAddonBranchPack3ProductId =
+    '3_extra_establishment_monthly';
+const String kRestodocksAddonBranchPack5ProductId =
+    '5_extra_establishment_monthly';
+const String kRestodocksAddonBranchPack10ProductId =
+    '10_extra_establishment_monthly';
+
+/// Employee slot add-ons (consumables).
+const String kRestodocksAddonEmployeePack5ProductId = '5_extra_employee_monthly';
+const String kRestodocksAddonEmployeePack10ProductId =
+    '10_extra_employee_monthly';
+const String kRestodocksAddonEmployeePack15ProductId =
+    '15_extra_employee_monthly';
+const String kRestodocksAddonEmployeePack20ProductId =
+    '20_extra_employee_monthly';
+
+/// Display order in subscription sheet.
+const List<String> kRestodocksAddonProductIdOrder = [
+  kRestodocksAddonBranchPack1ProductId,
+  kRestodocksAddonBranchPack3ProductId,
+  kRestodocksAddonBranchPack5ProductId,
+  kRestodocksAddonBranchPack10ProductId,
+  kRestodocksAddonEmployeePack5ProductId,
+  kRestodocksAddonEmployeePack10ProductId,
+  kRestodocksAddonEmployeePack15ProductId,
+  kRestodocksAddonEmployeePack20ProductId,
+];
 
 const Set<String> kRestodocksAddonProductIds = {
-  kRestodocksAddonEmployeePack5ProductId,
   kRestodocksAddonBranchPack1ProductId,
+  kRestodocksAddonBranchPack3ProductId,
+  kRestodocksAddonBranchPack5ProductId,
+  kRestodocksAddonBranchPack10ProductId,
+  kRestodocksAddonEmployeePack5ProductId,
+  kRestodocksAddonEmployeePack10ProductId,
+  kRestodocksAddonEmployeePack15ProductId,
+  kRestodocksAddonEmployeePack20ProductId,
 };
 
 /// Подписки, которые переводят заведение в Pro / Ultra после billing-verify-apple.
@@ -41,6 +55,5 @@ const Set<String> kRestodocksSubscriptionProductIds = {
 const Set<String> kRestodocksAllIapProductIds = {
   kRestodocksProMonthlyProductId,
   kRestodocksUltraMonthlyProductId,
-  kRestodocksAddonEmployeePack5ProductId,
-  kRestodocksAddonBranchPack1ProductId,
+  ...kRestodocksAddonProductIds,
 };

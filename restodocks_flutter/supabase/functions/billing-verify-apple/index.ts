@@ -96,16 +96,22 @@ function toExpiresMs(raw: unknown): number | null {
 
 /** Подписки Restodocks в одном чеке: Pro и Ultra (разные product_id в App Store Connect). */
 const TARGET_SUBSCRIPTION_PRODUCT_IDS = new Set([
-  "restodocks_pro_monthly",
-  "restodocks_ultra_monthly",
+  "Pro_monthly",
+  "Ultra_monthly",
 ]);
 
 const TARGET_ADDON_PRODUCT_IDS = new Set([
-  "restodocks_addon_employee_pack_5",
-  "restodocks_addon_branch_pack_1",
+  "1_extra_establishment_monthly",
+  "3_extra_establishment_monthly",
+  "5_extra_establishment_monthly",
+  "10_extra_establishment_monthly",
+  "5_extra_employee_monthly",
+  "10_extra_employee_monthly",
+  "15_extra_employee_monthly",
+  "20_extra_employee_monthly",
 ]);
 
-const ULTRA_PRODUCT_ID = "restodocks_ultra_monthly";
+const ULTRA_PRODUCT_ID = "Ultra_monthly";
 
 function isTargetSubscriptionProductId(id: string): boolean {
   return TARGET_SUBSCRIPTION_PRODUCT_IDS.has(String(id ?? "").trim());

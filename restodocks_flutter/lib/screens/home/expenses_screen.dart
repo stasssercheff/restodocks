@@ -32,7 +32,7 @@ String _expensesRpcErrorMessage(Object e, LocalizationService loc) {
   return s;
 }
 
-/// Экран «Расходы» для собственника: вкладки «ФЗП», «Заказы продуктов», «Списания», «Поставки».
+/// Экран «Расходы» для собственника: вкладки «ФЗП», «Заказы», «Списания», «Поставки».
 class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key});
 
@@ -265,7 +265,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                             break;
                           case _ExpensesTab.productOrders:
                             label = loc.t('expenses_tab_product_orders') ??
-                                'Заказы продуктов';
+                                'Заказы';
                             break;
                           case _ExpensesTab.writeoffs:
                             label = loc.t('expenses_tab_writeoffs') ?? 'Списания';
@@ -454,7 +454,7 @@ class _ExpensesMergedExportService {
     final period =
         '${dateFmt.format(report.dateStart)} - ${dateFmt.format(report.dateEnd)}';
     sheet.appendRow([
-      TextCellValue('Заказы продуктов'),
+      TextCellValue('Заказы'),
       IntCellValue(report.ordersCount),
       TextCellValue(dec.format(report.ordersTotal)),
       TextCellValue(currency),
@@ -538,7 +538,7 @@ class _ExpensesMergedExportService {
                 ],
               ),
               pw.TableRow(children: [
-                c('Заказы продуктов'),
+                c('Заказы'),
                 c('${report.ordersCount}'),
                 c(dec.format(report.ordersTotal)),
                 c(currency),

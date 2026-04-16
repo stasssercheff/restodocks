@@ -58,10 +58,10 @@ class AppleIapService extends ChangeNotifier {
   /// Доп. пакеты (+5 сотрудников, +1 филиал), если настроены в App Store Connect.
   List<ProductDetails> get addonProducts {
     final out = <ProductDetails>[];
-    final e = _products[kRestodocksAddonEmployeePack5ProductId];
-    final b = _products[kRestodocksAddonBranchPack1ProductId];
-    if (e != null) out.add(e);
-    if (b != null) out.add(b);
+    for (final id in kRestodocksAddonProductIdOrder) {
+      final product = _products[id];
+      if (product != null) out.add(product);
+    }
     return out;
   }
 
