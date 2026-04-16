@@ -58,50 +58,46 @@ class _PosProcurementScreenState extends State<PosProcurementScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: List.generate(tabs.length, (i) {
-                  final selected = _tabIndex == i;
-                  return Padding(
+            child: Row(
+              children: List.generate(tabs.length, (i) {
+                final selected = _tabIndex == i;
+                return Expanded(
+                  child: Padding(
                     padding: EdgeInsets.only(right: i < tabs.length - 1 ? 6 : 0),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(minWidth: 88),
-                      child: selected
-                          ? FilledButton(
-                              onPressed: () => setState(() => _tabIndex = i),
-                              style: FilledButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 10,
-                                ),
-                              ),
-                              child: Text(
-                                tabs[i],
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            )
-                          : OutlinedButton(
-                              onPressed: () => setState(() => _tabIndex = i),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 10,
-                                ),
-                              ),
-                              child: Text(
-                                tabs[i],
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
+                    child: selected
+                        ? FilledButton(
+                            onPressed: () => setState(() => _tabIndex = i),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 10,
                               ),
                             ),
-                    ),
-                  );
-                }),
-              ),
+                            child: Text(
+                              tabs[i],
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          )
+                        : OutlinedButton(
+                            onPressed: () => setState(() => _tabIndex = i),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 10,
+                              ),
+                            ),
+                            child: Text(
+                              tabs[i],
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                  ),
+                );
+              }),
             ),
           ),
           Expanded(

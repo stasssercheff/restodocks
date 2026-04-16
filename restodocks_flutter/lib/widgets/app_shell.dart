@@ -302,30 +302,32 @@ class _AppShellState extends State<AppShell> {
             children: [
               navBar,
               Positioned.fill(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: SpotlightTarget(
-                        id: 'home-nav-home',
-                        controller: tourController,
-                        child: const SizedBox.expand(),
+                child: IgnorePointer(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SpotlightTarget(
+                          id: 'home-nav-home',
+                          controller: tourController,
+                          child: const SizedBox.expand(),
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: SpotlightTarget(
-                        id: 'home-nav-middle',
-                        controller: tourController,
-                        child: const SizedBox.expand(),
+                      Expanded(
+                        child: SpotlightTarget(
+                          id: 'home-nav-middle',
+                          controller: tourController,
+                          child: const SizedBox.expand(),
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: SpotlightTarget(
-                        id: 'home-nav-cabinet',
-                        controller: tourController,
-                        child: const SizedBox.expand(),
+                      Expanded(
+                        child: SpotlightTarget(
+                          id: 'home-nav-cabinet',
+                          controller: tourController,
+                          child: const SizedBox.expand(),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],

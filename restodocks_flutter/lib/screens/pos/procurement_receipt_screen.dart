@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -1069,7 +1071,13 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
         final thStyleUse = thStyle?.copyWith(fontSize: narrow ? 10 : 12);
         final hPad = narrow ? 2.0 : 8.0;
         final vPad = narrow ? 2.0 : 6.0;
-        final minW = narrow ? 720.0 : 1040.0;
+        // Одна FlexColumnWidth забирала всё до minWidth — колонка «Наимен.» растягивалась.
+        // Фиксированная ширина (~в 2× уже прежнего flex-остатка при minW 720/1040).
+        final nameColW = narrow ? 140.0 : 180.0;
+        final tableMinW = narrow
+            ? 22.0 + nameColW + 44 + 52 + 56 + 52 + 56 + 56 + 36
+            : 32.0 + nameColW + 56 + 72 + 84 + 72 + 84 + 88 + 56;
+        final minW = math.max(tableMinW, constraints.maxWidth);
 
         Widget cell(Widget w) => Padding(
               padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
@@ -1088,7 +1096,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
               ),
               columnWidths: {
                 0: FixedColumnWidth(narrow ? 22 : 32),
-                1: FlexColumnWidth(narrow ? 1.35 : 2.0),
+                1: FixedColumnWidth(nameColW),
                 2: FixedColumnWidth(narrow ? 44 : 56),
                 3: FixedColumnWidth(narrow ? 52 : 72),
                 4: FixedColumnWidth(narrow ? 56 : 84),
@@ -1195,22 +1203,22 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
           l.nameReadOnly
               ? Text(
                   l.nameCtrl.text.isEmpty ? '—' : l.nameCtrl.text,
-                  maxLines: narrow ? 3 : 4,
-                  overflow: TextOverflow.fade,
+                  softWrap: true,
                   style: rowStyle,
                 )
               : widget.manualOffSystem
                   ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: TextField(
                             controller: l.nameCtrl,
                             decoration: _denseFieldDecoration(context),
                             style: rowStyle,
-                            maxLines: 1,
+                            keyboardType: TextInputType.multiline,
+                            textInputAction: TextInputAction.newline,
                             minLines: 1,
-                            textInputAction: TextInputAction.next,
+                            maxLines: null,
                             scrollPadding: scrollPad,
                             onChanged: (_) => onField(),
                           ),
@@ -1234,8 +1242,10 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                       controller: l.nameCtrl,
                       decoration: _denseFieldDecoration(context),
                       style: rowStyle,
-                      maxLines: 1,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.newline,
                       minLines: 1,
+                      maxLines: null,
                       scrollPadding: scrollPad,
                       onChanged: (_) => onField(),
                     ),
