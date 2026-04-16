@@ -26,6 +26,7 @@ class OrderCreateScreen extends StatefulWidget {
 
 class _OrderCreateScreenState extends State<OrderCreateScreen> {
   final _nameCtrl = TextEditingController();
+  final _productSearchCtrl = TextEditingController();
   DateTime? _orderForDate;
 
   List<OrderList> _suppliers = [];
@@ -53,6 +54,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _productSearchCtrl.dispose();
     _commentCtrl.dispose();
     for (final c in _qtyControllers) {
       c.dispose();
@@ -103,6 +105,16 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
               0)
           : e.value.quantity;
       return e.value.copyWith(quantity: q);
+    }).toList();
+  }
+
+  List<MapEntry<int, OrderListItem>> _filteredItemEntries(String lang) {
+    final q = _productSearchCtrl.text.trim().toLowerCase();
+    final entries = _items.asMap().entries.toList();
+    if (q.isEmpty) return entries;
+    return entries.where((e) {
+      final name = _getItemDisplayName(e.value, lang).toLowerCase();
+      return name.contains(q);
     }).toList();
   }
 
@@ -430,11 +442,14 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                   // Список продуктов
                   if (_selectedSupplier != null && _items.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    Text(
-                      loc.t('order_list_add_products') ?? 'Продукты',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
+                    TextField(
+                      controller: _productSearchCtrl,
+                      onChanged: (_) => setState(() {}),
+                      decoration: InputDecoration(
+                        hintText: loc.t('search') ?? 'Поиск',
+                        prefixIcon: const Icon(Icons.search),
+                        border: const OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Table(
@@ -482,7 +497,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                             ),
                           ],
                         ),
-                        ..._items.asMap().entries.map((e) {
+                        ..._filteredItemEntries(lang).map((e) {
                           final i = e.key;
                           final item = e.value;
                           return TableRow(

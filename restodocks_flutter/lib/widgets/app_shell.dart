@@ -558,6 +558,7 @@ class _AppShellState extends State<AppShell> {
         shellReturn.onFooterWillNavigate(context,
             tabIndex: 0, middleRoute: middleRoute);
         context.go('/home', extra: extra);
+        return;
       case 1:
         if (!noDataAccess) {
           final am = context.read<AccountManagerSupabase>();
@@ -571,14 +572,17 @@ class _AppShellState extends State<AppShell> {
         shellReturn.onFooterWillNavigate(context,
             tabIndex: 1, middleRoute: middleRoute);
         context.go(middleRoute, extra: extra);
+        return;
       case 2:
         shellReturn.onFooterWillNavigate(context,
             tabIndex: 2, middleRoute: middleRoute);
         context.go('/personal-cabinet', extra: extra);
+        return;
       default:
         shellReturn.onFooterWillNavigate(context,
             tabIndex: 0, middleRoute: middleRoute);
         context.go('/home', extra: extra);
+        return;
     }
   }
 }
