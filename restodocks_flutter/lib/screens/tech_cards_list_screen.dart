@@ -3393,14 +3393,10 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           final isLandscape = mq.orientation == Orientation.landscape;
           final isDesktopLike = screenW >= 900;
           final useCompactLayout = isLandscape && !isDesktopLike;
-          // Заголовок + actions + отступы диалога (без занижения: иначе в альбоме
-          // clamp «вверх» ломает раскладку и скрывает поле ввода).
-          final dialogChrome = useCompactLayout ? 100.0 : 176.0;
+          // Заголовок + actions + отступы диалога.
+          final dialogChrome = useCompactLayout ? 108.0 : 168.0;
           final availableH = screenH - kb - safePad;
-          final maxBody = (availableH - dialogChrome).clamp(48.0, screenH * 0.95);
-          const extrasBelowField = 8.0;
-          final fieldHeight =
-              (maxBody - extrasBelowField).clamp(48.0, isDesktopLike ? 620.0 : 520.0);
+          final maxBody = (availableH - dialogChrome).clamp(150.0, screenH * 0.62);
           final titleStyle = Theme.of(ctx).textTheme.titleMedium?.copyWith(
                 fontSize: useCompactLayout ? 14 : null,
                 height: useCompactLayout ? 1.15 : null,
@@ -3442,75 +3438,81 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             maxLines: useCompactLayout ? 2 : 4,
             overflow: TextOverflow.ellipsis,
           ),
-          content: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: dialogMinW,
-              maxWidth: dialogMaxW,
-              maxHeight: maxBody,
-            ),
-            child: SingleChildScrollView(
-              keyboardDismissBehavior:
-                  ScrollViewKeyboardDismissBehavior.onDrag,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (canShowAiQuota &&
-                      aiQuotaTotal != null &&
-                      aiQuotaRemaining != null) ...[
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Theme.of(ctx)
-                            .colorScheme
-                            .surfaceContainerHighest
-                            .withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
-                        ),
-                        child: Text(
-                          _aiTtkRemainingLabel(
-                            loc,
-                            aiQuotaRemaining,
-                            aiQuotaTotal,
-                          ),
-                          style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                      ),
+          content: SizedBox(
+            width: dialogMaxW,
+            height: maxBody,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (canShowAiQuota &&
+                    aiQuotaTotal != null &&
+                    aiQuotaRemaining != null) ...[
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Theme.of(ctx)
+                          .colorScheme
+                          .surfaceContainerHighest
+                          .withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    const SizedBox(height: 8),
-                  ],
-                  SizedBox(
-                    height: fieldHeight,
-                    child: TextField(
-                      controller: controller,
-                      maxLines: null,
-                      expands: true,
-                      style: fieldStyle,
-                      scrollPadding: EdgeInsets.only(bottom: kb + 32),
-                      textInputAction: TextInputAction.newline,
-                      decoration: InputDecoration(
-                        hintText:
-                            'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
-                        hintStyle: hintStyle,
-                        isDense: useCompactLayout,
-                        contentPadding: useCompactLayout
-                            ? const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 8,
-                              )
-                            : null,
-                        border: const OutlineInputBorder(),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      child: Text(
+                        _aiTtkRemainingLabel(
+                          loc,
+                          aiQuotaRemaining,
+                          aiQuotaTotal,
+                        ),
+                        style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
                     ),
                   ),
+                  const SizedBox(height: 8),
                 ],
-              ),
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    maxLines: null,
+                    expands: true,
+                    style: fieldStyle,
+                    scrollPadding: EdgeInsets.only(bottom: kb + 24),
+                    textInputAction: TextInputAction.newline,
+                    decoration: InputDecoration(
+                      hintText:
+                          'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
+                      hintStyle: hintStyle,
+                      isDense: useCompactLayout,
+                      contentPadding: useCompactLayout
+                          ? const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            )
+                          : null,
+                      border: const OutlineInputBorder(),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Theme.of(ctx)
+                              .colorScheme
+                              .outline
+                              .withValues(alpha: 0.7),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Theme.of(ctx).colorScheme.primary,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           actions: [
@@ -4120,6 +4122,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             ),
           )
         : null;
+    final importAllowed = canEdit && hasProSubscription;
     final createWidget = canEdit
         ? PopupMenuButton<String>(
             icon: Icon(Icons.add,
@@ -4133,6 +4136,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               }
               if (value == 'ai') {
                 await _createFromText(context, loc, allowPromptFallback: true);
+                return;
+              }
+              if (value == 'import_excel') {
+                await _createFromExcel(context, loc);
+                return;
+              }
+              if (value == 'import_text') {
+                await _createFromText(context, loc);
+                return;
+              }
+              if (value == 'import_photo') {
+                await _createFromPhoto(context, loc);
               }
             },
             itemBuilder: (_) => [
@@ -4169,43 +4184,32 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     ],
                   ),
                 ),
-            ],
-          )
-        : null;
-    final importWidget = canEdit && hasProSubscription
-        ? PopupMenuButton<String>(
-            icon: const Icon(Icons.upload),
-            tooltip: loc.t('ttk_import_file'),
-            onSelected: (value) async {
-              if (value == 'excel') await _createFromExcel(context, loc);
-              if (value == 'text') await _createFromText(context, loc);
-              if (value == 'photo') await _createFromPhoto(context, loc);
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'excel',
-                child: Text(
-                  loc.t('ttk_import_file'),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.w500,
-                      ),
-                ),
-              ),
-              PopupMenuItem(
-                  value: 'text',
+              if (importAllowed)
+                PopupMenuItem(
+                  value: 'import_excel',
                   child: Text(
-                    loc.t('ttk_import_paste_text').trim().isEmpty
-                        ? 'Вставить текст'
-                        : loc.t('ttk_import_paste_text'),
+                    loc.t('ttk_import_file'),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Theme.of(context).colorScheme.onSurface,
                           fontWeight: FontWeight.w500,
                         ),
-                  )),
-              if (!kIsWeb && OnDeviceOcrService.isSupported)
+                  ),
+                ),
+              if (importAllowed)
                 PopupMenuItem(
-                  value: 'photo',
+                    value: 'import_text',
+                    child: Text(
+                      loc.t('ttk_import_paste_text').trim().isEmpty
+                          ? 'Вставить текст'
+                          : loc.t('ttk_import_paste_text'),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontWeight: FontWeight.w500,
+                          ),
+                    )),
+              if (importAllowed && !kIsWeb && OnDeviceOcrService.isSupported)
+                PopupMenuItem(
+                  value: 'import_photo',
                   child: Text(
                     loc.t('ai_tech_card_from_photo').trim().isEmpty
                         ? 'ТТК из фото'
@@ -4301,7 +4305,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final result = <Widget>[];
     if (countWidget != null) result.add(wrap('ttk-count', countWidget));
     if (createWidget != null) result.add(wrap('ttk-create', createWidget));
-    if (importWidget != null) result.add(wrap('ttk-import', importWidget));
     result.add(wrap('ttk-export', exportWidget));
     result.add(wrap('ttk-refresh', refreshWidget));
     return result;
