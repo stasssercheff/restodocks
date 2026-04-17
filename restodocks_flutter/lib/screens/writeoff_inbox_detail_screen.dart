@@ -439,7 +439,7 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
         sheet.appendRow([
           IntCellValue(i + 1),
           TextCellValue(_localizedRowProductNameSync(r, saveLang, store, _techCards)),
-          TextCellValue(CulinaryUnits.displayName(unitRaw, saveLang)),
+          TextCellValue(LocalizationService().unitLabelForLanguage(unitRaw, saveLang)),
           DoubleCellValue((r['total'] as num?)?.toDouble() ?? 0),
         ]);
       }
@@ -601,7 +601,7 @@ class _WriteoffInboxDetailScreenState extends State<WriteoffInboxDetailScreen> {
                     children: [
                       _cell(theme, '${e.key + 1}'),
                       _cell(theme, _rowDisplayName(r, lang, store)),
-                      _cell(theme, CulinaryUnits.displayName(unitRaw, lang)),
+                      _cell(theme, LocalizationService().unitLabelForLanguage(unitRaw, lang)),
                       _cell(theme, _fmt(r['total'])),
                     ],
                   );

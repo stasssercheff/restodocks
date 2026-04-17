@@ -60,6 +60,9 @@ import '../services/domain_validation_service.dart';
 import '../services/translation_service.dart';
 import '../services/inventory_download.dart';
 import '../services/trial_device_save_kinds.dart';
+import '../services/unit_system_preference_service.dart';
+import '../core/subscription_entitlements.dart';
+import '../utils/unit_converter.dart';
 
 /// Экран номенклатуры: продукты и ПФ заведения с ценами
 class NomenclatureScreen extends StatefulWidget {
@@ -76,23 +79,12 @@ enum _CatalogSort { nameAz, nameZa, priceAsc, priceDesc }
 enum _NomenclatureFilter { all, products }
 
 /// Единица измерения для отображения в номенклатуре: кг, шт, г, л и т.д. (не сырой "pcs"/"kg" из БД).
-String _unitDisplay(String? unit, String lang) {
-  const ruToId = {
-    'г': 'g',
-    'кг': 'kg',
-    'мг': 'mg',
-    'л': 'l',
-    'мл': 'ml',
-    'шт': 'pcs',
-    'штука': 'pcs',
-    'штуки': 'pcs',
-    'штук': 'pcs',
-    'грамм': 'g',
-    'килограмм': 'kg',
-  };
-  final raw = (unit ?? 'g').trim().toLowerCase();
-  final id = ruToId[raw] ?? raw;
-  return CulinaryUnits.displayName(id, lang);
+String _unitDisplay(
+  String? unit,
+  LocalizationService loc, {
+  required UnitSystem unitSystem,
+}) {
+  return UnitConverter.displayUnitLabel(unit, loc, unitSystem);
 }
 
 /// Диалог с прогрессом загрузки продуктов
@@ -386,7 +378,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
 }
 
 // Вкладки номенклатуры
-enum _NomTab { nomenclature, newProducts, iiko }
+enum _NomTab { nomenclature, newProducts, iiko, duplicates }
 
 class _NomenclatureScreenState extends State<NomenclatureScreen> {
   String _query = '';
@@ -406,11 +398,31 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   _NomTab _selectedTab = _NomTab.nomenclature;
 
   final ScrollController _scrollController = ScrollController();
+  String? _unitScopeEstablishmentId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final account = context.read<AccountManagerSupabase>();
+    final estId = account.establishment?.id;
+    if (_unitScopeEstablishmentId != estId) {
+      _unitScopeEstablishmentId = estId;
+      unawaited(context.read<UnitSystemPreferenceService>().ensureScopeSynced());
+    }
+    final lite = SubscriptionEntitlements.from(account.establishment).isLiteTier;
+    if (lite && _selectedTab == _NomTab.iiko) {
+      setState(() => _selectedTab = _NomTab.nomenclature);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureLoaded());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await context.read<UnitSystemPreferenceService>().ensureScopeSynced();
+      if (!mounted) return;
+      await _ensureLoaded();
+    });
   }
 
   @override
@@ -1281,6 +1293,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   String _buildProductSubtitle(BuildContext context, Product p,
       ProductStoreSupabase store, String estId, LocalizationService loc) {
     final loc = context.read<LocalizationService>();
+    final unitPrefs = context.read<UnitSystemPreferenceService>();
     final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
     final rawPrice = establishmentPrice?.$1;
     final accountManager = context.read<AccountManagerSupabase>();
@@ -1296,13 +1309,19 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (rawPrice != null) {
       final unit = (p.unit ?? 'g').trim().toLowerCase();
       if (unit == 'g' || unit == 'грамм' || unit == 'kg' || unit == 'кг') {
-        priceText = loc
-            .t('price_per_kg')
-            .replaceFirst('%s', NumberFormatUtils.formatInt(rawPrice))
-            .replaceFirst('%s', currencySymbol);
+        if (unitPrefs.isImperial) {
+          final perLb = rawPrice * 0.453592;
+          priceText =
+              '${NumberFormatUtils.formatInt(perLb)} $currencySymbol/${loc.unitLabel('lb')}';
+        } else {
+          priceText = loc
+              .t('price_per_kg')
+              .replaceFirst('%s', NumberFormatUtils.formatInt(rawPrice))
+              .replaceFirst('%s', currencySymbol);
+        }
       } else {
         priceText =
-            '${NumberFormatUtils.formatInt(rawPrice)} $currencySymbol/${_unitDisplay(p.unit, loc.currentLanguageCode)}';
+            '${NumberFormatUtils.formatInt(rawPrice)} $currencySymbol/${_unitDisplay(p.unit, loc, unitSystem: unitPrefs.unitSystem)}';
       }
     } else {
       priceText = loc.t('price_not_set');
@@ -1510,6 +1529,49 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
   }
 
+  Widget _buildDuplicatesTabBody(LocalizationService loc, bool canEdit) {
+    final scheme = Theme.of(context).colorScheme;
+    final ent = SubscriptionEntitlements.from(
+        context.read<AccountManagerSupabase>().establishment);
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.find_replace_outlined, size: 56, color: scheme.primary),
+            const SizedBox(height: 16),
+            Text(
+              loc.t('duplicates_title'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              loc.t('nomenclature_duplicates_tab_intro'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 28),
+            FilledButton.icon(
+              onPressed: canEdit ? () => _showDuplicates() : null,
+              icon: const Icon(Icons.search),
+              label: Text(loc.t('tooltip_show_duplicates')),
+            ),
+            if (ent.hasProLevelOrTrial) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: canEdit ? () => _showDuplicatesWithAI() : null,
+                icon: const Icon(Icons.auto_awesome),
+                label: Text(loc.t('duplicates_search_ai')),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _tabChip(_NomTab tab, String label) {
     final isSelected = _selectedTab == tab;
     final scheme = Theme.of(context).colorScheme;
@@ -1528,6 +1590,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final loc = context.watch<LocalizationService>();
     final store = context.watch<ProductStoreSupabase>();
     final account = context.watch<AccountManagerSupabase>();
+    final unitPrefs = context.watch<UnitSystemPreferenceService>();
     final est = account.establishment;
     // Филиал: работа с номенклатурой и ценами по id филиала (головное — dataEstablishmentId).
     final estId =
@@ -1600,9 +1663,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     final iikoStore = context.watch<IikoProductStore>();
     final estId2 = account.dataEstablishmentId ?? '';
-
-    final canCreateProduct = (_selectedTab == _NomTab.nomenclature ||
-        _selectedTab == _NomTab.newProducts);
+    final nomEnt = SubscriptionEntitlements.from(est);
+    final showIikoTab = !nomEnt.isLiteTier &&
+        widget.department != 'hall' &&
+        widget.department != 'dining_room';
 
     return Scaffold(
       appBar: AppBar(
@@ -1649,11 +1713,6 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               onPressed: () => _importNomenclatureExcel(loc),
               tooltip: loc.t('nomenclature_excel_import_tooltip'),
             ),
-            IconButton(
-              icon: const Icon(Icons.warning),
-              onPressed: () => _showDuplicates(),
-              tooltip: loc.t('tooltip_show_duplicates'),
-            ),
             PopupMenuButton<String>(
               tooltip: loc.t('add'),
               icon: const Icon(Icons.add),
@@ -1669,6 +1728,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               },
               itemBuilder: (ctx) {
                 final accent = Theme.of(ctx).colorScheme.primary;
+                final uploadAllowed = !nomEnt.isLiteTier;
                 return [
                   PopupMenuItem(
                     value: 'create',
@@ -1683,30 +1743,69 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                       ],
                     ),
                   ),
-                  PopupMenuItem(
-                    value: 'upload',
-                    child: Row(
-                      children: [
-                        Icon(Icons.upload_file, size: 20, color: accent),
-                        const SizedBox(width: 10),
-                        Text(
-                          loc.t('upload_products'),
-                          style: TextStyle(color: accent, fontWeight: FontWeight.w500),
-                        ),
-                      ],
+                  if (uploadAllowed)
+                    PopupMenuItem(
+                      value: 'upload',
+                      child: Row(
+                        children: [
+                          Icon(Icons.upload_file, size: 20, color: accent),
+                          const SizedBox(width: 10),
+                          Text(
+                            loc.t('upload_products'),
+                            style: TextStyle(
+                                color: accent, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
                     ),
+                ];
+              },
+            ),
+          ],
+          if (account.establishment != null)
+            PopupMenuButton<String>(
+              tooltip: loc.t('nomenclature_display_settings_tooltip'),
+              icon: const Icon(Icons.tune),
+              onSelected: (v) async {
+                if (v == 'currency') {
+                  _showCurrencyDialog(context, loc, account, store);
+                  return;
+                }
+                if (v == 'metric') {
+                  await unitPrefs.setUnitSystem(UnitSystem.metric);
+                  return;
+                }
+                if (v == 'imperial') {
+                  await unitPrefs.setUnitSystem(UnitSystem.imperial);
+                }
+              },
+              itemBuilder: (ctx) {
+                final accent = Theme.of(ctx).colorScheme.primary;
+                return [
+                  PopupMenuItem<String>(
+                    value: 'currency',
+                    child: ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading:
+                          Icon(Icons.attach_money, size: 22, color: accent),
+                      title: Text(loc.t('nomenclature_settings_menu_currency')),
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  CheckedPopupMenuItem<String>(
+                    value: 'metric',
+                    checked: !unitPrefs.isImperial,
+                    child: Text(loc.t('unit_system_metric')),
+                  ),
+                  CheckedPopupMenuItem<String>(
+                    value: 'imperial',
+                    checked: unitPrefs.isImperial,
+                    child: Text(loc.t('unit_system_us_imperial')),
                   ),
                 ];
               },
             ),
-            IconButton(
-              icon: const Icon(Icons.attach_money),
-              onPressed: account.establishment != null
-                  ? () => _showCurrencyDialog(context, loc, account, store)
-                  : null,
-              tooltip: loc.t('default_currency'),
-            ),
-          ],
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () async {
@@ -1737,8 +1836,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                     _tabChip(_NomTab.nomenclature, loc.t('nomenclature')),
                     const SizedBox(width: 8),
                     _tabChip(_NomTab.newProducts, loc.t('nomenclature_new')),
-                    if (widget.department != 'hall' &&
-                        widget.department != 'dining_room') ...[
+                    if (showIikoTab) ...[
                       const SizedBox(width: 8),
                       _tabChip(_NomTab.iiko, 'iiko'),
                     ],
@@ -2048,7 +2146,32 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                     establishmentId: estId2,
                     onUpload: _uploadIikoBlank,
                   ),
+
+                  // Вкладка 3: дубликаты (поиск и объединение)
+                  _buildDuplicatesTabBody(loc, canEdit),
                 ],
+              ),
+            ),
+            Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: SafeArea(
+                top: false,
+                child: Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: Theme.of(context).dividerColor),
+                    ),
+                  ),
+                  child: Center(
+                    child: _tabChip(
+                      _NomTab.duplicates,
+                      loc.t('nomenclature_tab_duplicates'),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -4443,7 +4566,12 @@ class _CatalogTab extends StatelessWidget {
                               () {
                                 final cat = _categoryLabel(p.category);
                                 final unit = _unitDisplay(
-                                    p.unit, loc.currentLanguageCode);
+                                  p.unit,
+                                  loc,
+                                  unitSystem: context
+                                      .read<UnitSystemPreferenceService>()
+                                      .unitSystem,
+                                );
                                 return cat.isEmpty ? unit : '$cat · $unit';
                               }(),
                               style: Theme.of(context).textTheme.bodySmall,
@@ -4618,6 +4746,45 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   bool _priceByPackage = false;
   List<PriceHistoryEntry> _priceHistory = [];
   bool _priceHistoryLoaded = false;
+  bool _switchingUnitSystem = false;
+
+  void _reformatWeightControllersForSystem({
+    required UnitSystem from,
+    required UnitSystem to,
+  }) {
+    final pkg = _parseNum(_packageWeightController.text);
+    if (pkg != null && pkg > 0) {
+      final canonical = UnitConverter.fromDisplay(
+        displayValue: pkg,
+        canonicalUnit: 'g',
+        system: from,
+      );
+      final shown = UnitConverter.toDisplay(
+        canonicalValue: canonical,
+        canonicalUnit: 'g',
+        system: to,
+      ).value;
+      _packageWeightController.text =
+          UnitConverter.roundUi(shown, fractionDigits: to == UnitSystem.imperial ? 2 : 0)
+              .toStringAsFixed(to == UnitSystem.imperial ? 2 : 0);
+    }
+    final gpp = _parseNum(_gramsPerPieceController.text);
+    if (gpp != null && gpp > 0) {
+      final canonical = UnitConverter.fromDisplay(
+        displayValue: gpp,
+        canonicalUnit: 'g',
+        system: from,
+      );
+      final shown = UnitConverter.toDisplay(
+        canonicalValue: canonical,
+        canonicalUnit: 'g',
+        system: to,
+      ).value;
+      _gramsPerPieceController.text =
+          UnitConverter.roundUi(shown, fractionDigits: to == UnitSystem.imperial ? 2 : 0)
+              .toStringAsFixed(to == UnitSystem.imperial ? 2 : 0);
+    }
+  }
 
   @override
   void initState() {
@@ -4671,6 +4838,13 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     } else {
       _priceHistoryLoaded = true;
     }
+    final unitPrefs = context.read<UnitSystemPreferenceService>();
+    if (unitPrefs.isImperial) {
+      _reformatWeightControllersForSystem(
+        from: UnitSystem.metric,
+        to: UnitSystem.imperial,
+      );
+    }
   }
 
   @override
@@ -4691,7 +4865,15 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   /// Расчётная цена за кг из упаковки
   double? get _computedPricePerKg {
     final pkgPrice = _parseNum(_packagePriceController.text);
-    final pkgWeight = _parseNum(_packageWeightController.text);
+    final unitPrefs = context.read<UnitSystemPreferenceService>();
+    final pkgWeightRaw = _parseNum(_packageWeightController.text);
+    final pkgWeight = pkgWeightRaw == null
+        ? null
+        : UnitConverter.fromDisplay(
+            displayValue: pkgWeightRaw,
+            canonicalUnit: 'g',
+            system: unitPrefs.unitSystem,
+          );
     if (pkgPrice != null && pkgWeight != null && pkgWeight > 0) {
       return pkgPrice / pkgWeight * 1000.0;
     }
@@ -4884,12 +5066,27 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
         : _parseNum(_priceController.text);
     final double? pkgPrice =
         _priceByPackage ? _parseNum(_packagePriceController.text) : null;
-    final double? pkgWeight =
+    final unitPrefs = context.read<UnitSystemPreferenceService>();
+    final pkgWeightInput =
         _priceByPackage ? _parseNum(_packageWeightController.text) : null;
+    final double? pkgWeight = pkgWeightInput == null
+        ? null
+        : UnitConverter.fromDisplay(
+            displayValue: pkgWeightInput,
+            canonicalUnit: 'g',
+            system: unitPrefs.unitSystem,
+          );
 
-    final gpp = CulinaryUnits.isCountable(_unit)
+    final gppInput = CulinaryUnits.isCountable(_unit)
         ? _parseNum(_gramsPerPieceController.text)
         : null;
+    final gpp = gppInput == null
+        ? null
+        : UnitConverter.fromDisplay(
+            displayValue: gppInput,
+            canonicalUnit: 'g',
+            system: unitPrefs.unitSystem,
+          );
     final acc = context.read<AccountManagerSupabase>();
     final currencyCode = _currencyCodeForSave(acc);
     final updated = widget.product.copyWith(
@@ -4962,6 +5159,13 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   @override
   Widget build(BuildContext context) {
     final account = context.watch<AccountManagerSupabase>();
+    final unitPrefs = context.watch<UnitSystemPreferenceService>();
+    final isImperial = unitPrefs.isImperial;
+    final gLabel = UnitConverter.displayUnitLabel(
+      'g',
+      widget.loc,
+      unitPrefs.unitSystem,
+    );
     final lang = widget.loc.currentLanguageCode;
     final priceDisplayCode = _currencyFollowsEstablishment
         ? (account.establishment?.defaultCurrency ?? _currency)
@@ -5008,18 +5212,41 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                 items: CulinaryUnits.all
                     .map((e) => DropdownMenuItem(
                           value: e.id,
-                          child: Text(lang == 'ru' ? e.ru : e.en),
+                          child: Text(widget.loc.unitLabel(e.id)),
                         ))
                     .toList(),
                 onChanged: (v) => setState(() => _unit = v ?? _unit),
+              ),
+              const SizedBox(height: 10),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(widget.loc.t(isImperial
+                    ? 'unit_system_dialog_title_imperial'
+                    : 'unit_system_dialog_title_metric')),
+                subtitle: Text(
+                  widget.loc.t(isImperial
+                      ? 'unit_system_weight_hint_imperial'
+                      : 'unit_system_weight_hint_metric'),
+                ),
+                value: isImperial,
+                onChanged: _switchingUnitSystem
+                    ? null
+                    : (v) async {
+                        final from = unitPrefs.unitSystem;
+                        final to = v ? UnitSystem.imperial : UnitSystem.metric;
+                        if (from == to) return;
+                        setState(() => _switchingUnitSystem = true);
+                        _reformatWeightControllersForSystem(from: from, to: to);
+                        await unitPrefs.setUnitSystem(to);
+                        if (mounted) setState(() => _switchingUnitSystem = false);
+                      },
               ),
               if (CulinaryUnits.isCountable(_unit)) ...[
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _gramsPerPieceController,
                   decoration: InputDecoration(
-                    labelText:
-                        widget.loc.t('grams_per_piece_label'),
+                    labelText: '${widget.loc.t('grams_per_piece_label')} ($gLabel)',
                     border: const OutlineInputBorder(),
                   ),
                   keyboardType:
@@ -5183,7 +5410,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                       child: TextFormField(
                         controller: _packageWeightController,
                         decoration: InputDecoration(
-                          labelText: widget.loc.t('package_weight_label'),
+                          labelText: '${widget.loc.t('package_weight_label')} ($gLabel)',
                           border: const OutlineInputBorder(),
                         ),
                         keyboardType: const TextInputType.numberWithOptions(

@@ -25,7 +25,7 @@ String _unitDisplay(String? unit, String lang) {
   };
   final u = (unit ?? 'g').trim().toLowerCase();
   final id = ruToId[u] ?? u;
-  return CulinaryUnits.displayName(id, lang);
+  return LocalizationService().unitLabelForLanguage(id, lang);
 }
 
 /// Категории списания
@@ -518,15 +518,13 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
       if (p == null) continue;
       final pricePerKg = p.computedPricePerKg ?? p.basePrice;
       if (pricePerKg == null || pricePerKg <= 0) continue;
-      final u = (r.unit).toLowerCase().replaceAll(' ', '');
-      if (u == 'g' || u == 'г') {
-        sum += (r.total / 1000) * pricePerKg;
-      } else if (u == 'kg' || u == 'кг' || u == 'l' || u == 'л' || u == 'ml' || u == 'мл') {
-        sum += r.total * pricePerKg;
-      } else if (u == 'pcs' || u == 'шт' || u == 'штуки' || u == 'штук') {
-        final perPiece = p.basePrice ?? (p.gramsPerPiece != null && p.gramsPerPiece! > 0 ? (pricePerKg * p.gramsPerPiece! / 1000) : 0);
-        sum += r.total * (perPiece);
-      }
+      final grams = CulinaryUnits.toGrams(
+        r.total,
+        r.unit,
+        gramsPerPiece: p.gramsPerPiece,
+      );
+      if (grams <= 0) continue;
+      sum += (grams / 1000.0) * pricePerKg;
     }
     return sum;
   }
@@ -967,13 +965,20 @@ class _WriteoffUnitDropdown extends StatelessWidget {
   final ThemeData theme;
   final void Function(String) onChanged;
 
-  static const List<String> _baseUnits = ['g', 'kg', 'ml', 'l'];
+  static List<String> _baseUnits(UnitSystem unitSystem) =>
+      unitSystem == UnitSystem.imperial
+          ? <String>['oz', 'lb', 'fl_oz', 'gal']
+          : <String>['g', 'kg', 'ml', 'l'];
 
-  static List<String> _allowedUnits(_WriteoffRow r) {
-    if (r.techCard != null) return ['pcs', 'g', 'kg']; // ТТК — порции, можно взвесить
+  static List<String> _allowedUnits(_WriteoffRow r, UnitSystem unitSystem) {
+    if (r.techCard != null) {
+      return unitSystem == UnitSystem.imperial
+          ? ['pcs', 'oz', 'lb']
+          : ['pcs', 'g', 'kg'];
+    } // ТТК — порции, можно взвесить
     final p = r.product;
-    if (p == null) return _baseUnits;
-    final options = List<String>.from(_baseUnits);
+    if (p == null) return _baseUnits(unitSystem);
+    final options = List<String>.from(_baseUnits(unitSystem));
     final hasGpp = p.gramsPerPiece != null && p.gramsPerPiece! > 0;
     if (hasGpp) options.add('pcs'); // без дублей
     final hasPkg = p.packageWeightGrams != null && p.packageWeightGrams! > 0;
@@ -986,7 +991,8 @@ class _WriteoffUnitDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final options = _allowedUnits(row);
+    final unitPrefs = context.watch<UnitSystemPreferenceService>();
+    final options = _allowedUnits(row, unitPrefs.unitSystem);
     final current = row.unit.trim().toLowerCase();
     final match = options.where((u) => u.toLowerCase() == current).firstOrNull;
     final displayValue = match ?? options.first;

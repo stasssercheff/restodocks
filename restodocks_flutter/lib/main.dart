@@ -182,6 +182,7 @@ Future<void> _bootstrapApp() async {
     HomeButtonConfigService().initialize(),
     OwnerViewPreferenceService().initialize(),
     ScreenLayoutPreferenceService().initialize(),
+    UnitSystemPreferenceService().initialize(),
     MobileUiScaleService().initialize(),
     PosOrdersDisplaySettingsService().initialize(),
   ]);

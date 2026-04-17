@@ -58,6 +58,15 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
 
   /// Единица для нового пункта
   String _newItemUnit = 'kg';
+  List<String> _unitOptions(UnitSystem unitSystem) {
+    final base = unitSystem == UnitSystem.imperial
+        ? <String>['oz', 'lb', 'fl_oz', 'gal']
+        : <String>['g', 'kg', 'ml', 'l'];
+    return [...base, 'pcs'];
+  }
+
+  String _defaultUnit(UnitSystem unitSystem) =>
+      unitSystem == UnitSystem.imperial ? 'lb' : 'kg';
   List<Employee> _employees = [];
 
   /// null или пусто = всем
@@ -643,9 +652,10 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   void _showQuantityDialog({required String title, String? techCardId}) {
     final loc = context.read<LocalizationService>();
     final lang = loc.currentLanguageCode;
+    final unitPrefs = context.read<UnitSystemPreferenceService>();
     final qtyCtrl = TextEditingController();
-    String selectedUnit = 'kg';
-    final units = CulinaryUnits.all.map((u) => u.id).toList();
+    final units = _unitOptions(unitPrefs.unitSystem);
+    String selectedUnit = _defaultUnit(unitPrefs.unitSystem);
 
     showDialog<void>(
       context: context,
@@ -689,7 +699,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                       items: units
                           .map((u) => DropdownMenuItem(
                               value: u,
-                              child: Text(CulinaryUnits.displayName(u, lang))))
+                              child: Text(LocalizationService().unitLabelForLanguage(u, lang))))
                           .toList(),
                       onChanged: (v) {
                         if (v != null) setInner(() => selectedUnit = v);
@@ -736,12 +746,15 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
   void _editItemQuantity(int index) {
     final loc = context.read<LocalizationService>();
     final lang = loc.currentLanguageCode;
+    final unitPrefs = context.read<UnitSystemPreferenceService>();
     final item = _items[index];
     final qtyCtrl =
         TextEditingController(text: item.targetQuantity?.toString() ?? '');
-    final units = CulinaryUnits.all.map((u) => u.id).toList();
-    String selectedUnit = item.targetUnit ?? 'kg';
-    if (!units.contains(selectedUnit)) selectedUnit = 'kg';
+    final units = _unitOptions(unitPrefs.unitSystem);
+    String selectedUnit = item.targetUnit ?? _defaultUnit(unitPrefs.unitSystem);
+    if (!units.contains(selectedUnit)) {
+      selectedUnit = _defaultUnit(unitPrefs.unitSystem);
+    }
 
     showDialog<void>(
       context: context,
@@ -779,7 +792,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                       items: units
                           .map((u) => DropdownMenuItem(
                               value: u,
-                              child: Text(CulinaryUnits.displayName(u, lang))))
+                              child: Text(LocalizationService().unitLabelForLanguage(u, lang))))
                           .toList(),
                       onChanged: (v) {
                         if (v != null) setInner(() => selectedUnit = v);
@@ -2067,7 +2080,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                             ? it.targetQuantity!.toInt().toString()
                             : it.targetQuantity!.toStringAsFixed(1);
                         final unit = it.targetUnit?.isNotEmpty == true
-                            ? ' ${CulinaryUnits.displayName(it.targetUnit!, lang)}'
+                            ? ' ${LocalizationService().unitLabelForLanguage(it.targetUnit!, lang)}'
                             : '';
                         localizedQuantityLabel = '$qty$unit';
                       }

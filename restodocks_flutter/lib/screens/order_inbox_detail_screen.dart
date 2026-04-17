@@ -620,7 +620,7 @@ class _OrderInboxDetailScreenState extends State<OrderInboxDetailScreen> {
                         _cell(theme, _getItemName(item)),
                         _cell(
                             theme,
-                            CulinaryUnits.displayName(
+                            loc.unitLabelForLanguage(
                                 (item['unit'] ?? '').toString(),
                                 loc.currentLanguageCode)),
                         _cell(theme, _fmtNum(item['quantity'])),

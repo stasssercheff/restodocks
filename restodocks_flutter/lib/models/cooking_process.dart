@@ -99,6 +99,19 @@ class CookingProcess extends Equatable {
   /// Предопределенные процессы приготовления
   /// Дефолтные weightLossPercentage должны совпадать с SQL `public._default_cooking_loss_rows()` (миграция seed глобальных % ужарки).
   static List<CookingProcess> get defaultProcesses => [
+    // Смешивание (соусы, заправки и т.п.) — UI: ключ `cooking_process_mixing` в localizable.json
+    CookingProcess(
+      id: 'mixing',
+      name: 'Mixing',
+      localizedNames: {},
+      calorieMultiplier: 1.0,
+      proteinMultiplier: 1.0,
+      fatMultiplier: 1.0,
+      carbsMultiplier: 1.0,
+      weightLossPercentage: 0.0,
+      applicableCategories: ['all'],
+    ),
+
     // Варка
     CookingProcess(
       id: 'boiling',

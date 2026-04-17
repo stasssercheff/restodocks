@@ -1204,41 +1204,60 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
   }
 
   Widget _buildCookingMethodCell(TTIngredient ingredient, int rowIndex) {
+    String? cookingMethodDropdownValue(TTIngredient ing) {
+      if (ing.cookingProcessId == 'custom') return 'mixing';
+      if (ing.cookingProcessId == null && ing.cookingProcessName != null) {
+        final n = ing.cookingProcessName!.trim();
+        if (n == 'Свой вариант' ||
+            n == widget.loc.t('cooking_custom') ||
+            n == widget.loc.t('cooking_method_custom')) {
+          return 'mixing';
+        }
+      }
+      return ing.cookingProcessId;
+    }
+
     return Container(
       child: widget.canEdit
-          ? DropdownButton<String>(
+          ? DropdownButton<String?>(
               isExpanded: true,
               hint: Text(widget.loc.t('ttk_cooking_method'),
                   style: const TextStyle(fontSize: 12)),
-              value: ingredient.cookingProcessId ?? (ingredient.cookingProcessName == 'Свой вариант' ? 'custom' : null),
+              value: cookingMethodDropdownValue(ingredient),
               items: [
-                DropdownMenuItem<String>(
-                  value: 'custom',
-                  child: Text(widget.loc.t('cooking_method_custom'),
+                DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text(widget.loc.t('dash'),
                       style: const TextStyle(fontSize: 12)),
                 ),
                 ...CookingProcess.defaultProcesses.map((process) {
-                  return DropdownMenuItem<String>(
+                  return DropdownMenuItem<String?>(
                     value: process.id,
-                    child: Text(process.getLocalizedName(widget.loc.currentLanguageCode), style: const TextStyle(fontSize: 12)),
+                    child: Text(widget.loc.cookingProcessLabel(process),
+                        style: const TextStyle(fontSize: 12)),
                   );
                 }),
               ],
               onChanged: (processId) {
-                if (processId == 'custom') {
-                  // Для "своего варианта" очищаем cookingProcessId и cookingProcessName
-                  _updateIngredient(rowIndex, ingredient.copyWith(
-                    cookingProcessId: null,
-                    cookingProcessName: 'Свой вариант',
-                  ));
-                } else {
-                  final process = CookingProcess.defaultProcesses.firstWhere((p) => p.id == processId);
-                  _updateIngredient(rowIndex, ingredient.copyWith(
-                    cookingProcessId: processId,
-                    cookingProcessName: process.getLocalizedName(widget.loc.currentLanguageCode),
-                  ));
-                  widget.onSuggestCookingLoss?.call(rowIndex);
+                if (processId == null) {
+                  _updateIngredient(
+                      rowIndex,
+                      ingredient.copyWith(
+                        cookingProcessId: null,
+                        cookingProcessName: null,
+                      ));
+                  return;
                 }
+                final process = CookingProcess.defaultProcesses
+                    .firstWhere((p) => p.id == processId);
+                _updateIngredient(
+                    rowIndex,
+                    ingredient.copyWith(
+                      cookingProcessId: processId,
+                      cookingProcessName:
+                          widget.loc.cookingProcessLabel(process),
+                    ));
+                widget.onSuggestCookingLoss?.call(rowIndex);
               },
               underline: const SizedBox(),
               icon: const Icon(Icons.arrow_drop_down, size: 16),
@@ -1246,9 +1265,16 @@ class _ExcelStyleTtkTableState extends State<ExcelStyleTtkTable> {
             )
           : Center(
               child: Text(
-                ingredient.cookingProcessId != null
-                    ? CookingProcess.findById(ingredient.cookingProcessId!)?.getLocalizedName(widget.loc.currentLanguageCode) ?? ingredient.cookingProcessName ?? ''
-                    : ingredient.cookingProcessName ?? '',
+                () {
+                  final id = ingredient.cookingProcessId;
+                  if (id != null) {
+                    final p = CookingProcess.findById(id);
+                    if (p != null) {
+                      return widget.loc.cookingProcessLabel(p);
+                    }
+                  }
+                  return ingredient.cookingProcessName ?? '';
+                }(),
                 style: const TextStyle(fontSize: 12),
                 textAlign: TextAlign.center,
               ),

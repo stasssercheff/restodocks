@@ -4,6 +4,7 @@ import 'package:json_annotation/json_annotation.dart';
 import 'product.dart';
 import 'cooking_process.dart';
 import 'culinary_units.dart';
+import '../services/localization_service.dart';
 import '../services/product_store_supabase.dart';
 
 part 'tt_ingredient.g.dart';
@@ -575,7 +576,7 @@ class TTIngredient extends Equatable {
   String netWeightDisplay(String lang) => '${netWeight.toStringAsFixed(0)} г';
 
   String _formatWithUnit(double v, String u, String lang) {
-    final label = CulinaryUnits.displayName(u, lang);
+    final label = LocalizationService().unitLabelForLanguage(u, lang);
     if (u == 'pcs' || u == 'шт') return '${v.toStringAsFixed(v == v.truncateToDouble() ? 0 : 1)} $label';
     if (u == 'g' || u == 'г') return '${v.toStringAsFixed(0)} $label';
     if (u == 'kg' || u == 'кг') return '${v.toStringAsFixed(2)} $label';

@@ -17,6 +17,7 @@ import '../models/employee_direct_message.dart';
 import '../models/employee_message_system_link.dart';
 import '../services/services.dart';
 import '../utils/chat_system_link_paths.dart';
+import '../utils/employee_display_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 import '../widgets/chat_system_link_picker_sheet.dart';
 import '../widgets/chat_voice_player.dart';
@@ -447,10 +448,15 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
     final acc = context.watch<AccountManagerSupabase>();
+    final layoutPrefs = context.watch<ScreenLayoutPreferenceService>();
     final ent = SubscriptionEntitlements.from(acc.establishment);
     final liteChatTextOnly = ent.isLiteTier;
     final canUseChatSystemLinks = ent.canUseChatSystemLinks;
-    final otherName = _otherEmployee?.fullName ?? widget.otherEmployeeId;
+    final useTranslit =
+        loc.currentLanguageCode != 'ru' || layoutPrefs.showNameTranslit;
+    final otherName = _otherEmployee != null
+        ? employeeDisplayName(_otherEmployee!, translit: useTranslit)
+        : (loc.t('messages'));
 
     return Scaffold(
       appBar: AppBar(

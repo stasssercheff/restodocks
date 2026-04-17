@@ -40,10 +40,15 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
 
   bool _saving = false;
 
-  static const _unitIds = ['g', 'kg', 'ml', 'l', 'pcs', 'pack', 'can', 'box'];
+  static List<String> _unitIds(UnitSystem unitSystem) {
+    final base = unitSystem == UnitSystem.imperial
+        ? <String>['oz', 'lb', 'fl_oz', 'gal']
+        : <String>['g', 'kg', 'ml', 'l'];
+    return [...base, 'pcs', 'pack', 'can', 'box'];
+  }
 
   static String _unitLabel(String unitId, String lang) =>
-      CulinaryUnits.displayName(unitId, lang);
+      LocalizationService().unitLabelForLanguage(unitId, lang);
 
   @override
   void initState() {
@@ -365,6 +370,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final unitPrefs = context.watch<UnitSystemPreferenceService>();
     final lang = loc.currentLanguageCode;
     final mq = MediaQuery.of(context);
     final narrowPhone = mq.size.shortestSide < 600;
@@ -500,6 +506,10 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                         ..._filteredItemEntries(lang).map((e) {
                           final i = e.key;
                           final item = e.value;
+                          final allowedUnits = _unitIds(unitPrefs.unitSystem);
+                          final selectedUnit = allowedUnits.contains(item.unit)
+                              ? item.unit
+                              : allowedUnits.first;
                           return TableRow(
                             children: [
                               Padding(
@@ -512,10 +522,10 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 4, vertical: 4),
                                 child: DropdownButton<String>(
-                                  value: item.unit,
+                                  value: selectedUnit,
                                   isDense: true,
                                   isExpanded: true,
-                                  items: _unitIds
+                                  items: allowedUnits
                                       .map((id) => DropdownMenuItem(
                                             value: id,
                                             child: Text(

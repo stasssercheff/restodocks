@@ -713,7 +713,9 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                         border: const OutlineInputBorder(),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         // Показываем единицу измерения "рядом" с числом в той же колонке.
-                        suffixText: it.targetUnit?.isNotEmpty == true ? ' ${it.targetUnit!}' : null,
+                        suffixText: it.targetUnit?.isNotEmpty == true
+                            ? ' ${LocalizationService().unitLabelForLanguage(it.targetUnit!, context.read<LocalizationService>().currentLanguageCode)}'
+                            : null,
                       ),
                       style: const TextStyle(fontSize: 12),
                       onChanged: (v) {

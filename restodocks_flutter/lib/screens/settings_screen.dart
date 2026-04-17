@@ -60,6 +60,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final acc = context.read<AccountManagerSupabase>();
       final est = acc.establishment;
+      unawaited(context.read<UnitSystemPreferenceService>().ensureScopeSynced());
       if (est != null) context.read<HaccpConfigService>().load(est.id);
       // Отключение промо в админке / срок — сервер меняет тариф в check_establishment_access;
       // при открытии настроек подтягиваем актуальное заведение без ожидания resume/таймера.
@@ -2328,6 +2329,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (dark) => themeService
                     .setThemeMode(dark ? ThemeMode.dark : ThemeMode.light),
               ),
+            ),
+            Consumer<UnitSystemPreferenceService>(
+              builder: (_, unitPrefs, __) {
+                final isImperial = unitPrefs.isImperial;
+                final isRu = localization.currentLanguageCode == 'ru';
+                final title = isRu ? 'Система единиц' : 'Unit system';
+                final subtitle = isRu
+                    ? (isImperial ? 'US Imperial' : 'Metric')
+                    : (isImperial ? 'US Imperial' : 'Metric');
+                return SwitchListTile(
+                  secondary: const Icon(Icons.straighten),
+                  title: Text(title),
+                  subtitle: Text(subtitle),
+                  value: isImperial,
+                  onChanged: (v) => unitPrefs
+                      .setUnitSystem(v ? UnitSystem.imperial : UnitSystem.metric),
+                );
+              },
             ),
             // Валюта заведения — только у владельца и шеф-повара в настройках
             if (currentEmployee.hasRole('owner') ||
