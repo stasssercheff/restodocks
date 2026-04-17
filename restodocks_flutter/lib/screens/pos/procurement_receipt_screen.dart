@@ -9,7 +9,6 @@ import 'package:uuid/uuid.dart';
 
 import '../../models/models.dart';
 import '../../services/services.dart';
-import '../../services/unit_system_preference_service.dart';
 import '../../utils/order_list_units.dart';
 import '../../utils/supplier_contact_validation.dart';
 import '../../widgets/app_bar_home_button.dart';
@@ -1084,7 +1083,11 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
     );
   }
 
-  Widget _buildReceiptTable(LocalizationService loc, String currency) {
+  Widget _buildReceiptTable(
+    LocalizationService loc,
+    UnitSystemPreferenceService unitPrefs,
+    String currency,
+  ) {
     final thStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
           fontWeight: FontWeight.w600,
         );
@@ -1575,7 +1578,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
             child: SingleChildScrollView(
               keyboardDismissBehavior:
                   ScrollViewKeyboardDismissBehavior.onDrag,
-              child: _buildReceiptTable(loc, currency),
+              child: _buildReceiptTable(loc, unitPrefs, currency),
             ),
           ),
           AnimatedPadding(
