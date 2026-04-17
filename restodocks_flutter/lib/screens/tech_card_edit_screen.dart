@@ -4312,7 +4312,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                       ...processes.map((proc) => DropdownMenuItem(
                             value: proc,
                             child: Text(
-                                '${proc.getLocalizedName(lang)} (−${proc.weightLossPercentage.toStringAsFixed(0)}%)'),
+                                '${loc.cookingProcessLabel(proc)} (−${proc.weightLossPercentage.toStringAsFixed(0)}%)'),
                           )),
                     ],
                     onChanged: (v) => setStateDlg(() {
@@ -6958,7 +6958,9 @@ class _TtkTableState extends State<_TtkTable> {
                                 padding: _cellPad,
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<String?>(
-                                    value: ing.cookingProcessId,
+                                    value: ing.cookingProcessId == 'custom'
+                                        ? 'mixing'
+                                        : ing.cookingProcessId,
                                     isDense: true,
                                     isExpanded: true,
                                     items: product != null
@@ -6971,8 +6973,8 @@ class _TtkTableState extends State<_TtkTable> {
                                                 .map((p) => DropdownMenuItem(
                                                       value: p.id,
                                                       child: Text(
-                                                          p.getLocalizedName(
-                                                              lang),
+                                                          loc.cookingProcessLabel(
+                                                              p),
                                                           overflow: TextOverflow
                                                               .ellipsis),
                                                     )),
@@ -6984,17 +6986,11 @@ class _TtkTableState extends State<_TtkTable> {
                                                 .map((p) => DropdownMenuItem(
                                                       value: p.id,
                                                       child: Text(
-                                                          p.getLocalizedName(
-                                                              lang),
+                                                          loc.cookingProcessLabel(
+                                                              p),
                                                           overflow: TextOverflow
                                                               .ellipsis),
                                                     )),
-                                            DropdownMenuItem(
-                                                value: 'custom',
-                                                child: Text(
-                                                    loc.t('cooking_custom'),
-                                                    overflow:
-                                                        TextOverflow.ellipsis)),
                                           ],
                                     onChanged: (id) {
                                       if (id == null) {
@@ -7003,13 +6999,6 @@ class _TtkTableState extends State<_TtkTable> {
                                             ing.copyWith(
                                                 cookingProcessId: null,
                                                 cookingProcessName: null));
-                                      } else if (id == 'custom') {
-                                        widget.onUpdate(
-                                            i,
-                                            ing.copyWith(
-                                                cookingProcessId: 'custom',
-                                                cookingProcessName:
-                                                    loc.t('cooking_custom')));
                                       } else {
                                         final p = CookingProcess.findById(id);
                                         if (p != null) {
@@ -7018,7 +7007,7 @@ class _TtkTableState extends State<_TtkTable> {
                                               ing.copyWith(
                                                 cookingProcessId: p.id,
                                                 cookingProcessName:
-                                                    p.getLocalizedName(lang),
+                                                    loc.cookingProcessLabel(p),
                                               ));
                                         }
                                       }
@@ -8352,7 +8341,7 @@ class _ProductPickerState extends State<_ProductPicker> {
                       ...processes.map((proc) => DropdownMenuItem(
                             value: proc,
                             child: Text(
-                                '${proc.getLocalizedName(lang)} (−${proc.weightLossPercentage.toStringAsFixed(0)}%)'),
+                                '${loc.cookingProcessLabel(proc)} (−${proc.weightLossPercentage.toStringAsFixed(0)}%)'),
                           )),
                     ],
                     onChanged: (v) => setStateDlg(() {

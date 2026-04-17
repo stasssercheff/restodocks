@@ -5,6 +5,7 @@ import '../utils/cyrillic_transliteration.dart';
 import '../utils/dev_log.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/cooking_process.dart';
 import '../models/culinary_units.dart';
 import '../models/employee.dart';
 import '../models/translation.dart';
@@ -488,6 +489,13 @@ class LocalizationService extends ChangeNotifier {
       default:
         return CulinaryUnits.baseDisplayName(id, languageCode);
     }
+  }
+
+  /// Подпись способа приготовления: ключ `cooking_process_{id}` из JSON, иначе [CookingProcess.getLocalizedName].
+  String cookingProcessLabel(CookingProcess process) {
+    final key = 'cooking_process_${process.id}';
+    final out = t(key);
+    return out == key ? process.getLocalizedName(currentLanguageCode) : out;
   }
 
   /// Отображаемое название должности по коду (role_bar_manager → «Барменеджер»).
