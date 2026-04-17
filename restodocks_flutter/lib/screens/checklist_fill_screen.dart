@@ -17,11 +17,20 @@ import '../mixins/input_change_listener_mixin.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Просмотр ТТК из пункта чеклиста: `view=1` и при необходимости `targetOutputG` (г) для пересчёта «итого выход».
-String checklistItemTechCardViewRoute(ChecklistItem item) {
+String checklistItemTechCardViewRoute(
+  ChecklistItem item, {
+  String? quantityOverride,
+}) {
   final id = item.techCardId?.trim();
   if (id == null || id.isEmpty) return '';
   final q = <String, String>{'view': '1'};
-  final qty = item.targetQuantity;
+  double? qty;
+  final rawOverride = quantityOverride?.trim();
+  if (rawOverride != null && rawOverride.isNotEmpty) {
+    final normalized = rawOverride.replaceAll(',', '.');
+    qty = double.tryParse(normalized);
+  }
+  qty ??= item.targetQuantity;
   if (qty != null && qty > 0) {
     final unit = (item.targetUnit != null && item.targetUnit!.trim().isNotEmpty)
         ? item.targetUnit!.trim()
@@ -301,12 +310,6 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
           .where((e) => e.hasRole('executive_chef') || e.hasRole('sous_chef'))
           .map((e) => e.id)
           .toList();
-      if (chefIds.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.t('checklist_no_chefs'))),
-        );
-        return;
-      }
       final subSvc = context.read<ChecklistSubmissionService>();
       await subSvc.submit(
         establishmentId: est.id,
@@ -316,7 +319,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
         checklistName: c.name,
         additionalName: c.additionalName,
         section: c.effectiveSectionIds.isEmpty ? null : c.effectiveSectionIds.first,
-        recipientChefIds: chefIds,
+        recipientChefIds: chefIds.isNotEmpty ? chefIds : null,
         startTime: _startTime,
         endTime: _endTime,
         department: emp.department,
@@ -632,8 +635,13 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                 children: [
                   if (allowRichContent && it.techCardId != null)
                     InkWell(
-                      onTap: () =>
-                          context.push(checklistItemTechCardViewRoute(it)),
+                      onTap: () => context.push(
+                        checklistItemTechCardViewRoute(
+                          it,
+                          quantityOverride:
+                              i < _numericValues.length ? _numericValues[i] : null,
+                        ),
+                      ),
                       child: Row(
                         children: [
                           Icon(Icons.link, size: 16, color: Theme.of(context).colorScheme.primary),

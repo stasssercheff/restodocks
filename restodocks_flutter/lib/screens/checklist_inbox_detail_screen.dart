@@ -7,6 +7,7 @@ import '../models/models.dart';
 import '../services/services.dart';
 import '../services/inbox_viewed_service.dart';
 import '../widgets/app_bar_home_button.dart';
+import 'checklist_fill_screen.dart';
 
 /// Просмотр отправленного чеклиста из входящих.
 class ChecklistInboxDetailScreen extends StatefulWidget {
@@ -235,6 +236,8 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
               final numericValue = itemData['numericValue']?.toString();
               final dropdownValue = itemData['dropdownValue']?.toString();
               final imageUrl = itemData['imageUrl']?.toString().trim();
+              final targetQuantity = itemData['targetQuantity'];
+              final targetUnit = itemData['targetUnit']?.toString();
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
@@ -254,7 +257,17 @@ class _ChecklistInboxDetailScreenState extends State<ChecklistInboxDetailScreen>
                   ),
                   title: techCardId != null && techCardId.isNotEmpty
                       ? InkWell(
-                          onTap: () => context.push('/tech-cards/$techCardId'),
+                          onTap: () => context.push(
+                            checklistItemTechCardViewRoute(
+                              ChecklistItem.template(
+                                title: displayTitle,
+                                techCardId: techCardId,
+                                targetQuantity: (targetQuantity as num?)?.toDouble(),
+                                targetUnit: targetUnit,
+                              ),
+                              quantityOverride: numericValue,
+                            ),
+                          ),
                           child: Row(
                             children: [
                               Icon(Icons.link, size: 16, color: Theme.of(context).colorScheme.primary),

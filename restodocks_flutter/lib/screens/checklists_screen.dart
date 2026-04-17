@@ -23,10 +23,12 @@ class ChecklistsScreen extends StatefulWidget {
 }
 
 class _ChecklistsScreenState extends State<ChecklistsScreen> {
-  List<Checklist> _list = [];
+  List<Checklist> _activeList = [];
+  List<Checklist> _archivedList = [];
   List<Employee> _employees = [];
   bool _loading = true;
   String? _error;
+  bool _showArchive = false;
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -42,7 +44,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
 
     try {
       final translationSvc = context.read<TranslationService>();
-      for (final c in _list) {
+      for (final c in [..._activeList, ..._archivedList]) {
         final text = c.name.trim().isNotEmpty ? c.name : (c.additionalName?.trim().isNotEmpty == true ? c.additionalName! : '');
         if (text.isEmpty) continue;
         final translated = await translationSvc.translate(
@@ -72,10 +74,10 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
   }
 
   /// Совпадение поиска по исходному названию, переводу и (при транслите) латинице.
-  List<Checklist> _filterChecklists(bool useTranslit) {
-    if (_searchQuery.isEmpty) return _list;
+  List<Checklist> _filterChecklists(List<Checklist> source, bool useTranslit) {
+    if (_searchQuery.isEmpty) return source;
     final q = _searchQuery;
-    return _list.where((c) {
+    return source.where((c) {
       final raw = (c.name.trim().isNotEmpty ? c.name : c.additionalName ?? '').toLowerCase();
       if (raw.contains(q)) return true;
       final tr = _translatedNames[c.id]?.toLowerCase();
@@ -119,10 +121,27 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       final visibleList = isUltra
           ? list
           : list.where((c) => c.type != ChecklistType.prep).toList();
+      final submissions =
+          await ChecklistSubmissionService().listForEstablishment(est.id);
+      final submittedChecklistIds =
+          submissions.map((s) => s.checklistId).toSet();
+      final archived = <Checklist>[];
+      final active = <Checklist>[];
+      for (final c in visibleList) {
+        final isRecurring = c.reminderConfig?.recurrenceEnabled == true;
+        final isCompletedOnce = submittedChecklistIds.contains(c.id);
+        if (!isRecurring && isCompletedOnce) {
+          archived.add(c);
+        } else {
+          active.add(c);
+        }
+      }
       final emps = await acc.getEmployeesForEstablishment(est.id);
       if (mounted) {
         setState(() {
-          _list = visibleList;
+          _activeList = active;
+          _archivedList = archived;
+          if (_showArchive && _archivedList.isEmpty) _showArchive = false;
           _employees = emps;
           _loading = false;
         });
@@ -220,6 +239,28 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       ),
       body: Column(
         children: [
+          if (canEdit)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: SegmentedButton<bool>(
+                segments: [
+                  ButtonSegment<bool>(
+                    value: false,
+                    label: Text(loc.t('checklists') ?? 'Чеклисты'),
+                    icon: const Icon(Icons.list_alt),
+                  ),
+                  ButtonSegment<bool>(
+                    value: true,
+                    label: Text(loc.t('archive') ?? 'Архив'),
+                    icon: const Icon(Icons.archive_outlined),
+                  ),
+                ],
+                selected: {_showArchive},
+                onSelectionChanged: (v) {
+                  setState(() => _showArchive = v.first);
+                },
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: TextField(
@@ -371,7 +412,8 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
         ),
       );
     }
-    if (_list.isEmpty) {
+    final sourceList = _showArchive ? _archivedList : _activeList;
+    if (sourceList.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -381,13 +423,18 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
               Icon(Icons.checklist, size: 64, color: Colors.grey[400]),
               const SizedBox(height: 16),
               Text(
-                loc.t('no_checklists'),
+                _showArchive
+                    ? (loc.t('checklist_archive_empty') ?? 'Архив пуст')
+                    : loc.t('no_checklists'),
                 style: Theme.of(context).textTheme.titleLarge,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
-                loc.t('no_checklists_hint'),
+                _showArchive
+                    ? (loc.t('checklist_archive_empty_hint') ??
+                        'Завершенные неповторяющиеся чеклисты появятся здесь')
+                    : loc.t('no_checklists_hint'),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.grey[600],
                     ),
@@ -406,7 +453,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
         ),
       );
     }
-    final filtered = _filterChecklists(useTranslit);
+    final filtered = _filterChecklists(sourceList, useTranslit);
     final grouped = _buildGroupedItems(loc, filtered, useTranslit);
     if (grouped.isEmpty) {
       return Center(
@@ -575,13 +622,30 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                               );
                               if (confirm == true && mounted) {
                                 final toDelete = c;
-                                setState(() => _list = _list.where((x) => x.id != toDelete.id).toList());
+                                setState(() {
+                                  _activeList =
+                                      _activeList.where((x) => x.id != toDelete.id).toList();
+                                  _archivedList =
+                                      _archivedList.where((x) => x.id != toDelete.id).toList();
+                                });
                                 AppToastService.show(loc.t('checklist_deleted') ?? 'Удалено');
                                 try {
                                   await context.read<ChecklistServiceSupabase>().deleteChecklist(toDelete.id);
                                 } catch (e) {
                                   if (mounted) {
-                                    setState(() => _list = [..._list, toDelete]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)));
+                                    setState(() {
+                                      if (_showArchive) {
+                                        _archivedList = [
+                                          ..._archivedList,
+                                          toDelete
+                                        ]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+                                      } else {
+                                        _activeList = [
+                                          ..._activeList,
+                                          toDelete
+                                        ]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+                                      }
+                                    });
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))),
                                     );
