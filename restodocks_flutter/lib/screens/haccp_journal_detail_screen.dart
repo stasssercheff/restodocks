@@ -274,9 +274,10 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                explicitOverride
-                    ? _profileSourceManual(loc.currentLanguageCode)
-                    : _profileSourceAuto(loc.currentLanguageCode),
+                HaccpCountryProfiles.profileSourceLabel(
+                  manual: explicitOverride,
+                  languageCode: loc.currentLanguageCode,
+                ),
                 style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
                       color: Theme.of(ctx).colorScheme.onSurfaceVariant,
                     ),
@@ -704,9 +705,10 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
                   child: Text(
-                    explicitOverride
-                        ? _profileSourceManual(loc.currentLanguageCode)
-                        : _profileSourceAuto(loc.currentLanguageCode),
+                    HaccpCountryProfiles.profileSourceLabel(
+                      manual: explicitOverride,
+                      languageCode: loc.currentLanguageCode,
+                    ),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
@@ -1686,43 +1688,5 @@ class _JournalTableView extends StatelessWidget {
       border: TableBorder.all(color: Colors.grey),
       children: rows,
     );
-  }
-}
-
-String _profileSourceManual(String lang) {
-  switch (lang) {
-    case 'ru':
-      return 'Источник профиля: выбран вручную';
-    case 'es':
-      return 'Origen del perfil: seleccion manual';
-    case 'fr':
-      return 'Source du profil: selection manuelle';
-    case 'it':
-      return 'Origine profilo: selezione manuale';
-    case 'de':
-      return 'Profilquelle: manuelle Auswahl';
-    case 'tr':
-      return 'Profil kaynagi: manuel secim';
-    default:
-      return 'Profile source: manual selection';
-  }
-}
-
-String _profileSourceAuto(String lang) {
-  switch (lang) {
-    case 'ru':
-      return 'Источник профиля: автоопределение';
-    case 'es':
-      return 'Origen del perfil: deteccion automatica';
-    case 'fr':
-      return 'Source du profil: detection automatique';
-    case 'it':
-      return 'Origine profilo: rilevamento automatico';
-    case 'de':
-      return 'Profilquelle: automatische Erkennung';
-    case 'tr':
-      return 'Profil kaynagi: otomatik algilama';
-    default:
-      return 'Profile source: auto-detected';
   }
 }
