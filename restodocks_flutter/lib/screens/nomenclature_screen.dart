@@ -1708,17 +1708,16 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               onPressed: () => _showNomenclatureExcelExportDialog(loc),
               tooltip: loc.t('nomenclature_excel_export_title'),
             ),
-            IconButton(
-              icon: const Icon(Icons.file_upload_outlined),
-              onPressed: () => _importNomenclatureExcel(loc),
-              tooltip: loc.t('nomenclature_excel_import_tooltip'),
-            ),
             PopupMenuButton<String>(
               tooltip: loc.t('add'),
               icon: const Icon(Icons.add),
               onSelected: (v) {
                 if (v == 'create') {
                   _showCreateProductDialog(loc);
+                  return;
+                }
+                if (v == 'import_excel') {
+                  _importNomenclatureExcel(loc);
                   return;
                 }
                 if (v == 'upload') {
@@ -1743,6 +1742,22 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                       ],
                     ),
                   ),
+                  if (uploadAllowed)
+                    PopupMenuItem(
+                      value: 'import_excel',
+                      child: Row(
+                        children: [
+                          Icon(Icons.file_upload_outlined,
+                              size: 20, color: accent),
+                          const SizedBox(width: 10),
+                          Text(
+                            loc.t('nomenclature_excel_import_tooltip'),
+                            style: TextStyle(
+                                color: accent, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ),
                   if (uploadAllowed)
                     PopupMenuItem(
                       value: 'upload',
