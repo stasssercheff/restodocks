@@ -4620,6 +4620,52 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   bool _priceByPackage = false;
   List<PriceHistoryEntry> _priceHistory = [];
   bool _priceHistoryLoaded = false;
+  bool _switchingUnitSystem = false;
+
+  String _unitSystemTitle(LocalizationService loc, bool imperial) {
+    if (loc.currentLanguageCode == 'ru') {
+      return imperial ? 'Система: US Imperial' : 'Система: Metric';
+    }
+    return imperial ? 'System: US Imperial' : 'System: Metric';
+  }
+
+  void _reformatWeightControllersForSystem({
+    required UnitSystem from,
+    required UnitSystem to,
+  }) {
+    final pkg = _parseNum(_packageWeightController.text);
+    if (pkg != null && pkg > 0) {
+      final canonical = UnitConverter.fromDisplay(
+        displayValue: pkg,
+        canonicalUnit: 'g',
+        system: from,
+      );
+      final shown = UnitConverter.toDisplay(
+        canonicalValue: canonical,
+        canonicalUnit: 'g',
+        system: to,
+      ).value;
+      _packageWeightController.text =
+          UnitConverter.roundUi(shown, fractionDigits: to == UnitSystem.imperial ? 2 : 0)
+              .toStringAsFixed(to == UnitSystem.imperial ? 2 : 0);
+    }
+    final gpp = _parseNum(_gramsPerPieceController.text);
+    if (gpp != null && gpp > 0) {
+      final canonical = UnitConverter.fromDisplay(
+        displayValue: gpp,
+        canonicalUnit: 'g',
+        system: from,
+      );
+      final shown = UnitConverter.toDisplay(
+        canonicalValue: canonical,
+        canonicalUnit: 'g',
+        system: to,
+      ).value;
+      _gramsPerPieceController.text =
+          UnitConverter.roundUi(shown, fractionDigits: to == UnitSystem.imperial ? 2 : 0)
+              .toStringAsFixed(to == UnitSystem.imperial ? 2 : 0);
+    }
+  }
 
   @override
   void initState() {
@@ -4673,6 +4719,13 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     } else {
       _priceHistoryLoaded = true;
     }
+    final unitPrefs = context.read<UnitSystemPreferenceService>();
+    if (unitPrefs.isImperial) {
+      _reformatWeightControllersForSystem(
+        from: UnitSystem.metric,
+        to: UnitSystem.imperial,
+      );
+    }
   }
 
   @override
@@ -4693,7 +4746,15 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   /// Расчётная цена за кг из упаковки
   double? get _computedPricePerKg {
     final pkgPrice = _parseNum(_packagePriceController.text);
-    final pkgWeight = _parseNum(_packageWeightController.text);
+    final unitPrefs = context.read<UnitSystemPreferenceService>();
+    final pkgWeightRaw = _parseNum(_packageWeightController.text);
+    final pkgWeight = pkgWeightRaw == null
+        ? null
+        : UnitConverter.fromDisplay(
+            displayValue: pkgWeightRaw,
+            canonicalUnit: 'g',
+            system: unitPrefs.unitSystem,
+          );
     if (pkgPrice != null && pkgWeight != null && pkgWeight > 0) {
       return pkgPrice / pkgWeight * 1000.0;
     }
@@ -4886,12 +4947,27 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
         : _parseNum(_priceController.text);
     final double? pkgPrice =
         _priceByPackage ? _parseNum(_packagePriceController.text) : null;
-    final double? pkgWeight =
+    final unitPrefs = context.read<UnitSystemPreferenceService>();
+    final pkgWeightInput =
         _priceByPackage ? _parseNum(_packageWeightController.text) : null;
+    final double? pkgWeight = pkgWeightInput == null
+        ? null
+        : UnitConverter.fromDisplay(
+            displayValue: pkgWeightInput,
+            canonicalUnit: 'g',
+            system: unitPrefs.unitSystem,
+          );
 
-    final gpp = CulinaryUnits.isCountable(_unit)
+    final gppInput = CulinaryUnits.isCountable(_unit)
         ? _parseNum(_gramsPerPieceController.text)
         : null;
+    final gpp = gppInput == null
+        ? null
+        : UnitConverter.fromDisplay(
+            displayValue: gppInput,
+            canonicalUnit: 'g',
+            system: unitPrefs.unitSystem,
+          );
     final acc = context.read<AccountManagerSupabase>();
     final currencyCode = _currencyCodeForSave(acc);
     final updated = widget.product.copyWith(
@@ -4964,6 +5040,13 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   @override
   Widget build(BuildContext context) {
     final account = context.watch<AccountManagerSupabase>();
+    final unitPrefs = context.watch<UnitSystemPreferenceService>();
+    final isImperial = unitPrefs.isImperial;
+    final gLabel = UnitConverter.displayUnitLabel(
+      'g',
+      widget.loc.currentLanguageCode,
+      unitPrefs.unitSystem,
+    );
     final lang = widget.loc.currentLanguageCode;
     final priceDisplayCode = _currencyFollowsEstablishment
         ? (account.establishment?.defaultCurrency ?? _currency)
@@ -5015,13 +5098,34 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                     .toList(),
                 onChanged: (v) => setState(() => _unit = v ?? _unit),
               ),
+              const SizedBox(height: 10),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(_unitSystemTitle(widget.loc, isImperial)),
+                subtitle: Text(
+                  widget.loc.currentLanguageCode == 'ru'
+                      ? 'Весовые поля в этой форме: ${isImperial ? 'US Imperial' : 'Metric'}'
+                      : 'Weight fields in this form: ${isImperial ? 'US Imperial' : 'Metric'}',
+                ),
+                value: isImperial,
+                onChanged: _switchingUnitSystem
+                    ? null
+                    : (v) async {
+                        final from = unitPrefs.unitSystem;
+                        final to = v ? UnitSystem.imperial : UnitSystem.metric;
+                        if (from == to) return;
+                        setState(() => _switchingUnitSystem = true);
+                        _reformatWeightControllersForSystem(from: from, to: to);
+                        await unitPrefs.setUnitSystem(to);
+                        if (mounted) setState(() => _switchingUnitSystem = false);
+                      },
+              ),
               if (CulinaryUnits.isCountable(_unit)) ...[
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _gramsPerPieceController,
                   decoration: InputDecoration(
-                    labelText:
-                        widget.loc.t('grams_per_piece_label'),
+                    labelText: '${widget.loc.t('grams_per_piece_label')} ($gLabel)',
                     border: const OutlineInputBorder(),
                   ),
                   keyboardType:
@@ -5185,7 +5289,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                       child: TextFormField(
                         controller: _packageWeightController,
                         decoration: InputDecoration(
-                          labelText: widget.loc.t('package_weight_label'),
+                          labelText: '${widget.loc.t('package_weight_label')} ($gLabel)',
                           border: const OutlineInputBorder(),
                         ),
                         keyboardType: const TextInputType.numberWithOptions(
