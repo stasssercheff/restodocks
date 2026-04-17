@@ -456,7 +456,7 @@ class _EmployeeChatScreenState extends State<EmployeeChatScreen> {
         loc.currentLanguageCode != 'ru' || layoutPrefs.showNameTranslit;
     final otherName = _otherEmployee != null
         ? employeeDisplayName(_otherEmployee!, translit: useTranslit)
-        : widget.otherEmployeeId;
+        : (loc.t('messages'));
 
     return Scaffold(
       appBar: AppBar(
