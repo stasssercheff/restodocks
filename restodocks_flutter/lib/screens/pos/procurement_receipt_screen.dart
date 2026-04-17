@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../models/models.dart';
 import '../../services/services.dart';
+import '../../services/unit_system_preference_service.dart';
 import '../../utils/order_list_units.dart';
 import '../../utils/supplier_contact_validation.dart';
 import '../../widgets/app_bar_home_button.dart';
@@ -177,7 +178,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
   _ReceiptLineEdit _createEmptyLine() => _ReceiptLineEdit(
         productId: null,
         productName: '',
-        unit: 'kg',
+        unit: context.read<UnitSystemPreferenceService>().isImperial ? 'lb' : 'kg',
         initialOrderedQty: 0,
         referencePricePerUnit: 0,
         received: TextEditingController(),
@@ -235,25 +236,54 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
     return CulinaryUnits.displayName(unit, lang);
   }
 
-  bool _isKgOrG(String unit) {
+  bool _isConvertibleWeightOrVolume(String unit) {
     final u = unit.toLowerCase().trim();
-    return u == 'kg' || u == 'g' || u == 'г';
+    return u == 'kg' ||
+        u == 'g' ||
+        u == 'г' ||
+        u == 'кг' ||
+        u == 'lb' ||
+        u == 'oz' ||
+        u == 'ml' ||
+        u == 'мл' ||
+        u == 'l' ||
+        u == 'л' ||
+        u == 'fl_oz' ||
+        u == 'gal';
   }
 
-  void _convertLineWeightUnit(_ReceiptLineEdit line, String newUnit) {
+  String _normalizeUnit(String unit) {
+    final u = unit.toLowerCase().trim();
+    return switch (u) {
+      'г' => 'g',
+      'кг' => 'kg',
+      'мл' => 'ml',
+      'л' => 'l',
+      _ => u,
+    };
+  }
+
+  static const _weightUnits = {'g', 'kg', 'oz', 'lb'};
+  static const _volumeUnits = {'ml', 'l', 'fl_oz', 'gal'};
+
+  void _convertLineUnit(_ReceiptLineEdit line, String newUnit) {
     final old = line.unit.toLowerCase().trim();
     final nu = newUnit.toLowerCase().trim();
-    final o = old == 'г' ? 'g' : old;
-    final n = nu == 'г' ? 'g' : nu;
+    final o = _normalizeUnit(old);
+    final n = _normalizeUnit(nu);
     if (o == n) {
       line.unit = n;
       return;
     }
-    if ((o != 'kg' && o != 'g') || (n != 'kg' && n != 'g')) return;
-
-    final toG = o == 'kg' && n == 'g';
-    final factorQty = toG ? 1000.0 : 0.001;
-    final factorPrice = toG ? 0.001 : 1000.0;
+    final sameDomain =
+        (_weightUnits.contains(o) && _weightUnits.contains(n)) ||
+            (_volumeUnits.contains(o) && _volumeUnits.contains(n));
+    if (!sameDomain) return;
+    final oldPerUnit = CulinaryUnits.toGrams(1, o);
+    final newPerUnit = CulinaryUnits.toGrams(1, n);
+    if (oldPerUnit <= 0 || newPerUnit <= 0) return;
+    final factorQty = oldPerUnit / newPerUnit;
+    final factorPrice = newPerUnit / oldPerUnit;
 
     line.unit = n;
 
@@ -430,17 +460,12 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
     _onManualChanged();
   }
 
-  static const _newProductUnits = [
-    'g',
-    'kg',
-    'ml',
-    'l',
-    'pcs',
-    'pack',
-    'can',
-    'box',
-    'bottle',
-  ];
+  List<String> _newProductUnits(UnitSystem unitSystem) {
+    final base = unitSystem == UnitSystem.imperial
+        ? <String>['oz', 'lb', 'fl_oz', 'gal']
+        : <String>['g', 'kg', 'ml', 'l'];
+    return [...base, 'pcs', 'pack', 'can', 'box', 'bottle'];
+  }
 
   Future<void> _createNewNomenclatureProduct(int lineIndex) async {
     final loc = context.read<LocalizationService>();
@@ -452,7 +477,9 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
 
     final nameCtrl = TextEditingController();
     final priceCtrl = TextEditingController();
-    var unitChoice = 'kg';
+    final unitPrefs = context.read<UnitSystemPreferenceService>();
+    final productUnits = _newProductUnits(unitPrefs.unitSystem);
+    var unitChoice = unitPrefs.isImperial ? 'lb' : 'kg';
 
     final ok = await showDialog<bool>(
       context: context,
@@ -474,14 +501,14 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: _newProductUnits.contains(unitChoice)
+                    value: productUnits.contains(unitChoice)
                         ? unitChoice
-                        : 'kg',
+                        : productUnits.first,
                     decoration: InputDecoration(
                       labelText: loc.t('order_list_unit'),
                       border: const OutlineInputBorder(),
                     ),
-                    items: _newProductUnits
+                    items: productUnits
                         .map(
                           (id) => DropdownMenuItem(
                             value: id,
@@ -1136,6 +1163,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                   (i) => _tableDataRow(
                     i,
                     loc,
+                    unitPrefs,
                     currency,
                     cell,
                     onField,
@@ -1152,13 +1180,31 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
   }
 
   String _kgGDropdownValue(_ReceiptLineEdit l) {
-    final u = l.unit.toLowerCase().trim();
-    return u == 'kg' ? 'kg' : 'g';
+    final u = _normalizeUnit(l.unit);
+    if (_weightUnits.contains(u)) return u;
+    if (_volumeUnits.contains(u)) return u;
+    return 'kg';
+  }
+
+  List<String> _lineUnitOptions(UnitSystem unitSystem, _ReceiptLineEdit l) {
+    final u = _normalizeUnit(l.unit);
+    if (_weightUnits.contains(u)) {
+      return unitSystem == UnitSystem.imperial
+          ? <String>['lb', 'oz']
+          : <String>['kg', 'g'];
+    }
+    if (_volumeUnits.contains(u)) {
+      return unitSystem == UnitSystem.imperial
+          ? <String>['gal', 'fl_oz']
+          : <String>['l', 'ml'];
+    }
+    return const <String>[];
   }
 
   TableRow _tableDataRow(
     int i,
     LocalizationService loc,
+    UnitSystemPreferenceService unitPrefs,
     String currency,
     Widget Function(Widget) cell,
     VoidCallback onField,
@@ -1251,27 +1297,23 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                     ),
         ),
         cell(
-          _isKgOrG(l.unit)
+          _isConvertibleWeightOrVolume(l.unit)
               ? DropdownButton<String>(
                   isDense: true,
                   isExpanded: true,
                   itemHeight: narrow ? 40 : kMinInteractiveDimension,
                   value: _kgGDropdownValue(l),
-                  items: [
-                    DropdownMenuItem(
-                      value: 'kg',
-                      child: Text(_localizedUnit(loc, 'kg'),
-                          style: rowStyle),
-                    ),
-                    DropdownMenuItem(
-                      value: 'g',
-                      child:
-                          Text(_localizedUnit(loc, 'g'), style: rowStyle),
-                    ),
-                  ],
+                  items: _lineUnitOptions(unitPrefs.unitSystem, l)
+                      .map(
+                        (u) => DropdownMenuItem(
+                          value: u,
+                          child: Text(_localizedUnit(loc, u), style: rowStyle),
+                        ),
+                      )
+                      .toList(),
                   onChanged: (v) {
                     if (v == null) return;
-                    setState(() => _convertLineWeightUnit(l, v));
+                    setState(() => _convertLineUnit(l, v));
                     onField();
                   },
                 )
@@ -1345,6 +1387,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final unitPrefs = context.watch<UnitSystemPreferenceService>();
     final currency = context
             .watch<AccountManagerSupabase>()
             .establishment

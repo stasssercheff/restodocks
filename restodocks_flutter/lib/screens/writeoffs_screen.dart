@@ -518,15 +518,13 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
       if (p == null) continue;
       final pricePerKg = p.computedPricePerKg ?? p.basePrice;
       if (pricePerKg == null || pricePerKg <= 0) continue;
-      final u = (r.unit).toLowerCase().replaceAll(' ', '');
-      if (u == 'g' || u == 'г') {
-        sum += (r.total / 1000) * pricePerKg;
-      } else if (u == 'kg' || u == 'кг' || u == 'l' || u == 'л' || u == 'ml' || u == 'мл') {
-        sum += r.total * pricePerKg;
-      } else if (u == 'pcs' || u == 'шт' || u == 'штуки' || u == 'штук') {
-        final perPiece = p.basePrice ?? (p.gramsPerPiece != null && p.gramsPerPiece! > 0 ? (pricePerKg * p.gramsPerPiece! / 1000) : 0);
-        sum += r.total * (perPiece);
-      }
+      final grams = CulinaryUnits.toGrams(
+        r.total,
+        r.unit,
+        gramsPerPiece: p.gramsPerPiece,
+      );
+      if (grams <= 0) continue;
+      sum += (grams / 1000.0) * pricePerKg;
     }
     return sum;
   }

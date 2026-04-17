@@ -7521,6 +7521,11 @@ class _TtkCookTableState extends State<_TtkCookTable> {
           system: unitPrefs.unitSystem,
           gramsPerPiece: ing.gramsPerPiece,
         );
+    final totalOutputDisplay = UnitConverter.toDisplay(
+      canonicalValue: _totalOutput,
+      canonicalUnit: 'g',
+      system: unitPrefs.unitSystem,
+    );
     String weightText(TTIngredient ing, double grams) {
       final dv = displayWeight(ing, grams);
       final digits = unitPrefs.isImperial ? 2 : 0;
@@ -7694,7 +7699,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                   child: Padding(
                     padding: _TtkCookTable._cellPad,
                     child: Text(
-                        '${UnitConverter.roundUi(_totalOutput, fractionDigits: unitPrefs.isImperial ? 2 : 0).toStringAsFixed(unitPrefs.isImperial ? 2 : 0)} ${widget.loc.t('gram')}',
+                        '${UnitConverter.roundUi(totalOutputDisplay.value, fractionDigits: unitPrefs.isImperial ? 2 : 0).toStringAsFixed(unitPrefs.isImperial ? 2 : 0)} ${CulinaryUnits.displayName(totalOutputDisplay.unitId, widget.loc.currentLanguageCode)}',
                         style: const TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
@@ -7704,6 +7709,17 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                     padding: _TtkCookTable._cellPad,
                     child: _EditableNetCell(
                       value: _totalOutput,
+                      decimalPlaces: unitPrefs.isImperial ? 2 : 0,
+                      canonicalToDisplay: (v) => UnitConverter.toDisplay(
+                        canonicalValue: v,
+                        canonicalUnit: 'g',
+                        system: unitPrefs.unitSystem,
+                      ).value,
+                      displayToCanonical: (v) => UnitConverter.fromDisplay(
+                        displayValue: v,
+                        canonicalUnit: 'g',
+                        system: unitPrefs.unitSystem,
+                      ),
                       onChanged: (v) {
                         if (v != null && v > 0) _scaleByOutput(v);
                       },

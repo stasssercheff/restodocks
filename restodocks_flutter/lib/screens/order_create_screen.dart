@@ -506,6 +506,10 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                         ..._filteredItemEntries(lang).map((e) {
                           final i = e.key;
                           final item = e.value;
+                          final allowedUnits = _unitIds(unitPrefs.unitSystem);
+                          final selectedUnit = allowedUnits.contains(item.unit)
+                              ? item.unit
+                              : allowedUnits.first;
                           return TableRow(
                             children: [
                               Padding(
@@ -518,10 +522,10 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 4, vertical: 4),
                                 child: DropdownButton<String>(
-                                  value: item.unit,
+                                  value: selectedUnit,
                                   isDense: true,
                                   isExpanded: true,
-                                  items: _unitIds(unitPrefs.unitSystem)
+                                  items: allowedUnits
                                       .map((id) => DropdownMenuItem(
                                             value: id,
                                             child: Text(
