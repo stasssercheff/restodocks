@@ -470,7 +470,11 @@ Email: info@restodocks.com
 - сбои, вызванные действиями третьих лиц, провайдеров связи, платформ;
 - ошибки, вызванные некорректными действиями Пользователя;
 - косвенные убытки и упущенную выгоду (если иное не предусмотрено законом).
-11.3. Совокупная ответственность Исполнителя ограничивается суммой фактически уплаченных Пользователем средств за последние 12 месяцев, если иное не установлено императивными нормами.
+11.3. Исполнитель не несет ответственности за любые ошибки в расчетах (включая, но не ограничиваясь: расчет себестоимости, КБЖУ, остатков на складе), возникшие вследствие работы алгоритмов Сервиса, действий ИИ-ассистента или некорректного ввода данных Пользователем.
+11.4. Сервис является инструментом автоматизации. Ответственность за соблюдение санитарных норм (HACCP), точность указания аллергенов и безопасность продукции для конечного потребителя несет исключительно Пользователь.
+11.5. Пользователь осознает, что функции ИИ (включая, но не ограничиваясь DeepSeek/ChatGPT) могут генерировать недостоверную информацию. Пользователь обязан проверять все результаты работы ИИ перед использованием в операционной деятельности.
+11.6. В случае просрочки оплаты более чем на 30 дней Исполнитель вправе безвозвратно удалить все данные аккаунта Пользователя без возможности восстановления.
+11.7. Совокупная ответственность Исполнителя ограничивается суммой фактически уплаченных Пользователем средств за последние 12 месяцев, если иное не установлено императивными нормами.
 
 12. Форс-мажор
 Стороны освобождаются от ответственности за неисполнение обязательств при наступлении обстоятельств непреодолимой силы, подтвержденных надлежащим образом.
@@ -486,8 +490,8 @@ Email: info@restodocks.com
 14.3. Продолжение использования Сервиса после публикации изменений означает согласие Пользователя с новой редакцией.
 
 15. Применимое право и споры
-15.1. Применимое право: право Российской Федерации.
-15.2. Споры разрешаются путем переговоров; при недостижении согласия — в суде по месту нахождения Исполнителя (г. Санкт-Петербург), если иное не предусмотрено законом.
+15.1. Все споры, возникающие из настоящего Договора или в связи с ним, подлежат разрешению путем переговоров.
+15.2. В случае недостижения согласия, споры подлежат разрешению в соответствии с правилами международного арбитража или по месту регистрации Исполнителя, если иное не установлено императивными нормами законодательства страны нахождения Пользователя.
 
 16. Контакты
 По вопросам договора, доступа, претензий и уведомлений:
@@ -543,6 +547,10 @@ Exclusive rights to the Service belong to Provider or rights holders.
 
 11. Warranties and Liability Limits
 Service is provided “as is” to the extent permitted by law.
+Provider is not liable for any calculation errors (including but not limited to cost calculations, nutritional values, or stock balances) caused by Service algorithms, AI assistant behavior, or incorrect data entered by the User.
+The Service is an automation tool. The User is solely responsible for compliance with sanitary standards (HACCP), correct allergen disclosure, and product safety for end consumers.
+The User acknowledges that AI functions (including but not limited to DeepSeek/ChatGPT) may generate inaccurate information and must verify all AI-generated results before operational use.
+If payment is overdue by more than 30 days, the Provider may irreversibly delete all account data without recovery.
 Total Provider liability is limited to amounts actually paid by User for the last 12 months, unless mandatory law states otherwise.
 
 12. Force Majeure
@@ -555,8 +563,8 @@ Agreement is valid from acceptance until account/service termination per agreeme
 Provider may amend the Offer unilaterally; new version is effective upon publication unless specified otherwise.
 
 15. Governing Law and Disputes
-Governing law: laws of the Russian Federation.
-Disputes are resolved by negotiation; failing agreement, in court at Provider location (Saint Petersburg), unless law provides otherwise.
+All disputes arising out of or in connection with this Agreement shall be resolved through negotiations.
+If no agreement is reached, disputes shall be resolved under international arbitration rules or at the Provider's place of registration, unless mandatory legal provisions of the User's country require otherwise.
 
 16. Contacts
 info@restodocks.com
@@ -606,7 +614,11 @@ Los derechos exclusivos pertenecen al Prestador o titulares de derechos.
 
 11. Garantias y limitacion de responsabilidad
 Servicio “tal cual” en los limites de la ley.
-Responsabilidad total limitada a los pagos efectivamente realizados por el Usuario durante los ultimos 12 meses, salvo norma imperativa.
+El Prestador no asume responsabilidad por errores de calculo (incluyendo, entre otros, costo, valores nutricionales o saldos de inventario) derivados de algoritmos del Servicio, acciones del asistente de IA o datos incorrectos introducidos por el Usuario.
+El Servicio es una herramienta de automatizacion. La responsabilidad por el cumplimiento de normas sanitarias (HACCP), la correcta indicacion de alergenos y la seguridad del producto para el consumidor final recae exclusivamente en el Usuario.
+El Usuario reconoce que las funciones de IA (incluyendo, entre otras, DeepSeek/ChatGPT) pueden generar informacion inexacta y debe verificar todos los resultados antes de su uso operativo.
+Si el pago se retrasa por mas de 30 dias, el Prestador puede eliminar de forma irreversible todos los datos de la cuenta del Usuario sin posibilidad de recuperacion.
+La responsabilidad total del Prestador se limita a los pagos efectivamente realizados por el Usuario durante los ultimos 12 meses, salvo norma imperativa.
 
 12. Fuerza mayor
 Exencion de responsabilidad por incumplimiento debido a fuerza mayor.
@@ -618,8 +630,8 @@ Desde la aceptacion hasta la terminacion del uso/cuenta segun contrato o ley.
 El Prestador puede modificar la oferta; la nueva version entra en vigor al publicarse.
 
 15. Ley aplicable y disputas
-Ley aplicable: Federacion de Rusia.
-Disputas: negociacion; de no haber acuerdo, tribunal en San Petersburgo, salvo norma legal en contrario.
+Toda disputa derivada de este Contrato o relacionada con el se resolvera mediante negociacion.
+Si no se alcanza un acuerdo, las disputas se resolveran conforme a las reglas de arbitraje internacional o en el lugar de registro del Prestador, salvo que normas imperativas del pais del Usuario dispongan otra cosa.
 
 16. Contacto
 info@restodocks.com
@@ -669,6 +681,10 @@ Munasir haklar Saglayiciya veya hak sahiplerine aittir.
 
 11. Garanti ve Sorumluluk Siniri
 Hizmet “oldugu gibi” sunulur.
+Saglayici; Hizmet algoritmalarindan, YZ asistaninin davranisindan veya Kullanici tarafindan girilen hatali verilerden kaynaklanan hesaplama hatalarindan (maliyet, besin degerleri, stok bakiyesi dahil ancak bunlarla sinirli olmamak uzere) sorumlu degildir.
+Hizmet bir otomasyon aracidir. Sanitasyon standartlarina (HACCP) uyum, alerjenlerin dogru belirtilmesi ve son tuketici icin urun guvenligi konusunda tum sorumluluk yalnizca Kullaniciya aittir.
+Kullanici, YZ fonksiyonlarinin (DeepSeek/ChatGPT dahil ancak bunlarla sinirli olmamak uzere) hatali bilgi uretebilecegini kabul eder ve operasyonel kullanimdan once tum sonuclari dogrulamakla yukumludur.
+Odeme 30 gunden fazla gecikirse, Saglayici Kullanici hesabindaki tum verileri geri getirilemez sekilde silebilir.
 Toplam sorumluluk, zorunlu hukuk aksini gerektirmedikce son 12 ayda odenen tutarla sinirlidir.
 
 12. Mucbir Sebep
@@ -681,8 +697,8 @@ Sozlesme kabul anindan feshe kadar gecerlidir.
 Saglayici teklifi tek tarafli degistirebilir; yeni metin yayimla yururluge girer.
 
 15. Uygulanacak Hukuk ve Uyusmazlik
-Uygulanacak hukuk: Rusya Federasyonu hukuku.
-Uyusmazliklar once muzakerelerle, sonuc alinmazsa Saint Petersburg mahkemelerinde cozumlenecektir (hukuk aksini belirtmedikce).
+Bu Sozlesmeden dogan veya bununla baglantili tum uyusmazliklar muzakereler yoluyla cozulecektir.
+Uzlasma saglanamazsa, uyusmazliklar uluslararasi tahkim kurallarina gore veya Saglayicinin kayitli oldugu yerde cozulecektir; ancak Kullanici ulkesinin emredici hukuk kurallari farkli bir duzenleme getiriyorsa bu kurallar uygulanir.
 
 16. Iletisim
 info@restodocks.com
@@ -732,6 +748,10 @@ Quyen so huu tri tue thuoc Ben cung cap hoac chu so huu quyen.
 
 11. Bao dam va gioi han trach nhiem
 Dich vu duoc cung cap “nguyen trang”.
+Ben cung cap khong chiu trach nhiem doi voi cac loi tinh toan (bao gom nhung khong gioi han: gia thanh, gia tri dinh duong, ton kho) phat sinh do thuat toan cua Dich vu, hanh vi cua tro ly AI hoac du lieu nhap sai boi Nguoi dung.
+Dich vu la cong cu tu dong hoa. Nguoi dung chiu trach nhiem duy nhat ve viec tuan thu tieu chuan ve sinh (HACCP), khai bao dung di ung va an toan san pham cho nguoi tieu dung cuoi cung.
+Nguoi dung nhan thuc rang cac chuc nang AI (bao gom nhung khong gioi han DeepSeek/ChatGPT) co the tao ra thong tin khong chinh xac va phai kiem tra tat ca ket qua AI truoc khi dung trong van hanh.
+Neu cham thanh toan qua 30 ngay, Ben cung cap co quyen xoa vinh vien toan bo du lieu tai khoan cua Nguoi dung ma khong the khoi phuc.
 Tong trach nhiem cua Ben cung cap duoc gioi han trong so tien Nguoi dung da thanh toan trong 12 thang gan nhat, tru khi phap luat bat buoc quy dinh khac.
 
 12. Bat kha khang
@@ -744,8 +764,8 @@ Thoa thuan co hieu luc tu khi chap nhan den khi cham dut theo hop dong/phap luat
 Ben cung cap co quyen sua doi don phuong; ban moi co hieu luc khi cong bo.
 
 15. Luat ap dung va giai quyet tranh chap
-Luat ap dung: luat Lien bang Nga.
-Tranh chap uu tien thuong luong; neu khong dat duoc thoa thuan, giai quyet tai toa an noi Ben cung cap dat tru so (Saint Petersburg), tru khi phap luat quy dinh khac.
+Moi tranh chap phat sinh tu hoac lien quan den Thoa thuan nay se duoc giai quyet truoc tien bang thuong luong.
+Neu khong dat duoc dong thuan, tranh chap se duoc giai quyet theo quy tac trong tai quoc te hoac tai noi dang ky cua Ben cung cap, tru khi quy dinh bat buoc cua phap luat tai quoc gia cua Nguoi dung co quy dinh khac.
 
 16. Lien he
 info@restodocks.com
