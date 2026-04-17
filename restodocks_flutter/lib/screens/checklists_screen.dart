@@ -83,6 +83,9 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
   List<Checklist> _filterChecklists(List<Checklist> source, bool useTranslit) {
     if (_searchQuery.isEmpty) return source;
     final q = _searchQuery;
+    final employeeNameById = <String, String>{
+      for (final e in _employees) e.id: employeeDisplayName(e, translit: useTranslit),
+    };
     return source.where((c) {
       final raw = (c.name.trim().isNotEmpty ? c.name : c.additionalName ?? '').toLowerCase();
       if (raw.contains(q)) return true;
@@ -91,6 +94,22 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       if (useTranslit) {
         final lit = cyrillicToLatin(raw).toLowerCase();
         if (lit.contains(q)) return true;
+      }
+      final assignedIds = c.assignedEmployeeIds ??
+          (c.assignedEmployeeId != null ? [c.assignedEmployeeId!] : <String>[]);
+      for (final empId in assignedIds) {
+        final name = (employeeNameById[empId] ?? '').toLowerCase();
+        if (name.contains(q)) return true;
+      }
+      final deadline = c.deadlineAt;
+      if (deadline != null) {
+        final date = _formatDate(deadline.toLocal()).toLowerCase();
+        if (date.contains(q)) return true;
+      }
+      final scheduled = c.reminderConfig?.scheduleDate;
+      if (scheduled != null) {
+        final date = _formatDate(scheduled.toLocal()).toLowerCase();
+        if (date.contains(q)) return true;
       }
       return false;
     }).toList();
