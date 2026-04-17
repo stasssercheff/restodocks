@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../haccp/haccp_country_profile.dart';
 import '../models/employee.dart';
 import '../models/haccp_log.dart';
 import '../models/haccp_log_type.dart';
@@ -86,7 +87,13 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     final now = DateTime.now();
     _dateFrom = DateTime(now.year, now.month, 1);
     _dateTo = now;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final est = context.read<AccountManagerSupabase>().establishment;
+      if (est != null) {
+        context.read<HaccpConfigService>().load(est.id, notify: false);
+      }
+      _load();
+    });
   }
 
   String _roleLabelForPdf(Employee e, LocalizationService loc, String pdfLang) {
@@ -114,14 +121,22 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     final logType = _logType;
     if (logType == null) return;
     final acc = context.read<AccountManagerSupabase>();
+    final config = context.read<HaccpConfigService>();
     final est = acc.establishment;
     if (est == null) return;
+    final countryCode = config.resolveCountryCodeForEstablishment(est);
+    final selectedProfile = config.resolveCountryProfileForEstablishment(est);
 
     final loc = context.read<LocalizationService>();
+    final countryLabel = HaccpCountryProfiles.countryCodeAndNameLabel(
+      selectedProfile.countryCode,
+      loc.currentLanguageCode,
+    );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(loc.t('haccp_pdf_preparing') ?? 'Подготовка PDF...')),
+            content: Text(
+                '${loc.t('haccp_pdf_preparing') ?? 'Подготовка PDF...'} ($countryLabel)')),
       );
     }
 
@@ -137,7 +152,6 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
       from: dateFrom,
       to: dateTo,
     );
-
     final bytes = await HaccpPdfExportService.buildJournalPdf(
       loc: loc,
       pdfLanguageCode: pdfLanguageCode,
@@ -147,6 +161,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
       employeeIdToName: idToName,
       dateFrom: dateFrom,
       dateTo: dateTo,
+      establishmentCountryCode: countryCode,
       includeCover: true,
       includeStitchingSheet: true,
     );
@@ -159,10 +174,13 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
         docKind: TrialDeviceSaveKinds.journal,
       );
     }
-    await saveFileBytes('haccp_${safeCode}_$dateStr.pdf', bytes);
+    await saveFileBytes(
+        'haccp_${countryCode.toLowerCase()}_${safeCode}_$dateStr.pdf', bytes);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.t('haccp_pdf_saved') ?? 'PDF сохранён')),
+        SnackBar(
+            content: Text(
+                '${loc.t('haccp_pdf_saved') ?? 'PDF сохранён'} ($countryLabel)')),
       );
     }
   }
@@ -170,6 +188,15 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
   /// Три варианта периода экспорта: 1) весь месяц, 2) с 1 числа по сегодня, 3) с даты по дату.
   Future<void> _showExportOptions() async {
     final loc = context.read<LocalizationService>();
+    final est = context.read<AccountManagerSupabase>().establishment;
+    final config = context.read<HaccpConfigService>();
+    final selectedCountryCode =
+        est != null ? config.resolveCountryCodeForEstablishment(est) : 'RU';
+    final explicitOverride =
+        est != null && config.hasExplicitCountryOverride(est.id);
+    final selectedProfile = est != null
+        ? config.resolveCountryProfileForEstablishment(est)
+        : HaccpCountryProfiles.byCountryCode(selectedCountryCode);
     var pdfLang = loc.currentLanguageCode;
     final langResult = await showDialog<String>(
       context: context,
@@ -224,6 +251,35 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
               Text(
                 loc.t('haccp_save_file') ?? 'Сохранить журнал в PDF',
                 style: Theme.of(ctx).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                HaccpCountryProfiles.templateCountryLabel(
+                  selectedProfile.countryCode,
+                  loc.currentLanguageCode,
+                ),
+                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                HaccpCountryProfiles.legalFrameworkLabel(
+                  selectedProfile.countryCode,
+                  loc.currentLanguageCode,
+                ),
+                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                explicitOverride
+                    ? _profileSourceManual(loc.currentLanguageCode)
+                    : _profileSourceAuto(loc.currentLanguageCode),
+                style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                    ),
               ),
               const SizedBox(height: 8),
               Text(
@@ -534,8 +590,13 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final acc = context.watch<AccountManagerSupabase>();
+    final config = context.watch<HaccpConfigService>();
     final est = acc.establishment;
     final logType = _logType;
+    final selectedCountryCode =
+        est != null ? config.resolveCountryCodeForEstablishment(est) : 'RU';
+    final explicitOverride =
+        est != null && config.hasExplicitCountryOverride(est.id);
 
     if (logType == null) {
       return Scaffold(
@@ -618,6 +679,38 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                       ],
                     ),
                   ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Text(
+                    HaccpCountryProfiles.templateCountryLabel(
+                      selectedProfile.countryCode,
+                      loc.currentLanguageCode,
+                    ),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
+                  child: Text(
+                    HaccpCountryProfiles.legalFrameworkLabel(
+                      selectedProfile.countryCode,
+                      loc.currentLanguageCode,
+                    ),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
+                  child: Text(
+                    explicitOverride
+                        ? _profileSourceManual(loc.currentLanguageCode)
+                        : _profileSourceAuto(loc.currentLanguageCode),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  ),
+                ),
                 if (logType == HaccpLogType.warehouseTempHumidity &&
                     _logs.isNotEmpty) ...[
                   Padding(
@@ -703,6 +796,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                       : _JournalTableView(
                           logType: logType,
                           establishmentName: est?.name ?? '—',
+                          establishmentCountryCode: selectedCountryCode,
                           logs: logType == HaccpLogType.warehouseTempHumidity &&
                                   _selectedWarehousePremises != null
                               ? _logs
@@ -797,6 +891,7 @@ class _JournalTableView extends StatelessWidget {
   const _JournalTableView({
     required this.logType,
     required this.establishmentName,
+    required this.establishmentCountryCode,
     required this.logs,
     required this.employees,
     required this.onLogTap,
@@ -807,6 +902,7 @@ class _JournalTableView extends StatelessWidget {
 
   final HaccpLogType logType;
   final String establishmentName;
+  final String establishmentCountryCode;
   final List<HaccpLog> logs;
   final List<Employee> employees;
   final void Function(HaccpLog log) onLogTap;
@@ -885,9 +981,14 @@ class _JournalTableView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                loc.t('haccp_sanpin_line_${logType.code}'),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.primary),
+                HaccpCountryProfiles.journalLegalLine(
+                  establishmentCountryCode,
+                  logType,
+                ),
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Theme.of(context).colorScheme.primary),
               ),
               if (logType == HaccpLogType.warehouseTempHumidity &&
                   warehousePremisesName != null) ...[
@@ -1585,5 +1686,43 @@ class _JournalTableView extends StatelessWidget {
       border: TableBorder.all(color: Colors.grey),
       children: rows,
     );
+  }
+}
+
+String _profileSourceManual(String lang) {
+  switch (lang) {
+    case 'ru':
+      return 'Источник профиля: выбран вручную';
+    case 'es':
+      return 'Origen del perfil: seleccion manual';
+    case 'fr':
+      return 'Source du profil: selection manuelle';
+    case 'it':
+      return 'Origine profilo: selezione manuale';
+    case 'de':
+      return 'Profilquelle: manuelle Auswahl';
+    case 'tr':
+      return 'Profil kaynagi: manuel secim';
+    default:
+      return 'Profile source: manual selection';
+  }
+}
+
+String _profileSourceAuto(String lang) {
+  switch (lang) {
+    case 'ru':
+      return 'Источник профиля: автоопределение';
+    case 'es':
+      return 'Origen del perfil: deteccion automatica';
+    case 'fr':
+      return 'Source du profil: detection automatique';
+    case 'it':
+      return 'Origine profilo: rilevamento automatico';
+    case 'de':
+      return 'Profilquelle: automatische Erkennung';
+    case 'tr':
+      return 'Profil kaynagi: otomatik algilama';
+    default:
+      return 'Profile source: auto-detected';
   }
 }

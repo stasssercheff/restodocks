@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../haccp/haccp_country_profile.dart';
 import '../models/employee.dart';
 import '../models/haccp_log.dart';
 import '../models/haccp_log_type.dart';
@@ -242,8 +243,8 @@ class HaccpLogDetailScreen extends StatelessWidget {
     final products = context.read<ProductStoreSupabase>();
     final techSvc = context.read<TechCardServiceSupabase>();
     final lang = loc.currentLanguageCode;
-    final matched =
-        HaccpStoredFieldLocalizer.matchProduct(products.allProducts, log.productName);
+    final matched = HaccpStoredFieldLocalizer.matchProduct(
+        products.allProducts, log.productName);
     return FutureBuilder<TechCard?>(
       future: log.techCardId != null
           ? techSvc.getTechCardById(log.techCardId!)
@@ -260,10 +261,9 @@ class HaccpLogDetailScreen extends StatelessWidget {
             HaccpStoredFieldLocalizer.localizeFreeText(log.result, loc);
         final approval = HaccpStoredFieldLocalizer.localizeApprovalSnapshot(
             log.approvalToSell, loc);
-        final weighing = HaccpStoredFieldLocalizer.localizeFreeText(
-            log.weighingResult, loc);
-        final note =
-            HaccpStoredFieldLocalizer.localizeFreeText(log.note, loc);
+        final weighing =
+            HaccpStoredFieldLocalizer.localizeFreeText(log.weighingResult, loc);
+        final note = HaccpStoredFieldLocalizer.localizeFreeText(log.note, loc);
         return Table(
           columnWidths: const {
             0: FlexColumnWidth(1.2),
@@ -312,18 +312,16 @@ class HaccpLogDetailScreen extends StatelessWidget {
     final loc = context.watch<LocalizationService>();
     final products = context.read<ProductStoreSupabase>();
     final lang = loc.currentLanguageCode;
-    final matched =
-        HaccpStoredFieldLocalizer.matchProduct(products.allProducts, log.productName);
+    final matched = HaccpStoredFieldLocalizer.matchProduct(
+        products.allProducts, log.productName);
     final productLabel = HaccpStoredFieldLocalizer.displayIncomingProductName(
       productName: log.productName,
       matchedProduct: matched,
       languageCode: lang,
       loc: loc,
     );
-    final result =
-        HaccpStoredFieldLocalizer.localizeFreeText(log.result, loc);
-    final note =
-        HaccpStoredFieldLocalizer.localizeFreeText(log.note, loc);
+    final result = HaccpStoredFieldLocalizer.localizeFreeText(log.result, loc);
+    final note = HaccpStoredFieldLocalizer.localizeFreeText(log.note, loc);
     final translit =
         context.watch<ScreenLayoutPreferenceService>().showNameTranslit;
     final dateSoldStr =
@@ -709,8 +707,12 @@ class HaccpLogDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final theme = Theme.of(context);
-    final establishmentName =
-        context.watch<AccountManagerSupabase>().establishment?.name ?? '—';
+    final acc = context.watch<AccountManagerSupabase>();
+    final config = context.watch<HaccpConfigService>();
+    final est = acc.establishment;
+    final establishmentName = est?.name ?? '—';
+    final countryCode =
+        est != null ? config.resolveCountryCodeForEstablishment(est) : 'RU';
 
     return Scaffold(
       appBar: AppBar(
@@ -722,9 +724,24 @@ class HaccpLogDetailScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            loc.t('haccp_recommended_sample') ?? 'Рекомендуемый образец',
+            HaccpCountryProfiles.recommendedSampleLabel(countryCode),
             style: theme.textTheme.titleSmall
                 ?.copyWith(color: theme.colorScheme.primary),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            HaccpCountryProfiles.journalLegalLine(countryCode, log.logType),
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.primary),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            HaccpCountryProfiles.legalFrameworkLabel(
+              countryCode,
+              loc.currentLanguageCode,
+            ),
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 8),
           SingleChildScrollView(

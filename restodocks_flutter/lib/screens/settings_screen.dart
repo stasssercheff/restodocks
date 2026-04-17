@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../haccp/haccp_country_profile.dart';
 import '../models/haccp_log_type.dart';
 import '../models/models.dart';
 import '../core/feature_flags.dart';
@@ -60,7 +61,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final acc = context.read<AccountManagerSupabase>();
       final est = acc.establishment;
-      unawaited(context.read<UnitSystemPreferenceService>().ensureScopeSynced());
+      unawaited(
+          context.read<UnitSystemPreferenceService>().ensureScopeSynced());
       if (est != null) context.read<HaccpConfigService>().load(est.id);
       // Отключение промо в админке / срок — сервер меняет тариф в check_establishment_access;
       // при открытии настроек подтягиваем актуальное заведение без ожидания resume/таймера.
@@ -574,8 +576,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (emp == null) return;
     final layoutSvc = context.read<HomeLayoutConfigService>();
     final ownerPref = context.read<OwnerViewPreferenceService>();
-    final isOwnerHome =
-        emp.hasRole('owner') && (emp.positionRole == null || ownerPref.viewAsOwner);
+    final isOwnerHome = emp.hasRole('owner') &&
+        (emp.positionRole == null || ownerPref.viewAsOwner);
     final isLiteOwnerHome = isOwnerHome &&
         SubscriptionEntitlements.from(account.establishment).isLiteTier;
     if (isLiteOwnerHome) {
@@ -597,7 +599,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         context: context,
         builder: (ctx) => StatefulBuilder(
           builder: (ctx2, setState) => AlertDialog(
-            title: Text(loc.t('home_layout_config') ?? 'Настройка домашнего экрана'),
+            title: Text(
+                loc.t('home_layout_config') ?? 'Настройка домашнего экрана'),
             content: SizedBox(
               width: 380,
               height: 500,
@@ -753,7 +756,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SubscriptionEntitlements.from(account.establishment)
                 .canAccessBanquetCatering)
           'owner_banquet': loc.t('banquet_catering') ?? 'Банкет / Кейтринг',
-        if (posOn) 'owner_pos_warehouse_est': loc.t('pos_warehouse_establishment_title') ?? 'Сводная по заведению',
+        if (posOn)
+          'owner_pos_warehouse_est':
+              loc.t('pos_warehouse_establishment_title') ??
+                  'Сводная по заведению',
         'owner_expenses': loc.t('expenses'),
       };
       final hidden = Set<String>.from(layoutSvc.getHiddenKeys(emp.id));
@@ -761,7 +767,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         context: context,
         builder: (ctx) => StatefulBuilder(
           builder: (ctx2, setState) => AlertDialog(
-            title: Text(loc.t('home_layout_config') ?? 'Настройка домашнего экрана'),
+            title: Text(
+                loc.t('home_layout_config') ?? 'Настройка домашнего экрана'),
             content: SizedBox(
               width: 360,
               height: 460,
@@ -927,9 +934,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       HomeButtonConfigService homeBtn) {
     final accountManager = context.read<AccountManagerSupabase>();
     final emp = accountManager.currentEmployee;
-    final ownerLite = SubscriptionEntitlements.from(accountManager.establishment)
-            .isLiteTier &&
-        (emp?.hasRole('owner') ?? false);
+    final ownerLite =
+        SubscriptionEntitlements.from(accountManager.establishment)
+                .isLiteTier &&
+            (emp?.hasRole('owner') ?? false);
     final actions = homeButtonActionsFor(emp,
         hasProSubscription: accountManager.hasProSubscription,
         ownerLiteHome: ownerLite);
@@ -1481,9 +1489,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     HaccpLogType logType,
     bool enabled,
     LocalizationService loc,
+    String countryCode,
   ) async {
     try {
-      await config.setEnabled(establishmentId, logType, enabled);
+      await config.setEnabled(
+        establishmentId,
+        logType,
+        enabled,
+        countryCode: countryCode,
+      );
     } catch (e) {
       if (context.mounted) {
         final msg = e.toString().contains('404') ||
@@ -1494,6 +1508,269 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(msg), duration: const Duration(seconds: 5)));
       }
+    }
+  }
+
+  Future<void> _setHaccpCountryProfile(
+    BuildContext context,
+    HaccpConfigService config,
+    String establishmentId,
+    String countryCode,
+    LocalizationService loc,
+  ) async {
+    try {
+      final currentEnabled = config.getEnabledLogTypes(establishmentId);
+      final supportedForCountry = config.supportedCodesForCountry(countryCode);
+      final filtered = currentEnabled
+          .where((code) => supportedForCountry.contains(code))
+          .toSet();
+      final removedCount = currentEnabled.length - filtered.length;
+      await config.save(
+        establishmentId,
+        filtered,
+        countryCode: countryCode,
+      );
+      if (context.mounted) {
+        final countryLabel = HaccpCountryProfiles.countryCodeAndNameLabel(
+          countryCode,
+          loc.currentLanguageCode,
+        );
+        final base = '${_haccpTemplateCountryUpdatedLabel(loc)}: $countryLabel';
+        final note = removedCount > 0
+            ? '\n${_haccpJournalsAdjustedLabel(loc)}: $removedCount'
+            : '';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$base$note'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${loc.t('error')}: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _resetHaccpCountryProfileToAuto(
+    BuildContext context,
+    HaccpConfigService config,
+    Establishment establishment,
+    String establishmentId,
+    LocalizationService loc,
+  ) async {
+    try {
+      await config.clearHaccpCountryCode(establishmentId);
+      final autoCode = config.resolveCountryCodeForEstablishment(establishment);
+      final autoLabel = HaccpCountryProfiles.countryCodeAndNameLabel(
+        autoCode,
+        loc.currentLanguageCode,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${_haccpTemplateCountryAutoLabel(loc)}: $autoLabel'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${loc.t('error')}: $e')),
+        );
+      }
+    }
+  }
+
+  String _haccpTemplateCountryUpdatedLabel(LocalizationService loc) {
+    switch (loc.currentLanguageCode) {
+      case 'ru':
+        return 'Страна шаблона HACCP обновлена';
+      case 'es':
+        return 'Pais de plantilla HACCP actualizado';
+      case 'fr':
+        return 'Pays du modele HACCP mis a jour';
+      case 'it':
+        return 'Paese modello HACCP aggiornato';
+      case 'de':
+        return 'HACCP-Vorlagenland aktualisiert';
+      case 'tr':
+        return 'HACCP sablon ulkesi guncellendi';
+      default:
+        return 'HACCP template country updated';
+    }
+  }
+
+  String _haccpTemplateCountryAutoLabel(LocalizationService loc) {
+    switch (loc.currentLanguageCode) {
+      case 'ru':
+        return 'Страна шаблона HACCP переключена на автоопределение';
+      case 'es':
+        return 'Pais de plantilla HACCP cambiado a deteccion automatica';
+      case 'fr':
+        return 'Pays du modele HACCP bascule en detection automatique';
+      case 'it':
+        return 'Paese modello HACCP passato al rilevamento automatico';
+      case 'de':
+        return 'HACCP-Vorlagenland auf automatische Erkennung umgestellt';
+      case 'tr':
+        return 'HACCP sablon ulkesi otomatik algilamaya gecirildi';
+      default:
+        return 'HACCP template country switched to auto-detected';
+    }
+  }
+
+  String _haccpJournalsAdjustedLabel(LocalizationService loc) {
+    switch (loc.currentLanguageCode) {
+      case 'ru':
+        return 'Отключено несовместимых журналов';
+      case 'es':
+        return 'Diarios incompatibles desactivados';
+      case 'fr':
+        return 'Journaux incompatibles desactives';
+      case 'it':
+        return 'Registri incompatibili disattivati';
+      case 'de':
+        return 'Inkompatible Journale deaktiviert';
+      case 'tr':
+        return 'Uyumsuz gunlukler devre disi birakildi';
+      default:
+        return 'Incompatible journals disabled';
+    }
+  }
+
+  String _haccpProfileLabel(LocalizationService loc) {
+    switch (loc.currentLanguageCode) {
+      case 'ru':
+        return 'Профиль страны HACCP';
+      case 'es':
+        return 'Perfil de pais HACCP';
+      case 'fr':
+        return 'Profil pays HACCP';
+      case 'it':
+        return 'Profilo paese HACCP';
+      case 'de':
+        return 'HACCP-Landesprofil';
+      case 'tr':
+        return 'HACCP ulke profili';
+      default:
+        return 'HACCP country profile';
+    }
+  }
+
+  String _haccpProfileSourceManualLabel(LocalizationService loc) {
+    switch (loc.currentLanguageCode) {
+      case 'ru':
+        return 'Источник профиля: выбран вручную';
+      case 'es':
+        return 'Origen del perfil: seleccion manual';
+      case 'fr':
+        return 'Source du profil : selection manuelle';
+      case 'it':
+        return 'Origine profilo: selezione manuale';
+      case 'de':
+        return 'Profilquelle: manuelle Auswahl';
+      case 'tr':
+        return 'Profil kaynagi: manuel secim';
+      default:
+        return 'Profile source: manual selection';
+    }
+  }
+
+  String _haccpProfileSourceAutoLabel(LocalizationService loc) {
+    switch (loc.currentLanguageCode) {
+      case 'ru':
+        return 'Источник профиля: автоопределение (зафиксируйте вручную для стабильного шаблона)';
+      case 'es':
+        return 'Origen del perfil: deteccion automatica (fijelo manualmente para bloquear la plantilla)';
+      case 'fr':
+        return 'Source du profil : detection automatique (definissez manuellement pour verrouiller le modele)';
+      case 'it':
+        return 'Origine profilo: rilevamento automatico (impostare manualmente per bloccare il modello)';
+      case 'de':
+        return 'Profilquelle: automatische Erkennung (manuell festlegen, um die Vorlage zu sperren)';
+      case 'tr':
+        return 'Profil kaynagi: otomatik algilama (sablonu sabitlemek icin manuel secin)';
+      default:
+        return 'Profile source: auto-detected (set manually to lock template)';
+    }
+  }
+
+  String _haccpTemplateCountryFieldLabel(LocalizationService loc) {
+    switch (loc.currentLanguageCode) {
+      case 'ru':
+        return 'Страна шаблона для HACCP форм/PDF';
+      case 'es':
+        return 'Pais de plantilla para formularios/PDF HACCP';
+      case 'fr':
+        return 'Pays du modele pour formulaires/PDF HACCP';
+      case 'it':
+        return 'Paese modello per moduli/PDF HACCP';
+      case 'de':
+        return 'Vorlagenland fur HACCP-Formulare/PDF';
+      case 'tr':
+        return 'HACCP form/PDF sablon ulkesi';
+      default:
+        return 'Template country for HACCP forms/PDF';
+    }
+  }
+
+  String _haccpUseAutoTemplateLabel(LocalizationService loc) {
+    switch (loc.currentLanguageCode) {
+      case 'ru':
+        return 'Использовать автоопределенный шаблон';
+      case 'es':
+        return 'Usar plantilla autodetectada';
+      case 'fr':
+        return 'Utiliser le modele detecte automatiquement';
+      case 'it':
+        return 'Usa modello rilevato automaticamente';
+      case 'de':
+        return 'Automatisch erkannte Vorlage verwenden';
+      case 'tr':
+        return 'Otomatik algilanan sablonu kullan';
+      default:
+        return 'Use auto-detected template';
+    }
+  }
+
+  String _haccpTemplateUsageHint(LocalizationService loc) {
+    switch (loc.currentLanguageCode) {
+      case 'ru':
+        return 'Выбранный профиль страны применяется к шаблону HACCP формы и сохраненному PDF.';
+      case 'es':
+        return 'El perfil de pais seleccionado se aplica a la plantilla del formulario HACCP y al PDF guardado.';
+      case 'fr':
+        return 'Le profil pays selectionne est applique au modele de formulaire HACCP et au PDF enregistre.';
+      case 'it':
+        return 'Il profilo paese selezionato viene applicato al modello modulo HACCP e al PDF salvato.';
+      case 'de':
+        return 'Das ausgewahlte Landesprofil wird auf die HACCP-Formularvorlage und das gespeicherte PDF angewendet.';
+      case 'tr':
+        return 'Secilen ulke profili HACCP form sablonuna ve kaydedilen PDF duzenine uygulanir.';
+      default:
+        return 'Selected country profile is used for HACCP form template and saved PDF layout.';
+    }
+  }
+
+  String _haccpAvailableCountriesLabel(LocalizationService loc) {
+    switch (loc.currentLanguageCode) {
+      case 'ru':
+        return 'Доступные страны HACCP (нормативные профили)';
+      case 'es':
+        return 'Paises HACCP disponibles (perfiles regulatorios)';
+      case 'fr':
+        return 'Pays HACCP disponibles (profils reglementaires)';
+      case 'it':
+        return 'Paesi HACCP disponibili (profili normativi)';
+      case 'de':
+        return 'Verfugbare HACCP-Lander (regulatorische Profile)';
+      case 'tr':
+        return 'Kullanilabilir HACCP ulkeleri (duzenleyici profiller)';
+      default:
+        return 'Available HACCP countries (regulatory profiles)';
     }
   }
 
@@ -1941,8 +2218,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final localization = context.watch<LocalizationService>();
     final subEnt = SubscriptionEntitlements.from(accountManager.establishment);
     final screenPref = context.watch<ScreenLayoutPreferenceService>();
-    final posOn =
-        FeatureFlags.posEnabledForSubscription(subEnt) && screenPref.showPosSection;
+    final posOn = FeatureFlags.posEnabledForSubscription(subEnt) &&
+        screenPref.showPosSection;
 
     if (currentEmployee == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -2075,27 +2352,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 if (currentEmployee.hasRole('owner') &&
                     !accountManager.isLiteTier) ...[
-                  if (SubscriptionEntitlements.from(accountManager.establishment)
+                  if (SubscriptionEntitlements.from(
+                          accountManager.establishment)
                       .hasUltraLevelFeatures)
                     Consumer<ScreenLayoutPreferenceService>(
                       builder: (_, screenPref, __) => SwitchListTile(
                         secondary: const Icon(Icons.point_of_sale_outlined),
                         title: Text(localization.t('show_pos_section') ??
                             'Раздел «POS» на главной'),
-                        subtitle: Text(localization.t('show_pos_section_hint') ??
+                        subtitle: Text(localization
+                                .t('show_pos_section_hint') ??
                             'Показывать POS-плитки на домашнем экране (заказы, касса, столы, склад, закупка, продажи)'),
                         value: screenPref.showPosSection,
                         onChanged: (v) => screenPref.setShowPosSection(v),
                       ),
                     ),
-                  if (SubscriptionEntitlements.from(accountManager.establishment)
+                  if (SubscriptionEntitlements.from(
+                          accountManager.establishment)
                       .hasUltraLevelFeatures)
                     Consumer<ScreenLayoutPreferenceService>(
                       builder: (_, screenPref, __) => SwitchListTile(
                         secondary: const Icon(Icons.local_bar),
                         title: Text(localization.t('show_bar_section') ??
                             'Раздел «Бар» на главной'),
-                        subtitle: Text(localization.t('show_bar_section_hint') ??
+                        subtitle: Text(localization
+                                .t('show_bar_section_hint') ??
                             'Показывать секцию Бар (график, меню, ТТК и др.)'),
                         value: screenPref.showBarSection,
                         onChanged: (v) => screenPref.setShowBarSection(v),
@@ -2231,18 +2512,150 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     builder: (_, config, __) {
                       final est = establishment;
                       if (est == null) return const SizedBox.shrink();
+                      final selectedCountryCode =
+                          config.resolveCountryCodeForEstablishment(est);
+                      final profile = HaccpCountryProfiles.byCountryCode(
+                          selectedCountryCode);
+                      final explicitOverride =
+                          config.hasExplicitCountryOverride(est.id);
                       final enabled = config.getEnabledLogTypes(est.id);
+                      final supportedCodes = config.supportedCodesForCountry(
+                        profile.countryCode,
+                      );
+                      final supportedLogs = HaccpLogType.supportedInApp
+                          .where((t) => supportedCodes.contains(t.code))
+                          .toList();
                       return SingleChildScrollView(
                         padding: const EdgeInsets.fromLTRB(24, 0, 16, 16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
+                              '${_haccpProfileLabel(localization)}: ${HaccpCountryProfiles.countryCodeAndNameLabel(profile.countryCode, localization.currentLanguageCode)}',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              explicitOverride
+                                  ? _haccpProfileSourceManualLabel(localization)
+                                  : _haccpProfileSourceAutoLabel(localization),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                            ),
+                            const SizedBox(height: 6),
+                            DropdownButtonFormField<String>(
+                              value: profile.countryCode,
+                              decoration: InputDecoration(
+                                labelText: _haccpTemplateCountryFieldLabel(
+                                    localization),
+                              ),
+                              items: HaccpCountryProfiles.available
+                                  .map(
+                                    (p) => DropdownMenuItem<String>(
+                                      value: p.countryCode,
+                                      child: Text(HaccpCountryProfiles
+                                          .countryCodeAndNameLabel(
+                                              p.countryCode,
+                                              localization
+                                                  .currentLanguageCode)),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) {
+                                if (v == null || v == profile.countryCode) {
+                                  return;
+                                }
+                                _setHaccpCountryProfile(
+                                  context,
+                                  config,
+                                  est.id,
+                                  v,
+                                  localization,
+                                );
+                              },
+                            ),
+                            if (explicitOverride) ...[
+                              const SizedBox(height: 6),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  onPressed: () =>
+                                      _resetHaccpCountryProfileToAuto(
+                                    context,
+                                    config,
+                                    est,
+                                    est.id,
+                                    localization,
+                                  ),
+                                  icon: const Icon(Icons.refresh),
+                                  label: Text(
+                                      _haccpUseAutoTemplateLabel(localization)),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 8),
+                            Text(
+                              HaccpCountryProfiles.legalFrameworkLabel(
+                                profile.countryCode,
+                                localization.currentLanguageCode,
+                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _haccpTemplateUsageHint(localization),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              _haccpAvailableCountriesLabel(localization),
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: HaccpCountryProfiles.available
+                                  .map(
+                                    (p) => Chip(
+                                      label: Text(
+                                        HaccpCountryProfiles
+                                            .countryCodeAndNameLabel(
+                                                p.countryCode,
+                                                localization
+                                                    .currentLanguageCode),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
                               localization.t('haccp_enabled_journals') ??
                                   'Включённые журналы',
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
-                            ...HaccpLogType.supportedInApp.map((t) {
+                            ...supportedLogs.map((t) {
                               final isOn = enabled.contains(t.code);
                               return ListTile(
                                 leading: Checkbox(
@@ -2253,14 +2666,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       est.id,
                                       t,
                                       v ?? false,
-                                      localization),
+                                      localization,
+                                      profile.countryCode),
                                 ),
                                 title: Text(
                                     localization.t(t.displayNameKey) ??
                                         t.displayNameRu,
                                     style: const TextStyle(fontSize: 14)),
-                                onTap: () => _toggleHaccpJournal(context,
-                                    config, est.id, t, !isOn, localization),
+                                onTap: () => _toggleHaccpJournal(
+                                    context,
+                                    config,
+                                    est.id,
+                                    t,
+                                    !isOn,
+                                    localization,
+                                    profile.countryCode),
                               );
                             }),
                           ],
@@ -2343,8 +2763,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: Text(title),
                   subtitle: Text(subtitle),
                   value: isImperial,
-                  onChanged: (v) => unitPrefs
-                      .setUnitSystem(v ? UnitSystem.imperial : UnitSystem.metric),
+                  onChanged: (v) => unitPrefs.setUnitSystem(
+                      v ? UnitSystem.imperial : UnitSystem.metric),
                 );
               },
             ),

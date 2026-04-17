@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../core/config/roles_config.dart';
+import '../haccp/haccp_country_profile.dart';
 import '../models/employee.dart';
 import '../models/haccp_log.dart';
 import '../models/haccp_log_type.dart';
@@ -110,6 +111,17 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
 
   /// Сохранённые варианты по ключу поля формы (хранение в SharedPreferences под ключом logType:field).
   final Map<String, List<String>> _presetOptions = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final est = context.read<AccountManagerSupabase>().establishment;
+      if (est != null) {
+        context.read<HaccpConfigService>().load(est.id, notify: false);
+      }
+    });
+  }
 
   /// Сотрудники заведения для форм медкнижек, медосмотров и полей «ответственный»/«подпись».
   List<Employee> _formEmployees = [];
@@ -1051,8 +1063,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: available.map((e) {
                       final name = displayStoredPersonName(
-                          employeeFullNameRaw(e),
-                          loc,
+                          employeeFullNameRaw(e), loc,
                           showNameTranslit: showNameTranslit);
                       return ListTile(
                         title: Text(name),
@@ -1173,18 +1184,18 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           },
           border: TableBorder.all(color: Theme.of(context).dividerColor),
           children: [
-                TableRow(
-                  children: [
+            TableRow(
+              children: [
                 _tableHeaderCell(_th(loc, 'haccp_tbl_pp_no', '№ п/п')),
                 _tableHeaderCell(_th(loc, 'haccp_tbl_date', 'Дата')),
-                _tableHeaderCell(_th(loc, 'haccp_tbl_temp_c_label',
-                    'Температура, °C')),
+                _tableHeaderCell(
+                    _th(loc, 'haccp_tbl_temp_c_label', 'Температура, °C')),
                 _tableHeaderCell(_th(loc, 'haccp_tbl_rel_humidity_pct',
                     'Относительная влажность, %')),
                 _tableHeaderCell(_th(loc, 'haccp_tbl_responsible_sign',
                     'Подпись ответственного лица')),
-                  ],
-                ),
+              ],
+            ),
             TableRow(
               children: [
                 _tableCell(const Text('1')),
@@ -1262,8 +1273,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 'Наименование готового блюда')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_organo_result',
                 'Результаты органолептической оценки')),
-            _tableHeaderCell(_th(loc, 'haccp_tbl_sale_allowed',
-                'Разрешение к реализации')),
+            _tableHeaderCell(
+                _th(loc, 'haccp_tbl_sale_allowed', 'Разрешение к реализации')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_brakerage_commission_sigs',
                 'Подписи членов бракеражной комиссии')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_portion_weighing',
@@ -1275,8 +1286,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           children: [
             _tableCell(
                 Text(DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()))),
-            _tableCell(_textField('time_brakerage',
-                _th(loc, 'haccp_placeholder_time_sample', 'Время (например 12:00)'))),
+            _tableCell(_textField(
+                'time_brakerage',
+                _th(loc, 'haccp_placeholder_time_sample',
+                    'Время (например 12:00)'))),
             _tableCell(_finishedProductPickerCell(loc)),
             _tableCell(_textField(
                 'result', loc.t('haccp_result') ?? 'Результат оценки',
@@ -1312,19 +1325,20 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       children: [
         TableRow(
           children: [
-            _tableHeaderCell(_th(loc, 'haccp_tbl_received_at',
-                'Дата и час поступления')),
+            _tableHeaderCell(
+                _th(loc, 'haccp_tbl_received_at', 'Дата и час поступления')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_name', 'Наименование')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_packaging', 'Фасовка')),
-            _tableHeaderCell(_th(loc, 'haccp_tbl_manufacturer',
-                'Изготовитель/поставщик')),
+            _tableHeaderCell(
+                _th(loc, 'haccp_tbl_manufacturer', 'Изготовитель/поставщик')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_qty_short', 'Кол-во')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_doc_no', '№ документа')),
-            _tableHeaderCell(_th(loc, 'haccp_tbl_organo_short',
-                'Органолептическая оценка')),
+            _tableHeaderCell(
+                _th(loc, 'haccp_tbl_organo_short', 'Органолептическая оценка')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_storage_shelf',
                 'Условия хранения, срок реализации')),
-            _tableHeaderCell(_th(loc, 'haccp_tbl_sale_date', 'Дата реализации')),
+            _tableHeaderCell(
+                _th(loc, 'haccp_tbl_sale_date', 'Дата реализации')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_signature', 'Подпись')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_note_short', 'Прим.')),
           ],
@@ -1343,15 +1357,16 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             )),
             _tableCell(_savedOptionTextField(
               key: 'manufacturer_supplier',
-              label: _th(loc, 'haccp_tbl_manufacturer', 'Изготовитель/поставщик'),
+              label:
+                  _th(loc, 'haccp_tbl_manufacturer', 'Изготовитель/поставщик'),
               options: _presetOptions['manufacturer_supplier'] ?? const [],
               presetFieldKey: 'manufacturer_supplier',
             )),
-            _tableCell(_textField('quantity_kg',
-                _th(loc, 'haccp_cell_qty_kg_l_pcs', 'кг/л/шт'),
+            _tableCell(_textField(
+                'quantity_kg', _th(loc, 'haccp_cell_qty_kg_l_pcs', 'кг/л/шт'),
                 keyboardType: TextInputType.number)),
-            _tableCell(_textField('document_number',
-                _th(loc, 'haccp_doc_no_abbr', '№ док.'))),
+            _tableCell(_textField(
+                'document_number', _th(loc, 'haccp_doc_no_abbr', '№ док.'))),
             _tableCell(_textField('result', loc.t('haccp_result') ?? 'Оценка',
                 multiline: true)),
             _tableCell(_savedOptionTextField(
@@ -1386,8 +1401,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   Widget _medBookEmployeeDropdown(
       LocalizationService loc, bool showNameTranslit) {
     if (_formEmployees.isEmpty) {
-      return _textField(
-          'med_book_employee_name', _th(loc, 'haccp_tbl_med_exam_fio', 'Ф. И. О.'));
+      return _textField('med_book_employee_name',
+          _th(loc, 'haccp_tbl_med_exam_fio', 'Ф. И. О.'));
     }
     final selected =
         _formEmployees.where((e) => e.id == _medBookEmployeeId).firstOrNull;
@@ -1453,11 +1468,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         TableRow(
           children: [
             _tableHeaderCell(_th(loc, 'haccp_tbl_pp_no', '№ п/п')),
-            _tableHeaderCell(_th(loc, 'haccp_tbl_fio_full',
-                'Фамилия, имя, отчество')),
+            _tableHeaderCell(
+                _th(loc, 'haccp_tbl_fio_full', 'Фамилия, имя, отчество')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_position', 'Должность')),
-            _tableHeaderCell(_th(loc, 'haccp_tbl_med_book_no',
-                'Номер медицинской книжки')),
+            _tableHeaderCell(
+                _th(loc, 'haccp_tbl_med_book_no', 'Номер медицинской книжки')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_med_book_valid',
                 'Срок действия медицинской книжки')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_med_book_receipt',
@@ -1470,8 +1485,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           children: [
             _tableCell(const Text('1')),
             _tableCell(_medBookEmployeeDropdown(loc, showNameTranslit)),
-            _tableCell(_textField(
-                'med_book_position', _th(loc, 'haccp_tbl_position', 'Должность'))),
+            _tableCell(_textField('med_book_position',
+                _th(loc, 'haccp_tbl_position', 'Должность'))),
             _tableCell(_textField('med_book_number',
                 _th(loc, 'haccp_tbl_med_book_no', 'Номер медкнижки'))),
             _tableCell(InkWell(
@@ -1505,7 +1520,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   },
                   child: Text(_medBookIssuedAt != null
                       ? DateFormat('dd.MM.yyyy').format(_medBookIssuedAt!)
-                      : _th(loc, 'haccp_med_placeholder_issue', 'Дата получения')),
+                      : _th(loc, 'haccp_med_placeholder_issue',
+                          'Дата получения')),
                 ),
                 _signatureFromAccount(),
               ],
@@ -1526,7 +1542,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   },
                   child: Text(_medBookReturnedAt != null
                       ? DateFormat('dd.MM.yyyy').format(_medBookReturnedAt!)
-                      : _th(loc, 'haccp_med_placeholder_return', 'Дата возврата')),
+                      : _th(loc, 'haccp_med_placeholder_return',
+                          'Дата возврата')),
                 ),
                 _signatureFromAccount(),
               ],
@@ -1560,21 +1577,22 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             _tableHeaderCell(_th(loc, 'haccp_tbl_date', 'Дата')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_oil_use_start',
                 'Время начала использования жира')),
-            _tableHeaderCell(_th(loc, 'haccp_tbl_frying_fat_type',
-                'Вид фритюрного жира')),
+            _tableHeaderCell(
+                _th(loc, 'haccp_tbl_frying_fat_type', 'Вид фритюрного жира')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_organo_fry_start',
                 'Органолептическая оценка на начало жарки')),
             _tableHeaderCell(
                 _th(loc, 'haccp_tbl_fryer_type', 'Тип жарочного оборудования')),
             _tableHeaderCell(
                 _th(loc, 'haccp_tbl_product_type', 'Вид продукции')),
-            _tableHeaderCell(_th(loc, 'haccp_tbl_time_end', 'Время окончания жарки')),
+            _tableHeaderCell(
+                _th(loc, 'haccp_tbl_time_end', 'Время окончания жарки')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_organo_fry_end',
                 'Органолептическая оценка по окончании жарки')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_carry_remainder_kg',
                 'Переходящий остаток, кг')),
-            _tableHeaderCell(_th(loc, 'haccp_tbl_fat_disposed_kg',
-                'Утилизированный жир, кг')),
+            _tableHeaderCell(_th(
+                loc, 'haccp_tbl_fat_disposed_kg', 'Утилизированный жир, кг')),
             _tableHeaderCell(_th(loc, 'haccp_tbl_controller_fio_role',
                 'Должность, Ф.И.О. контролера')),
           ],
@@ -1604,16 +1622,18 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               options: _presetOptions['frying_product_type'] ?? const [],
               presetFieldKey: 'frying_product_type',
             )),
-            _tableCell(_textField('frying_end_time',
-                _th(loc, 'haccp_placeholder_time_sample_14', 'Время (например 14:00)'))),
+            _tableCell(_textField(
+                'frying_end_time',
+                _th(loc, 'haccp_placeholder_time_sample_14',
+                    'Время (например 14:00)'))),
             _tableCell(_textField('organoleptic_end',
                 _th(loc, 'haccp_tbl_score_end', 'Оценка по окончании'),
                 multiline: true)),
-            _tableCell(_textField('carry_over_kg',
-                _th(loc, 'haccp_tbl_carry_kg', 'кг'),
+            _tableCell(_textField(
+                'carry_over_kg', _th(loc, 'haccp_tbl_carry_kg', 'кг'),
                 keyboardType: TextInputType.number)),
-            _tableCell(_textField('utilized_kg',
-                _th(loc, 'haccp_tbl_utilized_kg', 'кг'),
+            _tableCell(_textField(
+                'utilized_kg', _th(loc, 'haccp_tbl_utilized_kg', 'кг'),
                 keyboardType: TextInputType.number)),
             _tableCell(_signatureFromAccount()),
           ],
@@ -1622,7 +1642,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     );
   }
 
-  Widget _buildMedExaminationsForm(LocalizationService loc, bool showNameTranslit) {
+  Widget _buildMedExaminationsForm(
+      LocalizationService loc, bool showNameTranslit) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1661,14 +1682,14 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           children: [
             TableRow(children: [
               _tableHeaderCell(_th(loc, 'haccp_tbl_med_exam_fio', 'Ф. И. О.')),
-              _tableHeaderCell(_th(loc, 'haccp_tbl_age_dob',
-                  'Возраст (дата рождения)'))
+              _tableHeaderCell(
+                  _th(loc, 'haccp_tbl_age_dob', 'Возраст (дата рождения)'))
             ]),
             TableRow(children: [
               _tableCell(_textField('med_exam_employee_name',
                   _th(loc, 'haccp_tbl_med_exam_fio', 'Ф. И. О.'))),
-              _tableCell(_textField('med_exam_dob',
-                  _th(loc, 'birth_date', 'Дата рождения')))
+              _tableCell(_textField(
+                  'med_exam_dob', _th(loc, 'birth_date', 'Дата рождения')))
             ]),
             TableRow(children: [
               _tableHeaderCell(_th(loc, 'haccp_tbl_gender_short', 'Пол')),
@@ -1681,9 +1702,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   _th(loc, 'haccp_tbl_position', 'Должность')))
             ]),
             TableRow(children: [
-              _tableHeaderCell(_th(loc, 'haccp_tbl_struct_unit',
-                  'Структурное подразделение')),
-              _tableHeaderCell(_th(loc, 'haccp_tbl_hire_date', 'Дата приёма на работу'))
+              _tableHeaderCell(_th(
+                  loc, 'haccp_tbl_struct_unit', 'Структурное подразделение')),
+              _tableHeaderCell(
+                  _th(loc, 'haccp_tbl_hire_date', 'Дата приёма на работу'))
             ]),
             TableRow(children: [
               _tableCell(_textField('med_exam_department',
@@ -1709,12 +1731,16 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             TableRow(children: [
               _tableCell(_textField('med_exam_type',
                   _th(loc, 'haccp_cell_exam_kind_short', 'Вид'))),
-              _tableCell(_textField('med_exam_institution',
-                  _th(loc, 'haccp_cell_institution_long', 'Лечебное учреждение')))
+              _tableCell(_textField(
+                  'med_exam_institution',
+                  _th(loc, 'haccp_cell_institution_long',
+                      'Лечебное учреждение')))
             ]),
             TableRow(children: [
-              _tableHeaderCell(_th(loc, 'haccp_tbl_harmful_90', 'Вредный фактор №90')),
-              _tableHeaderCell(_th(loc, 'haccp_tbl_harmful_83', 'Вредный фактор №83'))
+              _tableHeaderCell(
+                  _th(loc, 'haccp_tbl_harmful_90', 'Вредный фактор №90')),
+              _tableHeaderCell(
+                  _th(loc, 'haccp_tbl_harmful_83', 'Вредный фактор №83'))
             ]),
             TableRow(children: [
               _tableCell(_textField('med_exam_harmful_1',
@@ -1723,7 +1749,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   _th(loc, 'haccp_cell_order_ref_83', '№ по приказу 83')))
             ]),
             TableRow(children: [
-              _tableHeaderCell(_th(loc, 'haccp_tbl_exam_pass_date', 'Дата прохождения')),
+              _tableHeaderCell(
+                  _th(loc, 'haccp_tbl_exam_pass_date', 'Дата прохождения')),
               _tableHeaderCell(_th(loc, 'haccp_tbl_conclusion', 'Заключение'))
             ]),
             TableRow(children: [
@@ -1733,13 +1760,14 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   _th(loc, 'haccp_tbl_conclusion', 'Заключение'))),
             ]),
             TableRow(children: [
-              _tableHeaderCell(_th(loc, 'haccp_tbl_employer_decision',
-                  'Решение работодателя')),
-              _tableHeaderCell(_th(loc, 'haccp_tbl_next_exam_date',
-                  'Дата следующего осмотра'))
+              _tableHeaderCell(_th(
+                  loc, 'haccp_tbl_employer_decision', 'Решение работодателя')),
+              _tableHeaderCell(_th(
+                  loc, 'haccp_tbl_next_exam_date', 'Дата следующего осмотра'))
             ]),
             TableRow(children: [
-              _tableCell(_textField('med_exam_employer_decision',
+              _tableCell(_textField(
+                  'med_exam_employer_decision',
                   _th(loc, 'haccp_cell_employer_decision_short',
                       'Допущен/отстранён/переведён/уволен'))),
               _tableCell(_datePickerCell('med_exam_next_date', _medExamNextDate,
@@ -1755,8 +1783,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   'med_exam_exclusion_date',
                   _medExamExclusionDate,
                   (d) => setState(() => _medExamExclusionDate = d))),
-              _tableCell(_textField('med_exam_note',
-                  _th(loc, 'haccp_tbl_note', 'Примечание'))),
+              _tableCell(_textField(
+                  'med_exam_note', _th(loc, 'haccp_tbl_note', 'Примечание'))),
             ]),
           ],
         ),
@@ -1788,7 +1816,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(_th(loc, 'haccp_form_disinfect_need_title',
+        Text(
+            _th(loc, 'haccp_form_disinfect_need_title',
                 'Расчёт потребности в дезинфицирующих средствах'),
             style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 4),
@@ -1816,16 +1845,22 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               border: TableBorder.all(color: Theme.of(context).dividerColor),
               children: [
                 TableRow(children: [
-                  _tableHeaderCell(_th(loc, 'haccp_tbl_object_short', 'Объект')),
+                  _tableHeaderCell(
+                      _th(loc, 'haccp_tbl_object_short', 'Объект')),
                   _tableHeaderCell(_th(loc, 'haccp_tbl_qty_short', 'Кол-во')),
                   _tableHeaderCell(_th(loc, 'haccp_tbl_area_m2', 'Площадь м²')),
                   _tableHeaderCell(_th(loc, 'haccp_tbl_tg_type', 'Вид Т/Г')),
-                  _tableHeaderCell(_th(loc, 'haccp_tbl_frequency_month', 'Кратность/мес')),
-                  _tableHeaderCell(_th(loc, 'haccp_tbl_disinfectant_short', 'Дезсредство')),
+                  _tableHeaderCell(
+                      _th(loc, 'haccp_tbl_frequency_month', 'Кратность/мес')),
+                  _tableHeaderCell(
+                      _th(loc, 'haccp_tbl_disinfectant_short', 'Дезсредство')),
                   _tableHeaderCell(_th(loc, 'haccp_tbl_conc_pct', 'Конц.%')),
-                  _tableHeaderCell(_th(loc, 'haccp_tbl_consumption_m2', 'Расход/м²')),
-                  _tableHeaderCell(_th(loc, 'haccp_tbl_solution_per_round', 'Раствор на 1 обр.')),
-                  _tableHeaderCell(_th(loc, 'haccp_tbl_need_1_round', 'Потребность 1 обр.')),
+                  _tableHeaderCell(
+                      _th(loc, 'haccp_tbl_consumption_m2', 'Расход/м²')),
+                  _tableHeaderCell(_th(loc, 'haccp_tbl_solution_per_round',
+                      'Раствор на 1 обр.')),
+                  _tableHeaderCell(
+                      _th(loc, 'haccp_tbl_need_1_round', 'Потребность 1 обр.')),
                   _tableHeaderCell(_th(loc, 'haccp_tbl_per_month', 'В месяц')),
                   _tableHeaderCell(_th(loc, 'haccp_tbl_per_year', 'В год')),
                 ]),
@@ -1839,8 +1874,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   _tableCell(_textField('disinf_object_count',
                       _th(loc, 'haccp_tbl_qty_short', 'Кол-во'),
                       keyboardType: TextInputType.number)),
-                  _tableCell(_textField('disinf_area_sqm',
-                      _th(loc, 'haccp_tbl_area_m2', 'м²'),
+                  _tableCell(_textField(
+                      'disinf_area_sqm', _th(loc, 'haccp_tbl_area_m2', 'м²'),
                       keyboardType: TextInputType.number)),
                   _tableCell(_savedOptionTextField(
                     key: 'disinf_treatment_type',
@@ -1854,7 +1889,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                       keyboardType: TextInputType.number)),
                   _tableCell(_savedOptionTextField(
                     key: 'disinf_agent_name',
-                    label: _th(loc, 'haccp_tbl_disinfectant_short', 'Дезсредство'),
+                    label:
+                        _th(loc, 'haccp_tbl_disinfectant_short', 'Дезсредство'),
                     options: _presetOptions['disinf_agent_name'] ?? const [],
                     presetFieldKey: 'disinf_agent_name',
                   )),
@@ -1881,7 +1917,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        Text(_th(loc, 'haccp_form_disinfect_receipt_title',
+        Text(
+            _th(loc, 'haccp_form_disinfect_receipt_title',
                 'Поступление дезинфицирующих средств'),
             style: Theme.of(context).textTheme.titleSmall),
         const SizedBox(height: 4),
@@ -1899,10 +1936,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             TableRow(children: [
               _tableHeaderCell(_th(loc, 'haccp_tbl_date', 'Дата')),
               _tableHeaderCell(_th(loc, 'haccp_tbl_name', 'Наименование')),
-              _tableHeaderCell(_th(loc, 'haccp_tbl_invoice_date', 'Счёт, дата')),
+              _tableHeaderCell(
+                  _th(loc, 'haccp_tbl_invoice_date', 'Счёт, дата')),
               _tableHeaderCell(_th(loc, 'haccp_tbl_qty_short', 'Кол-во')),
               _tableHeaderCell(_th(loc, 'haccp_tbl_expiry', 'Срок годности')),
-              _tableHeaderCell(_th(loc, 'haccp_tbl_responsible', 'Ответственный'))
+              _tableHeaderCell(
+                  _th(loc, 'haccp_tbl_responsible', 'Ответственный'))
             ]),
             TableRow(children: [
               _tableCell(_datePickerCell(
@@ -1918,8 +1957,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               )),
               _tableCell(_textField('disinf_invoice_number',
                   _th(loc, 'haccp_cell_invoice_no', '№ счёта'))),
-              _tableCell(_textField('disinf_quantity',
-                  _th(loc, 'haccp_tbl_qty_short', 'Кол-во'),
+              _tableCell(_textField(
+                  'disinf_quantity', _th(loc, 'haccp_tbl_qty_short', 'Кол-во'),
                   keyboardType: TextInputType.number)),
               _tableCell(_datePickerCell(
                   'disinf_expiry_date',
@@ -1953,18 +1992,21 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           _tableHeaderCell(_th(loc, 'haccp_tbl_date', 'Дата')),
           _tableHeaderCell(_th(loc, 'haccp_tbl_wash_time', 'Время мойки')),
           _tableHeaderCell(_th(loc, 'haccp_tbl_equipment', 'Оборудование')),
-          _tableHeaderCell(_th(loc, 'haccp_tbl_cleaning_solution', 'Моющий раствор')),
+          _tableHeaderCell(
+              _th(loc, 'haccp_tbl_cleaning_solution', 'Моющий раствор')),
           _tableHeaderCell(_th(loc, 'haccp_tbl_conc_pct', 'Конц.%')),
-          _tableHeaderCell(_th(loc, 'haccp_tbl_disinfect_solution', 'Дез. раствор')),
+          _tableHeaderCell(
+              _th(loc, 'haccp_tbl_disinfect_solution', 'Дез. раствор')),
           _tableHeaderCell(_th(loc, 'haccp_tbl_conc_pct', 'Конц.%')),
-          _tableHeaderCell(_th(loc, 'haccp_tbl_rinse_temp', 'Ополаскивание t°')),
+          _tableHeaderCell(
+              _th(loc, 'haccp_tbl_rinse_temp', 'Ополаскивание t°')),
           _tableHeaderCell(_th(loc, 'haccp_tbl_washer_fio', 'Ф.И.О. мойщика')),
           _tableHeaderCell(_th(loc, 'haccp_tbl_controller', 'Контроль')),
         ]),
         TableRow(children: [
           _tableCell(Text(DateFormat('dd.MM.yyyy').format(DateTime.now()))),
-          _tableCell(_textField(
-              'wash_time', _th(loc, 'haccp_tbl_time', 'Время'))),
+          _tableCell(
+              _textField('wash_time', _th(loc, 'haccp_tbl_time', 'Время'))),
           _tableCell(_savedOptionTextField(
             key: 'wash_equipment_name',
             label: _th(loc, 'haccp_tbl_equipment', 'Оборудование'),
@@ -1987,8 +2029,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           )),
           _tableCell(_textField('wash_disinfectant_concentration_pct',
               _th(loc, 'haccp_tbl_conc_pct', '%'))),
-          _tableCell(_textField('wash_rinsing_temp',
-              _th(loc, 'haccp_tbl_rinse_temp', 't°'))),
+          _tableCell(_textField(
+              'wash_rinsing_temp', _th(loc, 'haccp_tbl_rinse_temp', 't°'))),
           _tableCell(_signatureFromAccount()),
           _tableCell(_signatureFromAccount()),
         ]),
@@ -2009,7 +2051,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         TableRow(children: [
           _tableHeaderCell(_th(loc, 'haccp_tbl_no_short', '№')),
           _tableHeaderCell(_th(loc, 'haccp_tbl_room_zone', 'Помещение / зона')),
-          _tableHeaderCell(_th(loc, 'haccp_tbl_gen_clean_date', 'Дата проведения')),
+          _tableHeaderCell(
+              _th(loc, 'haccp_tbl_gen_clean_date', 'Дата проведения')),
           _tableHeaderCell(_th(loc, 'haccp_tbl_responsible', 'Ответственный'))
         ]),
         TableRow(children: [
@@ -2041,15 +2084,18 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       border: TableBorder.all(color: Theme.of(context).dividerColor),
       children: [
         TableRow(children: [
-          _tableHeaderCell(_th(loc, 'haccp_tbl_sieve_magnet_no', '№ сита/магнита')),
-          _tableHeaderCell(_th(loc, 'haccp_tbl_name_location', 'Наименование / Расположение')),
+          _tableHeaderCell(
+              _th(loc, 'haccp_tbl_sieve_magnet_no', '№ сита/магнита')),
+          _tableHeaderCell(_th(
+              loc, 'haccp_tbl_name_location', 'Наименование / Расположение')),
           _tableHeaderCell(_th(loc, 'haccp_tbl_condition', 'Состояние')),
           _tableHeaderCell(_th(loc, 'haccp_tbl_cleaning_date', 'Дата очистки')),
           _tableHeaderCell(_th(loc, 'haccp_tbl_fio_signature', 'ФИО, Подпись')),
           _tableHeaderCell(_th(loc, 'haccp_tbl_comments', 'Комментарии'))
         ]),
         TableRow(children: [
-          _tableCell(_textField('sieve_no', _th(loc, 'haccp_tbl_no_short', '№'))),
+          _tableCell(
+              _textField('sieve_no', _th(loc, 'haccp_tbl_no_short', '№'))),
           _tableCell(_savedOptionTextField(
             key: 'sieve_name_location',
             label: _th(loc, 'haccp_tbl_name', 'Наименование'),
@@ -2065,8 +2111,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           _tableCell(_datePickerCell('sieve_cleaning_date', _sieveCleaningDate,
               (d) => setState(() => _sieveCleaningDate = d))),
           _tableCell(_signatureFromAccount()),
-          _tableCell(_textField('sieve_comments',
-              _th(loc, 'haccp_tbl_comments', 'Комментарии'))),
+          _tableCell(_textField(
+              'sieve_comments', _th(loc, 'haccp_tbl_comments', 'Комментарии'))),
         ]),
       ],
     );
@@ -2159,7 +2205,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     );
   }
 
-  Widget _buildFormByTypeMobile(LocalizationService loc, bool showNameTranslit) {
+  Widget _buildFormByTypeMobile(
+      LocalizationService loc, bool showNameTranslit) {
     switch (_logType) {
       case HaccpLogType.healthHygiene:
         final dateStr = DateFormat('dd.MM.yyyy').format(DateTime.now());
@@ -2227,8 +2274,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                       Text(
                           '${loc.t('haccp_result_label_short')}: ${row.statusOk ? loc.t('haccp_status_admitted') : loc.t('haccp_status_suspended')}',
                           style: const TextStyle(fontSize: 12)),
-                      Text(
-                          '${loc.t('haccp_responsible_person')}: $creatorName',
+                      Text('${loc.t('haccp_responsible_person')}: $creatorName',
                           style: const TextStyle(fontSize: 12)),
                     ],
                   ),
@@ -2260,8 +2306,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                         mainAxisSize: MainAxisSize.min,
                         children: available.map((e) {
                           final name = displayStoredPersonName(
-                              employeeFullNameRaw(e),
-                              loc,
+                              employeeFullNameRaw(e), loc,
                               showNameTranslit: showNameTranslit);
                           return ListTile(
                             title: Text(name),
@@ -2380,7 +2425,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               initialValue:
                   DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()),
               decoration: InputDecoration(
-                  labelText: _th(loc, 'haccp_tbl_dish_made_at', 'Дата и час изготовления блюда'),
+                  labelText: _th(loc, 'haccp_tbl_dish_made_at',
+                      'Дата и час изготовления блюда'),
                   border: const OutlineInputBorder(),
                   isDense: true),
               readOnly: true,
@@ -2397,7 +2443,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             _signatureFromAccount(),
             _textField(
                 'weighing_result',
-                _th(loc, 'haccp_tbl_portion_weighing', 'Результаты взвешивания порционных блюд')),
+                _th(loc, 'haccp_tbl_portion_weighing',
+                    'Результаты взвешивания порционных блюд')),
             _textField('note', loc.t('haccp_note') ?? 'Примечание'),
           ],
         );
@@ -2410,7 +2457,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               initialValue:
                   DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()),
               decoration: InputDecoration(
-                  labelText: _th(loc, 'haccp_tbl_received_at', 'Дата и час поступления'),
+                  labelText: _th(
+                      loc, 'haccp_tbl_received_at', 'Дата и час поступления'),
                   border: const OutlineInputBorder(),
                   isDense: true),
               readOnly: true,
@@ -2424,21 +2472,23 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             ),
             _savedOptionTextField(
               key: 'manufacturer_supplier',
-              label: _th(loc, 'haccp_tbl_manufacturer', 'Изготовитель/поставщик'),
+              label:
+                  _th(loc, 'haccp_tbl_manufacturer', 'Изготовитель/поставщик'),
               options: _presetOptions['manufacturer_supplier'] ?? const [],
               presetFieldKey: 'manufacturer_supplier',
             ),
             _textField('quantity_kg',
                 _th(loc, 'haccp_cell_qty_paren_long', 'Кол-во (кг/л/шт)'),
                 keyboardType: TextInputType.number),
-            _textField('document_number',
-                _th(loc, 'haccp_tbl_doc_no', '№ документа')),
+            _textField(
+                'document_number', _th(loc, 'haccp_tbl_doc_no', '№ документа')),
             _textField(
                 'result', loc.t('haccp_result') ?? 'Органолептическая оценка',
                 multiline: true),
             _savedOptionTextField(
               key: 'storage_conditions',
-              label: _th(loc, 'haccp_tbl_storage_shelf', 'Условия хранения, срок реализации'),
+              label: _th(loc, 'haccp_tbl_storage_shelf',
+                  'Условия хранения, срок реализации'),
               options: _presetOptions['storage_conditions'] ?? const [],
               presetFieldKey: 'storage_conditions',
             ),
@@ -2454,7 +2504,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               },
               child: InputDecorator(
                 decoration: InputDecoration(
-                    labelText: _th(loc, 'haccp_tbl_sale_date', 'Дата реализации'),
+                    labelText:
+                        _th(loc, 'haccp_tbl_sale_date', 'Дата реализации'),
                     border: const OutlineInputBorder(),
                     isDense: true),
                 child: Text(_dateSold != null
@@ -2483,7 +2534,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             TextFormField(
               initialValue: DateFormat('HH:mm').format(DateTime.now()),
               decoration: InputDecoration(
-                labelText: _th(loc, 'haccp_tbl_oil_use_start', 'Время начала использования жира'),
+                labelText: _th(loc, 'haccp_tbl_oil_use_start',
+                    'Время начала использования жира'),
                 border: const OutlineInputBorder(),
                 isDense: true,
               ),
@@ -2491,16 +2543,20 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
             ),
             _savedOptionTextField(
               key: 'oil_name',
-              label: _th(loc, 'haccp_tbl_frying_fat_type', 'Вид фритюрного жира'),
+              label:
+                  _th(loc, 'haccp_tbl_frying_fat_type', 'Вид фритюрного жира'),
               options: _presetOptions['oil_name'] ?? const [],
               presetFieldKey: 'oil_name',
             ),
-            _textField('organoleptic_start',
-                _th(loc, 'haccp_tbl_organo_fry_start', 'Органолептика на начало жарки'),
+            _textField(
+                'organoleptic_start',
+                _th(loc, 'haccp_tbl_organo_fry_start',
+                    'Органолептика на начало жарки'),
                 multiline: true),
             _savedOptionTextField(
               key: 'frying_equipment_type',
-              label: _th(loc, 'haccp_tbl_fryer_type', 'Тип жарочного оборудования'),
+              label: _th(
+                  loc, 'haccp_tbl_fryer_type', 'Тип жарочного оборудования'),
               options: _presetOptions['frying_equipment_type'] ?? const [],
               presetFieldKey: 'frying_equipment_type',
             ),
@@ -2514,14 +2570,20 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 'frying_end_time',
                 _th(loc, 'haccp_placeholder_time_sample_14',
                     'Время окончания жарки (например 14:00)')),
-            _textField('organoleptic_end',
-                _th(loc, 'haccp_tbl_organo_fry_end', 'Органолептика по окончании жарки'),
+            _textField(
+                'organoleptic_end',
+                _th(loc, 'haccp_tbl_organo_fry_end',
+                    'Органолептика по окончании жарки'),
                 multiline: true),
-            _textField('carry_over_kg',
-                _th(loc, 'haccp_tbl_carry_remainder_kg', 'Переходящий остаток, кг'),
+            _textField(
+                'carry_over_kg',
+                _th(loc, 'haccp_tbl_carry_remainder_kg',
+                    'Переходящий остаток, кг'),
                 keyboardType: TextInputType.number),
-            _textField('utilized_kg',
-                _th(loc, 'haccp_tbl_fat_disposed_kg', 'Утилизированный жир, кг'),
+            _textField(
+                'utilized_kg',
+                _th(loc, 'haccp_tbl_fat_disposed_kg',
+                    'Утилизированный жир, кг'),
                 keyboardType: TextInputType.number),
             _signatureFromAccount(),
             _textField('note', loc.t('haccp_note') ?? 'Примечание'),
@@ -2595,35 +2657,45 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 _th(loc, 'haccp_tbl_position', 'Должность')),
             _textField('med_exam_department',
                 _th(loc, 'haccp_tbl_struct_unit', 'Подразделение')),
-            _datePickerField('med_exam_hire_date',
+            _datePickerField(
+                'med_exam_hire_date',
                 _th(loc, 'haccp_tbl_hire_date', 'Дата приёма'),
-                _medExamHireDate, (d) => setState(() => _medExamHireDate = d)),
-            _textField('med_exam_type',
-                _th(loc, 'haccp_tbl_exam_kind', 'Вид (предварительный/периодический)')),
-            _textField('med_exam_institution',
-                _th(loc, 'haccp_tbl_lpu', 'ЛПУ')),
+                _medExamHireDate,
+                (d) => setState(() => _medExamHireDate = d)),
+            _textField(
+                'med_exam_type',
+                _th(loc, 'haccp_tbl_exam_kind',
+                    'Вид (предварительный/периодический)')),
+            _textField(
+                'med_exam_institution', _th(loc, 'haccp_tbl_lpu', 'ЛПУ')),
             _textField('med_exam_harmful_1',
                 _th(loc, 'haccp_tbl_harmful_90', 'Вредный фактор №90')),
             _textField('med_exam_harmful_2',
                 _th(loc, 'haccp_tbl_harmful_83', 'Вредный фактор №83')),
-            _datePickerField('med_exam_date',
+            _datePickerField(
+                'med_exam_date',
                 _th(loc, 'haccp_tbl_exam_pass_date', 'Дата прохождения'),
                 _medExamDate,
                 (d) => setState(() => _medExamDate = d)),
             _textField('med_exam_conclusion',
                 _th(loc, 'haccp_tbl_conclusion', 'Заключение')),
-            _textField('med_exam_employer_decision',
-                _th(loc, 'haccp_tbl_employer_decision', 'Решение работодателя')),
-            _datePickerField('med_exam_next_date',
+            _textField(
+                'med_exam_employer_decision',
+                _th(loc, 'haccp_tbl_employer_decision',
+                    'Решение работодателя')),
+            _datePickerField(
+                'med_exam_next_date',
                 _th(loc, 'haccp_tbl_next_exam_date', 'Дата следующего осмотра'),
-                _medExamNextDate, (d) => setState(() => _medExamNextDate = d)),
+                _medExamNextDate,
+                (d) => setState(() => _medExamNextDate = d)),
             _datePickerField(
                 'med_exam_exclusion_date',
-                _th(loc, 'haccp_tbl_exclusion_date', 'Дата исключения из списков'),
+                _th(loc, 'haccp_tbl_exclusion_date',
+                    'Дата исключения из списков'),
                 _medExamExclusionDate,
                 (d) => setState(() => _medExamExclusionDate = d)),
-            _textField('med_exam_note',
-                _th(loc, 'haccp_tbl_note', 'Примечание')),
+            _textField(
+                'med_exam_note', _th(loc, 'haccp_tbl_note', 'Примечание')),
           ],
         );
       case HaccpLogType.disinfectantAccounting:
@@ -2656,7 +2728,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                     keyboardType: TextInputType.number),
                 _savedOptionTextField(
                   key: 'disinf_agent_name',
-                  label: _th(loc, 'haccp_tbl_disinfectant_short', 'Дезсредство'),
+                  label:
+                      _th(loc, 'haccp_tbl_disinfectant_short', 'Дезсредство'),
                   options: _presetOptions['disinf_agent_name'] ?? const [],
                   presetFieldKey: 'disinf_agent_name',
                 ),
@@ -2727,8 +2800,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                   isDense: true),
               readOnly: true,
             ),
-            _textField('wash_time',
-                _th(loc, 'haccp_tbl_wash_time', 'Время мойки')),
+            _textField(
+                'wash_time', _th(loc, 'haccp_tbl_wash_time', 'Время мойки')),
             _savedOptionTextField(
               key: 'wash_equipment_name',
               label: _th(loc, 'haccp_tbl_equipment', 'Оборудование'),
@@ -2768,7 +2841,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               options: _presetOptions['gen_clean_premises'] ?? const [],
               presetFieldKey: 'gen_clean_premises',
             ),
-            _datePickerField('gen_clean_date',
+            _datePickerField(
+                'gen_clean_date',
                 _th(loc, 'haccp_tbl_gen_clean_date', 'Дата проведения'),
                 _genCleanDate,
                 (d) => setState(() => _genCleanDate = d)),
@@ -2785,7 +2859,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 _th(loc, 'haccp_tbl_sieve_magnet_no', '№ сита/магнита')),
             _savedOptionTextField(
               key: 'sieve_name_location',
-              label: _th(loc, 'haccp_tbl_name_location', 'Наименование / Расположение'),
+              label: _th(loc, 'haccp_tbl_name_location',
+                  'Наименование / Расположение'),
               options: _presetOptions['sieve_name_location'] ?? const [],
               presetFieldKey: 'sieve_name_location',
             ),
@@ -2962,8 +3037,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       HaccpLogServiceSupabase svc, String estId, String empId) async {
     final loc = context.read<LocalizationService>();
     final emp = context.read<AccountManagerSupabase>().currentEmployee;
-    final signatureName =
-        emp != null ? employeeFullNameRaw(emp) : null;
+    final signatureName = emp != null ? employeeFullNameRaw(emp) : null;
     final approvalStr = _logType == HaccpLogType.finishedProductBrakerage &&
             _approvalToSell != null
         ? (_approvalToSell!
@@ -3187,7 +3261,12 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
     final loc = context.watch<LocalizationService>();
     final showNameTranslit =
         context.watch<ScreenLayoutPreferenceService>().showNameTranslit;
-    final emp = context.watch<AccountManagerSupabase>().currentEmployee;
+    final account = context.watch<AccountManagerSupabase>();
+    final config = context.watch<HaccpConfigService>();
+    final emp = account.currentEmployee;
+    final est = account.establishment;
+    final countryCode =
+        est != null ? config.resolveCountryCodeForEstablishment(est) : 'RU';
     if (_logType == null) {
       return Scaffold(
         appBar: AppBar(
@@ -3229,9 +3308,26 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               ),
             const SizedBox(height: 16),
             Text(
-              loc.t('haccp_recommended_sample') ?? 'Рекомендуемый образец',
+              HaccpCountryProfiles.recommendedSampleLabel(countryCode),
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     color: Theme.of(context).colorScheme.primary,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              HaccpCountryProfiles.journalLegalLine(countryCode, _logType!),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              HaccpCountryProfiles.legalFrameworkLabel(
+                countryCode,
+                loc.currentLanguageCode,
+              ),
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
             ),
             const SizedBox(height: 4),
