@@ -401,7 +401,11 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureLoaded());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await context.read<UnitSystemPreferenceService>().ensureScopeSynced();
+      if (!mounted) return;
+      await _ensureLoaded();
+    });
   }
 
   @override
@@ -1525,6 +1529,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     final loc = context.watch<LocalizationService>();
     final store = context.watch<ProductStoreSupabase>();
     final account = context.watch<AccountManagerSupabase>();
+    final unitPrefs = context.watch<UnitSystemPreferenceService>();
     final est = account.establishment;
     // Филиал: работа с номенклатурой и ценами по id филиала (головное — dataEstablishmentId).
     final estId =
@@ -1757,6 +1762,19 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                         selected: _filterNoPrice,
                         showCheckmark: false,
                         onSelected: (v) => setState(() => _filterNoPrice = v),
+                        selectedColor:
+                            Theme.of(context).colorScheme.primaryContainer,
+                        backgroundColor: Theme.of(context).colorScheme.surface,
+                      ),
+                      const SizedBox(width: 8),
+                      FilterChip(
+                        avatar: const Icon(Icons.straighten, size: 16),
+                        label: Text(unitPrefs.isImperial ? 'US Imperial' : 'Metric'),
+                        selected: unitPrefs.isImperial,
+                        showCheckmark: false,
+                        onSelected: (v) => unitPrefs.setUnitSystem(
+                          v ? UnitSystem.imperial : UnitSystem.metric,
+                        ),
                         selectedColor:
                             Theme.of(context).colorScheme.primaryContainer,
                         backgroundColor: Theme.of(context).colorScheme.surface,
