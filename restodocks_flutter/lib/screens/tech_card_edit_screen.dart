@@ -6487,6 +6487,16 @@ class _TtkTableState extends State<_TtkTable> {
     final loc = widget.loc;
     final lang = loc.currentLanguageCode;
     final unitPrefs = context.watch<UnitSystemPreferenceService>();
+    final isRu = lang.toLowerCase().startsWith('ru');
+    final grossHeader = unitPrefs.isImperial
+        ? (isRu ? 'Брутто oz/lb' : 'Gross oz/lb')
+        : loc.t('ttk_gross_gr');
+    final netHeader = unitPrefs.isImperial
+        ? (isRu ? 'Нетто oz/lb' : 'Net oz/lb')
+        : loc.t('ttk_net_gr');
+    final outputHeader = unitPrefs.isImperial
+        ? (isRu ? 'Выход oz/lb' : 'Yield oz/lb')
+        : loc.t('ttk_output_gr');
     final ingredients = widget.ingredients;
     final totalNet = ingredients.fold<double>(0, (s, ing) => s + ing.netWeight);
     // Выход г. итого — сумма выходов по ингредиентам (не нетто)
@@ -6657,12 +6667,12 @@ class _TtkTableState extends State<_TtkTable> {
                   headerCell(loc.t('ttk_type')),
                   headerCell(loc.t('ttk_name')),
                   headerCell(loc.t('ttk_product')),
-                  headerCell(loc.t('ttk_gross_gr')),
+                  headerCell(grossHeader),
                   headerCell(loc.t('ttk_waste_pct')),
-                  headerCell(loc.t('ttk_net_gr')),
+                  headerCell(netHeader),
                   headerCell(loc.t('ttk_cooking_method')),
                   headerCell(loc.t('ttk_shrink_pct')),
-                  headerCell(loc.t('ttk_output_gr')),
+                  headerCell(outputHeader),
                   headerCell(loc.t('ttk_cost')),
                   headerCell(loc.t('ttk_price_per_1kg_dish')),
                   headerCell(loc.t('ttk_technology')),
@@ -7494,6 +7504,16 @@ class _TtkCookTableState extends State<_TtkCookTable> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final unitPrefs = context.watch<UnitSystemPreferenceService>();
+    final isRu = widget.loc.currentLanguageCode.toLowerCase().startsWith('ru');
+    final grossHeader = unitPrefs.isImperial
+        ? (isRu ? 'Брутто oz/lb' : 'Gross oz/lb')
+        : widget.loc.t('ttk_gross_gr');
+    final netHeader = unitPrefs.isImperial
+        ? (isRu ? 'Нетто oz/lb' : 'Net oz/lb')
+        : widget.loc.t('ttk_net_gr');
+    final outputHeader = unitPrefs.isImperial
+        ? (isRu ? 'Выход oz/lb' : 'Yield oz/lb')
+        : widget.loc.t('ttk_output_gr');
     UnitViewValue displayWeight(TTIngredient ing, double grams) =>
         UnitConverter.toDisplay(
           canonicalValue: grams,
@@ -7539,10 +7559,10 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                                   fontSize: 12, fontWeight: FontWeight.bold)))),
                 ),
                 _cell(widget.loc.t('ttk_product'), bold: true),
-                _cell(widget.loc.t('ttk_gross_gr'), bold: true),
-                _cell(widget.loc.t('ttk_net_gr'), bold: true),
+                _cell(grossHeader, bold: true),
+                _cell(netHeader, bold: true),
                 _cell(widget.loc.t('ttk_cooking_method'), bold: true),
-                _cell(widget.loc.t('ttk_output_gr'), bold: true),
+                _cell(outputHeader, bold: true),
                 _cell(widget.loc.t('ttk_portions_pcs'), bold: true),
               ],
             ),
