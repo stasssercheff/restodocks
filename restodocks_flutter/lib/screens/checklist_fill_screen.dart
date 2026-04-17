@@ -714,7 +714,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         // Показываем единицу измерения "рядом" с числом в той же колонке.
                         suffixText: it.targetUnit?.isNotEmpty == true
-                            ? ' ${CulinaryUnits.displayName(it.targetUnit!, context.read<LocalizationService>().currentLanguageCode.startsWith('ru') ? 'ru' : 'en')}'
+                            ? ' ${LocalizationService().unitLabelForLanguage(it.targetUnit!, context.read<LocalizationService>().currentLanguageCode)}'
                             : null,
                       ),
                       style: const TextStyle(fontSize: 12),

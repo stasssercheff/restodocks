@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../models/models.dart';
 import '../utils/number_format_utils.dart';
+import 'localization_service.dart';
 
 /// Excel и PDF: приёмки поставок для раздела «Расходы».
 class ProcurementReceiptExportService {
@@ -29,7 +30,7 @@ class ProcurementReceiptExportService {
   }
 
   static String _unitLabel(String unitId, String lang) =>
-      CulinaryUnits.displayName(unitId, lang);
+      LocalizationService().unitLabelForLanguage(unitId, lang);
 
   static Future<Uint8List> buildExcelBytes({
     required List<Map<String, dynamic>> documents,

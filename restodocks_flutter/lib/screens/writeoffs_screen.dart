@@ -25,7 +25,7 @@ String _unitDisplay(String? unit, String lang) {
   };
   final u = (unit ?? 'g').trim().toLowerCase();
   final id = ruToId[u] ?? u;
-  return CulinaryUnits.displayName(id, lang);
+  return LocalizationService().unitLabelForLanguage(id, lang);
 }
 
 /// Категории списания

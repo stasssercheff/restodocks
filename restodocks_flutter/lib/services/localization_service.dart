@@ -5,6 +5,7 @@ import '../utils/cyrillic_transliteration.dart';
 import '../utils/dev_log.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/culinary_units.dart';
 import '../models/employee.dart';
 import '../models/translation.dart';
 import 'translation_manager.dart';
@@ -466,6 +467,27 @@ class LocalizationService extends ChangeNotifier {
   /// Получение перевода с сокращенным синтаксисом
   String t(String key, {Map<String, String>? args}) {
     return translate(key, args: args);
+  }
+
+  /// Подпись единицы измерения для UI (oz/lb/fl_oz/gal — из JSON с сокращениями).
+  String unitLabel(String unitId) =>
+      unitLabelForLanguage(unitId, currentLanguageCode);
+
+  /// То же для заданного языка (экспорт, модели без BuildContext).
+  String unitLabelForLanguage(String unitId, String languageCode) {
+    final id = unitId.toLowerCase().trim();
+    switch (id) {
+      case 'oz':
+        return tForLanguage(languageCode, 'unit_abbr_oz');
+      case 'lb':
+        return tForLanguage(languageCode, 'unit_abbr_lb');
+      case 'fl_oz':
+        return tForLanguage(languageCode, 'unit_abbr_fl_oz');
+      case 'gal':
+        return tForLanguage(languageCode, 'unit_abbr_gal');
+      default:
+        return CulinaryUnits.baseDisplayName(id, languageCode);
+    }
   }
 
   /// Отображаемое название должности по коду (role_bar_manager → «Барменеджер»).

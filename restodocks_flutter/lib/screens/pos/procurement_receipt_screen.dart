@@ -232,7 +232,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
   String _localizedUnit(LocalizationService loc, String unit) {
     final code = loc.currentLanguageCode.toLowerCase();
     final lang = code.startsWith('ru') ? 'ru' : 'en';
-    return CulinaryUnits.displayName(unit, lang);
+    return LocalizationService().unitLabelForLanguage(unit, lang);
   }
 
   bool _isConvertibleWeightOrVolume(String unit) {
@@ -512,12 +512,7 @@ class _ProcurementReceiptScreenState extends State<ProcurementReceiptScreen> {
                           (id) => DropdownMenuItem(
                             value: id,
                             child: Text(
-                              CulinaryUnits.displayName(
-                                id,
-                                loc.currentLanguageCode.startsWith('ru')
-                                    ? 'ru'
-                                    : 'en',
-                              ),
+                              loc.unitLabel(id),
                             ),
                           ),
                         )

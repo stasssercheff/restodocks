@@ -27,7 +27,9 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
   }
 
   static String _unitLabel(String unitId, String lang) =>
-      unitId == 'pkg' ? (lang == 'ru' ? 'упак.' : 'pkg') : CulinaryUnits.displayName(unitId, lang);
+      unitId == 'pkg'
+          ? (lang == 'ru' ? 'упак.' : 'pkg')
+          : LocalizationService().unitLabelForLanguage(unitId, lang);
 
   /// Единицы: вес, объём, штуки, упаковка, бутылка — как в карточке продукта.
   static List<String> _allowedUnitsForProduct(Product? p, UnitSystem system) {

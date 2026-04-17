@@ -4282,7 +4282,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                               .map((u) => DropdownMenuItem(
                                   value: u.id,
                                   child: Text(
-                                      CulinaryUnits.displayName(u.id, lang))))
+                                      loc.unitLabel(u.id))))
                               .toList(),
                           onChanged: (v) =>
                               setStateDlg(() => selectedUnit = v ?? 'g'),
@@ -6487,15 +6487,15 @@ class _TtkTableState extends State<_TtkTable> {
     final loc = widget.loc;
     final lang = loc.currentLanguageCode;
     final unitPrefs = context.watch<UnitSystemPreferenceService>();
-    final isRu = lang.toLowerCase().startsWith('ru');
+    final ozLb = {'oz': loc.t('unit_abbr_oz'), 'lb': loc.t('unit_abbr_lb')};
     final grossHeader = unitPrefs.isImperial
-        ? (isRu ? 'Брутто oz/lb' : 'Gross oz/lb')
+        ? loc.t('ttk_gross_imperial', args: ozLb)
         : loc.t('ttk_gross_gr');
     final netHeader = unitPrefs.isImperial
-        ? (isRu ? 'Нетто oz/lb' : 'Net oz/lb')
+        ? loc.t('ttk_net_imperial', args: ozLb)
         : loc.t('ttk_net_gr');
     final outputHeader = unitPrefs.isImperial
-        ? (isRu ? 'Выход oz/lb' : 'Yield oz/lb')
+        ? loc.t('ttk_output_imperial', args: ozLb)
         : loc.t('ttk_output_gr');
     final ingredients = widget.ingredients;
     final totalNet = ingredients.fold<double>(0, (s, ing) => s + ing.netWeight);
@@ -7504,15 +7504,18 @@ class _TtkCookTableState extends State<_TtkCookTable> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final unitPrefs = context.watch<UnitSystemPreferenceService>();
-    final isRu = widget.loc.currentLanguageCode.toLowerCase().startsWith('ru');
+    final ozLb = {
+      'oz': widget.loc.t('unit_abbr_oz'),
+      'lb': widget.loc.t('unit_abbr_lb'),
+    };
     final grossHeader = unitPrefs.isImperial
-        ? (isRu ? 'Брутто oz/lb' : 'Gross oz/lb')
+        ? widget.loc.t('ttk_gross_imperial', args: ozLb)
         : widget.loc.t('ttk_gross_gr');
     final netHeader = unitPrefs.isImperial
-        ? (isRu ? 'Нетто oz/lb' : 'Net oz/lb')
+        ? widget.loc.t('ttk_net_imperial', args: ozLb)
         : widget.loc.t('ttk_net_gr');
     final outputHeader = unitPrefs.isImperial
-        ? (isRu ? 'Выход oz/lb' : 'Yield oz/lb')
+        ? widget.loc.t('ttk_output_imperial', args: ozLb)
         : widget.loc.t('ttk_output_gr');
     UnitViewValue displayWeight(TTIngredient ing, double grams) =>
         UnitConverter.toDisplay(
@@ -7627,7 +7630,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                                       ),
                                       TextSpan(
                                           text:
-                                              ' (${weightText(ing, ing.outputWeight)} ${CulinaryUnits.displayName(displayWeight(ing, ing.outputWeight).unitId, widget.loc.currentLanguageCode)})'),
+                                              ' (${weightText(ing, ing.outputWeight)} ${widget.loc.unitLabel(displayWeight(ing, ing.outputWeight).unitId)})'),
                                     ],
                                   ),
                                   softWrap: true,
@@ -7699,7 +7702,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                   child: Padding(
                     padding: _TtkCookTable._cellPad,
                     child: Text(
-                        '${UnitConverter.roundUi(totalOutputDisplay.value, fractionDigits: unitPrefs.isImperial ? 2 : 0).toStringAsFixed(unitPrefs.isImperial ? 2 : 0)} ${CulinaryUnits.displayName(totalOutputDisplay.unitId, widget.loc.currentLanguageCode)}',
+                        '${UnitConverter.roundUi(totalOutputDisplay.value, fractionDigits: unitPrefs.isImperial ? 2 : 0).toStringAsFixed(unitPrefs.isImperial ? 2 : 0)} ${widget.loc.unitLabel(totalOutputDisplay.unitId)}',
                         style: const TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
@@ -8246,9 +8249,8 @@ class _ProductPickerState extends State<_ProductPicker> {
                 onTap: () => _askWeight(p, loc),
                 child: ListTile(
                   title: Text(_getDisplayName(p, lang)),
-                  subtitle: Text(CulinaryUnits.displayName(
-                      (p.unit ?? 'g').trim().toLowerCase(),
-                      loc.currentLanguageCode)),
+                  subtitle: Text(loc.unitLabel(
+                      (p.unit ?? 'g').trim().toLowerCase())),
                 ),
               );
             },
@@ -8314,7 +8316,7 @@ class _ProductPickerState extends State<_ProductPicker> {
                               .map((u) => DropdownMenuItem(
                                     value: u.id,
                                     child: Text(
-                                        CulinaryUnits.displayName(u.id, lang)),
+                                        loc.unitLabel(u.id)),
                                   ))
                               .toList(),
                           onChanged: (v) =>
@@ -8523,7 +8525,7 @@ class _TechCardPicker extends StatelessWidget {
                           .map((u) => DropdownMenuItem(
                                 value: u.id,
                                 child:
-                                    Text(CulinaryUnits.displayName(u.id, lang)),
+                                    Text(loc.unitLabel(u.id)),
                               ))
                           .toList(),
                       onChanged: (v) =>

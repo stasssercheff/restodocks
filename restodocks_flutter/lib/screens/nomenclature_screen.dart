@@ -81,10 +81,10 @@ enum _NomenclatureFilter { all, products }
 /// Единица измерения для отображения в номенклатуре: кг, шт, г, л и т.д. (не сырой "pcs"/"kg" из БД).
 String _unitDisplay(
   String? unit,
-  String lang, {
+  LocalizationService loc, {
   required UnitSystem unitSystem,
 }) {
-  return UnitConverter.displayUnitLabel(unit, lang, unitSystem);
+  return UnitConverter.displayUnitLabel(unit, loc, unitSystem);
 }
 
 /// Диалог с прогрессом загрузки продуктов
@@ -1311,7 +1311,8 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       if (unit == 'g' || unit == 'грамм' || unit == 'kg' || unit == 'кг') {
         if (unitPrefs.isImperial) {
           final perLb = rawPrice * 0.453592;
-          priceText = '${NumberFormatUtils.formatInt(perLb)} $currencySymbol/lb';
+          priceText =
+              '${NumberFormatUtils.formatInt(perLb)} $currencySymbol/${loc.unitLabel('lb')}';
         } else {
           priceText = loc
               .t('price_per_kg')
@@ -1320,7 +1321,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
         }
       } else {
         priceText =
-            '${NumberFormatUtils.formatInt(rawPrice)} $currencySymbol/${_unitDisplay(p.unit, loc.currentLanguageCode, unitSystem: unitPrefs.unitSystem)}';
+            '${NumberFormatUtils.formatInt(rawPrice)} $currencySymbol/${_unitDisplay(p.unit, loc, unitSystem: unitPrefs.unitSystem)}';
       }
     } else {
       priceText = loc.t('price_not_set');
@@ -4566,7 +4567,7 @@ class _CatalogTab extends StatelessWidget {
                                 final cat = _categoryLabel(p.category);
                                 final unit = _unitDisplay(
                                   p.unit,
-                                  loc.currentLanguageCode,
+                                  loc,
                                   unitSystem: context
                                       .read<UnitSystemPreferenceService>()
                                       .unitSystem,
@@ -5162,7 +5163,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
     final isImperial = unitPrefs.isImperial;
     final gLabel = UnitConverter.displayUnitLabel(
       'g',
-      widget.loc.currentLanguageCode,
+      widget.loc,
       unitPrefs.unitSystem,
     );
     final lang = widget.loc.currentLanguageCode;
@@ -5211,7 +5212,7 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
                 items: CulinaryUnits.all
                     .map((e) => DropdownMenuItem(
                           value: e.id,
-                          child: Text(lang == 'ru' ? e.ru : e.en),
+                          child: Text(widget.loc.unitLabel(e.id)),
                         ))
                     .toList(),
                 onChanged: (v) => setState(() => _unit = v ?? _unit),

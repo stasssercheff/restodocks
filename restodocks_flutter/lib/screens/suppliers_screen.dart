@@ -820,7 +820,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                                     ),
                                   ),
                                   Text(
-                                    CulinaryUnits.displayName(item.unit, loc.currentLanguageCode),
+                                    loc.unitLabel(item.unit),
                                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                                         ),

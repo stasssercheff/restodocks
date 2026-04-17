@@ -150,7 +150,7 @@ class _InventoryRow {
     if (isCountedByPackage) {
       return loc.tForLanguage(lang, 'unit_package_abbr');
     }
-    return CulinaryUnits.displayName(unit.toLowerCase(), lang);
+    return loc.unitLabelForLanguage(unit.toLowerCase(), lang);
   }
 
   /// В бланке инвентаризации вес показываем в граммах, не в кг.
@@ -4383,7 +4383,7 @@ class _ProductUnitDropdown extends StatelessWidget {
                         ? loc.tForLanguage(lang, 'unit_package_abbr')
                         : u == 'btl'
                             ? loc.tForLanguage(lang, 'unit_bottle_display')
-                            : CulinaryUnits.displayName(u, lang),
+                            : LocalizationService().unitLabelForLanguage(u, lang),
                     style: theme.textTheme.bodySmall,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -4606,7 +4606,7 @@ class _ProductPickerSheetState extends State<_ProductPickerSheet> {
                   title:
                       Text(p.getLocalizedName(widget.loc.currentLanguageCode)),
                   subtitle: Text(
-                      '${p.category} · ${CulinaryUnits.displayName((p.unit ?? 'g').trim().toLowerCase(), widget.loc.currentLanguageCode)}'),
+                      '${p.category} · ${widget.loc.unitLabel((p.unit ?? 'g').trim().toLowerCase())}'),
                   onTap: () => widget.onSelect(p),
                 );
               },

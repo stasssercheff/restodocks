@@ -30,7 +30,7 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
 
   static String _unitLabel(String unitId, String lang) => unitId == 'pkg'
       ? (lang == 'ru' ? 'упак.' : 'pkg')
-      : CulinaryUnits.displayName(unitId, lang);
+      : LocalizationService().unitLabelForLanguage(unitId, lang);
 
   static List<String> _allowedUnitsForProduct(Product? p) {
     const base = [

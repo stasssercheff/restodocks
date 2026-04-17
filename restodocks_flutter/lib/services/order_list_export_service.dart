@@ -10,11 +10,12 @@ import 'package:pdf/widgets.dart' as pw;
 import '../models/models.dart';
 import '../utils/number_format_utils.dart';
 import 'inventory_download.dart';
+import 'localization_service.dart';
 
 /// Формирование текста и Excel для списка заказа (экспорт / отправка).
 class OrderListExportService {
   static String _unitLabel(String unitId, String lang) =>
-      CulinaryUnits.displayName(unitId, lang);
+      LocalizationService().unitLabelForLanguage(unitId, lang);
 
   /// Построить текст заказа в формате:
   /// От кого (компания)

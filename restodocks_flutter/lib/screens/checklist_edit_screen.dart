@@ -699,7 +699,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                       items: units
                           .map((u) => DropdownMenuItem(
                               value: u,
-                              child: Text(CulinaryUnits.displayName(u, lang))))
+                              child: Text(LocalizationService().unitLabelForLanguage(u, lang))))
                           .toList(),
                       onChanged: (v) {
                         if (v != null) setInner(() => selectedUnit = v);
@@ -792,7 +792,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                       items: units
                           .map((u) => DropdownMenuItem(
                               value: u,
-                              child: Text(CulinaryUnits.displayName(u, lang))))
+                              child: Text(LocalizationService().unitLabelForLanguage(u, lang))))
                           .toList(),
                       onChanged: (v) {
                         if (v != null) setInner(() => selectedUnit = v);
@@ -2080,7 +2080,7 @@ class _ChecklistEditScreenState extends State<ChecklistEditScreen>
                             ? it.targetQuantity!.toInt().toString()
                             : it.targetQuantity!.toStringAsFixed(1);
                         final unit = it.targetUnit?.isNotEmpty == true
-                            ? ' ${CulinaryUnits.displayName(it.targetUnit!, lang)}'
+                            ? ' ${LocalizationService().unitLabelForLanguage(it.targetUnit!, lang)}'
                             : '';
                         localizedQuantityLabel = '$qty$unit';
                       }

@@ -1,4 +1,5 @@
 import '../models/culinary_units.dart';
+import '../services/localization_service.dart';
 import '../services/unit_system_preference_service.dart';
 
 class UnitViewValue {
@@ -31,9 +32,10 @@ class UnitConverter {
     return raw;
   }
 
-  static String displayUnitLabel(String? rawUnit, String lang, UnitSystem system) {
+  static String displayUnitLabel(
+      String? rawUnit, LocalizationService loc, UnitSystem system) {
     final unit = preferredDisplayUnit(rawUnit, system);
-    return CulinaryUnits.displayName(unit, lang);
+    return loc.unitLabel(unit);
   }
 
   static String preferredDisplayUnit(String? rawUnit, UnitSystem system) {

@@ -48,7 +48,7 @@ class _OrderCreateScreenState extends State<OrderCreateScreen> {
   }
 
   static String _unitLabel(String unitId, String lang) =>
-      CulinaryUnits.displayName(unitId, lang);
+      LocalizationService().unitLabelForLanguage(unitId, lang);
 
   @override
   void initState() {

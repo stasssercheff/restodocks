@@ -109,8 +109,9 @@ class CulinaryUnits {
     return factor > 0 ? grams / factor : grams;
   }
 
-  /// Получить отображаемое название единицы
-  static String displayName(String unitId, String lang) {
+  /// Базовое имя единицы из списка [all] (ru vs остальные → en).
+  /// Для oz/lb/fl_oz/gal и UI используйте [LocalizationService.unitLabelForLanguage].
+  static String baseDisplayName(String unitId, String lang) {
     for (final e in all) {
       if (e.id == unitId) return lang == 'ru' ? e.ru : e.en;
     }
