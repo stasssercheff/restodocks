@@ -7702,7 +7702,10 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                   child: Padding(
                     padding: _TtkCookTable._cellPad,
                     child: Text(
-                        '${UnitConverter.roundUi(totalOutputDisplay.value, fractionDigits: unitPrefs.isImperial ? 2 : 0).toStringAsFixed(unitPrefs.isImperial ? 2 : 0)} ${widget.loc.unitLabel(totalOutputDisplay.unitId)}',
+                        UnitConverter.roundUi(
+                          totalOutputDisplay.value,
+                          fractionDigits: unitPrefs.isImperial ? 2 : 0,
+                        ).toStringAsFixed(unitPrefs.isImperial ? 2 : 0),
                         style: const TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
