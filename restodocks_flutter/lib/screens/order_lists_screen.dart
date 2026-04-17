@@ -92,7 +92,29 @@ class _OrderListsScreenState extends State<OrderListsScreen> {
   List<OrderList> get _filteredOrders {
     if (_orderSearchQuery.isEmpty) return _savedOrders;
     final q = _orderSearchQuery.trim().toLowerCase();
-    return _savedOrders.where((o) => o.name.toLowerCase().contains(q)).toList();
+    return _savedOrders.where((o) {
+      if (o.name.toLowerCase().contains(q)) return true;
+      if (o.supplierName.toLowerCase().contains(q)) return true;
+      final creator = (o.createdByEmployeeName ?? '').toLowerCase();
+      if (creator.contains(q)) return true;
+      final contact = (o.contactPerson ?? '').toLowerCase();
+      if (contact.contains(q)) return true;
+      final date = o.savedAt;
+      if (date != null) {
+        final dateOnly = DateFormat('dd.MM.yyyy').format(date).toLowerCase();
+        final dateTime = DateFormat('dd.MM.yyyy HH:mm').format(date).toLowerCase();
+        if (dateOnly.contains(q) || dateTime.contains(q)) return true;
+      }
+      final orderFor = o.orderForDate;
+      if (orderFor != null) {
+        final deliveryDate = DateFormat('dd.MM.yyyy').format(orderFor).toLowerCase();
+        if (deliveryDate.contains(q)) return true;
+      }
+      for (final item in o.items) {
+        if (item.productName.toLowerCase().contains(q)) return true;
+      }
+      return false;
+    }).toList();
   }
 
   Future<void> _deleteList(OrderList list) async {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../haccp/haccp_country_profile.dart';
 import '../models/haccp_log_type.dart';
 import '../services/services.dart';
 import '../widgets/app_bar_home_button.dart';
@@ -45,9 +46,17 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
     }
 
     List<HaccpLogType> journals;
+    final selectedCountryCode = config.resolveCountryCodeForEstablishment(est);
+    final selectedProfile = config.resolveCountryProfileForEstablishment(est);
+    final explicitOverride = config.hasExplicitCountryOverride(est.id);
     try {
-      journals = config.getEnabledJournalsOrdered(est.id);
-      journals = journals.where((t) => HaccpLogType.supportedInApp.contains(t)).toList();
+      journals = config.getEnabledJournalsOrdered(
+        est.id,
+        countryCode: selectedCountryCode,
+      );
+      journals = journals
+          .where((t) => HaccpLogType.supportedInApp.contains(t))
+          .toList();
     } catch (_) {
       journals = [];
     }
@@ -68,35 +77,61 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
       ),
       body: journals.isEmpty
           ? _EmptyState(
-              onConfigure: isOwnerOrManagement ? () => context.push('/settings') : null,
+              onConfigure:
+                  isOwnerOrManagement ? () => context.push('/settings') : null,
               loc: loc,
+              profileLabel: HaccpCountryProfiles.templateCountryLabel(
+                selectedProfile.countryCode,
+                loc.currentLanguageCode,
+              ),
             )
-          : ListView.builder(
+          : ListView(
               padding: const EdgeInsets.all(16),
-              itemCount: journals.length,
-              itemBuilder: (_, i) {
-                final t = journals[i];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 8),
+              children: [
+                Card(
+                  margin: const EdgeInsets.only(bottom: 12),
                   child: ListTile(
-                    leading: Icon(_iconForType(t)),
-                    title: Text(loc.t(t.displayNameKey)),
+                    leading: const Icon(Icons.flag_outlined),
+                    title: Text(HaccpCountryProfiles.templateCountryLabel(
+                      selectedProfile.countryCode,
+                      loc.currentLanguageCode,
+                    )),
                     subtitle: Text(
-                      _journalSubtitle(loc, t),
-                      style: const TextStyle(fontSize: 11),
+                      '${HaccpCountryProfiles.legalFrameworkLabel(selectedProfile.countryCode, loc.currentLanguageCode)}\n'
+                      '${HaccpCountryProfiles.profileSourceLabel(manual: explicitOverride, languageCode: loc.currentLanguageCode)}',
                     ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => context.push('/haccp-journals/${t.code}'),
+                    isThreeLine: true,
                   ),
-                );
-              },
+                ),
+                ...journals.map((t) => Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: Icon(_iconForType(t)),
+                        title: Text(loc.t(t.displayNameKey)),
+                        subtitle: Text(
+                          _journalSubtitle(
+                            loc,
+                            t,
+                            selectedCountryCode,
+                          ),
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => context.push('/haccp-journals/${t.code}'),
+                      ),
+                    )),
+              ],
             ),
     );
   }
 
   /// Подзаголовок (Приложение … / рекомендуемая форма) — только из [localizable.json].
-  static String _journalSubtitle(LocalizationService loc, HaccpLogType t) {
-    return loc.t('haccp_sanpin_line_${t.code}');
+  static String _journalSubtitle(
+    LocalizationService loc,
+    HaccpLogType t,
+    String countryCode,
+  ) {
+    return HaccpCountryProfiles.journalLegalLine(countryCode, t);
   }
 
   /// Иконки для поддерживаемых журналов (СанПиН 1–5 + фритюрные жиры).
@@ -131,10 +166,15 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({this.onConfigure, required this.loc});
+  const _EmptyState({
+    this.onConfigure,
+    required this.loc,
+    required this.profileLabel,
+  });
 
   final VoidCallback? onConfigure;
   final LocalizationService loc;
+  final String profileLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -144,7 +184,8 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.assignment_outlined, size: 64, color: Theme.of(context).colorScheme.outline),
+            Icon(Icons.assignment_outlined,
+                size: 64, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
             Text(
               loc.t('haccp_no_journals_hint'),
@@ -155,7 +196,15 @@ class _EmptyState extends StatelessWidget {
             Text(
               loc.t('haccp_no_journals_subtitle'),
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              profileLabel,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             if (onConfigure != null) ...[
               const SizedBox(height: 24),

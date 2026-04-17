@@ -42,24 +42,47 @@ class HaccpAgreementPdfService {
 Работник обязуется соблюдать порядок учёта и не разглашать данные для входа в систему.
 ''';
 
-  static String _employerPositionRu(Employee emp) {
+  static String _defaultEmployerPosition(Employee emp, {required bool isRu}) {
     if (emp.positionRole != null && emp.positionRole!.isNotEmpty) {
-      const roleToPosition = {
-        'owner': 'Генеральный директор',
-        'executive_chef': 'Шеф-повар',
-        'sous_chef': 'Су-шеф',
-        'bar_manager': 'Менеджер бара',
-        'floor_manager': 'Менеджер зала',
-        'general_manager': 'Управляющий',
-      };
-      return roleToPosition[emp.positionRole!] ?? emp.positionRole!;
+      final roleToPosition = isRu
+          ? const {
+              'owner': 'Генеральный директор',
+              'executive_chef': 'Шеф-повар',
+              'sous_chef': 'Су-шеф',
+              'bar_manager': 'Менеджер бара',
+              'floor_manager': 'Менеджер зала',
+              'general_manager': 'Управляющий',
+            }
+          : const {
+              'owner': 'General Director',
+              'executive_chef': 'Executive Chef',
+              'sous_chef': 'Sous Chef',
+              'bar_manager': 'Bar Manager',
+              'floor_manager': 'Floor Manager',
+              'general_manager': 'General Manager',
+            };
+      final key = emp.positionRole!.trim().toLowerCase();
+      if (roleToPosition.containsKey(key)) return roleToPosition[key]!;
+      final normalized = key.replaceAll('_', ' ').trim();
+      if (normalized.isEmpty) {
+        return isRu ? 'Представитель работодателя' : 'Employer representative';
+      }
+      if (isRu) return normalized;
+      return normalized
+          .split(' ')
+          .where((s) => s.isNotEmpty)
+          .map((s) => s[0].toUpperCase() + s.substring(1))
+          .join(' ');
     }
-    return emp.hasRole('owner') ? 'Генеральный директор' : 'Представитель работодателя';
+    return emp.hasRole('owner')
+        ? (isRu ? 'Генеральный директор' : 'General Director')
+        : (isRu ? 'Представитель работодателя' : 'Employer representative');
   }
 
   static Future<Uint8List> buildAgreementPdfBytes({
     required Establishment establishment,
     required Employee employerEmployee,
+    String? establishmentCountryCode,
     String? organizationLabel,
     String? innBinLabel,
     String? addressLabel,
@@ -76,11 +99,14 @@ class HaccpAgreementPdfService {
     String? agreementBody,
     String? employerPositionLabel,
   }) async {
+    final isRuProfile = (establishmentCountryCode ?? '').toUpperCase() == 'RU';
+    String fb(String ru, String en) => isRuProfile ? ru : en;
     final theme = await _getTheme();
     final doc = pw.Document(theme: theme);
 
     final headerStyle = pw.TextStyle(fontSize: 9, color: PdfColors.grey800);
-    final empPosition = employerPositionLabel ?? _employerPositionRu(employerEmployee);
+    final empPosition = employerPositionLabel ??
+        _defaultEmployerPosition(employerEmployee, isRu: isRuProfile);
     final empFullName = '${employerEmployee.fullName}${employerEmployee.surname != null ? ' ${employerEmployee.surname}' : ''}';
     final body = agreementBody != null
         ? agreementBody
@@ -108,32 +134,42 @@ class HaccpAgreementPdfService {
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text(
-                      '${organizationLabel ?? 'Организация'}: ${establishment.legalName ?? establishment.name}',
+                      '${organizationLabel ?? fb('Организация', 'Organization')}: ${establishment.legalName ?? establishment.name}',
                       style: headerStyle,
                     ),
                     if (establishment.innBin != null && establishment.innBin!.isNotEmpty)
-                      pw.Text('${innBinLabel ?? 'ИНН/БИН'}: ${establishment.innBin}', style: headerStyle),
+                      pw.Text('${innBinLabel ?? fb('ИНН/БИН', 'Tax ID')}: ${establishment.innBin}', style: headerStyle),
                     if (establishment.address != null && establishment.address!.isNotEmpty)
-                      pw.Text('${addressLabel ?? 'Адрес'}: ${establishment.address}', style: headerStyle),
+                      pw.Text('${addressLabel ?? fb('Адрес', 'Address')}: ${establishment.address}', style: headerStyle),
                   ],
                 ),
               ),
               pw.SizedBox(height: 16),
               pw.Text(
-                documentTitle ?? 'СОГЛАШЕНИЕ С СОТРУДНИКОМ',
+                documentTitle ?? fb('СОГЛАШЕНИЕ С СОТРУДНИКОМ', 'EMPLOYEE AGREEMENT'),
                 style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold),
               ),
               pw.SizedBox(height: 8),
               pw.Text(
-                documentSubtitle ?? 'О признании ввода данных в электронные журналы личной подписью',
+                documentSubtitle ?? fb(
+                  'О признании ввода данных в электронные журналы личной подписью',
+                  'On recognizing entries in digital journals as personal signature',
+                ),
                 style: pw.TextStyle(fontSize: 11),
               ),
               pw.SizedBox(height: 24),
-              pw.Text(agreementHeading ?? 'СОГЛАШЕНИЕ О ПРИЗНАНИИ ЭЛЕКТРОННОЙ ПОДПИСИ', style: textStyle),
+              pw.Text(
+                agreementHeading ??
+                    fb(
+                      'СОГЛАШЕНИЕ О ПРИЗНАНИИ ЭЛЕКТРОННОЙ ПОДПИСИ',
+                      'ELECTRONIC SIGNATURE ACKNOWLEDGEMENT',
+                    ),
+                style: textStyle,
+              ),
               pw.SizedBox(height: 8),
               pw.Row(
                 children: [
-                  pw.Text('${workerLabel ?? 'Работник'} ', style: textStyle),
+                  pw.Text('${workerLabel ?? fb('Работник', 'Employee')} ', style: textStyle),
                   pw.Expanded(
                     child: pw.Container(
                       decoration: pw.BoxDecoration(
@@ -144,13 +180,13 @@ class HaccpAgreementPdfService {
                       height: 14,
                     ),
                   ),
-                  pw.Text(' ${workerFioHint ?? '(ФИО полностью)'}', style: textStyle),
+                  pw.Text(' ${workerFioHint ?? fb('(ФИО полностью)', '(full name)')}', style: textStyle),
                 ],
               ),
               pw.SizedBox(height: 14),
               pw.Row(
                 children: [
-                  pw.Text('${positionLabel ?? 'должность'}: ', style: textStyle),
+                  pw.Text('${positionLabel ?? fb('должность', 'position')}: ', style: textStyle),
                   pw.Expanded(
                     child: pw.Container(
                       decoration: pw.BoxDecoration(
@@ -164,7 +200,14 @@ class HaccpAgreementPdfService {
                 ],
               ),
               pw.SizedBox(height: 14),
-              pw.Text(dateLine ?? 'дата: «____» ______________ 20____ г.', style: textStyle),
+              pw.Text(
+                dateLine ??
+                    fb(
+                      'дата: «____» ______________ 20____ г.',
+                      'date: "____" ______________ 20____',
+                    ),
+                style: textStyle,
+              ),
               pw.SizedBox(height: 14),
               pw.Text(body, style: textStyle),
               pw.Spacer(),
@@ -174,12 +217,16 @@ class HaccpAgreementPdfService {
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text('${employerLabel ?? 'Работодатель'}:', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                    pw.Text('${employerLabel ?? fb('Работодатель', 'Employer')}:', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
                     pw.SizedBox(height: 4),
                     pw.Text('$empPosition ___________ / $empFullName ___________ /', style: textStyle),
-                    pw.Text(stampHint ?? 'М.П. (место для печати)', style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700)),
+                    pw.Text(
+                      stampHint ??
+                          fb('М.П. (место для печати)', 'Seal (if applicable)'),
+                      style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+                    ),
                     pw.SizedBox(height: 16),
-                    pw.Text('${workerSignLabel ?? 'Работник'}:', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                    pw.Text('${workerSignLabel ?? fb('Работник', 'Employee')}:', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
                     pw.SizedBox(height: 4),
                     pw.Text('___________ / ___________ /', style: textStyle),
                   ],

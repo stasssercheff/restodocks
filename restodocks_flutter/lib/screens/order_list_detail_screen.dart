@@ -160,6 +160,8 @@ class _OrderListDetailScreenState extends State<OrderListDetailScreen> {
       name: '${_list!.name} $dateStr',
       comment: _commentCtrl.text,
       savedAt: now,
+      createdByEmployeeId: employee.id,
+      createdByEmployeeName: employee.fullName,
       items: itemsWithQty,
     );
     final lists = await loadOrderLists(_establishmentId!, department: dept);

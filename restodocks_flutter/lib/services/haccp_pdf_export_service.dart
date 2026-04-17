@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../haccp/haccp_country_profile.dart';
 import '../legal/legal_compliance_provider.dart';
 import '../models/haccp_log.dart';
 import '../models/haccp_log_type.dart';
@@ -74,6 +75,7 @@ class HaccpPdfExportService {
     required List<HaccpLog> logs,
     required Map<String, String> employeeIdToName,
     required DateFormat dateTimeFmt,
+    required String datePattern,
   }) {
     (String name, String position) _parseEmp(String s) {
       final idx = s.lastIndexOf(', ');
@@ -149,7 +151,7 @@ class HaccpPdfExportService {
           : (log.statusOk == false ? tr('haccp_status_suspended') : '');
     }
 
-    final dateFmt = DateFormat('dd.MM.yyyy');
+    final dateFmt = DateFormat(datePattern);
 
     final rowCount = logs.isEmpty ? 25 : logs.length;
     for (var i = 0; i < rowCount; i++) {
@@ -233,6 +235,15 @@ class HaccpPdfExportService {
         ),
       );
 
+  static String _th(
+    String Function(String key, {Map<String, String>? args}) tr,
+    String key,
+    String fallback,
+  ) {
+    final v = tr(key);
+    return v == key ? fallback : v;
+  }
+
   /// Журнал температуры в холодильном оборудовании: помещение, оборудование, дни 1–30 (образец).
   static pw.Widget _buildFridgeTemperaturePage({
     required String Function(String key, {Map<String, String>? args}) tr,
@@ -311,23 +322,28 @@ class HaccpPdfExportService {
   /// Журнал температурного режима: построчно по образцу docx (Дата, Время, Помещение/камера, Показатель сухой °С, Показатель влажности %, Ответственное лицо).
   static pw.Widget _buildTemperatureRowBasedPage({
     required String establishmentName,
+    required String Function(String key, {Map<String, String>? args}) tr,
     required List<HaccpLog> logs,
     required Map<String, String> employeeIdToName,
     required DateFormat dateTimeFmt,
     required bool includeHumidity,
+    required String datePattern,
   }) {
     final headerCells = <pw.Widget>[
-      _headerCellSmall('№ п/п'),
-      _headerCellSmall('Дата'),
-      _headerCellSmall('Время'),
-      _headerCellSmall('Помещение/камера'),
-      _headerCellSmall('Показатель сухой, °С'),
+      _headerCellSmall(_th(tr, 'haccp_tbl_pp_no', 'No.')),
+      _headerCellSmall(_th(tr, 'haccp_tbl_date', 'Date')),
+      _headerCellSmall(_th(tr, 'haccp_tbl_time', 'Time')),
+      _headerCellSmall(_th(tr, 'haccp_tbl_room', 'Room/camera')),
+      _headerCellSmall(_th(tr, 'haccp_tbl_temp_celsius', 'Dry indicator, C')),
     ];
     if (includeHumidity) {
-      headerCells.add(_headerCellSmall('Показатель влажности, %'));
+      headerCells.add(_headerCellSmall(
+          _th(tr, 'haccp_tbl_rel_humidity_pct', 'Humidity, %')));
     }
-    headerCells.add(_headerCellSmall('Ответственное лицо'));
-    headerCells.add(_headerCellSmall('Подпись'));
+    headerCells.add(_headerCellSmall(
+        _th(tr, 'haccp_tbl_responsible', 'Responsible person')));
+    headerCells
+        .add(_headerCellSmall(_th(tr, 'haccp_tbl_signature', 'Signature')));
 
     final colCount = headerCells.length;
     final colWidths = <int, pw.TableColumnWidth>{
@@ -340,7 +356,7 @@ class HaccpPdfExportService {
         children: headerCells,
       ),
     ];
-    final dateFmt = DateFormat('dd.MM.yyyy');
+    final dateFmt = DateFormat(datePattern);
     final timeFmt = DateFormat('HH:mm');
     for (var i = 0; i < logs.length; i++) {
       final log = logs[i];
@@ -377,6 +393,7 @@ class HaccpPdfExportService {
     required List<HaccpLog> logs,
     required Map<String, String> employeeIdToName,
     required DateFormat dateFmt,
+    required String Function(String key, {Map<String, String>? args}) tr,
   }) {
     const colWidths = <int, pw.TableColumnWidth>{
       0: pw.FlexColumnWidth(0.4),
@@ -388,11 +405,13 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
       decoration: const pw.BoxDecoration(color: PdfColors.grey300),
       children: [
-        _headerCellSmall('№ п/п'),
-        _headerCellSmall('Дата'),
-        _headerCellSmall('Температура, °C'),
-        _headerCellSmall('Относительная влажность, %'),
-        _headerCellSmall('Подпись ответственного лица'),
+        _headerCellSmall(_th(tr, 'haccp_tbl_pp_no', 'No.')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_date', 'Date')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_temp_c_label', 'Temperature, C')),
+        _headerCellSmall(
+            _th(tr, 'haccp_tbl_rel_humidity_pct', 'Relative humidity, %')),
+        _headerCellSmall(
+            _th(tr, 'haccp_tbl_responsible_sign', 'Responsible signature')),
       ],
     );
 
@@ -439,7 +458,7 @@ class HaccpPdfExportService {
             pw.Padding(
               padding: pw.EdgeInsets.only(bottom: 6),
               child: pw.Text(
-                'Наименование складского помещения: $premises',
+                '${_th(tr, 'haccp_warehouse_premises', 'Warehouse premises')}: $premises',
                 style:
                     pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
               ),
@@ -460,6 +479,7 @@ class HaccpPdfExportService {
     required List<HaccpLog> logs,
     required Map<String, String> employeeIdToName,
     required DateFormat dateTimeFmt,
+    required String Function(String key, {Map<String, String>? args}) tr,
   }) {
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(1.2),
@@ -474,14 +494,18 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
       decoration: const pw.BoxDecoration(color: PdfColors.grey300),
       children: [
-        _headerCellSmall('Дата и час изготовления блюда'),
-        _headerCellSmall('Время снятия бракеража'),
-        _headerCellSmall('Наименование готового блюда'),
-        _headerCellSmall('Результаты органолептической оценки'),
-        _headerCellSmall('Разрешение к реализации'),
-        _headerCellSmall('Подписи членов бракеражной комиссии'),
-        _headerCellSmall('Результаты взвешивания порционных блюд'),
-        _headerCellSmall('Примечание'),
+        _headerCellSmall(_th(tr, 'haccp_tbl_dish_made_at', 'Dish made at')),
+        _headerCellSmall(
+            _th(tr, 'haccp_tbl_brakerage_removed_at', 'Brakerage removed at')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_dish_name_ready', 'Dish name')),
+        _headerCellSmall(
+            _th(tr, 'haccp_tbl_organo_result', 'Organoleptic result')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_sale_allowed', 'Sale allowed')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_brakerage_commission_sigs',
+            'Commission signatures')),
+        _headerCellSmall(
+            _th(tr, 'haccp_tbl_portion_weighing', 'Portion weighing')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_note_short', 'Note')),
       ],
     );
     final dataRows = <pw.TableRow>[headerRow];
@@ -512,8 +536,10 @@ class HaccpPdfExportService {
     required List<HaccpLog> logs,
     required Map<String, String> employeeIdToName,
     required DateFormat dateTimeFmt,
+    required String Function(String key, {Map<String, String>? args}) tr,
+    required String datePattern,
   }) {
-    final dateFmt = DateFormat('dd.MM.yyyy');
+    final dateFmt = DateFormat(datePattern);
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(1),
       1: const pw.FlexColumnWidth(1),
@@ -530,17 +556,17 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
       decoration: const pw.BoxDecoration(color: PdfColors.grey300),
       children: [
-        _headerCellSmall('Дата и час поступления'),
-        _headerCellSmall('Наименование'),
-        _headerCellSmall('Фасовка'),
-        _headerCellSmall('Изготовитель/поставщик'),
-        _headerCellSmall('Кол-во'),
-        _headerCellSmall('№ документа'),
-        _headerCellSmall('Органолептическая оценка'),
-        _headerCellSmall('Условия хранения, срок реализации'),
-        _headerCellSmall('Дата реализации'),
-        _headerCellSmall('Подпись'),
-        _headerCellSmall('Прим.'),
+        _headerCellSmall(_th(tr, 'haccp_tbl_received_at', 'Received at')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_name', 'Name')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_packaging', 'Packaging')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_manufacturer', 'Manufacturer')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_qty_short', 'Qty')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_doc_no', 'Doc no.')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_organo_short', 'Organo')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_storage_shelf', 'Storage/shelf')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_sale_date', 'Sale date')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_signature', 'Signature')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_note_short', 'Note')),
       ],
     );
     final dataRows = <pw.TableRow>[headerRow];
@@ -580,8 +606,10 @@ class HaccpPdfExportService {
     required List<HaccpLog> logs,
     required Map<String, String> employeeIdToName,
     required DateFormat dateTimeFmt,
+    required String Function(String key, {Map<String, String>? args}) tr,
+    required String datePattern,
   }) {
-    final dateFmt = DateFormat('dd.MM.yyyy');
+    final dateFmt = DateFormat(datePattern);
     final timeFmt = DateFormat('HH:mm');
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(0.7),
@@ -599,17 +627,17 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
       decoration: const pw.BoxDecoration(color: PdfColors.grey300),
       children: [
-        _headerCellSmall('Дата'),
-        _headerCellSmall('Время начала использования жира'),
-        _headerCellSmall('Вид фритюрного жира'),
-        _headerCellSmall('Органолептическая оценка на начало жарки'),
-        _headerCellSmall('Тип жарочного оборудования'),
-        _headerCellSmall('Вид продукции'),
-        _headerCellSmall('Время окончания жарки'),
-        _headerCellSmall('Органолептическая оценка по окончании жарки'),
-        _headerCellSmall('Переходящий остаток, кг'),
-        _headerCellSmall('Утилизированный жир, кг'),
-        _headerCellSmall('Должность, Ф.И.О. контролера'),
+        _headerCellSmall(_th(tr, 'haccp_tbl_date', 'Date')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_time_start', 'Start time')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_fat_type', 'Fat type')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_score_start', 'Score start')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_equipment', 'Equipment')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_product_type', 'Product type')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_time_end', 'End time')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_score_end', 'Score end')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_carry_kg', 'Carry kg')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_utilized_kg', 'Utilized kg')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_controller', 'Controller')),
       ],
     );
     final dataRows = <pw.TableRow>[headerRow];
@@ -652,6 +680,7 @@ class HaccpPdfExportService {
     required List<HaccpLog> logs,
     required Map<String, String> employeeIdToName,
     required DateFormat dateFmt,
+    required String Function(String key, {Map<String, String>? args}) tr,
   }) {
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(0.4),
@@ -665,13 +694,13 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
       decoration: const pw.BoxDecoration(color: PdfColors.grey300),
       children: [
-        _headerCellSmall('№ п/п'),
-        _headerCellSmall('Фамилия, имя, отчество'),
-        _headerCellSmall('Должность'),
-        _headerCellSmall('Номер медицинской книжки'),
-        _headerCellSmall('Срок действия медицинской книжки'),
-        _headerCellSmall('Расписка и дата получения медицинской книжки'),
-        _headerCellSmall('Расписка и дата возврата медицинской книжки'),
+        _headerCellSmall(_th(tr, 'haccp_tbl_pp_no', 'No.')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_fio_full', 'Full name')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_position', 'Position')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_med_book_no', 'Med book no.')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_med_book_valid', 'Valid until')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_med_book_receipt', 'Receipt')),
+        _headerCellSmall(_th(tr, 'haccp_tbl_med_book_return', 'Return')),
       ],
     );
     final dataRows = <pw.TableRow>[headerRow];
@@ -706,8 +735,11 @@ class HaccpPdfExportService {
         border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
-  static pw.Widget _buildMedExaminationsPdfPage(List<HaccpLog> logs,
-      Map<String, String> employeeIdToName, DateFormat dateFmt) {
+  static pw.Widget _buildMedExaminationsPdfPage(
+      List<HaccpLog> logs,
+      Map<String, String> employeeIdToName,
+      DateFormat dateFmt,
+      String Function(String key, {Map<String, String>? args}) tr) {
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(0.3),
       1: const pw.FlexColumnWidth(1),
@@ -720,13 +752,13 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
         decoration: const pw.BoxDecoration(color: PdfColors.grey300),
         children: [
-          '№',
-          'Ф. И. О.',
-          'Должность',
-          'Дата осмотра',
-          'Заключение',
-          'Решение',
-          'Подпись'
+          _th(tr, 'haccp_tbl_serial_short', 'No.'),
+          _th(tr, 'haccp_tbl_med_exam_fio', 'Full name'),
+          _th(tr, 'haccp_tbl_position', 'Position'),
+          _th(tr, 'haccp_tbl_exam_date', 'Exam date'),
+          _th(tr, 'haccp_tbl_conclusion', 'Conclusion'),
+          _th(tr, 'haccp_tbl_decision', 'Decision'),
+          _th(tr, 'haccp_tbl_signature', 'Signature')
         ].map((h) => _headerCellSmall(h)).toList());
     final dataRows = <pw.TableRow>[headerRow];
     for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
@@ -746,8 +778,11 @@ class HaccpPdfExportService {
         border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
-  static pw.Widget _buildDisinfectantPdfPage(List<HaccpLog> logs,
-      Map<String, String> employeeIdToName, DateFormat dateFmt) {
+  static pw.Widget _buildDisinfectantPdfPage(
+      List<HaccpLog> logs,
+      Map<String, String> employeeIdToName,
+      DateFormat dateFmt,
+      String Function(String key, {Map<String, String>? args}) tr) {
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(0.6),
       1: const pw.FlexColumnWidth(1.2),
@@ -758,11 +793,11 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
         decoration: const pw.BoxDecoration(color: PdfColors.grey300),
         children: [
-          'Дата',
-          'Объект/Дезсредство',
-          'Кол-во',
-          'Поступление',
-          'Ответственный'
+          _th(tr, 'haccp_tbl_date', 'Date'),
+          _th(tr, 'haccp_tbl_object_agent', 'Object/agent'),
+          _th(tr, 'haccp_tbl_qty_short', 'Qty'),
+          _th(tr, 'haccp_tbl_receipt', 'Receipt'),
+          _th(tr, 'haccp_tbl_responsible', 'Responsible')
         ].map((h) => _headerCellSmall(h)).toList());
     final dataRows = <pw.TableRow>[headerRow];
     for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
@@ -788,8 +823,11 @@ class HaccpPdfExportService {
         border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
-  static pw.Widget _buildEquipmentWashingPdfPage(List<HaccpLog> logs,
-      Map<String, String> employeeIdToName, DateFormat dateFmt) {
+  static pw.Widget _buildEquipmentWashingPdfPage(
+      List<HaccpLog> logs,
+      Map<String, String> employeeIdToName,
+      DateFormat dateFmt,
+      String Function(String key, {Map<String, String>? args}) tr) {
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(0.6),
       1: const pw.FlexColumnWidth(0.4),
@@ -801,12 +839,12 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
         decoration: const pw.BoxDecoration(color: PdfColors.grey300),
         children: [
-          'Дата',
-          'Время',
-          'Оборудование',
-          'Моющее',
-          'Дез. раствор',
-          'Контролёр'
+          _th(tr, 'haccp_tbl_date', 'Date'),
+          _th(tr, 'haccp_tbl_time', 'Time'),
+          _th(tr, 'haccp_tbl_equipment', 'Equipment'),
+          _th(tr, 'haccp_tbl_wash_solution', 'Wash solution'),
+          _th(tr, 'haccp_tbl_disinfect_solution', 'Disinfect solution'),
+          _th(tr, 'haccp_tbl_controller', 'Controller')
         ].map((h) => _headerCellSmall(h)).toList());
     final dataRows = <pw.TableRow>[headerRow];
     for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
@@ -829,8 +867,11 @@ class HaccpPdfExportService {
         border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
-  static pw.Widget _buildGeneralCleaningPdfPage(List<HaccpLog> logs,
-      Map<String, String> employeeIdToName, DateFormat dateFmt) {
+  static pw.Widget _buildGeneralCleaningPdfPage(
+      List<HaccpLog> logs,
+      Map<String, String> employeeIdToName,
+      DateFormat dateFmt,
+      String Function(String key, {Map<String, String>? args}) tr) {
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(0.3),
       1: const pw.FlexColumnWidth(1.2),
@@ -839,9 +880,12 @@ class HaccpPdfExportService {
     };
     final headerRow = pw.TableRow(
         decoration: const pw.BoxDecoration(color: PdfColors.grey300),
-        children: ['№', 'Помещение', 'Дата', 'Ответственный']
-            .map((h) => _headerCellSmall(h))
-            .toList());
+        children: [
+          _th(tr, 'haccp_tbl_serial_short', 'No.'),
+          _th(tr, 'haccp_tbl_room', 'Room'),
+          _th(tr, 'haccp_tbl_date', 'Date'),
+          _th(tr, 'haccp_tbl_responsible', 'Responsible')
+        ].map((h) => _headerCellSmall(h)).toList());
     final dataRows = <pw.TableRow>[headerRow];
     for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
       final log = i < logs.length ? logs[i] : null;
@@ -861,8 +905,11 @@ class HaccpPdfExportService {
         border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
-  static pw.Widget _buildSieveFilterMagnetPdfPage(List<HaccpLog> logs,
-      Map<String, String> employeeIdToName, DateFormat dateFmt) {
+  static pw.Widget _buildSieveFilterMagnetPdfPage(
+      List<HaccpLog> logs,
+      Map<String, String> employeeIdToName,
+      DateFormat dateFmt,
+      String Function(String key, {Map<String, String>? args}) tr) {
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(0.4),
       1: const pw.FlexColumnWidth(1),
@@ -874,12 +921,12 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
         decoration: const pw.BoxDecoration(color: PdfColors.grey300),
         children: [
-          '№ сита/магнита',
-          'Наименование',
-          'Состояние',
-          'Дата очистки',
-          'ФИО',
-          'Комментарии'
+          _th(tr, 'haccp_tbl_sieve_magnet_no', 'Sieve/magnet No.'),
+          _th(tr, 'haccp_tbl_name', 'Name'),
+          _th(tr, 'haccp_tbl_condition', 'Condition'),
+          _th(tr, 'haccp_tbl_cleaning_date', 'Cleaning date'),
+          _th(tr, 'haccp_tbl_med_exam_fio', 'Full name'),
+          _th(tr, 'haccp_tbl_comments', 'Comments')
         ].map((h) => _headerCellSmall(h)).toList());
     final dataRows = <pw.TableRow>[headerRow];
     for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
@@ -904,6 +951,10 @@ class HaccpPdfExportService {
         border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
+  static String _datePatternByCountry(String countryCode) {
+    return HaccpCountryProfiles.datePatternForCountry(countryCode);
+  }
+
   /// Параметры экспорта.
   static Future<Uint8List> buildJournalPdf({
     required LocalizationService loc,
@@ -914,27 +965,51 @@ class HaccpPdfExportService {
     required Map<String, String> employeeIdToName,
     required DateTime dateFrom,
     required DateTime dateTo,
+    String? establishmentCountryCode,
     bool includeCover = true,
     bool includeStitchingSheet = true,
   }) async {
     final theme = await _getTheme();
-    final dateFmt = DateFormat('dd.MM.yyyy');
-    final dateTimeFmt = DateFormat('dd.MM.yyyy HH:mm');
     final isHealthHygiene = logType == HaccpLogType.healthHygiene;
 
     String tr(String key, {Map<String, String>? args}) =>
         loc.tForLanguage(pdfLanguageCode, key, args: args);
 
-    final sanpinLine = tr('haccp_sanpin_line_${logType.code}');
+    final sanpinLine = HaccpCountryProfiles.journalLegalLine(
+      establishmentCountryCode,
+      logType,
+    );
     final title = tr(logType.displayNameKey);
-    final footerText = tr('haccp_sanpin_footer_${logType.code}');
+    final footerText = HaccpCountryProfiles.journalFooterLine(
+      establishmentCountryCode,
+      logType,
+    );
+    final selectedProfile = HaccpCountryProfiles.byCountryCode(
+      establishmentCountryCode,
+    );
+    final datePattern = _datePatternByCountry(selectedProfile.countryCode);
+    final dateFmt = DateFormat(datePattern);
+    final dateTimeFmt = DateFormat('$datePattern HH:mm');
+    final templateProfileLine = HaccpCountryProfiles.templateCountryLabel(
+      selectedProfile.countryCode,
+      pdfLanguageCode,
+    );
+    final templateFrameworkLine = HaccpCountryProfiles.legalFrameworkLabel(
+      selectedProfile.countryCode,
+      pdfLanguageCode,
+    );
+    final recommendedSampleText =
+        HaccpCountryProfiles.recommendedSampleLabel(establishmentCountryCode);
     final euPdfComplianceFooter =
-        LegalComplianceProvider.journalPdfComplianceFooter(pdfLanguageCode);
+        LegalComplianceProvider.journalPdfComplianceFooterByCountry(
+      pdfLanguageCode,
+      selectedProfile.countryCode,
+    );
 
     final doc = pw.Document(
       theme: theme,
       title: title,
-      subject: tr('haccp_pdf_document_subject'),
+      subject: '${tr('haccp_pdf_document_subject')} [$templateProfileLine]',
       producer: tr('haccp_pdf_document_producer'),
     );
 
@@ -974,6 +1049,20 @@ class HaccpPdfExportService {
               pw.SizedBox(height: 24),
               pw.Center(
                 child: pw.Text(
+                  templateProfileLine,
+                  style: pw.TextStyle(fontSize: 9),
+                ),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text(
+                  templateFrameworkLine,
+                  style: pw.TextStyle(fontSize: 8),
+                ),
+              ),
+              pw.SizedBox(height: 8),
+              pw.Center(
+                child: pw.Text(
                   tr('haccp_pdf_cover_period', args: {
                     'from': dateFmt.format(dateFrom),
                     'to': dateFmt.format(dateTo),
@@ -1003,9 +1092,19 @@ class HaccpPdfExportService {
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text(tr('haccp_recommended_sample'),
+                child: pw.Text(recommendedSampleText,
                     style: pw.TextStyle(
                         fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text(templateProfileLine,
+                    style: pw.TextStyle(fontSize: 8)),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Center(
+                child: pw.Text(templateFrameworkLine,
+                    style: pw.TextStyle(fontSize: 7)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
@@ -1022,6 +1121,7 @@ class HaccpPdfExportService {
                 logs: logs,
                 employeeIdToName: employeeIdToName,
                 dateTimeFmt: dateTimeFmt,
+                datePattern: datePattern,
               ),
               pw.SizedBox(height: 10),
               pw.Center(
@@ -1044,14 +1144,23 @@ class HaccpPdfExportService {
             children: [
               pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Text(footerText,
-                    style: pw.TextStyle(fontSize: 9)),
+                child: pw.Text(footerText, style: pw.TextStyle(fontSize: 9)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text(tr('haccp_recommended_sample'),
+                child: pw.Text(recommendedSampleText,
                     style: pw.TextStyle(
                         fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text(templateProfileLine,
+                    style: pw.TextStyle(fontSize: 8)),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Center(
+                child: pw.Text(templateFrameworkLine,
+                    style: pw.TextStyle(fontSize: 7)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
@@ -1089,14 +1198,23 @@ class HaccpPdfExportService {
             children: [
               pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Text(footerText,
-                    style: pw.TextStyle(fontSize: 9)),
+                child: pw.Text(footerText, style: pw.TextStyle(fontSize: 9)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text(tr('haccp_recommended_sample'),
+                child: pw.Text(recommendedSampleText,
                     style: pw.TextStyle(
                         fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text(templateProfileLine,
+                    style: pw.TextStyle(fontSize: 8)),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Center(
+                child: pw.Text(templateFrameworkLine,
+                    style: pw.TextStyle(fontSize: 7)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
@@ -1110,6 +1228,7 @@ class HaccpPdfExportService {
                 logs: logs,
                 employeeIdToName: employeeIdToName,
                 dateFmt: dateFmt,
+                tr: tr,
               ),
               pw.SizedBox(height: 10),
               pw.Center(
@@ -1131,14 +1250,23 @@ class HaccpPdfExportService {
             children: [
               pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Text(footerText,
-                    style: pw.TextStyle(fontSize: 9)),
+                child: pw.Text(footerText, style: pw.TextStyle(fontSize: 9)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text(tr('haccp_recommended_sample'),
+                child: pw.Text(recommendedSampleText,
                     style: pw.TextStyle(
                         fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text(templateProfileLine,
+                    style: pw.TextStyle(fontSize: 8)),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Center(
+                child: pw.Text(templateFrameworkLine,
+                    style: pw.TextStyle(fontSize: 7)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
@@ -1151,6 +1279,7 @@ class HaccpPdfExportService {
                 logs: logs,
                 employeeIdToName: employeeIdToName,
                 dateTimeFmt: dateTimeFmt,
+                tr: tr,
               ),
               pw.SizedBox(height: 10),
               pw.Center(
@@ -1173,14 +1302,23 @@ class HaccpPdfExportService {
             children: [
               pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Text(footerText,
-                    style: pw.TextStyle(fontSize: 9)),
+                child: pw.Text(footerText, style: pw.TextStyle(fontSize: 9)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text(tr('haccp_recommended_sample'),
+                child: pw.Text(recommendedSampleText,
                     style: pw.TextStyle(
                         fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text(templateProfileLine,
+                    style: pw.TextStyle(fontSize: 8)),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Center(
+                child: pw.Text(templateFrameworkLine,
+                    style: pw.TextStyle(fontSize: 7)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
@@ -1193,6 +1331,8 @@ class HaccpPdfExportService {
                 logs: logs,
                 employeeIdToName: employeeIdToName,
                 dateTimeFmt: dateTimeFmt,
+                tr: tr,
+                datePattern: datePattern,
               ),
               pw.SizedBox(height: 10),
               pw.Center(
@@ -1215,15 +1355,23 @@ class HaccpPdfExportService {
             children: [
               pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Text(footerText,
-                    style: pw.TextStyle(fontSize: 9)),
+                child: pw.Text(footerText, style: pw.TextStyle(fontSize: 9)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text(
-                    tr('haccp_pdf_frying_oil_subtitle'),
+                child: pw.Text(tr('haccp_pdf_frying_oil_subtitle'),
                     style: pw.TextStyle(
                         fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text(templateProfileLine,
+                    style: pw.TextStyle(fontSize: 8)),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Center(
+                child: pw.Text(templateFrameworkLine,
+                    style: pw.TextStyle(fontSize: 7)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
@@ -1236,6 +1384,8 @@ class HaccpPdfExportService {
                 logs: logs,
                 employeeIdToName: employeeIdToName,
                 dateTimeFmt: dateTimeFmt,
+                tr: tr,
+                datePattern: datePattern,
               ),
               pw.SizedBox(height: 10),
               pw.Center(
@@ -1257,14 +1407,23 @@ class HaccpPdfExportService {
             children: [
               pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Text(footerText,
-                    style: pw.TextStyle(fontSize: 9)),
+                child: pw.Text(footerText, style: pw.TextStyle(fontSize: 9)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
-                child: pw.Text(tr('haccp_recommended_sample'),
+                child: pw.Text(recommendedSampleText,
                     style: pw.TextStyle(
                         fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text(templateProfileLine,
+                    style: pw.TextStyle(fontSize: 8)),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Center(
+                child: pw.Text(templateFrameworkLine,
+                    style: pw.TextStyle(fontSize: 7)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
@@ -1277,6 +1436,7 @@ class HaccpPdfExportService {
                 logs: logs,
                 employeeIdToName: employeeIdToName,
                 dateFmt: dateFmt,
+                tr: tr,
               ),
               pw.SizedBox(height: 10),
               pw.Center(
@@ -1301,9 +1461,17 @@ class HaccpPdfExportService {
                             style: pw.TextStyle(fontSize: 9))),
                     pw.SizedBox(height: 4),
                     pw.Center(
-                        child: pw.Text(tr('haccp_recommended_sample'),
+                        child: pw.Text(recommendedSampleText,
                             style: pw.TextStyle(
                                 fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                    pw.SizedBox(height: 4),
+                    pw.Center(
+                        child: pw.Text(templateProfileLine,
+                            style: pw.TextStyle(fontSize: 8))),
+                    pw.SizedBox(height: 2),
+                    pw.Center(
+                        child: pw.Text(templateFrameworkLine,
+                            style: pw.TextStyle(fontSize: 7))),
                     pw.SizedBox(height: 4),
                     pw.Center(
                         child: pw.Text(title,
@@ -1311,7 +1479,7 @@ class HaccpPdfExportService {
                                 fontSize: 10, fontWeight: pw.FontWeight.bold))),
                     pw.SizedBox(height: 8),
                     _buildMedExaminationsPdfPage(
-                        logs, employeeIdToName, dateFmt),
+                        logs, employeeIdToName, dateFmt, tr),
                     pw.SizedBox(height: 10),
                     pw.Center(
                         child: pw.Text(footerText,
@@ -1332,16 +1500,25 @@ class HaccpPdfExportService {
                             style: pw.TextStyle(fontSize: 9))),
                     pw.SizedBox(height: 4),
                     pw.Center(
-                        child: pw.Text(tr('haccp_recommended_sample'),
+                        child: pw.Text(recommendedSampleText,
                             style: pw.TextStyle(
                                 fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                    pw.SizedBox(height: 4),
+                    pw.Center(
+                        child: pw.Text(templateProfileLine,
+                            style: pw.TextStyle(fontSize: 8))),
+                    pw.SizedBox(height: 2),
+                    pw.Center(
+                        child: pw.Text(templateFrameworkLine,
+                            style: pw.TextStyle(fontSize: 7))),
                     pw.SizedBox(height: 4),
                     pw.Center(
                         child: pw.Text(title,
                             style: pw.TextStyle(
                                 fontSize: 10, fontWeight: pw.FontWeight.bold))),
                     pw.SizedBox(height: 8),
-                    _buildDisinfectantPdfPage(logs, employeeIdToName, dateFmt),
+                    _buildDisinfectantPdfPage(
+                        logs, employeeIdToName, dateFmt, tr),
                     pw.SizedBox(height: 10),
                     pw.Center(
                         child: pw.Text(footerText,
@@ -1362,9 +1539,17 @@ class HaccpPdfExportService {
                             style: pw.TextStyle(fontSize: 9))),
                     pw.SizedBox(height: 4),
                     pw.Center(
-                        child: pw.Text(tr('haccp_recommended_sample'),
+                        child: pw.Text(recommendedSampleText,
                             style: pw.TextStyle(
                                 fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                    pw.SizedBox(height: 4),
+                    pw.Center(
+                        child: pw.Text(templateProfileLine,
+                            style: pw.TextStyle(fontSize: 8))),
+                    pw.SizedBox(height: 2),
+                    pw.Center(
+                        child: pw.Text(templateFrameworkLine,
+                            style: pw.TextStyle(fontSize: 7))),
                     pw.SizedBox(height: 4),
                     pw.Center(
                         child: pw.Text(title,
@@ -1372,7 +1557,7 @@ class HaccpPdfExportService {
                                 fontSize: 10, fontWeight: pw.FontWeight.bold))),
                     pw.SizedBox(height: 8),
                     _buildEquipmentWashingPdfPage(
-                        logs, employeeIdToName, dateFmt),
+                        logs, employeeIdToName, dateFmt, tr),
                     pw.SizedBox(height: 10),
                     pw.Center(
                         child: pw.Text(footerText,
@@ -1393,9 +1578,17 @@ class HaccpPdfExportService {
                             style: pw.TextStyle(fontSize: 9))),
                     pw.SizedBox(height: 4),
                     pw.Center(
-                        child: pw.Text(tr('haccp_recommended_sample'),
+                        child: pw.Text(recommendedSampleText,
                             style: pw.TextStyle(
                                 fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                    pw.SizedBox(height: 4),
+                    pw.Center(
+                        child: pw.Text(templateProfileLine,
+                            style: pw.TextStyle(fontSize: 8))),
+                    pw.SizedBox(height: 2),
+                    pw.Center(
+                        child: pw.Text(templateFrameworkLine,
+                            style: pw.TextStyle(fontSize: 7))),
                     pw.SizedBox(height: 4),
                     pw.Center(
                         child: pw.Text(title,
@@ -1403,7 +1596,7 @@ class HaccpPdfExportService {
                                 fontSize: 10, fontWeight: pw.FontWeight.bold))),
                     pw.SizedBox(height: 8),
                     _buildGeneralCleaningPdfPage(
-                        logs, employeeIdToName, dateFmt),
+                        logs, employeeIdToName, dateFmt, tr),
                     pw.SizedBox(height: 10),
                     pw.Center(
                         child: pw.Text(footerText,
@@ -1424,9 +1617,17 @@ class HaccpPdfExportService {
                             style: pw.TextStyle(fontSize: 9))),
                     pw.SizedBox(height: 4),
                     pw.Center(
-                        child: pw.Text(tr('haccp_recommended_sample'),
+                        child: pw.Text(recommendedSampleText,
                             style: pw.TextStyle(
                                 fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                    pw.SizedBox(height: 4),
+                    pw.Center(
+                        child: pw.Text(templateProfileLine,
+                            style: pw.TextStyle(fontSize: 8))),
+                    pw.SizedBox(height: 2),
+                    pw.Center(
+                        child: pw.Text(templateFrameworkLine,
+                            style: pw.TextStyle(fontSize: 7))),
                     pw.SizedBox(height: 4),
                     pw.Center(
                         child: pw.Text(title,
@@ -1434,7 +1635,7 @@ class HaccpPdfExportService {
                                 fontSize: 10, fontWeight: pw.FontWeight.bold))),
                     pw.SizedBox(height: 8),
                     _buildSieveFilterMagnetPdfPage(
-                        logs, employeeIdToName, dateFmt),
+                        logs, employeeIdToName, dateFmt, tr),
                     pw.SizedBox(height: 10),
                     pw.Center(
                         child: pw.Text(footerText,
@@ -1466,6 +1667,16 @@ class HaccpPdfExportService {
                 child: pw.Text(establishmentName,
                     style: pw.TextStyle(fontSize: 9)),
               ),
+              pw.SizedBox(height: 2),
+              pw.Center(
+                child: pw.Text(templateProfileLine,
+                    style: pw.TextStyle(fontSize: 8)),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Center(
+                child: pw.Text(templateFrameworkLine,
+                    style: pw.TextStyle(fontSize: 7)),
+              ),
             ],
           ),
           footer: (ctx) {
@@ -1487,8 +1698,8 @@ class HaccpPdfExportService {
                     child: pw.Text(
                       eu,
                       textAlign: pw.TextAlign.center,
-                      style: pw.TextStyle(
-                          fontSize: 6.2, color: PdfColors.grey700),
+                      style:
+                          pw.TextStyle(fontSize: 6.2, color: PdfColors.grey700),
                     ),
                   ),
               ],
@@ -1500,9 +1711,12 @@ class HaccpPdfExportService {
                 decoration: pw.BoxDecoration(color: PdfColors.grey300),
                 children: [
                   _cell('№', bold: true),
-                  _cell('Дата и время', bold: true),
-                  ...colKeys.map((k) => _cell(_humanKey(k), bold: true)),
-                  _cell('ФИО, должность', bold: true),
+                  _cell(_th(tr, 'haccp_tbl_date', 'Date'), bold: true),
+                  ...colKeys.map((k) => _cell(_humanKey(k, tr), bold: true)),
+                  _cell(
+                    '${_th(tr, 'haccp_tbl_med_exam_fio', 'Full name')}, ${_th(tr, 'haccp_tbl_position', 'Position')}',
+                    bold: true,
+                  ),
                 ],
               ),
             ];
@@ -1561,6 +1775,16 @@ class HaccpPdfExportService {
               pw.SizedBox(height: 24),
               pw.Text(tr('haccp_pdf_stitching_sign'),
                   style: pw.TextStyle(fontSize: 10)),
+              pw.SizedBox(height: 6),
+              pw.Text(
+                templateProfileLine,
+                style: pw.TextStyle(fontSize: 8, color: PdfColors.grey700),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                templateFrameworkLine,
+                style: pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
+              ),
               _euPdfComplianceFooter(euPdfComplianceFooter),
             ],
           ),
@@ -1625,25 +1849,45 @@ class HaccpPdfExportService {
     }
   }
 
-  static String _humanKey(String key) {
-    const m = {
-      'value1': 'Температура °C',
-      'value2': 'Влажность %',
-      'equipment': 'Наименование холодильного оборудования',
-      'status': 'Результат осмотра (допущен/отстранен)',
-      'status2': 'Органолептическая оценка',
-      'description': 'Описание',
-      'location': 'Место (цех)',
-      'product': 'Наименование готового блюда / Наименование',
-      'result': 'Результаты органолептической оценки / Результат бракеража',
-      'weight': 'Вес, кг',
-      'reason': 'Причина списания',
-      'action': 'Действие (замена/долив)',
-      'oil_name': 'Вид фритюрного жира (марка масла)',
-      'agent': 'Средство',
-      'concentration': 'Концентрация',
-      'note': 'Примечание',
-    };
-    return m[key] ?? key;
+  static String _humanKey(
+    String key,
+    String Function(String key, {Map<String, String>? args}) tr,
+  ) {
+    switch (key) {
+      case 'value1':
+        return _th(tr, 'haccp_tbl_temp_celsius', 'Temperature C');
+      case 'value2':
+        return _th(tr, 'haccp_tbl_rel_humidity_pct', 'Humidity %');
+      case 'equipment':
+        return _th(tr, 'haccp_tbl_equipment', 'Equipment');
+      case 'status':
+        return _th(tr, 'haccp_tbl_exam_outcome', 'Status');
+      case 'status2':
+        return _th(tr, 'haccp_tbl_organo_short', 'Organoleptic');
+      case 'description':
+        return _th(tr, 'haccp_tbl_description', 'Description');
+      case 'location':
+        return _th(tr, 'haccp_tbl_location', 'Location');
+      case 'product':
+        return _th(tr, 'haccp_product', 'Product');
+      case 'result':
+        return _th(tr, 'haccp_tbl_result', 'Result');
+      case 'weight':
+        return _th(tr, 'haccp_tbl_weight', 'Weight');
+      case 'reason':
+        return _th(tr, 'haccp_tbl_reason', 'Reason');
+      case 'action':
+        return _th(tr, 'haccp_tbl_action', 'Action');
+      case 'oil_name':
+        return _th(tr, 'haccp_tbl_fat_type', 'Oil type');
+      case 'agent':
+        return _th(tr, 'haccp_tbl_object_agent', 'Agent');
+      case 'concentration':
+        return _th(tr, 'haccp_tbl_concentration', 'Concentration');
+      case 'note':
+        return _th(tr, 'haccp_note', 'Note');
+      default:
+        return key;
+    }
   }
 }

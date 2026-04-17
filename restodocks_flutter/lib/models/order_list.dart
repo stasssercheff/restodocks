@@ -18,6 +18,9 @@ class OrderList {
   final String comment;
   /// Дата сохранения списка с количествами (null = шаблон).
   final DateTime? savedAt;
+  /// Автор сохраненного списка заказа.
+  final String? createdByEmployeeId;
+  final String? createdByEmployeeName;
   /// На когда заказ (желаемая дата поставки).
   final DateTime? orderForDate;
   /// Подразделение: kitchen, bar, hall (default kitchen).
@@ -36,6 +39,8 @@ class OrderList {
     this.items = const [],
     this.comment = '',
     this.savedAt,
+    this.createdByEmployeeId,
+    this.createdByEmployeeName,
     this.orderForDate,
     this.department = 'kitchen',
   });
@@ -55,6 +60,8 @@ class OrderList {
         'items': items.map((e) => e.toJson()).toList(),
         'comment': comment,
         'savedAt': savedAt?.toIso8601String(),
+        'createdByEmployeeId': createdByEmployeeId,
+        'createdByEmployeeName': createdByEmployeeName,
         'orderForDate': orderForDate?.toIso8601String(),
         'department': department,
       };
@@ -77,6 +84,8 @@ class OrderList {
           [],
       comment: json['comment'] as String? ?? '',
       savedAt: savedAtStr != null ? DateTime.tryParse(savedAtStr) : null,
+      createdByEmployeeId: json['createdByEmployeeId'] as String?,
+      createdByEmployeeName: json['createdByEmployeeName'] as String?,
       orderForDate: (json['orderForDate'] as String?) != null ? DateTime.tryParse(json['orderForDate'] as String) : null,
       department: json['department'] as String? ?? 'kitchen',
     );
@@ -95,6 +104,8 @@ class OrderList {
     List<OrderListItem>? items,
     String? comment,
     DateTime? savedAt,
+    String? createdByEmployeeId,
+    String? createdByEmployeeName,
     DateTime? orderForDate,
     String? department,
   }) =>
@@ -111,6 +122,9 @@ class OrderList {
         items: items ?? this.items,
         comment: comment ?? this.comment,
         savedAt: savedAt ?? this.savedAt,
+        createdByEmployeeId: createdByEmployeeId ?? this.createdByEmployeeId,
+        createdByEmployeeName:
+            createdByEmployeeName ?? this.createdByEmployeeName,
         orderForDate: orderForDate ?? this.orderForDate,
         department: department ?? this.department,
       );

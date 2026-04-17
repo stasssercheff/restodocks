@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../haccp/haccp_country_profile.dart';
 import '../models/haccp_log_type.dart';
 import '../models/models.dart';
 import '../core/feature_flags.dart';
@@ -60,7 +61,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final acc = context.read<AccountManagerSupabase>();
       final est = acc.establishment;
-      unawaited(context.read<UnitSystemPreferenceService>().ensureScopeSynced());
+      unawaited(
+          context.read<UnitSystemPreferenceService>().ensureScopeSynced());
       if (est != null) context.read<HaccpConfigService>().load(est.id);
       // Отключение промо в админке / срок — сервер меняет тариф в check_establishment_access;
       // при открытии настроек подтягиваем актуальное заведение без ожидания resume/таймера.
@@ -574,8 +576,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (emp == null) return;
     final layoutSvc = context.read<HomeLayoutConfigService>();
     final ownerPref = context.read<OwnerViewPreferenceService>();
-    final isOwnerHome =
-        emp.hasRole('owner') && (emp.positionRole == null || ownerPref.viewAsOwner);
+    final isOwnerHome = emp.hasRole('owner') &&
+        (emp.positionRole == null || ownerPref.viewAsOwner);
     final isLiteOwnerHome = isOwnerHome &&
         SubscriptionEntitlements.from(account.establishment).isLiteTier;
     if (isLiteOwnerHome) {
@@ -597,7 +599,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         context: context,
         builder: (ctx) => StatefulBuilder(
           builder: (ctx2, setState) => AlertDialog(
-            title: Text(loc.t('home_layout_config') ?? 'Настройка домашнего экрана'),
+            title: Text(
+                loc.t('home_layout_config') ?? 'Настройка домашнего экрана'),
             content: SizedBox(
               width: 380,
               height: 500,
@@ -753,7 +756,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             SubscriptionEntitlements.from(account.establishment)
                 .canAccessBanquetCatering)
           'owner_banquet': loc.t('banquet_catering') ?? 'Банкет / Кейтринг',
-        if (posOn) 'owner_pos_warehouse_est': loc.t('pos_warehouse_establishment_title') ?? 'Сводная по заведению',
+        if (posOn)
+          'owner_pos_warehouse_est':
+              loc.t('pos_warehouse_establishment_title') ??
+                  'Сводная по заведению',
         'owner_expenses': loc.t('expenses'),
       };
       final hidden = Set<String>.from(layoutSvc.getHiddenKeys(emp.id));
@@ -761,7 +767,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         context: context,
         builder: (ctx) => StatefulBuilder(
           builder: (ctx2, setState) => AlertDialog(
-            title: Text(loc.t('home_layout_config') ?? 'Настройка домашнего экрана'),
+            title: Text(
+                loc.t('home_layout_config') ?? 'Настройка домашнего экрана'),
             content: SizedBox(
               width: 360,
               height: 460,
@@ -927,9 +934,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
       HomeButtonConfigService homeBtn) {
     final accountManager = context.read<AccountManagerSupabase>();
     final emp = accountManager.currentEmployee;
-    final ownerLite = SubscriptionEntitlements.from(accountManager.establishment)
-            .isLiteTier &&
-        (emp?.hasRole('owner') ?? false);
+    final ownerLite =
+        SubscriptionEntitlements.from(accountManager.establishment)
+                .isLiteTier &&
+            (emp?.hasRole('owner') ?? false);
     final actions = homeButtonActionsFor(emp,
         hasProSubscription: accountManager.hasProSubscription,
         ownerLiteHome: ownerLite);
@@ -1481,9 +1489,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     HaccpLogType logType,
     bool enabled,
     LocalizationService loc,
+    String countryCode,
   ) async {
     try {
-      await config.setEnabled(establishmentId, logType, enabled);
+      await config.setEnabled(
+        establishmentId,
+        logType,
+        enabled,
+        countryCode: countryCode,
+      );
     } catch (e) {
       if (context.mounted) {
         final msg = e.toString().contains('404') ||
@@ -1497,9 +1511,85 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _setHaccpCountryProfile(
+    BuildContext context,
+    HaccpConfigService config,
+    String establishmentId,
+    String countryCode,
+    LocalizationService loc,
+  ) async {
+    try {
+      final currentEnabled = config.getEnabledLogTypes(establishmentId);
+      final supportedForCountry = config.supportedCodesForCountry(countryCode);
+      final filtered = currentEnabled
+          .where((code) => supportedForCountry.contains(code))
+          .toSet();
+      final removedCount = currentEnabled.length - filtered.length;
+      await config.save(
+        establishmentId,
+        filtered,
+        countryCode: countryCode,
+      );
+      if (context.mounted) {
+        final countryLabel = HaccpCountryProfiles.countryCodeAndNameLabel(
+          countryCode,
+          loc.currentLanguageCode,
+        );
+        final base =
+            '${HaccpCountryProfiles.templateCountryUpdatedLabel(loc.currentLanguageCode)}: $countryLabel';
+        final note = removedCount > 0
+            ? '\n${HaccpCountryProfiles.incompatibleJournalsDisabledLabel(loc.currentLanguageCode)}: $removedCount'
+            : '';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$base$note'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${loc.t('error')}: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _resetHaccpCountryProfileToAuto(
+    BuildContext context,
+    HaccpConfigService config,
+    Establishment establishment,
+    String establishmentId,
+    LocalizationService loc,
+  ) async {
+    try {
+      await config.clearHaccpCountryCode(establishmentId);
+      final autoCode = config.resolveCountryCodeForEstablishment(establishment);
+      final autoLabel = HaccpCountryProfiles.countryCodeAndNameLabel(
+        autoCode,
+        loc.currentLanguageCode,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                '${HaccpCountryProfiles.templateCountryAutoLabel(loc.currentLanguageCode)}: $autoLabel'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${loc.t('error')}: $e')),
+        );
+      }
+    }
+  }
+
   Future<void> _downloadHaccpAgreement(
       BuildContext context, LocalizationService loc) async {
     final account = context.read<AccountManagerSupabase>();
+    final config = context.read<HaccpConfigService>();
     final est = account.establishment;
     final emp = account.currentEmployee;
     if (est == null || emp == null) {
@@ -1552,9 +1642,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           emp.positionRole ?? (emp.roles.contains('owner') ? 'owner' : null);
       final employerPosition =
           roleCode != null ? (loc.tForLanguage(lang, 'role_$roleCode')) : null;
+      final establishmentCountryCode =
+          config.resolveCountryCodeForEstablishment(est);
       final bytes = await HaccpAgreementPdfService.buildAgreementPdfBytes(
         establishment: est,
         employerEmployee: emp,
+        establishmentCountryCode: establishmentCountryCode,
         organizationLabel: loc.tForLanguage(lang, 'haccp_agreement_org'),
         innBinLabel: loc.tForLanguage(lang, 'haccp_agreement_inn_bin'),
         addressLabel: loc.tForLanguage(lang, 'haccp_agreement_address'),
@@ -1572,7 +1665,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         workerSignLabel: loc.tForLanguage(lang, 'haccp_agreement_worker_sign'),
         agreementBody: LegalComplianceProvider.applyCompliancePlaceholders(
           loc.tForLanguage(lang, 'haccp_agreement_body'),
-          LegalComplianceProvider.complianceForLanguageCode(lang),
+          LegalComplianceProvider.complianceForCountryCode(
+            establishmentCountryCode,
+            lang,
+          ),
         ),
         employerPositionLabel:
             (employerPosition != null && employerPosition != 'role_$roleCode')
@@ -1941,8 +2037,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final localization = context.watch<LocalizationService>();
     final subEnt = SubscriptionEntitlements.from(accountManager.establishment);
     final screenPref = context.watch<ScreenLayoutPreferenceService>();
-    final posOn =
-        FeatureFlags.posEnabledForSubscription(subEnt) && screenPref.showPosSection;
+    final posOn = FeatureFlags.posEnabledForSubscription(subEnt) &&
+        screenPref.showPosSection;
 
     if (currentEmployee == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -2075,27 +2171,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 if (currentEmployee.hasRole('owner') &&
                     !accountManager.isLiteTier) ...[
-                  if (SubscriptionEntitlements.from(accountManager.establishment)
+                  if (SubscriptionEntitlements.from(
+                          accountManager.establishment)
                       .hasUltraLevelFeatures)
                     Consumer<ScreenLayoutPreferenceService>(
                       builder: (_, screenPref, __) => SwitchListTile(
                         secondary: const Icon(Icons.point_of_sale_outlined),
                         title: Text(localization.t('show_pos_section') ??
                             'Раздел «POS» на главной'),
-                        subtitle: Text(localization.t('show_pos_section_hint') ??
+                        subtitle: Text(localization
+                                .t('show_pos_section_hint') ??
                             'Показывать POS-плитки на домашнем экране (заказы, касса, столы, склад, закупка, продажи)'),
                         value: screenPref.showPosSection,
                         onChanged: (v) => screenPref.setShowPosSection(v),
                       ),
                     ),
-                  if (SubscriptionEntitlements.from(accountManager.establishment)
+                  if (SubscriptionEntitlements.from(
+                          accountManager.establishment)
                       .hasUltraLevelFeatures)
                     Consumer<ScreenLayoutPreferenceService>(
                       builder: (_, screenPref, __) => SwitchListTile(
                         secondary: const Icon(Icons.local_bar),
                         title: Text(localization.t('show_bar_section') ??
                             'Раздел «Бар» на главной'),
-                        subtitle: Text(localization.t('show_bar_section_hint') ??
+                        subtitle: Text(localization
+                                .t('show_bar_section_hint') ??
                             'Показывать секцию Бар (график, меню, ТТК и др.)'),
                         value: screenPref.showBarSection,
                         onChanged: (v) => screenPref.setShowBarSection(v),
@@ -2231,18 +2331,159 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     builder: (_, config, __) {
                       final est = establishment;
                       if (est == null) return const SizedBox.shrink();
+                      final selectedCountryCode =
+                          config.resolveCountryCodeForEstablishment(est);
+                      final profile = HaccpCountryProfiles.byCountryCode(
+                          selectedCountryCode);
+                      final explicitOverride =
+                          config.hasExplicitCountryOverride(est.id);
                       final enabled = config.getEnabledLogTypes(est.id);
+                      final supportedCodes = config.supportedCodesForCountry(
+                        profile.countryCode,
+                      );
+                      final supportedLogs = HaccpLogType.supportedInApp
+                          .where((t) => supportedCodes.contains(t.code))
+                          .toList();
                       return SingleChildScrollView(
                         padding: const EdgeInsets.fromLTRB(24, 0, 16, 16),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
+                              '${HaccpCountryProfiles.profileTitleLabel(localization.currentLanguageCode)}: ${HaccpCountryProfiles.countryCodeAndNameLabel(profile.countryCode, localization.currentLanguageCode)}',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              explicitOverride
+                                  ? HaccpCountryProfiles.profileSourceLabel(
+                                      manual: true,
+                                      languageCode:
+                                          localization.currentLanguageCode,
+                                    )
+                                  : '${HaccpCountryProfiles.profileSourceLabel(manual: false, languageCode: localization.currentLanguageCode)} '
+                                      '(${HaccpCountryProfiles.profileAutoLockHintLabel(localization.currentLanguageCode)})',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                            ),
+                            const SizedBox(height: 6),
+                            DropdownButtonFormField<String>(
+                              value: profile.countryCode,
+                              decoration: InputDecoration(
+                                labelText: HaccpCountryProfiles
+                                    .templateCountryFieldLabel(
+                                        localization.currentLanguageCode),
+                              ),
+                              items: HaccpCountryProfiles.available
+                                  .map(
+                                    (p) => DropdownMenuItem<String>(
+                                      value: p.countryCode,
+                                      child: Text(HaccpCountryProfiles
+                                          .countryCodeAndNameLabel(
+                                              p.countryCode,
+                                              localization
+                                                  .currentLanguageCode)),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) {
+                                if (v == null || v == profile.countryCode) {
+                                  return;
+                                }
+                                _setHaccpCountryProfile(
+                                  context,
+                                  config,
+                                  est.id,
+                                  v,
+                                  localization,
+                                );
+                              },
+                            ),
+                            if (explicitOverride) ...[
+                              const SizedBox(height: 6),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton.icon(
+                                  onPressed: () =>
+                                      _resetHaccpCountryProfileToAuto(
+                                    context,
+                                    config,
+                                    est,
+                                    est.id,
+                                    localization,
+                                  ),
+                                  icon: const Icon(Icons.refresh),
+                                  label: Text(
+                                      HaccpCountryProfiles.useAutoTemplateLabel(
+                                          localization.currentLanguageCode)),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 8),
+                            Text(
+                              HaccpCountryProfiles.legalFrameworkLabel(
+                                profile.countryCode,
+                                localization.currentLanguageCode,
+                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              HaccpCountryProfiles.templateUsageHintLabel(
+                                  localization.currentLanguageCode),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              HaccpCountryProfiles.availableCountriesLabel(
+                                  localization.currentLanguageCode),
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: HaccpCountryProfiles.available
+                                  .map(
+                                    (p) => Chip(
+                                      label: Text(
+                                        HaccpCountryProfiles
+                                            .countryCodeAndNameLabel(
+                                                p.countryCode,
+                                                localization
+                                                    .currentLanguageCode),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
                               localization.t('haccp_enabled_journals') ??
                                   'Включённые журналы',
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
-                            ...HaccpLogType.supportedInApp.map((t) {
+                            ...supportedLogs.map((t) {
                               final isOn = enabled.contains(t.code);
                               return ListTile(
                                 leading: Checkbox(
@@ -2253,14 +2494,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       est.id,
                                       t,
                                       v ?? false,
-                                      localization),
+                                      localization,
+                                      profile.countryCode),
                                 ),
                                 title: Text(
-                                    localization.t(t.displayNameKey) ??
-                                        t.displayNameRu,
+                                    HaccpCountryProfiles.resolveLogTypeTitle(
+                                      logType: t,
+                                      languageCode:
+                                          localization.currentLanguageCode,
+                                      localizedValue:
+                                          localization.t(t.displayNameKey),
+                                    ),
                                     style: const TextStyle(fontSize: 14)),
-                                onTap: () => _toggleHaccpJournal(context,
-                                    config, est.id, t, !isOn, localization),
+                                onTap: () => _toggleHaccpJournal(
+                                    context,
+                                    config,
+                                    est.id,
+                                    t,
+                                    !isOn,
+                                    localization,
+                                    profile.countryCode),
                               );
                             }),
                           ],
@@ -2343,8 +2596,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: Text(title),
                   subtitle: Text(subtitle),
                   value: isImperial,
-                  onChanged: (v) => unitPrefs
-                      .setUnitSystem(v ? UnitSystem.imperial : UnitSystem.metric),
+                  onChanged: (v) => unitPrefs.setUnitSystem(
+                      v ? UnitSystem.imperial : UnitSystem.metric),
                 );
               },
             ),

@@ -23,10 +23,13 @@ class ChecklistsScreen extends StatefulWidget {
 }
 
 class _ChecklistsScreenState extends State<ChecklistsScreen> {
-  List<Checklist> _list = [];
+  List<Checklist> _activeList = [];
+  List<Checklist> _archivedList = [];
+  List<_ArchivedChecklistEntry> _archivedEntries = [];
   List<Employee> _employees = [];
   bool _loading = true;
   String? _error;
+  bool _showArchive = false;
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -42,7 +45,12 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
 
     try {
       final translationSvc = context.read<TranslationService>();
-      for (final c in _list) {
+      final source = {
+        ..._activeList,
+        ..._archivedList,
+        ..._archivedEntries.map((e) => e.checklist),
+      }.toList();
+      for (final c in source) {
         final text = c.name.trim().isNotEmpty ? c.name : (c.additionalName?.trim().isNotEmpty == true ? c.additionalName! : '');
         if (text.isEmpty) continue;
         final translated = await translationSvc.translate(
@@ -72,10 +80,13 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
   }
 
   /// Совпадение поиска по исходному названию, переводу и (при транслите) латинице.
-  List<Checklist> _filterChecklists(bool useTranslit) {
-    if (_searchQuery.isEmpty) return _list;
+  List<Checklist> _filterChecklists(List<Checklist> source, bool useTranslit) {
+    if (_searchQuery.isEmpty) return source;
     final q = _searchQuery;
-    return _list.where((c) {
+    final employeeNameById = <String, String>{
+      for (final e in _employees) e.id: employeeDisplayName(e, translit: useTranslit),
+    };
+    return source.where((c) {
       final raw = (c.name.trim().isNotEmpty ? c.name : c.additionalName ?? '').toLowerCase();
       if (raw.contains(q)) return true;
       final tr = _translatedNames[c.id]?.toLowerCase();
@@ -84,6 +95,50 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
         final lit = cyrillicToLatin(raw).toLowerCase();
         if (lit.contains(q)) return true;
       }
+      final assignedIds = c.assignedEmployeeIds ??
+          (c.assignedEmployeeId != null ? [c.assignedEmployeeId!] : <String>[]);
+      for (final empId in assignedIds) {
+        final name = (employeeNameById[empId] ?? '').toLowerCase();
+        if (name.contains(q)) return true;
+      }
+      final deadline = c.deadlineAt;
+      if (deadline != null) {
+        final date = _formatDate(deadline.toLocal()).toLowerCase();
+        if (date.contains(q)) return true;
+      }
+      final scheduled = c.reminderConfig?.scheduleDate;
+      if (scheduled != null) {
+        final date = _formatDate(scheduled.toLocal()).toLowerCase();
+        if (date.contains(q)) return true;
+      }
+      return false;
+    }).toList();
+  }
+
+  String _formatDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+
+  String _formatTime(DateTime d) =>
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
+  List<_ArchivedChecklistEntry> _filterArchivedEntries(bool useTranslit) {
+    if (_searchQuery.isEmpty) return _archivedEntries;
+    final q = _searchQuery;
+    return _archivedEntries.where((entry) {
+      final c = entry.checklist;
+      final raw = (c.name.trim().isNotEmpty ? c.name : c.additionalName ?? '')
+          .toLowerCase();
+      if (raw.contains(q)) return true;
+      final tr = _translatedNames[c.id]?.toLowerCase();
+      if (tr != null && tr.contains(q)) return true;
+      if (useTranslit) {
+        final lit = cyrillicToLatin(raw).toLowerCase();
+        if (lit.contains(q)) return true;
+      }
+      final performer = entry.performerName.toLowerCase();
+      if (performer.contains(q)) return true;
+      final dateText = _formatDate(entry.submittedAt.toLocal()).toLowerCase();
+      if (dateText.contains(q)) return true;
       return false;
     }).toList();
   }
@@ -120,9 +175,55 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
           ? list
           : list.where((c) => c.type != ChecklistType.prep).toList();
       final emps = await acc.getEmployeesForEstablishment(est.id);
+      final employeeNameById = <String, String>{
+        for (final e in emps) e.id: employeeDisplayName(e, translit: false),
+      };
+      final submissions =
+          await ChecklistSubmissionService().listForEstablishment(est.id);
+      final submittedChecklistIds =
+          submissions.map((s) => s.checklistId).toSet();
+      final latestSubmissionByChecklist = <String, ChecklistSubmission>{};
+      for (final sub in submissions) {
+        final prev = latestSubmissionByChecklist[sub.checklistId];
+        if (prev == null || sub.createdAt.isAfter(prev.createdAt)) {
+          latestSubmissionByChecklist[sub.checklistId] = sub;
+        }
+      }
+      final archived = <Checklist>[];
+      final archivedEntries = <_ArchivedChecklistEntry>[];
+      final active = <Checklist>[];
+      for (final c in visibleList) {
+        final isRecurring = c.reminderConfig?.recurrenceEnabled == true;
+        final isCompletedOnce = submittedChecklistIds.contains(c.id);
+        if (!isRecurring && isCompletedOnce) {
+          archived.add(c);
+          final latest = latestSubmissionByChecklist[c.id];
+          if (latest != null) {
+            final fallbackName =
+                latest.submittedByName.trim().isNotEmpty ? latest.submittedByName.trim() : '—';
+            final performer = latest.submittedByEmployeeId != null
+                ? (employeeNameById[latest.submittedByEmployeeId!] ?? fallbackName)
+                : fallbackName;
+            archivedEntries.add(
+              _ArchivedChecklistEntry(
+                checklist: c,
+                submission: latest,
+                performerName: performer.trim().isEmpty ? fallbackName : performer,
+                submittedAt: latest.createdAt,
+              ),
+            );
+          }
+        } else {
+          active.add(c);
+        }
+      }
       if (mounted) {
         setState(() {
-          _list = visibleList;
+          _activeList = active;
+          _archivedList = archived;
+          _archivedEntries = archivedEntries
+            ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+          if (_showArchive && _archivedList.isEmpty) _showArchive = false;
           _employees = emps;
           _loading = false;
         });
@@ -220,12 +321,38 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       ),
       body: Column(
         children: [
+          if (canEdit)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: SegmentedButton<bool>(
+                segments: [
+                  ButtonSegment<bool>(
+                    value: false,
+                    label: Text(loc.t('checklists') ?? 'Чеклисты'),
+                    icon: const Icon(Icons.list_alt),
+                  ),
+                  ButtonSegment<bool>(
+                    value: true,
+                    label: Text(loc.t('archive') ?? 'Архив'),
+                    icon: const Icon(Icons.archive_outlined),
+                  ),
+                ],
+                selected: {_showArchive},
+                onSelectionChanged: (v) {
+                  setState(() => _showArchive = v.first);
+                },
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: loc.t('checklist_search_hint'),
+                hintText: _showArchive
+                    ? (loc.t('checklist_archive_search_hint') ??
+                        (loc.t('checklist_search_hint') ??
+                            'Поиск по названию, исполнителю и дате'))
+                    : loc.t('checklist_search_hint'),
                 prefixIcon: const Icon(Icons.search),
                 border: const OutlineInputBorder(),
                 isDense: true,
@@ -371,7 +498,8 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
         ),
       );
     }
-    if (_list.isEmpty) {
+    final sourceList = _showArchive ? _archivedList : _activeList;
+    if (sourceList.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -381,13 +509,18 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
               Icon(Icons.checklist, size: 64, color: Colors.grey[400]),
               const SizedBox(height: 16),
               Text(
-                loc.t('no_checklists'),
+                _showArchive
+                    ? (loc.t('checklist_archive_empty') ?? 'Архив пуст')
+                    : loc.t('no_checklists'),
                 style: Theme.of(context).textTheme.titleLarge,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
-                loc.t('no_checklists_hint'),
+                _showArchive
+                    ? (loc.t('checklist_archive_empty_hint') ??
+                        'Завершенные неповторяющиеся чеклисты появятся здесь')
+                    : loc.t('no_checklists_hint'),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.grey[600],
                     ),
@@ -406,7 +539,22 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
         ),
       );
     }
-    final filtered = _filterChecklists(useTranslit);
+    if (_showArchive) {
+      final archived = _filterArchivedEntries(useTranslit);
+      if (archived.isEmpty) {
+        return Center(
+          child: Text(
+            loc.t('no_checklists') ?? 'Нет результатов',
+            style: Theme.of(context)
+                .textTheme
+                .bodyLarge
+                ?.copyWith(color: Colors.grey[600]),
+          ),
+        );
+      }
+      return _buildArchiveList(loc, archived, canEdit, useTranslit);
+    }
+    final filtered = _filterChecklists(sourceList, useTranslit);
     final grouped = _buildGroupedItems(loc, filtered, useTranslit);
     if (grouped.isEmpty) {
       return Center(
@@ -540,12 +688,12 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.task_alt),
+                          icon: const Icon(Icons.edit_outlined),
                           onPressed: () async {
-                            await context.push('/checklists/${c.id}/fill');
+                            await context.push('/checklists/${c.id}');
                             if (mounted) _load();
                           },
-                          tooltip: loc.t('fill_checklist') ?? 'Заполнить',
+                          tooltip: loc.t('edit') ?? 'Редактировать',
                         ),
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert),
@@ -575,13 +723,30 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                               );
                               if (confirm == true && mounted) {
                                 final toDelete = c;
-                                setState(() => _list = _list.where((x) => x.id != toDelete.id).toList());
+                                setState(() {
+                                  _activeList =
+                                      _activeList.where((x) => x.id != toDelete.id).toList();
+                                  _archivedList =
+                                      _archivedList.where((x) => x.id != toDelete.id).toList();
+                                });
                                 AppToastService.show(loc.t('checklist_deleted') ?? 'Удалено');
                                 try {
                                   await context.read<ChecklistServiceSupabase>().deleteChecklist(toDelete.id);
                                 } catch (e) {
                                   if (mounted) {
-                                    setState(() => _list = [..._list, toDelete]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt)));
+                                    setState(() {
+                                      if (_showArchive) {
+                                        _archivedList = [
+                                          ..._archivedList,
+                                          toDelete
+                                        ]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+                                      } else {
+                                        _activeList = [
+                                          ..._activeList,
+                                          toDelete
+                                        ]..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+                                      }
+                                    });
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(content: Text(loc.t('error_with_message').replaceAll('%s', e.toString()))),
                                     );
@@ -606,7 +771,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                     )
                   : const Icon(Icons.chevron_right),
               onTap: () async {
-                await context.push(canEdit ? '/checklists/${c.id}' : '/checklists/${c.id}/fill');
+                await context.push('/checklists/${c.id}/fill');
                 if (mounted) await _load();
               },
             ),
@@ -615,4 +780,89 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
       ),
     );
   }
+
+  Widget _buildArchiveList(
+    LocalizationService loc,
+    List<_ArchivedChecklistEntry> entries,
+    bool canEdit,
+    bool useTranslit,
+  ) {
+    final grouped = <String, List<_ArchivedChecklistEntry>>{};
+    for (final entry in entries) {
+      final key = _formatDate(entry.submittedAt.toLocal());
+      grouped.putIfAbsent(key, () => []).add(entry);
+    }
+    final dateKeys = grouped.keys.toList()..sort((a, b) => b.compareTo(a));
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+        children: dateKeys.expand((dateKey) {
+          final dayEntries = List<_ArchivedChecklistEntry>.from(grouped[dateKey]!)
+            ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+          return [
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 8),
+              child: Text(
+                dateKey,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+              ),
+            ),
+            ...dayEntries.map((entry) {
+              final checklist = entry.checklist;
+              final sectionLine = entry.submission.section?.trim().isNotEmpty == true
+                  ? entry.submission.section!.trim()
+                  : (loc.t('checklist_no_section') ?? 'Без цеха');
+              final subtitleParts = <String>[
+                entry.performerName,
+                '${_formatTime(entry.submittedAt.toLocal())} • $sectionLine',
+                '${checklist.items.length} ${loc.t('items_count')}',
+              ];
+              return Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  leading: const Icon(Icons.archive_outlined),
+                  title: Text(_displayName(checklist, loc, useTranslit)),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: subtitleParts
+                        .map((line) => Text(line))
+                        .toList(growable: false),
+                  ),
+                  trailing: canEdit
+                      ? IconButton(
+                          icon: const Icon(Icons.visibility_outlined),
+                          tooltip: loc.t('open') ?? 'Открыть',
+                          onPressed: () => context.push('/checklists/${checklist.id}?view=1'),
+                        )
+                      : const Icon(Icons.chevron_right),
+                  onTap: () => context.push('/checklists/${checklist.id}?view=1'),
+                ),
+              );
+            }),
+          ];
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _ArchivedChecklistEntry {
+  const _ArchivedChecklistEntry({
+    required this.checklist,
+    required this.submission,
+    required this.performerName,
+    required this.submittedAt,
+  });
+
+  final Checklist checklist;
+  final ChecklistSubmission submission;
+  final String performerName;
+  final DateTime submittedAt;
 }

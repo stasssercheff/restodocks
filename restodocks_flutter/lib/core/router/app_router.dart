@@ -462,6 +462,11 @@ class AppRouter {
           ),
         ),
         routes: [
+          // Временно скрыт экран «Кухня»: любые старые ссылки ведём на главную.
+          GoRoute(
+            path: '/kitchen',
+            redirect: (context, state) => '/home',
+          ),
           // Главный экран
           GoRoute(
             path: '/home',

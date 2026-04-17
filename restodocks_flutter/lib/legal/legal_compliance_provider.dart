@@ -48,18 +48,15 @@ class LegalComplianceProvider {
   LegalComplianceProvider._();
 
   static const LegalCompliance _spain = LegalCompliance(
-    systemName:
-        'APPCC (Análisis de Peligros y Puntos de Control Críticos)',
-    foodLaw:
-        'Reglamento (CE) n.º 852/2004 y Real Decreto 191/2011',
+    systemName: 'APPCC (Análisis de Peligros y Puntos de Control Críticos)',
+    foodLaw: 'Reglamento (CE) n.º 852/2004 y Real Decreto 191/2011',
     dataPrivacyLaw: 'RGPD y LOPDGDD',
     electronicSignatureLaw: 'Reglamento (UE) n.º 910/2014 (eIDAS)',
   );
 
   static const LegalCompliance _france = LegalCompliance(
     systemName: 'HACCP / Plan de Maîtrise Sanitaire (PMS)',
-    foodLaw:
-        'Règlement (CE) n° 852/2004 et Arrêté du 21 décembre 2009',
+    foodLaw: 'Règlement (CE) n° 852/2004 et Arrêté du 21 décembre 2009',
     dataPrivacyLaw: 'RGPD et Loi Informatique et Libertés',
     electronicSignatureLaw: 'Règlement (UE) n° 910/2014 (eIDAS)',
   );
@@ -89,8 +86,7 @@ class LegalComplianceProvider {
   /// ЕАЭС / РФ / СНГ: ссылки для шаблонов на ru/kk.
   static const LegalCompliance _cisEaeuRu = LegalCompliance(
     systemName: 'HACCP / ХАССП',
-    foodLaw:
-        'ТР ТС 021/2011 «О безопасности пищевой продукции» (ЕАЭС)',
+    foodLaw: 'ТР ТС 021/2011 «О безопасности пищевой продукции» (ЕАЭС)',
     dataPrivacyLaw:
         '152-ФЗ «О персональных данных» (РФ) и применимое законодательство',
     electronicSignatureLaw:
@@ -100,8 +96,7 @@ class LegalComplianceProvider {
   /// То же для tr/vi: англоязычные обозначения норм.
   static const LegalCompliance _cisEaeuEn = LegalCompliance(
     systemName: 'HACCP',
-    foodLaw:
-        'EAEU Technical Regulation TR CU 021/2011 “On Food Safety”',
+    foodLaw: 'EAEU Technical Regulation TR CU 021/2011 “On Food Safety”',
     dataPrivacyLaw:
         'Federal Law 152-FZ “On Personal Data” (Russian Federation) and applicable law',
     electronicSignatureLaw:
@@ -186,8 +181,7 @@ class LegalComplianceProvider {
         .replaceAll('{{SYSTEM_NAME}}', compliance.systemName)
         .replaceAll('{{FOOD_LAW}}', compliance.foodLaw)
         .replaceAll('{{DATA_PRIVACY_LAW}}', compliance.dataPrivacyLaw)
-        .replaceAll(
-            '{{E_SIGNATURE_LAW}}', compliance.electronicSignatureLaw);
+        .replaceAll('{{E_SIGNATURE_LAW}}', compliance.electronicSignatureLaw);
   }
 
   /// Языки экспорта PDF журналов, для которых показывается короткий футер eIDAS + защита данных.
@@ -204,6 +198,60 @@ class LegalComplianceProvider {
     final lc = languageCode.toLowerCase();
     if (!journalPdfEuComplianceFooterLanguages.contains(lc)) return null;
     final c = complianceForLanguageCode(lc);
+    switch (lc) {
+      case 'es':
+        return 'Identificación y registro con usuario: marco de referencia ${c.electronicSignatureLaw}. '
+            'Datos personales: ${c.dataPrivacyLaw}.';
+      case 'fr':
+        return 'Identification et enregistrement par compte utilisateur : référence ${c.electronicSignatureLaw}. '
+            'Données personnelles : ${c.dataPrivacyLaw}.';
+      case 'it':
+        return 'Identificazione e registrazione tramite account utente: riferimento ${c.electronicSignatureLaw}. '
+            'Dati personali: ${c.dataPrivacyLaw}.';
+      case 'de':
+        return 'Anmeldung und Protokollierung über das Benutzerkonto: Referenzrahmen ${c.electronicSignatureLaw}. '
+            'Personenbezogene Daten: ${c.dataPrivacyLaw}.';
+      case 'en':
+        return 'User sign-in and record keeping: electronic identification framework ${c.electronicSignatureLaw}. '
+            'Personal data: ${c.dataPrivacyLaw}.';
+      default:
+        return null;
+    }
+  }
+
+  static LegalCompliance complianceForCountryCode(
+    String countryCode,
+    String languageCode,
+  ) {
+    final cc = countryCode.toUpperCase();
+    switch (cc) {
+      case 'ES':
+        return _spain;
+      case 'FR':
+        return _france;
+      case 'IT':
+        return _italy;
+      case 'DE':
+        return _germany;
+      case 'GB':
+      case 'US':
+        return _euEnglish;
+      case 'TR':
+        return _cisEaeuEn;
+      case 'RU':
+      default:
+        return complianceForLanguageCode(languageCode);
+    }
+  }
+
+  /// Country-first footer: нормативные ссылки берутся от страны шаблона, текст — от языка PDF.
+  static String? journalPdfComplianceFooterByCountry(
+    String languageCode,
+    String countryCode,
+  ) {
+    final lc = languageCode.toLowerCase();
+    if (!journalPdfEuComplianceFooterLanguages.contains(lc)) return null;
+    final c = complianceForCountryCode(countryCode, languageCode);
     switch (lc) {
       case 'es':
         return 'Identificación y registro con usuario: marco de referencia ${c.electronicSignatureLaw}. '
