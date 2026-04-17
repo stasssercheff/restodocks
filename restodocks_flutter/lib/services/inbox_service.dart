@@ -136,7 +136,12 @@ class InboxService {
       for (final sub in subList) {
         final s = sub as ChecklistSubmission;
         final submittedName = s.submittedByName.isNotEmpty ? s.submittedByName : '—';
-        final subDept = s.payload['department']?.toString() ?? 'kitchen';
+        var subDept = _mapSectionToDepartment(
+          s.payload['department']?.toString() ?? '',
+        );
+        // Для management-подразделения показываем во вкладке «Кухня»,
+        // иначе карточки чеклистов не видны в фильтре цехов.
+        if (subDept == 'management') subDept = 'kitchen';
         documents.add(InboxDocument(
           id: s.id,
           type: DocumentType.checklistSubmission,
