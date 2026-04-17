@@ -171,11 +171,27 @@ class _InventoryRow {
       isWeightInKg ? quantities[i] * 1000 : quantities[i];
   double get totalDisplay => isWeightInKg ? total * 1000 : total;
 
+  /// Количество ячейки в канонической базе (г/мл).
+  double quantityCanonicalAt(int i) {
+    if (i < 0 || i >= quantities.length) return 0.0;
+    final q = quantities[i];
+    if (isCountedByPackage) return q * packageWeightGrams;
+    if (isPf) return q;
+    return CulinaryUnits.toGrams(
+      q,
+      unit,
+      gramsPerPiece: product?.gramsPerPiece ?? product?.packageWeightGrams,
+    );
+  }
+
   /// Итоговый вес в граммах (для выгрузки): упаковки × вес упаковки
   double get totalWeightGrams {
-    if (isCountedByPackage) return total * packageWeightGrams;
-    if (isWeightInKg) return total * 1000.0;
-    return total;
+    if (quantities.isEmpty) return 0.0;
+    var sum = 0.0;
+    for (var i = 0; i < quantities.length; i++) {
+      sum += quantityCanonicalAt(i);
+    }
+    return sum;
   }
 
   /// Сумма всех числовых значений строки (включая вторую ячейку и далее; последняя пустая — буфер для n+1).
@@ -3381,9 +3397,10 @@ class _InventoryScreenState extends State<InventoryScreen>
             : r.unitDisplayForBlank(loc, lang),
         'quantities': r.isCountedByPackage
             ? r.quantities.map((q) => q * r.packageWeightGrams).toList()
-            : r.isWeightInKg
-                ? r.quantities.map((q) => q * 1000).toList()
-                : r.quantities,
+            : List<double>.generate(
+                r.quantities.length,
+                (idx) => r.quantityCanonicalAt(idx),
+              ),
         'total': r.totalWeightGrams,
       };
       if (r.isCountedByPackage) {
@@ -4325,10 +4342,13 @@ class _ProductUnitDropdown extends StatelessWidget {
   final ThemeData theme;
   final Product? product;
 
-  static const List<String> _baseUnits = ['g', 'kg', 'ml', 'l'];
+  static List<String> _baseUnits(UnitSystem unitSystem) =>
+      unitSystem == UnitSystem.imperial
+          ? <String>['oz', 'lb', 'fl_oz', 'gal']
+          : <String>['g', 'kg', 'ml', 'l'];
 
-  static List<String> _allowedUnits(Product? p) {
-    final options = List<String>.from(_baseUnits);
+  static List<String> _allowedUnits(Product? p, UnitSystem unitSystem) {
+    final options = List<String>.from(_baseUnits(unitSystem));
     final hasGpp = p?.gramsPerPiece != null && p!.gramsPerPiece! > 0;
     if (hasGpp) {
       // Храним канонически как pcs, чтобы не было дублей в UI.
@@ -4344,7 +4364,8 @@ class _ProductUnitDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final options = _allowedUnits(product);
+    final unitPrefs = context.watch<UnitSystemPreferenceService>();
+    final options = _allowedUnits(product, unitPrefs.unitSystem);
     final normalized = value.trim().toLowerCase();
     final match =
         options.where((u) => u.toLowerCase() == normalized).firstOrNull;

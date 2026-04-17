@@ -30,15 +30,24 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
       unitId == 'pkg' ? (lang == 'ru' ? 'упак.' : 'pkg') : CulinaryUnits.displayName(unitId, lang);
 
   /// Единицы: вес, объём, штуки, упаковка, бутылка — как в карточке продукта.
-  static List<String> _allowedUnitsForProduct(Product? p) {
-    const base = [
-      'g', 'kg',           // вес
-      'ml', 'l',           // объём
-      'pcs',               // штуки (храним канонически как pcs)
-      'pack', 'pkg',       // упаковка (pkg — если в продукте указан packageWeightGrams)
-      'can', 'box',        // банка, коробка
-      'bottle',            // бутылка
-    ];
+  static List<String> _allowedUnitsForProduct(Product? p, UnitSystem system) {
+    final base = system == UnitSystem.imperial
+        ? <String>[
+            'oz', 'lb', // вес
+            'fl_oz', 'gal', // объём
+            'pcs',
+            'pack', 'pkg',
+            'can', 'box',
+            'bottle',
+          ]
+        : <String>[
+            'g', 'kg', // вес
+            'ml', 'l', // объём
+            'pcs',
+            'pack', 'pkg',
+            'can', 'box',
+            'bottle',
+          ];
     final options = List<String>.from(base);
     if (p?.packageWeightGrams != null && p!.packageWeightGrams! > 0) {
       if (!options.contains('pkg')) options.add('pkg');
@@ -50,6 +59,7 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
     final acc = context.read<AccountManagerSupabase>();
     final store = context.read<ProductStoreSupabase>();
     final loc = context.read<LocalizationService>();
+    final unitPrefs = context.read<UnitSystemPreferenceService>();
     final est = acc.establishment;
     final dataEstId = est?.dataEstablishmentId;
     if (dataEstId == null) return;
@@ -83,7 +93,7 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
       ),
     );
     if (product == null || !mounted) return;
-    final allowedUnits = _allowedUnitsForProduct(product);
+    final allowedUnits = _allowedUnitsForProduct(product, unitPrefs.unitSystem);
     final preferredUnit = product.unit ?? 'g';
     String unit = allowedUnits.contains(preferredUnit) ? preferredUnit : allowedUnits.first;
     final unitResult = await showDialog<String>(
@@ -165,6 +175,7 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final unitPrefs = context.watch<UnitSystemPreferenceService>();
     final lang = loc.currentLanguageCode;
     return Scaffold(
       appBar: AppBar(
@@ -237,7 +248,8 @@ class _OrderListProductsScreenState extends State<OrderListProductsScreen> {
                       final displayName = product != null
                           ? product.getLocalizedName(lang)
                           : item.productName;
-                      final allowedUnits = _allowedUnitsForProduct(product);
+                    final allowedUnits =
+                        _allowedUnitsForProduct(product, unitPrefs.unitSystem);
                       final currentUnit = allowedUnits.contains(item.unit) ? item.unit : allowedUnits.first;
                       return Card(
                         margin: const EdgeInsets.only(bottom: 8),

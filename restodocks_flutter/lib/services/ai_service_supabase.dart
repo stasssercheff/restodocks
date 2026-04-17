@@ -566,11 +566,15 @@ class AiServiceSupabase implements AiService {
   Future<List<TechCardRecognitionResult>> createTechCardsFromPrompt(
     String prompt, {
     String? establishmentId,
+    String? unitSystem,
   }) async {
     lastCreateTechCardReason = null;
     final body = <String, dynamic>{'prompt': prompt};
     if (establishmentId != null && establishmentId.isNotEmpty) {
       body['establishmentId'] = establishmentId;
+    }
+    if (unitSystem != null && unitSystem.trim().isNotEmpty) {
+      body['unitSystem'] = unitSystem.trim().toLowerCase();
     }
     final res = await _client.functions.invoke('ai-create-tech-card', body: body);
     final data = res.data;

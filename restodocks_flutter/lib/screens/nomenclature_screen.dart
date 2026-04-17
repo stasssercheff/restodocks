@@ -397,6 +397,16 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   _NomTab _selectedTab = _NomTab.nomenclature;
 
   final ScrollController _scrollController = ScrollController();
+  String? _unitScopeEstablishmentId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final estId = context.read<AccountManagerSupabase>().establishment?.id;
+    if (_unitScopeEstablishmentId == estId) return;
+    _unitScopeEstablishmentId = estId;
+    unawaited(context.read<UnitSystemPreferenceService>().ensureScopeSynced());
+  }
 
   @override
   void initState() {

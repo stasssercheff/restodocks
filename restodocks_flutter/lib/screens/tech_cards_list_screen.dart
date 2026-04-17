@@ -3559,9 +3559,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
       final establishmentId = est?.dataEstablishmentId;
       final aiService = context.read<AiService>();
       if (allowPromptFallback && aiService is AiServiceSupabase) {
+        final unitPrefs = context.read<UnitSystemPreferenceService>();
         final createdCards = await aiService.createTechCardsFromPrompt(
           result,
           establishmentId: establishmentId,
+          unitSystem: unitPrefs.isImperial ? 'imperial' : 'metric',
         );
         if (!mounted) return;
         if (createdCards.isNotEmpty) {
