@@ -11,6 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/subscription_entitlements.dart';
 import '../models/models.dart';
 import '../services/services.dart';
+import '../utils/employee_display_utils.dart';
 import '../widgets/app_bar_home_button.dart';
 
 /// Групповой чат.
@@ -270,25 +271,31 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
     }
   }
 
-  String _roomTitle() {
+  String _roomTitle(LocalizationService loc, bool showNameTranslit) {
     if (_room == null) return '';
-    if (_room!.displayName.isNotEmpty) return _room!.displayName;
-    return context.read<LocalizationService>().t('group_chat_default_name') ?? 'Групповой чат';
+    final raw = _room!.displayName.trim();
+    if (raw.isNotEmpty) {
+      return displayStoredPersonName(raw, loc, showNameTranslit: showNameTranslit);
+    }
+    return loc.t('group_chat_default_name') ?? 'Групповой чат';
   }
 
   @override
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
+    final layoutPrefs = context.watch<ScreenLayoutPreferenceService>();
     final theme = Theme.of(context);
     final acc = context.watch<AccountManagerSupabase>();
     final liteChatTextOnly =
         SubscriptionEntitlements.from(acc.establishment).isLiteTier;
     final myId = acc.currentEmployee?.id;
+    final nameTranslit =
+        loc.currentLanguageCode != 'ru' || layoutPrefs.showNameTranslit;
 
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(_roomTitle()),
+        title: Text(_roomTitle(loc, layoutPrefs.showNameTranslit)),
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -333,7 +340,11 @@ class _GroupChatScreenState extends State<GroupChatScreen> {
                           itemBuilder: (context, i) {
                             final msg = _messages[i];
                             final isMe = msg.senderEmployeeId == myId;
-                            final senderName = _employees[msg.senderEmployeeId]?.fullName ?? msg.senderEmployeeId;
+                            final senderEmp = _employees[msg.senderEmployeeId];
+                            final senderName = senderEmp != null
+                                ? employeeDisplayName(senderEmp,
+                                    translit: nameTranslit)
+                                : msg.senderEmployeeId;
                             return Align(
                               alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
                               child: _GroupMessageBubble(
