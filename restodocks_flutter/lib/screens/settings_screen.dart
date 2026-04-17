@@ -2335,9 +2335,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final isImperial = unitPrefs.isImperial;
                 final isRu = localization.currentLanguageCode == 'ru';
                 final title = isRu ? 'Система единиц' : 'Unit system';
-                final subtitle = isRu
-                    ? (isImperial ? 'US Imperial' : 'Metric')
-                    : (isImperial ? 'US Imperial' : 'Metric');
+                final subtitle = isImperial
+                    ? localization.t('unit_system_us_imperial')
+                    : localization.t('unit_system_metric');
                 return SwitchListTile(
                   secondary: const Icon(Icons.straighten),
                   title: Text(title),
