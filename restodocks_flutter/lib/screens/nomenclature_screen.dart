@@ -60,6 +60,8 @@ import '../services/domain_validation_service.dart';
 import '../services/translation_service.dart';
 import '../services/inventory_download.dart';
 import '../services/trial_device_save_kinds.dart';
+import '../services/unit_system_preference_service.dart';
+import '../utils/unit_converter.dart';
 
 /// Экран номенклатуры: продукты и ПФ заведения с ценами
 class NomenclatureScreen extends StatefulWidget {
@@ -76,23 +78,12 @@ enum _CatalogSort { nameAz, nameZa, priceAsc, priceDesc }
 enum _NomenclatureFilter { all, products }
 
 /// Единица измерения для отображения в номенклатуре: кг, шт, г, л и т.д. (не сырой "pcs"/"kg" из БД).
-String _unitDisplay(String? unit, String lang) {
-  const ruToId = {
-    'г': 'g',
-    'кг': 'kg',
-    'мг': 'mg',
-    'л': 'l',
-    'мл': 'ml',
-    'шт': 'pcs',
-    'штука': 'pcs',
-    'штуки': 'pcs',
-    'штук': 'pcs',
-    'грамм': 'g',
-    'килограмм': 'kg',
-  };
-  final raw = (unit ?? 'g').trim().toLowerCase();
-  final id = ruToId[raw] ?? raw;
-  return CulinaryUnits.displayName(id, lang);
+String _unitDisplay(
+  String? unit,
+  String lang, {
+  required UnitSystem unitSystem,
+}) {
+  return UnitConverter.displayUnitLabel(unit, lang, unitSystem);
 }
 
 /// Диалог с прогрессом загрузки продуктов
@@ -1281,6 +1272,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   String _buildProductSubtitle(BuildContext context, Product p,
       ProductStoreSupabase store, String estId, LocalizationService loc) {
     final loc = context.read<LocalizationService>();
+    final unitPrefs = context.read<UnitSystemPreferenceService>();
     final establishmentPrice = store.getEstablishmentPrice(p.id, estId);
     final rawPrice = establishmentPrice?.$1;
     final accountManager = context.read<AccountManagerSupabase>();
@@ -1296,13 +1288,18 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
     if (rawPrice != null) {
       final unit = (p.unit ?? 'g').trim().toLowerCase();
       if (unit == 'g' || unit == 'грамм' || unit == 'kg' || unit == 'кг') {
-        priceText = loc
-            .t('price_per_kg')
-            .replaceFirst('%s', NumberFormatUtils.formatInt(rawPrice))
-            .replaceFirst('%s', currencySymbol);
+        if (unitPrefs.isImperial) {
+          final perLb = rawPrice * 0.453592;
+          priceText = '${NumberFormatUtils.formatInt(perLb)} $currencySymbol/lb';
+        } else {
+          priceText = loc
+              .t('price_per_kg')
+              .replaceFirst('%s', NumberFormatUtils.formatInt(rawPrice))
+              .replaceFirst('%s', currencySymbol);
+        }
       } else {
         priceText =
-            '${NumberFormatUtils.formatInt(rawPrice)} $currencySymbol/${_unitDisplay(p.unit, loc.currentLanguageCode)}';
+            '${NumberFormatUtils.formatInt(rawPrice)} $currencySymbol/${_unitDisplay(p.unit, loc.currentLanguageCode, unitSystem: unitPrefs.unitSystem)}';
       }
     } else {
       priceText = loc.t('price_not_set');
@@ -4443,7 +4440,12 @@ class _CatalogTab extends StatelessWidget {
                               () {
                                 final cat = _categoryLabel(p.category);
                                 final unit = _unitDisplay(
-                                    p.unit, loc.currentLanguageCode);
+                                  p.unit,
+                                  loc.currentLanguageCode,
+                                  unitSystem: context
+                                      .read<UnitSystemPreferenceService>()
+                                      .unitSystem,
+                                );
                                 return cat.isEmpty ? unit : '$cat · $unit';
                               }(),
                               style: Theme.of(context).textTheme.bodySmall,

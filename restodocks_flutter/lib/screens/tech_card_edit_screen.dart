@@ -21,6 +21,7 @@ import '../services/tech_card_cost_hydrator.dart';
 import '../services/tech_card_nutrition_hydrator.dart';
 import '../utils/layout_breakpoints.dart';
 import '../utils/number_format_utils.dart';
+import '../utils/unit_converter.dart';
 import '../widgets/app_bar_home_button.dart';
 import 'excel_style_ttk_table.dart';
 
@@ -384,10 +385,26 @@ class _EditableProductNameCellState extends State<_EditableProductNameCell> {
 
 /// Редактируемая ячейка брутто (граммы). Тап по ячейке даёт фокус полю ввода.
 class _EditableGrossCell extends StatefulWidget {
-  const _EditableGrossCell({required this.grams, required this.onChanged});
+  const _EditableGrossCell({
+    required this.grams,
+    required this.onChanged,
+    this.canonicalToDisplay,
+    this.displayToCanonical,
+    this.decimalPlaces = 0,
+  });
 
   final double grams;
   final void Function(double? g) onChanged;
+  final double Function(double canonical)? canonicalToDisplay;
+  final double Function(double display)? displayToCanonical;
+  final int decimalPlaces;
+
+  String _format(double canonical) {
+    final shown = canonicalToDisplay?.call(canonical) ?? canonical;
+    if (decimalPlaces <= 0) return shown.toStringAsFixed(0);
+    if (shown == shown.truncateToDouble()) return shown.toInt().toString();
+    return shown.toStringAsFixed(decimalPlaces);
+  }
 
   @override
   State<_EditableGrossCell> createState() => _EditableGrossCellState();
@@ -401,7 +418,7 @@ class _EditableGrossCellState extends State<_EditableGrossCell> {
   @override
   void initState() {
     super.initState();
-    _ctrl = TextEditingController(text: widget.grams.toStringAsFixed(0));
+    _ctrl = TextEditingController(text: widget._format(widget.grams));
   }
 
   @override
@@ -409,8 +426,8 @@ class _EditableGrossCellState extends State<_EditableGrossCell> {
     super.didUpdateWidget(oldWidget);
     if (!_focusNode.hasFocus &&
         oldWidget.grams != widget.grams &&
-        _ctrl.text != widget.grams.toStringAsFixed(0)) {
-      _ctrl.text = widget.grams.toStringAsFixed(0);
+        _ctrl.text != widget._format(widget.grams)) {
+      _ctrl.text = widget._format(widget.grams);
     }
   }
 
@@ -429,7 +446,12 @@ class _EditableGrossCellState extends State<_EditableGrossCell> {
 
   void _submit() {
     final v = double.tryParse(_ctrl.text.replaceFirst(',', '.'));
-    widget.onChanged(v != null && v >= 0 ? v : null);
+    if (v == null || v < 0) {
+      widget.onChanged(null);
+      return;
+    }
+    final canonical = widget.displayToCanonical?.call(v) ?? v;
+    widget.onChanged(canonical >= 0 ? canonical : null);
   }
 
   @override
@@ -6464,6 +6486,7 @@ class _TtkTableState extends State<_TtkTable> {
     final theme = Theme.of(context);
     final loc = widget.loc;
     final lang = loc.currentLanguageCode;
+    final unitPrefs = context.watch<UnitSystemPreferenceService>();
     final ingredients = widget.ingredients;
     final totalNet = ingredients.fold<double>(0, (s, ing) => s + ing.netWeight);
     // Выход г. итого — сумма выходов по ингредиентам (не нетто)
@@ -6507,6 +6530,13 @@ class _TtkTableState extends State<_TtkTable> {
         Establishment.currencySymbolFor(est?.defaultCurrency ??
             accountManagerForEst.currentEmployee?.currency ??
             'VND');
+    UnitViewValue _displayWeight(double grams, TTIngredient ing) =>
+        UnitConverter.toDisplay(
+          canonicalValue: grams,
+          canonicalUnit: ing.unit,
+          system: unitPrefs.unitSystem,
+          gramsPerPiece: ing.gramsPerPiece,
+        );
 
     final hasDeleteCol = widget.effectiveCanEdit;
     // Порядок колонок как в образце. Ширины подобраны так, чтобы вся строка с полями ввода помещалась на экране без горизонтальной прокрутки.
@@ -6788,6 +6818,23 @@ class _TtkTableState extends State<_TtkTable> {
                                 padding: _cellPad,
                                 child: _EditableGrossCell(
                                   grams: ing.grossWeight,
+                                  decimalPlaces:
+                                      unitPrefs.isImperial ? 2 : 0,
+                                  canonicalToDisplay: (v) => UnitConverter
+                                      .toDisplay(
+                                        canonicalValue: v,
+                                        canonicalUnit: ing.unit,
+                                        system: unitPrefs.unitSystem,
+                                        gramsPerPiece: ing.gramsPerPiece,
+                                      )
+                                      .value,
+                                  displayToCanonical: (v) =>
+                                      UnitConverter.fromDisplay(
+                                    displayValue: v,
+                                    canonicalUnit: ing.unit,
+                                    system: unitPrefs.unitSystem,
+                                    gramsPerPiece: ing.gramsPerPiece,
+                                  ),
                                   onChanged: (g) {
                                     if (g != null && g >= 0)
                                       widget.onUpdate(
@@ -6797,7 +6844,10 @@ class _TtkTableState extends State<_TtkTable> {
                               ),
                             )),
                           )
-                        : _cell(ing.grossWeight.toStringAsFixed(0)),
+                        : _cell(UnitConverter.roundUi(
+                                _displayWeight(ing.grossWeight, ing).value,
+                                fractionDigits: unitPrefs.isImperial ? 2 : 0)
+                            .toStringAsFixed(unitPrefs.isImperial ? 2 : 0)),
                     widget.effectiveCanEdit
                         ? TableCell(
                             child: wrapCell(ConstrainedBox(
@@ -6856,6 +6906,23 @@ class _TtkTableState extends State<_TtkTable> {
                                 padding: _cellPad,
                                 child: _EditableNetCell(
                                   value: ing.effectiveGrossWeight,
+                                  decimalPlaces:
+                                      unitPrefs.isImperial ? 2 : 0,
+                                  canonicalToDisplay: (v) => UnitConverter
+                                      .toDisplay(
+                                        canonicalValue: v,
+                                        canonicalUnit: ing.unit,
+                                        system: unitPrefs.unitSystem,
+                                        gramsPerPiece: ing.gramsPerPiece,
+                                      )
+                                      .value,
+                                  displayToCanonical: (v) =>
+                                      UnitConverter.fromDisplay(
+                                    displayValue: v,
+                                    canonicalUnit: ing.unit,
+                                    system: unitPrefs.unitSystem,
+                                    gramsPerPiece: ing.gramsPerPiece,
+                                  ),
                                   onChanged: (v) {
                                     if (v != null && v >= 0)
                                       widget.onUpdate(
@@ -6868,7 +6935,11 @@ class _TtkTableState extends State<_TtkTable> {
                             )),
                           )
                         : _cell(
-                            '${ing.effectiveGrossWeight.toStringAsFixed(0)}'),
+                            UnitConverter.roundUi(
+                              _displayWeight(ing.effectiveGrossWeight, ing).value,
+                              fractionDigits: unitPrefs.isImperial ? 2 : 0,
+                            ).toStringAsFixed(unitPrefs.isImperial ? 2 : 0),
+                          ),
                     widget.effectiveCanEdit
                         ? TableCell(
                             child: wrapCell(ConstrainedBox(
@@ -7422,6 +7493,20 @@ class _TtkCookTableState extends State<_TtkCookTable> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final unitPrefs = context.watch<UnitSystemPreferenceService>();
+    UnitViewValue displayWeight(TTIngredient ing, double grams) =>
+        UnitConverter.toDisplay(
+          canonicalValue: grams,
+          canonicalUnit: ing.unit,
+          system: unitPrefs.unitSystem,
+          gramsPerPiece: ing.gramsPerPiece,
+        );
+    String weightText(TTIngredient ing, double grams) {
+      final dv = displayWeight(ing, grams);
+      final digits = unitPrefs.isImperial ? 2 : 0;
+      return UnitConverter.roundUi(dv.value, fractionDigits: digits)
+          .toStringAsFixed(digits);
+    }
     final borderColor = Colors.grey;
     return Stack(
       clipBehavior: Clip.none,
@@ -7517,7 +7602,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                                       ),
                                       TextSpan(
                                           text:
-                                              ' (${ing.outputWeight.toStringAsFixed(0)} ${widget.loc.t('gram')})'),
+                                              ' (${weightText(ing, ing.outputWeight)} ${CulinaryUnits.displayName(displayWeight(ing, ing.outputWeight).unitId, widget.loc.currentLanguageCode)})'),
                                     ],
                                   ),
                                   softWrap: true,
@@ -7540,6 +7625,15 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                         padding: _TtkCookTable._cellPad,
                         child: _EditableNetCell(
                           value: ing.grossWeight,
+                          decimalPlaces: unitPrefs.isImperial ? 2 : 0,
+                          canonicalToDisplay: (v) =>
+                              displayWeight(ing, v).value,
+                          displayToCanonical: (v) => UnitConverter.fromDisplay(
+                            displayValue: v,
+                            canonicalUnit: ing.unit,
+                            system: unitPrefs.unitSystem,
+                            gramsPerPiece: ing.gramsPerPiece,
+                          ),
                           onChanged: (v) =>
                               _updateGrossAt(i, v ?? ing.grossWeight),
                         ),
@@ -7550,12 +7644,21 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                         padding: _TtkCookTable._cellPad,
                         child: _EditableNetCell(
                           value: ing.netWeight,
+                          decimalPlaces: unitPrefs.isImperial ? 2 : 0,
+                          canonicalToDisplay: (v) =>
+                              displayWeight(ing, v).value,
+                          displayToCanonical: (v) => UnitConverter.fromDisplay(
+                            displayValue: v,
+                            canonicalUnit: ing.unit,
+                            system: unitPrefs.unitSystem,
+                            gramsPerPiece: ing.gramsPerPiece,
+                          ),
                           onChanged: (v) => _updateNetAt(i, v ?? ing.netWeight),
                         ),
                       ),
                     ),
                     _cell(ing.cookingProcessName ?? widget.loc.t('dash')),
-                    _cell(ing.outputWeight.toStringAsFixed(0)),
+                    _cell(weightText(ing, ing.outputWeight)),
                     _cell(_portionsAmount(ing)),
                   ],
                 );
@@ -7571,7 +7674,7 @@ class _TtkCookTableState extends State<_TtkCookTable> {
                   child: Padding(
                     padding: _TtkCookTable._cellPad,
                     child: Text(
-                        '${_totalOutput.toStringAsFixed(0)} ${widget.loc.t('gram')}',
+                        '${UnitConverter.roundUi(_totalOutput, fractionDigits: unitPrefs.isImperial ? 2 : 0).toStringAsFixed(unitPrefs.isImperial ? 2 : 0)} ${widget.loc.t('gram')}',
                         style: const TextStyle(fontWeight: FontWeight.bold)),
                   ),
                 ),
@@ -7682,6 +7785,8 @@ class _EditableNetCell extends StatefulWidget {
     required this.value,
     required this.onChanged,
     this.decimalPlaces = 0,
+    this.canonicalToDisplay,
+    this.displayToCanonical,
   });
 
   final double value;
@@ -7689,13 +7794,16 @@ class _EditableNetCell extends StatefulWidget {
 
   /// Количество знаков после запятой (0 = целые, 1 = 0.3 и т.д.)
   final int decimalPlaces;
+  final double Function(double canonical)? canonicalToDisplay;
+  final double Function(double display)? displayToCanonical;
 
   /// Целые без .0 (1, 2), дробные с одним знаком (0.5, 0.3).
   String _format(double v) {
-    if (decimalPlaces == 0) return v.toStringAsFixed(0);
-    return v == v.truncateToDouble()
-        ? v.toInt().toString()
-        : v.toStringAsFixed(decimalPlaces);
+    final shown = canonicalToDisplay?.call(v) ?? v;
+    if (decimalPlaces == 0) return shown.toStringAsFixed(0);
+    return shown == shown.truncateToDouble()
+        ? shown.toInt().toString()
+        : shown.toStringAsFixed(decimalPlaces);
   }
 
   @override
@@ -7739,7 +7847,12 @@ class _EditableNetCellState extends State<_EditableNetCell> {
 
   void _submit() {
     final v = double.tryParse(_ctrl.text.replaceFirst(',', '.'));
-    widget.onChanged(v != null && v >= 0 ? v : null);
+    if (v == null || v < 0) {
+      widget.onChanged(null);
+      return;
+    }
+    final canonical = widget.displayToCanonical?.call(v) ?? v;
+    widget.onChanged(canonical >= 0 ? canonical : null);
   }
 
   @override

@@ -35,6 +35,9 @@ class AppProviders {
         ChangeNotifierProvider<ScreenLayoutPreferenceService>(
           create: (_) => ScreenLayoutPreferenceService(),
         ),
+        ChangeNotifierProvider<UnitSystemPreferenceService>(
+          create: (_) => UnitSystemPreferenceService(),
+        ),
         ChangeNotifierProvider<MobileUiScaleService>(
           create: (_) => MobileUiScaleService(),
         ),

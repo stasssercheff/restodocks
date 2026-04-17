@@ -2329,6 +2329,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     .setThemeMode(dark ? ThemeMode.dark : ThemeMode.light),
               ),
             ),
+            Consumer<UnitSystemPreferenceService>(
+              builder: (_, unitPrefs, __) {
+                final isImperial = unitPrefs.isImperial;
+                final isRu = localization.currentLanguageCode == 'ru';
+                final title = isRu ? 'Система единиц' : 'Unit system';
+                final subtitle = isRu
+                    ? (isImperial ? 'US Imperial' : 'Metric')
+                    : (isImperial ? 'US Imperial' : 'Metric');
+                return SwitchListTile(
+                  secondary: const Icon(Icons.straighten),
+                  title: Text(title),
+                  subtitle: Text(subtitle),
+                  value: isImperial,
+                  onChanged: (v) => unitPrefs
+                      .setUnitSystem(v ? UnitSystem.imperial : UnitSystem.metric),
+                );
+              },
+            ),
             // Валюта заведения — только у владельца и шеф-повара в настройках
             if (currentEmployee.hasRole('owner') ||
                 currentEmployee.hasRole('executive_chef')) ...[
