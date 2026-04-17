@@ -867,6 +867,110 @@ class _ProPaymentHubFutureDialog extends StatefulWidget {
 
 class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> {
   late final Future<_ProHubPreload> _preload;
+  bool _establishmentsExpanded = true;
+  bool _employeesExpanded = true;
+
+  ({int? count, bool establishments}) _parseAddonId(String productId) {
+    final m = RegExp(r'^(\d+)_extra_(establishment|employee)_monthly$')
+        .firstMatch(productId.trim());
+    if (m == null) return (count: null, establishments: true);
+    return (
+      count: int.tryParse(m.group(1) ?? ''),
+      establishments: m.group(2) == 'establishment',
+    );
+  }
+
+  String _fallbackAddonTitle(LocalizationService loc, String productId) {
+    final parsed = _parseAddonId(productId);
+    final count = parsed.count;
+    if (count != null) {
+      final lang = loc.currentLanguageCode.toLowerCase();
+      if (lang == 'ru') {
+        final noun = parsed.establishments ? 'Заведение' : 'Сотрудник';
+        return '$noun +$count';
+      }
+      final noun = parsed.establishments ? 'Establishment' : 'Employee';
+      return '$noun +$count';
+    }
+    final cleaned = productId.trim();
+    if (cleaned.isEmpty) return productId;
+    final noSuffix = cleaned.replaceAll(RegExp(r'_monthly$', caseSensitive: false), '');
+    return noSuffix.replaceAll('_', ' ');
+  }
+
+  String _addonDisplayTitle(LocalizationService loc, String productId, ProductDetails? product) {
+    final title = product?.title.trim() ?? '';
+    if (title.isNotEmpty) {
+      // Store title can stay as fallback, but prefer clear localized label by product id.
+      final parsed = _parseAddonId(productId);
+      if (parsed.count == null) return title;
+    }
+    return _fallbackAddonTitle(loc, productId);
+  }
+
+  String _iapPriceMonthlyLabel(ProductDetails p) {
+    return widget.loc.t(
+      'iap_price_monthly',
+      args: {'price': widget.formatIapPrice(p)},
+    );
+  }
+
+  ButtonStyle _subscriptionButtonStyle(ColorScheme cs) {
+    return FilledButton.styleFrom(
+      backgroundColor: cs.primary,
+      foregroundColor: cs.onPrimary,
+    );
+  }
+
+  Widget _addonGroupSection({
+    required ThemeData theme,
+    required ColorScheme cs,
+    required String title,
+    required bool initiallyExpanded,
+    required ValueChanged<bool> onExpansionChanged,
+    required List<String> addonIds,
+    required Map<String, ProductDetails> addonsById,
+  }) {
+    return Theme(
+      data: theme.copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 6),
+        childrenPadding: EdgeInsets.zero,
+        initiallyExpanded: initiallyExpanded,
+        iconColor: cs.onSurfaceVariant,
+        collapsedIconColor: cs.onSurfaceVariant,
+        title: Text(
+          title,
+          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        onExpansionChanged: onExpansionChanged,
+        children: [
+          for (final addonId in addonIds) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: addonsById[addonId] != null
+                  ? FilledButton(
+                      style: _subscriptionButtonStyle(cs),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        unawaited(widget.iap.purchaseAddon(addonsById[addonId]!.id));
+                      },
+                      child: Text(
+                        '${_addonDisplayTitle(widget.loc, addonId, addonsById[addonId])} - ${_iapPriceMonthlyLabel(addonsById[addonId]!)}',
+                      ),
+                    )
+                  : OutlinedButton(
+                      onPressed: null,
+                      child: Text(
+                        '${_addonDisplayTitle(widget.loc, addonId, null)} - ${widget.loc.t('pro_iap_product_unavailable')}',
+                      ),
+                    ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -925,6 +1029,16 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
             final est = widget.accountManager.establishment;
             final subs = widget.iap.subscriptionProducts;
             final addons = widget.iap.addonProducts;
+            final addonsById = <String, ProductDetails>{
+              for (final addon in addons) addon.id: addon,
+            };
+            final addonIdsInOrder = kRestodocksAddonProductIdOrder;
+            final establishmentAddonIds = addonIdsInOrder
+                .where((id) => _parseAddonId(id).establishments)
+                .toList();
+            final employeeAddonIds = addonIdsInOrder
+                .where((id) => !_parseAddonId(id).establishments)
+                .toList();
             final ready = widget.iap.ready;
             final theme = Theme.of(context);
             final cs = theme.colorScheme;
@@ -990,75 +1104,52 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
                           if (ready && subs.isNotEmpty) ...[
                             const SizedBox(height: 16),
                             for (final d in subs) ...[
-                              DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: cs.surfaceContainerHighest
-                                      .withValues(alpha: 0.65),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                    horizontal: 12,
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.stretch,
-                                    children: [
-                                      Text(
-                                        widget.formatIapPrice(d),
-                                        textAlign: TextAlign.center,
-                                        style: theme.textTheme.headlineSmall
-                                            ?.copyWith(
-                                          fontWeight: FontWeight.w700,
-                                          color: cs.primary,
-                                        ),
+                              FilledButton(
+                                style: _subscriptionButtonStyle(cs),
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  unawaited(widget.iap.purchaseSubscription(d.id));
+                                },
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(_iapSubscriptionPurchaseLabel(loc, d.id)),
+                                    Text(
+                                      _iapPriceMonthlyLabel(d),
+                                      style: theme.textTheme.labelSmall?.copyWith(
+                                        color: cs.onPrimary.withValues(alpha: 0.88),
+                                        height: 1.2,
                                       ),
-                                      if (d.currencyCode.trim().isNotEmpty) ...[
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          loc.t('pro_payment_iap_currency_line',
-                                              args: {
-                                                'code': d.currencyCode
-                                                    .trim()
-                                                    .toUpperCase(),
-                                              }),
-                                          textAlign: TextAlign.center,
-                                          style: theme.textTheme.bodySmall
-                                              ?.copyWith(
-                                            color: cs.onSurfaceVariant,
-                                            height: 1.3,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                            ],
-                            if (addons.isNotEmpty) ...[
-                              Text(
-                                loc.t('subscription_iap_addons_heading'),
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
+                                    ),
+                                  ],
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              for (final a in addons) ...[
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 6),
-                                  child: FilledButton.tonal(
-                                    onPressed: () {
-                                      Navigator.pop(context);
-                                      unawaited(widget.iap.purchaseAddon(a.id));
-                                    },
-                                    child: Text(
-                                      '${a.title} - ${widget.formatIapPrice(a)}',
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            ],
+                            if (addons.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              _addonGroupSection(
+                                theme: theme,
+                                cs: cs,
+                                title: loc.t('establishments'),
+                                initiallyExpanded: _establishmentsExpanded,
+                                onExpansionChanged: (v) {
+                                  setState(() => _establishmentsExpanded = v);
+                                },
+                                addonIds: establishmentAddonIds,
+                                addonsById: addonsById,
+                              ),
+                              _addonGroupSection(
+                                theme: theme,
+                                cs: cs,
+                                title: loc.t('employees'),
+                                initiallyExpanded: _employeesExpanded,
+                                onExpansionChanged: (v) {
+                                  setState(() => _employeesExpanded = v);
+                                },
+                                addonIds: employeeAddonIds,
+                                addonsById: addonsById,
+                              ),
                               Text(
                                 loc.t('subscription_iap_addons_hint'),
                                 style: theme.textTheme.bodySmall?.copyWith(
@@ -1068,15 +1159,6 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
                               ),
                               const SizedBox(height: 12),
                             ],
-                            Text(
-                              loc.t('pro_payment_price_note'),
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                                height: 1.35,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
                             Text(
                               loc.t('pro_cancel_anytime_notice'),
                               textAlign: TextAlign.center,
@@ -1109,18 +1191,6 @@ class _ProPaymentHubFutureDialogState extends State<_ProPaymentHubFutureDialog> 
                             ),
                           ),
                           const SizedBox(height: 12),
-                        ],
-                        if (!paid && ready && subs.isNotEmpty) ...[
-                          for (final d in subs) ...[
-                            FilledButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                                unawaited(widget.iap.purchaseSubscription(d.id));
-                              },
-                              child: Text(_iapSubscriptionPurchaseLabel(loc, d.id)),
-                            ),
-                            const SizedBox(height: 8),
-                          ],
                         ],
                         if (paid) ...[
                           OutlinedButton(
