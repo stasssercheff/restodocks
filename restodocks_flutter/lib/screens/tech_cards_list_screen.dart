@@ -3393,14 +3393,14 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           final isLandscape = mq.orientation == Orientation.landscape;
           final isDesktopLike = screenW >= 900;
           final useCompactLayout = isLandscape && !isDesktopLike;
-          // Заголовок + actions + отступы диалога (без занижения: иначе в альбоме
-          // clamp «вверх» ломает раскладку и скрывает поле ввода).
-          final dialogChrome = useCompactLayout ? 100.0 : 176.0;
+          // Заголовок + actions + отступы диалога.
+          final dialogChrome = useCompactLayout ? 108.0 : 168.0;
           final availableH = screenH - kb - safePad;
-          final maxBody = (availableH - dialogChrome).clamp(48.0, screenH * 0.95);
-          const extrasBelowField = 8.0;
+          final maxBody = (availableH - dialogChrome).clamp(120.0, screenH * 0.72);
+          final preferredFieldHeight =
+              isDesktopLike ? 320.0 : (useCompactLayout ? 180.0 : 250.0);
           final fieldHeight =
-              (maxBody - extrasBelowField).clamp(48.0, isDesktopLike ? 620.0 : 520.0);
+              preferredFieldHeight.clamp(140.0, maxBody - 10.0);
           final titleStyle = Theme.of(ctx).textTheme.titleMedium?.copyWith(
                 fontSize: useCompactLayout ? 14 : null,
                 height: useCompactLayout ? 1.15 : null,
@@ -3506,6 +3506,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                               )
                             : null,
                         border: const OutlineInputBorder(),
+                        enabledBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color:
+                                Theme.of(ctx).colorScheme.outline.withValues(alpha: 0.7),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(
+                            color: Theme.of(ctx).colorScheme.primary,
+                            width: 1.5,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -4120,6 +4132,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             ),
           )
         : null;
+    final importAllowed = canEdit && hasProSubscription;
     final createWidget = canEdit
         ? PopupMenuButton<String>(
             icon: Icon(Icons.add,
@@ -4133,6 +4146,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               }
               if (value == 'ai') {
                 await _createFromText(context, loc, allowPromptFallback: true);
+                return;
+              }
+              if (value == 'import_excel') {
+                await _createFromExcel(context, loc);
+                return;
+              }
+              if (value == 'import_text') {
+                await _createFromText(context, loc);
+                return;
+              }
+              if (value == 'import_photo') {
+                await _createFromPhoto(context, loc);
               }
             },
             itemBuilder: (_) => [
@@ -4169,43 +4194,32 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                     ],
                   ),
                 ),
-            ],
-          )
-        : null;
-    final importWidget = canEdit && hasProSubscription
-        ? PopupMenuButton<String>(
-            icon: const Icon(Icons.upload),
-            tooltip: loc.t('ttk_import_file'),
-            onSelected: (value) async {
-              if (value == 'excel') await _createFromExcel(context, loc);
-              if (value == 'text') await _createFromText(context, loc);
-              if (value == 'photo') await _createFromPhoto(context, loc);
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'excel',
-                child: Text(
-                  loc.t('ttk_import_file'),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.w500,
-                      ),
-                ),
-              ),
-              PopupMenuItem(
-                  value: 'text',
+              if (importAllowed)
+                PopupMenuItem(
+                  value: 'import_excel',
                   child: Text(
-                    loc.t('ttk_import_paste_text').trim().isEmpty
-                        ? 'Вставить текст'
-                        : loc.t('ttk_import_paste_text'),
+                    loc.t('ttk_import_file'),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Theme.of(context).colorScheme.onSurface,
                           fontWeight: FontWeight.w500,
                         ),
-                  )),
-              if (!kIsWeb && OnDeviceOcrService.isSupported)
+                  ),
+                ),
+              if (importAllowed)
                 PopupMenuItem(
-                  value: 'photo',
+                    value: 'import_text',
+                    child: Text(
+                      loc.t('ttk_import_paste_text').trim().isEmpty
+                          ? 'Вставить текст'
+                          : loc.t('ttk_import_paste_text'),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontWeight: FontWeight.w500,
+                          ),
+                    )),
+              if (importAllowed && !kIsWeb && OnDeviceOcrService.isSupported)
+                PopupMenuItem(
+                  value: 'import_photo',
                   child: Text(
                     loc.t('ai_tech_card_from_photo').trim().isEmpty
                         ? 'ТТК из фото'
@@ -4301,7 +4315,6 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final result = <Widget>[];
     if (countWidget != null) result.add(wrap('ttk-count', countWidget));
     if (createWidget != null) result.add(wrap('ttk-create', createWidget));
-    if (importWidget != null) result.add(wrap('ttk-import', importWidget));
     result.add(wrap('ttk-export', exportWidget));
     result.add(wrap('ttk-refresh', refreshWidget));
     return result;
