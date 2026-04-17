@@ -3396,11 +3396,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           // Заголовок + actions + отступы диалога.
           final dialogChrome = useCompactLayout ? 108.0 : 168.0;
           final availableH = screenH - kb - safePad;
-          final maxBody = (availableH - dialogChrome).clamp(120.0, screenH * 0.72);
-          final preferredFieldHeight =
-              isDesktopLike ? 320.0 : (useCompactLayout ? 180.0 : 250.0);
-          final fieldHeight =
-              preferredFieldHeight.clamp(140.0, maxBody - 10.0);
+          final maxBody = (availableH - dialogChrome).clamp(150.0, screenH * 0.62);
           final titleStyle = Theme.of(ctx).textTheme.titleMedium?.copyWith(
                 fontSize: useCompactLayout ? 14 : null,
                 height: useCompactLayout ? 1.15 : null,
@@ -3442,87 +3438,81 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
             maxLines: useCompactLayout ? 2 : 4,
             overflow: TextOverflow.ellipsis,
           ),
-          content: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: dialogMinW,
-              maxWidth: dialogMaxW,
-              maxHeight: maxBody,
-            ),
-            child: SingleChildScrollView(
-              keyboardDismissBehavior:
-                  ScrollViewKeyboardDismissBehavior.onDrag,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (canShowAiQuota &&
-                      aiQuotaTotal != null &&
-                      aiQuotaRemaining != null) ...[
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: Theme.of(ctx)
-                            .colorScheme
-                            .surfaceContainerHighest
-                            .withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(10),
+          content: SizedBox(
+            width: dialogMaxW,
+            height: maxBody,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (canShowAiQuota &&
+                    aiQuotaTotal != null &&
+                    aiQuotaRemaining != null) ...[
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Theme.of(ctx)
+                          .colorScheme
+                          .surfaceContainerHighest
+                          .withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 8,
+                      child: Text(
+                        _aiTtkRemainingLabel(
+                          loc,
+                          aiQuotaRemaining,
+                          aiQuotaTotal,
                         ),
-                        child: Text(
-                          _aiTtkRemainingLabel(
-                            loc,
-                            aiQuotaRemaining,
-                            aiQuotaTotal,
-                          ),
-                          style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
+                        style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                  ],
-                  SizedBox(
-                    height: fieldHeight,
-                    child: TextField(
-                      controller: controller,
-                      maxLines: null,
-                      expands: true,
-                      style: fieldStyle,
-                      scrollPadding: EdgeInsets.only(bottom: kb + 32),
-                      textInputAction: TextInputAction.newline,
-                      decoration: InputDecoration(
-                        hintText:
-                            'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
-                        hintStyle: hintStyle,
-                        isDense: useCompactLayout,
-                        contentPadding: useCompactLayout
-                            ? const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 8,
-                              )
-                            : null,
-                        border: const OutlineInputBorder(),
-                        enabledBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                            color:
-                                Theme.of(ctx).colorScheme.outline.withValues(alpha: 0.7),
-                          ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    maxLines: null,
+                    expands: true,
+                    style: fieldStyle,
+                    scrollPadding: EdgeInsets.only(bottom: kb + 24),
+                    textInputAction: TextInputAction.newline,
+                    decoration: InputDecoration(
+                      hintText:
+                          'Название блюда\nнаименование\tЕд.изм\tНорма закладки\t...\n1\tПродукт\tкг\t0,100\t...\nВыход\t\tкг\t1,000',
+                      hintStyle: hintStyle,
+                      isDense: useCompactLayout,
+                      contentPadding: useCompactLayout
+                          ? const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            )
+                          : null,
+                      border: const OutlineInputBorder(),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Theme.of(ctx)
+                              .colorScheme
+                              .outline
+                              .withValues(alpha: 0.7),
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                            color: Theme.of(ctx).colorScheme.primary,
-                            width: 1.5,
-                          ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                          color: Theme.of(ctx).colorScheme.primary,
+                          width: 1.5,
                         ),
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           actions: [
