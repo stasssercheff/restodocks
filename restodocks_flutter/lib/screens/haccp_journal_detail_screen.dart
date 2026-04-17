@@ -112,6 +112,21 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     return rolePart.isEmpty ? namePart : '$namePart, $rolePart';
   }
 
+  String _activeCountryCode() {
+    final est = context.read<AccountManagerSupabase>().establishment;
+    if (est == null) return 'RU';
+    return context.read<HaccpConfigService>().resolveCountryCodeForEstablishment(
+          est,
+        );
+  }
+
+  String _datePatternForCountry() {
+    return HaccpCountryProfiles.datePatternForCountry(_activeCountryCode());
+  }
+
+  String _formatDate(DateTime value) =>
+      DateFormat(_datePatternForCountry()).format(value);
+
   /// Экспорт PDF: титульный лист + страницы за выбранный период + заключительный лист.
   Future<void> _exportPdf({
     required DateTime dateFrom,
@@ -126,17 +141,22 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     if (est == null) return;
     final countryCode = config.resolveCountryCodeForEstablishment(est);
     final selectedProfile = config.resolveCountryProfileForEstablishment(est);
+    final explicitOverride = config.hasExplicitCountryOverride(est.id);
 
     final loc = context.read<LocalizationService>();
     final countryLabel = HaccpCountryProfiles.countryCodeAndNameLabel(
       selectedProfile.countryCode,
       loc.currentLanguageCode,
     );
+    final profileSource = HaccpCountryProfiles.profileSourceLabel(
+      manual: explicitOverride,
+      languageCode: loc.currentLanguageCode,
+    );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(
-                '${loc.t('haccp_pdf_preparing') ?? 'Подготовка PDF...'} ($countryLabel)')),
+                '${loc.t('haccp_pdf_preparing') ?? 'Подготовка PDF...'} ($countryLabel, $profileSource)')),
       );
     }
 
@@ -180,7 +200,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text(
-                '${loc.t('haccp_pdf_saved') ?? 'PDF сохранён'} ($countryLabel)')),
+                '${loc.t('haccp_pdf_saved') ?? 'PDF сохранён'} ($countryLabel, $profileSource)')),
       );
     }
   }
@@ -304,7 +324,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                 title: Text(loc.t('haccp_pdf_period_month_to_today') ??
                     'С 1 числа по сегодня'),
                 subtitle: Text(
-                    '${DateFormat('dd.MM').format(DateTime(now.year, now.month, 1))} — ${DateFormat('dd.MM.yyyy').format(now)}'),
+                    '${_formatDate(DateTime(now.year, now.month, 1))} — ${_formatDate(now)}'),
                 onTap: () => Navigator.pop(ctx, 'month_to_today'),
               ),
               ListTile(
@@ -457,7 +477,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                   ),
                   const SizedBox(height: 16),
                   ListTile(
-                    title: Text(DateFormat('dd.MM.yyyy').format(from)),
+                    title: Text(_formatDate(from)),
                     subtitle: Text(loc.t('haccp_date_start')),
                     trailing: const Icon(Icons.calendar_today),
                     onTap: () async {
@@ -475,7 +495,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                     },
                   ),
                   ListTile(
-                    title: Text(DateFormat('dd.MM.yyyy').format(to)),
+                    title: Text(_formatDate(to)),
                     subtitle: Text(loc.t('haccp_date_end')),
                     trailing: const Icon(Icons.calendar_today),
                     onTap: () async {
@@ -512,7 +532,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     if (fromDay == toDay && fromDay == todayStart) {
       return loc.t('haccp_period_today') ?? 'Сегодня';
     }
-    return '${DateFormat('dd.MM.yyyy').format(from)} — ${DateFormat('dd.MM.yyyy').format(to)}';
+    return '${_formatDate(from)} — ${_formatDate(to)}';
   }
 
   Future<void> _showDateRangePicker() async {
@@ -538,7 +558,7 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
               title: Text(loc.t('haccp_period_month_to_today') ??
                   'С 1 числа по сегодня'),
               subtitle: Text(
-                  '${DateFormat('dd.MM').format(DateTime(now.year, now.month, 1))} — ${DateFormat('dd.MM.yyyy').format(now)}'),
+                  '${_formatDate(DateTime(now.year, now.month, 1))} — ${_formatDate(now)}'),
               onTap: () => Navigator.pop(ctx, 'month'),
             ),
             ListTile(
@@ -623,7 +643,10 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
                 const SizedBox(height: 8),
                 Text(
                   loc.t('haccp_not_supported_body') ??
-                      'Используются только журналы по СанПиН 2.3/2.4.3590-20 (Приложения 1–5).',
+                      HaccpCountryProfiles.notSupportedBodyLabel(
+                        loc.currentLanguageCode,
+                        selectedCountryCode,
+                      ),
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant),
                   textAlign: TextAlign.center,
@@ -645,7 +668,13 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t(logType.displayNameKey) ?? logType.displayNameRu),
+          title: Text(
+            HaccpCountryProfiles.resolveLogTypeTitle(
+              logType: logType,
+              languageCode: loc.currentLanguageCode,
+              localizedValue: loc.t(logType.displayNameKey),
+            ),
+          ),
         actions: [
           IconButton(
             icon: const Icon(Icons.date_range),
@@ -918,9 +947,28 @@ class _JournalTableView extends StatelessWidget {
   /// Для Приложения 3: наименование помещения (в шапке). Если null при «Все» — в таблице колонка «Помещение».
   final String? warehousePremisesName;
 
-  static final _dateFmt = DateFormat('dd.MM.yyyy');
-  static final _dateTimeFmt = DateFormat('dd.MM.yyyy HH:mm');
   static final _timeFmt = DateFormat('HH:mm');
+
+  String get _datePattern {
+    switch (establishmentCountryCode.toUpperCase()) {
+      case 'US':
+        return 'MM/dd/yyyy';
+      case 'GB':
+      case 'ES':
+      case 'FR':
+      case 'IT':
+        return 'dd/MM/yyyy';
+      case 'DE':
+      case 'TR':
+      case 'RU':
+      default:
+        return 'dd.MM.yyyy';
+    }
+  }
+
+  String _formatDate(DateTime value) => DateFormat(_datePattern).format(value);
+  String _formatDateTime(DateTime value) =>
+      DateFormat('$_datePattern HH:mm').format(value);
 
   Widget _header(String text) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
@@ -1074,7 +1122,7 @@ class _JournalTableView extends StatelessWidget {
           _wrapTap(_cell(log.medExamPosition ?? '—'), log),
           _wrapTap(
               _cell(log.medExamDate != null
-                  ? _dateFmt.format(log.medExamDate!)
+                  ? _formatDate(log.medExamDate!)
                   : '—'),
               log),
           _wrapTap(_cell(log.medExamConclusion ?? '—'), log),
@@ -1105,7 +1153,7 @@ class _JournalTableView extends StatelessWidget {
         _header(loc.t('haccp_tbl_responsible'))
       ]),
       ...logs.map((log) => TableRow(children: [
-            _wrapTap(_cell(_dateFmt.format(log.createdAt)), log),
+            _wrapTap(_cell(_formatDate(log.createdAt)), log),
             _wrapTap(
                 _cell(log.disinfObjectName ?? log.disinfAgentName ?? '—'), log),
             _wrapTap(
@@ -1117,7 +1165,7 @@ class _JournalTableView extends StatelessWidget {
                 log),
             _wrapTap(
                 _cell(log.disinfReceiptDate != null
-                    ? _dateFmt.format(log.disinfReceiptDate!)
+                    ? _formatDate(log.disinfReceiptDate!)
                     : '—'),
                 log),
             _wrapTap(
@@ -1149,7 +1197,7 @@ class _JournalTableView extends StatelessWidget {
         _header(loc.t('haccp_tbl_controller'))
       ]),
       ...logs.map((log) => TableRow(children: [
-            _wrapTap(_cell(_dateFmt.format(log.createdAt)), log),
+            _wrapTap(_cell(_formatDate(log.createdAt)), log),
             _wrapTap(_cell(log.washTime ?? '—'), log),
             _wrapTap(_cell(log.washEquipmentName ?? '—'), log),
             _wrapTap(_cell(log.washSolutionName ?? '—'), log),
@@ -1188,7 +1236,7 @@ class _JournalTableView extends StatelessWidget {
           _wrapTap(_cell(log.genCleanPremises ?? '—'), log),
           _wrapTap(
               _cell(log.genCleanDate != null
-                  ? _dateFmt.format(log.genCleanDate!)
+                  ? _formatDate(log.genCleanDate!)
                   : '—'),
               log),
           _wrapTap(
@@ -1225,7 +1273,7 @@ class _JournalTableView extends StatelessWidget {
             _wrapTap(_cell(log.sieveCondition ?? '—'), log),
             _wrapTap(
                 _cell(log.sieveCleaningDate != null
-                    ? _dateFmt.format(log.sieveCleaningDate!)
+                    ? _formatDate(log.sieveCleaningDate!)
                     : '—'),
                 log),
             _wrapTap(
@@ -1265,10 +1313,10 @@ class _JournalTableView extends StatelessWidget {
         final log = e.value;
         final sign = idToName[log.createdByEmployeeId] ?? '—';
         final issued = log.medBookIssuedAt != null
-            ? _dateFmt.format(log.medBookIssuedAt!)
+            ? _formatDate(log.medBookIssuedAt!)
             : '—';
         final returned = log.medBookReturnedAt != null
-            ? _dateFmt.format(log.medBookReturnedAt!)
+            ? _formatDate(log.medBookReturnedAt!)
             : '—';
         return TableRow(
           children: [
@@ -1278,7 +1326,7 @@ class _JournalTableView extends StatelessWidget {
             _wrapTap(_cell(log.medBookNumber ?? '—'), log),
             _wrapTap(
                 _cell(log.medBookValidUntil != null
-                    ? _dateFmt.format(log.medBookValidUntil!)
+                    ? _formatDate(log.medBookValidUntil!)
                     : '—'),
                 log),
             _wrapTap(_cell('$issued\n$sign'), log),
@@ -1322,7 +1370,7 @@ class _JournalTableView extends StatelessWidget {
       ),
       ...logs.map((log) => TableRow(
             children: [
-              _wrapTap(_cell(_dateFmt.format(log.createdAt)), log),
+              _wrapTap(_cell(_formatDate(log.createdAt)), log),
               _wrapTap(_cell(_timeFmt.format(log.createdAt)), log),
               _wrapTap(_cell(log.oilName ?? '—'), log),
               _wrapTap(_cell(log.organolepticStart ?? '—'), log),
@@ -1407,7 +1455,7 @@ class _JournalTableView extends StatelessWidget {
         return TableRow(
           children: [
             _wrapTap(_cell('$i'), log),
-            _wrapTap(_cell(_dateFmt.format(log.createdAt)), log),
+            _wrapTap(_cell(_formatDate(log.createdAt)), log),
             _wrapTap(_cell(name), log),
             _wrapTap(_cell(pos), log),
             _wrapTap(
@@ -1461,7 +1509,7 @@ class _JournalTableView extends StatelessWidget {
             children: [
               _wrapTap(_cell(establishmentName), log),
               _wrapTap(_cell(log.equipment ?? '—'), log),
-              _wrapTap(_cell(_dateTimeFmt.format(log.createdAt)), log),
+              _wrapTap(_cell(_formatDateTime(log.createdAt)), log),
               _wrapTap(
                   _cell(log.value1 != null
                       ? log.value1!.toStringAsFixed(1)
@@ -1514,7 +1562,7 @@ class _JournalTableView extends StatelessWidget {
           children: [
             _wrapTap(_cell('${e.key + 1}'), log),
             if (showPremisesColumn) _wrapTap(_cell(log.equipment ?? '—'), log),
-            _wrapTap(_cell(_dateFmt.format(log.createdAt)), log),
+            _wrapTap(_cell(_formatDate(log.createdAt)), log),
             _wrapTap(tempCell, log),
             _wrapTap(humCell, log),
             _wrapTap(_cell(sign), log),
@@ -1582,7 +1630,7 @@ class _JournalTableView extends StatelessWidget {
         final note = HaccpStoredFieldLocalizer.localizeFreeText(log.note, loc);
         return TableRow(
           children: [
-            _wrapTap(_cell(_dateTimeFmt.format(log.createdAt)), log),
+            _wrapTap(_cell(_formatDateTime(log.createdAt)), log),
             _wrapTap(_cell(log.timeBrakerage ?? '—'), log),
             _wrapTap(_cell(dish), log),
             _wrapTap(_cell(result), log),
@@ -1635,7 +1683,7 @@ class _JournalTableView extends StatelessWidget {
       ),
       ...logs.map((log) {
         final dateSold =
-            log.dateSold != null ? _dateFmt.format(log.dateSold!) : '—';
+            log.dateSold != null ? _formatDate(log.dateSold!) : '—';
         final empName = idToName[log.createdByEmployeeId] ?? '—';
         final matched = HaccpStoredFieldLocalizer.matchProduct(
             products.allProducts, log.productName);
@@ -1649,7 +1697,7 @@ class _JournalTableView extends StatelessWidget {
             HaccpStoredFieldLocalizer.localizeFreeText(log.result, loc);
         return TableRow(
           children: [
-            _wrapTap(_cell(_dateTimeFmt.format(log.createdAt)), log),
+            _wrapTap(_cell(_formatDateTime(log.createdAt)), log),
             _wrapTap(_cell(name), log),
             _wrapTap(_cell(log.packaging ?? '—'), log),
             _wrapTap(_cell(log.manufacturerSupplier ?? '—'), log),

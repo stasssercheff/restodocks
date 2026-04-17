@@ -4968,9 +4968,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
           if (_selectionMode) {
             _toggleTechCardSelection(tc.id);
           } else {
-            final path = effectiveCanEdit
-                ? '/tech-cards/${tc.id}'
-                : '/tech-cards/${tc.id}?view=1';
+            final path = '/tech-cards/${tc.id}?view=1';
             final needRefresh = await context.push<bool>(
               path,
               extra: {'initialTechCard': tc},
@@ -5069,12 +5067,24 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                         onChanged: (_) => _toggleTechCardSelection(tc.id),
                       )
                     : IconButton(
-                        icon: const Icon(Icons.visibility_outlined, size: 20),
-                        tooltip: loc.t('ttk_view'),
-                        onPressed: () => context.push(
-                          '/tech-cards/${tc.id}?view=1',
-                          extra: {'initialTechCard': tc},
+                        icon: Icon(
+                          effectiveCanEdit
+                              ? Icons.edit_outlined
+                              : Icons.visibility_outlined,
+                          size: 20,
                         ),
+                        tooltip: effectiveCanEdit
+                            ? (loc.t('edit') ?? 'Редактировать')
+                            : loc.t('ttk_view'),
+                        onPressed: effectiveCanEdit
+                            ? () => context.push(
+                                  '/tech-cards/${tc.id}',
+                                  extra: {'initialTechCard': tc},
+                                )
+                            : () => context.push(
+                                  '/tech-cards/${tc.id}?view=1',
+                                  extra: {'initialTechCard': tc},
+                                ),
                         style: IconButton.styleFrom(
                           minimumSize: const Size(36, 36),
                           padding: EdgeInsets.zero,
@@ -5122,7 +5132,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                   est != null && est.isBranch && tc.establishmentId != est.id;
               final path = viewOnlyCard
                   ? '/tech-cards/${tc.id}?view=1'
-                  : '/tech-cards/${tc.id}';
+                  : '/tech-cards/${tc.id}?view=1';
               return DataRow(
                 selected: _selectedTechCards.contains(tc.id),
                 cells: [

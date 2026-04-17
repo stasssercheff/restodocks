@@ -75,6 +75,7 @@ class HaccpPdfExportService {
     required List<HaccpLog> logs,
     required Map<String, String> employeeIdToName,
     required DateFormat dateTimeFmt,
+    required String datePattern,
   }) {
     (String name, String position) _parseEmp(String s) {
       final idx = s.lastIndexOf(', ');
@@ -150,7 +151,7 @@ class HaccpPdfExportService {
           : (log.statusOk == false ? tr('haccp_status_suspended') : '');
     }
 
-    final dateFmt = DateFormat('dd.MM.yyyy');
+    final dateFmt = DateFormat(datePattern);
 
     final rowCount = logs.isEmpty ? 25 : logs.length;
     for (var i = 0; i < rowCount; i++) {
@@ -326,6 +327,7 @@ class HaccpPdfExportService {
     required Map<String, String> employeeIdToName,
     required DateFormat dateTimeFmt,
     required bool includeHumidity,
+    required String datePattern,
   }) {
     final headerCells = <pw.Widget>[
       _headerCellSmall(_th(tr, 'haccp_tbl_pp_no', 'No.')),
@@ -354,7 +356,7 @@ class HaccpPdfExportService {
         children: headerCells,
       ),
     ];
-    final dateFmt = DateFormat('dd.MM.yyyy');
+    final dateFmt = DateFormat(datePattern);
     final timeFmt = DateFormat('HH:mm');
     for (var i = 0; i < logs.length; i++) {
       final log = logs[i];
@@ -535,8 +537,9 @@ class HaccpPdfExportService {
     required Map<String, String> employeeIdToName,
     required DateFormat dateTimeFmt,
     required String Function(String key, {Map<String, String>? args}) tr,
+    required String datePattern,
   }) {
-    final dateFmt = DateFormat('dd.MM.yyyy');
+    final dateFmt = DateFormat(datePattern);
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(1),
       1: const pw.FlexColumnWidth(1),
@@ -604,8 +607,9 @@ class HaccpPdfExportService {
     required Map<String, String> employeeIdToName,
     required DateFormat dateTimeFmt,
     required String Function(String key, {Map<String, String>? args}) tr,
+    required String datePattern,
   }) {
-    final dateFmt = DateFormat('dd.MM.yyyy');
+    final dateFmt = DateFormat(datePattern);
     final timeFmt = DateFormat('HH:mm');
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(0.7),
@@ -947,6 +951,10 @@ class HaccpPdfExportService {
         border: _tableBorder, columnWidths: colWidths, children: dataRows);
   }
 
+  static String _datePatternByCountry(String countryCode) {
+    return HaccpCountryProfiles.datePatternForCountry(countryCode);
+  }
+
   /// Параметры экспорта.
   static Future<Uint8List> buildJournalPdf({
     required LocalizationService loc,
@@ -962,8 +970,6 @@ class HaccpPdfExportService {
     bool includeStitchingSheet = true,
   }) async {
     final theme = await _getTheme();
-    final dateFmt = DateFormat('dd.MM.yyyy');
-    final dateTimeFmt = DateFormat('dd.MM.yyyy HH:mm');
     final isHealthHygiene = logType == HaccpLogType.healthHygiene;
 
     String tr(String key, {Map<String, String>? args}) =>
@@ -981,6 +987,9 @@ class HaccpPdfExportService {
     final selectedProfile = HaccpCountryProfiles.byCountryCode(
       establishmentCountryCode,
     );
+    final datePattern = _datePatternByCountry(selectedProfile.countryCode);
+    final dateFmt = DateFormat(datePattern);
+    final dateTimeFmt = DateFormat('$datePattern HH:mm');
     final templateProfileLine = HaccpCountryProfiles.templateCountryLabel(
       selectedProfile.countryCode,
       pdfLanguageCode,
@@ -1112,6 +1121,7 @@ class HaccpPdfExportService {
                 logs: logs,
                 employeeIdToName: employeeIdToName,
                 dateTimeFmt: dateTimeFmt,
+                datePattern: datePattern,
               ),
               pw.SizedBox(height: 10),
               pw.Center(
@@ -1322,6 +1332,7 @@ class HaccpPdfExportService {
                 employeeIdToName: employeeIdToName,
                 dateTimeFmt: dateTimeFmt,
                 tr: tr,
+                datePattern: datePattern,
               ),
               pw.SizedBox(height: 10),
               pw.Center(
@@ -1374,6 +1385,7 @@ class HaccpPdfExportService {
                 employeeIdToName: employeeIdToName,
                 dateTimeFmt: dateTimeFmt,
                 tr: tr,
+                datePattern: datePattern,
               ),
               pw.SizedBox(height: 10),
               pw.Center(
@@ -1402,6 +1414,16 @@ class HaccpPdfExportService {
                 child: pw.Text(recommendedSampleText,
                     style: pw.TextStyle(
                         fontSize: 10, fontWeight: pw.FontWeight.bold)),
+              ),
+              pw.SizedBox(height: 4),
+              pw.Center(
+                child: pw.Text(templateProfileLine,
+                    style: pw.TextStyle(fontSize: 8)),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Center(
+                child: pw.Text(templateFrameworkLine,
+                    style: pw.TextStyle(fontSize: 7)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
@@ -1598,6 +1620,14 @@ class HaccpPdfExportService {
                         child: pw.Text(recommendedSampleText,
                             style: pw.TextStyle(
                                 fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                    pw.SizedBox(height: 4),
+                    pw.Center(
+                        child: pw.Text(templateProfileLine,
+                            style: pw.TextStyle(fontSize: 8))),
+                    pw.SizedBox(height: 2),
+                    pw.Center(
+                        child: pw.Text(templateFrameworkLine,
+                            style: pw.TextStyle(fontSize: 7))),
                     pw.SizedBox(height: 4),
                     pw.Center(
                         child: pw.Text(title,

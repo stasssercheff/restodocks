@@ -168,7 +168,7 @@ class HaccpConfigService extends ChangeNotifier {
       ..sort((a, b) {
         final g = a.group.compareTo(b.group);
         if (g != 0) return g;
-        return a.displayNameRu.compareTo(b.displayNameRu);
+        return a.code.compareTo(b.code);
       });
   }
 

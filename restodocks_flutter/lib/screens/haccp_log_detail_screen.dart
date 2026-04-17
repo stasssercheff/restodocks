@@ -36,9 +36,25 @@ class HaccpLogDetailScreen extends StatelessWidget {
   /// Снимок должности субъекта (для гигиенического журнала при удалённом сотруднике).
   final String? subjectPositionSnapshot;
 
-  static final _dateFmt = DateFormat('dd.MM.yyyy');
-  static final _dateTimeFmt = DateFormat('dd.MM.yyyy HH:mm');
   static final _timeFmt = DateFormat('HH:mm');
+
+  String _countryCode(BuildContext context) {
+    final account = context.read<AccountManagerSupabase>();
+    final config = context.read<HaccpConfigService>();
+    final est = account.establishment;
+    if (est == null) return 'RU';
+    return config.resolveCountryCodeForEstablishment(est);
+  }
+
+  String _datePattern(BuildContext context) {
+    return HaccpCountryProfiles.datePatternForCountry(_countryCode(context));
+  }
+
+  String _formatDate(BuildContext context, DateTime value) =>
+      DateFormat(_datePattern(context)).format(value);
+
+  String _formatDateTime(BuildContext context, DateTime value) =>
+      DateFormat('${_datePattern(context)} HH:mm').format(value);
 
   Widget _header(String text) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -131,7 +147,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
         TableRow(
           children: [
             _cell('1'),
-            _cell(_dateFmt.format(log.createdAt)),
+            _cell(_formatDate(context, log.createdAt)),
             _cell(empName),
             _cell(position),
             _cell(sign2),
@@ -223,7 +239,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
             TableRow(
               children: [
                 _cell('1'),
-                _cell(DateFormat('dd.MM.yyyy').format(log.createdAt)),
+                _cell(_formatDate(context, log.createdAt)),
                 _cell(temp, color: tempAlert ? Colors.red : null),
                 _cell(hum, color: humAlert ? Colors.red : null),
                 _cell(employee != null
@@ -291,7 +307,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
             ),
             TableRow(
               children: [
-                _cell(_dateTimeFmt.format(log.createdAt)),
+                _cell(_formatDateTime(context, log.createdAt)),
                 _cell(log.timeBrakerage ?? '—'),
                 _cell(dish),
                 _cell(result),
@@ -325,7 +341,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
     final translit =
         context.watch<ScreenLayoutPreferenceService>().showNameTranslit;
     final dateSoldStr =
-        log.dateSold != null ? _dateFmt.format(log.dateSold!) : '—';
+        log.dateSold != null ? _formatDate(context, log.dateSold!) : '—';
     return Table(
       columnWidths: const {
         0: FlexColumnWidth(1),
@@ -359,7 +375,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
         ),
         TableRow(
           children: [
-            _cell(_dateTimeFmt.format(log.createdAt)),
+            _cell(_formatDateTime(context, log.createdAt)),
             _cell(productLabel),
             _cell(log.packaging ?? '—'),
             _cell(log.manufacturerSupplier ?? '—'),
@@ -417,7 +433,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
         ),
         TableRow(
           children: [
-            _cell(_dateFmt.format(log.createdAt)),
+            _cell(_formatDate(context, log.createdAt)),
             _cell(_timeFmt.format(log.createdAt)),
             _cell(log.oilName ?? '—'),
             _cell(log.organolepticStart ?? '—'),
@@ -449,10 +465,10 @@ class HaccpLogDetailScreen extends StatelessWidget {
         ? employeeDisplayName(creator!, translit: translit)
         : '—';
     final issued = log.medBookIssuedAt != null
-        ? _dateFmt.format(log.medBookIssuedAt!)
+        ? _formatDate(context, log.medBookIssuedAt!)
         : '—';
     final returned = log.medBookReturnedAt != null
-        ? _dateFmt.format(log.medBookReturnedAt!)
+        ? _formatDate(context, log.medBookReturnedAt!)
         : '—';
     return Table(
       columnWidths: const {
@@ -484,7 +500,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
             _cell(log.medBookPosition ?? '—'),
             _cell(log.medBookNumber ?? '—'),
             _cell(log.medBookValidUntil != null
-                ? _dateFmt.format(log.medBookValidUntil!)
+                ? _formatDate(context, log.medBookValidUntil!)
                 : '—'),
             _cell('$issued\n$sign'),
             _cell('$returned\n$sign'),
@@ -558,7 +574,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
           _cell(log.medExamEmployeeName ?? '—'),
           _cell(log.medExamPosition ?? '—'),
           _cell(log.medExamDate != null
-              ? _dateFmt.format(log.medExamDate!)
+              ? _formatDate(context, log.medExamDate!)
               : '—'),
           _cell(log.medExamConclusion ?? '—'),
           _cell(log.medExamEmployerDecision ?? '—'),
@@ -590,7 +606,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
           _header(loc.t('haccp_tbl_responsible'))
         ]),
         TableRow(children: [
-          _cell(_dateFmt.format(log.createdAt)),
+          _cell(_formatDate(context, log.createdAt)),
           _cell(log.disinfObjectName ?? log.disinfAgentName ?? '—'),
           _cell(log.disinfObjectCount != null
               ? log.disinfObjectCount.toString()
@@ -598,7 +614,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
                   ? log.disinfQuantity.toString()
                   : '—')),
           _cell(log.disinfReceiptDate != null
-              ? _dateFmt.format(log.disinfReceiptDate!)
+              ? _formatDate(context, log.disinfReceiptDate!)
               : '—'),
           _cell(log.disinfResponsibleName ?? creator?.fullName ?? '—'),
         ]),
@@ -628,7 +644,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
           _header(loc.t('haccp_tbl_controller'))
         ]),
         TableRow(children: [
-          _cell(_dateFmt.format(log.createdAt)),
+          _cell(_formatDate(context, log.createdAt)),
           _cell(log.washTime ?? '—'),
           _cell(log.washEquipmentName ?? '—'),
           _cell(log.washSolutionName ?? '—'),
@@ -660,7 +676,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
           _cell('1'),
           _cell(log.genCleanPremises ?? '—'),
           _cell(log.genCleanDate != null
-              ? _dateFmt.format(log.genCleanDate!)
+              ? _formatDate(context, log.genCleanDate!)
               : '—'),
           _cell(log.genCleanResponsible ?? creator?.fullName ?? '—'),
         ]),
@@ -694,7 +710,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
           _cell(log.sieveNameLocation ?? '—'),
           _cell(log.sieveCondition ?? '—'),
           _cell(log.sieveCleaningDate != null
-              ? _dateFmt.format(log.sieveCleaningDate!)
+              ? _formatDate(context, log.sieveCleaningDate!)
               : '—'),
           _cell(log.sieveSignature ?? creator?.fullName ?? '—'),
           _cell(log.sieveComments ?? '—'),
@@ -718,7 +734,7 @@ class HaccpLogDetailScreen extends StatelessWidget {
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(
-            '${loc.t('haccp_entry_view') ?? 'Запись'} — ${(loc.t(log.logType.displayNameKey) ?? log.logType.displayNameRu)}'),
+            '${loc.t('haccp_entry_view') ?? 'Запись'} — ${HaccpCountryProfiles.resolveLogTypeTitle(logType: log.logType, languageCode: loc.currentLanguageCode, localizedValue: loc.t(log.logType.displayNameKey))}'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

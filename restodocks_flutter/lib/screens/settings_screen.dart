@@ -1535,9 +1535,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           countryCode,
           loc.currentLanguageCode,
         );
-        final base = '${_haccpTemplateCountryUpdatedLabel(loc)}: $countryLabel';
+        final base =
+            '${HaccpCountryProfiles.templateCountryUpdatedLabel(loc.currentLanguageCode)}: $countryLabel';
         final note = removedCount > 0
-            ? '\n${_haccpJournalsAdjustedLabel(loc)}: $removedCount'
+            ? '\n${HaccpCountryProfiles.incompatibleJournalsDisabledLabel(loc.currentLanguageCode)}: $removedCount'
             : '';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1571,7 +1572,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${_haccpTemplateCountryAutoLabel(loc)}: $autoLabel'),
+            content: Text(
+                '${HaccpCountryProfiles.templateCountryAutoLabel(loc.currentLanguageCode)}: $autoLabel'),
           ),
         );
       }
@@ -1584,199 +1586,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  String _haccpTemplateCountryUpdatedLabel(LocalizationService loc) {
-    switch (loc.currentLanguageCode) {
-      case 'ru':
-        return 'Страна шаблона HACCP обновлена';
-      case 'es':
-        return 'Pais de plantilla HACCP actualizado';
-      case 'fr':
-        return 'Pays du modele HACCP mis a jour';
-      case 'it':
-        return 'Paese modello HACCP aggiornato';
-      case 'de':
-        return 'HACCP-Vorlagenland aktualisiert';
-      case 'tr':
-        return 'HACCP sablon ulkesi guncellendi';
-      default:
-        return 'HACCP template country updated';
-    }
-  }
-
-  String _haccpTemplateCountryAutoLabel(LocalizationService loc) {
-    switch (loc.currentLanguageCode) {
-      case 'ru':
-        return 'Страна шаблона HACCP переключена на автоопределение';
-      case 'es':
-        return 'Pais de plantilla HACCP cambiado a deteccion automatica';
-      case 'fr':
-        return 'Pays du modele HACCP bascule en detection automatique';
-      case 'it':
-        return 'Paese modello HACCP passato al rilevamento automatico';
-      case 'de':
-        return 'HACCP-Vorlagenland auf automatische Erkennung umgestellt';
-      case 'tr':
-        return 'HACCP sablon ulkesi otomatik algilamaya gecirildi';
-      default:
-        return 'HACCP template country switched to auto-detected';
-    }
-  }
-
-  String _haccpJournalsAdjustedLabel(LocalizationService loc) {
-    switch (loc.currentLanguageCode) {
-      case 'ru':
-        return 'Отключено несовместимых журналов';
-      case 'es':
-        return 'Diarios incompatibles desactivados';
-      case 'fr':
-        return 'Journaux incompatibles desactives';
-      case 'it':
-        return 'Registri incompatibili disattivati';
-      case 'de':
-        return 'Inkompatible Journale deaktiviert';
-      case 'tr':
-        return 'Uyumsuz gunlukler devre disi birakildi';
-      default:
-        return 'Incompatible journals disabled';
-    }
-  }
-
-  String _haccpProfileLabel(LocalizationService loc) {
-    switch (loc.currentLanguageCode) {
-      case 'ru':
-        return 'Профиль страны HACCP';
-      case 'es':
-        return 'Perfil de pais HACCP';
-      case 'fr':
-        return 'Profil pays HACCP';
-      case 'it':
-        return 'Profilo paese HACCP';
-      case 'de':
-        return 'HACCP-Landesprofil';
-      case 'tr':
-        return 'HACCP ulke profili';
-      default:
-        return 'HACCP country profile';
-    }
-  }
-
-  String _haccpProfileSourceManualLabel(LocalizationService loc) {
-    switch (loc.currentLanguageCode) {
-      case 'ru':
-        return 'Источник профиля: выбран вручную';
-      case 'es':
-        return 'Origen del perfil: seleccion manual';
-      case 'fr':
-        return 'Source du profil : selection manuelle';
-      case 'it':
-        return 'Origine profilo: selezione manuale';
-      case 'de':
-        return 'Profilquelle: manuelle Auswahl';
-      case 'tr':
-        return 'Profil kaynagi: manuel secim';
-      default:
-        return 'Profile source: manual selection';
-    }
-  }
-
-  String _haccpProfileSourceAutoLabel(LocalizationService loc) {
-    switch (loc.currentLanguageCode) {
-      case 'ru':
-        return 'Источник профиля: автоопределение (зафиксируйте вручную для стабильного шаблона)';
-      case 'es':
-        return 'Origen del perfil: deteccion automatica (fijelo manualmente para bloquear la plantilla)';
-      case 'fr':
-        return 'Source du profil : detection automatique (definissez manuellement pour verrouiller le modele)';
-      case 'it':
-        return 'Origine profilo: rilevamento automatico (impostare manualmente per bloccare il modello)';
-      case 'de':
-        return 'Profilquelle: automatische Erkennung (manuell festlegen, um die Vorlage zu sperren)';
-      case 'tr':
-        return 'Profil kaynagi: otomatik algilama (sablonu sabitlemek icin manuel secin)';
-      default:
-        return 'Profile source: auto-detected (set manually to lock template)';
-    }
-  }
-
-  String _haccpTemplateCountryFieldLabel(LocalizationService loc) {
-    switch (loc.currentLanguageCode) {
-      case 'ru':
-        return 'Страна шаблона для HACCP форм/PDF';
-      case 'es':
-        return 'Pais de plantilla para formularios/PDF HACCP';
-      case 'fr':
-        return 'Pays du modele pour formulaires/PDF HACCP';
-      case 'it':
-        return 'Paese modello per moduli/PDF HACCP';
-      case 'de':
-        return 'Vorlagenland fur HACCP-Formulare/PDF';
-      case 'tr':
-        return 'HACCP form/PDF sablon ulkesi';
-      default:
-        return 'Template country for HACCP forms/PDF';
-    }
-  }
-
-  String _haccpUseAutoTemplateLabel(LocalizationService loc) {
-    switch (loc.currentLanguageCode) {
-      case 'ru':
-        return 'Использовать автоопределенный шаблон';
-      case 'es':
-        return 'Usar plantilla autodetectada';
-      case 'fr':
-        return 'Utiliser le modele detecte automatiquement';
-      case 'it':
-        return 'Usa modello rilevato automaticamente';
-      case 'de':
-        return 'Automatisch erkannte Vorlage verwenden';
-      case 'tr':
-        return 'Otomatik algilanan sablonu kullan';
-      default:
-        return 'Use auto-detected template';
-    }
-  }
-
-  String _haccpTemplateUsageHint(LocalizationService loc) {
-    switch (loc.currentLanguageCode) {
-      case 'ru':
-        return 'Выбранный профиль страны применяется к шаблону HACCP формы и сохраненному PDF.';
-      case 'es':
-        return 'El perfil de pais seleccionado se aplica a la plantilla del formulario HACCP y al PDF guardado.';
-      case 'fr':
-        return 'Le profil pays selectionne est applique au modele de formulaire HACCP et au PDF enregistre.';
-      case 'it':
-        return 'Il profilo paese selezionato viene applicato al modello modulo HACCP e al PDF salvato.';
-      case 'de':
-        return 'Das ausgewahlte Landesprofil wird auf die HACCP-Formularvorlage und das gespeicherte PDF angewendet.';
-      case 'tr':
-        return 'Secilen ulke profili HACCP form sablonuna ve kaydedilen PDF duzenine uygulanir.';
-      default:
-        return 'Selected country profile is used for HACCP form template and saved PDF layout.';
-    }
-  }
-
-  String _haccpAvailableCountriesLabel(LocalizationService loc) {
-    switch (loc.currentLanguageCode) {
-      case 'ru':
-        return 'Доступные страны HACCP (нормативные профили)';
-      case 'es':
-        return 'Paises HACCP disponibles (perfiles regulatorios)';
-      case 'fr':
-        return 'Pays HACCP disponibles (profils reglementaires)';
-      case 'it':
-        return 'Paesi HACCP disponibili (profili normativi)';
-      case 'de':
-        return 'Verfugbare HACCP-Lander (regulatorische Profile)';
-      case 'tr':
-        return 'Kullanilabilir HACCP ulkeleri (duzenleyici profiller)';
-      default:
-        return 'Available HACCP countries (regulatory profiles)';
-    }
-  }
-
   Future<void> _downloadHaccpAgreement(
       BuildContext context, LocalizationService loc) async {
     final account = context.read<AccountManagerSupabase>();
+    final config = context.read<HaccpConfigService>();
     final est = account.establishment;
     final emp = account.currentEmployee;
     if (est == null || emp == null) {
@@ -1829,9 +1642,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           emp.positionRole ?? (emp.roles.contains('owner') ? 'owner' : null);
       final employerPosition =
           roleCode != null ? (loc.tForLanguage(lang, 'role_$roleCode')) : null;
+      final establishmentCountryCode =
+          config.resolveCountryCodeForEstablishment(est);
       final bytes = await HaccpAgreementPdfService.buildAgreementPdfBytes(
         establishment: est,
         employerEmployee: emp,
+        establishmentCountryCode: establishmentCountryCode,
         organizationLabel: loc.tForLanguage(lang, 'haccp_agreement_org'),
         innBinLabel: loc.tForLanguage(lang, 'haccp_agreement_inn_bin'),
         addressLabel: loc.tForLanguage(lang, 'haccp_agreement_address'),
@@ -1849,7 +1665,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         workerSignLabel: loc.tForLanguage(lang, 'haccp_agreement_worker_sign'),
         agreementBody: LegalComplianceProvider.applyCompliancePlaceholders(
           loc.tForLanguage(lang, 'haccp_agreement_body'),
-          LegalComplianceProvider.complianceForLanguageCode(lang),
+          LegalComplianceProvider.complianceForCountryCode(
+            establishmentCountryCode,
+            lang,
+          ),
         ),
         employerPositionLabel:
             (employerPosition != null && employerPosition != 'role_$roleCode')
@@ -2531,14 +2350,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${_haccpProfileLabel(localization)}: ${HaccpCountryProfiles.countryCodeAndNameLabel(profile.countryCode, localization.currentLanguageCode)}',
+                              '${HaccpCountryProfiles.profileTitleLabel(localization.currentLanguageCode)}: ${HaccpCountryProfiles.countryCodeAndNameLabel(profile.countryCode, localization.currentLanguageCode)}',
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                             const SizedBox(height: 6),
                             Text(
                               explicitOverride
-                                  ? _haccpProfileSourceManualLabel(localization)
-                                  : _haccpProfileSourceAutoLabel(localization),
+                                  ? HaccpCountryProfiles.profileSourceLabel(
+                                      manual: true,
+                                      languageCode:
+                                          localization.currentLanguageCode,
+                                    )
+                                  : '${HaccpCountryProfiles.profileSourceLabel(manual: false, languageCode: localization.currentLanguageCode)} '
+                                      '(${HaccpCountryProfiles.profileAutoLockHintLabel(localization.currentLanguageCode)})',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
@@ -2552,8 +2376,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             DropdownButtonFormField<String>(
                               value: profile.countryCode,
                               decoration: InputDecoration(
-                                labelText: _haccpTemplateCountryFieldLabel(
-                                    localization),
+                                labelText: HaccpCountryProfiles
+                                    .templateCountryFieldLabel(
+                                        localization.currentLanguageCode),
                               ),
                               items: HaccpCountryProfiles.available
                                   .map(
@@ -2595,7 +2420,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   ),
                                   icon: const Icon(Icons.refresh),
                                   label: Text(
-                                      _haccpUseAutoTemplateLabel(localization)),
+                                      HaccpCountryProfiles.useAutoTemplateLabel(
+                                          localization.currentLanguageCode)),
                                 ),
                               ),
                             ],
@@ -2616,7 +2442,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _haccpTemplateUsageHint(localization),
+                              HaccpCountryProfiles.templateUsageHintLabel(
+                                  localization.currentLanguageCode),
                               style: Theme.of(context)
                                   .textTheme
                                   .bodySmall
@@ -2628,7 +2455,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                             const SizedBox(height: 10),
                             Text(
-                              _haccpAvailableCountriesLabel(localization),
+                              HaccpCountryProfiles.availableCountriesLabel(
+                                  localization.currentLanguageCode),
                               style: Theme.of(context).textTheme.titleSmall,
                             ),
                             const SizedBox(height: 8),
@@ -2670,8 +2498,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       profile.countryCode),
                                 ),
                                 title: Text(
-                                    localization.t(t.displayNameKey) ??
-                                        t.displayNameRu,
+                                    HaccpCountryProfiles.resolveLogTypeTitle(
+                                      logType: t,
+                                      languageCode:
+                                          localization.currentLanguageCode,
+                                      localizedValue:
+                                          localization.t(t.displayNameKey),
+                                    ),
                                     style: const TextStyle(fontSize: 14)),
                                 onTap: () => _toggleHaccpJournal(
                                     context,

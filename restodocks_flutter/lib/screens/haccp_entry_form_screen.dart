@@ -112,6 +112,38 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   /// Сохранённые варианты по ключу поля формы (хранение в SharedPreferences под ключом logType:field).
   final Map<String, List<String>> _presetOptions = {};
 
+  /// Сотрудники заведения для форм медкнижек, медосмотров и полей «ответственный»/«подпись».
+  List<Employee> _formEmployees = [];
+
+  HaccpLogType? get _logType {
+    final t = HaccpLogType.fromCode(widget.logTypeCode);
+    return t != null && HaccpLogType.supportedInApp.contains(t) ? t : null;
+  }
+
+  String _activeCountryCode() {
+    final est = context.read<AccountManagerSupabase>().establishment;
+    if (est == null) return 'RU';
+    return context.read<HaccpConfigService>().resolveCountryCodeForEstablishment(
+          est,
+        );
+  }
+
+  String _datePatternForCountry() {
+    return HaccpCountryProfiles.datePatternForCountry(_activeCountryCode());
+  }
+
+  String _formatDate(DateTime value) =>
+      DateFormat(_datePatternForCountry()).format(value);
+  String _formatDateTime(DateTime value) =>
+      DateFormat('${_datePatternForCountry()} HH:mm').format(value);
+  String _formatTime(DateTime value) => DateFormat('HH:mm').format(value);
+  String _logTypeTitle(HaccpLogType type, LocalizationService loc) =>
+      HaccpCountryProfiles.resolveLogTypeTitle(
+        logType: type,
+        languageCode: loc.currentLanguageCode,
+        localizedValue: loc.t(type.displayNameKey),
+      );
+
   @override
   void initState() {
     super.initState();
@@ -121,19 +153,6 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         context.read<HaccpConfigService>().load(est.id, notify: false);
       }
     });
-  }
-
-  /// Сотрудники заведения для форм медкнижек, медосмотров и полей «ответственный»/«подпись».
-  List<Employee> _formEmployees = [];
-
-  HaccpLogType? get _logType {
-    final t = HaccpLogType.fromCode(widget.logTypeCode);
-    return t != null && HaccpLogType.supportedInApp.contains(t) ? t : null;
-  }
-
-  @override
-  void initState() {
-    super.initState();
     if (_logType == HaccpLogType.healthHygiene) {
       WidgetsBinding.instance
           .addPostFrameCallback((_) => _loadHealthEmployees());
@@ -416,7 +435,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           isDense: true,
         ),
         child: Text(value != null
-            ? DateFormat('dd.MM.yyyy').format(value)
+            ? _formatDate(value)
             : _th(loc, 'haccp_pick_date_short', 'Выбрать')),
       ),
     );
@@ -923,7 +942,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
   /// Форма по макету Приложения 1: Гигиенический журнал (сотрудники). Несколько строк — по одной на сотрудника; можно добавлять/удалять.
   Widget _buildHealthHygieneForm(
       LocalizationService loc, bool showNameTranslit) {
-    final dateStr = DateFormat('dd.MM.yyyy').format(DateTime.now());
+    final dateStr = _formatDate(DateTime.now());
     final currentEmp = context.watch<AccountManagerSupabase>().currentEmployee;
     final creatorName = currentEmp != null
         ? displayStoredPersonName(
@@ -1200,7 +1219,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               children: [
                 _tableCell(const Text('1')),
                 _tableCell(
-                    Text(DateFormat('dd.MM.yyyy').format(DateTime.now()))),
+                    Text(_formatDate(DateTime.now()))),
                 _tableCell(Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1285,7 +1304,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         TableRow(
           children: [
             _tableCell(
-                Text(DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()))),
+                Text(_formatDateTime(DateTime.now()))),
             _tableCell(_textField(
                 'time_brakerage',
                 _th(loc, 'haccp_placeholder_time_sample',
@@ -1346,7 +1365,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         TableRow(
           children: [
             _tableCell(
-                Text(DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()))),
+                Text(_formatDateTime(DateTime.now()))),
             _tableCell(_textField(
                 'product', loc.t('haccp_product') ?? 'Наименование')),
             _tableCell(_savedOptionTextField(
@@ -1386,7 +1405,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 if (d != null) setState(() => _dateSold = d);
               },
               child: Text(_dateSold != null
-                  ? DateFormat('dd.MM.yyyy').format(_dateSold!)
+                  ? _formatDate(_dateSold!)
                   : _th(loc, 'haccp_pick_date_short', 'Выбрать')),
             )),
             _tableCell(_signatureFromAccount()),
@@ -1501,7 +1520,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 if (d != null) setState(() => _medBookValidUntil = d);
               },
               child: Text(_medBookValidUntil != null
-                  ? DateFormat('dd.MM.yyyy').format(_medBookValidUntil!)
+                  ? _formatDate(_medBookValidUntil!)
                   : _th(loc, 'haccp_tap_to_select_date', 'Выбрать дату')),
             )),
             _tableCell(Column(
@@ -1519,7 +1538,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                     if (d != null) setState(() => _medBookIssuedAt = d);
                   },
                   child: Text(_medBookIssuedAt != null
-                      ? DateFormat('dd.MM.yyyy').format(_medBookIssuedAt!)
+                      ? _formatDate(_medBookIssuedAt!)
                       : _th(loc, 'haccp_med_placeholder_issue',
                           'Дата получения')),
                 ),
@@ -1541,7 +1560,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                     if (d != null) setState(() => _medBookReturnedAt = d);
                   },
                   child: Text(_medBookReturnedAt != null
-                      ? DateFormat('dd.MM.yyyy').format(_medBookReturnedAt!)
+                      ? _formatDate(_medBookReturnedAt!)
                       : _th(loc, 'haccp_med_placeholder_return',
                           'Дата возврата')),
                 ),
@@ -1599,8 +1618,8 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         ),
         TableRow(
           children: [
-            _tableCell(Text(DateFormat('dd.MM.yyyy').format(DateTime.now()))),
-            _tableCell(Text(DateFormat('HH:mm').format(DateTime.now()))),
+            _tableCell(Text(_formatDate(DateTime.now()))),
+            _tableCell(Text(_formatTime(DateTime.now()))),
             _tableCell(_savedOptionTextField(
               key: 'oil_name',
               label: _th(loc, 'haccp_tbl_fat_type', 'Вид жира'),
@@ -1663,7 +1682,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                 _setText(
                     'med_exam_dob',
                     e.birthday != null
-                        ? DateFormat('dd.MM.yyyy').format(e.birthday!)
+                        ? _formatDate(e.birthday!)
                         : '');
                 _setText(
                   'med_exam_position',
@@ -1807,7 +1826,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
           child: Text(value != null
-              ? DateFormat('dd.MM.yyyy').format(value)
+              ? _formatDate(value)
               : _th(loc, 'haccp_tap_to_select_date', 'Выбрать дату'))),
     );
   }
@@ -2004,7 +2023,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
           _tableHeaderCell(_th(loc, 'haccp_tbl_controller', 'Контроль')),
         ]),
         TableRow(children: [
-          _tableCell(Text(DateFormat('dd.MM.yyyy').format(DateTime.now()))),
+          _tableCell(Text(_formatDate(DateTime.now()))),
           _tableCell(
               _textField('wash_time', _th(loc, 'haccp_tbl_time', 'Время'))),
           _tableCell(_savedOptionTextField(
@@ -2209,7 +2228,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       LocalizationService loc, bool showNameTranslit) {
     switch (_logType) {
       case HaccpLogType.healthHygiene:
-        final dateStr = DateFormat('dd.MM.yyyy').format(DateTime.now());
+        final dateStr = _formatDate(DateTime.now());
         final currentEmp =
             context.watch<AccountManagerSupabase>().currentEmployee;
         final creatorName = currentEmp != null
@@ -2341,8 +2360,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         );
       case HaccpLogType.fridgeTemperature:
         return _mobileBlock(
-          loc.t(HaccpLogType.fridgeTemperature.displayNameKey) ??
-              HaccpLogType.fridgeTemperature.displayNameRu,
+          _logTypeTitle(HaccpLogType.fridgeTemperature, loc),
           [
             Consumer<AccountManagerSupabase>(
               builder: (_, acc, __) => TextFormField(
@@ -2378,8 +2396,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         return Column(
           children: [
             _mobileBlock(
-              loc.t(HaccpLogType.warehouseTempHumidity.displayNameKey) ??
-                  HaccpLogType.warehouseTempHumidity.displayNameRu,
+              _logTypeTitle(HaccpLogType.warehouseTempHumidity, loc),
               [
                 _savedOptionTextField(
                   key: 'warehouse_premises',
@@ -2418,12 +2435,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         );
       case HaccpLogType.finishedProductBrakerage:
         return _mobileBlock(
-          loc.t(HaccpLogType.finishedProductBrakerage.displayNameKey) ??
-              HaccpLogType.finishedProductBrakerage.displayNameRu,
+          _logTypeTitle(HaccpLogType.finishedProductBrakerage, loc),
           [
             TextFormField(
               initialValue:
-                  DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()),
+                  _formatDateTime(DateTime.now()),
               decoration: InputDecoration(
                   labelText: _th(loc, 'haccp_tbl_dish_made_at',
                       'Дата и час изготовления блюда'),
@@ -2450,12 +2466,11 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         );
       case HaccpLogType.incomingRawBrakerage:
         return _mobileBlock(
-          loc.t(HaccpLogType.incomingRawBrakerage.displayNameKey) ??
-              HaccpLogType.incomingRawBrakerage.displayNameRu,
+          _logTypeTitle(HaccpLogType.incomingRawBrakerage, loc),
           [
             TextFormField(
               initialValue:
-                  DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now()),
+                  _formatDateTime(DateTime.now()),
               decoration: InputDecoration(
                   labelText: _th(
                       loc, 'haccp_tbl_received_at', 'Дата и час поступления'),
@@ -2509,7 +2524,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
                     border: const OutlineInputBorder(),
                     isDense: true),
                 child: Text(_dateSold != null
-                    ? DateFormat('dd.MM.yyyy').format(_dateSold!)
+                    ? _formatDate(_dateSold!)
                     : _th(loc, 'haccp_pick_date_short', 'Выбрать')),
               ),
             ),
@@ -2520,11 +2535,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       case HaccpLogType.fryingOil:
         // Те же поля, что и в табличной форме (СанПиН), чтобы сохранение в БД и пресеты совпадали с десктопом.
         return _mobileBlock(
-          loc.t(HaccpLogType.fryingOil.displayNameKey) ??
-              HaccpLogType.fryingOil.displayNameRu,
+          _logTypeTitle(HaccpLogType.fryingOil, loc),
           [
             TextFormField(
-              initialValue: DateFormat('dd.MM.yyyy').format(DateTime.now()),
+              initialValue: _formatDate(DateTime.now()),
               decoration: InputDecoration(
                   labelText: _th(loc, 'haccp_tbl_date', 'Дата'),
                   border: const OutlineInputBorder(),
@@ -2532,7 +2546,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               readOnly: true,
             ),
             TextFormField(
-              initialValue: DateFormat('HH:mm').format(DateTime.now()),
+              initialValue: _formatTime(DateTime.now()),
               decoration: InputDecoration(
                 labelText: _th(loc, 'haccp_tbl_oil_use_start',
                     'Время начала использования жира'),
@@ -2591,8 +2605,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         );
       case HaccpLogType.medBookRegistry:
         return _mobileBlock(
-          loc.t(HaccpLogType.medBookRegistry.displayNameKey) ??
-              HaccpLogType.medBookRegistry.displayNameRu,
+          _logTypeTitle(HaccpLogType.medBookRegistry, loc),
           [
             _employeePickerField(
                 'med_book_employee_id',
@@ -2643,8 +2656,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         );
       case HaccpLogType.medExaminations:
         return _mobileBlock(
-          loc.t(HaccpLogType.medExaminations.displayNameKey) ??
-              HaccpLogType.medExaminations.displayNameRu,
+          _logTypeTitle(HaccpLogType.medExaminations, loc),
           [
             _employeePickerField(
                 'med_exam_employee_id',
@@ -2789,11 +2801,10 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         );
       case HaccpLogType.equipmentWashing:
         return _mobileBlock(
-          loc.t(HaccpLogType.equipmentWashing.displayNameKey) ??
-              HaccpLogType.equipmentWashing.displayNameRu,
+          _logTypeTitle(HaccpLogType.equipmentWashing, loc),
           [
             TextFormField(
-              initialValue: DateFormat('dd.MM.yyyy').format(DateTime.now()),
+              initialValue: _formatDate(DateTime.now()),
               decoration: InputDecoration(
                   labelText: _th(loc, 'haccp_tbl_date', 'Дата'),
                   border: const OutlineInputBorder(),
@@ -2832,8 +2843,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         );
       case HaccpLogType.generalCleaningSchedule:
         return _mobileBlock(
-          loc.t(HaccpLogType.generalCleaningSchedule.displayNameKey) ??
-              HaccpLogType.generalCleaningSchedule.displayNameRu,
+          _logTypeTitle(HaccpLogType.generalCleaningSchedule, loc),
           [
             _savedOptionTextField(
               key: 'gen_clean_premises',
@@ -2852,8 +2862,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
         );
       case HaccpLogType.sieveFilterMagnet:
         return _mobileBlock(
-          loc.t(HaccpLogType.sieveFilterMagnet.displayNameKey) ??
-              HaccpLogType.sieveFilterMagnet.displayNameRu,
+          _logTypeTitle(HaccpLogType.sieveFilterMagnet, loc),
           [
             _textField('sieve_no',
                 _th(loc, 'haccp_tbl_sieve_magnet_no', '№ сита/магнита')),
@@ -3280,7 +3289,7 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
       appBar: AppBar(
         leading: appBarBackButton(context),
         title: Text(
-            '${loc.t('haccp_add_entry') ?? 'Добавить'} — ${(loc.t(_logType!.displayNameKey) ?? _logType!.displayNameRu)}'),
+            '${loc.t('haccp_add_entry') ?? 'Добавить'} — ${_logTypeTitle(_logType!, loc)}'),
       ),
       body: Form(
         key: _formKey,

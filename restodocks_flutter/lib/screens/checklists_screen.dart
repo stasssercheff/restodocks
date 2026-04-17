@@ -688,12 +688,12 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.task_alt),
+                          icon: const Icon(Icons.edit_outlined),
                           onPressed: () async {
-                            await context.push('/checklists/${c.id}/fill');
+                            await context.push('/checklists/${c.id}');
                             if (mounted) _load();
                           },
-                          tooltip: loc.t('fill_checklist') ?? 'Заполнить',
+                          tooltip: loc.t('edit') ?? 'Редактировать',
                         ),
                         PopupMenuButton<String>(
                           icon: const Icon(Icons.more_vert),
@@ -771,7 +771,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
                     )
                   : const Icon(Icons.chevron_right),
               onTap: () async {
-                await context.push(canEdit ? '/checklists/${c.id}' : '/checklists/${c.id}/fill');
+                await context.push('/checklists/${c.id}/fill');
                 if (mounted) await _load();
               },
             ),

@@ -11,6 +11,7 @@ import '../models/models.dart';
 import '../services/services.dart';
 import '../utils/checklist_reminder_summary.dart';
 import '../utils/layout_breakpoints.dart';
+import '../utils/unit_converter.dart';
 import '../utils/employee_display_utils.dart';
 import '../mixins/auto_save_mixin.dart';
 import '../mixins/input_change_listener_mixin.dart';
@@ -233,6 +234,22 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
   String _getTitle(ChecklistItem item) {
     final t = _translatedTitles[item.title.trim()];
     return t ?? item.title;
+  }
+
+  String? _displayQuantityLabel(ChecklistItem item, LocalizationService loc) {
+    final qty = item.targetQuantity;
+    if (qty == null) return null;
+    final unitPrefs = context.watch<UnitSystemPreferenceService>();
+    final converted = UnitConverter.toDisplay(
+      canonicalValue: qty,
+      canonicalUnit: item.targetUnit ?? 'g',
+      system: unitPrefs.unitSystem,
+    );
+    final whole = converted.value == converted.value.truncateToDouble();
+    final valueText = whole
+        ? converted.value.toInt().toString()
+        : converted.value.toStringAsFixed(unitPrefs.isImperial ? 2 : 1);
+    return '$valueText ${loc.unitLabel(converted.unitId)}';
   }
 
   Future<void> _autoSaveToServer() async {
@@ -681,7 +698,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                     ),
                   ],
                   // Если есть колонка "Цифра", количество показываем в ней, а не "под" названием.
-                  if (!cfg.hasNumeric && it.quantityLabel != null) ...[
+                  if (!cfg.hasNumeric && _displayQuantityLabel(it, loc) != null) ...[
                     const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -690,7 +707,7 @@ class _ChecklistFillScreenState extends State<ChecklistFillScreen>
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        it.quantityLabel!,
+                        _displayQuantityLabel(it, loc)!,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               color: Theme.of(context).colorScheme.onPrimaryContainer,
                               fontWeight: FontWeight.bold,

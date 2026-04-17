@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
-import '../models/employee.dart';
 import '../models/models.dart';
 import '../legal/legal_compliance_provider.dart';
 import '../services/haccp_agreement_pdf_service.dart';
@@ -23,6 +22,7 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
   Future<void> _downloadHaccpAgreement(
       BuildContext context, LocalizationService loc) async {
     final account = context.read<AccountManagerSupabase>();
+    final config = context.read<HaccpConfigService>();
     final est = account.establishment;
     final emp = account.currentEmployee;
     if (est == null || emp == null) {
@@ -76,10 +76,13 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
       final employerPosition = roleCode != null
           ? (loc.tForLanguage(pickedLang, 'role_$roleCode'))
           : null;
+      final establishmentCountryCode =
+          config.resolveCountryCodeForEstablishment(est);
 
       final bytes = await HaccpAgreementPdfService.buildAgreementPdfBytes(
         establishment: est,
         employerEmployee: emp,
+        establishmentCountryCode: establishmentCountryCode,
         organizationLabel: loc.tForLanguage(pickedLang, 'haccp_agreement_org'),
         innBinLabel: loc.tForLanguage(pickedLang, 'haccp_agreement_inn_bin'),
         addressLabel: loc.tForLanguage(pickedLang, 'haccp_agreement_address'),
@@ -100,7 +103,10 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
             loc.tForLanguage(pickedLang, 'haccp_agreement_worker_sign'),
         agreementBody: LegalComplianceProvider.applyCompliancePlaceholders(
           loc.tForLanguage(pickedLang, 'haccp_agreement_body'),
-          LegalComplianceProvider.complianceForLanguageCode(pickedLang),
+          LegalComplianceProvider.complianceForCountryCode(
+            establishmentCountryCode,
+            pickedLang,
+          ),
         ),
         employerPositionLabel:
             (employerPosition != null && employerPosition != 'role_$roleCode')
@@ -334,7 +340,12 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
   Widget build(BuildContext context) {
     final loc = context.watch<LocalizationService>();
     final account = context.watch<AccountManagerSupabase>();
+    final config = context.watch<HaccpConfigService>();
     final emp = account.currentEmployee;
+    final est = account.establishment;
+    final countryCode = est != null
+        ? config.resolveCountryCodeForEstablishment(est)
+        : loc.currentLanguageCode.toUpperCase();
 
     if (emp == null)
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
@@ -388,8 +399,8 @@ class _HaccpDocumentationScreenState extends State<HaccpDocumentationScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: Text(
-                    loc.t('haccp_legal_text') ??
-                        'Легитимность цифровых журналов: допускается ведение производственных журналов в электронном виде...',
+                    '${loc.t('haccp_legal_text') ?? 'Легитимность цифровых журналов: допускается ведение производственных журналов в электронном виде...'}\n\n'
+                    '${LegalComplianceProvider.journalPdfComplianceFooterByCountry(loc.currentLanguageCode, countryCode)}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
