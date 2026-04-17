@@ -61,6 +61,7 @@ import '../services/translation_service.dart';
 import '../services/inventory_download.dart';
 import '../services/trial_device_save_kinds.dart';
 import '../services/unit_system_preference_service.dart';
+import '../core/subscription_entitlements.dart';
 import '../utils/unit_converter.dart';
 
 /// Экран номенклатуры: продукты и ПФ заведения с ценами
@@ -377,7 +378,7 @@ class _UploadProgressDialogState extends State<_UploadProgressDialog> {
 }
 
 // Вкладки номенклатуры
-enum _NomTab { nomenclature, newProducts, iiko }
+enum _NomTab { nomenclature, newProducts, iiko, duplicates }
 
 class _NomenclatureScreenState extends State<NomenclatureScreen> {
   String _query = '';
@@ -402,10 +403,16 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final estId = context.read<AccountManagerSupabase>().establishment?.id;
-    if (_unitScopeEstablishmentId == estId) return;
-    _unitScopeEstablishmentId = estId;
-    unawaited(context.read<UnitSystemPreferenceService>().ensureScopeSynced());
+    final account = context.read<AccountManagerSupabase>();
+    final estId = account.establishment?.id;
+    if (_unitScopeEstablishmentId != estId) {
+      _unitScopeEstablishmentId = estId;
+      unawaited(context.read<UnitSystemPreferenceService>().ensureScopeSynced());
+    }
+    final lite = SubscriptionEntitlements.from(account.establishment).isLiteTier;
+    if (lite && _selectedTab == _NomTab.iiko) {
+      setState(() => _selectedTab = _NomTab.nomenclature);
+    }
   }
 
   @override
@@ -1521,6 +1528,49 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
       _ensureLoaded(skipAutoTranslation: true).then((_) => setState(() {}));
   }
 
+  Widget _buildDuplicatesTabBody(LocalizationService loc, bool canEdit) {
+    final scheme = Theme.of(context).colorScheme;
+    final ent = SubscriptionEntitlements.from(
+        context.read<AccountManagerSupabase>().establishment);
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.find_replace_outlined, size: 56, color: scheme.primary),
+            const SizedBox(height: 16),
+            Text(
+              loc.t('duplicates_title'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              loc.t('nomenclature_duplicates_tab_intro'),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 28),
+            FilledButton.icon(
+              onPressed: canEdit ? () => _showDuplicates() : null,
+              icon: const Icon(Icons.search),
+              label: Text(loc.t('tooltip_show_duplicates')),
+            ),
+            if (ent.hasProLevelOrTrial) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: canEdit ? () => _showDuplicatesWithAI() : null,
+                icon: const Icon(Icons.auto_awesome),
+                label: Text(loc.t('duplicates_search_ai')),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _tabChip(_NomTab tab, String label) {
     final isSelected = _selectedTab == tab;
     final scheme = Theme.of(context).colorScheme;
@@ -1612,9 +1662,10 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
 
     final iikoStore = context.watch<IikoProductStore>();
     final estId2 = account.dataEstablishmentId ?? '';
-
-    final canCreateProduct = (_selectedTab == _NomTab.nomenclature ||
-        _selectedTab == _NomTab.newProducts);
+    final nomEnt = SubscriptionEntitlements.from(est);
+    final showIikoTab = !nomEnt.isLiteTier &&
+        widget.department != 'hall' &&
+        widget.department != 'dining_room';
 
     return Scaffold(
       appBar: AppBar(
@@ -1661,11 +1712,6 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               onPressed: () => _importNomenclatureExcel(loc),
               tooltip: loc.t('nomenclature_excel_import_tooltip'),
             ),
-            IconButton(
-              icon: const Icon(Icons.warning),
-              onPressed: () => _showDuplicates(),
-              tooltip: loc.t('tooltip_show_duplicates'),
-            ),
             PopupMenuButton<String>(
               tooltip: loc.t('add'),
               icon: const Icon(Icons.add),
@@ -1681,6 +1727,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
               },
               itemBuilder: (ctx) {
                 final accent = Theme.of(ctx).colorScheme.primary;
+                final uploadAllowed = !nomEnt.isLiteTier;
                 return [
                   PopupMenuItem(
                     value: 'create',
@@ -1695,30 +1742,69 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                       ],
                     ),
                   ),
-                  PopupMenuItem(
-                    value: 'upload',
-                    child: Row(
-                      children: [
-                        Icon(Icons.upload_file, size: 20, color: accent),
-                        const SizedBox(width: 10),
-                        Text(
-                          loc.t('upload_products'),
-                          style: TextStyle(color: accent, fontWeight: FontWeight.w500),
-                        ),
-                      ],
+                  if (uploadAllowed)
+                    PopupMenuItem(
+                      value: 'upload',
+                      child: Row(
+                        children: [
+                          Icon(Icons.upload_file, size: 20, color: accent),
+                          const SizedBox(width: 10),
+                          Text(
+                            loc.t('upload_products'),
+                            style: TextStyle(
+                                color: accent, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
                     ),
+                ];
+              },
+            ),
+          ],
+          if (account.establishment != null)
+            PopupMenuButton<String>(
+              tooltip: loc.t('nomenclature_display_settings_tooltip'),
+              icon: const Icon(Icons.tune),
+              onSelected: (v) async {
+                if (v == 'currency') {
+                  _showCurrencyDialog(context, loc, account, store);
+                  return;
+                }
+                if (v == 'metric') {
+                  await unitPrefs.setUnitSystem(UnitSystem.metric);
+                  return;
+                }
+                if (v == 'imperial') {
+                  await unitPrefs.setUnitSystem(UnitSystem.imperial);
+                }
+              },
+              itemBuilder: (ctx) {
+                final accent = Theme.of(ctx).colorScheme.primary;
+                return [
+                  PopupMenuItem<String>(
+                    value: 'currency',
+                    child: ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading:
+                          Icon(Icons.attach_money, size: 22, color: accent),
+                      title: Text(loc.t('nomenclature_settings_menu_currency')),
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  CheckedPopupMenuItem<String>(
+                    value: 'metric',
+                    checked: !unitPrefs.isImperial,
+                    child: Text(loc.t('unit_system_metric')),
+                  ),
+                  CheckedPopupMenuItem<String>(
+                    value: 'imperial',
+                    checked: unitPrefs.isImperial,
+                    child: Text(loc.t('unit_system_us_imperial')),
                   ),
                 ];
               },
             ),
-            IconButton(
-              icon: const Icon(Icons.attach_money),
-              onPressed: account.establishment != null
-                  ? () => _showCurrencyDialog(context, loc, account, store)
-                  : null,
-              tooltip: loc.t('default_currency'),
-            ),
-          ],
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () async {
@@ -1749,8 +1835,7 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                     _tabChip(_NomTab.nomenclature, loc.t('nomenclature')),
                     const SizedBox(width: 8),
                     _tabChip(_NomTab.newProducts, loc.t('nomenclature_new')),
-                    if (widget.department != 'hall' &&
-                        widget.department != 'dining_room') ...[
+                    if (showIikoTab) ...[
                       const SizedBox(width: 8),
                       _tabChip(_NomTab.iiko, 'iiko'),
                     ],
@@ -1772,19 +1857,6 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                         selected: _filterNoPrice,
                         showCheckmark: false,
                         onSelected: (v) => setState(() => _filterNoPrice = v),
-                        selectedColor:
-                            Theme.of(context).colorScheme.primaryContainer,
-                        backgroundColor: Theme.of(context).colorScheme.surface,
-                      ),
-                      const SizedBox(width: 8),
-                      FilterChip(
-                        avatar: const Icon(Icons.straighten, size: 16),
-                        label: Text(unitPrefs.isImperial ? 'US Imperial' : 'Metric'),
-                        selected: unitPrefs.isImperial,
-                        showCheckmark: false,
-                        onSelected: (v) => unitPrefs.setUnitSystem(
-                          v ? UnitSystem.imperial : UnitSystem.metric,
-                        ),
                         selectedColor:
                             Theme.of(context).colorScheme.primaryContainer,
                         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -2073,7 +2145,32 @@ class _NomenclatureScreenState extends State<NomenclatureScreen> {
                     establishmentId: estId2,
                     onUpload: _uploadIikoBlank,
                   ),
+
+                  // Вкладка 3: дубликаты (поиск и объединение)
+                  _buildDuplicatesTabBody(loc, canEdit),
                 ],
+              ),
+            ),
+            Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: SafeArea(
+                top: false,
+                child: Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: Theme.of(context).dividerColor),
+                    ),
+                  ),
+                  child: Center(
+                    child: _tabChip(
+                      _NomTab.duplicates,
+                      loc.t('nomenclature_tab_duplicates'),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -4650,13 +4747,6 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
   bool _priceHistoryLoaded = false;
   bool _switchingUnitSystem = false;
 
-  String _unitSystemTitle(LocalizationService loc, bool imperial) {
-    if (loc.currentLanguageCode == 'ru') {
-      return imperial ? 'Система: US Imperial' : 'Система: Metric';
-    }
-    return imperial ? 'System: US Imperial' : 'System: Metric';
-  }
-
   void _reformatWeightControllersForSystem({
     required UnitSystem from,
     required UnitSystem to,
@@ -5129,11 +5219,13 @@ class _ProductEditDialogState extends State<_ProductEditDialog> {
               const SizedBox(height: 10),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(_unitSystemTitle(widget.loc, isImperial)),
+                title: Text(widget.loc.t(isImperial
+                    ? 'unit_system_dialog_title_imperial'
+                    : 'unit_system_dialog_title_metric')),
                 subtitle: Text(
-                  widget.loc.currentLanguageCode == 'ru'
-                      ? 'Весовые поля в этой форме: ${isImperial ? 'US Imperial' : 'Metric'}'
-                      : 'Weight fields in this form: ${isImperial ? 'US Imperial' : 'Metric'}',
+                  widget.loc.t(isImperial
+                      ? 'unit_system_weight_hint_imperial'
+                      : 'unit_system_weight_hint_metric'),
                 ),
                 value: isImperial,
                 onChanged: _switchingUnitSystem
