@@ -106,7 +106,7 @@ class _ChecklistsScreenState extends State<ChecklistsScreen> {
         final date = _formatDate(deadline.toLocal()).toLowerCase();
         if (date.contains(q)) return true;
       }
-      final scheduled = c.reminderConfig?.scheduleDate;
+      final scheduled = c.reminderConfig?.recurrenceEndDate;
       if (scheduled != null) {
         final date = _formatDate(scheduled.toLocal()).toLowerCase();
         if (date.contains(q)) return true;

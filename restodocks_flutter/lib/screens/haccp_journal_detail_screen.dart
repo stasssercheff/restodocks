@@ -212,11 +212,11 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     final config = context.read<HaccpConfigService>();
     final selectedCountryCode =
         est != null ? config.resolveCountryCodeForEstablishment(est) : 'RU';
-    final explicitOverride =
-        est != null && config.hasExplicitCountryOverride(est.id);
     final selectedProfile = est != null
         ? config.resolveCountryProfileForEstablishment(est)
         : HaccpCountryProfiles.byCountryCode(selectedCountryCode);
+    final explicitOverride =
+        est != null && config.hasExplicitCountryOverride(est.id);
     var pdfLang = loc.currentLanguageCode;
     final langResult = await showDialog<String>(
       context: context,
@@ -616,6 +616,9 @@ class _HaccpJournalDetailScreenState extends State<HaccpJournalDetailScreen> {
     final logType = _logType;
     final selectedCountryCode =
         est != null ? config.resolveCountryCodeForEstablishment(est) : 'RU';
+    final selectedProfile = est != null
+        ? config.resolveCountryProfileForEstablishment(est)
+        : HaccpCountryProfiles.byCountryCode(selectedCountryCode);
     final explicitOverride =
         est != null && config.hasExplicitCountryOverride(est.id);
 
