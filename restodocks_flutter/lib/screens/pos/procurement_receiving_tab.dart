@@ -128,7 +128,13 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
 
   bool _matchesProductSearch(Map<String, dynamic> doc, String q) {
     if (q.isEmpty) return true;
+    if (_supplierName(doc).toLowerCase().contains(q)) return true;
     final payload = doc['payload'] as Map<String, dynamic>? ?? {};
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    for (final k in ['name', 'orderName', 'title']) {
+      final s = (header[k] ?? '').toString().toLowerCase();
+      if (s.contains(q)) return true;
+    }
     final items = payload['items'] as List<dynamic>? ?? [];
     for (final it in items) {
       if (it is! Map) continue;
@@ -347,11 +353,13 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => _selectDateMode('order_range'),
-                      child: Text(
-                        loc.currentLanguageCode == 'ru'
-                            ? 'Заказ дата'
-                            : loc.t('pos_procurement_filter_mode_order'),
-                        textAlign: TextAlign.center,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          loc.t('pos_procurement_date_btn_order'),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                        ),
                       ),
                     ),
                   ),
@@ -359,11 +367,13 @@ class _ProcurementReceivingTabState extends State<ProcurementReceivingTab> {
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => _selectDateMode('delivery_range'),
-                      child: Text(
-                        loc.currentLanguageCode == 'ru'
-                            ? 'Привоз дата'
-                            : loc.t('pos_procurement_filter_mode_delivery'),
-                        textAlign: TextAlign.center,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          loc.t('pos_procurement_date_btn_delivery'),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                        ),
                       ),
                     ),
                   ),

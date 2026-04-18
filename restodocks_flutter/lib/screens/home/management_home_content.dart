@@ -239,12 +239,6 @@ class ManagementHomeContent extends StatelessWidget {
             title: loc.t('sales_title') ?? 'Продажи',
             onTap: () => context.push('/sales/$dept'),
           ),
-          HomeFeatureTile(
-            icon: Icons.tv_outlined,
-            title: loc.t('pos_kds_title'),
-            subtitle: loc.t('pos_kds_hint'),
-            onTap: () => context.push('/pos/kds/$dept'),
-          ),
         ],
         if (posOn) ...[
           HomeFeatureTile(

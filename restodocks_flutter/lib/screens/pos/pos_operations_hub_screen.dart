@@ -72,12 +72,6 @@ class PosOperationsHubScreen extends StatelessWidget {
               title: loc.t('sales_title'),
               onTap: () => context.push('/sales/$dept'),
             ),
-            _OpTile(
-              icon: Icons.tv_outlined,
-              title: loc.t('pos_kds_title'),
-              subtitle: loc.t('pos_kds_hint'),
-              onTap: () => context.push('/pos/kds/$dept'),
-            ),
           ],
           if (dept != 'establishment') ...[
             _OpTile(

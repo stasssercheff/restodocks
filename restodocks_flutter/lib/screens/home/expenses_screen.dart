@@ -229,13 +229,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         ),
         actions: [
           if (hasProOrUltra)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: TextButton.icon(
-                onPressed: () => _exportMergedExpenses(context, ent: ent),
-                icon: const Icon(Icons.merge_type_outlined),
-                label: const Text('Слияние'),
-              ),
+            IconButton(
+              tooltip: loc.t('expenses_merge_report_tooltip'),
+              onPressed: () => _exportMergedExpenses(context, ent: ent),
+              icon: const Icon(Icons.merge_type_outlined),
             ),
         ],
       ),
@@ -595,6 +592,8 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
   /// ID заказов, исключённых из итога (например, отправлены по ошибке). Сохраняется в SharedPreferences.
   Set<String> _excludedFromTotalOrderIds = {};
 
+  final TextEditingController _textSearch = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -602,6 +601,31 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
     _dateStart = DateTime(now.year, now.month, 1);
     _dateEnd = DateTime(now.year, now.month + 1, 0);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _textSearch.dispose();
+    super.dispose();
+  }
+
+  static bool _orderDocMatchesText(Map<String, dynamic> d, String q) {
+    if (q.isEmpty) return true;
+    final payload = d['payload'] as Map<String, dynamic>? ?? {};
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    if ((header['supplierName'] ?? '').toString().toLowerCase().contains(q)) {
+      return true;
+    }
+    if ((header['employeeName'] ?? '').toString().toLowerCase().contains(q)) {
+      return true;
+    }
+    for (final it in (payload['items'] as List<dynamic>? ?? [])) {
+      if (it is! Map) continue;
+      if ((it['productName'] ?? '').toString().toLowerCase().contains(q)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   Future<void> _load() async {
@@ -668,6 +692,13 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
       }
       return true;
     }).toList();
+  }
+
+  List<Map<String, dynamic>> get _ordersForList {
+    final q = _textSearch.text.trim().toLowerCase();
+    final base = _filteredOrders;
+    if (q.isEmpty) return base;
+    return base.where((d) => _orderDocMatchesText(d, q)).toList();
   }
 
   Set<String> get _uniqueSupplierNames {
@@ -1062,7 +1093,7 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
       );
     }
 
-    final filteredOrders = _filteredOrders;
+    final filteredOrders = _ordersForList;
     double totalSum = 0;
     for (final order in filteredOrders) {
       final orderId = order['id']?.toString() ?? '';
@@ -1184,6 +1215,17 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _textSearch,
+                  decoration: InputDecoration(
+                    hintText: loc.t('expenses_orders_search_hint'),
+                    prefixIcon: const Icon(Icons.search, size: 22),
+                    isDense: true,
+                    border: const OutlineInputBorder(),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
               ],
             ),
           ),
@@ -1196,7 +1238,11 @@ class _ProductOrdersTabState extends State<_ProductOrdersTab> {
                         Icon(Icons.filter_list_off, size: 48, color: Theme.of(context).colorScheme.outline),
                         const SizedBox(height: 16),
                         Text(
-                          loc.t('expenses_orders_empty_filter') ?? 'Нет заказов за выбранный период и поставщиков',
+                          _filteredOrders.isNotEmpty &&
+                                  _textSearch.text.trim().isNotEmpty
+                              ? (loc.t('no_results') ?? 'Ничего не найдено')
+                              : (loc.t('expenses_orders_empty_filter') ??
+                                  'Нет заказов за выбранный период и поставщиков'),
                           style: Theme.of(context).textTheme.bodyLarge,
                           textAlign: TextAlign.center,
                         ),
@@ -1344,6 +1390,7 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
   late DateTime _dateEnd;
   Set<String> _selectedSupplierNames = {};
   Set<String> _excludedFromTotalIds = {};
+  final TextEditingController _textSearch = TextEditingController();
   static const String _prefsKeyPrefix = 'expenses_procurement_excluded_';
 
   @override
@@ -1353,6 +1400,12 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
     _dateStart = DateTime(now.year, now.month, 1);
     _dateEnd = DateTime(now.year, now.month + 1, 0);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _textSearch.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -1410,6 +1463,29 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
       }
       return true;
     }).toList();
+  }
+
+  static bool _procurementDocMatchesText(Map<String, dynamic> d, String q) {
+    if (q.isEmpty) return true;
+    final payload = d['payload'] as Map<String, dynamic>? ?? {};
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    if ((header['supplierName'] ?? '').toString().toLowerCase().contains(q)) {
+      return true;
+    }
+    for (final it in (payload['items'] as List<dynamic>? ?? [])) {
+      if (it is! Map) continue;
+      if ((it['productName'] ?? '').toString().toLowerCase().contains(q)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  List<Map<String, dynamic>> get _docsForList {
+    final q = _textSearch.text.trim().toLowerCase();
+    final base = _filteredDocs;
+    if (q.isEmpty) return base;
+    return base.where((d) => _procurementDocMatchesText(d, q)).toList();
   }
 
   Set<String> get _uniqueSupplierNames {
@@ -1564,7 +1640,7 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
   }
 
   Future<void> _export(LocalizationService loc) async {
-    final filtered = _filteredDocs;
+    final filtered = _docsForList;
     if (filtered.isEmpty) return;
     final account = context.read<AccountManagerSupabase>();
     final currency = account.establishment?.defaultCurrency ?? 'VND';
@@ -1739,7 +1815,7 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
       );
     }
 
-    final filtered = _filteredDocs;
+    final filtered = _docsForList;
     double totalSum = 0;
     for (final doc in filtered) {
       final docId = doc['id']?.toString() ?? '';
@@ -1777,7 +1853,10 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+            Row(
               children: [
                 Expanded(
                   child: Column(
@@ -1877,12 +1956,28 @@ class _ProcurementReceiptsTabState extends State<_ProcurementReceiptsTab> {
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _textSearch,
+              decoration: InputDecoration(
+                hintText: loc.t('expenses_orders_search_hint'),
+                prefixIcon: const Icon(Icons.search, size: 22),
+                isDense: true,
+                border: const OutlineInputBorder(),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+        ),
+      ),
           Expanded(
             child: filtered.isEmpty
                 ? Center(
                     child: Text(
-                      loc.t('expenses_orders_empty_filter') ?? '',
+                      _filteredDocs.isNotEmpty &&
+                              _textSearch.text.trim().isNotEmpty
+                          ? (loc.t('no_results') ?? '')
+                          : (loc.t('expenses_orders_empty_filter') ?? ''),
                       style: Theme.of(context).textTheme.bodyLarge,
                       textAlign: TextAlign.center,
                     ),
@@ -2089,6 +2184,7 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
   late DateTime _dateEnd;
   /// ID списаний, включённых в итог (пусто = все включены). Аналогично заказам — снятая галочка = исключить из итога.
   Set<String> _excludedFromTotalIds = {};
+  final TextEditingController _textSearch = TextEditingController();
   static const String _prefsKeyPrefix = 'expenses_writeoffs_excluded_';
 
   @override
@@ -2098,6 +2194,12 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
     _dateStart = DateTime(now.year, now.month, 1);
     _dateEnd = DateTime(now.year, now.month + 1, 0);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _textSearch.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -2247,6 +2349,38 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
     }).toList();
   }
 
+  bool _writeoffDocMatchesText(
+    Map<String, dynamic> d,
+    String q,
+    LocalizationService loc,
+  ) {
+    if (q.isEmpty) return true;
+    final payload = d['payload'] as Map<String, dynamic>? ?? {};
+    if ((payload['comment'] ?? '').toString().toLowerCase().contains(q)) {
+      return true;
+    }
+    final cat = _categoryName(loc, payload['category']?.toString()).toLowerCase();
+    if (cat.contains(q)) return true;
+    for (final row in (payload['rows'] as List<dynamic>? ?? [])) {
+      if (row is! Map) continue;
+      if ((row['productName'] ?? '').toString().toLowerCase().contains(q)) {
+        return true;
+      }
+    }
+    final header = payload['header'] as Map<String, dynamic>? ?? {};
+    if ((header['employeeName'] ?? '').toString().toLowerCase().contains(q)) {
+      return true;
+    }
+    return false;
+  }
+
+  List<Map<String, dynamic>> _writeoffsForList(LocalizationService loc) {
+    final q = _textSearch.text.trim().toLowerCase();
+    final base = _filteredDocs;
+    if (q.isEmpty) return base;
+    return base.where((d) => _writeoffDocMatchesText(d, q, loc)).toList();
+  }
+
   String _categoryName(LocalizationService loc, String? code) {
     switch (code) {
       case 'staff':
@@ -2290,7 +2424,7 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final filtered = _filteredDocs;
+    final filtered = _writeoffsForList(loc);
     double totalSelected = 0;
     double totalPeriod = 0;
     for (final doc in filtered) {
@@ -2327,7 +2461,10 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
           Container(
             padding: const EdgeInsets.all(16),
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: InkWell(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+            InkWell(
               onTap: () async {
                 final range = await showDateRangePicker(
                   context: context,
@@ -2370,12 +2507,27 @@ class _WriteoffsTabState extends State<_WriteoffsTab> {
                 ),
               ),
             ),
-          ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _textSearch,
+              decoration: InputDecoration(
+                hintText: loc.t('expenses_orders_search_hint'),
+                prefixIcon: const Icon(Icons.search, size: 22),
+                isDense: true,
+                border: const OutlineInputBorder(),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ],
+        ),
+      ),
           Expanded(
             child: filtered.isEmpty
                 ? Center(
                     child: Text(
-                      loc.t('expenses_orders_empty_filter') ?? 'Нет за период',
+                      _filteredDocs.isNotEmpty && _textSearch.text.trim().isNotEmpty
+                          ? (loc.t('no_results') ?? '')
+                          : (loc.t('expenses_orders_empty_filter') ?? 'Нет за период'),
                       style: Theme.of(context).textTheme.bodyLarge,
                       textAlign: TextAlign.center,
                     ),
@@ -2524,9 +2676,18 @@ class _ProductIdsMergeExportPickerDialogState
   List<Product> get _filtered {
     final q = _search.text.trim().toLowerCase();
     if (q.isEmpty) return widget.products;
-    return widget.products
-        .where((p) => p.name.toLowerCase().contains(q))
-        .toList();
+    return widget.products.where((p) {
+      if (p.name.toLowerCase().contains(q)) return true;
+      if (p.getLocalizedName('ru').toLowerCase().contains(q)) return true;
+      if (p.getLocalizedName('en').toLowerCase().contains(q)) return true;
+      if (p.category.toLowerCase().contains(q)) return true;
+      final n = p.names;
+      if (n == null) return false;
+      for (final v in n.values) {
+        if (v.toLowerCase().contains(q)) return true;
+      }
+      return false;
+    }).toList();
   }
 
   @override
