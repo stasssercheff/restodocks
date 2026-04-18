@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../haccp/haccp_country_profile.dart';
+import '../haccp/haccp_pdf_layout.dart';
 import '../legal/legal_compliance_provider.dart';
 import '../models/haccp_log.dart';
 import '../models/haccp_log_type.dart';
@@ -66,11 +67,46 @@ class HaccpPdfExportService {
     );
   }
 
-  /// Гигиенический журнал: макет по образцу — графы как в рекомендуемой форме.
+  /// Оговорка: макет типовой, не обязательно совпадает с бумажным бланком надзора в каждом регионе.
+  static pw.Widget _pdfTemplateDisclaimer(
+      String Function(String key, {Map<String, String>? args}) tr) {
+    const key = 'haccp_pdf_template_disclaimer';
+    final text = tr(key);
+    if (text == key || text.trim().isEmpty) return pw.SizedBox.shrink();
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(top: 6),
+      child: pw.Center(
+        child: pw.Text(
+          text,
+          textAlign: pw.TextAlign.center,
+          style: pw.TextStyle(fontSize: 6.2, color: PdfColors.grey600),
+        ),
+      ),
+    );
+  }
+
+  static pw.Widget _pdfComplianceAndDisclaimer(
+    String Function(String key, {Map<String, String>? args}) tr,
+    String? euText,
+  ) {
+    return pw.Column(
+      mainAxisSize: pw.MainAxisSize.min,
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        _euPdfComplianceFooter(euText),
+        _pdfTemplateDisclaimer(tr),
+      ],
+    );
+  }
+
+  /// Гигиенический журнал: для РФ — развёрнутые шапки в духе СанПиН (печать плотная; не претензия на подлинник надзора).
   static pw.Widget _buildHealthHygienePage({
+    required String journalLegalBanner,
     required LocalizationService loc,
     required String pdfLanguageCode,
     required String Function(String key, {Map<String, String>? args}) tr,
+    required HaccpPdfLayoutFamily layoutFamily,
+    required HaccpLogType logType,
     required String establishmentName,
     required List<HaccpLog> logs,
     required Map<String, String> employeeIdToName,
@@ -94,39 +130,62 @@ class HaccpPdfExportService {
       verticalInside: border,
     );
 
-    pw.Widget _headerCell(String text) => pw.Padding(
-          padding: pw.EdgeInsets.all(2),
+    final sanPinPrint = layoutFamily == HaccpPdfLayoutFamily.ruSanPin;
+
+    pw.Widget headerCellHealth(String text) => pw.Padding(
+          padding: pw.EdgeInsets.all(sanPinPrint ? 4 : 2),
           child: pw.Center(
-            child: pw.Text(text,
-                style:
-                    pw.TextStyle(fontSize: 5, fontWeight: pw.FontWeight.bold),
-                textAlign: pw.TextAlign.center),
+            child: pw.Text(
+              text,
+              style: pw.TextStyle(
+                fontSize: sanPinPrint ? 3.8 : 5,
+                fontWeight: pw.FontWeight.bold,
+              ),
+              textAlign: pw.TextAlign.center,
+            ),
           ),
         );
 
-    final colWidths = {
-      0: const pw.FlexColumnWidth(0.3),
-      1: const pw.FlexColumnWidth(0.9),
-      2: const pw.FlexColumnWidth(1.4),
-      3: const pw.FlexColumnWidth(0.8),
-      4: const pw.FlexColumnWidth(1.3),
-      5: const pw.FlexColumnWidth(1.5),
-      6: const pw.FlexColumnWidth(0.9),
-      7: const pw.FlexColumnWidth(1.2),
-    };
+    /// Ширины колонок: для СанПиН шире графы с длинным текстом под перенос.
+    final Map<int, pw.TableColumnWidth> colWidths = sanPinPrint
+        ? {
+            0: const pw.FlexColumnWidth(0.28),
+            1: const pw.FlexColumnWidth(0.85),
+            2: const pw.FlexColumnWidth(1.15),
+            3: const pw.FlexColumnWidth(0.65),
+            4: const pw.FlexColumnWidth(1.55),
+            5: const pw.FlexColumnWidth(1.55),
+            6: const pw.FlexColumnWidth(1.15),
+            7: const pw.FlexColumnWidth(1.15),
+          }
+        : {
+            0: const pw.FlexColumnWidth(0.3),
+            1: const pw.FlexColumnWidth(0.9),
+            2: const pw.FlexColumnWidth(1.4),
+            3: const pw.FlexColumnWidth(0.8),
+            4: const pw.FlexColumnWidth(1.3),
+            5: const pw.FlexColumnWidth(1.5),
+            6: const pw.FlexColumnWidth(0.9),
+            7: const pw.FlexColumnWidth(1.2),
+          };
 
     final headerRows = <pw.TableRow>[
       pw.TableRow(
         decoration: const pw.BoxDecoration(color: PdfColors.grey300),
         children: [
-          _headerCell(tr('haccp_tbl_pp_no')),
-          _headerCell(tr('haccp_tbl_date')),
-          _headerCell(tr('haccp_tbl_employee_fio_long')),
-          _headerCell(tr('haccp_tbl_position')),
-          _headerCell(tr('haccp_tbl_sign_family_infect')),
-          _headerCell(tr('haccp_tbl_sign_skin_resp')),
-          _headerCell(tr('haccp_tbl_exam_outcome')),
-          _headerCell(tr('haccp_tbl_med_worker_sign')),
+          headerCellHealth(_pdfTrLayout(tr, layoutFamily, 'haccp_tbl_pp_no')),
+          headerCellHealth(_pdfTrLayout(tr, layoutFamily, 'haccp_tbl_date')),
+          headerCellHealth(
+              _pdfTrLayout(tr, layoutFamily, 'haccp_tbl_employee_fio_long')),
+          headerCellHealth(_pdfTrLayout(tr, layoutFamily, 'haccp_tbl_position')),
+          headerCellHealth(
+              _pdfTrLayout(tr, layoutFamily, 'haccp_tbl_sign_family_infect')),
+          headerCellHealth(
+              _pdfTrLayout(tr, layoutFamily, 'haccp_tbl_sign_skin_resp')),
+          headerCellHealth(
+              _pdfTrLayout(tr, layoutFamily, 'haccp_tbl_exam_outcome')),
+          headerCellHealth(
+              _pdfTrLayout(tr, layoutFamily, 'haccp_tbl_med_worker_sign')),
         ],
       ),
     ];
@@ -194,13 +253,17 @@ class HaccpPdfExportService {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
+        _journalLegalBanner(journalLegalBanner),
         pw.Table(
             border: tableBorder, columnWidths: colWidths, children: headerRows),
         pw.SizedBox(height: 12),
         pw.Center(
           child: pw.Text(
-            tr('haccp_pdf_health_form_caption'),
-            style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold),
+            _pdfTrLayout(tr, layoutFamily, 'haccp_pdf_health_form_caption'),
+            style: pw.TextStyle(
+              fontSize: sanPinPrint ? 8.5 : 9,
+              fontWeight: pw.FontWeight.bold,
+            ),
           ),
         ),
       ],
@@ -244,16 +307,105 @@ class HaccpPdfExportService {
     return v == key ? fallback : v;
   }
 
-  /// Журнал температуры в холодильном оборудовании: помещение, оборудование, дни 1–30 (образец).
+  /// Шапка колонки PDF: сначала `baseKey` + суффикс макета (`_layout_us` и т.д.), иначе базовый ключ.
+  static String _pdfTrLayout(
+    String Function(String key, {Map<String, String>? args}) tr,
+    HaccpPdfLayoutFamily layout,
+    String baseKey,
+  ) {
+    final suf = layout.pdfHeaderSuffix;
+    if (suf != null) {
+      final k = '$baseKey$suf';
+      final v = tr(k);
+      if (v != k) return v;
+    }
+    return tr(baseKey);
+  }
+
+  static String _pdfTh(
+    String Function(String key, {Map<String, String>? args}) tr,
+    HaccpPdfLayoutFamily layout,
+    String baseKey,
+    String fallback,
+  ) {
+    final v = _pdfTrLayout(tr, layout, baseKey);
+    if (v != baseKey) return v;
+    final b = tr(baseKey);
+    return b == baseKey ? fallback : b;
+  }
+
+  /// Над таблицей на каждой странице печати — та же юридическая строка, что и в интерфейсе (`journalLegalLineTr`), для любой страны.
+  static pw.Widget _journalLegalBanner(String journalLegalRefLine) {
+    if (journalLegalRefLine.trim().isEmpty) return pw.SizedBox.shrink();
+    return pw.Padding(
+      padding: pw.EdgeInsets.only(bottom: 8),
+      child: pw.Center(
+        child: pw.Text(
+          journalLegalRefLine,
+          style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold),
+          textAlign: pw.TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  /// Строка организации на бланке учёта температуры холодильного оборудования — для всех стран.
+  static pw.Widget _fridgeEstablishmentLine(
+    String Function(String key, {Map<String, String>? args}) tr,
+    String establishmentName,
+  ) {
+    return pw.Padding(
+      padding: pw.EdgeInsets.only(bottom: 8),
+      child: pw.Align(
+        alignment: pw.Alignment.centerLeft,
+        child: pw.Text(
+          tr('haccp_pdf_print_org_line', args: {'name': establishmentName}),
+          style: pw.TextStyle(fontSize: 10),
+        ),
+      ),
+    );
+  }
+
+  static pw.Widget _fridgePdfLayoutNote(
+    String Function(String key, {Map<String, String>? args}) tr,
+    HaccpPdfLayoutFamily layoutFamily,
+  ) {
+    final key = switch (layoutFamily) {
+      HaccpPdfLayoutFamily.usFda => 'haccp_pdf_fridge_layout_us_note',
+      HaccpPdfLayoutFamily.eu852 => 'haccp_pdf_fridge_layout_eu_note',
+      HaccpPdfLayoutFamily.gbFoodSafety => 'haccp_pdf_fridge_layout_gb_note',
+      HaccpPdfLayoutFamily.trCodex => 'haccp_pdf_fridge_layout_tr_note',
+      HaccpPdfLayoutFamily.ruSanPin => null,
+    };
+    if (key == null) return pw.SizedBox.shrink();
+    final text = tr(key);
+    if (text == key || text.trim().isEmpty) return pw.SizedBox.shrink();
+    return pw.Padding(
+      padding: pw.EdgeInsets.only(top: 6),
+      child: pw.Center(
+        child: pw.Text(
+          text,
+          style: pw.TextStyle(fontSize: 7, color: PdfColors.grey800),
+          textAlign: pw.TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  /// Журнал температуры в холодильном оборудовании: 31 колонка по числам месяца (типовой календарный бланк).
   static pw.Widget _buildFridgeTemperaturePage({
+    required String journalLegalBanner,
     required String Function(String key, {Map<String, String>? args}) tr,
+    required HaccpPdfLayoutFamily layoutFamily,
+    required HaccpLogType logType,
     required String footerSanpin,
     required String establishmentName,
     required List<HaccpLog> logs,
     required DateTime dateFrom,
     required DateTime dateTo,
   }) {
-    const dayCount = 30;
+    final sanPinPrint = layoutFamily == HaccpPdfLayoutFamily.ruSanPin;
+    const dayCount = 31;
     final byEquipment = <String, Map<int, double>>{};
     for (final log in logs) {
       if (log.equipment == null || log.equipment!.isEmpty) continue;
@@ -263,20 +415,32 @@ class HaccpPdfExportService {
     final equipmentList = byEquipment.keys.toList()..sort();
     if (equipmentList.isEmpty) equipmentList.add('—');
 
+    final dayFlex = sanPinPrint ? 0.30 : 0.30;
     final colWidths = <int, pw.TableColumnWidth>{
-      0: const pw.FlexColumnWidth(1.2),
-      1: const pw.FlexColumnWidth(1.5),
+      0: pw.FlexColumnWidth(sanPinPrint ? 1.0 : 1.15),
+      1: pw.FlexColumnWidth(sanPinPrint ? 1.25 : 1.45),
       ...List.generate(dayCount, (i) => i + 2)
           .asMap()
-          .map((i, _) => MapEntry(i + 2, const pw.FlexColumnWidth(0.35))),
+          .map((i, _) => MapEntry(i + 2, pw.FlexColumnWidth(dayFlex))),
     };
+
+    String formatTempCell(double? v) {
+      if (v == null) return '';
+      if (layoutFamily == HaccpPdfLayoutFamily.usFda) {
+        final f = v * 9 / 5 + 32;
+        return '${v.toStringAsFixed(0)}/${f.toStringAsFixed(0)}';
+      }
+      return v.toStringAsFixed(0);
+    }
 
     final rows = <pw.TableRow>[
       pw.TableRow(
         decoration: const pw.BoxDecoration(color: PdfColors.grey300),
         children: [
-          _headerCellSmall(tr('haccp_tbl_room_name_prod')),
-          _headerCellSmall(tr('haccp_tbl_fridge_equipment_name')),
+          _headerCellSmall(
+              _pdfTrLayout(tr, layoutFamily, 'haccp_tbl_room_name_prod')),
+          _headerCellSmall(
+              _pdfTrLayout(tr, layoutFamily, 'haccp_tbl_fridge_equipment_name')),
           ...List.generate(dayCount, (d) => _headerCellSmall('${d + 1}')),
         ],
       ),
@@ -290,7 +454,7 @@ class HaccpPdfExportService {
             _tableCell(equip),
             ...List.generate(dayCount, (d) {
               final v = dayValues[d + 1];
-              return _tableCell(v != null ? v.toStringAsFixed(0) : '');
+              return _tableCell(formatTempCell(v));
             }),
           ],
         );
@@ -309,7 +473,10 @@ class HaccpPdfExportService {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
+        _journalLegalBanner(journalLegalBanner),
+        _fridgeEstablishmentLine(tr, establishmentName),
         pw.Table(border: _tableBorder, columnWidths: colWidths, children: rows),
+        _fridgePdfLayoutNote(tr, layoutFamily),
         pw.SizedBox(height: 10),
         pw.Center(
             child: pw.Text(footerSanpin,
@@ -319,81 +486,16 @@ class HaccpPdfExportService {
     );
   }
 
-  /// Журнал температурного режима: построчно по образцу docx (Дата, Время, Помещение/камера, Показатель сухой °С, Показатель влажности %, Ответственное лицо).
-  static pw.Widget _buildTemperatureRowBasedPage({
-    required String establishmentName,
-    required String Function(String key, {Map<String, String>? args}) tr,
-    required List<HaccpLog> logs,
-    required Map<String, String> employeeIdToName,
-    required DateFormat dateTimeFmt,
-    required bool includeHumidity,
-    required String datePattern,
-  }) {
-    final headerCells = <pw.Widget>[
-      _headerCellSmall(_th(tr, 'haccp_tbl_pp_no', 'No.')),
-      _headerCellSmall(_th(tr, 'haccp_tbl_date', 'Date')),
-      _headerCellSmall(_th(tr, 'haccp_tbl_time', 'Time')),
-      _headerCellSmall(_th(tr, 'haccp_tbl_room', 'Room/camera')),
-      _headerCellSmall(_th(tr, 'haccp_tbl_temp_celsius', 'Dry indicator, C')),
-    ];
-    if (includeHumidity) {
-      headerCells.add(_headerCellSmall(
-          _th(tr, 'haccp_tbl_rel_humidity_pct', 'Humidity, %')));
-    }
-    headerCells.add(_headerCellSmall(
-        _th(tr, 'haccp_tbl_responsible', 'Responsible person')));
-    headerCells
-        .add(_headerCellSmall(_th(tr, 'haccp_tbl_signature', 'Signature')));
-
-    final colCount = headerCells.length;
-    final colWidths = <int, pw.TableColumnWidth>{
-      for (var i = 0; i < colCount; i++) i: const pw.FlexColumnWidth(1.2),
-    };
-
-    final rows = <pw.TableRow>[
-      pw.TableRow(
-        decoration: const pw.BoxDecoration(color: PdfColors.grey300),
-        children: headerCells,
-      ),
-    ];
-    final dateFmt = DateFormat(datePattern);
-    final timeFmt = DateFormat('HH:mm');
-    for (var i = 0; i < logs.length; i++) {
-      final log = logs[i];
-      final cells = <pw.Widget>[
-        _tableCell('${i + 1}'),
-        _tableCell(dateFmt.format(log.createdAt)),
-        _tableCell(timeFmt.format(log.createdAt)),
-        _tableCell(log.equipment ?? establishmentName),
-        _tableCell(log.value1 != null ? log.value1!.toStringAsFixed(1) : ''),
-      ];
-      if (includeHumidity) {
-        cells.add(_tableCell(
-            log.value2 != null ? log.value2!.toStringAsFixed(0) : ''));
-      }
-      cells.add(_tableCell(employeeIdToName[log.createdByEmployeeId] ?? ''));
-      cells.add(_tableCell(''));
-      rows.add(pw.TableRow(children: cells));
-    }
-    const emptyRows = 15;
-    for (var i = logs.length; i < emptyRows; i++) {
-      rows.add(pw.TableRow(
-        children: List.generate(
-            colCount, (j) => _tableCell(j == 0 ? '${i + 1}' : '')),
-      ));
-    }
-
-    return pw.Table(
-        border: _tableBorder, columnWidths: colWidths, children: rows);
-  }
-
   /// Приложение № 3: 5 обязательных колонок. Группировка по наименованию помещения. Шрифт Roboto — кириллица.
   static pw.Widget _buildWarehouseTempHumidityPage({
+    required String journalLegalBanner,
     required String establishmentName,
     required List<HaccpLog> logs,
     required Map<String, String> employeeIdToName,
     required DateFormat dateFmt,
     required String Function(String key, {Map<String, String>? args}) tr,
+    required HaccpPdfLayoutFamily layoutFamily,
+    required HaccpLogType logType,
   }) {
     const colWidths = <int, pw.TableColumnWidth>{
       0: pw.FlexColumnWidth(0.4),
@@ -405,13 +507,14 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
       decoration: const pw.BoxDecoration(color: PdfColors.grey300),
       children: [
-        _headerCellSmall(_th(tr, 'haccp_tbl_pp_no', 'No.')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_date', 'Date')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_temp_c_label', 'Temperature, C')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_pp_no', 'No.')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_date', 'Date')),
         _headerCellSmall(
-            _th(tr, 'haccp_tbl_rel_humidity_pct', 'Relative humidity, %')),
-        _headerCellSmall(
-            _th(tr, 'haccp_tbl_responsible_sign', 'Responsible signature')),
+            _pdfTh(tr, layoutFamily, 'haccp_tbl_temp_c_label', 'Temperature, C')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_rel_humidity_pct',
+            'Relative humidity, %')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_responsible_sign',
+            'Responsible signature')),
       ],
     );
 
@@ -424,7 +527,9 @@ class HaccpPdfExportService {
     premisesList.sort();
     if (premisesList.isEmpty) premisesList.add('—');
 
-    final children = <pw.Widget>[];
+    final children = <pw.Widget>[
+      _journalLegalBanner(journalLegalBanner),
+    ];
     for (final premises in premisesList) {
       final premLogs = premises == '—'
           ? logs
@@ -458,7 +563,7 @@ class HaccpPdfExportService {
             pw.Padding(
               padding: pw.EdgeInsets.only(bottom: 6),
               child: pw.Text(
-                '${_th(tr, 'haccp_warehouse_premises', 'Warehouse premises')}: $premises',
+                '${_pdfTh(tr, layoutFamily, 'haccp_warehouse_premises', 'Warehouse premises')}: $premises',
                 style:
                     pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold),
               ),
@@ -476,10 +581,13 @@ class HaccpPdfExportService {
 
   /// Приложение 4: Журнал бракеража готовой пищевой продукции — макет как в образце.
   static pw.Widget _buildBrakerageFinishedProductPage({
+    required String journalLegalBanner,
     required List<HaccpLog> logs,
     required Map<String, String> employeeIdToName,
     required DateFormat dateTimeFmt,
     required String Function(String key, {Map<String, String>? args}) tr,
+    required HaccpPdfLayoutFamily layoutFamily,
+    required HaccpLogType logType,
   }) {
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(1.2),
@@ -494,18 +602,21 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
       decoration: const pw.BoxDecoration(color: PdfColors.grey300),
       children: [
-        _headerCellSmall(_th(tr, 'haccp_tbl_dish_made_at', 'Dish made at')),
         _headerCellSmall(
-            _th(tr, 'haccp_tbl_brakerage_removed_at', 'Brakerage removed at')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_dish_name_ready', 'Dish name')),
+            _pdfTh(tr, layoutFamily, 'haccp_tbl_dish_made_at', 'Dish made at')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_brakerage_removed_at',
+            'Brakerage removed at')),
         _headerCellSmall(
-            _th(tr, 'haccp_tbl_organo_result', 'Organoleptic result')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_sale_allowed', 'Sale allowed')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_brakerage_commission_sigs',
+            _pdfTh(tr, layoutFamily, 'haccp_tbl_dish_name_ready', 'Dish name')),
+        _headerCellSmall(
+            _pdfTh(tr, layoutFamily, 'haccp_tbl_organo_result', 'Organoleptic result')),
+        _headerCellSmall(
+            _pdfTh(tr, layoutFamily, 'haccp_tbl_sale_allowed', 'Sale allowed')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_brakerage_commission_sigs',
             'Commission signatures')),
         _headerCellSmall(
-            _th(tr, 'haccp_tbl_portion_weighing', 'Portion weighing')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_note_short', 'Note')),
+            _pdfTh(tr, layoutFamily, 'haccp_tbl_portion_weighing', 'Portion weighing')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_note_short', 'Note')),
       ],
     );
     final dataRows = <pw.TableRow>[headerRow];
@@ -527,17 +638,26 @@ class HaccpPdfExportService {
         ),
       );
     }
-    return pw.Table(
-        border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        _journalLegalBanner(journalLegalBanner),
+        pw.Table(
+            border: _tableBorder, columnWidths: colWidths, children: dataRows),
+      ],
+    );
   }
 
   /// Приложение 5: Журнал бракеража скоропортящейся пищевой продукции — макет как в образце.
   static pw.Widget _buildBrakerageIncomingRawPage({
+    required String journalLegalBanner,
     required List<HaccpLog> logs,
     required Map<String, String> employeeIdToName,
     required DateFormat dateTimeFmt,
     required String Function(String key, {Map<String, String>? args}) tr,
     required String datePattern,
+    required HaccpPdfLayoutFamily layoutFamily,
+    required HaccpLogType logType,
   }) {
     final dateFmt = DateFormat(datePattern);
     final colWidths = <int, pw.TableColumnWidth>{
@@ -556,17 +676,17 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
       decoration: const pw.BoxDecoration(color: PdfColors.grey300),
       children: [
-        _headerCellSmall(_th(tr, 'haccp_tbl_received_at', 'Received at')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_name', 'Name')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_packaging', 'Packaging')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_manufacturer', 'Manufacturer')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_qty_short', 'Qty')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_doc_no', 'Doc no.')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_organo_short', 'Organo')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_storage_shelf', 'Storage/shelf')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_sale_date', 'Sale date')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_signature', 'Signature')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_note_short', 'Note')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_received_at', 'Received at')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_name', 'Name')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_packaging', 'Packaging')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_manufacturer', 'Manufacturer')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_qty_short', 'Qty')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_doc_no', 'Doc no.')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_organo_short', 'Organo')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_storage_shelf', 'Storage/shelf')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_sale_date', 'Sale date')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_signature', 'Signature')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_note_short', 'Note')),
       ],
     );
     final dataRows = <pw.TableRow>[headerRow];
@@ -597,17 +717,26 @@ class HaccpPdfExportService {
         ),
       );
     }
-    return pw.Table(
-        border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        _journalLegalBanner(journalLegalBanner),
+        pw.Table(
+            border: _tableBorder, columnWidths: colWidths, children: dataRows),
+      ],
+    );
   }
 
   /// Приложение 8: Журнал учета использования фритюрных жиров — макет как в образце.
   static pw.Widget _buildFryingOilPage({
+    required String journalLegalBanner,
     required List<HaccpLog> logs,
     required Map<String, String> employeeIdToName,
     required DateFormat dateTimeFmt,
     required String Function(String key, {Map<String, String>? args}) tr,
     required String datePattern,
+    required HaccpPdfLayoutFamily layoutFamily,
+    required HaccpLogType logType,
   }) {
     final dateFmt = DateFormat(datePattern);
     final timeFmt = DateFormat('HH:mm');
@@ -627,17 +756,17 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
       decoration: const pw.BoxDecoration(color: PdfColors.grey300),
       children: [
-        _headerCellSmall(_th(tr, 'haccp_tbl_date', 'Date')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_time_start', 'Start time')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_fat_type', 'Fat type')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_score_start', 'Score start')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_equipment', 'Equipment')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_product_type', 'Product type')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_time_end', 'End time')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_score_end', 'Score end')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_carry_kg', 'Carry kg')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_utilized_kg', 'Utilized kg')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_controller', 'Controller')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_date', 'Date')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_time_start', 'Start time')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_fat_type', 'Fat type')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_score_start', 'Score start')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_equipment', 'Equipment')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_product_type', 'Product type')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_time_end', 'End time')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_score_end', 'Score end')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_carry_kg', 'Carry kg')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_utilized_kg', 'Utilized kg')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_controller', 'Controller')),
       ],
     );
     final dataRows = <pw.TableRow>[headerRow];
@@ -671,16 +800,25 @@ class HaccpPdfExportService {
         ),
       );
     }
-    return pw.Table(
-        border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        _journalLegalBanner(journalLegalBanner),
+        pw.Table(
+            border: _tableBorder, columnWidths: colWidths, children: dataRows),
+      ],
+    );
   }
 
   /// Журнал учёта личных медицинских книжек: 7 колонок по бланку.
   static pw.Widget _buildMedBookPage({
+    required String journalLegalBanner,
     required List<HaccpLog> logs,
     required Map<String, String> employeeIdToName,
     required DateFormat dateFmt,
     required String Function(String key, {Map<String, String>? args}) tr,
+    required HaccpPdfLayoutFamily layoutFamily,
+    required HaccpLogType logType,
   }) {
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(0.4),
@@ -694,13 +832,13 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
       decoration: const pw.BoxDecoration(color: PdfColors.grey300),
       children: [
-        _headerCellSmall(_th(tr, 'haccp_tbl_pp_no', 'No.')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_fio_full', 'Full name')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_position', 'Position')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_med_book_no', 'Med book no.')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_med_book_valid', 'Valid until')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_med_book_receipt', 'Receipt')),
-        _headerCellSmall(_th(tr, 'haccp_tbl_med_book_return', 'Return')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_pp_no', 'No.')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_fio_full', 'Full name')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_position', 'Position')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_med_book_no', 'Med book no.')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_med_book_valid', 'Valid until')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_med_book_receipt', 'Receipt')),
+        _headerCellSmall(_pdfTh(tr, layoutFamily, 'haccp_tbl_med_book_return', 'Return')),
       ],
     );
     final dataRows = <pw.TableRow>[headerRow];
@@ -731,15 +869,24 @@ class HaccpPdfExportService {
         ),
       );
     }
-    return pw.Table(
-        border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        _journalLegalBanner(journalLegalBanner),
+        pw.Table(
+            border: _tableBorder, columnWidths: colWidths, children: dataRows),
+      ],
+    );
   }
 
   static pw.Widget _buildMedExaminationsPdfPage(
+      String journalLegalBanner,
       List<HaccpLog> logs,
       Map<String, String> employeeIdToName,
       DateFormat dateFmt,
-      String Function(String key, {Map<String, String>? args}) tr) {
+      String Function(String key, {Map<String, String>? args}) tr,
+      HaccpPdfLayoutFamily layoutFamily,
+      HaccpLogType logType) {
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(0.3),
       1: const pw.FlexColumnWidth(1),
@@ -752,13 +899,13 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
         decoration: const pw.BoxDecoration(color: PdfColors.grey300),
         children: [
-          _th(tr, 'haccp_tbl_serial_short', 'No.'),
-          _th(tr, 'haccp_tbl_med_exam_fio', 'Full name'),
-          _th(tr, 'haccp_tbl_position', 'Position'),
-          _th(tr, 'haccp_tbl_exam_date', 'Exam date'),
-          _th(tr, 'haccp_tbl_conclusion', 'Conclusion'),
-          _th(tr, 'haccp_tbl_decision', 'Decision'),
-          _th(tr, 'haccp_tbl_signature', 'Signature')
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_serial_short', 'No.'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_med_exam_fio', 'Full name'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_position', 'Position'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_exam_date', 'Exam date'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_conclusion', 'Conclusion'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_decision', 'Decision'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_signature', 'Signature')
         ].map((h) => _headerCellSmall(h)).toList());
     final dataRows = <pw.TableRow>[headerRow];
     for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
@@ -774,15 +921,24 @@ class HaccpPdfExportService {
         log != null ? (employeeIdToName[log.createdByEmployeeId] ?? '') : ''
       ].map((c) => _tableCell(c)).toList()));
     }
-    return pw.Table(
-        border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        _journalLegalBanner(journalLegalBanner),
+        pw.Table(
+            border: _tableBorder, columnWidths: colWidths, children: dataRows),
+      ],
+    );
   }
 
   static pw.Widget _buildDisinfectantPdfPage(
+      String journalLegalBanner,
       List<HaccpLog> logs,
       Map<String, String> employeeIdToName,
       DateFormat dateFmt,
-      String Function(String key, {Map<String, String>? args}) tr) {
+      String Function(String key, {Map<String, String>? args}) tr,
+      HaccpPdfLayoutFamily layoutFamily,
+      HaccpLogType logType) {
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(0.6),
       1: const pw.FlexColumnWidth(1.2),
@@ -793,11 +949,11 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
         decoration: const pw.BoxDecoration(color: PdfColors.grey300),
         children: [
-          _th(tr, 'haccp_tbl_date', 'Date'),
-          _th(tr, 'haccp_tbl_object_agent', 'Object/agent'),
-          _th(tr, 'haccp_tbl_qty_short', 'Qty'),
-          _th(tr, 'haccp_tbl_receipt', 'Receipt'),
-          _th(tr, 'haccp_tbl_responsible', 'Responsible')
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_date', 'Date'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_object_agent', 'Object/agent'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_qty_short', 'Qty'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_receipt', 'Receipt'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_responsible', 'Responsible')
         ].map((h) => _headerCellSmall(h)).toList());
     final dataRows = <pw.TableRow>[headerRow];
     for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
@@ -819,15 +975,24 @@ class HaccpPdfExportService {
             : ''
       ].map((c) => _tableCell(c)).toList()));
     }
-    return pw.Table(
-        border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        _journalLegalBanner(journalLegalBanner),
+        pw.Table(
+            border: _tableBorder, columnWidths: colWidths, children: dataRows),
+      ],
+    );
   }
 
   static pw.Widget _buildEquipmentWashingPdfPage(
+      String journalLegalBanner,
       List<HaccpLog> logs,
       Map<String, String> employeeIdToName,
       DateFormat dateFmt,
-      String Function(String key, {Map<String, String>? args}) tr) {
+      String Function(String key, {Map<String, String>? args}) tr,
+      HaccpPdfLayoutFamily layoutFamily,
+      HaccpLogType logType) {
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(0.6),
       1: const pw.FlexColumnWidth(0.4),
@@ -839,12 +1004,12 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
         decoration: const pw.BoxDecoration(color: PdfColors.grey300),
         children: [
-          _th(tr, 'haccp_tbl_date', 'Date'),
-          _th(tr, 'haccp_tbl_time', 'Time'),
-          _th(tr, 'haccp_tbl_equipment', 'Equipment'),
-          _th(tr, 'haccp_tbl_wash_solution', 'Wash solution'),
-          _th(tr, 'haccp_tbl_disinfect_solution', 'Disinfect solution'),
-          _th(tr, 'haccp_tbl_controller', 'Controller')
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_date', 'Date'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_time', 'Time'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_equipment', 'Equipment'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_wash_solution', 'Wash solution'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_disinfect_solution', 'Disinfect solution'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_controller', 'Controller')
         ].map((h) => _headerCellSmall(h)).toList());
     final dataRows = <pw.TableRow>[headerRow];
     for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
@@ -863,15 +1028,24 @@ class HaccpPdfExportService {
             : ''
       ].map((c) => _tableCell(c)).toList()));
     }
-    return pw.Table(
-        border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        _journalLegalBanner(journalLegalBanner),
+        pw.Table(
+            border: _tableBorder, columnWidths: colWidths, children: dataRows),
+      ],
+    );
   }
 
   static pw.Widget _buildGeneralCleaningPdfPage(
+      String journalLegalBanner,
       List<HaccpLog> logs,
       Map<String, String> employeeIdToName,
       DateFormat dateFmt,
-      String Function(String key, {Map<String, String>? args}) tr) {
+      String Function(String key, {Map<String, String>? args}) tr,
+      HaccpPdfLayoutFamily layoutFamily,
+      HaccpLogType logType) {
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(0.3),
       1: const pw.FlexColumnWidth(1.2),
@@ -881,10 +1055,10 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
         decoration: const pw.BoxDecoration(color: PdfColors.grey300),
         children: [
-          _th(tr, 'haccp_tbl_serial_short', 'No.'),
-          _th(tr, 'haccp_tbl_room', 'Room'),
-          _th(tr, 'haccp_tbl_date', 'Date'),
-          _th(tr, 'haccp_tbl_responsible', 'Responsible')
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_serial_short', 'No.'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_room', 'Room'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_date', 'Date'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_responsible', 'Responsible')
         ].map((h) => _headerCellSmall(h)).toList());
     final dataRows = <pw.TableRow>[headerRow];
     for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
@@ -901,15 +1075,24 @@ class HaccpPdfExportService {
             : ''
       ].map((c) => _tableCell(c)).toList()));
     }
-    return pw.Table(
-        border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        _journalLegalBanner(journalLegalBanner),
+        pw.Table(
+            border: _tableBorder, columnWidths: colWidths, children: dataRows),
+      ],
+    );
   }
 
   static pw.Widget _buildSieveFilterMagnetPdfPage(
+      String journalLegalBanner,
       List<HaccpLog> logs,
       Map<String, String> employeeIdToName,
       DateFormat dateFmt,
-      String Function(String key, {Map<String, String>? args}) tr) {
+      String Function(String key, {Map<String, String>? args}) tr,
+      HaccpPdfLayoutFamily layoutFamily,
+      HaccpLogType logType) {
     final colWidths = <int, pw.TableColumnWidth>{
       0: const pw.FlexColumnWidth(0.4),
       1: const pw.FlexColumnWidth(1),
@@ -921,12 +1104,12 @@ class HaccpPdfExportService {
     final headerRow = pw.TableRow(
         decoration: const pw.BoxDecoration(color: PdfColors.grey300),
         children: [
-          _th(tr, 'haccp_tbl_sieve_magnet_no', 'Sieve/magnet No.'),
-          _th(tr, 'haccp_tbl_name', 'Name'),
-          _th(tr, 'haccp_tbl_condition', 'Condition'),
-          _th(tr, 'haccp_tbl_cleaning_date', 'Cleaning date'),
-          _th(tr, 'haccp_tbl_med_exam_fio', 'Full name'),
-          _th(tr, 'haccp_tbl_comments', 'Comments')
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_sieve_magnet_no', 'Sieve/magnet No.'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_name', 'Name'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_condition', 'Condition'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_cleaning_date', 'Cleaning date'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_med_exam_fio', 'Full name'),
+          _pdfTh(tr, layoutFamily, 'haccp_tbl_comments', 'Comments')
         ].map((h) => _headerCellSmall(h)).toList());
     final dataRows = <pw.TableRow>[headerRow];
     for (var i = 0; i < (logs.isEmpty ? 20 : logs.length); i++) {
@@ -947,8 +1130,14 @@ class HaccpPdfExportService {
         log?.sieveComments ?? ''
       ].map((c) => _tableCell(c)).toList()));
     }
-    return pw.Table(
-        border: _tableBorder, columnWidths: colWidths, children: dataRows);
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        _journalLegalBanner(journalLegalBanner),
+        pw.Table(
+            border: _tableBorder, columnWidths: colWidths, children: dataRows),
+      ],
+    );
   }
 
   static String _datePatternByCountry(String countryCode) {
@@ -975,14 +1164,17 @@ class HaccpPdfExportService {
     String tr(String key, {Map<String, String>? args}) =>
         loc.tForLanguage(pdfLanguageCode, key, args: args);
 
-    final sanpinLine = HaccpCountryProfiles.journalLegalLine(
+    final layoutFamily =
+        HaccpPdfLayoutFamily.fromCountry(establishmentCountryCode);
+    final journalLegalRefLine = HaccpCountryProfiles.journalLegalLineTr(
       establishmentCountryCode,
       logType,
+      tr,
     );
     final title = tr(logType.displayNameKey);
-    final footerText = HaccpCountryProfiles.journalFooterLine(
+    final footerText = HaccpCountryProfiles.journalFooterLineTr(
       establishmentCountryCode,
-      logType,
+      tr,
     );
     final selectedProfile = HaccpCountryProfiles.byCountryCode(
       establishmentCountryCode,
@@ -999,7 +1191,10 @@ class HaccpPdfExportService {
       pdfLanguageCode,
     );
     final recommendedSampleText =
-        HaccpCountryProfiles.recommendedSampleLabel(establishmentCountryCode);
+        HaccpCountryProfiles.recommendedSampleLabelTr(
+      establishmentCountryCode,
+      tr,
+    );
     final euPdfComplianceFooter =
         LegalComplianceProvider.journalPdfComplianceFooterByCountry(
       pdfLanguageCode,
@@ -1023,7 +1218,8 @@ class HaccpPdfExportService {
             children: [
               pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Text(sanpinLine, style: pw.TextStyle(fontSize: 9)),
+                child: pw.Text(journalLegalRefLine,
+                    style: pw.TextStyle(fontSize: 9)),
               ),
               pw.SizedBox(height: 32),
               pw.Center(
@@ -1071,7 +1267,7 @@ class HaccpPdfExportService {
                 ),
               ),
               pw.Spacer(),
-              _euPdfComplianceFooter(euPdfComplianceFooter),
+              _pdfComplianceAndDisclaimer(tr, euPdfComplianceFooter),
             ],
           ),
         ),
@@ -1088,7 +1284,8 @@ class HaccpPdfExportService {
             children: [
               pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Text(sanpinLine, style: pw.TextStyle(fontSize: 9)),
+                child: pw.Text(journalLegalRefLine,
+                    style: pw.TextStyle(fontSize: 9)),
               ),
               pw.SizedBox(height: 4),
               pw.Center(
@@ -1114,9 +1311,12 @@ class HaccpPdfExportService {
               ),
               pw.SizedBox(height: 8),
               _buildHealthHygienePage(
+                journalLegalBanner: journalLegalRefLine,
                 loc: loc,
                 pdfLanguageCode: pdfLanguageCode,
                 tr: tr,
+                layoutFamily: layoutFamily,
+                logType: logType,
                 establishmentName: establishmentName,
                 logs: logs,
                 employeeIdToName: employeeIdToName,
@@ -1128,7 +1328,7 @@ class HaccpPdfExportService {
                   child: pw.Text(footerText,
                       style: pw.TextStyle(
                           fontSize: 9, fontWeight: pw.FontWeight.bold))),
-              _euPdfComplianceFooter(euPdfComplianceFooter),
+              _pdfComplianceAndDisclaimer(tr, euPdfComplianceFooter),
             ],
           ),
         ),
@@ -1170,7 +1370,10 @@ class HaccpPdfExportService {
               ),
               pw.SizedBox(height: 8),
               _buildFridgeTemperaturePage(
+                journalLegalBanner: journalLegalRefLine,
                 tr: tr,
+                layoutFamily: layoutFamily,
+                logType: logType,
                 footerSanpin: footerText,
                 establishmentName: establishmentName,
                 logs: logs,
@@ -1182,7 +1385,7 @@ class HaccpPdfExportService {
                   child: pw.Text(footerText,
                       style: pw.TextStyle(
                           fontSize: 9, fontWeight: pw.FontWeight.bold))),
-              _euPdfComplianceFooter(euPdfComplianceFooter),
+              _pdfComplianceAndDisclaimer(tr, euPdfComplianceFooter),
             ],
           ),
         ),
@@ -1224,18 +1427,21 @@ class HaccpPdfExportService {
               ),
               pw.SizedBox(height: 8),
               _buildWarehouseTempHumidityPage(
+                journalLegalBanner: journalLegalRefLine,
                 establishmentName: establishmentName,
                 logs: logs,
                 employeeIdToName: employeeIdToName,
                 dateFmt: dateFmt,
                 tr: tr,
+                layoutFamily: layoutFamily,
+                logType: logType,
               ),
               pw.SizedBox(height: 10),
               pw.Center(
                   child: pw.Text(footerText,
                       style: pw.TextStyle(
                           fontSize: 9, fontWeight: pw.FontWeight.bold))),
-              _euPdfComplianceFooter(euPdfComplianceFooter),
+              _pdfComplianceAndDisclaimer(tr, euPdfComplianceFooter),
             ],
           ),
         ),
@@ -1276,17 +1482,20 @@ class HaccpPdfExportService {
               ),
               pw.SizedBox(height: 8),
               _buildBrakerageFinishedProductPage(
+                journalLegalBanner: journalLegalRefLine,
                 logs: logs,
                 employeeIdToName: employeeIdToName,
                 dateTimeFmt: dateTimeFmt,
                 tr: tr,
+                layoutFamily: layoutFamily,
+                logType: logType,
               ),
               pw.SizedBox(height: 10),
               pw.Center(
                   child: pw.Text(footerText,
                       style: pw.TextStyle(
                           fontSize: 9, fontWeight: pw.FontWeight.bold))),
-              _euPdfComplianceFooter(euPdfComplianceFooter),
+              _pdfComplianceAndDisclaimer(tr, euPdfComplianceFooter),
             ],
           ),
         ),
@@ -1328,18 +1537,21 @@ class HaccpPdfExportService {
               ),
               pw.SizedBox(height: 8),
               _buildBrakerageIncomingRawPage(
+                journalLegalBanner: journalLegalRefLine,
                 logs: logs,
                 employeeIdToName: employeeIdToName,
                 dateTimeFmt: dateTimeFmt,
                 tr: tr,
                 datePattern: datePattern,
+                layoutFamily: layoutFamily,
+                logType: logType,
               ),
               pw.SizedBox(height: 10),
               pw.Center(
                   child: pw.Text(footerText,
                       style: pw.TextStyle(
                           fontSize: 9, fontWeight: pw.FontWeight.bold))),
-              _euPdfComplianceFooter(euPdfComplianceFooter),
+              _pdfComplianceAndDisclaimer(tr, euPdfComplianceFooter),
             ],
           ),
         ),
@@ -1381,18 +1593,21 @@ class HaccpPdfExportService {
               ),
               pw.SizedBox(height: 8),
               _buildFryingOilPage(
+                journalLegalBanner: journalLegalRefLine,
                 logs: logs,
                 employeeIdToName: employeeIdToName,
                 dateTimeFmt: dateTimeFmt,
                 tr: tr,
                 datePattern: datePattern,
+                layoutFamily: layoutFamily,
+                logType: logType,
               ),
               pw.SizedBox(height: 10),
               pw.Center(
                   child: pw.Text(footerText,
                       style: pw.TextStyle(
                           fontSize: 9, fontWeight: pw.FontWeight.bold))),
-              _euPdfComplianceFooter(euPdfComplianceFooter),
+              _pdfComplianceAndDisclaimer(tr, euPdfComplianceFooter),
             ],
           ),
         ),
@@ -1433,17 +1648,20 @@ class HaccpPdfExportService {
               ),
               pw.SizedBox(height: 8),
               _buildMedBookPage(
+                journalLegalBanner: journalLegalRefLine,
                 logs: logs,
                 employeeIdToName: employeeIdToName,
                 dateFmt: dateFmt,
                 tr: tr,
+                layoutFamily: layoutFamily,
+                logType: logType,
               ),
               pw.SizedBox(height: 10),
               pw.Center(
                   child: pw.Text(footerText,
                       style: pw.TextStyle(
                           fontSize: 9, fontWeight: pw.FontWeight.bold))),
-              _euPdfComplianceFooter(euPdfComplianceFooter),
+              _pdfComplianceAndDisclaimer(tr, euPdfComplianceFooter),
             ],
           ),
         ),
@@ -1479,13 +1697,19 @@ class HaccpPdfExportService {
                                 fontSize: 10, fontWeight: pw.FontWeight.bold))),
                     pw.SizedBox(height: 8),
                     _buildMedExaminationsPdfPage(
-                        logs, employeeIdToName, dateFmt, tr),
+                        journalLegalRefLine,
+                        logs,
+                        employeeIdToName,
+                        dateFmt,
+                        tr,
+                        layoutFamily,
+                        logType),
                     pw.SizedBox(height: 10),
                     pw.Center(
                         child: pw.Text(footerText,
                             style: pw.TextStyle(
                                 fontSize: 9, fontWeight: pw.FontWeight.bold))),
-                    _euPdfComplianceFooter(euPdfComplianceFooter),
+                    _pdfComplianceAndDisclaimer(tr, euPdfComplianceFooter),
                   ])));
     } else if (logType == HaccpLogType.disinfectantAccounting) {
       doc.addPage(pw.Page(
@@ -1518,13 +1742,19 @@ class HaccpPdfExportService {
                                 fontSize: 10, fontWeight: pw.FontWeight.bold))),
                     pw.SizedBox(height: 8),
                     _buildDisinfectantPdfPage(
-                        logs, employeeIdToName, dateFmt, tr),
+                        journalLegalRefLine,
+                        logs,
+                        employeeIdToName,
+                        dateFmt,
+                        tr,
+                        layoutFamily,
+                        logType),
                     pw.SizedBox(height: 10),
                     pw.Center(
                         child: pw.Text(footerText,
                             style: pw.TextStyle(
                                 fontSize: 9, fontWeight: pw.FontWeight.bold))),
-                    _euPdfComplianceFooter(euPdfComplianceFooter),
+                    _pdfComplianceAndDisclaimer(tr, euPdfComplianceFooter),
                   ])));
     } else if (logType == HaccpLogType.equipmentWashing) {
       doc.addPage(pw.Page(
@@ -1557,13 +1787,19 @@ class HaccpPdfExportService {
                                 fontSize: 10, fontWeight: pw.FontWeight.bold))),
                     pw.SizedBox(height: 8),
                     _buildEquipmentWashingPdfPage(
-                        logs, employeeIdToName, dateFmt, tr),
+                        journalLegalRefLine,
+                        logs,
+                        employeeIdToName,
+                        dateFmt,
+                        tr,
+                        layoutFamily,
+                        logType),
                     pw.SizedBox(height: 10),
                     pw.Center(
                         child: pw.Text(footerText,
                             style: pw.TextStyle(
                                 fontSize: 9, fontWeight: pw.FontWeight.bold))),
-                    _euPdfComplianceFooter(euPdfComplianceFooter),
+                    _pdfComplianceAndDisclaimer(tr, euPdfComplianceFooter),
                   ])));
     } else if (logType == HaccpLogType.generalCleaningSchedule) {
       doc.addPage(pw.Page(
@@ -1596,13 +1832,19 @@ class HaccpPdfExportService {
                                 fontSize: 10, fontWeight: pw.FontWeight.bold))),
                     pw.SizedBox(height: 8),
                     _buildGeneralCleaningPdfPage(
-                        logs, employeeIdToName, dateFmt, tr),
+                        journalLegalRefLine,
+                        logs,
+                        employeeIdToName,
+                        dateFmt,
+                        tr,
+                        layoutFamily,
+                        logType),
                     pw.SizedBox(height: 10),
                     pw.Center(
                         child: pw.Text(footerText,
                             style: pw.TextStyle(
                                 fontSize: 9, fontWeight: pw.FontWeight.bold))),
-                    _euPdfComplianceFooter(euPdfComplianceFooter),
+                    _pdfComplianceAndDisclaimer(tr, euPdfComplianceFooter),
                   ])));
     } else if (logType == HaccpLogType.sieveFilterMagnet) {
       doc.addPage(pw.Page(
@@ -1635,13 +1877,19 @@ class HaccpPdfExportService {
                                 fontSize: 10, fontWeight: pw.FontWeight.bold))),
                     pw.SizedBox(height: 8),
                     _buildSieveFilterMagnetPdfPage(
-                        logs, employeeIdToName, dateFmt, tr),
+                        journalLegalRefLine,
+                        logs,
+                        employeeIdToName,
+                        dateFmt,
+                        tr,
+                        layoutFamily,
+                        logType),
                     pw.SizedBox(height: 10),
                     pw.Center(
                         child: pw.Text(footerText,
                             style: pw.TextStyle(
                                 fontSize: 9, fontWeight: pw.FontWeight.bold))),
-                    _euPdfComplianceFooter(euPdfComplianceFooter),
+                    _pdfComplianceAndDisclaimer(tr, euPdfComplianceFooter),
                   ])));
     } else {
       final colKeys = logs.isNotEmpty
@@ -1702,6 +1950,7 @@ class HaccpPdfExportService {
                           pw.TextStyle(fontSize: 6.2, color: PdfColors.grey700),
                     ),
                   ),
+                _pdfTemplateDisclaimer(tr),
               ],
             );
           },
@@ -1711,10 +1960,11 @@ class HaccpPdfExportService {
                 decoration: pw.BoxDecoration(color: PdfColors.grey300),
                 children: [
                   _cell('№', bold: true),
-                  _cell(_th(tr, 'haccp_tbl_date', 'Date'), bold: true),
+                  _cell(_pdfTh(tr, layoutFamily, 'haccp_tbl_date', 'Date'),
+                      bold: true),
                   ...colKeys.map((k) => _cell(_humanKey(k, tr), bold: true)),
                   _cell(
-                    '${_th(tr, 'haccp_tbl_med_exam_fio', 'Full name')}, ${_th(tr, 'haccp_tbl_position', 'Position')}',
+                    '${_pdfTh(tr, layoutFamily, 'haccp_tbl_med_exam_fio', 'Full name')}, ${_pdfTh(tr, layoutFamily, 'haccp_tbl_position', 'Position')}',
                     bold: true,
                   ),
                 ],
@@ -1785,7 +2035,7 @@ class HaccpPdfExportService {
                 templateFrameworkLine,
                 style: pw.TextStyle(fontSize: 7, color: PdfColors.grey700),
               ),
-              _euPdfComplianceFooter(euPdfComplianceFooter),
+              _pdfComplianceAndDisclaimer(tr, euPdfComplianceFooter),
             ],
           ),
         ),

@@ -131,7 +131,7 @@ class _HaccpJournalsScreenState extends State<HaccpJournalsScreen> {
     HaccpLogType t,
     String countryCode,
   ) {
-    return HaccpCountryProfiles.journalLegalLine(countryCode, t);
+    return HaccpCountryProfiles.journalLegalLineTr(countryCode, t, loc.t);
   }
 
   /// Иконки для поддерживаемых журналов (СанПиН 1–5 + фритюрные жиры).

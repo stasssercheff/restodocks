@@ -740,13 +740,14 @@ class HaccpLogDetailScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            HaccpCountryProfiles.recommendedSampleLabel(countryCode),
+            HaccpCountryProfiles.recommendedSampleLabelTr(countryCode, loc.t),
             style: theme.textTheme.titleSmall
                 ?.copyWith(color: theme.colorScheme.primary),
           ),
           const SizedBox(height: 4),
           Text(
-            HaccpCountryProfiles.journalLegalLine(countryCode, log.logType),
+            HaccpCountryProfiles.journalLegalLineTr(
+                countryCode, log.logType, loc.t),
             style: theme.textTheme.bodySmall
                 ?.copyWith(color: theme.colorScheme.primary),
           ),

@@ -102,76 +102,41 @@ abstract final class HaccpCountryProfiles {
     return resolveForEstablishment(est).countryCode;
   }
 
-  static String recommendedSampleLabel(String? countryCode) {
-    switch ((countryCode ?? '').toUpperCase()) {
-      case 'US':
-        return 'Recommended FDA-style record form';
-      case 'ES':
-        return 'Modelo recomendado APPCC';
-      case 'FR':
-        return 'Modele recommande HACCP';
-      case 'GB':
-        return 'Recommended HACCP record template';
-      case 'TR':
-        return 'Tavsiye edilen HACCP kayit formu';
-      case 'IT':
-        return 'Modello consigliato HACCP';
-      case 'DE':
-        return 'Empfohlenes HACCP-Protokollformular';
-      case 'RU':
-      default:
-        return 'Рекомендуемый образец';
-    }
+  /// Рекомендуемая форма бланка — строки в [localizable.json] `haccp_recommended_sample_*`.
+  static String recommendedSampleLabelTr(
+    String? countryCode,
+    String Function(String key, {Map<String, String>? args}) tr,
+  ) {
+    final cc = (countryCode ?? 'RU').toUpperCase();
+    final key = 'haccp_recommended_sample_$cc';
+    final out = tr(key);
+    if (out != key) return out;
+    return tr('haccp_recommended_sample_fallback');
   }
 
-  static String journalLegalLine(
+  /// Юридическая строка под заголовком журнала — `haccp_journal_legal_*`, плейсхолдер `{code}`.
+  static String journalLegalLineTr(
     String? countryCode,
     HaccpLogType logType,
+    String Function(String key, {Map<String, String>? args}) tr,
   ) {
-    switch ((countryCode ?? '').toUpperCase()) {
-      case 'US':
-        return 'FDA Food Code / HACCP record: ${logType.code}';
-      case 'ES':
-        return 'APPCC (Reglamento (CE) 852/2004): ${logType.code}';
-      case 'FR':
-        return 'HACCP (Reglement (CE) 852/2004): ${logType.code}';
-      case 'GB':
-        return 'UK Food Hygiene / HACCP record: ${logType.code}';
-      case 'TR':
-        return 'Turkish Food Codex / HACCP kaydi: ${logType.code}';
-      case 'IT':
-        return 'HACCP (Regolamento (CE) 852/2004): ${logType.code}';
-      case 'DE':
-        return 'HACCP (VO (EG) Nr. 852/2004): ${logType.code}';
-      case 'RU':
-      default:
-        return 'СанПиН / ХАССП: ${logType.code}';
-    }
+    final cc = (countryCode ?? 'RU').toUpperCase();
+    final key = 'haccp_journal_legal_$cc';
+    final out = tr(key, args: {'code': logType.code});
+    if (out != key) return out;
+    return tr('haccp_journal_legal_fallback', args: {'code': logType.code});
   }
 
-  static String journalFooterLine(
+  /// Нижний колонтитул PDF — `haccp_journal_footer_*`.
+  static String journalFooterLineTr(
     String? countryCode,
-    HaccpLogType logType,
+    String Function(String key, {Map<String, String>? args}) tr,
   ) {
-    switch ((countryCode ?? '').toUpperCase()) {
-      case 'US':
-        return 'FDA HACCP compliance record';
-      case 'ES':
-        return 'Registro APPCC conforme normativa espanola/UE';
-      case 'FR':
-        return 'Registre HACCP conforme aux exigences UE';
-      case 'GB':
-        return 'HACCP record compliant with UK hygiene guidance';
-      case 'TR':
-        return 'HACCP kaydi, Turkiye gida hijyen kurallarina uygun';
-      case 'IT':
-        return 'Registro HACCP conforme ai requisiti UE';
-      case 'DE':
-        return 'HACCP-Nachweis gemaess EU-Hygienevorgaben';
-      case 'RU':
-      default:
-        return 'Журнал ХАССП (внутренний производственный контроль)';
-    }
+    final cc = (countryCode ?? 'RU').toUpperCase();
+    final key = 'haccp_journal_footer_$cc';
+    final out = tr(key);
+    if (out != key) return out;
+    return tr('haccp_journal_footer_fallback');
   }
 
   static String templateCountryLabel(

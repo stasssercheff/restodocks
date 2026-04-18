@@ -3317,14 +3317,16 @@ class _HaccpEntryFormScreenState extends State<HaccpEntryFormScreen> {
               ),
             const SizedBox(height: 16),
             Text(
-              HaccpCountryProfiles.recommendedSampleLabel(countryCode),
+              HaccpCountryProfiles.recommendedSampleLabelTr(
+                  countryCode, loc.t),
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     color: Theme.of(context).colorScheme.primary,
                   ),
             ),
             const SizedBox(height: 4),
             Text(
-              HaccpCountryProfiles.journalLegalLine(countryCode, _logType!),
+              HaccpCountryProfiles.journalLegalLineTr(
+                  countryCode, _logType!, loc.t),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.primary,
                   ),

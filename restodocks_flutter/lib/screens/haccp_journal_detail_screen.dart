@@ -1034,9 +1034,10 @@ class _JournalTableView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                HaccpCountryProfiles.journalLegalLine(
+                HaccpCountryProfiles.journalLegalLineTr(
                   establishmentCountryCode,
                   logType,
+                  loc.t,
                 ),
                 style: Theme.of(context)
                     .textTheme
