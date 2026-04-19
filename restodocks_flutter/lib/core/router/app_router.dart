@@ -499,6 +499,11 @@ class AppRouter {
                 _slideTransitionPage(state, const SettingsScreen()),
           ),
           GoRoute(
+            path: '/faq',
+            pageBuilder: (context, state) =>
+                _slideTransitionPage(state, const FaqScreen()),
+          ),
+          GoRoute(
             path: '/settings/orders-display',
             pageBuilder: (context, state) => _slideTransitionPage(
               state,

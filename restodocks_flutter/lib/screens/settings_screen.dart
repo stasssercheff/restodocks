@@ -2716,6 +2716,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () => _showTrainingDialog(context, localization),
             ),
             ListTile(
+              leading: const Icon(Icons.quiz_outlined),
+              title: Text(localization.t('faq_title')),
+              subtitle: Text(localization.t('faq_subtitle')),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/faq'),
+            ),
+            ListTile(
               leading: const Icon(Icons.support_agent),
               title: Text(localization.t('contact_support')),
               subtitle: Text(localization.t('contact_support_subtitle')),
