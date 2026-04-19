@@ -24,20 +24,34 @@ export async function GET() {
   const config = await getSupabaseConfig()
   if (!config) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
   const supabase = createClient(config.url, config.serviceRoleKey)
+  // Не используем вложенный promo_code_redemptions(count): в PostgREST/версии клиента
+  // агрегат в embed часто даёт ошибку → 500 в админке.
   const { data: raw, error } = await supabase
     .from('promo_codes')
-    .select('*, establishments:used_by_establishment_id(name), promo_code_redemptions(count)')
+    .select('*, establishments:used_by_establishment_id(name)')
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  const data = (raw ?? []).map((row: Record<string, unknown>) => {
-    const pr = row.promo_code_redemptions as { count: number | string }[] | undefined
-    const c = pr?.[0]?.count
-    const redemption_count = c === undefined || c === null ? 0 : Number(c) || 0
-    const { promo_code_redemptions, ...rest } = row
-    void promo_code_redemptions
-    return { ...rest, redemption_count }
-  })
+
+  const rows = raw ?? []
+  const promoIds = rows.map(r => (r as { id: number }).id).filter(id => id != null)
+  const countByPromoId = new Map<number, number>()
+  if (promoIds.length > 0) {
+    const { data: rrows, error: rerr } = await supabase
+      .from('promo_code_redemptions')
+      .select('promo_code_id')
+      .in('promo_code_id', promoIds)
+    if (rerr) return NextResponse.json({ error: rerr.message }, { status: 500 })
+    for (const row of rrows ?? []) {
+      const pid = (row as { promo_code_id: number }).promo_code_id
+      countByPromoId.set(pid, (countByPromoId.get(pid) ?? 0) + 1)
+    }
+  }
+
+  const data = rows.map(row => ({
+    ...(row as Record<string, unknown>),
+    redemption_count: countByPromoId.get((row as { id: number }).id) ?? 0,
+  }))
   return NextResponse.json(data)
 }
 

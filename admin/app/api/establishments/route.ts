@@ -132,10 +132,14 @@ export async function GET() {
     }
   }
 
-  const { data: employees } = await supabase
-    .from('employees')
-    .select('id, full_name, email, roles, establishment_id')
-    .in('establishment_id', ids)
+  // Пустой .in() у PostgREST даёт ошибку запроса — при 0 заведений список сотрудников пустой.
+  const { data: employees } =
+    ids.length === 0
+      ? { data: [] as Record<string, unknown>[] | null }
+      : await supabase
+          .from('employees')
+          .select('id, full_name, email, roles, establishment_id')
+          .in('establishment_id', ids)
 
   const employeesByEstId = new Map<string, EmployeeRow[]>()
   for (const emp of (employees ?? []) as EmployeeRow[]) {
