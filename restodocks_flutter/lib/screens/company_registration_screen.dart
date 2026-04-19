@@ -161,10 +161,9 @@ class _CompanyRegistrationScreenState extends State<CompanyRegistrationScreen> {
                 Map<String, dynamic>.from(estRaw),
               );
               final estId = establishment.id;
-              // register-metadata в owner-first даёт шумные 403 в части окружений.
-              // Не блокирует бизнес-логику, поэтому пропускаем.
+              // После входа JWT передаётся в Edge; исправлена проверка employees.auth_user_id (раньше 403).
               if (estId.isNotEmpty) {
-                // acc.registerMetadataBestEffort(estId);
+                acc.registerMetadataBestEffort(estId);
               }
               // Письмо о регистрации компании/PIN отправляется серверным триггером БД
               // (on_establishment_created_send_owner_email), чтобы не зависеть от клиентских 4xx.

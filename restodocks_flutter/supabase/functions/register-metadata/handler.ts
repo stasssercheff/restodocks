@@ -92,10 +92,11 @@ export async function handleRequest(req: Request): Promise<Response> {
     if (isService) {
       allowed = true;
     } else if (userId) {
+      // userId — auth.users.id; у employees первичный ключ id ≠ auth, связь через auth_user_id.
       const { data: allowedEmployee } = await supabase
         .from("employees")
         .select("id")
-        .eq("id", userId)
+        .eq("auth_user_id", userId)
         .eq("establishment_id", establishmentId)
         .maybeSingle();
       if (allowedEmployee?.id) {
