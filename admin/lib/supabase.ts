@@ -41,5 +41,9 @@ export type PromoCode = {
   /** Только аддоны, без смены тарифа заведения */
   grants_additive_only?: boolean | null
   max_employees: number | null
+  /** Сколько раз можно погасить один код (разные заведения). */
+  max_redemptions?: number | null
+  /** Число уже выполненных погашений (из GET /api/promo). */
+  redemption_count?: number
   establishments?: { name: string } | null
 }

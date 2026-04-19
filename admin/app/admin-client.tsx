@@ -88,9 +88,11 @@ function isValidNow(startsAt: string | null, expiresAt: string | null) {
 }
 
 /** Статус строки: отключение вручную важнее остального. */
-function promoRowStatus(row: PromoCode): 'disabled' | 'used' | 'expired' | 'free' {
+function promoRowStatus(row: PromoCode): 'disabled' | 'used' | 'partial' | 'expired' | 'free' {
   if (row.is_disabled) return 'disabled'
   if (row.is_used) return 'used'
+  const rc = row.redemption_count ?? 0
+  if (rc > 0) return 'partial'
   if (!isValidNow(row.starts_at, row.expires_at)) return 'expired'
   return 'free'
 }
@@ -869,6 +871,8 @@ function PromoTab() {
   /** Подписка расширения заведений: значение из фиксированного набора пакетов. */
   const [newBranchSlotPacks, setNewBranchSlotPacks] = useState('0')
   const [newAdditiveOnly, setNewAdditiveOnly] = useState(false)
+  /** Сколько раз один код можно применить (разные учётные записи / заведения). */
+  const [newMaxRedemptions, setNewMaxRedemptions] = useState('1')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'free' | 'used' | 'expired' | 'disabled'>('all')
   /** Редактирование даты окончания / «ввести до» у существующего промокода (вместо prompt). */
@@ -912,6 +916,11 @@ function PromoTab() {
         return
       }
     }
+    const maxR = newMaxRedemptions.trim() ? parseInt(newMaxRedemptions.trim(), 10) : NaN
+    if (Number.isNaN(maxR) || maxR < 1 || maxR > 100000) {
+      alert('«Сколько учётных записей»: целое число от 1 до 100000 (по умолчанию 1).')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
@@ -932,6 +941,7 @@ function PromoTab() {
           grants_employee_slot_packs: empN,
           grants_branch_slot_packs: brN,
           grants_additive_only: newAdditiveOnly,
+          max_redemptions: maxR,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -950,6 +960,7 @@ function PromoTab() {
       setNewEmpSlotPacks('0')
       setNewBranchSlotPacks('0')
       setNewAdditiveOnly(false)
+      setNewMaxRedemptions('1')
       await loadCodes()
     } finally {
       setSaving(false)
@@ -1057,6 +1068,37 @@ function PromoTab() {
     await loadCodes()
   }
 
+  async function setMaxRedemptionsRow(id: number, current: number | null) {
+    const val = prompt(
+      'Сколько раз можно применить этот код (разные учётные записи). Уже погашенные не снимаются.',
+      current != null ? String(current) : '1',
+    )
+    if (val === null) return
+    const t = val.trim()
+    const parsed = t === '' ? 1 : parseInt(t, 10)
+    if (Number.isNaN(parsed) || parsed < 1 || parsed > 100000) {
+      alert('Введи целое от 1 до 100000')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/promo', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, max_redemptions: parsed }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(typeof data?.error === 'string' ? data.error : `Не удалось сохранить лимит (${res.status})`)
+        return
+      }
+      await loadCodes()
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function setMaxEmployees(id: number, current: number | null) {
     const val = prompt('Макс. сотрудников (пусто — без ограничений):', current?.toString() ?? '')
     if (val === null) return
@@ -1108,7 +1150,7 @@ function PromoTab() {
 
   async function toggleDisabled(row: PromoCode) {
     const next = !row.is_disabled
-    if (next && row.is_used) {
+    if (next && (row.is_used || (row.redemption_count ?? 0) > 0)) {
       const ok = confirm(
         'Отключить промокод? У заведений, которые уже его применили, доступ будет заблокирован (как при истечении срока).',
       )
@@ -1128,7 +1170,7 @@ function PromoTab() {
     const match = c.code.includes(search.toUpperCase()) || (c.note ?? '').toLowerCase().includes(search.toLowerCase())
     if (!match) return false
     const st = promoRowStatus(c)
-    if (filter === 'free') return st === 'free'
+    if (filter === 'free') return st === 'free' || st === 'partial'
     if (filter === 'used') return c.is_used
     if (filter === 'expired') return st === 'expired'
     if (filter === 'disabled') return c.is_disabled === true
@@ -1137,7 +1179,10 @@ function PromoTab() {
 
   const total = codes.length
   const usedCount = codes.filter(c => c.is_used).length
-  const freeCount = codes.filter(c => promoRowStatus(c) === 'free').length
+  const freeCount = codes.filter(c => {
+    const st = promoRowStatus(c)
+    return st === 'free' || st === 'partial'
+  }).length
   const expiredCount = codes.filter(c => promoRowStatus(c) === 'expired').length
   const disabledCount = codes.filter(c => c.is_disabled === true).length
 
@@ -1350,6 +1395,23 @@ function PromoTab() {
               className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-24"
             />
           </div>
+          <div className="flex flex-col gap-1">
+            <label
+              className="text-xs text-gray-500"
+              title="Один и тот же строковый код можно применить к указанному числу разных заведений (регистраций)."
+            >
+              Учётных записей
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="100000"
+              value={newMaxRedemptions}
+              onChange={e => setNewMaxRedemptions(e.target.value)}
+              placeholder="1"
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 text-sm w-full sm:w-28"
+            />
+          </div>
         </div>
         <div className="text-[10px] text-gray-500 uppercase tracking-wide mt-3 mb-1">
           Подписки расширения (отдельно от промокода тарифа)
@@ -1479,6 +1541,12 @@ function PromoTab() {
                 <tr className="border-b border-gray-800 text-gray-500 text-xs uppercase tracking-wide">
                   <th className="px-4 py-3 text-left">Код</th>
                   <th className="px-4 py-3 text-left">Статус</th>
+                  <th
+                    className="px-4 py-3 text-center text-[10px] uppercase max-w-[6rem]"
+                    title="Сколько раз код уже применён / максимум разных учётных записей"
+                  >
+                    Активации
+                  </th>
                   <th className="px-4 py-3 text-left">Заметка / Заведение</th>
                   <th
                     className="px-4 py-3 text-left"
@@ -1514,7 +1582,8 @@ function PromoTab() {
                   const status = promoRowStatus(row)
                   const statusCfg = {
                     disabled: { label: 'Отключён', cls: 'bg-amber-900/40 text-amber-200' },
-                    used: { label: 'Использован', cls: 'bg-blue-900/40 text-blue-300' },
+                    used: { label: 'Закончился', cls: 'bg-blue-900/40 text-blue-300' },
+                    partial: { label: 'Есть активации', cls: 'bg-cyan-900/40 text-cyan-200' },
                     expired: { label: 'Истёк', cls: 'bg-red-900/40 text-red-300' },
                     free: { label: 'Свободен', cls: 'bg-emerald-900/40 text-emerald-300' },
                   }[status]
@@ -1538,6 +1607,20 @@ function PromoTab() {
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusCfg.cls}`}>{statusCfg.label}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center align-top">
+                        <button
+                          type="button"
+                          title="Изменить лимит активаций"
+                          onClick={() =>
+                            setMaxRedemptionsRow(row.id, row.max_redemptions ?? 1)
+                          }
+                          className="text-xs font-mono tabular-nums hover:text-indigo-400 transition"
+                        >
+                          <span className="text-gray-300">{row.redemption_count ?? 0}</span>
+                          <span className="text-gray-600">/</span>
+                          <span className="text-gray-400">{row.max_redemptions ?? 1}</span>
+                        </button>
                       </td>
                       <td className="px-4 py-3 text-gray-400">
                         {row.is_used && row.establishments?.name ? <span className="text-white">{row.establishments.name}</span> : row.note || '—'}
@@ -1658,7 +1741,8 @@ function PromoTab() {
               const status = promoRowStatus(row)
               const statusCfg = {
                 disabled: { label: 'Отключён', cls: 'bg-amber-900/40 text-amber-200' },
-                used: { label: 'Использован', cls: 'bg-blue-900/40 text-blue-300' },
+                used: { label: 'Закончился', cls: 'bg-blue-900/40 text-blue-300' },
+                partial: { label: 'Есть активации', cls: 'bg-cyan-900/40 text-cyan-200' },
                 expired: { label: 'Истёк', cls: 'bg-red-900/40 text-red-300' },
                 free: { label: 'Свободен', cls: 'bg-emerald-900/40 text-emerald-300' },
               }[status]
@@ -1678,6 +1762,17 @@ function PromoTab() {
                     <span className={`px-2 py-0.5 rounded text-xs font-medium shrink-0 ${statusCfg.cls}`}>
                       {statusCfg.label}
                     </span>
+                  </div>
+
+                  <div className="text-[11px] text-gray-500 mb-2">
+                    Активации:{' '}
+                    <button
+                      type="button"
+                      className="font-mono text-gray-300 hover:text-indigo-400"
+                      onClick={() => setMaxRedemptionsRow(row.id, row.max_redemptions ?? 1)}
+                    >
+                      {row.redemption_count ?? 0}/{row.max_redemptions ?? 1}
+                    </button>
                   </div>
 
                   {(row.note || (row.is_used && row.establishments?.name)) && (

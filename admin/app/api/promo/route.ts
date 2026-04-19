@@ -24,12 +24,20 @@ export async function GET() {
   const config = await getSupabaseConfig()
   if (!config) return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 })
   const supabase = createClient(config.url, config.serviceRoleKey)
-  const { data, error } = await supabase
+  const { data: raw, error } = await supabase
     .from('promo_codes')
-    .select('*, establishments:used_by_establishment_id(name)')
+    .select('*, establishments:used_by_establishment_id(name), promo_code_redemptions(count)')
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const data = (raw ?? []).map((row: Record<string, unknown>) => {
+    const pr = row.promo_code_redemptions as { count: number | string }[] | undefined
+    const c = pr?.[0]?.count
+    const redemption_count = c === undefined || c === null ? 0 : Number(c) || 0
+    const { promo_code_redemptions, ...rest } = row
+    void promo_code_redemptions
+    return { ...rest, redemption_count }
+  })
   return NextResponse.json(data)
 }
 
@@ -62,6 +70,15 @@ export async function POST(req: NextRequest) {
     if (!Number.isInteger(n) || n < 1 || n > 36500) {
       return NextResponse.json(
         { error: 'Invalid activation_duration_days: must be an integer between 1 and 36500' },
+        { status: 400 },
+      )
+    }
+  }
+  if (body.max_redemptions !== undefined && body.max_redemptions !== null) {
+    const n = Number(body.max_redemptions)
+    if (!Number.isInteger(n) || n < 1 || n > 100000) {
+      return NextResponse.json(
+        { error: 'Invalid max_redemptions: must be an integer between 1 and 100000' },
         { status: 400 },
       )
     }
@@ -111,6 +128,10 @@ export async function POST(req: NextRequest) {
       grants_employee_slot_packs: empPacks,
       grants_branch_slot_packs: brPacks,
       grants_additive_only: additiveOnly,
+      max_redemptions:
+        body.max_redemptions !== undefined && body.max_redemptions !== null
+          ? Number(body.max_redemptions)
+          : 1,
     })
     .select()
     .single()
@@ -139,6 +160,7 @@ export async function PATCH(req: NextRequest) {
     'grants_employee_slot_packs',
     'grants_branch_slot_packs',
     'grants_additive_only',
+    'max_redemptions',
   ] as const
   if (updates.grants_subscription_type !== undefined && updates.grants_subscription_type !== null) {
     const g = String(updates.grants_subscription_type).trim().toLowerCase()
@@ -172,6 +194,15 @@ export async function PATCH(req: NextRequest) {
     if (!Number.isInteger(n) || n < 1 || n > 36500) {
       return NextResponse.json(
         { error: 'Invalid activation_duration_days: must be an integer between 1 and 36500' },
+        { status: 400 },
+      )
+    }
+  }
+  if (updates.max_redemptions !== undefined && updates.max_redemptions !== null) {
+    const n = Number(updates.max_redemptions)
+    if (!Number.isInteger(n) || n < 1 || n > 100000) {
+      return NextResponse.json(
+        { error: 'Invalid max_redemptions: must be an integer between 1 and 100000' },
         { status: 400 },
       )
     }
