@@ -18,15 +18,22 @@ export const SUBSCRIPTION_PAID_TIERS_DB = [
   'business',
 ] as const
 
+/** Безопасная нормализация тарифа из БД (иногда приходит не string — иначе падает .toLowerCase). */
+export function safeTierString(raw: unknown): string {
+  if (raw == null || raw === '') return 'free'
+  if (typeof raw === 'string') return raw.toLowerCase().trim()
+  return String(raw).toLowerCase().trim()
+}
+
 /** Совпадает с subscription_type_is_paid_tier — любое значение, которое БД считает платным тарифом. */
-export function isPaidTierStoredInDb(raw: string | null | undefined): boolean {
-  const t = (raw ?? 'free').toLowerCase().trim()
+export function isPaidTierStoredInDb(raw: unknown): boolean {
+  const t = safeTierString(raw)
   return (SUBSCRIPTION_PAID_TIERS_DB as readonly string[]).includes(t)
 }
 
 /** Создание промокода через админку: только pro | ultra. */
 export function isSelectablePromoGrantTier(raw: string | null | undefined): raw is PromoGrantSubscriptionType {
-  const t = (raw ?? 'ultra').toLowerCase().trim()
+  const t = safeTierString(raw)
   return t === 'pro' || t === 'ultra'
 }
 
@@ -35,8 +42,8 @@ export function isAllowedPromoGrantType(raw: string | null | undefined): boolean
   return isPaidTierStoredInDb(raw)
 }
 
-export function subscriptionTierLabelRu(tier: string | null | undefined): string {
-  const t = (tier ?? 'free').toLowerCase().trim()
+export function subscriptionTierLabelRu(tier: unknown): string {
+  const t = safeTierString(tier)
   const map: Record<string, string> = {
     free: 'Free',
     lite: 'Lite',
@@ -47,5 +54,5 @@ export function subscriptionTierLabelRu(tier: string | null | undefined): string
     starter: 'Starter',
     business: 'Business',
   }
-  return map[t] ?? tier?.trim() ?? '—'
+  return map[t] ?? (typeof tier === 'string' ? tier.trim() : String(tier ?? '—'))
 }

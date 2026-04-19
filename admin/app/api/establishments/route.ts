@@ -13,6 +13,16 @@ import {
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  try {
+    return await getEstablishmentsJson()
+  } catch (e) {
+    console.error('GET /api/establishments', e)
+    const message = e instanceof Error ? e.message : 'Internal Server Error'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
+async function getEstablishmentsJson() {
   const cookieStore = await cookies()
   const session = cookieStore.get('admin_session')?.value
   const adminPassword = await getAdminPassword()
@@ -95,12 +105,15 @@ export async function GET() {
 
   const promoByEstId = new Map<string, PromoRedemptionRow>()
   if (ids.length > 0) {
-    const { data: redemptionRows } = await supabase
+    const { data: redemptionRows, error: redemptionErr } = await supabase
       .from('promo_code_redemptions')
       .select(
         'establishment_id, redeemed_at, promo_codes(code, activation_duration_days, expires_at)',
       )
       .in('establishment_id', ids)
+    if (redemptionErr) {
+      return NextResponse.json({ error: redemptionErr.message }, { status: 500 })
+    }
 
     for (const raw of redemptionRows ?? []) {
       const r = raw as unknown as {
@@ -133,13 +146,17 @@ export async function GET() {
   }
 
   // Пустой .in() у PostgREST даёт ошибку запроса — при 0 заведений список сотрудников пустой.
-  const { data: employees } =
+  const employeesRes =
     ids.length === 0
-      ? { data: [] as Record<string, unknown>[] | null }
+      ? { data: [] as Record<string, unknown>[] | null, error: null }
       : await supabase
           .from('employees')
           .select('id, full_name, email, roles, establishment_id')
           .in('establishment_id', ids)
+  if (employeesRes.error) {
+    return NextResponse.json({ error: employeesRes.error.message }, { status: 500 })
+  }
+  const { data: employees } = employeesRes
 
   const employeesByEstId = new Map<string, EmployeeRow[]>()
   for (const emp of (employees ?? []) as EmployeeRow[]) {
@@ -255,5 +272,8 @@ export async function GET() {
     }
   })
 
-  return NextResponse.json(result)
+  return new NextResponse(
+    JSON.stringify(result, (_key, value) => (typeof value === 'bigint' ? value.toString() : value)),
+    { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8' } },
+  )
 }

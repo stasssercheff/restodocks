@@ -1,12 +1,11 @@
 /**
  * Сводка подписки для админки: тариф (не только pro), способ (IAP / промокод), даты.
  */
-import { isAllowedPromoGrantType, subscriptionTierLabelRu } from '@/lib/promo-tiers'
+import { isAllowedPromoGrantType, safeTierString, subscriptionTierLabelRu } from '@/lib/promo-tiers'
 
-function isPaidSubscriptionTier(sub: string | null | undefined): boolean {
-  const t = (sub ?? 'free').toLowerCase().trim()
-  if (t === 'free' || t === '') return false
-  return isAllowedPromoGrantType(t)
+function isPaidSubscriptionTier(sub: string): boolean {
+  if (sub === 'free' || sub === '') return false
+  return isAllowedPromoGrantType(sub)
 }
 
 /** Данные погашения из promo_code_redemptions + promo_codes (для админки). */
@@ -80,7 +79,7 @@ export function hasEffectivePro(
   nowMs: number = Date.now(),
 ): boolean {
   const now = new Date(nowMs)
-  const sub = (est.subscription_type ?? 'free').toLowerCase().trim()
+  const sub = safeTierString(est.subscription_type)
   const paidUntil = parseDate(est.pro_paid_until ?? null)
   const trialUntil = parseDate(est.pro_trial_ends_at ?? null)
   const trialActive = trialUntil !== null && trialUntil > now
@@ -112,7 +111,7 @@ export function summarizeSubscriptionForAdmin(
   establishmentCreatedAt?: string | null,
 ): SubscriptionAdminSummary {
   const now = new Date(nowMs)
-  const sub = (est.subscription_type ?? 'free').toLowerCase().trim()
+  const sub = safeTierString(est.subscription_type)
   const paidUntil = parseDate(est.pro_paid_until ?? null)
   const trialUntil = parseDate(est.pro_trial_ends_at ?? null)
   const promoEnd = promoProEndDate(promo)
