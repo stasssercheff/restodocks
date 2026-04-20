@@ -242,6 +242,20 @@ class InventoryScreen extends StatefulWidget {
 
 class _InventoryScreenState extends State<InventoryScreen>
     with AutoSaveMixin<InventoryScreen>, WidgetsBindingObserver {
+  String _normalizedEmployeeRoleCode(Employee? employee) {
+    if (employee == null) return '';
+    final raw = (employee.positionRole?.trim().isNotEmpty == true)
+        ? employee.positionRole!.trim()
+        : (employee.roles.isNotEmpty ? employee.roles.first : '');
+    if (raw.isEmpty) return '';
+    return raw
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9_]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+  }
+
   /// Пока не завершена первичная инициализация/восстановление черновика,
   /// не даём lifecycle-автосохранению перезаписать локальный черновик пустым снимком.
   bool _draftHydrationFinished = false;
@@ -2361,9 +2375,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     final endStr = _endTime != null
         ? '${_endTime!.hour.toString().padLeft(2, '0')}:${_endTime!.minute.toString().padLeft(2, '0')}'
         : null;
-    final roleStr = employee != null && employee!.roles.isNotEmpty
-        ? loc.roleDisplayName(employee!.roles.first)
-        : '—';
+    final roleCode = _normalizedEmployeeRoleCode(employee);
+    final roleStr = roleCode.isNotEmpty ? loc.roleDisplayName(roleCode) : '—';
     final headerLine =
         '$dateStr ${startStr} ${employee?.fullName ?? '—'} ($roleStr)${endStr != null ? ' $endStr' : ''}';
     final headerRow = Container(
@@ -3393,8 +3406,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     List<Map<String, dynamic>>? aggregatedProducts,
   }) {
     final loc = context.read<LocalizationService>();
-    final roleKey =
-        employee.roles.isNotEmpty ? 'role_${employee.roles.first}' : 'employee';
+    final roleCode = _normalizedEmployeeRoleCode(employee);
+    final roleKey = roleCode.isNotEmpty ? 'role_$roleCode' : 'employee';
     final department = (employee.department == 'bar' ||
             employee.hasRole('bar_manager') ||
             employee.hasRole('bartender'))
@@ -3409,9 +3422,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       'employeeName': employee.fullName,
       'employeeRole': loc.tForLanguage(lang, roleKey) != roleKey
           ? loc.tForLanguage(lang, roleKey)
-          : loc.roleDisplayName(
-              employee.roles.isNotEmpty ? employee.roles.first : '',
-            ),
+          : loc.roleDisplayName(roleCode),
       'department': department,
       'date':
           '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
