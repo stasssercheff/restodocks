@@ -3965,7 +3965,7 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
                 ? loc
                     .t('ttk_select_count')
                     .replaceFirst('%s', '${_selectedTechCards.length}')
-                : 'ТТК',
+                : loc.t('tech_cards'),
           ),
         ),
         actions: _buildAppBarActions(
