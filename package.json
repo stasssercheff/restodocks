@@ -19,7 +19,7 @@
   },
   "homepage": "https://github.com/stasssercheff/restodocks#readme",
   "dependencies": {
-    "@supabase/supabase-js": "^2.97.0",
+    "@supabase/supabase-js": "^2.104.0",
     "bcrypt": "^6.0.0",
     "dotenv": "^17.3.1"
   }
