@@ -226,6 +226,30 @@ bool _inventoryDraftSnapshotHasRows(Map<String, dynamic>? d) {
   return rows is List && rows.isNotEmpty;
 }
 
+DateTime? _inventoryDraftSavedAt(Map<String, dynamic>? d) {
+  if (d == null || d.isEmpty) return null;
+  final raw = d['draftSavedAt']?.toString().trim();
+  if (raw == null || raw.isEmpty) return null;
+  return DateTime.tryParse(raw)?.toUtc();
+}
+
+Map<String, dynamic>? _pickNewerInventoryDraft(
+  Map<String, dynamic>? local,
+  Map<String, dynamic>? server,
+) {
+  final localOk = _inventoryDraftSnapshotHasRows(local);
+  final serverOk = _inventoryDraftSnapshotHasRows(server);
+  if (!localOk && !serverOk) return null;
+  if (localOk && !serverOk) return local;
+  if (!localOk && serverOk) return server;
+  final localAt = _inventoryDraftSavedAt(local);
+  final serverAt = _inventoryDraftSavedAt(server);
+  if (localAt == null && serverAt == null) return local;
+  if (localAt == null) return server;
+  if (serverAt == null) return local;
+  return serverAt.isAfter(localAt) ? server : local;
+}
+
 enum _InventorySort { alphabetAsc, alphabetDesc, lastAdded }
 
 /// Фильтр по типу строк: все, только продукты, только ПФ.
@@ -588,30 +612,10 @@ class _InventoryScreenState extends State<InventoryScreen>
         serverSelectiveDraft = sp[1];
       }
 
-      final stdDraftResolved = stdDraft != null &&
-              stdDraft.isNotEmpty &&
-              _inventoryDraftSnapshotHasRows(stdDraft)
-          ? stdDraft
-          : null;
-      final serverStdResolved = serverStdDraft != null &&
-              serverStdDraft.isNotEmpty &&
-              _inventoryDraftSnapshotHasRows(serverStdDraft)
-          ? serverStdDraft
-          : null;
-      final stdDraftToRestore = stdDraftResolved ?? serverStdResolved;
-
-      final selectiveDraftResolved = selectiveDraft != null &&
-              selectiveDraft.isNotEmpty &&
-              _inventoryDraftSnapshotHasRows(selectiveDraft)
-          ? selectiveDraft
-          : null;
-      final serverSelResolved = serverSelectiveDraft != null &&
-              serverSelectiveDraft.isNotEmpty &&
-              _inventoryDraftSnapshotHasRows(serverSelectiveDraft)
-          ? serverSelectiveDraft
-          : null;
+      final stdDraftToRestore =
+          _pickNewerInventoryDraft(stdDraft, serverStdDraft);
       final selectiveDraftToRestore =
-          selectiveDraftResolved ?? serverSelResolved;
+          _pickNewerInventoryDraft(selectiveDraft, serverSelectiveDraft);
 
       final hasIikoProducts = iikoStore.hasProducts;
       final hasIikoDraft = iikoDraft != null && iikoDraft.isNotEmpty;
@@ -951,30 +955,18 @@ class _InventoryScreenState extends State<InventoryScreen>
     } else if (choice == 'standard') {
       setState(() => _isSelectiveInventory = false);
       if (hasStdDraft) {
-        if (resolvedStdDraft != null &&
-            resolvedStdDraft.isNotEmpty &&
-            _inventoryDraftSnapshotHasRows(resolvedStdDraft)) {
-          _stateRestored = false;
-          await restoreState(resolvedStdDraft);
-          return;
-        }
         final draftStorage = DraftStorageService();
         final savedDraft = await draftStorage.loadInventoryDraft();
         if (!mounted) return;
-        if (savedDraft != null &&
-            savedDraft.isNotEmpty &&
-            _inventoryDraftSnapshotHasRows(savedDraft)) {
-          _stateRestored = false;
-          await restoreState(savedDraft);
-          return;
-        }
         final serverStd = await _loadDraftFromServer();
         if (!mounted) return;
-        if (serverStd != null &&
-            serverStd.isNotEmpty &&
-            _inventoryDraftSnapshotHasRows(serverStd)) {
+        final preferredStdDraft = _pickNewerInventoryDraft(
+          _pickNewerInventoryDraft(resolvedStdDraft, savedDraft),
+          serverStd,
+        );
+        if (preferredStdDraft != null) {
           _stateRestored = false;
-          await restoreState(serverStd);
+          await restoreState(preferredStdDraft);
           return;
         }
       }
@@ -982,26 +974,18 @@ class _InventoryScreenState extends State<InventoryScreen>
     } else if (choice == 'selective') {
       setState(() => _isSelectiveInventory = true);
       if (hasSelectiveDraft) {
-        if (resolvedSelectiveDraft != null &&
-            resolvedSelectiveDraft.isNotEmpty &&
-            _inventoryDraftSnapshotHasRows(resolvedSelectiveDraft)) {
-          _stateRestored = false;
-          await restoreState(resolvedSelectiveDraft);
-          return;
-        }
         final draftStorage = DraftStorageService();
         final savedDraft = await draftStorage.loadSelectiveInventoryDraft();
         if (!mounted) return;
-        if (savedDraft != null && savedDraft.isNotEmpty) {
-          _stateRestored = false;
-          await restoreState(savedDraft);
-          return;
-        }
         final serverSel = await _loadSelectiveDraftFromServer();
         if (!mounted) return;
-        if (serverSel != null && serverSel.isNotEmpty) {
+        final preferredSelectiveDraft = _pickNewerInventoryDraft(
+          _pickNewerInventoryDraft(resolvedSelectiveDraft, savedDraft),
+          serverSel,
+        );
+        if (preferredSelectiveDraft != null) {
           _stateRestored = false;
-          await restoreState(serverSel);
+          await restoreState(preferredSelectiveDraft);
           return;
         }
       }
@@ -1256,12 +1240,14 @@ class _InventoryScreenState extends State<InventoryScreen>
       String establishmentId, Map<String, dynamic> data) async {
     final account = context.read<AccountManagerSupabase>();
     final employeeId = account.currentEmployee?.id;
+    final payload = Map<String, dynamic>.from(data);
+    payload['draftSavedAt'] = DateTime.now().toUtc().toIso8601String();
     await Supabase.instance.client.from('inventory_drafts').upsert(
       {
         'establishment_id': establishmentId,
         'employee_id': employeeId,
         'draft_type': _isSelectiveInventory ? 'selective' : 'standard',
-        'draft_data': data,
+        'draft_data': payload,
         'updated_at': DateTime.now().toIso8601String(),
       },
       onConflict: 'establishment_id,draft_type',
