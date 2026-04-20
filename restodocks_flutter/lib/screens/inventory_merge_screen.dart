@@ -32,13 +32,64 @@ class InventoryMergeScreen extends StatefulWidget {
 
 class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
   final Set<String> _selectedIds = {};
+  final TextEditingController _searchController = TextEditingController();
   bool _loading = false;
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   List<InboxDocument> get _sortedDocs {
     final list = List<InboxDocument>.from(widget.documents);
     list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return list;
   }
+
+  bool get _isWriteoffMode =>
+      _sortedDocs.isNotEmpty &&
+      _sortedDocs.every((d) => d.type == DocumentType.writeoff);
+
+  bool get _hasIikoDocs =>
+      _sortedDocs.any((d) => d.type == DocumentType.iikoInventory);
+
+  String get _screenTitle =>
+      _isWriteoffMode ? _loc.t('writeoffs') : _loc.t('inventory_merge_title');
+
+  bool _matchesSearch(InboxDocument doc) {
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return true;
+
+    final dateLocal = doc.createdAt.toLocal();
+    final dateTokens = <String>{
+      DateFormat('yyyy-MM-dd').format(dateLocal).toLowerCase(),
+      DateFormat('dd.MM.yyyy').format(dateLocal).toLowerCase(),
+      DateFormat('dd.MM.yyyy HH:mm').format(dateLocal).toLowerCase(),
+    };
+
+    final metadata = doc.metadata as Map<String, dynamic>? ?? const {};
+    final rows = metadata['rows'] as List<dynamic>? ?? const [];
+    final productTokens = rows.map((row) {
+      if (row is! Map) return '';
+      final name = row['productName']?.toString().trim();
+      if (name != null && name.isNotEmpty) return name;
+      return row['name']?.toString().trim() ?? '';
+    }).where((name) => name.isNotEmpty);
+
+    final haystack = <String>[
+      doc.getLocalizedTitle(_loc),
+      doc.employeeName,
+      ...dateTokens,
+      ...productTokens,
+    ].join(' ').toLowerCase();
+
+    return haystack.contains(query);
+  }
+
+  List<InboxDocument> get _filteredDocs =>
+      _sortedDocs.where(_matchesSearch).toList();
 
   void _toggleSelection(String id) {
     setState(() {
@@ -50,12 +101,15 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
     });
   }
 
-  void _selectAll() {
+  void _selectAll(List<InboxDocument> docs) {
     setState(() {
-      if (_selectedIds.length == _sortedDocs.length) {
-        _selectedIds.clear();
+      final visibleIds = docs.map((d) => d.id).toSet();
+      final selectedVisibleCount =
+          _selectedIds.where((id) => visibleIds.contains(id)).length;
+      if (selectedVisibleCount == visibleIds.length && visibleIds.isNotEmpty) {
+        _selectedIds.removeWhere((id) => visibleIds.contains(id));
       } else {
-        _selectedIds.addAll(_sortedDocs.map((d) => d.id));
+        _selectedIds.addAll(visibleIds);
       }
     });
   }
@@ -899,12 +953,15 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
   Widget build(BuildContext context) {
     final loc = _loc;
     final dateFormat = DateFormat('dd.MM.yyyy HH:mm', 'ru');
-    final docs = _sortedDocs;
+    final docs = _filteredDocs;
+    final hasSearch = _searchQuery.trim().isNotEmpty;
+    final allVisibleSelected =
+        docs.isNotEmpty && docs.every((d) => _selectedIds.contains(d.id));
 
     return Scaffold(
       appBar: AppBar(
         leading: appBarBackButton(context),
-        title: Text(loc.t('inventory_merge_title')),
+        title: Text(_screenTitle),
         actions: [
           if (_loading)
             const Padding(
@@ -932,7 +989,11 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
                       size: 64, color: Theme.of(context).colorScheme.outline),
                   const SizedBox(height: 16),
                   Text(
-                    loc.t('inventory_merge_empty'),
+                    hasSearch
+                        ? '${loc.t('search')}: "${_searchQuery.trim()}"'
+                        : (_isWriteoffMode
+                            ? loc.t('writeoff_saved_empty')
+                            : loc.t('inventory_merge_empty')),
                     style: Theme.of(context).textTheme.bodyLarge,
                     textAlign: TextAlign.center,
                   ),
@@ -955,23 +1016,48 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
                                   .onSurfaceVariant,
                             ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        loc.t('inventory_merge_iiko_hint'),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                              fontStyle: FontStyle.italic,
-                            ),
+                      if (!_isWriteoffMode && _hasIikoDocs) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          loc.t('inventory_merge_iiko_hint'),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _searchController,
+                        onChanged: (value) {
+                          setState(() => _searchQuery = value);
+                        },
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _searchQuery.isEmpty
+                              ? null
+                              : IconButton(
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                  icon: const Icon(Icons.close),
+                                ),
+                          hintText:
+                              '${loc.t('search')}: ${loc.t('search_products')} / ${loc.t('date')}',
+                          border: const OutlineInputBorder(),
+                        ),
                       ),
                     ],
                   ),
                 ),
                 CheckboxListTile(
-                  value: _selectedIds.length == docs.length,
+                  value: allVisibleSelected,
                   tristate: true,
-                  onChanged: (_) => _selectAll(),
+                  onChanged: (_) => _selectAll(docs),
                   title: Text(
                       loc.t('inventory_merge_select_all')),
                 ),

@@ -2150,6 +2150,25 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
             _ingredients
               ..clear()
               ..addAll(_ensureOutputWeights(tc.ingredients));
+            final targetFromChecklist = widget.initialViewTargetOutputGrams;
+            if (widget.forceViewMode &&
+                targetFromChecklist != null &&
+                targetFromChecklist > 0) {
+              final currentTotal = _ingredients
+                  .where((i) => i.productName.trim().isNotEmpty)
+                  .fold<double>(0, (s, i) => s + i.outputWeight);
+              if (currentTotal > 0) {
+                final factor = targetFromChecklist / currentTotal;
+                if ((factor - 1.0).abs() > 0.0001) {
+                  final scaled = _ingredients.map((i) => i.scaleBy(factor)).toList();
+                  _ingredients
+                    ..clear()
+                    ..addAll(scaled);
+                }
+              }
+              // Для переходов из чеклиста целевой выход — источник истины UI.
+              _portionWeight = targetFromChecklist;
+            }
             _ensurePlaceholderRowAtEnd();
           }
           _contentPhase =
@@ -5666,10 +5685,13 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                             scrollDirection: Axis.horizontal,
                             clipBehavior: Clip.hardEdge,
                             child: InteractiveViewer(
-                              panEnabled: false,
+                              panEnabled: MediaQuery.sizeOf(context).width < 700,
                               scaleEnabled: true,
-                              minScale: 0.75,
+                              constrained: false,
+                              alignment: Alignment.topLeft,
+                              minScale: 0.5,
                               maxScale: 2.2,
+                              boundaryMargin: const EdgeInsets.all(64),
                               child: effectiveCanEdit
                                   ? RepaintBoundary(
                                       child: ExcelStyleTtkTable(
@@ -6549,36 +6571,39 @@ class _TtkTableState extends State<_TtkTable> {
         );
 
     final hasDeleteCol = widget.effectiveCanEdit;
-    // Порядок колонок как в образце. Ширины подобраны так, чтобы вся строка с полями ввода помещалась на экране без горизонтальной прокрутки.
+    // Порядок колонок как в образце.
+    // На мобильном просмотре делаем таблицу заметно компактнее:
+    // - продукт ~ на 40% уже;
+    // - числовые столбцы под ширину заголовков/значений.
     final screenWidth = MediaQuery.of(context).size.width;
     final isWideDesktop = screenWidth >= 1200;
     final isMobile = screenWidth < 600;
-    const colType = 64.0; // Тип ТТК
-    const colName = 100.0; // Наименование
-    final colProduct = isWideDesktop ? 240.0 : (isMobile ? 210.0 : 160.0);
-    const colGross = 70.0; // Брутто г. (как столбец Цена)
-    const colWaste = 64.0; // Отход %
-    const colNet = 70.0; // Нетто г.
-    const colMethod = 100.0; // Способ
-    const colShrink = 64.0; // Ужарка %
-    const colOutput = 70.0; // Выход г. (как столбец Цена)
-    const colCost = 82.0; // Стоимость
-    const colPriceKg = 88.0; // Цена за 1 кг/шт
-    const colTech = 180.0; // Технология
+    final colType = isMobile ? 56.0 : 64.0; // Тип ТТК
+    final colName = isMobile ? 84.0 : 100.0; // Наименование
+    final colProduct = isWideDesktop ? 240.0 : (isMobile ? 126.0 : 160.0);
+    final colGross = isMobile ? 56.0 : 70.0; // Брутто
+    final colWaste = isMobile ? 56.0 : 64.0; // Отход %
+    final colNet = isMobile ? 56.0 : 70.0; // Нетто
+    final colMethod = isMobile ? 72.0 : 100.0; // Способ
+    final colShrink = isMobile ? 56.0 : 64.0; // Ужарка %
+    final colOutput = isMobile ? 56.0 : 70.0; // Выход
+    final colCost = isMobile ? 72.0 : 82.0; // Стоимость
+    final colPriceKg = isMobile ? 76.0 : 88.0; // Цена за 1 кг/шт
+    final colTech = isMobile ? 140.0 : 180.0; // Технология
     const colDel = 44.0;
     final columnWidths = <int, TableColumnWidth>{
-      0: const FixedColumnWidth(colType),
-      1: const FixedColumnWidth(colName),
+      0: FixedColumnWidth(colType),
+      1: FixedColumnWidth(colName),
       2: FixedColumnWidth(colProduct),
-      3: const FixedColumnWidth(colGross),
-      4: const FixedColumnWidth(colWaste),
-      5: const FixedColumnWidth(colNet),
-      6: const FixedColumnWidth(colMethod),
-      7: const FixedColumnWidth(colShrink),
-      8: const FixedColumnWidth(colOutput),
-      9: const FixedColumnWidth(colCost),
-      10: const FixedColumnWidth(colPriceKg),
-      11: const FixedColumnWidth(colTech),
+      3: FixedColumnWidth(colGross),
+      4: FixedColumnWidth(colWaste),
+      5: FixedColumnWidth(colNet),
+      6: FixedColumnWidth(colMethod),
+      7: FixedColumnWidth(colShrink),
+      8: FixedColumnWidth(colOutput),
+      9: FixedColumnWidth(colCost),
+      10: FixedColumnWidth(colPriceKg),
+      11: FixedColumnWidth(colTech),
       if (hasDeleteCol) 12: const FixedColumnWidth(colDel),
     };
     final tableWidth = colType +
