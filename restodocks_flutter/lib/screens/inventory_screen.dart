@@ -1522,6 +1522,12 @@ class _InventoryScreenState extends State<InventoryScreen>
     final establishment = account.establishment;
     final employee = account.currentEmployee;
 
+    // Фиксируем ввод активной ячейки перед сохранением/отправкой, чтобы
+    // черновик "Продолжить" не терял последнее состояние.
+    FocusScope.of(context).unfocus();
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    saveNow();
+
     if (establishment == null || employee == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -5072,6 +5078,11 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
     FocusScope.of(context).unfocus();
     // Даём фреймворку обработать onEditingComplete / onChanged
     await Future.delayed(const Duration(milliseconds: 50));
+    // Гарантируем обновление черновика перед отправкой, чтобы "Продолжить"
+    // в iiko-режиме восстанавливал актуальные значения.
+    _serverDraftDirty = true;
+    await saveImmediately();
+    await _saveIikoDraftToServer();
     final bytes = await _buildIikoExcel();
 
     final date = _date;
