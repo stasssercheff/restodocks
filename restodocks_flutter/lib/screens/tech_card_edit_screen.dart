@@ -5088,22 +5088,28 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
         if (mounted) context.pushReplacement('/tech-cards');
       });
       return Scaffold(
-        appBar:
-            AppBar(leading: appBarBackButton(context), title: const Text('ТТК')),
+        appBar: AppBar(
+          leading: appBarBackButton(context),
+          title: Text(loc.t('appbar_title_ttk_short')),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_loading) {
       return Scaffold(
-        appBar:
-            AppBar(leading: appBarBackButton(context), title: const Text('ТТК')),
+        appBar: AppBar(
+          leading: appBarBackButton(context),
+          title: Text(loc.t('appbar_title_ttk_short')),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_error != null) {
       return Scaffold(
-        appBar:
-            AppBar(leading: appBarBackButton(context), title: const Text('ТТК')),
+        appBar: AppBar(
+          leading: appBarBackButton(context),
+          title: Text(loc.t('appbar_title_ttk_short')),
+        ),
         body: Center(
             child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -5124,7 +5130,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
-          title: const Text('ТТК'),
+          title: Text(loc.t('appbar_title_ttk_short')),
         ),
         body: Center(
           child: Column(
@@ -5167,7 +5173,7 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
       return Scaffold(
         appBar: AppBar(
           leading: appBarBackButton(context),
-          title: const Text('ТТК'),
+          title: Text(loc.t('appbar_title_ttk_short')),
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -5685,8 +5691,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                             scrollDirection: Axis.horizontal,
                             clipBehavior: Clip.hardEdge,
                             child: Builder(builder: (ctx) {
-                              final enableZoomViewer =
-                                  isHandheldNarrowLayout(ctx) && !kIsWeb;
+                              // On iOS handhelds InteractiveViewer may render
+                              // the table off-screen after recent layout changes.
+                              // Keep stable table rendering across platforms.
+                              const enableZoomViewer = false;
                               final table = effectiveCanEdit
                                   ? RepaintBoundary(
                                       child: ExcelStyleTtkTable(
