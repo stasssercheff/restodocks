@@ -1599,7 +1599,6 @@ class AccountManagerSupabase extends ChangeNotifier {
     if (useUiLang) {
       _currentEmployee = _currentEmployee!.copyWith(preferredLanguage: ui);
       onPreferredLanguageLoaded?.call(ui);
-      unawaited(LocalizationService().markLocaleChoiceFromAuthFlow());
       unawaited(savePreferredLanguage(ui));
     } else {
       onPreferredLanguageLoaded?.call(employee.preferredLanguage);
@@ -2235,7 +2234,6 @@ class AccountManagerSupabase extends ChangeNotifier {
       } else {
         _currentEmployee = emp.copyWith(preferredLanguage: code);
       }
-      await LocalizationService().markLocaleChoiceFromAuthFlow();
       notifyListeners();
     }
 

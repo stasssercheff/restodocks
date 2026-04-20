@@ -3364,6 +3364,15 @@ class _InventoryScreenState extends State<InventoryScreen>
     final loc = context.read<LocalizationService>();
     final roleKey =
         employee.roles.isNotEmpty ? 'role_${employee.roles.first}' : 'employee';
+    final department = (employee.department == 'bar' ||
+            employee.hasRole('bar_manager') ||
+            employee.hasRole('bartender'))
+        ? 'bar'
+        : (employee.department == 'hall' ||
+                employee.department == 'dining_room' ||
+                employee.hasRole('floor_manager'))
+            ? 'hall'
+            : 'kitchen';
     final header = {
       'establishmentName': establishment.name,
       'employeeName': employee.fullName,
@@ -3372,7 +3381,7 @@ class _InventoryScreenState extends State<InventoryScreen>
           : loc.roleDisplayName(
               employee.roles.isNotEmpty ? employee.roles.first : '',
             ),
-      'department': employee.department,
+      'department': department,
       'date':
           '${_date.year}-${_date.month.toString().padLeft(2, '0')}-${_date.day.toString().padLeft(2, '0')}',
       'timeStart': _startTime != null

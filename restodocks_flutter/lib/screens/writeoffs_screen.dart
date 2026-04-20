@@ -483,11 +483,20 @@ class _WriteoffsScreenState extends State<WriteoffsScreen>
     required String lang,
     required LocalizationService loc,
   }) {
+    final department = (employee.department == 'bar' ||
+            employee.hasRole('bar_manager') ||
+            employee.hasRole('bartender'))
+        ? 'bar'
+        : (employee.department == 'hall' ||
+                employee.department == 'dining_room' ||
+                employee.hasRole('floor_manager'))
+            ? 'hall'
+            : 'kitchen';
     final header = {
       'establishmentName': establishment.name,
       'employeeName':
           employeeNameWithPositionLine(employee, loc, establishment: establishment),
-      'department': employee.department,
+      'department': department,
       'date': DateFormat('yyyy-MM-dd').format(DateTime.now()),
       'timeEnd': DateFormat('HH:mm').format(DateTime.now()),
     };
@@ -1173,8 +1182,18 @@ class _WriteoffRowTileState extends State<_WriteoffRowTile> {
                             width: _colQtyWidth,
                             child: _QuantityField(
                               value: qty,
-                              onChanged: (v) => widget.onSetQuantity(widget.rowIndex, c, v),
-                              onFocusLast: isLast ? () => widget.onLastCellFocused(widget.rowIndex) : null,
+                              onChanged: (v) {
+                                widget.onSetQuantity(widget.rowIndex, c, v);
+                                if (isLast && v > 0) {
+                                  _scrollToEnd();
+                                }
+                              },
+                              onFocusLast: isLast
+                                  ? () {
+                                      widget.onLastCellFocused(widget.rowIndex);
+                                      _scrollToEnd();
+                                    }
+                                  : null,
                             ),
                           ),
                         );

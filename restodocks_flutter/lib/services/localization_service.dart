@@ -329,60 +329,24 @@ class LocalizationService extends ChangeNotifier {
     }
   }
 
-  /// Согласовать [serverLanguageCode] из профиля с локалью без «отката» при refresh сессии.
+  /// Согласовать [serverLanguageCode] из профиля сотрудника с текущей локалью.
   ///
-  /// После выбора языка в настройках выставляется [prefsKeyLocaleUserSet]. Пока он true,
-  /// строка из БД не перезаписывает устройство, если отличается (устаревший `preferred_language`);
-  /// вместо этого вызывается [onPinnedLocaleNeedsServerSync], чтобы снова записать выбор в БД.
+  /// Источник истины — `employees.preferred_language` на сервере.
+  /// Локальные prefs используются только как кэш между перезапусками до загрузки профиля.
   Future<void> reconcileServerPreferredLanguage(String serverLanguageCode) async {
     final p = serverLanguageCode.trim().toLowerCase();
     if (!supportedLocales.any((l) => l.languageCode == p)) return;
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final pinned = prefs.getBool(prefsKeyLocaleUserSet) == true;
-      var saved = prefs.getString(prefsKeyLocale)?.trim().toLowerCase();
-
-      // Явный выбор языка уже закреплён, но prefs ещё не успели записаться — не откатывать на серверный ru.
-      if (pinned && (saved == null || saved.isEmpty)) {
-        final cur = currentLanguageCode.trim().toLowerCase();
-        if (supportedLocales.any((l) => l.languageCode == cur)) {
-          saved = cur;
-          try {
-            await prefs.setString(prefsKeyLocale, saved);
-          } catch (_) {}
-        }
-      }
-
-      if (pinned && saved != null && saved.isNotEmpty) {
-        final savedSupported =
-            supportedLocales.any((l) => l.languageCode == saved);
-        if (!savedSupported) {
-          if (currentLanguageCode != p) {
-            await setLocale(Locale(p));
-          }
-          return;
-        }
-        if (saved == p) {
-          if (currentLanguageCode != saved) {
-            await setLocale(Locale(saved));
-          }
-          return;
-        }
-        if (currentLanguageCode != saved) {
-          await setLocale(Locale(saved));
-        }
-        try {
-          await onPinnedLocaleNeedsServerSync?.call(saved);
-        } catch (e, st) {
-          devLog('onPinnedLocaleNeedsServerSync: $e $st');
-        }
-        return;
-      }
-
       if (currentLanguageCode != p) {
         await setLocale(Locale(p));
       }
+      // После согласования с профилем убираем device pin: на новых устройствах/браузерах
+      // язык должен однозначно браться из аккаунта.
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(prefsKeyLocaleUserSet);
+      } catch (_) {}
     } catch (e, st) {
       devLog('reconcileServerPreferredLanguage: $e $st');
     }

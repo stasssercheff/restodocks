@@ -298,6 +298,10 @@ class ManagementHomeContent extends StatelessWidget {
             icon: Icons.payments,
             title: loc.t('expenses') ?? 'Расходы',
             onTap: () {
+              if (!ent.isLiteTier) {
+                context.go('/expenses');
+                return;
+              }
               final d = isBarManager
                   ? (ent.hasUltraLevelFeatures ? 'bar' : 'kitchen')
                   : isFloorManager
@@ -311,22 +315,35 @@ class ManagementHomeContent extends StatelessWidget {
           if ((isChef || roles.contains('sous_chef')) && !isGeneral)
             HomeFeatureTile(
                 icon: Icons.payments,
-                title: loc.t('salary_tab_fzp') ?? 'ФЗП',
+                title: ent.isLiteTier
+                    ? (loc.t('salary_tab_fzp') ?? 'ФЗП')
+                    : (loc.t('expenses') ?? 'Расходы'),
                 subscriptionLocked: !subOk,
                 onTap: () =>
-                    context.go('/expenses/salary?department=kitchen')),
+                    ent.isLiteTier
+                        ? context.go('/expenses/salary?department=kitchen')
+                        : context.go('/expenses')),
           if (roles.contains('floor_manager') && !isGeneral)
             HomeFeatureTile(
                 icon: Icons.payments,
-                title: loc.t('salary_tab_fzp') ?? 'ФЗП',
+                title: ent.isLiteTier
+                    ? (loc.t('salary_tab_fzp') ?? 'ФЗП')
+                    : (loc.t('expenses') ?? 'Расходы'),
                 subscriptionLocked: !subOk,
-                onTap: () => context.go('/expenses/salary?department=hall')),
+                onTap: () => ent.isLiteTier
+                    ? context.go('/expenses/salary?department=hall')
+                    : context.go('/expenses')),
           if (isBarManager && !isGeneral)
             HomeFeatureTile(
                 icon: Icons.payments,
-                title: loc.t('salary_tab_fzp') ?? 'ФЗП',
+                title: ent.isLiteTier
+                    ? (loc.t('salary_tab_fzp') ?? 'ФЗП')
+                    : (loc.t('expenses') ?? 'Расходы'),
                 subscriptionLocked: !subOk,
-                onTap: () => context.go('/expenses/salary?department=${ent.hasUltraLevelFeatures ? 'bar' : 'kitchen'}')),
+                onTap: () => ent.isLiteTier
+                    ? context.go(
+                        '/expenses/salary?department=${ent.hasUltraLevelFeatures ? 'bar' : 'kitchen'}')
+                    : context.go('/expenses')),
         ],
       ],
     );

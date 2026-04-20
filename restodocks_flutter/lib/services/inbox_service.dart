@@ -98,8 +98,13 @@ class InboxService {
         final isWriteoff = payloadType == 'writeoff';
         var docDept = header['department']?.toString() ?? _mapSectionToDepartment(currentEmployee.department);
         docDept = _mapSectionToDepartment(docDept);
-        // Списания: если отдел management — показываем в Кухне, чтобы были видны во входящих
-        if (isWriteoff && docDept == 'management') docDept = 'kitchen';
+        // Документы инвентаризаций/списаний с "management" (или пустым отделом)
+        // должны быть видимы во входящих у владельца/менеджмента, поэтому
+        // маппим их в "kitchen" (вкладки owner не содержат "management").
+        if ((isWriteoff || isIiko || payloadType == 'selective_inventory' || payloadType.isEmpty) &&
+            docDept == 'management') {
+          docDept = 'kitchen';
+        }
 
         DocumentType docType;
         String docTitle;

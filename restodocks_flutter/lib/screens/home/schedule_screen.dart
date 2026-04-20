@@ -1689,6 +1689,14 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
   late DateTime? _targetEnd;
   final Set<String> _selectedSlots = {};
 
+  String _slotLabel(ScheduleSlot slot) {
+    final name = slot.name.trim();
+    if (name.isEmpty) return slot.name;
+    return widget.loc.currentLanguageCode == 'ru'
+        ? name
+        : cyrillicToLatin(name);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1769,7 +1777,7 @@ class _CopyRangeDialogState extends State<_CopyRangeDialog> {
               spacing: 8,
               children: widget.slots
                   .map((slot) => FilterChip(
-                        label: Text(slot.name),
+                        label: Text(_slotLabel(slot)),
                         selected: _selectedSlots.contains(slot.id),
                         onSelected: (selected) {
                           setState(() {
@@ -1968,6 +1976,12 @@ class _ScheduleExportDialogState extends State<_ScheduleExportDialog> {
   String _format = 'pdf';
   final Set<String> _selectedSlots = {};
 
+  String _slotLabel(ScheduleSlot slot) {
+    final name = slot.name.trim();
+    if (name.isEmpty) return slot.name;
+    return _lang == 'ru' ? name : cyrillicToLatin(name);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -2075,7 +2089,7 @@ class _ScheduleExportDialogState extends State<_ScheduleExportDialog> {
                 children: widget.slots
                     .map(
                       (s) => FilterChip(
-                        label: Text(s.name),
+                        label: Text(_slotLabel(s)),
                         selected: _selectedSlots.contains(s.id),
                         onSelected: (on) {
                           setState(() {
@@ -2132,7 +2146,11 @@ class _ScheduleExportDialogState extends State<_ScheduleExportDialog> {
               lang: _lang,
             ));
           },
-          child: Text(_format == 'excel' ? 'Сохранить Excel' : 'Сохранить PDF'),
+          child: Text(
+            _format == 'excel'
+                ? loc.t('schedule_export_save_excel')
+                : loc.t('schedule_export_save_pdf'),
+          ),
         ),
       ],
     );
