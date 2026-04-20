@@ -4824,8 +4824,11 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     final categoryHeaderLabel = isMobile
         ? shortHeaderLabel(loc.t('column_category'))
         : loc.t('column_category');
+    final actionLabelRaw = loc.t('edit');
     final actionHeaderLabel =
-        isMobile ? shortHeaderLabel(loc.t('edit')) : loc.t('edit');
+        (isMobile || actionLabelRaw.runes.length > 4)
+            ? shortHeaderLabel(actionLabelRaw)
+            : actionLabelRaw;
     // Показываем все цеха целиком; на мобильном расширяем колонку "Цех".
     final colSectionWidth = isMobile ? 140.0 : 180.0;
     final colCatWidth = isMobile ? 52.0 : 84.0;
