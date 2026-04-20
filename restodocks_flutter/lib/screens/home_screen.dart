@@ -511,7 +511,8 @@ class _PersonalCabinetScreenState extends State<PersonalCabinetScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: shellReturnLeading(context),
+        leading: shellReturnLeading(context) ??
+            (GoRouter.of(context).canPop() ? appBarBackButton(context) : null),
         title: Text(loc.t('personal_cabinet')),
       ),
       body: SingleChildScrollView(

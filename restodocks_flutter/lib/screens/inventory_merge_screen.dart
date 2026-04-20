@@ -52,6 +52,9 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
       _sortedDocs.isNotEmpty &&
       _sortedDocs.every((d) => d.type == DocumentType.writeoff);
 
+  bool get _hasIikoDocs =>
+      _sortedDocs.any((d) => d.type == DocumentType.iikoInventory);
+
   String get _screenTitle =>
       _isWriteoffMode ? _loc.t('writeoffs') : _loc.t('inventory_merge_title');
 
@@ -1013,7 +1016,7 @@ class _InventoryMergeScreenState extends State<InventoryMergeScreen> {
                                   .onSurfaceVariant,
                             ),
                       ),
-                      if (!_isWriteoffMode) ...[
+                      if (!_isWriteoffMode && _hasIikoDocs) ...[
                         const SizedBox(height: 8),
                         Text(
                           loc.t('inventory_merge_iiko_hint'),
