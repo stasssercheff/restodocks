@@ -5687,9 +5687,11 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                             child: InteractiveViewer(
                               panEnabled: MediaQuery.sizeOf(context).width < 700,
                               scaleEnabled: true,
-                              minScale: 0.75,
+                              constrained: false,
+                              alignment: Alignment.topLeft,
+                              minScale: 0.5,
                               maxScale: 2.2,
-                              boundaryMargin: const EdgeInsets.all(24),
+                              boundaryMargin: const EdgeInsets.all(64),
                               child: effectiveCanEdit
                                   ? RepaintBoundary(
                                       child: ExcelStyleTtkTable(
