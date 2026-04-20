@@ -613,6 +613,8 @@ class _InventoryScreenState extends State<InventoryScreen>
           hasIikoDraft: hasIikoDraft,
           hasStdDraft: hasStdDraft,
           hasSelectiveDraft: hasSelectiveDraftForModeDialog,
+          resolvedStdDraft: stdDraftToRestore,
+          resolvedSelectiveDraft: selectiveDraftToRestore,
         );
         return;
       }
@@ -625,6 +627,8 @@ class _InventoryScreenState extends State<InventoryScreen>
           hasIikoDraft: true,
           hasStdDraft: hasStdDraft,
           hasSelectiveDraft: hasSelectiveDraftForModeDialog,
+          resolvedStdDraft: stdDraftToRestore,
+          resolvedSelectiveDraft: selectiveDraftToRestore,
         );
         return;
       }
@@ -634,6 +638,8 @@ class _InventoryScreenState extends State<InventoryScreen>
         await _showModeDialog(
           hasStdDraft: true,
           hasSelectiveDraft: hasSelectiveDraftForModeDialog,
+          resolvedStdDraft: stdDraftToRestore,
+          resolvedSelectiveDraft: selectiveDraftToRestore,
         );
         return;
       }
@@ -641,7 +647,7 @@ class _InventoryScreenState extends State<InventoryScreen>
       // iiko нет — тихо восстанавливаем один из черновиков (если есть)
       if (hasStdDraft) {
         _stateRestored = false;
-        await restoreState(stdDraftToRestore!);
+        await restoreState(stdDraftToRestore);
         return;
       }
 
@@ -651,13 +657,14 @@ class _InventoryScreenState extends State<InventoryScreen>
           hasIikoDraft: hasIikoDraft,
           hasStdDraft: hasStdDraft,
           hasSelectiveDraft: false,
+          resolvedStdDraft: stdDraftToRestore,
         );
         return;
       }
 
       if (hasSelectiveDraft && allowSelectiveInventory) {
         _stateRestored = false;
-        await restoreState(selectiveDraftToRestore!);
+        await restoreState(selectiveDraftToRestore);
         return;
       }
 
@@ -763,6 +770,8 @@ class _InventoryScreenState extends State<InventoryScreen>
     bool hasIikoDraft = false,
     bool hasStdDraft = false,
     bool hasSelectiveDraft = false,
+    Map<String, dynamic>? resolvedStdDraft,
+    Map<String, dynamic>? resolvedSelectiveDraft,
   }) async {
     if (!mounted) return;
     final iikoStore = context.read<IikoProductStore>();
@@ -928,6 +937,13 @@ class _InventoryScreenState extends State<InventoryScreen>
     } else if (choice == 'standard') {
       setState(() => _isSelectiveInventory = false);
       if (hasStdDraft) {
+        if (resolvedStdDraft != null &&
+            resolvedStdDraft.isNotEmpty &&
+            _inventoryDraftSnapshotHasRows(resolvedStdDraft)) {
+          _stateRestored = false;
+          await restoreState(resolvedStdDraft);
+          return;
+        }
         final draftStorage = DraftStorageService();
         final savedDraft = await draftStorage.loadInventoryDraft();
         if (!mounted) return;
@@ -952,6 +968,13 @@ class _InventoryScreenState extends State<InventoryScreen>
     } else if (choice == 'selective') {
       setState(() => _isSelectiveInventory = true);
       if (hasSelectiveDraft) {
+        if (resolvedSelectiveDraft != null &&
+            resolvedSelectiveDraft.isNotEmpty &&
+            _inventoryDraftSnapshotHasRows(resolvedSelectiveDraft)) {
+          _stateRestored = false;
+          await restoreState(resolvedSelectiveDraft);
+          return;
+        }
         final draftStorage = DraftStorageService();
         final savedDraft = await draftStorage.loadSelectiveInventoryDraft();
         if (!mounted) return;
@@ -974,6 +997,8 @@ class _InventoryScreenState extends State<InventoryScreen>
           hasIikoDraft: hasIikoDraft,
           hasStdDraft: hasStdDraft,
           hasSelectiveDraft: hasSelectiveDraft,
+          resolvedStdDraft: resolvedStdDraft,
+          resolvedSelectiveDraft: resolvedSelectiveDraft,
         );
       }
     }
