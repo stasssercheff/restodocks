@@ -398,10 +398,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             // Имя и фамилия
             Builder(
               builder: (_) {
-                final parts = employee.fullName.trim().split(RegExp(r'\s+'));
-                final name = parts.isNotEmpty ? parts.first : employee.fullName;
+                final displayFullName =
+                    localization.displayPersonNameForUi(employee.fullName);
+                final parts = displayFullName.trim().split(RegExp(r'\s+'));
+                final name =
+                    parts.isNotEmpty ? parts.first : displayFullName;
+                final displaySurname = employee.surname?.trim().isNotEmpty == true
+                    ? localization.displayPersonNameForUi(employee.surname!)
+                    : null;
                 final surname = employee.surname?.trim().isNotEmpty == true
-                    ? employee.surname!
+                    ? displaySurname
                     : (parts.length > 1 ? parts.sublist(1).join(' ') : null);
                 return Column(
                   children: [

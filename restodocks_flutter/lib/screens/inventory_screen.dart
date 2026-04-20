@@ -1591,6 +1591,10 @@ class _InventoryScreenState extends State<InventoryScreen>
       return;
     }
 
+    // Дополнительная гарантия для "Продолжить" после отправки:
+    // фиксируем актуальный черновик сразу после успешного save().
+    await saveImmediately();
+
     // Сохраняем инвентаризацию в историю перед установкой статуса
     try {
       final inventoryService = context.read<InventoryHistoryService>();
@@ -2377,8 +2381,9 @@ class _InventoryScreenState extends State<InventoryScreen>
         : null;
     final roleCode = _normalizedEmployeeRoleCode(employee);
     final roleStr = roleCode.isNotEmpty ? loc.roleDisplayName(roleCode) : '—';
+    final employeeName = loc.displayPersonNameForUi(employee?.fullName);
     final headerLine =
-        '$dateStr ${startStr} ${employee?.fullName ?? '—'} ($roleStr)${endStr != null ? ' $endStr' : ''}';
+        '$dateStr ${startStr} $employeeName ($roleStr)${endStr != null ? ' $endStr' : ''}';
     final headerRow = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -3419,7 +3424,7 @@ class _InventoryScreenState extends State<InventoryScreen>
             : 'kitchen';
     final header = {
       'establishmentName': establishment.name,
-      'employeeName': employee.fullName,
+      'employeeName': loc.displayPersonNameForLanguage(employee.fullName, lang),
       'employeeRole': loc.tForLanguage(lang, roleKey) != roleKey
           ? loc.tForLanguage(lang, roleKey)
           : loc.roleDisplayName(roleCode),
@@ -5158,7 +5163,10 @@ class _InventoryIikoScreenState extends State<InventoryIikoScreen>
         'header': {
           'date': _date.toIso8601String(),
           'establishmentName': establishment.name,
-          'employeeName': employee.fullName,
+          'employeeName':
+              context.read<LocalizationService>().displayPersonNameForUi(
+                    employee.fullName,
+                  ),
           'department': dept,
           'fileName': fileName,
           'totalPositions': _rows.length,
