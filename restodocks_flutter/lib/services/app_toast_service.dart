@@ -41,44 +41,59 @@ class AppToastService {
           right: 0,
           child: Material(
             color: Colors.transparent,
-            child: GestureDetector(
-              onTap: () {
-                _pendingOnTap?.call();
-                hide();
-              },
-              child: SafeArea(
-                child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: bgColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppTheme.primaryColor.withValues(alpha: 0.4),
-                      width: 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+            child: SafeArea(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: bgColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppTheme.primaryColor.withValues(alpha: 0.4),
+                    width: 1,
                   ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.notifications_active, color: AppTheme.primaryColor, size: 24),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          message,
-                          style: TextStyle(color: textColor, fontSize: 14),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          _pendingOnTap?.call();
+                          hide();
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+                          child: Row(
+                            children: [
+                              Icon(Icons.notifications_active, color: AppTheme.primaryColor, size: 24),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  message,
+                                  style: TextStyle(color: textColor, fontSize: 14),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    IconButton(
+                      tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+                      onPressed: hide,
+                      icon: Icon(Icons.close, color: textColor, size: 20),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
                 ),
               ),
             ),
