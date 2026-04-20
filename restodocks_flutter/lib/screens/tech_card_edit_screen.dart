@@ -5684,15 +5684,10 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                             controller: _compositionTableHScrollController,
                             scrollDirection: Axis.horizontal,
                             clipBehavior: Clip.hardEdge,
-                            child: InteractiveViewer(
-                              panEnabled: MediaQuery.sizeOf(context).width < 700,
-                              scaleEnabled: true,
-                              constrained: false,
-                              alignment: Alignment.topLeft,
-                              minScale: 0.5,
-                              maxScale: 2.2,
-                              boundaryMargin: const EdgeInsets.all(64),
-                              child: effectiveCanEdit
+                            child: Builder(builder: (ctx) {
+                              final enableZoomViewer =
+                                  isHandheldNarrowLayout(ctx) && !kIsWeb;
+                              final table = effectiveCanEdit
                                   ? RepaintBoundary(
                                       child: ExcelStyleTtkTable(
                                         loc: loc,
@@ -5828,8 +5823,21 @@ class _TechCardEditScreenState extends State<TechCardEditScreen>
                                           ),
                                         );
                                       },
-                                    ),
-                            ),
+                                    );
+                              if (!enableZoomViewer) {
+                                return table;
+                              }
+                              return InteractiveViewer(
+                                panEnabled: true,
+                                scaleEnabled: true,
+                                constrained: false,
+                                alignment: Alignment.topLeft,
+                                minScale: 0.5,
+                                maxScale: 2.2,
+                                boundaryMargin: const EdgeInsets.all(64),
+                                child: table,
+                              );
+                            }),
                           ),
                         ),
                       ),

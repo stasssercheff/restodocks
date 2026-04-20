@@ -4814,6 +4814,18 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
     }
     final lang = loc.currentLanguageCode;
     final isMobile = isHandheldNarrowLayout(context);
+    String shortHeaderLabel(String fullText) {
+      final compact = fullText.replaceAll(RegExp(r'\s+'), '').trim();
+      if (compact.isEmpty) return fullText;
+      final runes = compact.runes.toList();
+      if (runes.length <= 4) return compact;
+      return '${String.fromCharCodes(runes.take(3))}.';
+    }
+    final categoryHeaderLabel = isMobile
+        ? shortHeaderLabel(loc.t('column_category'))
+        : loc.t('column_category');
+    final actionHeaderLabel =
+        isMobile ? shortHeaderLabel(loc.t('edit')) : loc.t('edit');
     // Показываем все цеха целиком; на мобильном расширяем колонку "Цех".
     final colSectionWidth = isMobile ? 140.0 : 180.0;
     final colCatWidth = isMobile ? 52.0 : 84.0;
@@ -4881,9 +4893,9 @@ class _TechCardsListScreenState extends State<TechCardsListScreen>
               onColor: Theme.of(context).colorScheme.onPrimaryContainer,
               labelName: loc.t('ttk_col_name'),
               labelSection: loc.t('ttk_col_section'),
-              labelCat: loc.t('column_category'),
+              labelCat: categoryHeaderLabel,
               labelCost: costLabel,
-              labelView: loc.t('ttk_col_view'),
+              labelView: actionHeaderLabel,
             ),
           ),
           ...groups.expand((g) => [
