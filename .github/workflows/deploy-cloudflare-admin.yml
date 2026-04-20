@@ -31,10 +31,14 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
         run: |
           printf 'NEXT_PUBLIC_SUPABASE_URL=%s\nSUPABASE_URL=%s\n' "$SUPABASE_URL" "$SUPABASE_URL" >> .env.production.local
           printf 'NEXT_PUBLIC_SUPABASE_ANON_KEY=%s\n' "$NEXT_PUBLIC_SUPABASE_ANON_KEY" >> .env.production.local
           printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$SUPABASE_SERVICE_ROLE_KEY" >> .env.production.local
+          if [ -n "${RESEND_API_KEY:-}" ]; then printf 'RESEND_API_KEY=%s\n' "$RESEND_API_KEY" >> .env.production.local; fi
+          if [ -n "${RESEND_FROM_EMAIL:-}" ]; then printf 'RESEND_FROM_EMAIL=%s\n' "$RESEND_FROM_EMAIL" >> .env.production.local; fi
 
       - name: Set admin secrets in KV
         env:
@@ -43,11 +47,15 @@ jobs:
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
         run: |
           printf '%s' "$ADMIN_PASSWORD" > /tmp/admin_pw
           npx wrangler kv key put --namespace-id=3f9acc45fa9e41a585e0d9be3e34ab02 "admin_password" --path=/tmp/admin_pw --remote
           [ -n "$SUPABASE_URL" ] && printf '%s' "$SUPABASE_URL" > /tmp/supabase_url && npx wrangler kv key put --namespace-id=3f9acc45fa9e41a585e0d9be3e34ab02 "supabase_url" --path=/tmp/supabase_url --remote
           [ -n "$SUPABASE_SERVICE_ROLE_KEY" ] && printf '%s' "$SUPABASE_SERVICE_ROLE_KEY" > /tmp/supabase_key && npx wrangler kv key put --namespace-id=3f9acc45fa9e41a585e0d9be3e34ab02 "supabase_service_role_key" --path=/tmp/supabase_key --remote
+          if [ -n "${RESEND_API_KEY:-}" ]; then printf '%s' "$RESEND_API_KEY" > /tmp/resend_key && npx wrangler kv key put --namespace-id=3f9acc45fa9e41a585e0d9be3e34ab02 "resend_api_key" --path=/tmp/resend_key --remote && rm -f /tmp/resend_key; fi
+          if [ -n "${RESEND_FROM_EMAIL:-}" ]; then printf '%s' "$RESEND_FROM_EMAIL" > /tmp/resend_from && npx wrangler kv key put --namespace-id=3f9acc45fa9e41a585e0d9be3e34ab02 "resend_from_email" --path=/tmp/resend_from --remote && rm -f /tmp/resend_from; fi
 
       - name: Build and deploy
         env:

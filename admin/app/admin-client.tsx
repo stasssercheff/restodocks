@@ -7,6 +7,7 @@ import type { Insight, SecuritySnapshotPayload } from '@/lib/security-snapshot'
 import type { SystemHealthPayload } from '@/lib/system-health'
 import {
   PROMO_GRANT_SUBSCRIPTION_TYPES,
+  SUBSCRIPTION_PAID_TIERS_DB,
   isSelectablePromoGrantTier,
   subscriptionTierLabelRu,
   type PromoGrantSubscriptionType,
@@ -103,7 +104,9 @@ const RD_ADMIN_SUPPORT_KEY = 'rd_admin_support_active'
 
 export default function AdminClient() {
   const router = useRouter()
-  const [tab, setTab] = useState<'establishments' | 'promo' | 'support' | 'security' | 'health'>('establishments')
+  const [tab, setTab] = useState<
+    'establishments' | 'promo' | 'broadcast' | 'support' | 'security' | 'health'
+  >('establishments')
   const [supportShellHighlight, setSupportShellHighlight] = useState(false)
 
   useEffect(() => {
@@ -149,6 +152,7 @@ export default function AdminClient() {
           {([
             { key: 'establishments', label: 'Заведения' },
             { key: 'promo', label: 'Промокоды' },
+            { key: 'broadcast', label: 'Рассылка' },
             { key: 'support', label: 'Техподдержка' },
             { key: 'security', label: 'Безопасность' },
             { key: 'health', label: 'Нагрузка' },
@@ -171,6 +175,7 @@ export default function AdminClient() {
       <main className="max-w-[min(1600px,calc(100vw-1.5rem))] mx-auto px-3 py-4 sm:px-6 sm:py-8">
         {tab === 'establishments' && <EstablishmentsTab />}
         {tab === 'promo' && <PromoTab />}
+        {tab === 'broadcast' && <BroadcastTab />}
         {tab === 'support' && (
           <SupportAccessTab
             onSupportShellActiveChange={active => {
@@ -2303,6 +2308,336 @@ function SystemHealthTab() {
       >
         Обновить проверки
       </button>
+    </div>
+  )
+}
+
+// ─── Broadcast Tab ─────────────────────────────────────────────────────────────
+
+function BroadcastTab() {
+  const [userKind, setUserKind] = useState<'owners' | 'line' | 'all'>('all')
+  const [subscriptionMode, setSubscriptionMode] = useState<
+    'all' | 'with_any_subscription' | 'with_specific_subscriptions' | 'without_subscription'
+  >('all')
+  const [selectedSubscriptionTypes, setSelectedSubscriptionTypes] = useState<string[]>([])
+  const [registeredFrom, setRegisteredFrom] = useState('')
+  const [registeredTo, setRegisteredTo] = useState('')
+  const [subject, setSubject] = useState('')
+  const [body, setBody] = useState('')
+  const [count, setCount] = useState<number | null>(null)
+  const [countLoading, setCountLoading] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [lastResult, setLastResult] = useState<string | null>(null)
+
+  function buildFiltersQuery(): URLSearchParams {
+    const p = new URLSearchParams()
+    p.set('userKind', userKind)
+    p.set('subscriptionMode', subscriptionMode)
+    if (selectedSubscriptionTypes.length > 0) {
+      p.set('subscriptionTypes', selectedSubscriptionTypes.join(','))
+    }
+    if (registeredFrom.trim()) p.set('registeredFrom', registeredFrom.trim())
+    if (registeredTo.trim()) p.set('registeredTo', registeredTo.trim())
+    return p
+  }
+
+  async function refreshCount() {
+    setCountLoading(true)
+    setError(null)
+    setLastResult(null)
+    try {
+      const res = await fetch(`/api/broadcast?${buildFiltersQuery().toString()}`)
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(typeof data?.error === 'string' ? data.error : `Ошибка (${res.status})`)
+        setCount(null)
+        return
+      }
+      setCount(typeof data?.count === 'number' ? data.count : null)
+    } finally {
+      setCountLoading(false)
+    }
+  }
+
+  async function send() {
+    const subj = subject.trim()
+    const text = body.trim()
+    if (subj.length === 0 || text.length === 0) {
+      setError('Укажите тему и текст письма')
+      return
+    }
+    if (subscriptionMode === 'with_specific_subscriptions' && selectedSubscriptionTypes.length === 0) {
+      setError('Выберите хотя бы один тип подписки')
+      return
+    }
+    const userKindLabel =
+      userKind === 'owners'
+        ? 'только собственники'
+        : userKind === 'line'
+          ? 'только линейный персонал'
+          : 'все пользователи'
+    const subscriptionLabel =
+      subscriptionMode === 'all'
+        ? 'все'
+        : subscriptionMode === 'without_subscription'
+          ? 'без подписки'
+          : subscriptionMode === 'with_any_subscription'
+            ? 'с любой подпиской'
+            : `с выбранными: ${selectedSubscriptionTypes.map((x) => subscriptionTierLabelRu(x)).join(', ')}`
+    const ok = window.confirm(
+      `Отправить рассылку?\n\nПользователи: ${userKindLabel}\nПодписка: ${subscriptionLabel}\nРегистрация: ${registeredFrom || 'любая'} — ${registeredTo || 'любая'}\nПолучателей (по последнему подсчёту): ${count ?? '—'}\nОт: info@restodocks.com (через Resend)`,
+    )
+    if (!ok) return
+
+    setSending(true)
+    setError(null)
+    setLastResult(null)
+    try {
+      const res = await fetch('/api/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userKind,
+          subscriptionMode,
+          subscriptionTypes: selectedSubscriptionTypes,
+          registeredFrom: registeredFrom.trim() || null,
+          registeredTo: registeredTo.trim() || null,
+          subject: subj,
+          body: text,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(typeof data?.error === 'string' ? data.error : `Ошибка (${res.status})`)
+        return
+      }
+      const sent = typeof data?.sent === 'number' ? data.sent : 0
+      const failed = typeof data?.failed === 'number' ? data.failed : 0
+      const msg = typeof data?.message === 'string' ? data.message : null
+      const errLines =
+        Array.isArray(data?.errors) && data.errors.length
+          ? `\nДетали: ${data.errors.map((x: unknown) => String(x)).join('; ')}`
+          : ''
+      setLastResult(
+        (msg ??
+          `Отправлено: ${sent}${failed > 0 ? `, не доставлено (ошибки API): ${failed}` : ''}. В списке было: ${data?.recipientCount ?? sent}.`) + errLines,
+      )
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      {error && (
+        <div className="p-3 rounded-lg border border-red-800 bg-red-950/40 text-red-200 text-sm">{error}</div>
+      )}
+      {lastResult && !error && (
+        <div className="p-3 rounded-lg border border-emerald-800/60 bg-emerald-950/30 text-emerald-100 text-sm">
+          {lastResult}
+        </div>
+      )}
+
+      <div className="bg-gray-900 rounded-xl border border-gray-800 p-4 space-y-4">
+        <h2 className="text-sm font-semibold text-white">Рассылка по email</h2>
+        <p className="text-xs text-gray-500 leading-relaxed">
+          Уходят через Resend с адреса по умолчанию{' '}
+          <span className="text-gray-400">Restodocks &lt;info@restodocks.com&gt;</span> (или{' '}
+          <code className="text-gray-500">RESEND_FROM_EMAIL</code> в окружении). Попадают только учётки с
+          подтверждённым email в Auth и активной записью сотрудника. Очень большие списки могут упираться в
+          таймаут Cloudflare Worker — при необходимости разбивайте рассылку по времени.
+        </p>
+
+        <div className="space-y-2">
+          <div className="text-xs text-gray-400">Пользователи</div>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="broadcast_audience"
+                checked={userKind === 'all'}
+                onChange={() => {
+                  setUserKind('all')
+                  setCount(null)
+                }}
+              />
+              Все пользователи
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="broadcast_audience"
+                checked={userKind === 'owners'}
+                onChange={() => {
+                  setUserKind('owners')
+                  setCount(null)
+                }}
+              />
+              Только собственники (роль owner)
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="broadcast_audience"
+                checked={userKind === 'line'}
+                onChange={() => {
+                  setUserKind('line')
+                  setCount(null)
+                }}
+              />
+              Только линейный персонал
+            </label>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="text-xs text-gray-400">Подписка</div>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="broadcast_subscription_mode"
+                checked={subscriptionMode === 'all'}
+                onChange={() => {
+                  setSubscriptionMode('all')
+                  setCount(null)
+                }}
+              />
+              Все
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="broadcast_subscription_mode"
+                checked={subscriptionMode === 'with_any_subscription'}
+                onChange={() => {
+                  setSubscriptionMode('with_any_subscription')
+                  setCount(null)
+                }}
+              />
+              С подпиской (любая)
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="broadcast_subscription_mode"
+                checked={subscriptionMode === 'without_subscription'}
+                onChange={() => {
+                  setSubscriptionMode('without_subscription')
+                  setCount(null)
+                }}
+              />
+              Без подписки
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="broadcast_subscription_mode"
+                checked={subscriptionMode === 'with_specific_subscriptions'}
+                onChange={() => {
+                  setSubscriptionMode('with_specific_subscriptions')
+                  setCount(null)
+                }}
+              />
+              С конкретной подпиской
+            </label>
+          </div>
+          {subscriptionMode === 'with_specific_subscriptions' && (
+            <div className="grid sm:grid-cols-3 gap-2 text-sm">
+              {SUBSCRIPTION_PAID_TIERS_DB.map((tier) => {
+                const checked = selectedSubscriptionTypes.includes(tier)
+                return (
+                  <label key={tier} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => {
+                        setCount(null)
+                        setSelectedSubscriptionTypes((prev) =>
+                          checked ? prev.filter((x) => x !== tier) : [...prev, tier],
+                        )
+                      }}
+                    />
+                    {subscriptionTierLabelRu(tier)}
+                  </label>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <div className="text-xs text-gray-400">Диапазон регистрации (дата создания аккаунта)</div>
+          <div className="grid sm:grid-cols-2 gap-2">
+            <input
+              type="date"
+              value={registeredFrom}
+              onChange={(e) => {
+                setRegisteredFrom(e.target.value)
+                setCount(null)
+              }}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+            />
+            <input
+              type="date"
+              value={registeredTo}
+              onChange={(e) => {
+                setRegisteredTo(e.target.value)
+                setCount(null)
+              }}
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void refreshCount()}
+            disabled={countLoading}
+            className="bg-gray-800 border border-gray-700 hover:bg-gray-700 disabled:opacity-50 px-4 py-2 rounded-lg text-sm"
+          >
+            {countLoading ? 'Подсчёт…' : 'Подсчитать получателей'}
+          </button>
+          {count !== null && (
+            <span className="text-sm text-gray-400">
+              В списке: <span className="text-white font-medium">{count}</span>
+            </span>
+          )}
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-xs text-gray-400">Тема</label>
+          <input
+            value={subject}
+            onChange={e => setSubject(e.target.value)}
+            placeholder="Тема письма"
+            maxLength={200}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-xs text-gray-400">Текст (простой текст, переносы строк сохраняются)</label>
+          <textarea
+            value={body}
+            onChange={e => setBody(e.target.value)}
+            placeholder="Текст рассылки…"
+            rows={12}
+            className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm font-mono leading-relaxed"
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => void send()}
+          disabled={sending || subject.trim().length === 0 || body.trim().length === 0}
+          className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-4 py-2 rounded-lg text-sm"
+        >
+          {sending ? 'Отправка…' : 'Отправить рассылку'}
+        </button>
+      </div>
     </div>
   )
 }

@@ -43,3 +43,41 @@ export async function getSupabaseConfig(): Promise<{ url: string; serviceRoleKey
   if (!url || !key) return null
   return { url, serviceRoleKey: key }
 }
+
+const DEFAULT_RESEND_FROM = 'Restodocks <info@restodocks.com>'
+
+/** Ключ Resend и адрес отправителя для рассылки из админки (process.env, KV, Cloudflare bindings). */
+export async function getResendConfig(): Promise<{ apiKey: string; fromEmail: string } | null> {
+  let apiKey = (process.env.RESEND_API_KEY ?? '').trim()
+  let fromEmail = (process.env.RESEND_FROM_EMAIL ?? '').trim() || DEFAULT_RESEND_FROM
+
+  try {
+    const { env } = await getCloudflareContext()
+    const e = env as Record<string, unknown>
+    const boundKey = e.RESEND_API_KEY
+    if (typeof boundKey === 'string' && boundKey.trim()) apiKey = boundKey.trim()
+    const boundFrom = e.RESEND_FROM_EMAIL
+    if (typeof boundFrom === 'string' && boundFrom.trim()) fromEmail = boundFrom.trim()
+  } catch {
+    /* не Cloudflare */
+  }
+
+  if (!apiKey) {
+    try {
+      const { env } = await getCloudflareContext()
+      const kv = (env as { ADMIN_CONFIG?: { get: (k: string) => Promise<string | null> } }).ADMIN_CONFIG
+      if (kv) {
+        const v = await kv.get('resend_api_key')
+        if (v?.trim()) apiKey = v.trim()
+        const fe = await kv.get('resend_from_email')
+        if (fe?.trim()) fromEmail = fe.trim()
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (!apiKey) return null
+  if (!fromEmail) fromEmail = DEFAULT_RESEND_FROM
+  return { apiKey, fromEmail }
+}
