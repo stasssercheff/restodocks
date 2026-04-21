@@ -324,45 +324,58 @@ class _InboxScreenState extends State<InboxScreen> {
       List<({Employee emp, DateTime birthdayDate, int daysUntil})> upcoming =
           [];
       if (currentEmployee != null && _canSeeNotifications(currentEmployee)) {
-        notifications =
-            await _inboxService.getDeletionNotifications(establishment.id);
-        birthdayChanges = await _inboxService
-            .getBirthdayChangeNotifications(establishment.id);
-        final screenPref = context.read<ScreenLayoutPreferenceService>();
-        final days = screenPref.birthdayNotifyDays;
-        if (days > 0) {
-          final employees = await accountManager
-              .getEmployeesForEstablishment(establishment.id);
-          final now = DateTime.now();
-          final today = DateTime(now.year, now.month, now.day);
-          for (final emp in employees) {
-            final b = emp.birthday;
-            if (b == null) continue;
-            final thisYear = DateTime(now.year, b.month, b.day);
-            if (thisYear == today) {
-              upcoming.add((emp: emp, birthdayDate: thisYear, daysUntil: 0));
-              continue;
-            }
-            for (var d = 1; d <= days; d++) {
-              final target = today.add(Duration(days: d));
-              if (thisYear.year == target.year &&
-                  thisYear.month == target.month &&
-                  thisYear.day == target.day) {
-                upcoming.add((emp: emp, birthdayDate: thisYear, daysUntil: d));
-                break;
+        try {
+          notifications =
+              await _inboxService.getDeletionNotifications(establishment.id);
+          birthdayChanges = await _inboxService
+              .getBirthdayChangeNotifications(establishment.id);
+          final screenPref = context.read<ScreenLayoutPreferenceService>();
+          final days = screenPref.birthdayNotifyDays;
+          if (days > 0) {
+            final employees = await accountManager
+                .getEmployeesForEstablishment(establishment.id);
+            final now = DateTime.now();
+            final today = DateTime(now.year, now.month, now.day);
+            for (final emp in employees) {
+              final b = emp.birthday;
+              if (b == null) continue;
+              final thisYear = DateTime(now.year, b.month, b.day);
+              if (thisYear == today) {
+                upcoming.add((emp: emp, birthdayDate: thisYear, daysUntil: 0));
+                continue;
+              }
+              for (var d = 1; d <= days; d++) {
+                final target = today.add(Duration(days: d));
+                if (thisYear.year == target.year &&
+                    thisYear.month == target.month &&
+                    thisYear.day == target.day) {
+                  upcoming
+                      .add((emp: emp, birthdayDate: thisYear, daysUntil: d));
+                  break;
+                }
               }
             }
           }
+        } catch (e) {
+          devLog('InboxScreen: notifications adjunct load failed: $e');
         }
       }
       int unreadMessages = 0;
       if (currentEmployee != null) {
-        final unreadMap = await context
-            .read<EmployeeMessageService>()
-            .getUnreadCountPerPartner(currentEmployee.id, establishment.id);
-        unreadMessages = unreadMap.values.fold(0, (a, b) => a + b);
+        try {
+          final unreadMap = await context
+              .read<EmployeeMessageService>()
+              .getUnreadCountPerPartner(currentEmployee.id, establishment.id);
+          unreadMessages = unreadMap.values.fold(0, (a, b) => a + b);
+        } catch (e) {
+          devLog('InboxScreen: unread count load failed: $e');
+        }
       }
-      await context.read<InboxViewedService>().getViewedIds(establishment.id);
+      try {
+        await context.read<InboxViewedService>().getViewedIds(establishment.id);
+      } catch (e) {
+        devLog('InboxScreen: viewed ids load failed: $e');
+      }
       if (mounted) {
         setState(() {
           _documents = enrichedDocs;

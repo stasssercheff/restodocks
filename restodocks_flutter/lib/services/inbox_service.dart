@@ -36,13 +36,27 @@ class InboxService {
   }
 
   Future<T> _withAuthRetry<T>(String tag, Future<T> Function() run) async {
+    final retryDelays = <Duration>[
+      const Duration(milliseconds: 250),
+      const Duration(milliseconds: 700),
+    ];
     try {
       return await run();
     } catch (e) {
       if (!_isAuthLikeError(e)) rethrow;
       devLog('InboxService: $tag auth-like error, retry after refresh');
       await _refreshSessionQuietly();
-      return await run();
+      for (var i = 0; i <= retryDelays.length; i++) {
+        try {
+          return await run();
+        } catch (e2) {
+          final canRetry = _isAuthLikeError(e2) && i < retryDelays.length;
+          if (!canRetry) rethrow;
+          await Future<void>.delayed(retryDelays[i]);
+          await _refreshSessionQuietly();
+        }
+      }
+      rethrow;
     }
   }
 
