@@ -67,7 +67,6 @@ class _InboxScreenState extends State<InboxScreen> {
       _upcomingBirthdays = [];
   int _unreadMessagesCount = 0;
   bool _loading = true;
-  String? _loadError;
   _InboxTab? _selectedTab;
   _InboxDeptTab? _selectedDeptTab;
   _InboxTypeTab? _selectedTypeTab;
@@ -273,7 +272,6 @@ class _InboxScreenState extends State<InboxScreen> {
       if (mounted) {
         setState(() {
           _loading = true;
-          _loadError = null;
         });
       }
       final currentEmployee = accountManager.currentEmployee;
@@ -384,21 +382,12 @@ class _InboxScreenState extends State<InboxScreen> {
           _upcomingBirthdays = upcoming;
           _unreadMessagesCount = unreadMessages;
           _loading = false;
-          _loadError = null;
         });
       }
     } catch (e) {
       devLog('Error loading inbox documents: $e');
       if (mounted) {
-        final loc = context.read<LocalizationService>();
-        final err = e is InboxLoadException
-            ? '${loc.t('error_short') ?? 'Ошибка'}: не загрузились источники: ${e.failedSources.join(', ')}'
-            : (loc.t('error_loading_data') ??
-                'Ошибка загрузки данных. Потяните вниз или нажмите обновить.');
-        setState(() {
-          _loading = false;
-          _loadError = err;
-        });
+        setState(() => _loading = false);
       }
     }
   }
@@ -698,8 +687,6 @@ class _InboxScreenState extends State<InboxScreen> {
                 ? _buildMessagesContent(loc)
                 : (_loading
                     ? const Center(child: CircularProgressIndicator())
-                    : _loadError != null
-                        ? _buildLoadErrorState(loc, _loadError!)
                     : _isNotificationsTab(isOwner)
                         ? _buildDeletionNotificationsList(loc)
                         : (isOwner
@@ -752,33 +739,6 @@ class _InboxScreenState extends State<InboxScreen> {
                 loc,
               ),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoadErrorState(LocalizationService loc, String errorText) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.error_outline,
-                size: 44, color: Theme.of(context).colorScheme.error),
-            const SizedBox(height: 12),
-            Text(
-              errorText,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: _loadDocuments,
-              icon: const Icon(Icons.refresh),
-              label: Text(loc.t('inbox_refresh') ?? 'Обновить'),
-            ),
           ],
         ),
       ),

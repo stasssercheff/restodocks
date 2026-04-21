@@ -2,15 +2,6 @@ import '../models/models.dart';
 import '../utils/dev_log.dart';
 import 'services.dart';
 
-class InboxLoadException implements Exception {
-  final List<String> failedSources;
-  InboxLoadException(this.failedSources);
-
-  @override
-  String toString() =>
-      'InboxLoadException: failed sources: ${failedSources.join(', ')}';
-}
-
 /// Сервис для работы с документами во входящих (инвентаризации — шефу и собственнику).
 class InboxService {
   final SupabaseService _supabase;
@@ -60,17 +51,11 @@ class InboxService {
     }
   }
 
-  Future<T> _safe<T>(
-    String tag,
-    Future<T> Function() run,
-    T fallback,
-    List<String> failedSources,
-  ) async {
+  Future<T> _safe<T>(String tag, Future<T> Function() run, T fallback) async {
     try {
       return await _withAuthRetry(tag, run);
     } catch (e) {
       devLog('InboxService: $tag failed: $e');
-      failedSources.add(tag);
       return fallback;
     }
   }
@@ -82,7 +67,6 @@ class InboxService {
     if (currentEmployee == null) return documents;
 
     try {
-      final failedSources = <String>[];
       final docService = InventoryDocumentService();
       final isOwnerOrMgmt = currentEmployee.hasRole('owner') || currentEmployee.department == 'management';
       final isChefOrOwner = currentEmployee.hasRole('executive_chef') || currentEmployee.hasRole('sous_chef') || isOwnerOrMgmt;
@@ -140,21 +124,18 @@ class InboxService {
 
       final results = await Future.wait([
         _safe<List<Map<String, dynamic>>>(
-            'inventory', () async => await inventoryFuture, <Map<String, dynamic>>[], failedSources),
+            'inventory', () async => await inventoryFuture, <Map<String, dynamic>>[]),
         _safe<List<dynamic>>(
-            'checklist_submissions', () async => await checklistFuture, <dynamic>[], failedSources),
+            'checklist_submissions', () async => await checklistFuture, <dynamic>[]),
         _safe<List<dynamic>>(
-            'checklist_missed', () async => await missedFuture, <dynamic>[], failedSources),
+            'checklist_missed', () async => await missedFuture, <dynamic>[]),
         _safe<List<Map<String, dynamic>>>(
-            'orders', () async => await ordersFuture, <Map<String, dynamic>>[], failedSources),
+            'orders', () async => await ordersFuture, <Map<String, dynamic>>[]),
         _safe<List<Map<String, dynamic>>>(
-            'procurement_receipts', () async => await receiptsFuture, <Map<String, dynamic>>[], failedSources),
+            'procurement_receipts', () async => await receiptsFuture, <Map<String, dynamic>>[]),
         _safe<List<Map<String, dynamic>>>(
-            'price_approvals', () async => await priceApprovalFuture, <Map<String, dynamic>>[], failedSources),
+            'price_approvals', () async => await priceApprovalFuture, <Map<String, dynamic>>[]),
       ]);
-      if (failedSources.isNotEmpty) {
-        throw InboxLoadException(failedSources);
-      }
       final rawList = results[0] as List<Map<String, dynamic>>;
       final subList = results[1] as List<dynamic>;
       final missed = results[2] as List<dynamic>;
@@ -440,7 +421,7 @@ class InboxService {
       return documents;
     } catch (e) {
       devLog('Error loading inbox documents: $e');
-      rethrow;
+      return [];
     }
   }
 
