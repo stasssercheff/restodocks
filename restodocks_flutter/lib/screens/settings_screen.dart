@@ -977,14 +977,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     unawaited(localization.showLocalePickerDialog(
       context,
       afterApplied: (code) async {
-        scheduleMicrotask(() async {
-          if (!context.mounted) return;
-          await context
-              .read<AccountManagerSupabase>()
-              .savePreferredLanguage(code);
-          if (!context.mounted) return;
-          _translateMissingForLanguage(context, code);
-        });
+        if (!context.mounted) return;
+        await context.read<AccountManagerSupabase>().savePreferredLanguage(code);
+        if (!context.mounted) return;
+        _translateMissingForLanguage(context, code);
       },
     ));
   }
