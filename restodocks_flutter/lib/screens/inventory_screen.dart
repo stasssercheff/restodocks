@@ -1109,10 +1109,21 @@ class _InventoryScreenState extends State<InventoryScreen>
           } catch (_) {}
         }
         // Второй шанс после refreshSession/временных сетевых сбоев.
-        await loadCatalogAndNomenclature();
+        try {
+          await loadCatalogAndNomenclature();
+        } catch (e2) {
+          // Не роняем Continue: используем то, что уже есть в памяти.
+          devLog('⚠️ Inventory: _loadNomenclature retry failed: $e2');
+        }
       }
 
-      final techCards = await techCardSvc.getTechCardsForEstablishment(estId);
+      List<TechCard> techCards = const <TechCard>[];
+      try {
+        techCards = await techCardSvc.getTechCardsForEstablishment(estId);
+      } catch (e) {
+        // ТТК не должны блокировать открытие бланка инвентаризации.
+        devLog('⚠️ Inventory: getTechCardsForEstablishment failed: $e');
+      }
       if (!mounted) return;
       var products = store.getNomenclatureProducts(estId);
       if (products.isEmpty && fillAllProducts && _rows.isEmpty) {
@@ -1129,6 +1140,13 @@ class _InventoryScreenState extends State<InventoryScreen>
           devLog(
               '⚠️ Inventory: using catalog fallback (${products.length}) while nomenclature is empty');
         }
+      }
+      // Для восстановленного черновика с productId: даже если номенклатура пуста,
+      // пробуем резолвить строки из полного каталога, чтобы не показывать пустые имена.
+      if (products.isEmpty &&
+          _rows.any((r) => (r.productId?.isNotEmpty ?? false)) &&
+          store.allProducts.isNotEmpty) {
+        products = List<Product>.from(store.allProducts);
       }
       final pfOnly = techCards.where((tc) => tc.isSemiFinished).toList();
       if (!mounted) return;
