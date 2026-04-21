@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 import '../../core/subscription_entitlements.dart';
 import '../../services/services.dart';
@@ -74,6 +76,48 @@ class _InboxScreenState extends State<InboxScreen> {
   final GlobalKey<_MessagesContentState> _messagesContentKey = GlobalKey();
   GoRouter? _goRouter;
   VoidCallback? _routeListener;
+
+  String _inboxCacheKey(String estId, String? employeeId) =>
+      'inbox_cache:$estId:${employeeId ?? 'anon'}';
+
+  Future<void> _saveInboxCache(
+    String estId,
+    String? employeeId,
+    List<InboxDocument> docs,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final payload = docs.map((d) => d.toJson()).toList();
+      await prefs.setString(_inboxCacheKey(estId, employeeId), jsonEncode(payload));
+    } catch (e) {
+      devLog('InboxScreen: save cache failed: $e');
+    }
+  }
+
+  Future<List<InboxDocument>> _loadInboxCache(
+    String estId,
+    String? employeeId,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_inboxCacheKey(estId, employeeId));
+      if (raw == null || raw.isEmpty) return <InboxDocument>[];
+      final arr = jsonDecode(raw);
+      if (arr is! List) return <InboxDocument>[];
+      final out = <InboxDocument>[];
+      for (final item in arr) {
+        if (item is Map<String, dynamic>) {
+          out.add(InboxDocument.fromJson(item));
+        } else if (item is Map) {
+          out.add(InboxDocument.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+      return out;
+    } catch (e) {
+      devLog('InboxScreen: load cache failed: $e');
+      return <InboxDocument>[];
+    }
+  }
 
   @override
   void initState() {
@@ -387,10 +431,28 @@ class _InboxScreenState extends State<InboxScreen> {
           _loadError = null;
         });
       }
+      await _saveInboxCache(
+        establishment.id,
+        currentEmployee?.id,
+        enrichedDocs,
+      );
     } catch (e) {
       devLog('Error loading inbox documents: $e');
       if (mounted) {
         final loc = context.read<LocalizationService>();
+        final account = context.read<AccountManagerSupabase>();
+        final cached = await _loadInboxCache(
+          establishment.id,
+          account.currentEmployee?.id,
+        );
+        if (cached.isNotEmpty) {
+          setState(() {
+            _documents = cached;
+            _loading = false;
+            _loadError = null;
+          });
+          return;
+        }
         final err = e is InboxLoadException
             ? '${loc.t('error_short') ?? 'Ошибка'}: не загрузились источники: ${e.failedSources.join(', ')}'
             : (loc.t('error_loading_data') ??
