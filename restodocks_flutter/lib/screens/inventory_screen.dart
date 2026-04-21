@@ -226,6 +226,33 @@ bool _inventoryDraftSnapshotHasRows(Map<String, dynamic>? d) {
   return rows is List && rows.isNotEmpty;
 }
 
+/// Строки с привязкой к номенклатуре / свободным названиям или ненулевыми количествами.
+int _inventoryDraftMeaningfulRowCount(Map<String, dynamic>? d) {
+  if (d == null || d.isEmpty) return 0;
+  final rows = d['rows'];
+  if (rows is! List) return 0;
+  var n = 0;
+  for (final raw in rows) {
+    if (raw is! Map) continue;
+    final m = Map<String, dynamic>.from(raw);
+    final pid = m['productId']?.toString().trim() ?? '';
+    final tid = m['techCardId']?.toString().trim() ?? '';
+    final fn = m['freeName']?.toString().trim() ?? '';
+    var hasQty = false;
+    final qty = m['quantities'];
+    if (qty is List) {
+      for (final q in qty) {
+        if (q is num && q > 0) {
+          hasQty = true;
+          break;
+        }
+      }
+    }
+    if (pid.isNotEmpty || tid.isNotEmpty || fn.isNotEmpty || hasQty) n++;
+  }
+  return n;
+}
+
 DateTime? _inventoryDraftSavedAt(Map<String, dynamic>? d) {
   if (d == null || d.isEmpty) return null;
   final raw = d['draftSavedAt']?.toString().trim();
@@ -242,6 +269,9 @@ Map<String, dynamic>? _pickNewerInventoryDraft(
   if (!localOk && !serverOk) return null;
   if (localOk && !serverOk) return local;
   if (!localOk && serverOk) return server;
+  final lc = _inventoryDraftMeaningfulRowCount(local);
+  final sc = _inventoryDraftMeaningfulRowCount(server);
+  if (lc != sc) return lc > sc ? local : server;
   final localAt = _inventoryDraftSavedAt(local);
   final serverAt = _inventoryDraftSavedAt(server);
   if (localAt == null && serverAt == null) return local;
@@ -960,10 +990,19 @@ class _InventoryScreenState extends State<InventoryScreen>
         if (!mounted) return;
         final serverStd = await _loadDraftFromServer();
         if (!mounted) return;
-        final preferredStdDraft = _pickNewerInventoryDraft(
+        var preferredStdDraft = _pickNewerInventoryDraft(
           _pickNewerInventoryDraft(resolvedStdDraft, savedDraft),
           serverStd,
         );
+        if (preferredStdDraft == null && hasStdDraft) {
+          if (_inventoryDraftSnapshotHasRows(resolvedStdDraft)) {
+            preferredStdDraft = resolvedStdDraft;
+          } else if (_inventoryDraftSnapshotHasRows(savedDraft)) {
+            preferredStdDraft = savedDraft;
+          } else if (_inventoryDraftSnapshotHasRows(serverStd)) {
+            preferredStdDraft = serverStd;
+          }
+        }
         if (preferredStdDraft != null) {
           _stateRestored = false;
           await restoreState(preferredStdDraft);
@@ -979,10 +1018,19 @@ class _InventoryScreenState extends State<InventoryScreen>
         if (!mounted) return;
         final serverSel = await _loadSelectiveDraftFromServer();
         if (!mounted) return;
-        final preferredSelectiveDraft = _pickNewerInventoryDraft(
+        var preferredSelectiveDraft = _pickNewerInventoryDraft(
           _pickNewerInventoryDraft(resolvedSelectiveDraft, savedDraft),
           serverSel,
         );
+        if (preferredSelectiveDraft == null && hasSelectiveDraft) {
+          if (_inventoryDraftSnapshotHasRows(resolvedSelectiveDraft)) {
+            preferredSelectiveDraft = resolvedSelectiveDraft;
+          } else if (_inventoryDraftSnapshotHasRows(savedDraft)) {
+            preferredSelectiveDraft = savedDraft;
+          } else if (_inventoryDraftSnapshotHasRows(serverSel)) {
+            preferredSelectiveDraft = serverSel;
+          }
+        }
         if (preferredSelectiveDraft != null) {
           _stateRestored = false;
           await restoreState(preferredSelectiveDraft);

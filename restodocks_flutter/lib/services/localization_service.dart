@@ -331,20 +331,47 @@ class LocalizationService extends ChangeNotifier {
 
   /// Согласовать [serverLanguageCode] из профиля сотрудника с текущей локалью.
   ///
-  /// Источник истины — `employees.preferred_language` на сервере.
-  /// Локальные prefs используются только как кэш между перезапусками до загрузки профиля.
+  /// По умолчанию источник истины — `employees.preferred_language` на сервере.
+  /// Если пользователь явно выбрал язык на устройстве ([prefsKeyLocaleUserSet]),
+  /// не откатываем интерфейс на устаревшее значение из профиля (часто `ru` по умолчанию
+  /// в JSON при пустой колонке) — держим локаль из prefs и догоняем сервер через
+  /// [onPinnedLocaleNeedsServerSync].
   Future<void> reconcileServerPreferredLanguage(String serverLanguageCode) async {
     final p = serverLanguageCode.trim().toLowerCase();
     if (!supportedLocales.any((l) => l.languageCode == p)) return;
 
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final userPinned = prefs.getBool(prefsKeyLocaleUserSet) ?? false;
+      final deviceCode = prefs.getString(prefsKeyLocale)?.trim().toLowerCase();
+
+      if (userPinned &&
+          deviceCode != null &&
+          deviceCode.isNotEmpty &&
+          deviceCode != p &&
+          supportedLocales.any((l) => l.languageCode == deviceCode)) {
+        if (currentLanguageCode != deviceCode) {
+          await setLocale(Locale(deviceCode));
+        }
+        final sync = onPinnedLocaleNeedsServerSync;
+        if (sync != null) {
+          unawaited(
+            Future<void>(() async {
+              try {
+                await sync(deviceCode);
+              } catch (e, st) {
+                devLog('onPinnedLocaleNeedsServerSync: $e $st');
+              }
+            }),
+          );
+        }
+        return;
+      }
+
       if (currentLanguageCode != p) {
         await setLocale(Locale(p));
       }
-      // После согласования с профилем убираем device pin: на новых устройствах/браузерах
-      // язык должен однозначно браться из аккаунта.
       try {
-        final prefs = await SharedPreferences.getInstance();
         await prefs.remove(prefsKeyLocaleUserSet);
       } catch (_) {}
     } catch (e, st) {
